@@ -5,6 +5,7 @@ import {
   type CardId,
   type Graph,
   type GraphId,
+  type PerComputedView,
   type UUID,
 } from '@project/core';
 import {
@@ -338,8 +339,15 @@ const freshEmptyGraph: ViewGraphPolicy = (_space, subject) => [
  * ids and what happens when a plugin is missing are undecided — and a seam
  * exposed before either question is answered would be a guess. Two definitions
  * behind one internal shape is enough to keep the shape honest.
+ *
+ * `PerComputedView` is what closes it: one definition per id `core` ships, held
+ * to that count by the compiler. Everything below reads this registry by id and
+ * refuses an id it does not hold, so an id shipped without a definition here is
+ * a Space View that resolves nowhere — and `canvas-renderers.ts` would throw
+ * building its row list at module scope, taking the application down at import.
+ * That failure has to be a compile error, and this is where it is one.
  */
-const COMPUTED_VIEWS: readonly ComputedViewDefinition[] = [
+const COMPUTED_VIEWS: PerComputedView<ComputedViewDefinition> = [
   {
     id: FLOW_SPACE_VIEW_ID,
     title: 'Flow',
@@ -364,6 +372,11 @@ const COMPUTED_VIEWS: readonly ComputedViewDefinition[] = [
  * title for each, where `ResolvedViewRenderer.title` answers only for the View
  * currently drawing. Titles stay defined once, beside the strategy and subject
  * they belong to.
+ *
+ * It throws for an id the registry does not hold, which every Computed View id
+ * `core` ships does — the registry is declared `PerComputedView`, so one that
+ * did not could not have compiled. The refusal is for a caller that made an id
+ * up, not for a View that was forgotten.
  */
 export const computedViewTitle = (id: UUID): string => {
   const definition = COMPUTED_VIEWS.find((view) => view.id === id);

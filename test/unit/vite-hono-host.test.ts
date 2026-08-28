@@ -13,7 +13,11 @@ import {
   type SpaceSnapshot,
 } from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
-import { encodeCommitRequest, type SpaceResourceRepository } from '@project/persistence';
+import {
+  decodeProblemDetails,
+  encodeCommitRequest,
+  type SpaceResourceRepository,
+} from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';
@@ -179,15 +183,20 @@ describe('Vite Hono host', () => {
     await expect(response.text()).resolves.toBe('<main>Vite application</main>');
   });
 
-  it('redirects root to the compact Entry Space URL before Vite fallback', async () => {
+  it('redirects root to the compact Entry Space URL without reading its document', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID));
-    const { host } = await startHost(hostApp);
+    const spaceRepository = new MemorySpaceRepository([stored], SPACE_ID);
+    const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
+    const { host } = await startHost(createSpaceHost(spaceRepository));
 
     const response = await fetch(`${host.url}/`, { redirect: 'manual' });
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
+    // The redirect target's first act is to load this Space, and the id came
+    // from the row that holds it — so loading it here to prove it exists is a
+    // read the answer never depended on.
+    expect(loadSpace).not.toHaveBeenCalled();
   });
 
   it('answers malformed and unresolved Space URLs before Vite fallback', async () => {
@@ -201,6 +210,34 @@ describe('Vite Hono host', () => {
       fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`).then((value) => value.status),
     ).resolves.toBe(404);
     await expect(fetch(`${host.url}/`).then((value) => value.status)).resolves.toBe(404);
+  });
+
+  it('serves product failures as Problem Details or a browser error surface', async () => {
+    const { host } = await startHost(createSpaceHost(new MemorySpaceRepository()));
+    const path = `/spaces/${encodeCompactUuid(SPACE_ID)}`;
+
+    const protocol = await fetch(`${host.url}${path}`, {
+      headers: { Accept: 'application/problem+json' },
+    });
+    expect(protocol.status).toBe(404);
+    expect(protocol.headers.get('content-type')).toBe('application/problem+json');
+    expect(decodeProblemDetails(await protocol.json())).toMatchObject({
+      status: 404,
+      title: 'Not found',
+    });
+
+    const browser = await fetch(`${host.url}${path}`, { headers: { Accept: 'text/html' } });
+    expect(browser.status).toBe(404);
+    expect(browser.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    await expect(browser.text()).resolves.toContain('<h1>Not found</h1>');
+
+    const head = await fetch(`${host.url}${path}`, {
+      method: 'HEAD',
+      headers: { Accept: 'text/html' },
+    });
+    expect(head.status).toBe(404);
+    expect(head.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    await expect(head.text()).resolves.toBe('');
   });
 
   it('lets an existing canonical Space URL reach the SPA fallback', async () => {
@@ -279,6 +316,82 @@ describe('Vite Hono host', () => {
     });
     expect(existing.status).toBe(200);
     await expect(existing.text()).resolves.toBe('');
+  });
+
+  /**
+   * A stored Layout carrying an available Computed View's id. Intake rejects
+   * one, so this is a document that reached storage some other way, and the
+   * address then names two Space Views with no rule to choose between them (ADR
+   * 0069). The fault is in what the host holds rather than in what was asked,
+   * which is the difference between this and the 404 beside it.
+   */
+  it('answers a Space View identity collision as a server fault', async () => {
+    const collided = {
+      snapshot: {
+        ...snapshot,
+        document: {
+          ...snapshot.document,
+          layouts: [
+            {
+              id: FLOW_SPACE_VIEW_ID,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              graphs: [],
+            },
+          ],
+        },
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const { host } = await startHost(createSpaceHost(new MemorySpaceRepository([collided])));
+
+    const response = await fetch(
+      `${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.text()).resolves.toContain(FLOW_SPACE_VIEW_ID);
+  });
+
+  /**
+   * A product URL is a web address and carries real HTTP semantics (ADR 0069),
+   * so a method the contract does not serve is answered rather than handed to
+   * the SPA fallback — which was returning the whole application shell with a
+   * 200 for the very URL GET answers 400.
+   *
+   * The same shape as `unservedContractPath` gives the API tree: the identity
+   * is judged first, so a segment that is not a compact id is the 400 GET says
+   * about that URL for every method, and only a readable address gets the 405
+   * and its `Allow`.
+   */
+  it('refuses a method the product contract does not serve', async () => {
+    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    const spaceRepository = new MemorySpaceRepository([stored], SPACE_ID);
+    const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
+    const { host } = await startHost(createSpaceHost(spaceRepository), (_request, response) => {
+      response.setHeader('Content-Type', 'text/html');
+      response.end('<main>Vite fallback</main>');
+    });
+
+    const posted = await fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`, {
+      method: 'POST',
+    });
+    expect(posted.status).toBe(405);
+    expect(posted.headers.get('allow')).toBe('GET, HEAD');
+    // Answered on the address alone: whether the Space exists cannot change it.
+    expect(loadSpace).not.toHaveBeenCalled();
+
+    const root = await fetch(`${host.url}/`, { method: 'DELETE' });
+    expect(root.status).toBe(405);
+
+    const malformed = await fetch(`${host.url}/spaces/not-canonical`, { method: 'POST' });
+    expect(malformed.status).toBe(400);
+
+    const outside = await fetch(`${host.url}/index.html`, { method: 'POST' });
+    expect(outside.status).toBe(200);
+    await expect(outside.text()).resolves.toBe('<main>Vite fallback</main>');
   });
 
   it('serves the API from the built runtime and leaves the rest to preview static assets', async () => {

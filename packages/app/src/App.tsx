@@ -2,11 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { ReactFlowProvider } from '@xyflow/react';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { type Card, type CardId, type GraphId, type LayoutPosition } from '@project/core';
-import {
-  productDestinationPath,
-  resolveProductDestinationInSnapshot,
-  type ProductDestination,
-} from '@project/http';
+import { productDestinationPath, type ProductDestination } from '@project/http';
 import { graphCardIds } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { composeApp, openingPlacement } from './compose-app';
@@ -18,11 +14,13 @@ import { canvasContent } from './canvas-content';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { canRetreat } from './navigation';
+import { copyLink } from './clipboard';
 import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
 import { activeGraphColor } from './colors';
 import type { CanvasRendererId } from './renderer';
-import { destinationOpening } from './destination-opening';
+import type { DestinationOpening } from './destination-opening';
+import { adoptedRendererDestination, destinationRestoration } from './destination-coordination';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CardDestinationFocus } from './components/CardDestinationFocus';
@@ -34,13 +32,7 @@ import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
 import { SelectedCanvasRenderer, SpaceSidebar } from './components/SpaceSidebar';
 
-export const createApp = (
-  { spaceSession }: OpenedSpace,
-  selection?: CanvasRendererId,
-  destinationCardId?: CardId,
-  destinationGraphId?: GraphId,
-  destinationPresentationCardId?: CardId,
-) => {
+export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOpening) => {
   // What an opened Space is composed of, stated once (`compose-app.ts`): one
   // working-space reader every collaborator shares, one renderer resolver, and
   // the order the six of them have to be built in.
@@ -52,15 +44,17 @@ export const createApp = (
     authoring,
     adapter: useRenderAdapter,
     edgeAuthoring,
-  } = composeApp({ spaceSession, selection });
-  if (destinationGraphId !== undefined && destinationPresentationCardId !== undefined) {
+  } = composeApp({ spaceSession, selection: opening?.selection });
+  const openingGraphId = opening?.graphId ?? null;
+  const openingPresentationCardId = opening?.presentationCardId ?? null;
+  if (openingGraphId !== null && openingPresentationCardId !== null) {
     navigation.openPresentation(
       navigation.getState().selectedRenderer,
-      destinationGraphId,
-      destinationPresentationCardId,
+      openingGraphId,
+      openingPresentationCardId,
     );
-  } else if (destinationGraphId !== undefined) {
-    navigation.openGraph(navigation.getState().selectedRenderer, destinationGraphId);
+  } else if (openingGraphId !== null) {
+    navigation.openGraph(navigation.getState().selectedRenderer, openingGraphId);
   }
 
   function App() {
@@ -76,12 +70,19 @@ export const createApp = (
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
-    const [addressedCardId, setAddressedCardId] = useState<CardId | null>(
-      destinationCardId ?? null,
-    );
+    const [addressedCardId, setAddressedCardId] = useState<CardId | null>(opening?.cardId ?? null);
+    // Keyed on the renderer as well as the Card: `installCanvasRenderer` clears
+    // the published selection, and moving between two Space Views that address
+    // the *same* Card leaves `addressedCardId` untouched, so keying on the Card
+    // alone would let React bail out and never restore it. Clearing on `null` is
+    // the other half — an address that stops naming a Card must stop selecting
+    // one, or the Sidebar keeps offering copy commands for a Card the URL has
+    // left behind.
     useEffect(() => {
-      if (addressedCardId !== null) useRenderAdapter.getState().selectCard(addressedCardId);
-    }, [addressedCardId]);
+      const adapter = useRenderAdapter.getState();
+      if (addressedCardId === null) adapter.clearSelection();
+      else adapter.selectCard(addressedCardId);
+    }, [addressedCardId, selectedRenderer]);
     /**
      * Whether a Card's content edit is running, reported up by the canvas.
      *
@@ -94,12 +95,19 @@ export const createApp = (
     const [editingCardBody, setEditingCardBody] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
+    const [destinationNotFound, setDestinationNotFound] = useState(false);
+    const syncDestination = useCallback(
+      (method: 'push' | 'replace', destination: ProductDestination): void => {
+        const path = productDestinationPath(destination);
+        if (method === 'push') window.history.pushState(null, '', path);
+        else window.history.replaceState(null, '', path);
+      },
+      [],
+    );
     const copyProductDestination = useCallback((destination: ProductDestination) => {
       const path = productDestinationPath(destination);
       setClipboardFailure(null);
-      void navigator.clipboard
-        .writeText(new URL(path, window.location.href).href)
-        .catch(() => setClipboardFailure('The browser refused clipboard access.'));
+      void copyLink(new URL(path, window.location.href).href).then(setClipboardFailure);
     }, []);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
@@ -125,6 +133,19 @@ export const createApp = (
     );
 
     const { activeGraphId, openedCardId } = navigationState;
+    const previousRenderer = useRef(selectedRenderer);
+    useEffect(() => {
+      if (previousRenderer.current === selectedRenderer) return;
+      previousRenderer.current = selectedRenderer;
+
+      const destination = adoptedRendererDestination(
+        currentSpace(),
+        spaceSession.getState().working,
+        window.location.pathname,
+        selectedRenderer,
+      );
+      if (destination !== null) syncDestination('push', destination);
+    }, [selectedRenderer, syncDestination]);
     const editorGraphColor = activeGraphColor(projection.colors, activeGraphId);
     const openCard = navigation.openCard;
     const closeCard = navigation.closeCard;
@@ -162,6 +183,24 @@ export const createApp = (
     const selectedCardId = selectedCardOf(selection);
     const selectedCard =
       selectedCardId === null ? undefined : rendererSpace.lookup.card(selectedCardId);
+
+    /**
+     * Whether the selected Card has a contextual address in this Space View.
+     *
+     * A Layout's members *are* its position keys (ADR 0040). Cards outside them
+     * remain available in the Sidebar Cards collection, but have no contextual
+     * address in that Layout.
+     */
+    const contextualCardLink =
+      selectedCard === undefined ||
+      renderer.kind !== 'layout' ||
+      renderer.resolvedLayout.layout.positions[selectedCard.id] !== undefined;
+    const cardsOutsideSelectedLayout =
+      renderer.kind === 'layout'
+        ? rendererSpace.cards.filter(
+            (card) => renderer.resolvedLayout.layout.positions[card.id] === undefined,
+          )
+        : [];
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
@@ -230,22 +269,31 @@ export const createApp = (
       useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
     }, []);
 
+    /**
+     * Choosing a Space View row, including the row already current.
+     *
+     * The repeated choice is not a no-op and must not be skipped here:
+     * `navigation.selectRenderer` publishes `openedCardId: null` and
+     * `mode: 'overview'`, so choosing the current row is how an author closes an
+     * open Card or leaves a presentation. What the repeat may not do is *push* —
+     * the destination has not changed, and a pushed entry would make Back a
+     * no-op. It still replaces, because the address it is leaving may be a
+     * narrower destination in this same Space View (a Card, a Graph, a
+     * presentation point) that Navigation has just cleared.
+     */
     const selectCanvasRenderer = useCallback(
       (selection: CanvasRendererId) => {
-        if (navigation.getState().selectedRenderer === selection) return;
+        const moves = navigation.getState().selectedRenderer !== selection;
         setAddressedCardId(null);
         installCanvasRenderer(selection);
-        window.history.pushState(
-          null,
-          '',
-          productDestinationPath({
-            kind: 'space-view',
-            spaceId: currentSpace().id,
-            spaceViewId: selection,
-          }),
-        );
+        const destination: ProductDestination = {
+          kind: 'space-view',
+          spaceId: currentSpace().id,
+          spaceViewId: selection,
+        };
+        syncDestination(moves ? 'push' : 'replace', destination);
       },
-      [installCanvasRenderer],
+      [installCanvasRenderer, syncDestination],
     );
 
     const installGraphRenderer = useCallback((selection: CanvasRendererId, graphId: GraphId) => {
@@ -270,19 +318,15 @@ export const createApp = (
     const pushPresentationCard = useCallback(
       (cardId: CardId) => {
         if (activeGraphId === null) return;
-        window.history.pushState(
-          null,
-          '',
-          productDestinationPath({
-            kind: 'presentation',
-            spaceId: currentSpace().id,
-            spaceViewId: selectedRenderer,
-            graphId: activeGraphId,
-            cardId,
-          }),
-        );
+        syncDestination('push', {
+          kind: 'presentation',
+          spaceId: currentSpace().id,
+          spaceViewId: selectedRenderer,
+          graphId: activeGraphId,
+          cardId,
+        });
       },
-      [activeGraphId, selectedRenderer],
+      [activeGraphId, selectedRenderer, syncDestination],
     );
 
     const present = useCallback(() => {
@@ -292,62 +336,80 @@ export const createApp = (
     }, [pushPresentationCard]);
 
     const advance = useCallback(() => {
-      const before = navigation.activeCardId();
+      const before = navigation.getState();
+      const beforeLength = before.mode === 'presenting' ? before.traversalHistory.length : 0;
       navigation.advance();
-      const after = navigation.activeCardId();
-      if (after !== null && after !== before) pushPresentationCard(after);
+      const after = navigation.getState();
+      const cardId = navigation.activeCardId();
+      if (
+        cardId !== null &&
+        after.mode === 'presenting' &&
+        after.traversalHistory.length > beforeLength
+      ) {
+        pushPresentationCard(cardId);
+      }
     }, [pushPresentationCard]);
 
     const retreat = useCallback(() => {
-      const before = navigation.activeCardId();
+      const before = navigation.getState();
+      const beforeLength = before.mode === 'presenting' ? before.traversalHistory.length : 0;
       navigation.retreat();
-      const after = navigation.activeCardId();
-      if (after !== null && after !== before) pushPresentationCard(after);
+      const after = navigation.getState();
+      const cardId = navigation.activeCardId();
+      if (
+        cardId !== null &&
+        after.mode === 'presenting' &&
+        after.traversalHistory.length < beforeLength
+      ) {
+        pushPresentationCard(cardId);
+      }
     }, [pushPresentationCard]);
 
     const exitPresenting = useCallback(() => {
       navigation.exitPresenting();
       if (activeGraphId === null) return;
-      window.history.pushState(
-        null,
-        '',
-        productDestinationPath({
+      syncDestination('push', {
+        kind: 'space-view-graph',
+        spaceId: currentSpace().id,
+        spaceViewId: selectedRenderer,
+        graphId: activeGraphId,
+      });
+    }, [activeGraphId, selectedRenderer, syncDestination]);
+
+    // Same rule as `selectCanvasRenderer`, for the same reason: activating the
+    // Graph that is already active publishes `mode: 'overview'`, which is how
+    // the Graph row leaves a presentation, so the call may not be skipped — only
+    // the history entry may.
+    const activateGraph = useCallback(
+      (graphId: GraphId) => {
+        const moves = navigation.getState().activeGraphId !== graphId;
+        setAddressedCardId(null);
+        navigation.activateGraph(graphId);
+        const destination: ProductDestination = {
           kind: 'space-view-graph',
           spaceId: currentSpace().id,
           spaceViewId: selectedRenderer,
-          graphId: activeGraphId,
-        }),
-      );
-    }, [activeGraphId, selectedRenderer]);
-
-    const activateGraph = useCallback(
-      (graphId: GraphId) => {
-        if (navigation.getState().activeGraphId === graphId) return;
-        setAddressedCardId(null);
-        navigation.activateGraph(graphId);
-        window.history.pushState(
-          null,
-          '',
-          productDestinationPath({
-            kind: 'space-view-graph',
-            spaceId: currentSpace().id,
-            spaceViewId: selectedRenderer,
-            graphId,
-          }),
-        );
+          graphId,
+        };
+        syncDestination(moves ? 'push' : 'replace', destination);
       },
-      [selectedRenderer],
+      [selectedRenderer, syncDestination],
     );
 
     useEffect(() => {
       const restoreDestination = () => {
         const space = currentSpace();
-        const resolution = resolveProductDestinationInSnapshot(
+        const restoration = destinationRestoration(
+          space,
           spaceSession.getState().working,
           window.location.pathname,
         );
-        if (resolution.kind !== 'resolved') return;
-        const opening = destinationOpening(space, resolution.destination);
+        if (restoration.kind !== 'opening') {
+          setDestinationNotFound(restoration.kind === 'not-found');
+          return;
+        }
+        setDestinationNotFound(false);
+        const { opening } = restoration;
         if (opening.graphId === null) installCanvasRenderer(opening.selection);
         else if (opening.presentationCardId === null) {
           installGraphRenderer(opening.selection, opening.graphId);
@@ -695,6 +757,11 @@ export const createApp = (
           state: sessionState.persistence.kind,
           acknowledgedRevision: sessionState.acknowledgedRevision,
         }}
+        cardsCollection={
+          renderer.kind === 'layout'
+            ? { cards: cardsOutsideSelectedLayout, revealedCardId: addressedCardId }
+            : undefined
+        }
         cardLinks={
           selectedCard === undefined
             ? undefined
@@ -706,13 +773,24 @@ export const createApp = (
                     spaceId: rendererSpace.id,
                     cardId: selectedCard.id,
                   }),
-                onCopyContextual: () =>
-                  copyProductDestination({
-                    kind: 'space-view-card',
-                    spaceId: rendererSpace.id,
-                    spaceViewId: selectedRenderer,
-                    cardId: selectedCard.id,
-                  }),
+                /**
+                 * Offered only for a Card this Space View actually holds.
+                 *
+                 * A selected Card revealed in the Cards collection is not
+                 * necessarily a member of the Layout. `space-view-card` resolves
+                 * against `layout.positions`, so a contextual link to it is one
+                 * the host answers 404 for. There is no such thing for a Computed
+                 * View, whose subject is the whole Space.
+                 */
+                onCopyContextual: contextualCardLink
+                  ? () =>
+                      copyProductDestination({
+                        kind: 'space-view-card',
+                        spaceId: rendererSpace.id,
+                        spaceViewId: selectedRenderer,
+                        cardId: selectedCard.id,
+                      })
+                  : undefined,
               }
         }
       />
@@ -731,6 +809,15 @@ export const createApp = (
                 <AlertDescription>{clipboardFailure}</AlertDescription>
               </Alert>
             )}
+            {destinationNotFound ? (
+              <Alert variant="destructive">
+                <AlertIcon />
+                <AlertTitle>Destination not found</AlertTitle>
+                <AlertDescription>
+                  The requested address does not exist in this Space.
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <PersistenceNotice
               persistence={sessionState.persistence}
               onRetry={authoring.retryPersistence}

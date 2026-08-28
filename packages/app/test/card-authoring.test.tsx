@@ -1,6 +1,12 @@
 import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  encodeCompactUuid,
+  FLOW_SPACE_VIEW_ID,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { mountSpaceApp } from '../src/SpaceApp';
@@ -50,6 +56,25 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
     { id: OTHER_CARD_ID, document: { title: 'B', kind: 'markdown', body: 'B source' } },
   ],
+});
+
+const selfEdge: SpaceSnapshot = spaceSnapshotSchema.parse({
+  id: SPACE_ID,
+  document: {
+    version: 1,
+    title: 'Space',
+    defaultRenderer: LAYOUT_ID,
+    layouts: [
+      {
+        id: LAYOUT_ID,
+        title: 'Layout',
+        kind: 'positioned',
+        positions: { [CARD_ID]: { x: 10, y: 20, open: false } },
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: CARD_ID }] }],
+      },
+    ],
+  },
+  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } }],
 });
 
 /**
@@ -192,6 +217,11 @@ describe('presenting after a conversion', () => {
   });
 
   it('offers no Present action while the converted Layout’s Graph is empty', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+    );
     const session = mount(noLayouts);
     // Nothing to present before the conversion either: a Space with no Layouts
     // has no Graphs at all, so there is no Active Graph.
@@ -209,6 +239,13 @@ describe('presenting after a conversion', () => {
         expect.objectContaining({ edges: [] }),
       ]),
     );
+    const layoutId = session.getState().working.document.layouts?.[0]?.id;
+    expect(layoutId).toBeDefined();
+    await waitFor(() =>
+      expect(window.location.pathname).toBe(
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(uuidSchema.parse(layoutId))}`,
+      ),
+    );
     expect(screen.getByTestId('present-button')).toBeDisabled();
     await settled(session);
   });
@@ -223,6 +260,37 @@ describe('presenting after a conversion', () => {
 
     expect(await screen.findByTestId('present-button')).toBeEnabled();
     await settled(session);
+  });
+});
+
+describe('browser destination restoration', () => {
+  it('reports a destination that Back or Forward can no longer resolve', async () => {
+    mount();
+    const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(missingView)}`,
+    );
+
+    fireEvent(window, new PopStateEvent('popstate'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Destination not found');
+    expect(alert).toHaveTextContent('The requested address does not exist in this Space.');
+  });
+
+  it('pushes a browser entry when presenting advances over a self-Edge', async () => {
+    mount(selfEdge);
+    const pushState = vi.spyOn(window.history, 'pushState');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Present Graph' }));
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Back' }));
+
+    await waitFor(() => expect(pushState).toHaveBeenCalledTimes(3));
+    expect(pushState.mock.calls[1]?.[2]).toBe(pushState.mock.calls[0]?.[2]);
+    expect(pushState.mock.calls[2]?.[2]).toBe(pushState.mock.calls[0]?.[2]);
   });
 });
 

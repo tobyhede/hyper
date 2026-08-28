@@ -142,6 +142,23 @@ describe('SpaceSidebar', () => {
     expect(props.cardLinks?.onCopyContextual).toHaveBeenCalledOnce();
   });
 
+  it('reveals an addressed Card outside the selected Layout in the Cards collection', () => {
+    const props: SpaceSidebarProps = {
+      ...settledProps(),
+      cardsCollection: {
+        cards: [{ id: CARD_A, title: 'Outside the Layout' }],
+        revealedCardId: CARD_A,
+      },
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    expect(screen.getByText('Cards', { exact: true })).toBeVisible();
+    expect(screen.getByText('Outside the Layout').closest('[data-card-id]')).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+  });
+
   /**
    * The whole of ADR 0053's first claim, asserted as one state: every computed
    * View and every authored Layout is a row of one list, exactly one is pressed,

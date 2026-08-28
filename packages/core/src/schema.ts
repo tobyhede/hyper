@@ -222,11 +222,36 @@ export const GRID_SPACE_VIEW_ID = uuidSchema.parse('2e84c9f4-63bb-4e26-8f32-3c2a
  * Computed View identity is independent of product naming. These ids are
  * application constants, available in every Space, and share the same
  * namespace as authored Layout ids (ADR 0068).
+ *
+ * A tuple rather than a widened array, so its *length* is part of its type and
+ * {@link PerComputedView} can hold a consumer's registry to it.
  */
-export const COMPUTED_VIEW_IDS: readonly z.infer<typeof uuidSchema>[] = Object.freeze([
-  FLOW_SPACE_VIEW_ID,
-  GRID_SPACE_VIEW_ID,
-]);
+export const COMPUTED_VIEW_IDS = Object.freeze([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID] as const);
+
+/**
+ * One value per element of a tuple, and exactly as many.
+ *
+ * The tuple is a parameter and not `typeof COMPUTED_VIEW_IDS` written inline,
+ * because a mapped type only maps a tuple to a tuple when its source is a naked
+ * type parameter. Spelled inline it maps `keyof` an array instead — `length`,
+ * `toString` and the rest — and the arity this exists for is lost.
+ */
+type PerElement<Tuple extends readonly unknown[], Value> = {
+  readonly [Index in keyof Tuple]: Value;
+};
+
+/**
+ * One value per Computed View, in the order the ids are declared above.
+ *
+ * What a consumer's registry is declared as, so that adding a Computed View
+ * here fails to compile everywhere that owes an answer for one — the guarantee
+ * `satisfies Record<BuiltInViewId, …>` gave while a View was named by a string
+ * literal, and lost when identity became a UUID. A UUID is not a type-level
+ * key, so what a type can still hold a registry to is how *many* Views there
+ * are; each entry still writes its id out, where a reader sees which View it
+ * answers for.
+ */
+export type PerComputedView<Value> = PerElement<typeof COMPUTED_VIEW_IDS, Value>;
 
 export function isComputedViewId(id: z.infer<typeof uuidSchema>): boolean {
   return COMPUTED_VIEW_IDS.includes(id);

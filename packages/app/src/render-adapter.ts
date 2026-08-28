@@ -471,8 +471,8 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
         state.selection,
       );
       set({ projection: { nodes: reconciled, edges: [...edges] } });
-      // Reporting geometry, not authoring it: a Card the selected Layout omits is
-      // drawn in the fallback band and must stay unplaced.
+      // Reporting geometry, not authoring it: only Cards the selected Space View
+      // draws can contribute placement.
       authoring.reportRendered(placementFromNodes(reconciled));
     },
 

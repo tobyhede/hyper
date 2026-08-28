@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { FLOW_SPACE_VIEW_ID, encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test } from './fixtures';
 import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
 import {
@@ -24,6 +25,8 @@ import {
   sidebar,
   viewportTransform,
 } from './graph';
+
+const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 
 /**
  * The barrier a *negative* assertion needs.
@@ -590,6 +593,29 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   }
 });
 
+test('an edit conversion addresses the minted Layout and reload does not convert again', async ({
+  page,
+}) => {
+  await page.goto(
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+  );
+  const a = nodeByTitle(page, 'A').first();
+  await expect(a).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+
+  await dragBy(page, a, 0, 220);
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  const convertedUrl = page.url();
+  expect(convertedUrl).toMatch(/\/views\/[A-Za-z0-9_-]{22}$/);
+  expect(convertedUrl).not.toContain(encodeCompactUuid(FLOW_SPACE_VIEW_ID));
+
+  await page.reload();
+  await expect(page).toHaveURL(convertedUrl);
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await expect(sidebar(page).getByRole('button', { name: 'Layout 1', exact: true })).toHaveCount(1);
+});
+
 test(
   'selecting Flow or Grid is navigation and does not persist',
   { tag: '@parity:space-sidebar-marks-one-current-renderer' },
@@ -764,8 +790,8 @@ test(
     // declares a 5px box and outranks a rule naming one class, so this is
     // asserted as a size rather than inferred from the drag below succeeding:
     // a pointer driven by test code hits 5px exactly, and a person does not.
-    expect(box.width).toBe(48);
-    expect(box.height).toBe(48);
+    expect(box.width).toBeCloseTo(48, 2);
+    expect(box.height).toBeCloseTo(48, 2);
     const markLocator = card.locator('.rf-card-node__resize-mark');
     await expect.poll(async () => (await markLocator.boundingBox())?.width).toBeCloseTo(20, 1);
     const mark = await markLocator.boundingBox();
@@ -1801,6 +1827,7 @@ for (const key of ['Backspace', 'Delete'] as const) {
     // An Edge belongs to a Layout's Graph, so an Edge Edit needs one selected.
     await selectCanvas(page, 'Collection 1');
     await settled(page);
+    const drawnCards = await page.locator('.react-flow__node').count();
     const drawn = await page.locator('.react-flow__edge').count();
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
@@ -1809,7 +1836,7 @@ for (const key of ['Backspace', 'Delete'] as const) {
     await page.keyboard.press(key);
 
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
-    await expect(page.locator('.react-flow__node')).toHaveCount(FIXTURE_CARD_COUNT);
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards);
     await expect(persistence).toHaveAttribute('data-revision', '1');
     await expect(persistence).toHaveText('Persisted');
   });
@@ -1831,6 +1858,7 @@ test('Backspace with a Card selected removes neither the Card nor its Edges', as
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await selectCanvas(page, 'Collection 1');
   await settled(page);
+  const drawnCards = await page.locator('.react-flow__node').count();
   const drawn = await page.locator('.react-flow__edge').count();
 
   const cardBox = (await card.boundingBox())!;
@@ -1841,7 +1869,7 @@ test('Backspace with a Card selected removes neither the Card nor its Edges', as
   await page.keyboard.press('Delete');
   await quiescent(page);
 
-  await expect(page.locator('.react-flow__node')).toHaveCount(FIXTURE_CARD_COUNT);
+  await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards);
   await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });

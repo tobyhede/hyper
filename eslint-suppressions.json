@@ -156,7 +156,7 @@
   },
   "test/unit/vite-space-http-plugin.test.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 10
+      "count": 4
     }
   },
   "vitest.setup.ts": {

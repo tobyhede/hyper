@@ -328,13 +328,12 @@ describe('Space app failure reporting', () => {
       exportedRevision: null,
     });
 
-    mountSpaceApp(
-      { space: runtime(addressed), spaceSession: session },
-      (app) => render(app),
-      LAYOUT_ID,
-      undefined,
-      GRAPH_ID,
-    );
+    mountSpaceApp({ space: runtime(addressed), spaceSession: session }, (app) => render(app), {
+      selection: LAYOUT_ID,
+      cardId: null,
+      graphId: GRAPH_ID,
+      presentationCardId: null,
+    });
 
     expect(await screen.findByRole('button', { name: 'Present Addressed' })).toBeVisible();
     expect(session.getState().working).toEqual(addressed);
@@ -362,12 +361,12 @@ describe('Space app failure reporting', () => {
       });
 
       try {
-        mountSpaceApp(
-          { space: runtime(valid), spaceSession: session },
-          (app) => render(app),
-          undefined,
-          CARD_ID,
-        );
+        mountSpaceApp({ space: runtime(valid), spaceSession: session }, (app) => render(app), {
+          selection: LAYOUT_ID,
+          cardId: CARD_ID,
+          graphId: null,
+          presentationCardId: null,
+        });
 
         fireEvent.click(await screen.findByRole('button', { name: copyAction }));
 

@@ -82,6 +82,28 @@ test('Space Sidebar story keeps the Add Card split control whole', async ({ page
   await expect(moreKinds).toBeFocused();
 });
 
+test(
+  'Space Sidebar story dispatches distinct Card and Graph copy commands',
+  {
+    tag: [
+      '@parity:space-sidebar-copies-card-destinations',
+      '@parity:space-sidebar-copies-graph-destinations',
+    ],
+  },
+  async ({ page }) => {
+    await page.goto('/?story=components--space-sidebar--settled&mode=preview');
+
+    await page.getByRole('button', { name: 'Copy link to Card 1' }).click();
+    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'card-canonical');
+    await page.getByRole('button', { name: 'Copy link in this Space View' }).click();
+    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'card-contextual');
+    await page.getByRole('button', { name: 'Copy link to Long', exact: true }).click();
+    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'graph-canonical');
+    await page.getByRole('button', { name: 'Copy link to Long in this Space View' }).click();
+    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'graph-contextual');
+  },
+);
+
 /**
  * A Space opens on a computed View owning no Layout and no Graph (ADR 0025, ADR
  * 0018).

@@ -371,16 +371,6 @@ test('the Close action closes an opened card', async ({ page }) => {
   await expect(card.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });
 
-test('a card outside the selected Layout cannot be opened', async ({ page }) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-
-  const card = nodeByTitle(page, 'E');
-  await openCard(card, 'E');
-  await expect(card).not.toContainText('Echo collection');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-});
-
 test('cards are drawn at exactly the size the layout placed them at', async ({ page }) => {
   await page.goto('/');
   const inner = page.locator('.rf-card-node__inner').first();

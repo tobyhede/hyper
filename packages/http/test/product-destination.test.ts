@@ -369,48 +369,51 @@ describe('product destinations', () => {
     ).resolves.toEqual({ kind: 'unresolved' });
   });
 
-  it('throws when a Computed View and Layout collide', async () => {
-    const collision: LoadedSpace = {
-      ...loaded,
-      snapshot: {
-        ...loaded.snapshot,
-        document: {
-          ...loaded.snapshot.document,
-          layouts: loaded.snapshot.document.layouts?.map((layout) => ({
-            ...layout,
-            id: FLOW_SPACE_VIEW_ID,
-          })),
-        },
+  /**
+   * A Layout carrying a Computed View's id, which intake rejects
+   * (`space-view-id-collision`) and this therefore never meets in a Space that
+   * was committed through it. Resolution still owes an answer rather than a
+   * throw: the server-side caller is a request handler and the browser-side one
+   * is a `popstate` listener, and neither has anywhere to put an exception.
+   */
+  const collided = (): LoadedSpace => ({
+    ...loaded,
+    snapshot: {
+      ...loaded.snapshot,
+      document: {
+        ...loaded.snapshot.document,
+        layouts: loaded.snapshot.document.layouts?.map((layout) => ({
+          ...layout,
+          id: FLOW_SPACE_VIEW_ID,
+        })),
       },
-    };
-
-    await expect(
-      resolveProductDestination(
-        loader(collision),
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
-      ),
-    ).rejects.toThrow(/collision/);
+    },
   });
 
-  it('throws for a canonical Space when a Computed View and Layout collide', async () => {
-    const collision: LoadedSpace = {
-      ...loaded,
-      snapshot: {
-        ...loaded.snapshot,
-        document: {
-          ...loaded.snapshot.document,
-          layouts: loaded.snapshot.document.layouts?.map((layout) => ({
-            ...layout,
-            id: FLOW_SPACE_VIEW_ID,
-          })),
-        },
-      },
-    };
-    const path = `/spaces/${encodeCompactUuid(SPACE_ID)}`;
+  it('classifies a Space View both a Computed View and a Layout claim as a collision', async () => {
+    const path = `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`;
 
-    expect(() => resolveProductDestinationInSnapshot(collision.snapshot, path)).toThrow(
-      /collision/,
-    );
-    await expect(resolveProductDestination(loader(collision), path)).rejects.toThrow(/collision/);
+    expect(resolveProductDestinationInSnapshot(collided().snapshot, path)).toEqual({
+      kind: 'collision',
+      spaceViewId: FLOW_SPACE_VIEW_ID,
+    });
+    await expect(resolveProductDestination(loader(collided()), path)).resolves.toEqual({
+      kind: 'collision',
+      spaceViewId: FLOW_SPACE_VIEW_ID,
+    });
+  });
+
+  it('resolves a destination naming no Space View although the document collides', async () => {
+    const path = `/spaces/${encodeCompactUuid(SPACE_ID)}`;
+    const destination = { kind: 'space', spaceId: SPACE_ID };
+
+    expect(resolveProductDestinationInSnapshot(collided().snapshot, path)).toEqual({
+      kind: 'resolved',
+      destination,
+    });
+    await expect(resolveProductDestination(loader(collided()), path)).resolves.toMatchObject({
+      kind: 'resolved',
+      destination,
+    });
   });
 });

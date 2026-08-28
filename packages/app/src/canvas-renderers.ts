@@ -53,7 +53,16 @@ export interface CanvasRenderers {
   readonly authored: readonly CanvasRenderer[];
 }
 
-/** Every application-supplied Computed View row, keyed by its durable UUID. */
+/**
+ * Every application-supplied Computed View row, keyed by its durable UUID.
+ *
+ * `computedViewTitle` throws for an id its registry does not hold, and this runs
+ * at module scope — so a Computed View id shipped without a definition would
+ * take the whole application down at import rather than draw a row wrongly.
+ * What stops it is a compile error in `renderer.ts`, whose registry is declared
+ * `PerComputedView`: an id added here without a definition there does not
+ * build. Nothing on this side re-checks it, and nothing on this side could.
+ */
 const COMPUTED: readonly CanvasRenderer[] = Object.freeze(
   COMPUTED_VIEW_IDS.map((id) => ({
     kind: 'computed' as const,

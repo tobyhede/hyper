@@ -80,6 +80,10 @@ export function SpaceSidebarFixture({
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
   const colorByGraphId = graphColorMap(space);
+  const linkedCard = space.cards[0];
+  const recordCopyCommand = (command: string) => () => {
+    document.body.dataset['copyCommand'] = command;
+  };
 
   return (
     <AppShell
@@ -92,6 +96,10 @@ export function SpaceSidebarFixture({
             activeGraphId: navigationState.activeGraphId,
             colorByGraphId,
             onActivate: navigation.activateGraph,
+            links: {
+              onCopyCanonical: recordCopyCommand('graph-canonical'),
+              onCopyContextual: recordCopyCommand('graph-contextual'),
+            },
             onPresent: navigation.present,
             presenting: navigationState.mode === 'presenting',
             onExitPresenting: navigation.exitPresenting,
@@ -114,6 +122,15 @@ export function SpaceSidebarFixture({
             state: persistence.kind,
             acknowledgedRevision,
           }}
+          cardLinks={
+            linkedCard === undefined
+              ? undefined
+              : {
+                  title: linkedCard.title,
+                  onCopyCanonical: recordCopyCommand('card-canonical'),
+                  onCopyContextual: recordCopyCommand('card-contextual'),
+                }
+          }
         />
       }
       header={<SelectedCanvasRenderer renderer={current} />}

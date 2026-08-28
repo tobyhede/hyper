@@ -27,6 +27,7 @@ Then:
 3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart.
 4. Hover or select a card to reveal its four authoring handles. Drag to another card to add an Edge to the active Graph. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Card N`, its placement and the Edge.
 5. Press **Present** to traverse the Graph: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
+6. Watch the address bar. The Space, a Space View, a Card, a Graph and each presentation point have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)); the Sidebar and the presenting chrome offer **Copy link** for the current one, browser Back and Forward walk the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
 
 The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored Graph edges stay legible.
 
@@ -169,7 +170,7 @@ A pnpm workspace with strict TypeScript and enforced package boundaries:
 | `@project/persistence` | Browser-safe backend and session contracts, optimistic revisions, commit coalescing, failure/conflict handling, and the memory adapter. |
 | `@project/react-flow-adapter` | Owns React Flow projection and all elkjs specifics. Runs the ELK strategy and projects the domain model into coloured React Flow Card nodes and Edges. |
 | `@project/ui` | Reusable, framework-agnostic React: card renderer, Graph selector, Graph legend, presentation controls, app shell. |
-| `@project/app` | Wiring: TanStack Router, a Zustand store for presentation state, the example presentation, and Vite. |
+| `@project/app` | Wiring: Navigation, Space Authoring and Edge Authoring, product-URL navigation over the browser History API (no router library), the Zustand-backed render adapter, the canvas and its cameras, the example presentation, and Vite. |
 
 Design rules kept throughout: domain logic stays out of React components, React Flow specifics stay in the adapter, and app wiring stays in `@project/app`.
 
@@ -198,6 +199,5 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - Structural deletion for Edges, Cards and Graphs through the completed-Edit lifecycle.
 - Detached Card creation, without requiring an Edge from an existing Card.
 - Card content and metadata editing, plus creation, naming, recolouring and reordering of additional Graphs.
-- Encode the active Graph and card in the TanStack Router URL so a position is linkable and refresh-safe.
 - Authored camera hints (zoom/pan/highlight several nodes) and move transitions in the space file.
 - A traversal-native speaker view: current and next Card, notes, and elapsed time.

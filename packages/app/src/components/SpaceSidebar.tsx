@@ -2,8 +2,10 @@ import type { ReactNode, Ref } from 'react';
 import {
   FLOW_SPACE_VIEW_ID,
   GRID_SPACE_VIEW_ID,
+  type CardId,
   type Graph,
   type GraphId,
+  type PerComputedView,
   type UUID,
 } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
@@ -90,32 +92,60 @@ export interface SpaceSidebarProps {
     readonly state: SpaceSessionState['persistence']['kind'];
     readonly acknowledgedRevision: bigint;
   };
+  readonly cardsCollection?:
+    | {
+        readonly cards: readonly { readonly id: CardId; readonly title: string }[];
+        readonly revealedCardId: CardId | null;
+      }
+    | undefined;
   readonly cardLinks?:
     | {
         readonly title: string;
         readonly onCopyCanonical: () => void;
-        readonly onCopyContextual: () => void;
+        /**
+         * Absent when the Card has no address in the current Space View — a
+         * Card the selected Layout omits and the Cards collection reveals. The
+         * command is withheld rather than shown and refused, because the
+         * destination it would copy does not exist.
+         */
+        readonly onCopyContextual?: (() => void) | undefined;
       }
     | undefined;
 }
 
 /**
- * Keyed by the ids `core` ships, so a new Computed View is visible here
- * rather than a View the Sidebar quietly draws without a glyph.
+ * One glyph per Computed View, beside the id it draws.
  *
- * It stays here rather than moving beside the View's strategy and title:
+ * `PerComputedView` is what makes a new Computed View visible here: the tuple
+ * holds one entry per id `core` ships, so a third View fails to compile until it
+ * has a glyph. That is the guarantee `satisfies Record<BuiltInViewId, …>` gave
+ * while a View was identified by a string literal, and its absence is silent —
+ * a missing glyph is not a blank row but the authored-Layout glyph, drawn for
+ * something that is not a Layout.
+ *
+ * The glyphs stay here rather than moving beside the View's strategy and title:
  * exactly one module draws a row today, so a glyph declared next to the strategy
  * would open a seam nothing crosses — and it would make a pure module import
  * `@project/ui`. Revisit when a second module draws a row.
  */
-const VIEW_ICONS = new Map<UUID, ReactNode>([
+const COMPUTED_VIEW_ICONS: PerComputedView<readonly [UUID, ReactNode]> = [
   [FLOW_SPACE_VIEW_ID, <FlowIcon key={FLOW_SPACE_VIEW_ID} />],
   [GRID_SPACE_VIEW_ID, <GridIcon key={GRID_SPACE_VIEW_ID} />],
-]);
+];
 
-const RendererIcon = ({ selection }: { readonly selection: CanvasRendererId }): ReactNode => {
-  return VIEW_ICONS.get(selection) ?? <LayoutIcon />;
-};
+const VIEW_ICONS = new Map<UUID, ReactNode>(COMPUTED_VIEW_ICONS);
+
+/**
+ * A row's glyph, chosen on the kind the row already carries rather than on
+ * whether a lookup missed (ADR 0072 leaves the kind to resolution, and
+ * `canvasRenderers` has already resolved it).
+ *
+ * An authored Layout draws one glyph whatever its id; a Computed View draws the
+ * one paired with it above. The tuple covers every id `core` ships, so a View
+ * with no glyph cannot compile and the absent arm here cannot be reached.
+ */
+const RendererIcon = ({ renderer }: { readonly renderer: CanvasRenderer }): ReactNode =>
+  renderer.kind === 'authored' ? <LayoutIcon /> : VIEW_ICONS.get(renderer.selection);
 
 /**
  * One group of the single canvas choice.
@@ -159,7 +189,7 @@ function RendererGroup({
               data-renderer={canvasRendererKey(renderer.selection)}
               onClick={() => onSelect(renderer.selection)}
             >
-              <RendererIcon selection={renderer.selection} />
+              <RendererIcon renderer={renderer} />
               <span>{renderer.title}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -191,6 +221,7 @@ export function SpaceSidebar({
   graph,
   addCard,
   persistence,
+  cardsCollection,
   cardLinks,
 }: SpaceSidebarProps) {
   // Below the primitive's breakpoint this whole surface is a modal Sheet drawn
@@ -275,6 +306,37 @@ export function SpaceSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {cardsCollection !== undefined && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Cards</SidebarGroupLabel>
+            <SidebarGroupContent>
+              {cardsCollection.cards.length === 0 ? (
+                <NothingYet testId="no-cards-outside-layout">
+                  All Cards are in this Layout.
+                </NothingYet>
+              ) : (
+                <SidebarMenu>
+                  {cardsCollection.cards.map((card) => {
+                    const revealed = card.id === cardsCollection.revealedCardId;
+                    return (
+                      <SidebarMenuItem key={card.id}>
+                        <SidebarMenuButton
+                          render={<span />}
+                          isActive={revealed}
+                          aria-current={revealed ? 'true' : undefined}
+                          data-card-id={card.id}
+                        >
+                          <span>{card.title}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         <SidebarSeparator />
 
         <SidebarGroup>
@@ -333,9 +395,11 @@ export function SpaceSidebar({
             <Button variant="secondary" size="toolbar" onClick={cardLinks.onCopyCanonical}>
               Copy link to {cardLinks.title}
             </Button>
-            <Button variant="secondary" size="toolbar" onClick={cardLinks.onCopyContextual}>
-              Copy link in this Space View
-            </Button>
+            {cardLinks.onCopyContextual !== undefined && (
+              <Button variant="secondary" size="toolbar" onClick={cardLinks.onCopyContextual}>
+                Copy link in this Space View
+              </Button>
+            )}
           </div>
         )}
         <Button

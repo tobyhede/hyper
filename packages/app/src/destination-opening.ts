@@ -1,4 +1,4 @@
-import { FLOW_SPACE_VIEW_ID, isComputedViewId, type CardId, type GraphId } from '@project/core';
+import type { CardId, GraphId } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
 import { defaultRenderer, type CanvasRendererId } from './renderer';
@@ -67,11 +67,10 @@ export function destinationOpening(
       presentationCardId: null,
     };
   }
-  const opening = defaultRenderer(space);
-  const layout = isComputedViewId(opening) ? undefined : space.lookup.layout(opening)?.layout;
-  const selection =
-    layout !== undefined && layout.positions[destination.cardId] === undefined
-      ? FLOW_SPACE_VIEW_ID
-      : opening;
-  return { selection, cardId: destination.cardId, graphId: null, presentationCardId: null };
+  return {
+    selection: defaultRenderer(space),
+    cardId: destination.cardId,
+    graphId: null,
+    presentationCardId: null,
+  };
 }
