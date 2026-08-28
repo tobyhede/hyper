@@ -39,6 +39,7 @@ export const createApp = (
   selection?: CanvasRendererId,
   destinationCardId?: CardId,
   destinationGraphId?: GraphId,
+  destinationPresentationCardId?: CardId,
 ) => {
   // What an opened Space is composed of, stated once (`compose-app.ts`): one
   // working-space reader every collaborator shares, one renderer resolver, and
@@ -52,7 +53,13 @@ export const createApp = (
     adapter: useRenderAdapter,
     edgeAuthoring,
   } = composeApp({ spaceSession, selection });
-  if (destinationGraphId !== undefined) {
+  if (destinationGraphId !== undefined && destinationPresentationCardId !== undefined) {
+    navigation.openPresentation(
+      navigation.getState().selectedRenderer,
+      destinationGraphId,
+      destinationPresentationCardId,
+    );
+  } else if (destinationGraphId !== undefined) {
     navigation.openGraph(navigation.getState().selectedRenderer, destinationGraphId);
   }
 
@@ -125,10 +132,6 @@ export const createApp = (
     // There is a Card to go back to only once a traversal has left its first, and only
     // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
-    const present = navigation.present;
-    const exitPresenting = navigation.exitPresenting;
-    const advance = navigation.advance;
-    const retreat = navigation.retreat;
     const selectBranch = navigation.selectBranch;
     const activeCardId = navigation.activeCardId();
     // Derived here rather than in a store selector: the array is rebuilt on every
@@ -253,6 +256,70 @@ export const createApp = (
       useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
     }, []);
 
+    const installPresentationRenderer = useCallback(
+      (selection: CanvasRendererId, graphId: GraphId, cardId: CardId) => {
+        const resolved = resolveRenderer(currentSpace(), selection);
+        const changesRenderer = navigation.getState().selectedRenderer !== selection;
+        navigation.openPresentation(selection, graphId, cardId);
+        if (!changesRenderer) return;
+        useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
+      },
+      [],
+    );
+
+    const pushPresentationCard = useCallback(
+      (cardId: CardId) => {
+        if (activeGraphId === null) return;
+        window.history.pushState(
+          null,
+          '',
+          productDestinationPath({
+            kind: 'presentation',
+            spaceId: currentSpace().id,
+            spaceViewId: selectedRenderer,
+            graphId: activeGraphId,
+            cardId,
+          }),
+        );
+      },
+      [activeGraphId, selectedRenderer],
+    );
+
+    const present = useCallback(() => {
+      navigation.present();
+      const cardId = navigation.activeCardId();
+      if (cardId !== null) pushPresentationCard(cardId);
+    }, [pushPresentationCard]);
+
+    const advance = useCallback(() => {
+      const before = navigation.activeCardId();
+      navigation.advance();
+      const after = navigation.activeCardId();
+      if (after !== null && after !== before) pushPresentationCard(after);
+    }, [pushPresentationCard]);
+
+    const retreat = useCallback(() => {
+      const before = navigation.activeCardId();
+      navigation.retreat();
+      const after = navigation.activeCardId();
+      if (after !== null && after !== before) pushPresentationCard(after);
+    }, [pushPresentationCard]);
+
+    const exitPresenting = useCallback(() => {
+      navigation.exitPresenting();
+      if (activeGraphId === null) return;
+      window.history.pushState(
+        null,
+        '',
+        productDestinationPath({
+          kind: 'space-view-graph',
+          spaceId: currentSpace().id,
+          spaceViewId: selectedRenderer,
+          graphId: activeGraphId,
+        }),
+      );
+    }, [activeGraphId, selectedRenderer]);
+
     const activateGraph = useCallback(
       (graphId: GraphId) => {
         if (navigation.getState().activeGraphId === graphId) return;
@@ -282,12 +349,20 @@ export const createApp = (
         if (resolution.kind !== 'resolved') return;
         const opening = destinationOpening(space, resolution.destination);
         if (opening.graphId === null) installCanvasRenderer(opening.selection);
-        else installGraphRenderer(opening.selection, opening.graphId);
+        else if (opening.presentationCardId === null) {
+          installGraphRenderer(opening.selection, opening.graphId);
+        } else {
+          installPresentationRenderer(
+            opening.selection,
+            opening.graphId,
+            opening.presentationCardId,
+          );
+        }
         setAddressedCardId(opening.cardId);
       };
       window.addEventListener('popstate', restoreDestination);
       return () => window.removeEventListener('popstate', restoreDestination);
-    }, [installCanvasRenderer, installGraphRenderer]);
+    }, [installCanvasRenderer, installGraphRenderer, installPresentationRenderer]);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.
@@ -738,6 +813,16 @@ export const createApp = (
               onAdvance={advance}
               onRetreat={retreat}
               onExit={exitPresenting}
+              onCopyLink={() => {
+                if (activeGraphId === null || activeCardId === null) return;
+                copyProductDestination({
+                  kind: 'presentation',
+                  spaceId: rendererSpace.id,
+                  spaceViewId: selectedRenderer,
+                  graphId: activeGraphId,
+                  cardId: activeCardId,
+                });
+              }}
             />
           )}
 

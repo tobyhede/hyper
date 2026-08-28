@@ -16,6 +16,7 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const loaded: LoadedSpace = {
   snapshot: spaceSnapshotSchema.parse({
     id: SPACE_ID,
@@ -28,11 +29,14 @@ const loaded: LoadedSpace = {
           title: 'Layout',
           kind: 'positioned',
           positions: { [CARD_ID]: { x: 10, y: 20, open: false } },
-          graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+          graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
         },
       ],
     },
-    cards: [{ id: CARD_ID, document: { title: 'Card', kind: 'markdown', body: '' } }],
+    cards: [
+      { id: CARD_ID, document: { title: 'Card', kind: 'markdown', body: '' } },
+      { id: OTHER_CARD_ID, document: { title: 'Other', kind: 'markdown', body: '' } },
+    ],
   }),
   revision: 7n,
   exportedRevision: 6n,
@@ -147,6 +151,74 @@ describe('product destinations', () => {
     });
   });
 
+  it('formats and resolves an exact contextual presentation destination', async () => {
+    const presentation = `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(CARD_ID)}`;
+
+    expect(
+      productDestinationPath({
+        kind: 'presentation',
+        spaceId: SPACE_ID,
+        spaceViewId: LAYOUT_ID,
+        graphId: GRAPH_ID,
+        cardId: CARD_ID,
+      }),
+    ).toBe(presentation);
+    await expect(resolveProductDestination(loader(), presentation)).resolves.toMatchObject({
+      kind: 'resolved',
+      destination: {
+        kind: 'presentation',
+        spaceId: SPACE_ID,
+        spaceViewId: LAYOUT_ID,
+        graphId: GRAPH_ID,
+        cardId: CARD_ID,
+      },
+    });
+    expect(resolveProductDestinationInSnapshot(loaded.snapshot, presentation)).toEqual({
+      kind: 'resolved',
+      destination: {
+        kind: 'presentation',
+        spaceId: SPACE_ID,
+        spaceViewId: LAYOUT_ID,
+        graphId: GRAPH_ID,
+        cardId: CARD_ID,
+      },
+    });
+  });
+
+  it.each([
+    ['an unknown Card', '00000000-0000-4000-8000-000000000099', false],
+    ['a Card outside the Graph', '00000000-0000-4000-8000-000000000006', true],
+  ])('does not resolve a presentation destination for %s', async (_name, cardValue, isStored) => {
+    const cardId = uuidSchema.parse(cardValue);
+    const withOutsideCard: LoadedSpace = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        cards: isStored
+          ? [
+              ...loaded.snapshot.cards,
+              { id: cardId, document: { title: 'Outside', kind: 'markdown', body: '' } },
+            ]
+          : loaded.snapshot.cards,
+      },
+    };
+    const presentation = `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(cardId)}`;
+
+    await expect(resolveProductDestination(loader(withOutsideCard), presentation)).resolves.toEqual(
+      {
+        kind: 'unresolved',
+      },
+    );
+  });
+
+  it.each([
+    `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/not-a-compact-uuid`,
+    `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(CARD_ID)}/extra`,
+    `/spaces/${encodeCompactUuid(SPACE_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(CARD_ID)}`,
+  ])('classifies the invalid presentation path %s as malformed', async (path) => {
+    await expect(resolveProductDestination(loader(), path)).resolves.toEqual({ kind: 'malformed' });
+  });
+
   it('does not resolve a contextual Layout-and-Graph destination when the Layout does not own the Graph', async () => {
     const otherLayout = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
     const withOtherLayout: LoadedSpace = {
@@ -173,6 +245,12 @@ describe('product destinations', () => {
       resolveProductDestination(
         loader(withOtherLayout),
         `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(otherLayout)}/graphs/${encodeCompactUuid(GRAPH_ID)}`,
+      ),
+    ).resolves.toEqual({ kind: 'unresolved' });
+    await expect(
+      resolveProductDestination(
+        loader(withOtherLayout),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(otherLayout)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(CARD_ID)}`,
       ),
     ).resolves.toEqual({ kind: 'unresolved' });
   });

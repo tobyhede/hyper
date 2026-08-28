@@ -15,6 +15,7 @@ export interface OpenedApplicationStartup {
   selection?: CanvasRendererId | undefined;
   cardId?: CardId | undefined;
   graphId?: GraphId | undefined;
+  presentationCardId?: CardId | undefined;
 }
 
 export type ApplicationStartupResult = OpenedApplicationStartup;
@@ -27,6 +28,7 @@ const renderOpenedSpace = (
   selection?: CanvasRendererId,
   cardId?: CardId,
   graphId?: GraphId,
+  presentationCardId?: CardId,
 ): void => {
   mountSpaceApp(
     opened,
@@ -36,6 +38,7 @@ const renderOpenedSpace = (
     selection,
     cardId,
     graphId,
+    presentationCardId,
   );
 };
 
@@ -53,8 +56,8 @@ export const startApplication = async (
 ): Promise<void> => {
   try {
     const startup = await resolveStartup();
-    const { opened, selection, cardId, graphId } = startup;
-    renderOpenedSpace(root, opened, selection, cardId, graphId);
+    const { opened, selection, cardId, graphId, presentationCardId } = startup;
+    renderOpenedSpace(root, opened, selection, cardId, graphId, presentationCardId);
   } catch (error) {
     renderStartupError(root, error);
   }

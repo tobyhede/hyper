@@ -120,6 +120,57 @@ describe('HTTP space startup composition', () => {
     expect(result.graphId).toBe(GRAPH_ID);
   });
 
+  it('opens an exact presentation point with its named View, Graph and Card', async () => {
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        cards: [
+          ...snapshot().cards,
+          { id: OTHER_CARD_ID, document: { title: 'Next', kind: 'markdown' as const, body: '' } },
+        ],
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          layouts: [
+            {
+              id: LAYOUT_ID,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: {
+                [CARD_ID]: { x: 0, y: 0, open: false as const },
+                [OTHER_CARD_ID]: { x: 320, y: 0, open: false as const },
+              },
+              graphs: [
+                {
+                  id: GRAPH_ID,
+                  title: 'Graph',
+                  edges: [{ from: CARD_ID, to: OTHER_CARD_ID }],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+
+    const result = await startup.resolve(
+      productDestinationPath({
+        kind: 'presentation',
+        spaceId: SPACE_ID,
+        spaceViewId: LAYOUT_ID,
+        graphId: GRAPH_ID,
+        cardId: OTHER_CARD_ID,
+      }),
+    );
+
+    expect(result.selection).toBe(LAYOUT_ID);
+    expect(result.graphId).toBe(GRAPH_ID);
+    expect(result.presentationCardId).toBe(OTHER_CARD_ID);
+  });
+
   it('opens a contextual Card in its named Space View without authoring it open', async () => {
     const layoutId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
     const loaded = {

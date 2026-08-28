@@ -25,6 +25,13 @@ export type ProductDestination =
       readonly spaceId: UUID;
       readonly spaceViewId: UUID;
       readonly graphId: GraphId;
+    }
+  | {
+      readonly kind: 'presentation';
+      readonly spaceId: UUID;
+      readonly spaceViewId: UUID;
+      readonly graphId: GraphId;
+      readonly cardId: CardId;
     };
 
 export type ProductDestinationResolution =
@@ -51,6 +58,9 @@ export const productDestinationPath = (destination: ProductDestination): string 
     return `${space}/graphs/${encodeCompactUuid(destination.graphId)}`;
   }
   const view = `${space}/views/${encodeCompactUuid(destination.spaceViewId)}`;
+  if (destination.kind === 'presentation') {
+    return `${view}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.cardId)}`;
+  }
   return destination.kind === 'space-view'
     ? view
     : destination.kind === 'space-view-card'
@@ -62,7 +72,14 @@ type ProductDestinationLoader = Pick<SpaceBackend, 'loadSpace'>;
 
 const parseProductDestination = (pathname: string): ProductDestination | undefined => {
   const segments = pathname.split('/');
-  if (segments.length !== 3 && segments.length !== 5 && segments.length !== 7) return undefined;
+  if (
+    segments.length !== 3 &&
+    segments.length !== 5 &&
+    segments.length !== 7 &&
+    segments.length !== 9
+  ) {
+    return undefined;
+  }
   if (segments[0] !== '' || segments[1] !== 'spaces') return undefined;
   const spaceId = decodeCompactUuid(segments[2] ?? '');
   if (spaceId === undefined) return undefined;
@@ -79,6 +96,14 @@ const parseProductDestination = (pathname: string): ProductDestination | undefin
   const spaceViewId = decodeCompactUuid(segments[4] ?? '');
   if (spaceViewId === undefined) return undefined;
   if (segments.length === 5) return { kind: 'space-view', spaceId, spaceViewId };
+  if (segments.length === 9) {
+    if (segments[5] !== 'graphs' || segments[7] !== 'present') return undefined;
+    const graphId = decodeCompactUuid(segments[6] ?? '');
+    const cardId = decodeCompactUuid(segments[8] ?? '');
+    return graphId === undefined || cardId === undefined
+      ? undefined
+      : { kind: 'presentation', spaceId, spaceViewId, graphId, cardId };
+  }
   if (segments[5] === 'cards') {
     const cardId = decodeCompactUuid(segments[6] ?? '');
     return cardId === undefined
@@ -103,17 +128,25 @@ const destinationInSnapshot = (
   if (collision !== undefined) {
     throw new Error(`Space View identity collision for ${collision.id}`);
   }
-  if (destination.kind === 'card' || destination.kind === 'space-view-card') {
+  if (
+    destination.kind === 'card' ||
+    destination.kind === 'space-view-card' ||
+    destination.kind === 'presentation'
+  ) {
     if (!snapshot.cards.some(({ id }) => id === destination.cardId)) return { kind: 'unresolved' };
   }
   const graphOwner =
-    destination.kind === 'graph' || destination.kind === 'space-view-graph'
+    destination.kind === 'graph' ||
+    destination.kind === 'space-view-graph' ||
+    destination.kind === 'presentation'
       ? snapshot.document.layouts?.find((layout) =>
           layout.graphs.some(({ id }) => id === destination.graphId),
         )
       : undefined;
   if (
-    (destination.kind === 'graph' || destination.kind === 'space-view-graph') &&
+    (destination.kind === 'graph' ||
+      destination.kind === 'space-view-graph' ||
+      destination.kind === 'presentation') &&
     graphOwner === undefined
   ) {
     return { kind: 'unresolved' };
@@ -121,7 +154,8 @@ const destinationInSnapshot = (
   if (
     destination.kind === 'space-view' ||
     destination.kind === 'space-view-card' ||
-    destination.kind === 'space-view-graph'
+    destination.kind === 'space-view-graph' ||
+    destination.kind === 'presentation'
   ) {
     const layout = snapshot.document.layouts?.find(({ id }) => id === destination.spaceViewId);
     if (layout === undefined && !isComputedViewId(destination.spaceViewId)) {
@@ -135,11 +169,18 @@ const destinationInSnapshot = (
       return { kind: 'unresolved' };
     }
     if (
-      destination.kind === 'space-view-graph' &&
+      (destination.kind === 'space-view-graph' || destination.kind === 'presentation') &&
       layout !== undefined &&
       layout.id !== graphOwner?.id
     ) {
       return { kind: 'unresolved' };
+    }
+    if (destination.kind === 'presentation') {
+      const graph = graphOwner?.graphs.find(({ id }) => id === destination.graphId);
+      const graphContainsCard = graph?.edges.some(
+        ({ from, to }) => from === destination.cardId || to === destination.cardId,
+      );
+      if (graphContainsCard !== true) return { kind: 'unresolved' };
     }
   }
   return { kind: 'resolved', destination };

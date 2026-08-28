@@ -39,6 +39,7 @@ const chrome = (props: Partial<PresentingChromeProps> = {}) => (
     onAdvance={() => undefined}
     onRetreat={() => undefined}
     onExit={() => undefined}
+    onCopyLink={() => undefined}
     {...props}
   />
 );
@@ -137,6 +138,25 @@ describe('PresentingChrome', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
 
     expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it('copies the exact presentation point through its own command', () => {
+    const onCopyLink = vi.fn();
+    render(chrome({ onCopyLink }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link to this presentation point' }));
+
+    expect(onCopyLink).toHaveBeenCalledOnce();
+  });
+
+  it('guards its chrome controls from React Flow document shortcuts', () => {
+    render(chrome());
+
+    expect(
+      screen
+        .getByRole('button', { name: 'Copy link to this presentation point' })
+        .closest('.nokey'),
+    ).not.toBeNull();
   });
 
   /**

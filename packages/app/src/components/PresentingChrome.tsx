@@ -23,6 +23,8 @@ export interface PresentingChromeProps {
   /** Traverse back, the same Navigation operation Arrow Left performs. */
   onRetreat: () => void;
   onExit: () => void;
+  /** Copy the exact Space View, Graph and Card currently being presented. */
+  onCopyLink: () => void;
 }
 
 /**
@@ -93,6 +95,7 @@ export function PresentingChrome({
   onAdvance,
   onRetreat,
   onExit,
+  onCopyLink,
 }: PresentingChromeProps) {
   const selectedIndex = moves.findIndex((move) => move.selected);
   const selected = moves[selectedIndex];
@@ -156,7 +159,7 @@ export function PresentingChrome({
       // Its own container, so the responsive rule below reads the width the
       // chrome actually has rather than the viewport's: the Space Sidebar
       // takes 16rem of it above the breakpoint and none below.
-      className="@container absolute inset-x-0 bottom-0 z-20 border-t border-border bg-background/90"
+      className="nokey @container absolute inset-x-0 bottom-0 z-20 border-t border-border bg-background/90"
     >
       <div className="flex items-center gap-4 p-3 @max-3xl:flex-col @max-3xl:items-stretch">
         {/*
@@ -243,6 +246,10 @@ export function PresentingChrome({
         </div>
 
         <div className="flex items-center gap-3 @max-3xl:flex-wrap @max-3xl:justify-between">
+          <Button variant="secondary" onClick={onCopyLink}>
+            Copy link to this presentation point
+          </Button>
+
           {canRetreat && (
             <Button
               ref={back}

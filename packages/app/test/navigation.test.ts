@@ -8,7 +8,12 @@ import {
   type UUID,
 } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
-import { createNavigation, type NavigationState, type NavigationOptions } from '../src/navigation';
+import {
+  canRetreat,
+  createNavigation,
+  type NavigationState,
+  type NavigationOptions,
+} from '../src/navigation';
 import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 import { cardFile } from './card-files';
 
@@ -382,6 +387,29 @@ it('opens a Graph destination in its named renderer with one navigation publicat
     openedCardId: null,
     mode: 'overview',
   });
+  expect(space.defaultRenderer).toBeUndefined();
+});
+
+it('opens an exact presentation Card with fresh Traversal history in one publication', () => {
+  const space = fixture();
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
+  navigation.present();
+  navigation.advance();
+  const observed: NavigationState[] = [];
+  navigation.subscribe(() => observed.push(navigation.getState()));
+
+  navigation.openPresentation(LAYOUT, GRAPH_TWO, CARD_C);
+
+  expect(observed).toHaveLength(1);
+  expect(navigation.getState()).toEqual({
+    selectedRenderer: LAYOUT,
+    activeGraphId: GRAPH_TWO,
+    openedCardId: null,
+    mode: 'presenting',
+    traversalHistory: [CARD_C],
+    branchIndex: 0,
+  });
+  expect(canRetreat(navigation.getState())).toBe(false);
   expect(space.defaultRenderer).toBeUndefined();
 });
 

@@ -13,6 +13,8 @@ const LONG_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
 const MID_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
 const ECHO_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
 const CARD_A_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const CARD_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const CARD_C_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const CARD_E_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
 test('root redirects to and opens the canonical Entry Space URL', async ({ page }) => {
@@ -268,4 +270,93 @@ test('an incompatible contextual Layout-and-Graph destination has a real 404', a
   );
 
   expect(response?.status()).toBe(404);
+});
+
+test('an exact presentation link starts fresh at its Card and moves through browser history', async ({
+  page,
+}) => {
+  const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}`;
+  const atB = `${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(CARD_B_ID)}`;
+  const atC = `${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(CARD_C_ID)}`;
+  const before = await page.request
+    .get(`/api/spaces/${FIXTURE_ID}`)
+    .then((response) => response.text());
+
+  expect((await page.goto(atB))?.status()).toBe(200);
+  await expect(page.getByTestId('presenting-chrome')).toBeVisible();
+  await expect(page.locator(`.react-flow__node[data-id="${CARD_B_ID}"]`)).toHaveClass(
+    /rf-card-node--active/,
+  );
+  await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
+  await page.reload();
+  await expect(page).toHaveURL(atB);
+  await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
+
+  await page.keyboard.press('ArrowRight');
+  await expect(page).toHaveURL(atC);
+  await page.goBack();
+  await expect(page).toHaveURL(atB);
+  await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
+  await page.goForward();
+  await expect(page).toHaveURL(atC);
+  await page.getByTestId('exit-presenting').click();
+  await expect(page).toHaveURL(`${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
+
+  const after = await page.request
+    .get(`/api/spaces/${FIXTURE_ID}`)
+    .then((response) => response.text());
+  expect(after).toEqual(before);
+});
+
+test('copies the exact current presentation point', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: (value: string) => {
+          sessionStorage.setItem('copied-product-url', value);
+          return Promise.resolve();
+        },
+        readText: () => Promise.resolve(sessionStorage.getItem('copied-product-url') ?? ''),
+      },
+    });
+  });
+  const path = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(CARD_B_ID)}`;
+  await page.goto(path);
+
+  await page.getByRole('button', { name: 'Copy link to this presentation point' }).click();
+
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(`${new URL(page.url()).origin}${path}`);
+});
+
+test('entering, advancing and retreating each append presentation history', async ({ page }) => {
+  const graph = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`;
+  const atA = `${graph}/present/${encodeCompactUuid(CARD_A_ID)}`;
+  const atB = `${graph}/present/${encodeCompactUuid(CARD_B_ID)}`;
+  await page.goto(graph);
+
+  await page.getByRole('button', { name: 'Present Long' }).click();
+  await expect(page).toHaveURL(atA);
+  await page.keyboard.press('ArrowRight');
+  await expect(page).toHaveURL(atB);
+  await page.getByTestId('presenting-chrome').getByRole('button', { name: 'Back' }).click();
+  await expect(page).toHaveURL(atA);
+
+  await page.goBack();
+  await expect(page).toHaveURL(atB);
+  await page.goBack();
+  await expect(page).toHaveURL(atA);
+  await page.goForward();
+  await expect(page).toHaveURL(atB);
+  await page.goForward();
+  await expect(page).toHaveURL(atA);
+});
+
+test('malformed and incompatible presentation destinations have real host statuses', async ({
+  page,
+}) => {
+  const base = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present`;
+  expect((await page.goto(`${base}/not-a-compact-uuid`))?.status()).toBe(400);
+  expect((await page.goto(`${base}/${encodeCompactUuid(CARD_E_ID)}`))?.status()).toBe(404);
 });

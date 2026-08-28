@@ -85,6 +85,7 @@ export function PresentingChromeFixture({
           onAdvance={navigation.advance}
           onRetreat={navigation.retreat}
           onExit={navigation.exitPresenting}
+          onCopyLink={() => undefined}
         />
       )}
     </div>

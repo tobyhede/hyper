@@ -7,6 +7,7 @@ export interface DestinationOpening {
   readonly selection: CanvasRendererId;
   readonly cardId: CardId | null;
   readonly graphId: GraphId | null;
+  readonly presentationCardId: CardId | null;
 }
 
 /** Translate a resolved product destination into the application state it opens. */
@@ -15,16 +16,44 @@ export function destinationOpening(
   destination: ProductDestination,
 ): DestinationOpening {
   if (destination.kind === 'space') {
-    return { selection: defaultRenderer(space), cardId: null, graphId: null };
+    return {
+      selection: defaultRenderer(space),
+      cardId: null,
+      graphId: null,
+      presentationCardId: null,
+    };
   }
   if (destination.kind === 'space-view') {
-    return { selection: destination.spaceViewId, cardId: null, graphId: null };
+    return {
+      selection: destination.spaceViewId,
+      cardId: null,
+      graphId: null,
+      presentationCardId: null,
+    };
   }
   if (destination.kind === 'space-view-card') {
-    return { selection: destination.spaceViewId, cardId: destination.cardId, graphId: null };
+    return {
+      selection: destination.spaceViewId,
+      cardId: destination.cardId,
+      graphId: null,
+      presentationCardId: null,
+    };
   }
   if (destination.kind === 'space-view-graph') {
-    return { selection: destination.spaceViewId, cardId: null, graphId: destination.graphId };
+    return {
+      selection: destination.spaceViewId,
+      cardId: null,
+      graphId: destination.graphId,
+      presentationCardId: null,
+    };
+  }
+  if (destination.kind === 'presentation') {
+    return {
+      selection: destination.spaceViewId,
+      cardId: null,
+      graphId: destination.graphId,
+      presentationCardId: destination.cardId,
+    };
   }
   if (destination.kind === 'graph') {
     const owned = space.lookup.graph(destination.graphId);
@@ -35,6 +64,7 @@ export function destinationOpening(
       selection: owned.owner.layout.id,
       cardId: null,
       graphId: destination.graphId,
+      presentationCardId: null,
     };
   }
   const opening = defaultRenderer(space);
@@ -43,5 +73,5 @@ export function destinationOpening(
     layout !== undefined && layout.positions[destination.cardId] === undefined
       ? FLOW_SPACE_VIEW_ID
       : opening;
-  return { selection, cardId: destination.cardId, graphId: null };
+  return { selection, cardId: destination.cardId, graphId: null, presentationCardId: null };
 }

@@ -29,6 +29,7 @@ export const createSpaceStartup = (
       selection: opening.selection,
       cardId: opening.cardId ?? undefined,
       graphId: opening.graphId ?? undefined,
+      presentationCardId: opening.presentationCardId ?? undefined,
     };
   },
 });

@@ -66,10 +66,11 @@ export function mountSpaceApp(
   selection?: CanvasRendererId,
   cardId?: CardId,
   graphId?: GraphId,
+  presentationCardId?: CardId,
 ): void {
   let App: ReturnType<typeof createApp>;
   try {
-    App = createApp(opened, selection, cardId, graphId);
+    App = createApp(opened, selection, cardId, graphId, presentationCardId);
   } catch (error) {
     console.error('Composing the Space app failed', error);
     render(<SpaceAppFailureView message={failureMessage(error)} />);
