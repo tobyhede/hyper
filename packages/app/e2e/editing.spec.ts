@@ -766,16 +766,16 @@ test(
     // a pointer driven by test code hits 5px exactly, and a person does not.
     expect(box.width).toBe(48);
     expect(box.height).toBe(48);
-    const mark = await control.locator('.rf-card-node__resize-mark').boundingBox();
+    const markLocator = card.locator('.rf-card-node__resize-mark');
+    await expect.poll(async () => (await markLocator.boundingBox())?.width).toBeCloseTo(20, 1);
+    const mark = await markLocator.boundingBox();
     if (mark === null) throw new Error("Card A's resize control draws no mark");
-    expect(mark.width).toBe(20);
-    expect(mark.height).toBe(20);
-    expect(mark.x - box.x).toBe(10);
-    expect(mark.y - box.y).toBe(10);
-    await expect(control.locator('.rf-card-node__resize-mark')).toHaveCSS(
-      'background-color',
-      'rgb(0, 0, 0)',
-    );
+    expect(mark.height).toBeCloseTo(20, 1);
+    const innerBox = await boxOf(card.locator('.rf-card-node__inner'), "Card A's inner box");
+    expect(mark.x + mark.width).toBeGreaterThan(innerBox.x + innerBox.width);
+    expect(mark.y + mark.height).toBeGreaterThan(innerBox.y + innerBox.height);
+    await expect(markLocator).toHaveCSS('translate', '1px 1px');
+    await expect(markLocator).toHaveCSS('background-color', 'rgb(0, 0, 0)');
 
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();

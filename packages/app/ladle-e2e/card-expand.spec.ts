@@ -236,24 +236,20 @@ test(
     // hand does not. The mark stays smaller than the target it sits in.
     expect(box.width).toBe(48);
     expect(box.height).toBe(48);
-    const mark = await openControl.locator('.rf-card-node__resize-mark').boundingBox();
+    const markLocator = openRegion.locator('.rf-card-node__resize-mark');
+    const mark = await markLocator.boundingBox();
     if (mark === null) throw new Error('The Open resize control draws no mark.');
     expect(mark.width).toBe(20);
     expect(mark.height).toBe(20);
-    expect(mark.x - box.x).toBe(10);
-    expect(mark.y - box.y).toBe(10);
-    await expect(openControl.locator('.rf-card-node__resize-mark')).toHaveCSS(
-      'background-color',
-      'rgb(0, 0, 0)',
-    );
+    expect(mark.x - box.x).toBe(33);
+    expect(mark.y - box.y).toBe(33);
+    expect(mark.x + mark.width - (before.x + before.width)).toBe(5);
+    expect(mark.y + mark.height - (before.y + before.height)).toBe(5);
+    await expect(markLocator).toHaveCSS('background-color', 'rgb(0, 0, 0)');
 
-    // Nothing of the control may sit over the pane. It is invisible at rest and
-    // always grabbable, so an overhang is a hit target no reveal announces —
-    // and touch, having no hover, would meet it first on an unselected Card.
-    // React Flow's own `.handle` centres this box on the corner it resizes
-    // from, which is the overhang; the rule that anchors it inside the Card is
-    // what this asserts, and gating `pointer-events` instead deadlocks the
-    // gesture (`.scratch/card-resizing/issues/02-…`).
+    // The interactive control stays inside the Card so its invisible state
+    // cannot receive an unannounced touch over the pane. Only its inert mark
+    // straddles the bottom-right edge by 5px on each axis.
     expect(box.x).toBeGreaterThanOrEqual(before.x);
     expect(box.y).toBeGreaterThanOrEqual(before.y);
     expect(box.x + box.width).toBeLessThanOrEqual(before.x + before.width + 0.5);

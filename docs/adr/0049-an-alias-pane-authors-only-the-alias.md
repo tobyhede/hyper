@@ -1,6 +1,7 @@
 # An Alias pane authors only the Alias
 
-Status: accepted
+Status: superseded
+Superseded by: 0070
 Refines: 0039, 0046, 0048
 Refined by: 0051
 Related: 0009, 0037, 0042

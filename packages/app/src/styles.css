@@ -164,13 +164,13 @@ body {
    bare `.handle`, which belongs to React Flow and which no module here names.
 
    The control is the hit target and the mark is only what it draws, and the
-   whole of it stays inside the Card: `translate` is overridden rather than left
-   as React Flow's centring of the box on the corner it resizes from. Centred,
-   three quarters of a 24px target lay over the pane while `opacity` kept it
-   invisible, and hover is no answer to a pointer that has none — a touch beside
-   an unselected Open Card's bottom-right corner began a resize on a control
-   nothing had revealed. Anchored inside, the mark sits just within the corner
-   rather than straddling it, and there is nothing over the pane to hit.
+   whole interactive box stays inside the Card: `translate` is overridden rather
+   than left as React Flow's centring of the box on the corner it resizes from.
+   Centred, three quarters of the target lay over the pane while `opacity` kept
+   it invisible, and hover is no answer to a pointer that has none — a touch
+   beside an unselected Open Card's bottom-right corner began a resize on a
+   control nothing had revealed. The inert mark keeps its corner anchor; its
+   visual adjustment is CSS-only and changes no layout or interaction geometry.
 
    Anchoring it inside is what makes `z-index` load-bearing. The control is
    rendered before the Card so `canvas-card.css` can reach the authoring handles
@@ -206,13 +206,16 @@ body {
 }
 
 .rf-card-node__resize-mark {
-  position: relative;
-  top: -4px;
-  left: -4px;
+  position: absolute;
+  translate: 1px 1px;
+  transform-origin: right bottom;
   width: 20px;
   height: 20px;
   background: #000;
   border: 2px solid var(--canvas-card-ink-color);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
 }
 
 /* Hover discovers the control, Selection keeps it stable for touch (no hover
@@ -226,6 +229,12 @@ body {
 .react-flow__node:focus-within .react-flow__resize-control.rf-card-node__resize-control {
   opacity: 1;
   pointer-events: auto;
+}
+
+.react-flow__node:hover .rf-card-node__resize-mark,
+.rf-card-node__inner[data-selected='true'] .rf-card-node__resize-mark,
+.react-flow__node:focus-within .rf-card-node__resize-mark {
+  opacity: 1;
 }
 
 .new-card-preview {

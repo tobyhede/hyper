@@ -3,7 +3,7 @@
 Status: accepted
 Supersedes: 0006, 0011, 0037
 Refines: 0048, 0063
-Refined by: 0066
+Refined by: 0066, 0070
 Related: 0024, 0025, 0027, 0036, 0040, 0045, 0051, 0058, 0065
 
 Opening a Card draws its content **on the Card**, by growing that Card on the
@@ -93,10 +93,8 @@ The transient `openedCardId`, its `openCard`/`closeCard` navigation operations a
 the covering Card pane are replaced by Layout-owned expansion. Alias creation is
 unaffected: creating a Card that does not exist yet is not opening one.
 
-An Alias has no content front of its own to expand. Its existing Open action remains
-the metadata-authoring dialog for the two fields the Alias owns, Title and Target;
-that dialog does not make the Alias Expanded and is not Layout-owned content Opening.
-Opening the Target's content still means opening the Target Card itself.
+ADR 0070 replaces the Alias exception: an Alias now uses this Layout-owned Open
+operation and fills the Open Card with its immutable Target's content read-only.
 
 ## The negative to remember
 

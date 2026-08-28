@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
   Background,
   Controls,
@@ -15,6 +9,7 @@ import {
   type OnNodesChange,
 } from '@xyflow/react';
 import type { Card, CardId, Graph, GraphId } from '@project/core';
+import type { SpaceSession } from '@project/persistence';
 import {
   nodeTypes,
   GraphConnectionLine,
@@ -22,10 +17,11 @@ import {
   type CardFlowNode,
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
-import { CARD_SIZE } from '../card';
+import { useCanvasCardAuthoring } from '../canvas-card-authoring';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import type { EdgeAuthoring } from '../edge-authoring';
 import type { CanvasSelection, CardResize, EdgeSubject } from '../render-adapter';
+import type { SpaceAuthoring } from '../space-authoring';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { OverviewCamera, PresentingCamera } from './cameras';
 
@@ -133,10 +129,9 @@ export interface SpaceCanvasProps {
    * nothing with it, because the initial state is whatever arrives with it.
    */
   nameOnCreation: string | null;
-  /** Opening a card is a view gesture; the graph only reports which was picked. */
-  onOpenCard: (cardId: string) => 'completed' | 'retained';
-  onCloseCard: (cardId: CardId) => 'completed' | 'retained';
-  onCompleteCardBody: (cardId: CardId, body: string) => 'completed' | 'retained';
+  authoring: SpaceAuthoring;
+  spaceSession: SpaceSession;
+  onOpenAlias: (cardId: CardId) => void;
   /**
    * Whether a content edit is running, for the one control outside this canvas
    * that has to know: Present.
@@ -148,10 +143,6 @@ export interface SpaceCanvasProps {
    */
   onBodyEditingChange?: (editing: boolean) => void;
   cardResize: CardResize;
-  /** Complete one locally validated title draft, or return its field error. */
-  onCompleteCardTitle: (cardId: string, title: string) => string | null;
-  /** Which Cards may be opened for editing — every Card of the Space (ADR 0049). */
-  editableCardIds: ReadonlySet<string>;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: GraphId | null;
@@ -176,66 +167,16 @@ export function SpaceCanvas({
   newCardTitle,
   onAddCard,
   nameOnCreation,
-  onOpenCard,
-  onCloseCard,
+  authoring,
+  spaceSession,
+  onOpenAlias,
   onBodyEditingChange,
-  onCompleteCardBody,
   cardResize,
-  onCompleteCardTitle,
-  editableCardIds,
   graphs,
   colorByGraphId,
   activeGraphId,
   activeGraphCardIds,
 }: SpaceCanvasProps) {
-  const [caret, setCaret] = useState<
-    | { cardId: string; field: 'title' }
-    | { cardId: string; field: 'body'; openObserved: boolean }
-    | null
-  >(null);
-  const editingTitleCardId = caret?.field === 'title' ? caret.cardId : null;
-  const bodyCaretNamesOpenMarkdown =
-    caret?.field === 'body' &&
-    nodes.some(
-      (node) =>
-        node.id === caret.cardId && node.data.expanded === true && node.data.kind === 'markdown',
-    );
-  if (caret?.field === 'body') {
-    if (bodyCaretNamesOpenMarkdown && !caret.openObserved) {
-      setCaret({ ...caret, openObserved: true });
-    } else if (!bodyCaretNamesOpenMarkdown && caret.openObserved) {
-      setCaret(null);
-    }
-  }
-  /**
-   * Which Card carries a live content editor — **derived, never stored**.
-   *
-   * The caret is the author's intent and is real state. Whether that intent is
-   * running is not: it is true exactly while the Card the caret names is still
-   * an Expanded Markdown Card this canvas may edit. Deriving it is what makes
-   * the answer and the editor one fact rather than two that can disagree.
-   *
-   * Storing it is how the canvas used to lock: `onEnd` is the only thing that
-   * clears the caret and it arrives through `data.bodyEditor`, so a Card that
-   * stopped being Expanded — a replacement Space accepted mid-edit — took the
-   * callback away and left a stored `true` behind. Title editing, `F2` and `C`
-   * are all withheld while an edit runs, so the canvas stayed withdrawn until
-   * the author presented or reloaded.
-   *
-   * `editable` and `presenting` belong here and `titleEditingEnabled` does not.
-   * A modal over the canvas hides the editor and gives it back — it owns its own
-   * modality (`CardPane`), and ADR 0064 allows exactly four exits, none of which
-   * is a surface opening over the graph. Leaving authoring altogether is a
-   * different thing, and it ends the edit because the Card stops being drawn.
-   */
-  const bodyEditorCardId =
-    caret?.field === 'body' && editable && !presenting && bodyCaretNamesOpenMarkdown
-      ? caret.cardId
-      : null;
-  const bodyEditing = bodyEditorCardId !== null;
-  useEffect(() => {
-    onBodyEditingChange?.(bodyEditing);
-  }, [bodyEditing, onBodyEditingChange]);
   /**
    * Whether a drag may begin at a Card's authoring handles.
    *
@@ -267,39 +208,20 @@ export function SpaceCanvas({
    * behind it. The Card controls and spatial Edge gestures agree here, and
    * `edge-authoring-react.test.tsx` holds them to it.
    */
-  const canAuthorOnCanvas = canConnectOnCanvas && !presenting;
-
-  // A withdrawn editor does not come back on its own.
-  //
-  // `canAuthorOnCanvas` going false — presenting starts, a Card opens over the graph
-  // — unmounts the editor along with the only controls that could settle a draft
-  // it refused, so the Card it named is forgotten at that moment rather than
-  // remembered until editing returns and reopened over a Card nobody asked to
-  // rename. Adjusted during render rather than in an effect: this is React's
-  // documented way to reset state on a changed input, and an effect would both
-  // cost a second render and be rejected by lint.
-  const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(canAuthorOnCanvas);
-  if (canvasAuthoringWasEnabled !== canAuthorOnCanvas) {
-    setCanvasAuthoringWasEnabled(canAuthorOnCanvas);
-    // The *title* editor only. It is a canvas control and goes with the rest of
-    // them. A content edit is the Card's, not the canvas's: presenting may hide
-    // it without withdrawing the author's caret.
-    if (!canAuthorOnCanvas && caret?.field === 'title') setCaret(null);
-  }
-
-  // A created Card is named in place, in the editor that already exists for
-  // renaming one. Adjusted during render for the same reason as the reset above
-  // — React's documented way to react to a changed input, without the second
-  // render an effect would cost — and driven by the identity changing rather
-  // than by a request being raised and cleared, so nothing has to be handed
-  // back once the naming is over.
-  const [lastCreatedCardId, setLastCreatedCardId] = useState(nameOnCreation);
-  if (lastCreatedCardId !== nameOnCreation) {
-    setLastCreatedCardId(nameOnCreation);
-    if (nameOnCreation !== null && !bodyEditing) {
-      setCaret({ cardId: nameOnCreation, field: 'title' });
-    }
-  }
+  const cardAuthoring = useCanvasCardAuthoring({
+    nodes,
+    editable,
+    presenting,
+    enabled: titleEditingEnabled,
+    nameOnCreation,
+    authoring,
+    spaceSession,
+    cardResize,
+    onOpenAlias,
+    onSelectCard,
+    onBodyEditingChange,
+  });
+  const { bodyEditing, canAuthorOnCanvas, openCard: onOpenCard, beginTitleEditing } = cardAuthoring;
 
   const edgeSurface = useEdgeAuthoring({
     authoring: edgeAuthoring,
@@ -398,93 +320,17 @@ export function SpaceCanvas({
       const selected = nodes.find((node) => node.selected);
       if (selected === undefined) return;
       event.preventDefault();
-      setCaret({ cardId: selected.id, field: 'title' });
+      beginTitleEditing(selected.id);
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, [canAuthorOnCanvas, bodyEditing, nodes]);
+  }, [canAuthorOnCanvas, bodyEditing, nodes, beginTitleEditing]);
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
   // that depended on the object would be rebuilt every time.
   const deleteEdges = edgeSurface.deleteEdges;
-  const editableNodes = useMemo(
-    () =>
-      nodes.map((node) => {
-        const data: CardFlowNode['data'] = {
-          ...node.data,
-          // The Title's direct edit is offered on every Card; the Card
-          // affordance only on one that owns content to edit. Each flag travels
-          // with the operation that performs it — `CardNode` withholds a control
-          // it was offered without one.
-          titleEditingEnabled: canAuthorOnCanvas && !bodyEditing,
-          cardEditingEnabled: canAuthorOnCanvas && editableCardIds.has(node.id),
-          onEditCard: (open) => (open ? onOpenCard(node.id) : onCloseCard(node.data.cardId)),
-        };
-        if (canAuthorOnCanvas && !bodyEditing) {
-          data.onBeginTitleEditing = () => setCaret({ cardId: node.id, field: 'title' });
-        }
-        if (canAuthorOnCanvas && !bodyEditing && node.data.kind === 'markdown') {
-          data.onBeginBodyEditing = () =>
-            setCaret({
-              cardId: node.id,
-              field: 'body',
-              openObserved: node.data.expanded === true,
-            });
-        }
-        // Resize belongs to Card and follows authored Expanded state; the body
-        // editor belongs separately to the Markdown kind (ADR 0064).
-        if (node.data.expanded === true && canAuthorOnCanvas) {
-          data.resize = {
-            minWidth: CARD_SIZE.width,
-            minHeight: CARD_SIZE.height,
-            // A resize gesture begun on an unselected Card selects it, so the
-            // control that grows the box also becomes the thing Selected — one
-            // drag, not a drag followed by a separate click.
-            onResizeStart: () => {
-              onSelectCard(node.data.cardId);
-              cardResize.beginResize(node.data.cardId);
-            },
-            onResize: (size) => cardResize.previewResize(node.data.cardId, size),
-            onResizeEnd: () => cardResize.finishResize(node.data.cardId),
-            onResizeCancel: () => cardResize.cancelResize(node.data.cardId),
-          };
-        }
-        if (node.data.kind === 'markdown' && bodyEditorCardId === node.id) {
-          data.bodyEditor = {
-            onComplete: (body) => onCompleteCardBody(node.data.cardId, body),
-            onEnd: () => setCaret(null),
-          };
-        }
-        // The editor is the Card being renamed, and it arrives with what ends
-        // it rather than as a flag beside two callbacks that might not be there.
-        if (canAuthorOnCanvas && node.id === editingTitleCardId) {
-          data.titleEditor = {
-            onComplete: (title: string) => {
-              const error = onCompleteCardTitle(node.id, title);
-              if (error === null) setCaret(null);
-              return error;
-            },
-            onCancel: () => setCaret(null),
-          };
-        }
-        return { ...node, data };
-      }),
-    [
-      nodes,
-      canAuthorOnCanvas,
-      bodyEditing,
-      editableCardIds,
-      editingTitleCardId,
-      onCompleteCardTitle,
-      onOpenCard,
-      onCloseCard,
-      onCompleteCardBody,
-      bodyEditorCardId,
-      cardResize,
-      onSelectCard,
-    ],
-  );
+  const editableNodes = cardAuthoring.nodes;
 
   const connectionLineStyle = useMemo(
     () => ({

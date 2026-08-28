@@ -432,7 +432,8 @@ test(
     await expect(recap).toBeVisible();
     await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
-    await openCard(recap, 'A′');
+    await recap.focus();
+    await page.keyboard.press('Enter');
     // Two fields, both the Alias's own, and nothing belonging to A.
     await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
     const target = page.getByRole('combobox', { name: 'Target' });
@@ -444,6 +445,12 @@ test(
     await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
     await target.press('Escape');
     await expect(page.getByTestId('open-card')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    // Pointer and keyboard activation are separate production paths. Keep both:
+    // this affordance is the Alias front's explicit Open operation.
+    await openCard(recap, 'A′');
+    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
     await page.getByRole('button', { name: 'Cancel' }).click();
 
     // Its own title is still authored, inline on the graph.
