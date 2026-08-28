@@ -16,6 +16,13 @@ import { HTTPException } from 'hono/http-exception';
 import { validator } from 'hono/validator';
 import { hasValidUniqueMediaTypeParameters } from './media-type';
 
+export {
+  productDestinationPath,
+  resolveProductDestination,
+  type ProductDestination,
+  type ProductDestinationResolution,
+} from './product-destination';
+
 export { HttpSpaceBackend } from './backend';
 export type { HttpSpaceBackendOptions } from './backend';
 
