@@ -1,6 +1,6 @@
 # Interaction-draft invalidation is mostly already covered, by accident
 
-Status: ready-for-human
+Status: resolved
 
 Surfaced by: investigating AGENTS.md's standing claim that ADR 0042's other half
 is "not built", before building it
@@ -8,6 +8,25 @@ is "not built", before building it
 Moved from `.scratch/adr-0040-0042/issues/07` when that effort was split by
 subject: its ADR 0042 tickets are this effort, its ADR 0040/0041 tickets are
 `.scratch/layout-ownership-review/`.
+
+Resolved after the investigation: Edge Authoring now owns the one Edge draft,
+observes `replacementEpoch` and cancels that draft when its context changes.
+The shared replacement contract test and the Edge Authoring unit test pin the
+reachable invalidation paths, and `docs/agents/rendering.md` records ADR 0042's
+invalidation half as built. The connection-specific work proposed below is
+therefore superseded rather than waiting to be implemented.
+
+The remaining App-level focus ambiguity is tracked separately in
+`03-focus-after-space-replacement.md`. Acknowledgement of discarded prose is
+carried forward as `04-acknowledge-markdown-prose-discarded-by-replacement.md`,
+because one reachable interaction does hold such a draft when Accept remote is
+invoked: an opened Card's Markdown body. ADR 0064 gives that editor no commit on
+blur, so the modal carrying Accept remote takes focus without ending the draft —
+unlike the inline Title field, whose blur is its own commit. The contract test
+cannot stage it, which is a property of that fixture rather than of the product:
+opening is itself an authored commit, so it trips the fixture's deliberately
+waiting conflict before body editing can begin, while a remote change in the
+running app can arrive at any point after the body editor is already live.
 
 ## Context
 
@@ -181,14 +200,22 @@ The nearest precedent for the guarantee is `packages/app/test/navigation.test.ts
 "closes an opened Card when the renderer changes, so no editor outlives its
 placement" — the same shape for a different trigger.
 
-## Acceptance
+## Resolution
 
-- [ ] A decision on silent discard versus an acknowledgement, recorded here.
-- [ ] A decision on what "focuses the canvas" means, recorded here.
-- [ ] A decision on the two unreachable survivors, recorded here.
-- [ ] A decision on whether an arriving conflict should commit an in-progress
-      inline rename, recorded here. Surfaced by 5 below: the modal that carries
-      `Accept remote` blurs the field, and blur is that editor's commit.
+- [x] The reachable invalidation cases are pinned by
+      `packages/app/test/replacement-invalidation.test.tsx`.
+- [x] Edge Authoring explicitly observes `replacementEpoch`, cancels its draft
+      and stale refusal, and requests canvas focus when the context changes.
+      `packages/app/test/edge-authoring.test.ts` pins replacement invalidation.
+- [x] The earlier connection-specific survivors are superseded by that single
+      Edge Authoring owner; no React Flow cancellation registry is required.
+- [x] The remaining App-level focus ambiguity is extracted to
+      `03-focus-after-space-replacement.md`.
+- [x] Silent-discard acknowledgement is deferred to
+      `04-acknowledge-markdown-prose-discarded-by-replacement.md`, against the
+      one reachable surface that still holds destructive local prose at the
+      moment Accept remote is invoked: an opened Card's Markdown body, which
+      ADR 0064 does not commit on blur.
 - [x] `docs/agents/editing-and-persistence.md` (where AGENTS.md's install-gate
       rule now lives) and `01`'s answer no longer say the half is simply
       unbuilt. Both now carry the finding in a sentence and point here for the
@@ -205,11 +232,11 @@ placement" — the same shape for a different trigger.
 
 ## Answer
 
-**This records what the investigation established; it does not resolve the
-ticket.** `Status:` stays `ready-for-human` because the three decisions in
-Comments are open, and the Acceptance boxes above are the ones that close it.
-Read the heading as the answer to "is this built?", which was answerable from the
-tree, and not as the answer to "what should happen?", which is not.
+**This records what the investigation established at the time.** Later Edge
+Authoring work resolved the invalidation question at the owning seam, so the
+historical gaps and product questions below no longer keep this ticket open.
+Read the heading as the answer to "was this already built when investigated?";
+the Resolution above records what subsequently closed it.
 
 The half is not unbuilt — it is unevenly built, and nothing tests the part that
 works. Two of the four drafts ADR 0042 names have nothing to invalidate. Both of
@@ -385,7 +412,7 @@ commit it?* — which is listed with the others below rather than answered here.
 
 ## Comments
 
-### The question that needs answering — deferred, and blocking the rest
+### Historical product questions — no longer blocking this ticket
 
 **When an author's Space is replaced out from under an open draft, what should
 they see?**
@@ -418,6 +445,8 @@ Three separable answers are needed:
   it is the one where "leave it, it cannot happen" rests on a third party's
   internals rather than on our own.
 
-Until the first is answered, building anything here is guessing at product
-behaviour. The answer's fourth item was the exception — the prose correction
-stands whichever way these three go, so it did not wait on them and is done.
+These questions explained why the investigation originally stopped at
+`ready-for-human`. Edge Authoring later supplied one explicit invalidation owner
+without requiring those answers. The still-reachable focus ambiguity has moved
+to `03-focus-after-space-replacement.md`; the other questions remain historical
+until a reachable interaction makes them concrete again.
