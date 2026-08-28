@@ -1,5 +1,4 @@
 import { StrictMode, type ReactNode } from 'react';
-import { createAppRouter } from './router';
 import type { OpenedSpace } from './open-space';
 import type { CanvasRendererId } from './renderer';
 import { mountSpaceApp } from './SpaceApp';
@@ -27,12 +26,7 @@ const renderOpenedSpace = (
   mountSpaceApp(
     opened,
     (app) => {
-      const AppRouter = createAppRouter(() => app);
-      root.render(
-        <StrictMode>
-          <AppRouter />
-        </StrictMode>,
-      );
+      root.render(<StrictMode>{app}</StrictMode>);
     },
     selection,
   );

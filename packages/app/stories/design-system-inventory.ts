@@ -47,11 +47,7 @@ export const uncataloguedComponents = [
   },
   {
     module: 'packages/app/src/main.tsx',
-    reason: 'The browser entry point: one `createRoot` call and the router.',
-  },
-  {
-    module: 'packages/app/src/router.tsx',
-    reason: 'TanStack Router route definitions. No rendered surface of its own.',
+    reason: 'The browser entry point: one `createRoot` call and startup composition.',
   },
   {
     module: 'packages/app/src/startup.tsx',

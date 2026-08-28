@@ -1,12 +1,7 @@
 import { act, waitFor, within } from '@testing-library/react';
 import { createRoot } from 'react-dom/client';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import {
-  encodeCompactUuid,
-  spaceSnapshotSchema,
-  uuidSchema,
-  type SpaceSnapshot,
-} from '@project/core';
+import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { openStoredSpace } from '../src/open-space';
 import { startApplication } from '../src/startup';
@@ -45,13 +40,13 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
-it('mounts an opened startup result', async () => {
+it('mounts an opened startup result without interpreting the browser path again', async () => {
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
   const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
   const opened = await openStoredSpace(backend, SPACE_ID);
-  window.history.replaceState(null, '', `/spaces/${encodeCompactUuid(SPACE_ID)}`);
+  window.history.replaceState(null, '', '/already-resolved-by-startup');
 
   try {
     await act(async () => {

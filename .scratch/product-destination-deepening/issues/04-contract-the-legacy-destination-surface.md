@@ -17,3 +17,7 @@
 The legacy `core` Space View destination module, barrel export and tests are removed. `App` formats pushed addresses through the shared product formatter and restores popstate destinations by comparing that formatter's canonical output across the current Space's available Space Views; it owns no parsing grammar. A repository search finds the `/spaces` grammar only in `@project/http`'s private product-destination parser.
 
 The new public-interface, host-translation and browser-routing suites carry the destination examples at their intended seams. No later entity destinations or error surfaces were added. `pnpm verify` passed with 157 files and 1,780 tests passed (8 skipped); `pnpm e2e` passed all 122 tests.
+
+Post-resolution review found that TanStack Router still wrapped the application with one splat route while startup and in-session navigation owned product destinations independently. The inert wrapper and dependency are now removed, so the application deliberately owns browser history until later destination kinds justify a single richer routing boundary. A startup regression test proves an already-resolved startup result mounts without interpreting `window.location.pathname` a second time.
+
+The same review verified that the current `popstate` restoration intentionally handles only destinations within the opened Space. Back/Forward across a Space boundary becomes reachable when Space Cards can open another Space and remains owned by the later cross-Space addressability tickets; this behavior-preserving ticket does not speculate that opening seam.

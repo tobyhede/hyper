@@ -127,12 +127,10 @@ const isImplementationSource = (file: string): boolean =>
 const HISTORICAL_TREES = ['docs/adr/', 'docs/superpowers/', '.scratch/'] as const;
 
 /**
- * The one live file speaking a *different* library's routing vocabulary.
- * TanStack Router's root/tree constructors are its API, not our domain, and
- * this file is the whole of our contact with it. It is named rather than
- * pattern-matched so that reintroducing the domain entity here still fails.
+ * Live files speaking a different library's routing vocabulary belong here.
+ * The list is empty now that no routing library owns product navigation.
  */
-const QUALIFIED_FILES = ['packages/app/src/router.tsx'] as const;
+const QUALIFIED_FILES = [] as const;
 
 /** The index modes of an ordinary blob; a tracked symlink is `120000`. */
 const REGULAR_FILE_MODES = new Set(['100644', '100755']);
