@@ -18,8 +18,15 @@ therefore superseded rather than waiting to be implemented.
 
 The remaining App-level focus ambiguity is tracked separately in
 `03-focus-after-space-replacement.md`. Acknowledgement of discarded prose is
-not carried forward without a reachable interaction that can still hold such a
-draft when Accept remote is invoked.
+carried forward as `04-acknowledge-markdown-prose-discarded-by-replacement.md`,
+because one reachable interaction does hold such a draft when Accept remote is
+invoked: an opened Card's Markdown body. ADR 0064 gives that editor no commit on
+blur, so the modal carrying Accept remote takes focus without ending the draft —
+unlike the inline Title field, whose blur is its own commit. The contract test
+cannot stage it, which is a property of that fixture rather than of the product:
+opening is itself an authored commit, so it trips the fixture's deliberately
+waiting conflict before body editing can begin, while a remote change in the
+running app can arrive at any point after the body editor is already live.
 
 ## Context
 
@@ -204,8 +211,11 @@ placement" — the same shape for a different trigger.
       Edge Authoring owner; no React Flow cancellation registry is required.
 - [x] The remaining App-level focus ambiguity is extracted to
       `03-focus-after-space-replacement.md`.
-- [x] Silent-discard acknowledgement is deferred unless a reachable surface can
-      still hold destructive local prose at the moment Accept remote is invoked.
+- [x] Silent-discard acknowledgement is deferred to
+      `04-acknowledge-markdown-prose-discarded-by-replacement.md`, against the
+      one reachable surface that still holds destructive local prose at the
+      moment Accept remote is invoked: an opened Card's Markdown body, which
+      ADR 0064 does not commit on blur.
 - [x] `docs/agents/editing-and-persistence.md` (where AGENTS.md's install-gate
       rule now lives) and `01`'s answer no longer say the half is simply
       unbuilt. Both now carry the finding in a sentence and point here for the
