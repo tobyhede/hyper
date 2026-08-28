@@ -1,6 +1,6 @@
 import type { ComponentProps, ComponentType } from 'react';
 import type { Card } from '@project/core';
-import { AliasIcon, MarkdownIcon } from './icons';
+import { AliasIcon, MarkdownIcon, SpaceCardIcon } from './icons';
 
 /**
  * What kind of Card this is, drawn rather than described.
@@ -18,11 +18,13 @@ import { AliasIcon, MarkdownIcon } from './icons';
 const KIND_GLYPHS = {
   markdown: MarkdownIcon,
   alias: AliasIcon,
+  space: SpaceCardIcon,
 } satisfies Record<Card['kind'], ComponentType<{ size?: number }>>;
 
 const KIND_NAMES = {
   markdown: 'Markdown Card',
   alias: 'Alias',
+  space: 'Space Card',
 } satisfies Record<Card['kind'], string>;
 
 export interface CardKindIconProps {

@@ -44,6 +44,25 @@ const cardArb: fc.Arbitrary<Card> = fc.oneof(
     kind: fc.constant('alias' as const),
     target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
   }),
+  fc.record(
+    {
+      id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+      title: line,
+      kind: fc.constant('space' as const),
+      spaceId: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+      spaceView: fc.option(
+        fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+        { nil: undefined },
+      ),
+      graph: fc.option(
+        fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+        {
+          nil: undefined,
+        },
+      ),
+    },
+    { requiredKeys: ['id', 'title', 'kind', 'spaceId'] },
+  ),
 );
 
 describe('card file round-trip', () => {

@@ -54,7 +54,7 @@ export interface SpaceLookup {
 }
 
 /** A card that owns content rather than pointing at another card's content. */
-export type ResolvedContentCard = Exclude<Card, { kind: 'alias' }>;
+export type ResolvedContentCard = Extract<Card, { kind: 'markdown' }>;
 
 /**
  * The card whose content `cardId` shows. A markdown card is its own content
@@ -68,10 +68,11 @@ export type ResolvedContentCard = Exclude<Card, { kind: 'alias' }>;
  */
 export function resolveContentCard(space: Space, cardId: CardId): ResolvedContentCard | undefined {
   const card = space.lookup.card(cardId);
-  if (card?.kind !== 'alias') return card;
+  if (card?.kind === 'markdown') return card;
+  if (card?.kind !== 'alias') return undefined;
 
   const target = space.lookup.card(card.target);
-  return target === undefined || target.kind === 'alias' ? undefined : target;
+  return target?.kind === 'markdown' ? target : undefined;
 }
 
 /**

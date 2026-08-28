@@ -46,29 +46,38 @@ interface Document {
   readonly cards: readonly Card[];
 }
 
-type Loader = (document: Document) => LoadSpaceResult;
+type Loader = (document: Document, ancestorSpaceIds?: readonly string[]) => LoadSpaceResult;
 
 /**
  * The file loader: cards arrive as the markdown files an author wrote, so the
  * document under test is turned back into frontmatter on the way in.
  */
-const viaFiles: Loader = ({ cards, ...structure }) =>
+const viaFiles: Loader = ({ cards, ...structure }, ancestorSpaceIds = []) =>
   loadSpace(
     { version: 1, id: SPACE, title: 'Test space', ...structure },
     cards.map((card) =>
       card.kind === 'alias'
         ? aliasFile(card.id, card.title, card.target)
-        : cardFile(card.id, card.title, card.body),
+        : card.kind === 'space'
+          ? {
+              path: `cards/${card.id}.md`,
+              text: `---\nid: ${card.id}\ntitle: ${card.title}\nkind: space\nspaceId: ${card.spaceId}\n${card.spaceView === undefined ? '' : `spaceView: ${card.spaceView}\n`}${card.graph === undefined ? '' : `graph: ${card.graph}\n`}---\n`,
+            }
+          : cardFile(card.id, card.title, card.body),
     ),
+    ancestorSpaceIds.map(uuid),
   );
 
 /** The persistence loader: the same aggregate, fully identified. */
-const viaSnapshot: Loader = ({ cards, ...structure }) => {
-  const result = loadSpaceSnapshot({
-    id: SPACE,
-    document: { version: 1, title: 'Test space', ...structure },
-    cards: cards.map(({ id, ...document }) => ({ id, document })),
-  });
+const viaSnapshot: Loader = ({ cards, ...structure }, ancestorSpaceIds = []) => {
+  const result = loadSpaceSnapshot(
+    {
+      id: SPACE,
+      document: { version: 1, title: 'Test space', ...structure },
+      cards: cards.map(({ id, ...document }) => ({ id, document })),
+    },
+    ancestorSpaceIds.map(uuid),
+  );
   return result.ok ? { ok: true, space: result.space } : result;
 };
 
@@ -84,6 +93,13 @@ const aliasTo = (id: string, target: string): Card => ({
   title: `alias ${id}`,
   kind: 'alias',
   target: uuid(target),
+});
+
+const spaceCard = (id: string, spaceId: string): Card => ({
+  id: uuid(id),
+  title: `Space ${spaceId}`,
+  kind: 'space',
+  spaceId: uuid(spaceId),
 });
 
 const graph = (id: string, title: string, edges: { from: string; to: string }[] = []) => ({
@@ -582,6 +598,30 @@ describe.each([
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'alias-targets-alias', ref: B }),
       );
+    });
+  });
+
+  describe('Space Card reference cycles (ADR 0068)', () => {
+    it('refuses a Space Card that targets the Space containing it', () => {
+      const errors = refused(load({ cards: [spaceCard(A, SPACE)], layouts: [] }));
+
+      expect(errors).toContainEqual(
+        expect.objectContaining({ kind: 'space-card-reference-cycle', ref: SPACE }),
+      );
+    });
+
+    it('refuses a Space Card that targets an open ancestor Space', () => {
+      const errors = refused(load({ cards: [spaceCard(A, B)], layouts: [] }, [C, B]));
+
+      expect(errors).toContainEqual(
+        expect.objectContaining({ kind: 'space-card-reference-cycle', ref: B }),
+      );
+    });
+
+    it('accepts several Space Cards that converge on one target', () => {
+      const space = loaded(load({ cards: [spaceCard(A, C), spaceCard(B, C)], layouts: [] }));
+
+      expect(space.cards).toHaveLength(2);
     });
   });
 

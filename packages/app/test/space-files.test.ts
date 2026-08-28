@@ -82,7 +82,7 @@ describe.each([
     // An alias shows its target's content, so it has no body of its own (ADR
     // 0009); every markdown card carries one.
     for (const card of result.space.cards) {
-      if (card.kind === 'alias') expect('body' in card).toBe(false);
+      if (card.kind !== 'markdown') expect('body' in card).toBe(false);
       else expect(card.body.trim().length).toBeGreaterThan(0);
     }
   });

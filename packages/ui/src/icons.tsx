@@ -14,6 +14,7 @@ import {
   Pencil,
   Play,
   Plus,
+  SquareSquare,
   Workflow,
   X,
 } from 'lucide-react';
@@ -80,6 +81,9 @@ export const AliasIcon = ({ size = 14 }: { size?: number }) => <CornerDownRight 
 
 /** The Card kind that owns the Markdown it draws. */
 export const MarkdownIcon = ({ size = 14 }: { size?: number }) => <FileText size={size} />;
+
+/** The Card kind that shows one selected view of another Space (ADR 0068). */
+export const SpaceCardIcon = ({ size = 14 }: { size?: number }) => <SquareSquare size={size} />;
 
 /** Mark the selected item in a list. */
 export const CheckIcon = () => <Check color="var(--accent)" size={14} />;

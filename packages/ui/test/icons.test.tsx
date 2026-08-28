@@ -125,14 +125,18 @@ describe('the public icon facade', () => {
       <>
         <CardKindIcon kind="markdown" />
         <CardKindIcon kind="alias" />
+        <CardKindIcon kind="space" />
       </>,
     );
 
     const markdown = screen.getByRole('img', { name: 'Markdown Card' });
     const alias = screen.getByRole('img', { name: 'Alias' });
+    const space = screen.getByRole('img', { name: 'Space Card' });
     expect(markdown).toHaveAttribute('title', 'Markdown Card');
     expect(alias).toHaveAttribute('title', 'Alias');
+    expect(space).toHaveAttribute('title', 'Space Card');
     expect(markdown.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(alias.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(space.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 });
