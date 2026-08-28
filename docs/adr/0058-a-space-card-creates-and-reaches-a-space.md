@@ -1,6 +1,7 @@
 # A Space Card creates and reaches a Space
 
-Status: accepted
+Status: superseded
+Superseded by: 0068
 Refines: 0001, 0030
 Related: 0009, 0051, 0053
 Refined by: 0059, 0060

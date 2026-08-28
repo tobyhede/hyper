@@ -1,12 +1,14 @@
 # A Space Card shows a Space View
 
-Status: proposed
-Supersedes when accepted: 0055, 0058, 0059, 0060
-Related: 0018, 0025, 0040, 0053, 0069, 0070
+Status: accepted
+Supersedes: 0055, 0058, 0059, 0060
+Refines: 0053, 0057
+Related: 0018, 0025, 0040, 0048, 0064, 0069, 0070
 
-**Provisional until the Space Card UX is exercised.** The terminology, initial
-authored state and cross-Space topology below are decided for the prototype;
-the gestures and visual treatment are hypotheses, not accepted design.
+The Space Card UX has been exercised by the review prototypes under
+`packages/app/stories/review/`, and this decision is accepted on what they
+settled. What is still a hypothesis is named where it appears: how a cross-Space
+Edge is drawn, and how several leaving one Card are offered as a fork.
 
 A **Space View** is one way of seeing a Space's Cards. It is the product-facing
 term shared by Computed Views and authored Layouts, replacing **canvas
@@ -43,16 +45,37 @@ Card therefore shows the same selection. Showing a different view of the same
 Space requires another Space Card, rather than breaking Card identity by
 putting its kind-specific configuration in a Layout.
 
+**An entered Space carries a live selection that authors nothing.** Entering
+seeds a navigation context from the Space Card's selection, and changing the
+Space View or Active Graph while inside is navigation rather than an Edit: it
+writes neither the Card nor the Space. Leave that Space and return to it and the
+selection is the one you left, because the surface behind its entry stays
+mounted. Reload and it is the Card's selection again, because nothing stored it.
+**Exit closes the entry outright**, so entering that Space again seeds from the
+Card exactly as the first crossing did — switching away and exiting are not the
+same act, and only one of them keeps a selection alive.
+
+This is the mechanism ADR 0069 already establishes, reached by a gesture instead
+of a URL: an explicit context "wins for that navigation and never edits the
+authored active selections". It is a second instance of that mechanism and not
+the same object as the ordered crossings ADR 0069 encodes for a presentation
+point, which belong to a traversal rather than to what is open. So the paragraph
+above holds exactly as written — every placement of one Space Card still shows
+the same *stored* selection, and showing a different one still needs another
+Space Card. What an author does while inside an entered Space is not a placement.
+
 The Space reference itself is immutable. A Space Card is never retargeted to a
 different Space; an author creates another Space Card instead. This keeps the
 Card's identity and every cross-Space Edge naming it stable, while the Card's
 Space View and Active Graph selections remain editable.
 
 The active Space View is authored for the context in which the Space is being
-seen. A standalone or new-tab Space uses the Space's selection. An embedded
-Space Card uses the Card's independent selection, and entering that Card
-preserves it. A new tab opens the Space independently and carries no containing
-navigation or presentation state. Stored selections may remain optional for
+seen. A standalone Space, or one opened in a new browser tab, uses the Space's
+selection. An embedded Space Card uses the Card's independent selection, and
+entering that Card preserves it as the starting value. A new tab is the
+browser's own: ADR 0069 gives every Space a durable address, so opening one
+independently is a link and the application builds no tab of its own. It carries
+no containing navigation or presentation state. Stored selections may remain optional for
 simple manual authoring, but the UI always writes the target Space, Active Space
 View and Active Graph explicitly. When manual authoring omits either selection,
 the Space Card resolves it from the target Space's active selection. A Space
@@ -71,10 +94,84 @@ express rather than the state the UI creates.
 
 Opening a Space Card embeds its selected Space View in the Card by default. The
 same opened Card may be entered, adopting the target Space's full command
-surface until Back or Escape returns to the containing Space, or its Space may
-be opened independently in a new tab. Editing inside the embedded or entered
+surface until an explicit Exit closes it, or its Space may be opened
+independently in a new browser tab. Editing inside the embedded or entered
 Space authors that Space; moving or resizing the containing Space Card authors
 the containing Layout.
+
+## Open Spaces
+
+Entering does not unwind. Every Space an author enters and has not exited stays
+open, and **Open Spaces** is the surface that draws them: a vertical set of
+entries beside the Space Sidebar, one per open Space. Selecting an entry
+switches to that Space and closes nothing. Exit is a separate, explicit command
+in that Space's own Sidebar, and the root Space is never closable.
+
+Open Spaces draws only once more than one Space is open. A surface offering a
+choice between one thing does not earn permanent width from a spatial canvas,
+which is the cost ADR 0053 weighed and accepted once already. It comes out of
+`SIDEBAR_WIDTH` rather than adding to it, so depth costs a row and never any
+width. Below the breakpoint the Sheet is a fixed width with nothing to its left,
+so it has to come out of the panel there whatever the desktop does; taking it
+out everywhere keeps one behaviour rather than two.
+
+**This refines ADR 0053 twice.** That decision's command surface stays one
+Space's: Open Spaces sits beside one Space Sidebar per open Space, each composed
+exactly as the application composes one today, with only the active one showing.
+What is session-scoped is Open Spaces, not the Sidebar. And an entry may carry a
+status mark for a Space that has stopped saving — `conflicted`, `failed` or
+`rejected`, and nothing else. ADR 0053's "status is not a command" is untouched:
+it forbids status in a command list, and an entry is a place rather than a
+command. The save lifecycle stays in that Space's own Sidebar footer.
+
+**An entry names a Space and remembers nothing else.** It does not keep the
+chain of Space Cards crossed to reach it, so closing one Space never closes
+another. This amends the sentence above that once had entering last "until Back
+or Escape returns to the containing Space", which is now withdrawn: Exit is the
+one thing that closes a Space, Back is the browser's linear history under ADR
+0069 rather than a pop, and Escape keeps the meaning ADR 0048 gives it
+everywhere else. Closing a Space is too large an action to reach by the key that
+cancels an edit.
+
+**Entering a Space that is already open focuses its existing entry.** A second
+entry on one Space would be two live selections over one Space identity, and the
+second would show a stale derivation the moment the first edited. Two views of
+one Space at once is what a second browser tab on its address is for.
+
+**Naming.** Rail is ADR 0070's word, for a Card's toolbar, and is not reused
+here. Tab is not a domain word, so it keeps meaning a browser tab. The
+collection is an ordered set of open Spaces and is deliberately not a stack: a
+stack is the model in which selecting an outer Space closes everything inside
+it, and that model was built, compared and rejected.
+
+## Persistence across open Spaces
+
+More than one Space is open at once, so a Space may be left while it is still
+saving, and may sit in a state it cannot save out of while the author is looking
+at something else. This refines ADR 0057 with three rules.
+
+**Switching Spaces awaits any in-flight commit on the Space being left.** That
+is sufficient for the arrival case: `failed`, `rejected` and `conflicted` are
+published only from the commit-result handler, so a Space cannot go bad while
+idle — only as the outcome of a write it started. At the moment you leave, it
+has either settled or has just landed in a bad state while you are still there.
+
+**A conflict dialog does not open until you switch to the Space that owns it.**
+The entry carries the mark instead. A dialog for a Space that is not on screen
+asks for a decision about something the surface is not conducting.
+
+**Exit waits on an in-flight commit and refuses on `failed` or `conflicted`.**
+`submit` returns early when the previous state is either, so a Space parked in
+one is not merely unsaved but un-saving, and `conflicted` cannot self-heal.
+Closing an entry is not a way to discard state the session could not save. The
+refusal carries a stable code, per ADR 0057, and names the recovery that already
+exists: Retry for `failed`, Accept remote or Resolve for `conflicted`.
+
+**Exit warns and allows on `rejected`.** This reads backwards — it is the state
+in which the work is certainly lost — and it is deliberate. A permanent failure
+has no recovery to point at, so refusing there would trap the entry with nothing
+the author could do about it. A refusal is only worth making when it names an
+action.
 
 ## Cross-Space Edges
 
@@ -150,7 +247,7 @@ dangling Edges remain invalid.
 
 ## UX prototype
 
-The provisional Ladle review story compares the two canvas models that change
+The Ladle review story compared the two canvas models that change
 the authoring interaction:
 
 - **Nested canvases:** the target Space has an independent React Flow instance
@@ -163,9 +260,8 @@ the authoring interaction:
 
 Both variants exercise the same compact Space View and Graph controls, Open and
 Close, resize, Enter, independent new-tab opening, entry and exit treatment,
-local editing, and presentation traversal. The story is a decision surface, not
-evidence that either canvas model is accepted. This ADR remains proposed until
-that UX is reviewed.
+local editing, and presentation traversal. The story was a decision surface. The
+review it existed for has happened, and what it settled is written above.
 
 The first UX review favors the **compound canvas**. It keeps local and
 cross-Space Edge authoring, exit, and reconnection in React Flow's one existing
@@ -174,3 +270,10 @@ cross-instance drags. This is the current implementation direction, not yet an
 accepted decision: editing must still establish whether sharing the containing
 camera is an acceptable cost. The nested-canvas variant remains in the story as
 the counterfactual for that comparison.
+
+**Enter is exempt from that preference.** An entered Space gets its own React
+Flow instance and its own camera, and is edited exactly as a Space opened
+normally is. The compound canvas is a question about the *embedded* open-Card
+case, where two Spaces are drawn at once and an Edge is dragged between them.
+Entering draws one Space, so it has nothing to coordinate and no reason to give
+up a camera.

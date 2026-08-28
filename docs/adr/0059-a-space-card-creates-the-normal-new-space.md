@@ -1,6 +1,7 @@
 # A Space Card creates the normal new Space
 
-Status: accepted
+Status: superseded
+Superseded by: 0068
 Refines: 0018, 0058
 Related: 0025
 

@@ -1,6 +1,7 @@
 # A nested Space has one owner
 
-Status: accepted
+Status: superseded
+Superseded by: 0068
 Refines: 0058
 Related: 0030, 0059
 

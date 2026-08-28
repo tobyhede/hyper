@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0031
-Refined by: 0055
+Refined by: 0055, 0068
 Related: 0025, 0026, 0028, 0040, 0045, 0047, 0050, 0052
 
 Workspace commands live in a persistent left **Sidebar**, and what draws the canvas is **one exclusive choice** in it: the computed Views and authored Layouts are rendered as two labelled menu groups sharing exactly one pressed item. There is no second selector and no `None`. The Space title names the workspace at the top of the sidebar; the canvas header names what is currently drawing it and whether that is computed or authored.

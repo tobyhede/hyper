@@ -1,6 +1,7 @@
 # Name the canvas renderer, not its control
 
-Status: accepted
+Status: superseded
+Superseded by: 0068
 Refines: 0053
 Refined by: 0072
 
