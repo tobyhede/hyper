@@ -1,11 +1,4 @@
-import {
-  isBuiltInViewId,
-  uuidSchema,
-  type BuiltInViewId,
-  type Card,
-  type Layout,
-  type UUID,
-} from '@project/core';
+import { isComputedViewId, uuidSchema, type Card, type Layout, type UUID } from '@project/core';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
@@ -22,7 +15,7 @@ import { repeatedGraphEdges } from './graph-edges';
 export interface Referenceable {
   readonly cards: readonly Card[];
   readonly layouts?: readonly Layout[] | undefined;
-  readonly defaultRenderer?: BuiltInViewId | UUID | undefined;
+  readonly defaultRenderer?: UUID | undefined;
 }
 
 /**
@@ -40,6 +33,7 @@ export type SpaceReferenceErrorKind =
   | 'duplicate-card-id'
   | 'duplicate-graph-id'
   | 'duplicate-layout-id'
+  | 'space-view-id-collision'
   /** A Layout's position names a Card the Space does not hold. */
   | 'layout-member-missing-card'
   /** A Layout opens active on a Graph no Layout in the Space owns. */
@@ -114,6 +108,15 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   const layouts = space.layouts ?? [];
   for (const id of duplicates(layouts.map((l) => l.id))) {
     errors.push({ kind: 'duplicate-layout-id', ref: id, message: `Duplicate layout id "${id}"` });
+  }
+
+  for (const layout of layouts) {
+    if (!isComputedViewId(layout.id)) continue;
+    errors.push({
+      kind: 'space-view-id-collision',
+      ref: layout.id,
+      message: `Layout "${layout.id}" collides with an available Computed View`,
+    });
   }
 
   // A graph id is unique across the **space**, although one layout owns it
@@ -231,15 +234,15 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     }
   }
 
-  // `defaultRenderer` names a declared layout or a built-in automatic view, and
+  // `defaultRenderer` names a declared Layout or a Computed View, and
   // nothing else — it records which view opens, never how to compute one.
   if (space.defaultRenderer !== undefined) {
     const declared = new Set(layouts.map((l) => l.id));
-    if (!isBuiltInViewId(space.defaultRenderer) && !declared.has(space.defaultRenderer)) {
+    if (!isComputedViewId(space.defaultRenderer) && !declared.has(space.defaultRenderer)) {
       errors.push({
         kind: 'unresolved-default-renderer',
         ref: space.defaultRenderer,
-        message: `defaultRenderer "${space.defaultRenderer}" names neither a declared layout nor a built-in view`,
+        message: `defaultRenderer "${space.defaultRenderer}" names neither a declared Layout nor an available Computed View`,
       });
     }
   }

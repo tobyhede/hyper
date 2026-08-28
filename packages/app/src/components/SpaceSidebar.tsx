@@ -1,5 +1,11 @@
 import type { ReactNode, Ref } from 'react';
-import type { BuiltInViewId, Graph, GraphId } from '@project/core';
+import {
+  FLOW_SPACE_VIEW_ID,
+  GRID_SPACE_VIEW_ID,
+  type Graph,
+  type GraphId,
+  type UUID,
+} from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
@@ -80,10 +86,17 @@ export interface SpaceSidebarProps {
     readonly state: SpaceSessionState['persistence']['kind'];
     readonly acknowledgedRevision: bigint;
   };
+  readonly cardLinks?:
+    | {
+        readonly title: string;
+        readonly onCopyCanonical: () => void;
+        readonly onCopyContextual: () => void;
+      }
+    | undefined;
 }
 
 /**
- * Keyed by the ids `core` ships, so a new built-in View is a compile error here
+ * Keyed by the ids `core` ships, so a new Computed View is visible here
  * rather than a View the Sidebar quietly draws without a glyph.
  *
  * It stays here rather than moving beside the View's strategy and title:
@@ -91,15 +104,13 @@ export interface SpaceSidebarProps {
  * would open a seam nothing crosses — and it would make a pure module import
  * `@project/ui`. Revisit when a second module draws a row.
  */
-const VIEW_ICONS = {
-  flow: FlowIcon,
-  grid: GridIcon,
-} as const satisfies Record<BuiltInViewId, () => ReactNode>;
+const VIEW_ICONS = new Map<UUID, ReactNode>([
+  [FLOW_SPACE_VIEW_ID, <FlowIcon key={FLOW_SPACE_VIEW_ID} />],
+  [GRID_SPACE_VIEW_ID, <GridIcon key={GRID_SPACE_VIEW_ID} />],
+]);
 
 const RendererIcon = ({ selection }: { readonly selection: CanvasRendererId }): ReactNode => {
-  if (selection.kind === 'layout') return <LayoutIcon />;
-  const Icon = VIEW_ICONS[selection.view];
-  return <Icon />;
+  return VIEW_ICONS.get(selection) ?? <LayoutIcon />;
 };
 
 /**
@@ -176,6 +187,7 @@ export function SpaceSidebar({
   graph,
   addCard,
   persistence,
+  cardLinks,
 }: SpaceSidebarProps) {
   // Below the primitive's breakpoint this whole surface is a modal Sheet drawn
   // *over* the canvas, with a focus trap and everything behind it inert. Every
@@ -292,6 +304,16 @@ export function SpaceSidebar({
       </SidebarContent>
 
       <SidebarFooter className="nokey">
+        {cardLinks !== undefined && (
+          <div className="grid gap-1">
+            <Button variant="secondary" size="toolbar" onClick={cardLinks.onCopyCanonical}>
+              Copy link to {cardLinks.title}
+            </Button>
+            <Button variant="secondary" size="toolbar" onClick={cardLinks.onCopyContextual}>
+              Copy link in this Space View
+            </Button>
+          </div>
+        )}
         <Button
           variant="secondary"
           size="toolbar"
@@ -349,7 +371,7 @@ export function SelectedCanvasRenderer({ renderer }: { readonly renderer: Canvas
         data-testid="selected-canvas-kind"
         className="shrink-0 text-xs whitespace-nowrap text-muted-foreground"
       >
-        {renderer.selection.kind === 'layout' ? 'Authored layout' : 'Computed view'}
+        {renderer.kind === 'authored' ? 'Authored layout' : 'Computed view'}
       </span>
     </div>
   );

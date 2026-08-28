@@ -1,5 +1,12 @@
 import { expect, expectTypeOf, it, vi } from 'vitest';
-import { uuidSchema, type CardId, type GraphId, type UUID } from '@project/core';
+import {
+  FLOW_SPACE_VIEW_ID,
+  GRID_SPACE_VIEW_ID,
+  uuidSchema,
+  type CardId,
+  type GraphId,
+  type UUID,
+} from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import { createNavigation, type NavigationState, type NavigationOptions } from '../src/navigation';
 import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
@@ -128,21 +135,21 @@ function spaceOwning(
 
 it('selects a renderer and its active Graph without changing the Space', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   navigation.present();
 
-  navigation.selectRenderer({ kind: 'layout', layoutId: LAYOUT });
+  navigation.selectRenderer(LAYOUT);
 
   expect(navigation.getState()).toMatchObject({
-    selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
+    selectedRenderer: LAYOUT,
     activeGraphId: GRAPH_TWO,
     mode: 'overview',
   });
   expect(navigation.activeCardId()).toBeNull();
   expect(space.defaultRenderer).toBeUndefined();
 
-  navigation.selectRenderer({ kind: 'view', view: 'grid' });
-  expect(navigation.getState().selectedRenderer).toEqual({ kind: 'view', view: 'grid' });
+  navigation.selectRenderer(GRID_SPACE_VIEW_ID);
+  expect(navigation.getState().selectedRenderer).toEqual(GRID_SPACE_VIEW_ID);
 });
 
 /**
@@ -163,10 +170,10 @@ it('selects a renderer and its active Graph without changing the Space', () => {
  */
 it('closes an opened Card when the renderer changes, so no editor outlives its placement', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   navigation.openCard(uuid('00000000-0000-4000-8000-000000000002'));
 
-  navigation.selectRenderer({ kind: 'layout', layoutId: LAYOUT });
+  navigation.selectRenderer(LAYOUT);
 
   expect(navigation.getState().openedCardId).toBeNull();
 });
@@ -176,7 +183,7 @@ it('traverses an Edge from the changing working Space without installing a copy'
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const cardC = uuid('00000000-0000-4000-8000-000000000004');
   let working = fixture();
-  const navigation = navigationFor(() => working, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => working, FLOW_SPACE_VIEW_ID);
   navigation.present();
 
   // The same Space with a second Edge out of A, authored into the Graph the
@@ -237,7 +244,7 @@ it('presents a fully cyclic Graph, which has no entry Card', () => {
     [{ id: GRAPH_ONE, title: 'Loop', edges: [{ from: card, to: card }] }],
     [{ id: card }],
   );
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
 
   navigation.present();
 
@@ -275,7 +282,7 @@ it('reads the last Card when Traversal history returns to one it has already vis
     ],
     [{ id: cardA }, { id: cardB }],
   );
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
 
   navigation.present();
   navigation.advance();
@@ -311,14 +318,14 @@ it('reads the last Card when Traversal history returns to one it has already vis
  */
 it('leaves no Traversal history behind when presenting ends', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   navigation.present();
   navigation.advance();
 
   navigation.exitPresenting();
 
   expect(navigation.getState()).toEqual({
-    selectedRenderer: { kind: 'view', view: 'flow' },
+    selectedRenderer: FLOW_SPACE_VIEW_ID,
     activeGraphId: GRAPH_ONE,
     mode: 'overview',
     openedCardId: null,
@@ -333,7 +340,7 @@ it('leaves no Traversal history behind when presenting ends', () => {
  */
 it('stands on a Card for as long as it is presenting', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
 
   navigation.present();
 
@@ -346,7 +353,7 @@ it('stands on a Card for as long as it is presenting', () => {
 
 it('activating a Graph ends the current Traversal history without changing the Space', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   navigation.present();
 
   navigation.activateGraph(GRAPH_TWO);
@@ -361,7 +368,7 @@ it('activating a Graph ends the current Traversal history without changing the S
 
 it('refuses to activate a Graph the current Space does not hold', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   navigation.present();
   const before = navigation.getState();
 
@@ -387,15 +394,15 @@ it('refuses to activate a Graph the current Space does not hold', () => {
  */
 it('continues the current Traversal history when an Edit converts the renderer to a Layout', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   navigation.activateGraph(GRAPH_TWO);
   navigation.present();
   const traversalHistory = traversalHistoryOf(navigation.getState());
 
-  navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT }, GRAPH_TWO);
+  navigation.continueInRenderer(LAYOUT, GRAPH_TWO);
 
   expect(navigation.getState()).toMatchObject({
-    selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
+    selectedRenderer: LAYOUT,
     activeGraphId: GRAPH_TWO,
     mode: 'presenting',
   });
@@ -411,13 +418,13 @@ it('continues the current Traversal history when an Edit converts the renderer t
  */
 it('takes the adopted renderer’s own Active Graph over the one that was emphasised', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   expect(navigation.getState().activeGraphId).toBe(GRAPH_ONE);
 
-  navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT }, GRAPH_TWO);
+  navigation.continueInRenderer(LAYOUT, GRAPH_TWO);
 
   expect(navigation.getState()).toMatchObject({
-    selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
+    selectedRenderer: LAYOUT,
     activeGraphId: GRAPH_TWO,
   });
 });
@@ -435,13 +442,13 @@ it('takes the adopted renderer’s own Active Graph over the one that was emphas
  */
 it('refuses to adopt a renderer that does not draw the Graph handed with it', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   navigation.present();
   const before = navigation.getState();
 
-  expect(() =>
-    navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT }, GRAPH_ONE),
-  ).toThrow(/does not show the active Graph/);
+  expect(() => navigation.continueInRenderer(LAYOUT, GRAPH_ONE)).toThrow(
+    /does not show the active Graph/,
+  );
   expect(navigation.getState()).toBe(before);
 });
 
@@ -453,7 +460,7 @@ it('refuses to adopt a renderer that does not draw the Graph handed with it', ()
  */
 it('refuses to activate a Graph the selected Layout does not own', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'layout', layoutId: LAYOUT });
+  const navigation = navigationFor(() => space, LAYOUT);
   const before = navigation.getState();
   expect(before.activeGraphId).toBe(GRAPH_TWO);
 
@@ -478,20 +485,20 @@ it('adopts a renderer with no active Graph to name', () => {
     [cardFile(CARD_A)],
   );
   if (!loaded.ok) throw new Error('empty fixture should load');
-  const navigation = navigationFor(() => loaded.space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => loaded.space, FLOW_SPACE_VIEW_ID);
   expect(navigation.getState().activeGraphId).toBeNull();
 
-  navigation.continueInRenderer({ kind: 'view', view: 'grid' }, null);
+  navigation.continueInRenderer(GRID_SPACE_VIEW_ID, null);
 
   expect(navigation.getState()).toMatchObject({
-    selectedRenderer: { kind: 'view', view: 'grid' },
+    selectedRenderer: GRID_SPACE_VIEW_ID,
     activeGraphId: null,
   });
 });
 
 it('notifies subscribers synchronously until they unsubscribe', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   const seen: (GraphId | null)[] = [];
   // The seam `useSyncExternalStore` drives. It must notify during the call that
   // changed the state — React reads `getState` straight after and would
@@ -512,7 +519,7 @@ it('notifies subscribers synchronously until they unsubscribe', () => {
 it('contains a failing subscriber and still notifies the ones behind it', () => {
   const space = fixture();
   const reported: unknown[] = [];
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' }, space, {
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID, space, {
     reportObserverError: (error) => reported.push(error),
   });
   const observerError = new Error('observer failed');
@@ -534,28 +541,24 @@ it('contains a failing subscriber and still notifies the ones behind it', () => 
 it('refuses a renderer the current Space does not hold, leaving navigation untouched', () => {
   const space = fixture();
   const missing = uuid('00000000-0000-4000-8000-000000000099');
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
   navigation.present();
   const before = navigation.getState();
 
   // Resolving first is the invariant: Navigation may never name a renderer the
   // Space does not hold, so an unresolvable selection is refused outright rather
   // than half-applied.
-  expect(() => navigation.selectRenderer({ kind: 'layout', layoutId: missing })).toThrow(
-    /does not exist/,
-  );
+  expect(() => navigation.selectRenderer(missing)).toThrow(/does not exist/);
   expect(navigation.getState()).toBe(before);
 
-  expect(() =>
-    navigation.continueInRenderer({ kind: 'layout', layoutId: missing }, GRAPH_ONE),
-  ).toThrow(/does not exist/);
+  expect(() => navigation.continueInRenderer(missing, GRAPH_ONE)).toThrow(/does not exist/);
   expect(navigation.getState()).toBe(before);
 });
 
 it('opens and closes Cards, and closes an opened Card when presenting starts', () => {
   const space = fixture();
   const card = uuid('00000000-0000-4000-8000-000000000003');
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
 
   navigation.openCard(card);
   expect(navigation.getState().openedCardId).toBe(card);
@@ -580,15 +583,15 @@ it('opens and closes Cards, and closes an opened Card when presenting starts', (
 it('opens a replacement Space as new navigation, retaining no reading state', () => {
   const space = fixture();
   const card = uuid('00000000-0000-4000-8000-000000000003');
-  const navigation = navigationFor(() => space, { kind: 'view', view: 'grid' });
+  const navigation = navigationFor(() => space, GRID_SPACE_VIEW_ID);
   navigation.present();
   navigation.advance();
   navigation.openCard(card);
 
-  navigation.openFresh({ kind: 'layout', layoutId: LAYOUT });
+  navigation.openFresh(LAYOUT);
 
   expect(navigation.getState()).toEqual({
-    selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
+    selectedRenderer: LAYOUT,
     activeGraphId: GRAPH_TWO,
     mode: 'overview',
     openedCardId: null,
@@ -622,7 +625,7 @@ it('reads the working Space once per moves() call, whatever the branching', () =
       reads += 1;
       return forked;
     },
-    { kind: 'view', view: 'flow' },
+    FLOW_SPACE_VIEW_ID,
     forked,
   );
   navigation.present();
@@ -650,7 +653,7 @@ it('reads the working Space once per moves() call, whatever the branching', () =
 it('answers no moves outside Traversal history without reading the working Space', () => {
   const space = fixture();
   const currentSpace = vi.fn(() => space);
-  const navigation = navigationFor(currentSpace, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(currentSpace, FLOW_SPACE_VIEW_ID);
 
   const before = currentSpace.mock.calls.length;
   const moves = navigation.moves();
@@ -677,7 +680,7 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
     ],
     [{ id: cardA }, { id: cardB }, { id: cardC }],
   );
-  const navigation = navigationFor(() => forked, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => forked, FLOW_SPACE_VIEW_ID);
   navigation.present();
 
   navigation.selectBranch(-1);

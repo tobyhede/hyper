@@ -6,12 +6,19 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { connect } from 'node:net';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  FLOW_SPACE_VIEW_ID,
+  encodeCompactUuid,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
 import { encodeCommitRequest, type SpaceResourceRepository } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';
+import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -41,7 +48,7 @@ const repository = (): SpaceResourceRepository => ({
 });
 
 const startHost = async (
-  application: ReturnType<typeof createSpaceHttpApp>,
+  application: ReturnType<typeof createSpaceHttpApp> | SpaceHostApplication,
   fallback: (request: IncomingMessage, response: ServerResponse) => void = (_request, response) => {
     response.statusCode = 404;
     response.end();
@@ -54,7 +61,13 @@ const startHost = async (
   hook: 'development' | 'preview' = 'development',
 ) => {
   let middleware: Middleware | undefined;
-  const createApp = vi.fn(() => application);
+  const hosted = Object.assign(application, {
+    resolveProductRequest:
+      'resolveProductRequest' in application
+        ? application.resolveProductRequest.bind(application)
+        : () => Promise.resolve(undefined),
+  });
+  const createApp = vi.fn(() => hosted);
   const plugin = spaceHttpPlugin({
     developmentModule: '/runtime.ts',
     previewModule: '/runtime.js',
@@ -164,6 +177,108 @@ describe('Vite Hono host', () => {
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe('<main>Vite application</main>');
+  });
+
+  it('redirects root to the compact Entry Space URL before Vite fallback', async () => {
+    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID));
+    const { host } = await startHost(hostApp);
+
+    const response = await fetch(`${host.url}/`, { redirect: 'manual' });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
+  });
+
+  it('answers malformed and unresolved Space URLs before Vite fallback', async () => {
+    const hostApp = createSpaceHost(new MemorySpaceRepository());
+    const { host } = await startHost(hostApp);
+
+    await expect(
+      fetch(`${host.url}/spaces/not-canonical`).then((value) => value.status),
+    ).resolves.toBe(400);
+    await expect(
+      fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`).then((value) => value.status),
+    ).resolves.toBe(404);
+    await expect(fetch(`${host.url}/`).then((value) => value.status)).resolves.toBe(404);
+  });
+
+  it('lets an existing canonical Space URL reach the SPA fallback', async () => {
+    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored]));
+    const { host } = await startHost(hostApp, (_request, response) => {
+      response.setHeader('Content-Type', 'text/html');
+      response.end('<main>Canonical Space</main>');
+    });
+
+    const response = await fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`);
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe('<main>Canonical Space</main>');
+  });
+
+  it('lets an existing Computed View destination reach the SPA fallback', async () => {
+    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    const spaceRepository = new MemorySpaceRepository([stored]);
+    const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
+    const hostApp = createSpaceHost(spaceRepository);
+    const { host } = await startHost(hostApp, (_request, response) => {
+      response.end('<main>Computed View</main>');
+    });
+
+    const response = await fetch(
+      `${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe('<main>Computed View</main>');
+    expect(loadSpace).toHaveBeenCalledOnce();
+    expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
+  });
+
+  it('leaves a path outside product addressing to the SPA fallback without loading', async () => {
+    const spaceRepository = new MemorySpaceRepository();
+    const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
+    const hostApp = createSpaceHost(spaceRepository);
+    const { host } = await startHost(hostApp, (_request, response) => {
+      response.end('<main>Outside product addressing</main>');
+    });
+
+    const response = await fetch(`${host.url}/index.html`);
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe('<main>Outside product addressing</main>');
+    expect(loadSpace).not.toHaveBeenCalled();
+  });
+
+  it('resolves HEAD like GET while sending no product response body', async () => {
+    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID));
+    const { host } = await startHost(hostApp, (_request, response) => {
+      response.statusCode = 200;
+      response.end('<main>Vite fallback</main>');
+    });
+
+    const root = await fetch(`${host.url}/`, { method: 'HEAD', redirect: 'manual' });
+    expect(root.status).toBe(302);
+    expect(root.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
+    await expect(root.text()).resolves.toBe('');
+
+    const malformed = await fetch(`${host.url}/spaces/not-canonical`, { method: 'HEAD' });
+    expect(malformed.status).toBe(400);
+    await expect(malformed.text()).resolves.toBe('');
+
+    const missing = await fetch(`${host.url}/spaces/${encodeCompactUuid(CARD_ID)}`, {
+      method: 'HEAD',
+    });
+    expect(missing.status).toBe(404);
+    await expect(missing.text()).resolves.toBe('');
+
+    const existing = await fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`, {
+      method: 'HEAD',
+    });
+    expect(existing.status).toBe(200);
+    await expect(existing.text()).resolves.toBe('');
   });
 
   it('serves the API from the built runtime and leaves the rest to preview static assets', async () => {

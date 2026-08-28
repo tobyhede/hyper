@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=24"
+    "node": ">=26.8.1"
   },
   "scripts": {
     "dev": "pnpm --filter @project/app dev",
@@ -19,7 +19,7 @@
     "contract:emit": "prisma-next contract emit",
     "contract:check": "pnpm contract:emit && git diff --exit-code -- src/prisma/contract.json src/prisma/contract.d.ts && prisma-next migration check --format json",
     "db:migrate": "prisma-next migrate",
-    "hyper": "tsx src/cli/entry.ts",
+    "hyper": "node --disable-warning=DEP0205 --import tsx src/cli/entry.ts",
     "postgres:up": "docker compose up -d --wait",
     "postgres:down": "docker compose down",
     "typecheck:toolchain": "tsx scripts/check-typescript-toolchain.ts",

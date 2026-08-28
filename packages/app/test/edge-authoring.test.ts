@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { FLOW_SPACE_VIEW_ID, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
@@ -85,7 +85,7 @@ const positionedSnapshot: SpaceSnapshot = {
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  renderer: CanvasRendererId = { kind: 'layout', layoutId: LAYOUT_ID },
+  renderer: CanvasRendererId = LAYOUT_ID,
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -295,7 +295,7 @@ describe('draft invalidation', () => {
     const { edges, navigation } = open();
     edges.beginPointerConnect(CARD_A);
 
-    navigation.selectRenderer({ kind: 'view', view: 'flow' });
+    navigation.selectRenderer(FLOW_SPACE_VIEW_ID);
 
     expect(edges.getState().draft).toBeNull();
   });
@@ -330,7 +330,7 @@ describe('draft invalidation', () => {
     const session = openSpaceSession(backend, loaded);
     const { authoring, edgeAuthoring: edges } = composeApp({
       spaceSession: session,
-      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      selection: LAYOUT_ID,
       newGraphId: mintingGraphIds(MINTED_GRAPH),
       initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20, open: false }],
@@ -378,8 +378,7 @@ describe('draft invalidation', () => {
     ],
     [
       'the renderer changes',
-      ({ navigation }: ReturnType<typeof open>) =>
-        navigation.selectRenderer({ kind: 'view', view: 'flow' }),
+      ({ navigation }: ReturnType<typeof open>) => navigation.selectRenderer(FLOW_SPACE_VIEW_ID),
     ],
   ])('clears a refusal left by a finished gesture when %s', (_name, change) => {
     const opened = open();

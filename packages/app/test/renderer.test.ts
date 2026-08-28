@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type GraphId } from '@project/core';
+import { FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID, uuidSchema, type GraphId } from '@project/core';
 import { buildLayoutStrategyGraph, loadSpace, Placement, type Space } from '@project/graph';
 import { CARD_SIZE } from '../src/card';
 import { GRAPH_PALETTE } from '../src/colors';
@@ -68,10 +68,7 @@ const SECOND = {
   graphs: [ASIDE],
 };
 
-const LAYOUT_SELECTION = {
-  kind: 'layout' as const,
-  layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
-};
+const LAYOUT_SELECTION = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 
 function spaceWith(extra: Record<string, unknown> = {}): Space {
   const result = loadSpace(
@@ -160,10 +157,10 @@ describe('resolving a renderer', () => {
   it('resolves an explicitly selected View without changing the Space default', async () => {
     const space = spaceWith({ defaultRenderer: '00000000-0000-4000-8000-000000000022' });
 
-    const renderer = resolver()(space, { kind: 'view', view: 'grid' });
+    const renderer = resolver()(space, GRID_SPACE_VIEW_ID);
 
     expect(renderer.kind).toBe('view');
-    expect(renderer.kind === 'view' && renderer.id).toBe('grid');
+    expect(renderer.kind === 'view' && renderer.id).toBe(GRID_SPACE_VIEW_ID);
     expect(renderer.kind === 'view' && renderer.title).toBe('Grid');
     expect(space.defaultRenderer).toBe('00000000-0000-4000-8000-000000000022');
     const graph = buildLayoutStrategyGraph(
@@ -177,14 +174,14 @@ describe('resolving a renderer', () => {
   });
 
   it('resolves an explicitly selected Layout without changing the Space default', async () => {
-    const space = spaceWith({ defaultRenderer: 'grid' });
+    const space = spaceWith({ defaultRenderer: GRID_SPACE_VIEW_ID });
 
     const renderer = resolver()(space, LAYOUT_SELECTION);
 
     expect(renderer.kind).toBe('layout');
     if (renderer.kind !== 'layout') return;
     expect(renderer.resolvedLayout.layout.title).toBe('Working');
-    expect(space.defaultRenderer).toBe('grid');
+    expect(space.defaultRenderer).toBe(GRID_SPACE_VIEW_ID);
     const graph = buildLayoutStrategyGraph(
       space.cards.map((card) => card.id),
       new Map(),
@@ -204,26 +201,23 @@ describe('resolving a renderer', () => {
     const space = spaceWith();
     const renderer = resolver()(space, LAYOUT_SELECTION);
     expect(renderer.kind === 'layout' && renderer.resolvedLayout).toBe(
-      space.lookup.layout(LAYOUT_SELECTION.layoutId),
+      space.lookup.layout(LAYOUT_SELECTION),
     );
   });
 
   it('refuses a selected Layout that the Space does not own', () => {
     const refused = refusal(() =>
-      resolver()(spaceWith(), {
-        kind: 'layout',
-        layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000099'),
-      }),
+      resolver()(spaceWith(), uuidSchema.parse('00000000-0000-4000-8000-000000000099')),
     );
 
     expect(refused.reason).toBe('renderer-not-found');
     expect(refused.message).toContain(
-      'The selected Layout 00000000-0000-4000-8000-000000000099 does not',
+      'The selected Space View 00000000-0000-4000-8000-000000000099 does not',
     );
   });
 
   it('falls back to the graph-driven Flow View when a Space names no View', () => {
-    expect(asView(spaceWith()).id).toBe('flow');
+    expect(asView(spaceWith()).id).toBe(FLOW_SPACE_VIEW_ID);
   });
 
   it('resolves a declared Layout and carries its authored placement', () => {
@@ -240,8 +234,8 @@ describe('resolving a renderer', () => {
     });
   });
 
-  it('resolves the built-in grid, which computes placement and carries no Layout', async () => {
-    const space = spaceWith({ defaultRenderer: 'grid' });
+  it('resolves the Grid Computed View, which computes placement and carries no Layout', async () => {
+    const space = spaceWith({ defaultRenderer: GRID_SPACE_VIEW_ID });
     expect(resolver()(space).kind).toBe('view');
     // The grid's own arithmetic, not ELK's: first card at the origin.
     expect((await arrange(space))[A]).toEqual({ x: 0, y: 0 });

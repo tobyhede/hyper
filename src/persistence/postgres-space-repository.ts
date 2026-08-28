@@ -344,6 +344,26 @@ export class PostgresSpaceRepository implements SpaceRepository {
     this.#database = database;
   }
 
+  async entrySpaceId(): Promise<UUID | undefined> {
+    const entry = await this.#database.orm.public.Space.where({ entry: true }).first();
+    return entry === null ? undefined : uuidSchema.parse(entry.id);
+  }
+
+  async setEntrySpace(id: UUID): Promise<void> {
+    await this.#database.transaction(async ({ orm }) => {
+      const selected = await orm.public.Space.where({ id }).first();
+      if (selected === null) throw new Error(`Space ${id} does not exist`);
+      if (selected.entry === true) return;
+
+      const previous = await orm.public.Space.where({ entry: true }).first();
+      if (previous !== null) {
+        await orm.public.Space.where({ id: previous.id }).update({ entry: null });
+      }
+      const updated = await orm.public.Space.where({ id }).update({ entry: true });
+      if (updated === null) throw new Error(`Space ${id} disappeared while becoming Entry Space`);
+    });
+  }
+
   async listSpaces(): Promise<readonly SpaceSummary[]> {
     const spaces = await this.#database.orm.public.Space.orderBy((space) => space.id.asc()).all();
 

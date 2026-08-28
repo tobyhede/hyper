@@ -8,7 +8,7 @@ import {
   type InternalNode,
 } from '@xyflow/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { FLOW_SPACE_VIEW_ID, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
@@ -45,7 +45,7 @@ const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041')
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
 /** The one row this chrome draws, named so `selected` can be that very value. */
-const FLOW: CanvasRenderer = { selection: { kind: 'view', view: 'flow' }, title: 'Flow' };
+const FLOW: CanvasRenderer = { kind: 'computed', selection: FLOW_SPACE_VIEW_ID, title: 'Flow' };
 /** The real app chrome, composed as `App` composes it, outside the canvas. */
 const appChrome = (
   <SidebarProvider>
@@ -205,7 +205,7 @@ function compose({
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const composed = composeApp({
     spaceSession: session,
-    selection: { kind: 'layout', layoutId: LAYOUT_ID },
+    selection: LAYOUT_ID,
     newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
     initialPlacement: Placement.fromEntries([
       [CARD_A, { x: 0, y: 0, open: false }],

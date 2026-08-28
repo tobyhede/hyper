@@ -149,10 +149,7 @@ describe('canvasProjection', () => {
   it('draws every Graph a selected Layout owns', async () => {
     const space = spaceWith({ layouts: [layoutOwning(DRAWN, OTHER)] });
 
-    const { visibleGraphs, nodes, edges } = await projectThrough(space, AT_REST, {
-      kind: 'layout',
-      layoutId: LAYOUT,
-    });
+    const { visibleGraphs, nodes, edges } = await projectThrough(space, AT_REST, LAYOUT);
 
     // Graphs, Edges and handles are derived separately and must agree on the
     // same set — the Graphs this Layout owns (ADR 0040), which here is both.
@@ -172,7 +169,7 @@ describe('canvasProjection', () => {
       },
     };
     const space = spaceWith({ layouts: [layout] });
-    const renderer = resolveRenderer(space, { kind: 'layout', layoutId: LAYOUT });
+    const renderer = resolveRenderer(space, LAYOUT);
     const projection = canvasProjection(space, renderer);
     const strategyCard = projection.strategyGraph.cards.find(({ id }) => id === CARD_A);
 

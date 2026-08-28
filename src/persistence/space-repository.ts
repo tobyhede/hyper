@@ -32,6 +32,9 @@ export type ImportMode = 'insert' | 'truncate';
  * declare them.
  */
 export interface SpaceRepository extends SpaceResourceRepository {
+  /** Application state, separate from every authored Space document. */
+  entrySpaceId(): Promise<UUID | undefined>;
+  setEntrySpace(id: UUID): Promise<void>;
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult>;
   /** Records the revision projected by a completed external export. */
   markExported(id: UUID, revision: bigint): Promise<void>;

@@ -12,6 +12,7 @@ model Space {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        temporal.updatedAt() @map("updated_at")
   cards            Card[]
+  entry             Boolean? @unique
 
   @@map("spaces")
 }

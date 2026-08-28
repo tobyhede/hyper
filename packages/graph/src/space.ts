@@ -3,7 +3,6 @@ import {
   spaceFileSchema,
   spaceSnapshotSchema,
   type Card,
-  type BuiltInViewId,
   type Layout,
   type Graph,
   type SpaceSnapshot,
@@ -57,8 +56,8 @@ export interface Space {
    * declared nowhere (ADR 0025).
    */
   readonly layouts: readonly Layout[];
-  /** Which view this space opens in — a layout's id or a built-in view's. */
-  readonly defaultRenderer: BuiltInViewId | UUID | undefined;
+  /** Which Space View this Space opens in — one UUID namespace for both variants. */
+  readonly defaultRenderer: UUID | undefined;
   /**
    * Contextual entity resolution — the only one. The Maps behind it are closed
    * over and appear nowhere on this value, so no caller can index the space a
@@ -287,7 +286,7 @@ function buildSpace(input: {
   title: string;
   cards: Card[];
   layouts: Layout[] | undefined;
-  defaultRenderer: BuiltInViewId | UUID | undefined;
+  defaultRenderer: UUID | undefined;
 }): LoadSpaceResult {
   // Array order is read only by automatic strategies, so title order is the one
   // default stable across filesystem scans and unordered relational reads. Ties

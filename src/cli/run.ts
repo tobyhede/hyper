@@ -41,15 +41,8 @@ const reportImportError = (error: unknown, io: CliIo): void => {
 };
 
 const reportStartup = (startup: DatabaseStartupResult, io: CliIo): void => {
-  if (startup.kind === 'opened') {
-    io.stdout(
-      `Opened space ${startup.space.snapshot.id} at revision ${startup.space.revision.toString()}\n`,
-    );
-    return;
-  }
-
   io.stdout(
-    `Choose a space:\n${startup.spaces.map((space) => `${space.title} (${space.id})`).join('\n')}\n`,
+    `Opened space ${startup.space.snapshot.id} at revision ${startup.space.revision.toString()}\n`,
   );
 };
 

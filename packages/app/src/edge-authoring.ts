@@ -339,10 +339,7 @@ const anchorCardOf = (draft: EdgeDraft): CardId => {
  * identity comparison reads "the renderer changed" after an Edit that plainly
  * stayed in the same Layout, and cancels a draft that had nothing to do with it.
  */
-const sameRenderer = (left: CanvasRendererId, right: CanvasRendererId): boolean =>
-  left.kind === 'view'
-    ? right.kind === 'view' && left.view === right.view
-    : right.kind === 'layout' && left.layoutId === right.layoutId;
+const sameRenderer = (left: CanvasRendererId, right: CanvasRendererId): boolean => left === right;
 
 /** Whether a canvas selection names the thing this draft is about. */
 const selectionMatchesDraft = (selection: CanvasSelection, draft: EdgeDraft): boolean => {

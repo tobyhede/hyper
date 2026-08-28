@@ -6,6 +6,7 @@ import {
   openSpaceSession,
   type SpaceBackend,
   type SpaceSession,
+  type LoadedSpace,
 } from '@project/persistence';
 import { snapshotFromSpace } from './snapshot';
 
@@ -14,14 +15,8 @@ export interface OpenedSpace {
   spaceSession: SpaceSession;
 }
 
-/** Open one exact Space already stored by the configured backend. */
-export const openStoredSpace = async (
-  spaceBackend: SpaceBackend,
-  id: UUID,
-): Promise<OpenedSpace> => {
-  const loaded = await spaceBackend.loadSpace(id);
-  if (loaded === undefined) throw new Error(`The backend could not load space ${id}`);
-
+/** Compose one exact Space value already loaded by the configured backend. */
+export const openLoadedSpace = (spaceBackend: SpaceBackend, loaded: LoadedSpace): OpenedSpace => {
   const runtime = loadSpaceSnapshot(loaded.snapshot);
   if (!runtime.ok) {
     throw new Error(
@@ -32,6 +27,16 @@ export const openStoredSpace = async (
     space: runtime.space,
     spaceSession: openSpaceSession(spaceBackend, loaded),
   };
+};
+
+/** Open one exact Space already stored by the configured backend. */
+export const openStoredSpace = async (
+  spaceBackend: SpaceBackend,
+  id: UUID,
+): Promise<OpenedSpace> => {
+  const loaded = await spaceBackend.loadSpace(id);
+  if (loaded === undefined) throw new Error(`The backend could not load space ${id}`);
+  return openLoadedSpace(spaceBackend, loaded);
 };
 
 /** Import files into the configured backend, then open its first Space. */

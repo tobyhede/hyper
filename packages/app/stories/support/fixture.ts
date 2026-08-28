@@ -117,7 +117,7 @@ export const colorByGraphId = {
 /**
  * Where the static canvas draws each Card. Authored, as placement always is —
  * these are hand-set so both Graphs read forward, left to right, which is the
- * only arrangement in which two overlaid Graphs stay legible (the acyclic-union
+ * only way two overlaid Graphs stay legible (the acyclic-union
  * limit). `closing` belongs to only the short Graph, so the design still has to
  * distinguish Cards with different Graph membership.
  */

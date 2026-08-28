@@ -281,7 +281,7 @@ describe('hyper CLI', () => {
     });
   });
 
-  it('reports the complete catalog without paths after importing multiple spaces', async () => {
+  it('imports multiple spaces without inferring an Entry Space', async () => {
     await seedSpace(UNRELATED_SPACE_ID, 'Unrelated talk');
     const collection = await mkdtemp(join(tmpdir(), 'hyper-cli-collection-'));
     temporaryDirectories.add(collection);
@@ -291,15 +291,11 @@ describe('hyper CLI', () => {
     const result = await runHyperCommand([collection]);
 
     expect(result).toEqual({
-      status: 0,
-      stdout:
-        `Choose a space:\n` +
-        `Unrelated talk (${UNRELATED_SPACE_ID})\n` +
-        `First imported (${FIRST_BATCH_SPACE_ID})\n` +
-        `Second imported (${SECOND_BATCH_SPACE_ID})\n`,
-      stderr: '',
+      status: 1,
+      stdout: '',
+      stderr: 'Database startup failed: The database has no configured Entry Space\n',
     });
-    expect(result.stdout).not.toContain(collection);
+    expect(result.stderr).not.toContain(collection);
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: UNRELATED_SPACE_ID, title: 'Unrelated talk' },
       { id: FIRST_BATCH_SPACE_ID, title: 'First imported' },

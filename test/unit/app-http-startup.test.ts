@@ -1,5 +1,6 @@
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
+import { FLOW_SPACE_VIEW_ID, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { createSpaceHttpApp, HttpSpaceBackend, productDestinationPath } from '@project/http';
+import { MemorySpaceBackend } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 import { createSpaceStartup } from '../../packages/app/src/space';
@@ -28,40 +29,157 @@ const startupFor = (...snapshots: SpaceSnapshot[]) => {
 };
 
 describe('HTTP space startup composition', () => {
-  it('opens the only durable space through the HTTP backend', async () => {
+  it('opens the Space named by the compact product-route id through HTTP', async () => {
     const startup = startupFor(snapshot());
 
-    const result = await startup.resolve();
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
+    );
 
     expect(result.kind).toBe('opened');
-    if (result.kind !== 'opened') throw new Error('Expected opened space');
     expect(result.opened.space.id).toBe(SPACE_ID);
     expect(result.opened.spaceSession.getState().acknowledgedRevision).toBe(0n);
   });
 
-  it('fails rather than inventing a space when the catalog is empty', async () => {
-    // Server-side startup is what guarantees a database has at least one Space,
-    // so an empty catalog here means that policy did not run. The browser has
-    // no import path of its own to fall back to, and quietly opening something
-    // it minted locally would be a space with nowhere to commit.
+  it('fails when the product-route id no longer resolves', async () => {
     const startup = startupFor();
 
-    await expect(startup.resolve()).rejects.toThrow(
-      'The persistence service returned no database spaces.',
+    await expect(
+      startup.resolve(productDestinationPath({ kind: 'space', spaceId: SPACE_ID })),
+    ).rejects.toThrow('The product URL does not resolve.');
+  });
+
+  it('opens the exact named Space when several are stored', async () => {
+    const startup = startupFor(snapshot(), snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'));
+
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'space', spaceId: OTHER_SPACE_ID }),
+    );
+
+    expect(result.opened.space.id).toBe(OTHER_SPACE_ID);
+  });
+
+  it('rejects a malformed compact product-route id', async () => {
+    const startup = startupFor(snapshot());
+
+    await expect(startup.resolve('/spaces/not-a-compact-uuid')).rejects.toThrow(
+      'The product URL is malformed.',
     );
   });
 
-  it('returns the complete catalog and opens the exact selected UUID', async () => {
-    const startup = startupFor(snapshot(), snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'));
+  it('opens a resolved Space View from one backend load', async () => {
+    const loaded = { snapshot: snapshot(), revision: 0n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const loadSpace = vi.spyOn(backend, 'loadSpace');
+    const startup = createSpaceStartup(backend);
 
-    await expect(startup.resolve()).resolves.toEqual({
-      kind: 'selection',
-      spaces: [
-        { id: SPACE_ID, title: 'Stored space' },
-        { id: OTHER_SPACE_ID, title: 'Other space' },
-      ],
-    });
-    const opened = await startup.openSelected(OTHER_SPACE_ID);
-    expect(opened.space.id).toBe(OTHER_SPACE_ID);
+    const result = await startup.resolve(
+      productDestinationPath({
+        kind: 'space-view',
+        spaceId: SPACE_ID,
+        spaceViewId: FLOW_SPACE_VIEW_ID,
+      }),
+    );
+
+    expect(result.selection).toBe(FLOW_SPACE_VIEW_ID);
+    expect(result.opened.space.id).toBe(SPACE_ID);
+    expect(loadSpace).toHaveBeenCalledOnce();
+    expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
+  });
+
+  it('opens a contextual Card in its named Space View without authoring it open', async () => {
+    const layoutId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          layouts: [
+            {
+              id: layoutId,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              graphs: [
+                {
+                  id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
+                  title: 'Graph',
+                  edges: [],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+
+    const result = await startup.resolve(
+      productDestinationPath({
+        kind: 'space-view-card',
+        spaceId: SPACE_ID,
+        spaceViewId: layoutId,
+        cardId: CARD_ID,
+      }),
+    );
+
+    expect(result.selection).toBe(layoutId);
+    expect(result.cardId).toBe(CARD_ID);
+    expect(result.opened.space.lookup.layout(layoutId)?.layout.positions[CARD_ID]?.open).toBe(
+      false,
+    );
+  });
+
+  it('reveals a canonical Card omitted by the default Layout in the Cards collection', async () => {
+    const layoutId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+    const omittedId = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          defaultRenderer: layoutId,
+          layouts: [
+            {
+              id: layoutId,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              graphs: [
+                {
+                  id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
+                  title: 'Graph',
+                  edges: [],
+                },
+              ],
+            },
+          ],
+        },
+        cards: [
+          ...snapshot().cards,
+          {
+            id: omittedId,
+            document: { title: 'Omitted', kind: 'markdown' as const, body: '' },
+          },
+        ],
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: omittedId }),
+    );
+
+    expect(result.selection).toBe(FLOW_SPACE_VIEW_ID);
+    expect(result.cardId).toBe(omittedId);
+    expect(
+      result.opened.space.lookup.layout(layoutId)?.layout.positions[omittedId],
+    ).toBeUndefined();
   });
 });

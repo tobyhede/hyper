@@ -198,28 +198,20 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      # No `actions/setup-node` here, unlike the other two jobs. The image brings
-      # its own Node, and `setup-node`'s `cache: pnpm` would key a store resolved
+      # The image's Node is deliberately replaced from `.node-version`: ADR 0071
+      # admits native Typed Array codecs that its Node 24 does not carry. The
+      # image still owns the browsers and system libraries, and its exact tag
+      # stays paired with `@playwright/test`. `setup-node` has no `cache: pnpm`
+      # because that would key a store resolved
       # under the container's `HOME` — `/github/home`, which Actions mounts and
       # sets for every `container:` job — against the key `verify` uses for
       # `/home/runner/…`, restoring each job's archive into the other's wrong
       # path. pnpm is the one thing the image lacks, so `action-setup` stays and
       # the store is cached below under a key that cannot collide.
       #
-      # Losing `setup-node` also loses `.node-version` as this job's Node pin,
-      # and nothing else enforces it: `.npmrc` sets no `engine-strict` and pnpm 9
-      # does not check `engines` by default, so a `.node-version` bump would
-      # otherwise land while e2e quietly kept running the image's older Node.
-      # The check below restores that pin by reading the file rather than
-      # repeating it, so it stays correct without becoming a literal to update.
-      - name: The image's Node must satisfy .node-version
-        run: |
-          want="$(cut -d. -f1 < .node-version)"
-          have="$(node -p 'process.versions.node.split(".")[0]')"
-          [ "$want" = "$have" ] || {
-            echo "::error::.node-version wants Node $want; the container ships $have. Move the image tag and digest to a Playwright image built on Node $want."
-            exit 1
-          }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - name: Resolve the pnpm store
         id: pnpm-store
@@ -264,9 +256,8 @@ jobs:
     # reasons its comments give and not repeated here: the same image pinned by
     # tag *and* digest (a bump moves both, together with `@playwright/test` in
     # the lockfile), `--ipc=host` for Chromium's `/dev/shm`, `--init` for the
-    # helpers that reparent onto a PID 1 that is not ours, no
-    # `actions/setup-node`, and the `.node-version` assertion that restores the
-    # Node pin dropping `setup-node` would otherwise lose. Two things differ,
+    # helpers that reparent onto a PID 1 that is not ours, and `setup-node`
+    # overlaying `.node-version` without taking over the pnpm cache. Two things differ,
     # and both are commented where they appear: the cache key and the artifact
     # name.
     container:
@@ -275,14 +266,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - name: The image's Node must satisfy .node-version
-        run: |
-          want="$(cut -d. -f1 < .node-version)"
-          have="$(node -p 'process.versions.node.split(".")[0]')"
-          [ "$want" = "$have" ] || {
-            echo "::error::.node-version wants Node $want; the container ships $have. Move the image tag and digest to a Playwright image built on Node $want."
-            exit 1
-          }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - name: Resolve the pnpm store
         id: pnpm-store

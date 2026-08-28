@@ -1,11 +1,9 @@
 import { StrictMode, type ReactNode } from 'react';
-import type { UUID } from '@project/core';
-import type { SpaceSummary } from '@project/persistence';
-import { createAppRouter } from './router';
+import type { CardId } from '@project/core';
 import type { OpenedSpace } from './open-space';
+import type { CanvasRendererId } from './renderer';
 import { mountSpaceApp } from './SpaceApp';
 import { StartupFailure } from './components/StartupFailure';
-import { SpaceSelection } from './SpaceSelection';
 
 export interface ApplicationRoot {
   render(children: ReactNode): void;
@@ -14,27 +12,28 @@ export interface ApplicationRoot {
 export interface OpenedApplicationStartup {
   kind: 'opened';
   opened: OpenedSpace;
+  selection?: CanvasRendererId | undefined;
+  cardId?: CardId | undefined;
 }
 
-export interface SelectionApplicationStartup {
-  kind: 'selection';
-  spaces: readonly SpaceSummary[];
-}
-
-export type ApplicationStartupResult = OpenedApplicationStartup | SelectionApplicationStartup;
+export type ApplicationStartupResult = OpenedApplicationStartup;
 
 export type ApplicationStartupResolver = () => Promise<ApplicationStartupResult>;
-export type SpaceSelectionOpener = (id: UUID) => Promise<OpenedSpace>;
 
-const renderOpenedSpace = (root: ApplicationRoot, opened: OpenedSpace): void => {
-  mountSpaceApp(opened, (app) => {
-    const AppRouter = createAppRouter(() => app);
-    root.render(
-      <StrictMode>
-        <AppRouter />
-      </StrictMode>,
-    );
-  });
+const renderOpenedSpace = (
+  root: ApplicationRoot,
+  opened: OpenedSpace,
+  selection?: CanvasRendererId,
+  cardId?: CardId,
+): void => {
+  mountSpaceApp(
+    opened,
+    (app) => {
+      root.render(<StrictMode>{app}</StrictMode>);
+    },
+    selection,
+    cardId,
+  );
 };
 
 const errorMessage = (error: unknown): string =>
@@ -48,33 +47,11 @@ const renderStartupError = (root: ApplicationRoot, error: unknown): void => {
 export const startApplication = async (
   root: ApplicationRoot,
   resolveStartup: ApplicationStartupResolver,
-  openSelected?: SpaceSelectionOpener,
 ): Promise<void> => {
   try {
     const startup = await resolveStartup();
-    if (startup.kind === 'selection') {
-      if (openSelected === undefined) {
-        throw new Error('No space selection opener was configured.');
-      }
-      root.render(
-        <StrictMode>
-          <SpaceSelection
-            spaces={startup.spaces}
-            openSelected={openSelected}
-            onOpened={(opened) => {
-              renderOpenedSpace(root, opened);
-            }}
-            onError={(error) => {
-              renderStartupError(root, error);
-            }}
-          />
-        </StrictMode>,
-      );
-      return;
-    }
-
-    const { opened } = startup;
-    renderOpenedSpace(root, opened);
+    const { opened, selection, cardId } = startup;
+    renderOpenedSpace(root, opened, selection, cardId);
   } catch (error) {
     renderStartupError(root, error);
   }

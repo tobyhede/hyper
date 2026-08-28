@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0053
+Refined by: 0072
 
 A **canvas renderer** is a View or Layout in the role of drawing the canvas. Its
 in-memory identity is `CanvasRendererId`, a tagged choice between a built-in View
@@ -19,4 +20,3 @@ identity, not an act. Renaming that type fixes the names that hold it while
 leaving the verb accurate. It also keeps the flat persisted representation and
 the tagged in-memory representation explicit instead of forcing either across
 the other boundary.
-

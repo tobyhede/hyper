@@ -1,0 +1,86 @@
+[
+  {
+    "id": "column.public.spaces.entry",
+    "label": "Add column \"entry\" to \"spaces\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "entry",
+        "table": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"entry\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "entry"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"entry\"",
+        "sql": "ALTER TABLE \"public\".\"spaces\" ADD COLUMN \"entry\" bool"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"entry\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "entry"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.spaces.spaces_entry_key",
+    "label": "Add unique constraint on \"spaces\" (entry)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "spaces_entry_key",
+        "table": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"spaces_entry_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "spaces_entry_key",
+          "public",
+          "\"public\".\"spaces\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"spaces_entry_key\"",
+        "sql": "ALTER TABLE \"public\".\"spaces\" ADD CONSTRAINT \"spaces_entry_key\" UNIQUE (\"entry\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"spaces_entry_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "spaces_entry_key",
+          "public",
+          "\"public\".\"spaces\""
+        ]
+      }
+    ]
+  }
+]

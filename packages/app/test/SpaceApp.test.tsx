@@ -311,6 +311,43 @@ describe('Space app permanent save refusal', () => {
 });
 
 describe('Space app failure reporting', () => {
+  it.each(['Copy link to Card', 'Copy link in this Space View'])(
+    'reports a rejected clipboard write from %s without unmounting the Space',
+    async (copyAction) => {
+      const valid = snapshot('Space', 'Card', 10, 20);
+      const session = openSpaceSession(new MemorySpaceBackend(), {
+        snapshot: valid,
+        revision: 0n,
+        exportedRevision: null,
+      });
+      const clipboardFailure = new Error('Clipboard permission denied');
+      const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: vi.fn().mockRejectedValue(clipboardFailure) },
+      });
+
+      try {
+        mountSpaceApp(
+          { space: runtime(valid), spaceSession: session },
+          (app) => render(app),
+          undefined,
+          CARD_ID,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: copyAction }));
+
+        const report = await screen.findByRole('alert');
+        expect(report).toHaveTextContent('Link not copied');
+        expect(report).toHaveTextContent('The browser refused clipboard access.');
+        expect(screen.getByText('Space')).toBeVisible();
+      } finally {
+        if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
+        else Object.defineProperty(navigator, 'clipboard', previousClipboard);
+      }
+    },
+  );
+
   /**
    * The snapshot is already unloadable when the Space app is composed, so
    * nothing has rendered yet: `createApp` builds Navigation, which resolves the

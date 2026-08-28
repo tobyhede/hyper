@@ -1,6 +1,6 @@
 import {
-  isBuiltInViewId,
-  type BuiltInViewId,
+  FLOW_SPACE_VIEW_ID,
+  GRID_SPACE_VIEW_ID,
   type Card,
   type CardId,
   type Graph,
@@ -36,7 +36,7 @@ import { nextGraphTitle } from './titles';
  */
 
 /** Where a space opens when it names no view of its own. */
-export const DEFAULT_VIEW_ID: BuiltInViewId = 'flow';
+export const DEFAULT_VIEW_ID: UUID = FLOW_SPACE_VIEW_ID;
 
 /**
  * What a renderer draws: exact Cards and exact Graphs, taken from one Space.
@@ -80,7 +80,7 @@ export interface ViewConversion {
 /** An application-supplied View: it computes placement, and editing converts it. */
 export interface ResolvedViewRenderer {
   readonly kind: 'view';
-  readonly id: BuiltInViewId;
+  readonly id: UUID;
   readonly title: string;
   readonly subject: RendererSubject;
   readonly strategy: LayoutStrategy;
@@ -115,9 +115,7 @@ export interface ResolvedLayoutRenderer {
 export type ResolvedRenderer = ResolvedViewRenderer | ResolvedLayoutRenderer;
 
 /** The one renderer currently navigating a Space (ADR 0031). */
-export type CanvasRendererId =
-  | { readonly kind: 'view'; readonly view: BuiltInViewId }
-  | { readonly kind: 'layout'; readonly layoutId: UUID };
+export type CanvasRendererId = UUID;
 
 /**
  * Why a renderer refused, and every one of them is a defect rather than an
@@ -158,10 +156,10 @@ export class RendererInvariantError extends Error {
  * disagreement `canvas-renderers.ts` exists to remove and would then have
  * reintroduced a layer down.
  */
-export const layoutNotFound = (layoutId: UUID): RendererInvariantError =>
+export const spaceViewNotFound = (spaceViewId: UUID): RendererInvariantError =>
   new RendererInvariantError(
     'renderer-not-found',
-    `The selected Layout ${layoutId} does not exist.`,
+    `The selected Space View ${spaceViewId} does not exist.`,
   );
 
 /**
@@ -194,9 +192,9 @@ export interface SubjectConversion {
   readonly newGraphId: () => GraphId;
   /**
    * Which renderer a refusal names, in the same closed vocabulary a selection
-   * and `space.defaultRenderer` are written in: a built-in View's id, or a Layout's.
+   * and `space.defaultRenderer` are written in: one Space View UUID namespace.
    */
-  readonly rendererId: BuiltInViewId | UUID;
+  readonly rendererId: UUID;
 }
 
 /**
@@ -287,7 +285,8 @@ export function convertSubject({
   return { graphs: [identify(head), ...tail.map(identify)] };
 }
 
-interface BuiltInViewDefinition {
+interface ComputedViewDefinition {
+  readonly id: UUID;
   readonly title: string;
   readonly selectSubject: (space: Space) => RendererSubject;
   readonly createStrategy: () => LayoutStrategy;
@@ -333,38 +332,44 @@ const freshEmptyGraph: ViewGraphPolicy = (_space, subject) => [
 ];
 
 /**
- * The built-in Views, closed.
+ * The Computed Views, closed.
  *
  * Private on purpose. Public View registration is future work — persisted View
  * ids and what happens when a plugin is missing are undecided — and a seam
  * exposed before either question is answered would be a guess. Two definitions
  * behind one internal shape is enough to keep the shape honest.
  */
-const BUILT_IN_VIEWS = {
-  flow: {
+const COMPUTED_VIEWS: readonly ComputedViewDefinition[] = [
+  {
+    id: FLOW_SPACE_VIEW_ID,
     title: 'Flow',
     selectSubject: spaceSubject,
     createStrategy: elkStrategy,
     graphPolicy: freshEmptyGraph,
   },
-  grid: {
+  {
+    id: GRID_SPACE_VIEW_ID,
     title: 'Grid',
     selectSubject: spaceSubject,
     createStrategy: gridStrategy,
     graphPolicy: freshEmptyGraph,
   },
-} satisfies Readonly<Record<BuiltInViewId, BuiltInViewDefinition>>;
+];
 
 /**
- * What a built-in View is called, for the chrome that lists every one of them.
+ * What a Computed View is called, for the chrome that lists every one of them.
  *
  * A lookup and not the registration seam the collection above declines to be:
- * the Space Sidebar draws one row per built-in View (ADR 0053) and needs a
+ * the Space Sidebar draws one row per Computed View (ADR 0053) and needs a
  * title for each, where `ResolvedViewRenderer.title` answers only for the View
  * currently drawing. Titles stay defined once, beside the strategy and subject
  * they belong to.
  */
-export const builtInViewTitle = (id: BuiltInViewId): string => BUILT_IN_VIEWS[id].title;
+export const computedViewTitle = (id: UUID): string => {
+  const definition = COMPUTED_VIEWS.find((view) => view.id === id);
+  if (definition === undefined) throw spaceViewNotFound(id);
+  return definition.title;
+};
 
 /**
  * A Layout's subject: its own Card members, and the Graphs it owns.
@@ -405,7 +410,7 @@ function layoutSubject(
  */
 export function checkSubject(
   space: Space,
-  rendererId: BuiltInViewId | UUID,
+  rendererId: UUID,
   subject: RendererSubject,
 ): RendererSubject {
   const cardIds = new Set<CardId>();
@@ -465,15 +470,11 @@ export type ResolveRenderer = (space: Space, selection?: CanvasRendererId) => Re
  * is current, and comparing two selections field by field at each site is how
  * the list and the thing it reports on begin to disagree (ADR 0053).
  */
-export const canvasRendererKey = (selection: CanvasRendererId): string =>
-  selection.kind === 'view' ? `view:${selection.view}` : `layout:${selection.layoutId}`;
+export const canvasRendererKey = (selection: CanvasRendererId): string => selection;
 
 /** Resolve the Space default into the initial renderer selection. */
 export function defaultRenderer(space: Space): CanvasRendererId {
-  const requested = space.defaultRenderer ?? DEFAULT_VIEW_ID;
-  return isBuiltInViewId(requested)
-    ? { kind: 'view', view: requested }
-    : { kind: 'layout', layoutId: requested };
+  return space.defaultRenderer ?? DEFAULT_VIEW_ID;
 }
 
 /**
@@ -488,9 +489,10 @@ export function createRendererResolver({
   newGraphId,
 }: RendererResolverDependencies): ResolveRenderer {
   return (space, selection = defaultRenderer(space)) => {
-    if (selection.kind === 'layout') {
-      const resolvedLayout = space.lookup.layout(selection.layoutId);
-      if (resolvedLayout === undefined) throw layoutNotFound(selection.layoutId);
+    const definition = COMPUTED_VIEWS.find((view) => view.id === selection);
+    if (definition === undefined) {
+      const resolvedLayout = space.lookup.layout(selection);
+      if (resolvedLayout === undefined) throw spaceViewNotFound(selection);
       const members = Placement.fromLayout(resolvedLayout.layout);
       return {
         kind: 'layout',
@@ -504,11 +506,10 @@ export function createRendererResolver({
       };
     }
 
-    const definition = BUILT_IN_VIEWS[selection.view];
-    const subject = checkSubject(space, selection.view, definition.selectSubject(space));
+    const subject = checkSubject(space, selection, definition.selectSubject(space));
     return {
       kind: 'view',
-      id: selection.view,
+      id: selection,
       title: definition.title,
       subject,
       strategy: definition.createStrategy(),
@@ -520,7 +521,7 @@ export function createRendererResolver({
           policy: definition.graphPolicy,
           placement: rendered,
           newGraphId,
-          rendererId: selection.view,
+          rendererId: selection,
         }),
     };
   };

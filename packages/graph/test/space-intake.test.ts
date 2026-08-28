@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Card, CardPlacement } from '@project/core';
+import {
+  COMPUTED_VIEW_IDS,
+  FLOW_SPACE_VIEW_ID,
+  type Card,
+  type CardPlacement,
+} from '@project/core';
 import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
 import { aliasFile, cardFile, uuid } from './card-files';
@@ -585,10 +590,25 @@ describe.each([
       expect(loaded(load(simple(WORKING))).defaultRenderer).toBe(WORKING);
     });
 
-    it('accepts a defaultRenderer naming a built-in view', () => {
-      for (const view of ['flow', 'grid'] as const) {
+    it('accepts a defaultRenderer naming a Computed View', () => {
+      for (const view of COMPUTED_VIEW_IDS) {
         expect(loaded(load(simple(view))).defaultRenderer).toBe(view);
       }
+    });
+
+    it('refuses a Layout whose id collides with an available Computed View', () => {
+      const errors = refused(
+        load({
+          cards: [markdown(A, 'A')],
+          layouts: [
+            layout(FLOW_SPACE_VIEW_ID, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
+          ],
+        }),
+      );
+
+      expect(errors).toContainEqual(
+        expect.objectContaining({ kind: 'space-view-id-collision', ref: FLOW_SPACE_VIEW_ID }),
+      );
     });
 
     it('refuses a defaultRenderer naming neither', () => {

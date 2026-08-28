@@ -1,6 +1,13 @@
 import fc from 'fast-check';
 import { expect, it } from 'vitest';
-import { uuidSchema, type Card, type Graph, type Layout, type SpaceSnapshot } from '@project/core';
+import {
+  FLOW_SPACE_VIEW_ID,
+  uuidSchema,
+  type Card,
+  type Graph,
+  type Layout,
+  type SpaceSnapshot,
+} from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
@@ -167,11 +174,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
   fc.assert(
     fc.property(
       fc.array(operation, { minLength: 1, maxLength: 12 }),
-      fc.constantFrom<CanvasRendererId>(
-        { kind: 'layout', layoutId: LAYOUT_ID },
-        { kind: 'layout', layoutId: OTHER_LAYOUT_ID },
-        { kind: 'view', view: 'flow' },
-      ),
+      fc.constantFrom<CanvasRendererId>(LAYOUT_ID, OTHER_LAYOUT_ID, FLOW_SPACE_VIEW_ID),
       (operations, renderer) => {
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
@@ -192,9 +195,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
         // is what it authored.
         const selectedLayout = (): Layout | undefined => {
           const selected = navigation.getState().selectedRenderer;
-          return selected.kind === 'layout'
-            ? currentSpace().lookup.layout(selected.layoutId)?.layout
-            : undefined;
+          return currentSpace().lookup.layout(selected)?.layout;
         };
         const opened = selectedLayout();
         authoring.replacePlacement(

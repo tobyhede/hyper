@@ -63,9 +63,21 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
 /** Behavioral repository for server-side startup tests. */
 export class MemorySpaceRepository implements SpaceRepository {
   readonly #spaces = new Map<UUID, LoadedSpace>();
+  #entrySpaceId: UUID | undefined;
 
-  constructor(spaces: readonly LoadedSpace[] = []) {
+  constructor(spaces: readonly LoadedSpace[] = [], entrySpaceId?: UUID) {
     for (const space of spaces) this.#spaces.set(space.snapshot.id, clone(space));
+    this.#entrySpaceId = entrySpaceId;
+  }
+
+  entrySpaceId(): Promise<UUID | undefined> {
+    return Promise.resolve(this.#entrySpaceId);
+  }
+
+  setEntrySpace(id: UUID): Promise<void> {
+    if (!this.#spaces.has(id)) return Promise.reject(new Error(`Space ${id} does not exist`));
+    this.#entrySpaceId = id;
+    return Promise.resolve();
   }
 
   listSpaces(): Promise<readonly SpaceSummary[]> {
@@ -221,7 +233,10 @@ export class MemorySpaceRepository implements SpaceRepository {
       snapshots.push(intake.snapshot);
     }
 
-    if (mode === 'truncate') this.#spaces.clear();
+    if (mode === 'truncate') {
+      this.#spaces.clear();
+      this.#entrySpaceId = undefined;
+    }
     const stored = snapshots.map((snapshot): LoadedSpace => ({
       snapshot: clone(snapshot),
       revision: 0n,

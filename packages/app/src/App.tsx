@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { AppShell } from '@project/ui';
+import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { type Card, type CardId, type LayoutPosition } from '@project/core';
+import { productDestinationPath, resolveProductDestinationInSnapshot } from '@project/http';
 import { graphCardIds } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { composeApp, openingPlacement } from './compose-app';
@@ -17,8 +18,10 @@ import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
 import { activeGraphColor } from './colors';
 import type { CanvasRendererId } from './renderer';
+import { destinationOpening } from './destination-opening';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
+import { CardDestinationFocus } from './components/CardDestinationFocus';
 import { NewAlias } from './components/NewAlias';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
@@ -27,7 +30,11 @@ import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
 import { SelectedCanvasRenderer, SpaceSidebar } from './components/SpaceSidebar';
 
-export const createApp = ({ spaceSession }: OpenedSpace) => {
+export const createApp = (
+  { spaceSession }: OpenedSpace,
+  selection?: CanvasRendererId,
+  destinationCardId?: CardId,
+) => {
   // What an opened Space is composed of, stated once (`compose-app.ts`): one
   // working-space reader every collaborator shares, one renderer resolver, and
   // the order the six of them have to be built in.
@@ -39,7 +46,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     authoring,
     adapter: useRenderAdapter,
     edgeAuthoring,
-  } = composeApp({ spaceSession });
+  } = composeApp({ spaceSession, selection });
 
   function App() {
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
@@ -54,6 +61,12 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
+    const [addressedCardId, setAddressedCardId] = useState<CardId | null>(
+      destinationCardId ?? null,
+    );
+    useEffect(() => {
+      if (addressedCardId !== null) useRenderAdapter.getState().selectCard(addressedCardId);
+    }, [addressedCardId]);
     /**
      * Whether a Card's content edit is running, reported up by the canvas.
      *
@@ -65,6 +78,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
      */
     const [editingCardBody, setEditingCardBody] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
+    const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const rendererSpace = useMemo(
@@ -129,6 +143,8 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
     const selection = useRenderAdapter((s) => s.selection);
     const selectedCardId = selectedCardOf(selection);
+    const selectedCard =
+      selectedCardId === null ? undefined : rendererSpace.lookup.card(selectedCardId);
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
@@ -184,11 +200,52 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     // the rendered one matters because Navigation resolves against the live one
     // too: deciding from a snapshot Navigation will not consult is one decision
     // with two sources of truth.
-    const selectCanvasRenderer = useCallback((selection: CanvasRendererId) => {
+    const installCanvasRenderer = useCallback((selection: CanvasRendererId) => {
       const resolved = resolveRenderer(currentSpace(), selection);
+      const changesRenderer = navigation.getState().selectedRenderer !== selection;
       navigation.selectRenderer(selection);
+      // A current row can be chosen again after reload. Its UUID is already the
+      // Navigation value, so no renderer dependency will change and no placement
+      // effect will rerun; clearing the published projection here would strand
+      // the canvas in its pending state. Navigation still receives the choice so
+      // it can apply its own same-renderer semantics.
+      if (!changesRenderer) return;
       useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
     }, []);
+
+    const selectCanvasRenderer = useCallback(
+      (selection: CanvasRendererId) => {
+        if (navigation.getState().selectedRenderer === selection) return;
+        setAddressedCardId(null);
+        installCanvasRenderer(selection);
+        window.history.pushState(
+          null,
+          '',
+          productDestinationPath({
+            kind: 'space-view',
+            spaceId: currentSpace().id,
+            spaceViewId: selection,
+          }),
+        );
+      },
+      [installCanvasRenderer],
+    );
+
+    useEffect(() => {
+      const restoreDestination = () => {
+        const space = currentSpace();
+        const resolution = resolveProductDestinationInSnapshot(
+          spaceSession.getState().working,
+          window.location.pathname,
+        );
+        if (resolution.kind !== 'resolved') return;
+        const opening = destinationOpening(space, resolution.destination);
+        installCanvasRenderer(opening.selection);
+        setAddressedCardId(opening.cardId);
+      };
+      window.addEventListener('popstate', restoreDestination);
+      return () => window.removeEventListener('popstate', restoreDestination);
+    }, [installCanvasRenderer]);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.
@@ -506,6 +563,36 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
           state: sessionState.persistence.kind,
           acknowledgedRevision: sessionState.acknowledgedRevision,
         }}
+        cardLinks={
+          selectedCard === undefined
+            ? undefined
+            : {
+                title: selectedCard.title,
+                onCopyCanonical: () => {
+                  const path = productDestinationPath({
+                    kind: 'card',
+                    spaceId: rendererSpace.id,
+                    cardId: selectedCard.id,
+                  });
+                  setClipboardFailure(null);
+                  void navigator.clipboard
+                    .writeText(new URL(path, window.location.href).href)
+                    .catch(() => setClipboardFailure('The browser refused clipboard access.'));
+                },
+                onCopyContextual: () => {
+                  const path = productDestinationPath({
+                    kind: 'space-view-card',
+                    spaceId: rendererSpace.id,
+                    spaceViewId: selectedRenderer,
+                    cardId: selectedCard.id,
+                  });
+                  setClipboardFailure(null);
+                  void navigator.clipboard
+                    .writeText(new URL(path, window.location.href).href)
+                    .catch(() => setClipboardFailure('The browser refused clipboard access.'));
+                },
+              }
+        }
       />
     );
 
@@ -514,10 +601,19 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
         sidebar={sidebar}
         header={<SelectedCanvasRenderer renderer={current} />}
         notice={
-          <PersistenceNotice
-            persistence={sessionState.persistence}
-            onRetry={authoring.retryPersistence}
-          />
+          <>
+            {clipboardFailure === null ? null : (
+              <Alert variant="destructive">
+                <AlertIcon />
+                <AlertTitle>Link not copied</AlertTitle>
+                <AlertDescription>{clipboardFailure}</AlertDescription>
+              </Alert>
+            )}
+            <PersistenceNotice
+              persistence={sessionState.persistence}
+              onRetry={authoring.retryPersistence}
+            />
+          </>
         }
       >
         <div className="graph-area" style={cardSizeVars}>
@@ -531,6 +627,13 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
                   the replacement epoch — the getter it reports describes the
                   viewport, which a replaced Space does not invalidate. */}
               <CanvasCentre report={reportVisibleCentre} />
+              <CardDestinationFocus
+                cardId={addressedCardId}
+                ready={
+                  addressedCardId !== null &&
+                  (liveProjection?.nodes.some(({ id }) => id === addressedCardId) ?? false)
+                }
+              />
               <SpaceCanvas
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { BUILT_IN_VIEW_IDS, uuidSchema } from '@project/core';
+import {
+  COMPUTED_VIEW_IDS,
+  FLOW_SPACE_VIEW_ID,
+  GRID_SPACE_VIEW_ID,
+  uuidSchema,
+} from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import {
@@ -48,18 +53,18 @@ const AUTHORED = space([
   layout(SECOND_LAYOUT, 'Collection 2', '00000000-0000-4000-8000-000000000031'),
 ]);
 
-const FLOW: CanvasRendererId = { kind: 'view', view: 'flow' };
-const GRID: CanvasRendererId = { kind: 'view', view: 'grid' };
+const FLOW: CanvasRendererId = FLOW_SPACE_VIEW_ID;
+const GRID: CanvasRendererId = GRID_SPACE_VIEW_ID;
 
 describe('canvasRenderers', () => {
-  it('offers every built-in View and every authored Layout, in the order each is declared', () => {
+  it('offers every Computed View and every authored Layout, in the order each is declared', () => {
     const renderers = canvasRenderers(AUTHORED);
 
     expect(renderers.computed.map((renderer) => renderer.title)).toEqual(['Flow', 'Grid']);
     expect(renderers.computed.map((renderer) => renderer.selection)).toEqual([FLOW, GRID]);
     expect(renderers.authored).toEqual([
-      { selection: { kind: 'layout', layoutId: FIRST_LAYOUT }, title: 'Collection 1' },
-      { selection: { kind: 'layout', layoutId: SECOND_LAYOUT }, title: 'Collection 2' },
+      { kind: 'authored', selection: FIRST_LAYOUT, title: 'Collection 1' },
+      { kind: 'authored', selection: SECOND_LAYOUT, title: 'Collection 2' },
     ]);
   });
 
@@ -83,9 +88,7 @@ describe('canvasRenderers', () => {
     const renderers = canvasRenderers(AUTHORED);
     expect(currentRenderer(renderers, GRID)).toBe(renderers.computed[1]);
 
-    expect(currentRenderer(renderers, { kind: 'layout', layoutId: SECOND_LAYOUT })).toBe(
-      renderers.authored[1],
-    );
+    expect(currentRenderer(renderers, SECOND_LAYOUT)).toBe(renderers.authored[1]);
   });
 
   /**
@@ -104,7 +107,7 @@ describe('canvasRenderers', () => {
    * back to a View and quietly drawing something else.
    */
   it('refuses a selection naming a Layout the Space does not hold', () => {
-    const selection: CanvasRendererId = { kind: 'layout', layoutId: ABSENT_LAYOUT };
+    const selection: CanvasRendererId = ABSENT_LAYOUT;
     const renderers = canvasRenderers(AUTHORED);
 
     expect(renderers.authored.map((renderer) => renderer.title)).toEqual([
@@ -133,7 +136,7 @@ describe('canvasRenderers', () => {
    * not the other, it fails here rather than in whichever surface reads it.
    */
   it('refuses in the same words the resolver does', () => {
-    const selection: CanvasRendererId = { kind: 'layout', layoutId: ABSENT_LAYOUT };
+    const selection: CanvasRendererId = ABSENT_LAYOUT;
     const resolveRenderer = createRendererResolver({
       newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
     });
@@ -149,26 +152,27 @@ describe('canvasRenderers', () => {
   });
 
   /**
-   * Every built-in View resolves, and to the very row the computed group holds.
+   * Every Computed View resolves, and to the very row the computed group holds.
    *
-   * `BuiltInViewId` is a closed union and `BY_VIEW` has a row for each member,
-   * so this is the whole of the View case rather than a sample of it. Reference
-   * identity is the assertion because it is what the canvas header draws and
-   * what the sidebar's list is asked about.
+   * `COMPUTED_VIEW_IDS` enumerates the durable identities the registry holds,
+   * so this is the whole Computed View case rather than a sample of it.
+   * Reference identity is the assertion because it is what the canvas header
+   * draws and what the sidebar's list is asked about.
    */
-  it('answers every built-in View with the row the computed group holds', () => {
+  it('answers every Computed View with the row the computed group holds', () => {
     const renderers = canvasRenderers(AUTHORED);
 
-    BUILT_IN_VIEW_IDS.forEach((view, index) => {
-      expect(currentRenderer(renderers, { kind: 'view', view })).toBe(renderers.computed[index]);
+    COMPUTED_VIEW_IDS.forEach((view, index) => {
+      expect(currentRenderer(renderers, view)).toBe(renderers.computed[index]);
     });
   });
 
   /**
-   * A View is answered by lookup and not by searching the group it was handed.
+   * A Computed View is answered by registry lookup, not by searching the group
+   * it was handed.
    *
-   * `BY_VIEW` is total over `BuiltInViewId`: there is no "no such View" case to
-   * write and none to leave untested. Searching the supplied group put one back
+   * The registry is total over `COMPUTED_VIEW_IDS`: there is no "no such
+   * Computed View" case to write and none to leave untested. Searching the supplied group put one back
    * — a refusal reachable only by handing in a list `canvasRenderers` would
    * never build, so no test could reach it without a cast. This pins the lookup
    * by asking with the group emptied: the answer never depended on it.
@@ -190,7 +194,7 @@ describe('canvasRenderers', () => {
    * `SpaceSidebar.test.tsx` pins the other half of it.
    */
   it('builds a fresh authored row on each call', () => {
-    const selection: CanvasRendererId = { kind: 'layout', layoutId: FIRST_LAYOUT };
+    const selection: CanvasRendererId = FIRST_LAYOUT;
 
     const fromFirstCall = currentRenderer(canvasRenderers(AUTHORED), selection);
     const fromSecondCall = currentRenderer(canvasRenderers(AUTHORED), selection);
