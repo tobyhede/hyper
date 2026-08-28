@@ -164,18 +164,24 @@ export function useCanvasCardAuthoring({
   const decoratedNodes = useMemo(
     () =>
       nodes.map((node) => {
+        const cardBelongsToWorkingSpace = editableCardIds.has(node.data.cardId);
         const data: CardFlowNode['data'] = {
           ...node.data,
-          titleEditingEnabled: canAuthorOnCanvas && !bodyEditing,
+          titleEditingEnabled: cardBelongsToWorkingSpace && canAuthorOnCanvas && !bodyEditing,
         };
-        if (canAuthorOnCanvas && editableCardIds.has(node.data.cardId)) {
+        if (cardBelongsToWorkingSpace && canAuthorOnCanvas) {
           data.cardEditingEnabled = true;
           data.onEditCard = (open) => (open ? openCard(node.id) : closeCard(node.data.cardId));
         }
-        if (canAuthorOnCanvas && !bodyEditing) {
+        if (cardBelongsToWorkingSpace && canAuthorOnCanvas && !bodyEditing) {
           data.onBeginTitleEditing = () => beginTitleEditing(node.id);
         }
-        if (canAuthorOnCanvas && !bodyEditing && node.data.kind === 'markdown') {
+        if (
+          cardBelongsToWorkingSpace &&
+          canAuthorOnCanvas &&
+          !bodyEditing &&
+          node.data.kind === 'markdown'
+        ) {
           data.onBeginBodyEditing = () =>
             setCaret({
               cardId: node.id,
@@ -183,7 +189,7 @@ export function useCanvasCardAuthoring({
               openObserved: node.data.expanded === true,
             });
         }
-        if (node.data.expanded === true && canAuthorOnCanvas) {
+        if (cardBelongsToWorkingSpace && node.data.expanded === true && canAuthorOnCanvas) {
           data.resize = {
             minWidth: CARD_SIZE.width,
             minHeight: CARD_SIZE.height,
@@ -196,13 +202,17 @@ export function useCanvasCardAuthoring({
             onResizeCancel: () => cardResize.cancelResize(node.data.cardId),
           };
         }
-        if (node.data.kind === 'markdown' && bodyEditorCardId === node.id) {
+        if (
+          cardBelongsToWorkingSpace &&
+          node.data.kind === 'markdown' &&
+          bodyEditorCardId === node.id
+        ) {
           data.bodyEditor = {
             onComplete: (body) => completeCardBody(node.data.cardId, body),
             onEnd: () => setCaret(null),
           };
         }
-        if (canAuthorOnCanvas && node.id === editingTitleCardId) {
+        if (cardBelongsToWorkingSpace && canAuthorOnCanvas && node.id === editingTitleCardId) {
           data.titleEditor = {
             onComplete: (title) => {
               const error = completeCardTitle(node.id, title);

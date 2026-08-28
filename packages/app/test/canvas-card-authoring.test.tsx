@@ -236,17 +236,27 @@ describe('canvas Card authoring', () => {
   });
 
   it.each(['markdown', 'alias'] as const)(
-    'withholds Card editing from a projected %s Card absent from the working Space',
+    'withholds every authoring control from a projected %s Card absent from the working Space',
     (kind) => {
       const { result, rerender } = mountAuthoring(undefined, kind);
       rerender({
-        expanded: false,
+        expanded: true,
         enabled: true,
         presenting: false,
         nameOnCreation: null,
         cardId: MISSING_CARD_ID,
       });
-      expect(onlyNode(result.current.nodes).data.cardEditingEnabled).toBeUndefined();
+      act(() => result.current.beginTitleEditing(MISSING_CARD_ID));
+
+      const missing = onlyNode(result.current.nodes);
+      expect(missing.data.titleEditingEnabled).toBe(false);
+      expect(missing.data.cardEditingEnabled).toBeUndefined();
+      expect(missing.data.onEditCard).toBeUndefined();
+      expect(missing.data.onBeginTitleEditing).toBeUndefined();
+      expect(missing.data.onBeginBodyEditing).toBeUndefined();
+      expect(missing.data.resize).toBeUndefined();
+      expect(missing.data.titleEditor).toBeUndefined();
+      expect(missing.data.bodyEditor).toBeUndefined();
     },
   );
 

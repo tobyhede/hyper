@@ -125,7 +125,7 @@ _Avoid_: arrangement (ADR 0005 — applying a strategy produces no separate enti
 **Layout strategy**:
 A named strategy for arranging a space's cards — how they are organised and positioned. Which cards it arranges is the Space View's choice, not the strategy's.
 
-A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from the Cards and Graphs alone — a grid, Cards ordered by name, a tree, a cluster map, a Graph-driven arrangement — so it needs nothing from the Space and carries no authored data. The positioned strategy reads a **Layout**. Every Layout has a strategy that renders it; not every strategy has a Layout behind it.
+A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from the Cards and Graphs alone — a grid, Cards ordered by name, a tree, a cluster map, a Graph-driven placement — so it needs nothing from the Space and carries no authored data. The positioned strategy reads a **Layout**. Every Layout has a strategy that renders it; not every strategy has a Layout behind it.
 
 No strategy is the primary one. A space is arranged by whichever the author or the application chose, the set of them grows, and any particular graph-layout engine is one member of it rather than the thing layout means.
 
