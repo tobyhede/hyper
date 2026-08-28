@@ -10,7 +10,7 @@ The original Alias schema and single-hop resolution remain. ADR 0070 supersedes 
 - An Alias remains independently authorable as a Card and through its Layouts and Graphs: Title, placement, Edges, Open/Closed state and Open Size all remain authorable.
 - Opening an Alias is the normal Layout-owned Open operation and renders the Target Card's content read-only under the Alias Title.
 - A Markdown Target supplies rendered Markdown without source authoring.
-- A Space Card Target supplies its selected Space View and Graph without controls that change either selection.
+- When ADR 0068's Space Card is accepted and built, the same read-only capability rule applies without this feature settling that kind's renderer or gestures.
 - Target content and content configuration are authored only by opening the Target Card itself.
 - Jump to Target and a possible Edit Target shortcut are deferred under issue 05 until ADR 0069's durable Card URLs are implemented.
 
@@ -73,3 +73,4 @@ resolved — `04` was added after this line first claimed three.
 - `03-render-aliased-cards` — how an alias reads on screen.
 - `05-jump-to-alias-target` — deferred navigation from an Open Alias to its Target, blocked on Card URL addressability.
 - `06-open-alias-shows-target-content-read-only` — implement ADR 0070 and remove existing-Alias retargeting.
+- `07-space-card-alias-content-is-read-only` — apply ADR 0070 to Space Cards after ADR 0068 is accepted and built.

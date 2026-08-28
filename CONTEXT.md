@@ -37,7 +37,7 @@ _Avoid_: subspace, portal, link, nested space (as a second name for the same thi
 **Alias**:
 A card that shows another card's **content** read-only: the same content appearing again elsewhere in the space, with a single source of truth, so editing the Target changes every place it appears. An Alias carries its own Title and chooses its immutable Target when created; it may target any non-Alias card kind, including a Markdown Card or a Space Card, but never itself or another Alias.
 
-An Alias is authorable as a Card and through the Layouts and Graphs that contain it: it may be renamed, moved, connected, Opened, Closed and Resized. An Open Alias renders its Target's content without authoring it: rendered Markdown for a Markdown Target, or the selected Space View and Graph for a Space Card Target; the Target Card must be opened explicitly to author that content or configuration.
+An Alias is authorable as a Card and through the Layouts and Graphs that contain it: it may be renamed, moved, connected, Opened, Closed and Resized. An Open Alias renders its Target's content without authoring it; the Target Card must be opened explicitly to author that content or its kind-specific configuration.
 _Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
 
 ## Graphs
@@ -141,7 +141,7 @@ Projecting a space into the repository-friendly form an author can review, commi
 _Avoid_: saving, publishing, syncing.
 
 **Opening**:
-Bringing a single card's content up **on the Card itself**, by growing it where it already sits. A Markdown Card opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias opens on its own Title and its immutable Target's content read-only. A Space Card opens on its nested Graph to explore. Opening is not presenting — the canvas it happens on is still the thing being worked in — and Open Markdown content reads through the same renderer used while presenting.
+Bringing a single card's content up **on the Card itself**, by growing it where it already sits. A Markdown Card opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias opens on its own Title and its immutable Target's content read-only, while the Target Card must be opened explicitly to author that content. A Space Card opens on its nested Graph to explore. Opening is not presenting — the canvas it happens on is still the thing being worked in — and Open Markdown content reads through the same renderer used while presenting.
 
 A Card is **Open** or **Closed**, and that state is a property of the **Layout**, not of the Card and not of the viewer: opening a Card is an Edit, it survives a reload, and any number of a Layout's Cards may be Open at once. Every Closed Card has the fixed Card size. Every Open Card has an **Open Size**: the concrete dimensions authored when it first Opens and changed by Resize. Close preserves the Open Size, so reopening returns to it. Resizing is a Card capability, not behavior supplied by a Card kind; a kind decides what its Open Card contains.
 

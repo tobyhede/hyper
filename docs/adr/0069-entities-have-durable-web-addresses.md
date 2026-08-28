@@ -1,7 +1,7 @@
 # Entities have durable web addresses
 
 Status: accepted
-Related: 0068
+Related: 0068, 0070
 
 Every Space, Card, Graph and Space View has a durable product URL built from its
 Id. A URL may identify the entity alone or establish an explicit Space View,

@@ -2,7 +2,7 @@
 
 Status: proposed
 Supersedes when accepted: 0055, 0058, 0059, 0060
-Related: 0018, 0025, 0040, 0053, 0069
+Related: 0018, 0025, 0040, 0053, 0069, 0070
 
 **Provisional until the Space Card UX is exercised.** The terminology, initial
 authored state and cross-Space topology below are decided for the prototype;
