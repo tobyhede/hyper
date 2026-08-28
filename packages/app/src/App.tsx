@@ -2,13 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell } from '@project/ui';
 import {
-  encodeCompactUuid,
-  parseSpaceViewDestination,
-  spaceViewDestinationPath,
   type Card,
   type CardId,
   type LayoutPosition,
 } from '@project/core';
+import { productDestinationPath } from '@project/http';
 import { graphCardIds } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { composeApp, openingPlacement } from './compose-app';
@@ -208,7 +206,15 @@ export const createApp = ({ spaceSession }: OpenedSpace, selection?: CanvasRende
       (selection: CanvasRendererId) => {
         if (navigation.getState().selectedRenderer === selection) return;
         installCanvasRenderer(selection);
-        window.history.pushState(null, '', spaceViewDestinationPath(currentSpace().id, selection));
+        window.history.pushState(
+          null,
+          '',
+          productDestinationPath({
+            kind: 'space-view',
+            spaceId: currentSpace().id,
+            spaceViewId: selection,
+          }),
+        );
       },
       [installCanvasRenderer],
     );
@@ -216,12 +222,22 @@ export const createApp = ({ spaceSession }: OpenedSpace, selection?: CanvasRende
     useEffect(() => {
       const restoreDestination = () => {
         const space = currentSpace();
-        const parsed = parseSpaceViewDestination(window.location.pathname);
-        if (parsed.kind === 'parsed' && parsed.spaceId === space.id) {
-          installCanvasRenderer(parsed.spaceViewId);
+        const renderers = canvasRenderers(space);
+        const selected = [...renderers.computed, ...renderers.authored].find(
+          ({ selection }) =>
+            productDestinationPath({
+              kind: 'space-view',
+              spaceId: space.id,
+              spaceViewId: selection,
+            }) === window.location.pathname,
+        );
+        if (selected !== undefined) {
+          installCanvasRenderer(selected.selection);
           return;
         }
-        if (window.location.pathname === `/spaces/${encodeCompactUuid(space.id)}`) {
+        if (
+          window.location.pathname === productDestinationPath({ kind: 'space', spaceId: space.id })
+        ) {
           installCanvasRenderer(defaultRenderer(space));
         }
       };
