@@ -368,7 +368,7 @@ describe.each([
   });
 });
 
-it.each(['Enter', ' '])('routes %s on a focused Alias through Alias opening', (key) => {
+it.each(['Enter', ' '])('opens a focused Alias with %s', (key) => {
   const alias = cardNode('A again', ALIAS_ID);
   alias.data.kind = 'alias';
   alias.data.aliasOf = 'A';
