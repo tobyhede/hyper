@@ -1,7 +1,6 @@
 import { StrictMode, type ReactNode } from 'react';
-import type { CardId } from '@project/core';
 import type { OpenedSpace } from './open-space';
-import type { CanvasRendererId } from './renderer';
+import type { DestinationOpening } from './destination-opening';
 import { mountSpaceApp } from './SpaceApp';
 import { StartupFailure } from './components/StartupFailure';
 
@@ -12,8 +11,7 @@ export interface ApplicationRoot {
 export interface OpenedApplicationStartup {
   kind: 'opened';
   opened: OpenedSpace;
-  selection?: CanvasRendererId | undefined;
-  cardId?: CardId | undefined;
+  opening?: DestinationOpening | undefined;
 }
 
 export type ApplicationStartupResult = OpenedApplicationStartup;
@@ -23,16 +21,14 @@ export type ApplicationStartupResolver = () => Promise<ApplicationStartupResult>
 const renderOpenedSpace = (
   root: ApplicationRoot,
   opened: OpenedSpace,
-  selection?: CanvasRendererId,
-  cardId?: CardId,
+  opening?: DestinationOpening,
 ): void => {
   mountSpaceApp(
     opened,
     (app) => {
       root.render(<StrictMode>{app}</StrictMode>);
     },
-    selection,
-    cardId,
+    opening,
   );
 };
 
@@ -50,8 +46,7 @@ export const startApplication = async (
 ): Promise<void> => {
   try {
     const startup = await resolveStartup();
-    const { opened, selection, cardId } = startup;
-    renderOpenedSpace(root, opened, selection, cardId);
+    renderOpenedSpace(root, startup.opened, startup.opening);
   } catch (error) {
     renderStartupError(root, error);
   }

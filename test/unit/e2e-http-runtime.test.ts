@@ -40,7 +40,7 @@ describe('e2e HTTP runtime', () => {
   it('configures the tracked fixture as the explicit Entry Space', async () => {
     const app = await createApp({ catalog: 'fixture', startup: true });
 
-    await expect(app.resolveProductRequest('/')).resolves.toEqual({
+    await expect(app.resolveProductRequest('/', 'GET')).resolves.toEqual({
       status: 302,
       headers: {
         location: `/spaces/${encodeCompactUuid(FIXTURE_ID)}`,

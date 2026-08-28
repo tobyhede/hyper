@@ -80,20 +80,11 @@ export function canvasProjection(
   const visible = new Set<GraphId>(drawnGraphIds);
   const handles = filterHandlesByGraphs(buildCardHandles(space), drawnGraphIds);
   const edges = buildGraphRenderEdges(space).filter((edge) => visible.has(edge.graphId));
-  // Every Card in the Space, and **deliberately not `renderer.subject.cards`**.
-  //
-  // This is the one deferred read of the fallback-band exception (docs/agents/rendering.md).
-  // `positionedStrategy` still draws a Card a selected Layout omits, in a band
-  // below everything the Layout places, and until package 5 builds Cards View,
-  // Add to Layout and Remove from Layout that band is the only surface such a
-  // Card can be reached through. Narrowing this to the subject now would take it
-  // off screen with nothing to replace it. Package 5 swaps this line for the
-  // subject when it deletes the band.
-  //
-  // A Space may also have Cards and no Graphs at all (ADR 0015), so the set can
-  // never be derived from the Graphs either — that would draw a new Space as an
-  // empty canvas.
-  const cardIds = space.cards.map((card) => card.id);
+  // The renderer chooses the Cards it draws. In particular, a Layout's sparse
+  // placement omits Cards from its canvas; the Sidebar Cards collection is the
+  // surface that reveals those Cards without manufacturing positions (ADR 0040,
+  // ADR 0069).
+  const cardIds = renderer.subject.cards.map((card) => card.id);
   const authored =
     renderer.kind === 'layout' ? Placement.fromLayout(renderer.resolvedLayout.layout) : null;
   const openCardIds = new Set(

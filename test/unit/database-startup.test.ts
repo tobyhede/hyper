@@ -17,8 +17,6 @@ const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_CARD_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
-const THIRD_SPACE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
-const THIRD_CARD_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
 
 class PersistenceOwnedSpaceIdRepository implements SpaceRepository {
   readonly #memory = new MemorySpaceRepository();
@@ -165,35 +163,6 @@ describe('resolveDatabaseStartup', () => {
     expect(result).toEqual({ kind: 'opened', space: existing });
   });
 
-  it('rejects an empty import without opening the configured Entry Space', async () => {
-    const unrelated = storedSpace(4n);
-    const repository = new MemorySpaceRepository([unrelated], SPACE_ID);
-
-    await expect(resolveDatabaseStartup(repository, [])).rejects.toThrow(
-      'Database import returned no spaces',
-    );
-    await expect(repository.listSpaces()).resolves.toEqual([
-      { id: SPACE_ID, title: 'Existing space' },
-    ]);
-  });
-
-  it('opens the one imported space by its UUID when unrelated spaces exist', async () => {
-    const unrelated = storedSpace(4n);
-    const stored = storedSpace(
-      BigInt(Number.MAX_SAFE_INTEGER) + 1n,
-      OTHER_SPACE_ID,
-      OTHER_CARD_ID,
-      'Fresh imported space',
-    );
-    const imported = storedSpace(0n, OTHER_SPACE_ID, OTHER_CARD_ID, 'Stale imported space');
-    const repository = new MemorySpaceRepository([unrelated, stored]);
-
-    const result = await resolveDatabaseStartup(repository, [imported]);
-
-    expect(result).toEqual({ kind: 'opened', space: stored });
-    await expect(repository.entrySpaceId()).resolves.toBe(OTHER_SPACE_ID);
-  });
-
   it('opens the configured Entry Space when several spaces are stored', async () => {
     const entry = storedSpace(7n, OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space');
     const repository = new MemorySpaceRepository([storedSpace(4n), entry], OTHER_SPACE_ID);
@@ -209,18 +178,6 @@ describe('resolveDatabaseStartup', () => {
     await expect(resolveDatabaseStartup(repository)).rejects.toThrow(
       'The database has no configured Entry Space',
     );
-    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
-  });
-
-  it('does not infer an Entry Space from a batch import', async () => {
-    const unrelated = storedSpace(4n);
-    const firstImported = storedSpace(0n, OTHER_SPACE_ID, OTHER_CARD_ID, 'First imported');
-    const secondImported = storedSpace(0n, THIRD_SPACE_ID, THIRD_CARD_ID, 'Second imported');
-    const repository = new MemorySpaceRepository([unrelated, firstImported, secondImported]);
-
-    await expect(
-      resolveDatabaseStartup(repository, [firstImported, secondImported]),
-    ).rejects.toThrow('The database has no configured Entry Space');
     await expect(repository.entrySpaceId()).resolves.toBeUndefined();
   });
 });

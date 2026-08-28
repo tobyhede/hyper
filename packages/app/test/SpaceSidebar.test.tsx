@@ -142,6 +142,23 @@ describe('SpaceSidebar', () => {
     expect(props.cardLinks?.onCopyContextual).toHaveBeenCalledOnce();
   });
 
+  it('reveals an addressed Card outside the selected Layout in the Cards collection', () => {
+    const props: SpaceSidebarProps = {
+      ...settledProps(),
+      cardsCollection: {
+        cards: [{ id: CARD_A, title: 'Outside the Layout' }],
+        revealedCardId: CARD_A,
+      },
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    expect(screen.getByText('Cards', { exact: true })).toBeVisible();
+    expect(screen.getByText('Outside the Layout').closest('[data-card-id]')).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+  });
+
   /**
    * The whole of ADR 0053's first claim, asserted as one state: every computed
    * View and every authored Layout is a row of one list, exactly one is pressed,
@@ -230,6 +247,31 @@ describe('SpaceSidebar', () => {
 
     fireEvent.click(choice);
     expect(props.graph.onActivate).toHaveBeenCalledWith(GRAPH_ID);
+  });
+
+  it('offers distinct canonical and Space View copy commands for the Active Graph', () => {
+    const base = settledProps();
+    const props: SpaceSidebarProps = {
+      ...base,
+      graph: {
+        ...base.graph,
+        graphs: [{ id: GRAPH_ID, title: 'Authored', color: '#123456', edges: [] }],
+        activeGraphId: GRAPH_ID,
+        links: {
+          onCopyCanonical: vi.fn(),
+          onCopyContextual: vi.fn(),
+        },
+      },
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link to Authored' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Copy link to Authored in this Space View' }),
+    );
+
+    expect(props.graph.links?.onCopyCanonical).toHaveBeenCalledWith(GRAPH_ID);
+    expect(props.graph.links?.onCopyContextual).toHaveBeenCalledWith(GRAPH_ID);
   });
 
   /**
@@ -388,6 +430,75 @@ describe('SpaceSidebar', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Graph 1' }));
 
       expect(props.graph.onActivate).toHaveBeenCalledWith(GRAPH_ID);
+      await dismissed();
+    });
+
+    it.each([
+      {
+        name: 'the canonical Card link is copied',
+        button: 'Copy link to Start here',
+        callback: 'canonical' as const,
+      },
+      {
+        name: 'the contextual Card link is copied',
+        button: 'Copy link in this Space View',
+        callback: 'contextual' as const,
+      },
+    ])('dismisses itself when $name', async ({ button, callback }) => {
+      const onCopyCanonical = vi.fn();
+      const onCopyContextual = vi.fn();
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        cardLinks: {
+          title: 'Start here',
+          onCopyCanonical,
+          onCopyContextual,
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: button }));
+
+      const expected = callback === 'canonical' ? onCopyCanonical : onCopyContextual;
+      const other = callback === 'canonical' ? onCopyContextual : onCopyCanonical;
+      expect(expected).toHaveBeenCalledOnce();
+      expect(other).not.toHaveBeenCalled();
+      await dismissed();
+    });
+
+    it.each([
+      {
+        name: 'the canonical Graph link is copied',
+        button: 'Copy link to Graph 1',
+        callback: 'canonical' as const,
+      },
+      {
+        name: 'the contextual Graph link is copied',
+        button: 'Copy link to Graph 1 in this Space View',
+        callback: 'contextual' as const,
+      },
+    ])('dismisses itself when $name', async ({ button, callback }) => {
+      const onCopyCanonical = vi.fn();
+      const onCopyContextual = vi.fn();
+      const base = settledProps();
+      const props: SpaceSidebarProps = {
+        ...base,
+        graph: {
+          ...base.graph,
+          graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+          activeGraphId: GRAPH_ID,
+          links: { onCopyCanonical, onCopyContextual },
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: button }));
+
+      const expected = callback === 'canonical' ? onCopyCanonical : onCopyContextual;
+      const other = callback === 'canonical' ? onCopyContextual : onCopyCanonical;
+      expect(expected).toHaveBeenCalledOnce();
+      expect(expected).toHaveBeenCalledWith(GRAPH_ID);
+      expect(other).not.toHaveBeenCalled();
       await dismissed();
     });
 

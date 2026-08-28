@@ -2,8 +2,7 @@ import { Component, type ReactElement, type ReactNode } from 'react';
 import { createApp } from './App';
 import { SpaceAppFailureView } from './components/SpaceAppFailureView';
 import type { OpenedSpace } from './space';
-import type { CanvasRendererId } from './renderer';
-import type { CardId } from '@project/core';
+import type { DestinationOpening } from './destination-opening';
 
 export type SpaceAppRenderer = (app: ReactElement) => void;
 
@@ -63,12 +62,11 @@ class SpaceAppFailure extends Component<{ children: ReactNode }, SpaceAppFailure
 export function mountSpaceApp(
   opened: OpenedSpace,
   render: SpaceAppRenderer,
-  selection?: CanvasRendererId,
-  cardId?: CardId,
+  opening?: DestinationOpening,
 ): void {
   let App: ReturnType<typeof createApp>;
   try {
-    App = createApp(opened, selection, cardId);
+    App = createApp(opened, opening);
   } catch (error) {
     console.error('Composing the Space app failed', error);
     render(<SpaceAppFailureView message={failureMessage(error)} />);

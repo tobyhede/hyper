@@ -510,6 +510,32 @@ describe('runHyper', () => {
     expect(output.stderr).toEqual([]);
   });
 
+  it('explicitly selects an existing Entry Space', async () => {
+    const output = captureIo();
+    const repository = new MemorySpaceRepository([storedSpace]);
+
+    const exitCode = await runHyper(['entry', SPACE_ID], { repository, io: output.io });
+
+    expect(exitCode).toBe(0);
+    expect(output.stdout).toEqual([`Selected Entry Space ${SPACE_ID}\n`]);
+    expect(output.stderr).toEqual([]);
+    await expect(repository.entrySpaceId()).resolves.toBe(SPACE_ID);
+  });
+
+  it('refuses to select a missing Entry Space', async () => {
+    const output = captureIo();
+    const repository = new MemorySpaceRepository([storedSpace]);
+
+    const exitCode = await runHyper(['entry', OTHER_SPACE_ID], { repository, io: output.io });
+
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual([
+      `Entry Space selection failed: Space ${OTHER_SPACE_ID} does not exist\n`,
+    ]);
+    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
+  });
+
   it.each([
     { args: ['first', 'second'] },
     { args: ['--dangerous-truncate'] },
@@ -525,7 +551,7 @@ describe('runHyper', () => {
     expect(exitCode).toBe(2);
     expect(output.stdout).toEqual([]);
     expect(output.stderr).toEqual([
-      'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper export <space-uuid> <destination-directory>\n',
+      'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper entry <space-uuid>\n       hyper export <space-uuid> <destination-directory>\n',
     ]);
   });
 
@@ -547,11 +573,11 @@ describe('runHyper', () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(output.stdout).toEqual([`Opened space ${SPACE_ID} at revision 9007199254740993\n`]);
+    expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 9007199254740993\n`]);
     expect(output.stderr).toEqual([]);
   });
 
-  it('opens the imported UUID when an unrelated space sorts first in the catalog', async () => {
+  it('imports a UUID without changing the Entry Space', async () => {
     const directory = await writeValidSpace(OTHER_SPACE_ID, 'Fresh imported talk');
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace]);
@@ -559,7 +585,7 @@ describe('runHyper', () => {
     const exitCode = await runHyper([directory], { repository, io: output.io });
 
     expect(exitCode).toBe(0);
-    expect(output.stdout).toEqual([`Opened space ${OTHER_SPACE_ID} at revision 0\n`]);
+    expect(output.stdout).toEqual([`Imported space ${OTHER_SPACE_ID} at revision 0\n`]);
     expect(output.stderr).toEqual([]);
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Stored talk' },
@@ -568,6 +594,7 @@ describe('runHyper', () => {
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toMatchObject({
       snapshot: { id: OTHER_SPACE_ID },
     });
+    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
   });
 
   it('dangerously truncates existing spaces when importing a path', async () => {
@@ -581,13 +608,13 @@ describe('runHyper', () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(output.stdout).toEqual([`Opened space ${OTHER_SPACE_ID} at revision 0\n`]);
+    expect(output.stdout).toEqual([`Imported space ${OTHER_SPACE_ID} at revision 0\n`]);
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: OTHER_SPACE_ID, title: 'Replacement talk' },
     ]);
   });
 
-  it('refuses to infer an Entry Space from a batch import', async () => {
+  it('imports a batch without inferring an Entry Space', async () => {
     const collection = await makeTemporaryDirectory();
     const first = join(collection, 'first');
     const second = join(collection, 'second');
@@ -609,12 +636,14 @@ describe('runHyper', () => {
       io: output.io,
     });
 
-    expect(exitCode).toBe(1);
-    expect(output.stdout).toEqual([]);
-    expect(output.stdout.join('')).not.toContain(collection);
-    expect(output.stderr).toEqual([
-      'Database startup failed: The database has no configured Entry Space\n',
+    expect(exitCode).toBe(0);
+    expect(output.stdout).toEqual([
+      `Imported space ${OTHER_SPACE_ID} at revision 0\n`,
+      `Imported space ${THIRD_SPACE_ID} at revision 0\n`,
     ]);
+    expect(output.stdout.join('')).not.toContain(collection);
+    expect(output.stderr).toEqual([]);
+    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
   });
 
   it('reports every file diagnostic with its path', async () => {
@@ -775,7 +804,7 @@ describe('runHyper', () => {
     expect(output.stderr).toEqual(['Database import failed: connection lost\n']);
   });
 
-  it('classifies a failure opening a successfully imported space as database startup', async () => {
+  it('does not load a successfully imported Space', async () => {
     const directory = await writeValidSpace();
     const output = captureIo();
     const repository = new MemorySpaceRepository();
@@ -783,15 +812,15 @@ describe('runHyper', () => {
 
     const exitCode = await runHyper([directory], { repository, io: output.io });
 
-    expect(exitCode).toBe(1);
-    expect(output.stdout).toEqual([]);
-    expect(output.stderr).toEqual(['Database startup failed: load unavailable\n']);
+    expect(exitCode).toBe(0);
+    expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 0\n`]);
+    expect(output.stderr).toEqual([]);
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Imported talk' },
     ]);
   });
 
-  it('classifies a failure listing the catalog after a successful batch import as database startup', async () => {
+  it('does not list the catalog after a successful batch import', async () => {
     const collection = await makeTemporaryDirectory();
     const first = join(collection, 'first');
     const second = join(collection, 'second');
@@ -811,9 +840,12 @@ describe('runHyper', () => {
 
     const exitCode = await runHyper([collection], { repository, io: output.io });
 
-    expect(exitCode).toBe(1);
-    expect(output.stdout).toEqual([]);
-    expect(output.stderr).toEqual(['Database startup failed: catalog unavailable\n']);
+    expect(exitCode).toBe(0);
+    expect(output.stdout).toEqual([
+      `Imported space ${SPACE_ID} at revision 0\n`,
+      `Imported space ${OTHER_SPACE_ID} at revision 0\n`,
+    ]);
+    expect(output.stderr).toEqual([]);
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       snapshot: { id: SPACE_ID },
     });
@@ -892,7 +924,7 @@ describe('runCliMain', () => {
 
     expect(exitCode).toBe(0);
     expect(closed).toBe(true);
-    expect(output.stdout).toEqual([`Opened space ${SPACE_ID} at revision 0\n`]);
+    expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 0\n`]);
     expect(output.stderr).toEqual([]);
   });
 
@@ -907,7 +939,7 @@ describe('runCliMain', () => {
     });
 
     expect(exitCode).toBe(1);
-    expect(output.stdout).toEqual([`Opened space ${SPACE_ID} at revision 0\n`]);
+    expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 0\n`]);
     expect(output.stderr).toEqual(['Database shutdown failed: socket stuck\n']);
   });
 

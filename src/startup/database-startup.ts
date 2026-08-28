@@ -54,21 +54,9 @@ export const bootstrapEmptyDatabase = async (repository: SpaceRepository): Promi
 /** Resolve the configured Entry Space; the database catalog only determines whether bootstrap is necessary. */
 export const resolveDatabaseStartup = async (
   repository: SpaceRepository,
-  importedSpaces?: readonly LoadedSpace[],
 ): Promise<DatabaseStartupResult> => {
-  if (importedSpaces !== undefined) {
-    if (importedSpaces.length === 0) throw new Error('Database import returned no spaces');
-  }
-
   const entrySpaceId = await repository.entrySpaceId();
   if (entrySpaceId !== undefined) return openDatabaseSelection(repository, entrySpaceId);
-
-  if (importedSpaces?.length === 1) {
-    const imported = importedSpaces[0];
-    if (imported === undefined) throw new Error('The imported space changed unexpectedly');
-    await repository.setEntrySpace(imported.snapshot.id);
-    return openDatabaseSelection(repository, imported.snapshot.id);
-  }
 
   await bootstrapEmptyDatabase(repository);
   const configured = await repository.entrySpaceId();

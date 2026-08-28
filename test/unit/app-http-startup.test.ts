@@ -9,6 +9,8 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const snapshot = (id = SPACE_ID, cardId = CARD_ID, title = 'Stored space'): SpaceSnapshot => ({
   id,
@@ -81,10 +83,132 @@ describe('HTTP space startup composition', () => {
       }),
     );
 
-    expect(result.selection).toBe(FLOW_SPACE_VIEW_ID);
+    expect(result.opening?.selection).toBe(FLOW_SPACE_VIEW_ID);
     expect(result.opened.space.id).toBe(SPACE_ID);
     expect(loadSpace).toHaveBeenCalledOnce();
     expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
+  });
+
+  /**
+   * A stored Layout carrying a Computed View's id. Intake rejects it, so the
+   * only way here is a document that reached storage some other way — and the
+   * address then names two Space Views with no rule to choose between them (ADR
+   * 0069). Startup says so rather than opening one of them.
+   */
+  it('refuses a Space View a Computed View and a Layout both claim', async () => {
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          layouts: [
+            {
+              id: FLOW_SPACE_VIEW_ID,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              graphs: [],
+            },
+          ],
+        },
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+
+    await expect(
+      startup.resolve(
+        productDestinationPath({
+          kind: 'space-view',
+          spaceId: SPACE_ID,
+          spaceViewId: FLOW_SPACE_VIEW_ID,
+        }),
+      ),
+    ).rejects.toThrow('The product URL names two Space Views.');
+  });
+
+  it('opens a canonical Graph in its owning Layout as navigation context', async () => {
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          layouts: [
+            {
+              id: LAYOUT_ID,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+            },
+          ],
+        },
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'graph', spaceId: SPACE_ID, graphId: GRAPH_ID }),
+    );
+
+    expect(result.opening?.selection).toBe(LAYOUT_ID);
+    expect(result.opening?.graphId).toBe(GRAPH_ID);
+  });
+
+  it('opens an exact presentation point with its named View, Graph and Card', async () => {
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        cards: [
+          ...snapshot().cards,
+          { id: OTHER_CARD_ID, document: { title: 'Next', kind: 'markdown' as const, body: '' } },
+        ],
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          layouts: [
+            {
+              id: LAYOUT_ID,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: {
+                [CARD_ID]: { x: 0, y: 0, open: false as const },
+                [OTHER_CARD_ID]: { x: 320, y: 0, open: false as const },
+              },
+              graphs: [
+                {
+                  id: GRAPH_ID,
+                  title: 'Graph',
+                  edges: [{ from: CARD_ID, to: OTHER_CARD_ID }],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+
+    const result = await startup.resolve(
+      productDestinationPath({
+        kind: 'presentation',
+        spaceId: SPACE_ID,
+        spaceViewId: LAYOUT_ID,
+        graphId: GRAPH_ID,
+        cardId: OTHER_CARD_ID,
+      }),
+    );
+
+    expect(result.opening?.selection).toBe(LAYOUT_ID);
+    expect(result.opening?.graphId).toBe(GRAPH_ID);
+    expect(result.opening?.presentationCardId).toBe(OTHER_CARD_ID);
   });
 
   it('opens a contextual Card in its named Space View without authoring it open', async () => {
@@ -126,8 +250,8 @@ describe('HTTP space startup composition', () => {
       }),
     );
 
-    expect(result.selection).toBe(layoutId);
-    expect(result.cardId).toBe(CARD_ID);
+    expect(result.opening?.selection).toBe(layoutId);
+    expect(result.opening?.cardId).toBe(CARD_ID);
     expect(result.opened.space.lookup.layout(layoutId)?.layout.positions[CARD_ID]?.open).toBe(
       false,
     );
@@ -176,8 +300,8 @@ describe('HTTP space startup composition', () => {
       productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: omittedId }),
     );
 
-    expect(result.selection).toBe(FLOW_SPACE_VIEW_ID);
-    expect(result.cardId).toBe(omittedId);
+    expect(result.opening?.selection).toBe(layoutId);
+    expect(result.opening?.cardId).toBe(omittedId);
     expect(
       result.opened.space.lookup.layout(layoutId)?.layout.positions[omittedId],
     ).toBeUndefined();

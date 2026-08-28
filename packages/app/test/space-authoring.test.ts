@@ -719,9 +719,9 @@ describe('Space Authoring', () => {
    * it (ADR 0040), and a Layout's members are its position keys — so an Edge to
    * a Card this Layout omits derives a Space intake rejects. `deriveCompletedEdit`
    * answers an unloadable Space by throwing, which is right for a bug and wrong
-   * for a gesture: the omitted-Card fallback band still draws such a Card, so
-   * the author can aim at one. The predicate refuses it instead, and the preview
-   * and the completion agree because they are the same policy.
+   * for an eligibility query. The predicate refuses a stale caller naming such
+   * a Card, and the preview and completion agree because they are the same
+   * policy.
    */
   it('refuses an Edge to a Card the selected Layout does not hold', () => {
     const sparse: SpaceSnapshot = {

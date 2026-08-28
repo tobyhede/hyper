@@ -1,5 +1,5 @@
 import type { CardId, GraphId } from '@project/core';
-import { outgoingEdges, graphStartCard, type Space } from '@project/graph';
+import { graphCardIds, outgoingEdges, graphStartCard, type Space } from '@project/graph';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import type { CanvasRendererId, ResolvedRenderer, ResolveRenderer } from './renderer';
 
@@ -75,6 +75,14 @@ export interface Navigation {
    * and not something Navigation carries across from the renderer before it.
    */
   readonly continueInRenderer: (selection: CanvasRendererId, activeGraphId: GraphId | null) => void;
+  /** Open an addressed Graph in one compatible renderer without authoring either selection. */
+  readonly openGraph: (selection: CanvasRendererId, graphId: GraphId) => void;
+  /** Start an addressed presentation at one exact Card with fresh Traversal history. */
+  readonly openPresentation: (
+    selection: CanvasRendererId,
+    graphId: GraphId,
+    cardId: CardId,
+  ) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   readonly openCard: (cardId: CardId) => void;
   readonly closeCard: () => void;
@@ -257,6 +265,43 @@ export function createNavigation(
       setState({
         selectedRenderer: selection,
         activeGraphId,
+      });
+    },
+    openGraph: (selection, graphId) => {
+      const space = currentSpace();
+      if (space.lookup.graph(graphId) === undefined) {
+        throw new Error(`The Graph ${graphId} does not exist.`);
+      }
+      const renderer = resolveRenderer(space, selection);
+      if (!rendererShowsGraph(renderer, graphId)) {
+        throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
+      }
+      observable.publish({
+        selectedRenderer: selection,
+        activeGraphId: graphId,
+        openedCardId: null,
+        mode: 'overview',
+      });
+    },
+    openPresentation: (selection, graphId, cardId) => {
+      const space = currentSpace();
+      if (space.lookup.graph(graphId) === undefined) {
+        throw new Error(`The Graph ${graphId} does not exist.`);
+      }
+      const renderer = resolveRenderer(space, selection);
+      if (!rendererShowsGraph(renderer, graphId)) {
+        throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
+      }
+      if (!graphCardIds(space, graphId).includes(cardId)) {
+        throw new Error(`The Graph ${graphId} does not contain the Card ${cardId}.`);
+      }
+      observable.publish({
+        selectedRenderer: selection,
+        activeGraphId: graphId,
+        openedCardId: null,
+        mode: 'presenting',
+        traversalHistory: [cardId],
+        branchIndex: 0,
       });
     },
     // Resolved first, for the same reason a renderer is: Navigation may not name

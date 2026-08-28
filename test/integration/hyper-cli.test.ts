@@ -141,7 +141,7 @@ describe('hyper CLI', () => {
     const result = await runHyperCommand([directory]);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(`Opened space ${IMPORTED_SPACE_ID} at revision 0\n`);
+    expect(result.stdout).toBe(`Imported space ${IMPORTED_SPACE_ID} at revision 0\n`);
     expect(result.stderr).toBe('');
     const stored = await repository.loadSpace(IMPORTED_SPACE_ID);
     expect(stored?.revision).toBe(0n);
@@ -156,6 +156,14 @@ describe('hyper CLI', () => {
       kind: 'markdown',
       body: 'Durable CLI body.\n',
     });
+
+    const selected = await runHyperCommand(['entry', IMPORTED_SPACE_ID]);
+    expect(selected).toEqual({
+      status: 0,
+      stdout: `Selected Entry Space ${IMPORTED_SPACE_ID}\n`,
+      stderr: '',
+    });
+    await expect(repository.entrySpaceId()).resolves.toBe(IMPORTED_SPACE_ID);
   });
 
   it('exports through the real command and records the projected PostgreSQL revision', async () => {
@@ -257,7 +265,7 @@ describe('hyper CLI', () => {
     await expect(repository.loadSpace(created.id)).resolves.toEqual(firstStored);
   });
 
-  it('opens the exact imported space when an unrelated space already exists', async () => {
+  it('imports the exact Space without changing Entry Space', async () => {
     await seedSpace(UNRELATED_SPACE_ID, 'Unrelated talk');
     const directory = await makeSpaceDirectory(EXACT_IMPORTED_SPACE_ID, 'Fresh imported talk');
 
@@ -265,7 +273,7 @@ describe('hyper CLI', () => {
 
     expect(result).toEqual({
       status: 0,
-      stdout: `Opened space ${EXACT_IMPORTED_SPACE_ID} at revision 0\n`,
+      stdout: `Imported space ${EXACT_IMPORTED_SPACE_ID} at revision 0\n`,
       stderr: '',
     });
     await expect(repository.listSpaces()).resolves.toEqual([
@@ -291,9 +299,11 @@ describe('hyper CLI', () => {
     const result = await runHyperCommand([collection]);
 
     expect(result).toEqual({
-      status: 1,
-      stdout: '',
-      stderr: 'Database startup failed: The database has no configured Entry Space\n',
+      status: 0,
+      stdout:
+        `Imported space ${FIRST_BATCH_SPACE_ID} at revision 0\n` +
+        `Imported space ${SECOND_BATCH_SPACE_ID} at revision 0\n`,
+      stderr: '',
     });
     expect(result.stderr).not.toContain(collection);
     await expect(repository.listSpaces()).resolves.toEqual([

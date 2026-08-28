@@ -16,7 +16,7 @@ interface RunHyperDependencies {
 }
 
 const USAGE =
-  'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper export <space-uuid> <destination-directory>\n';
+  'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper entry <space-uuid>\n       hyper export <space-uuid> <destination-directory>\n';
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -50,6 +50,27 @@ export const runHyper = async (
   args: readonly string[],
   dependencies: RunHyperDependencies,
 ): Promise<number> => {
+  if (args[0] === 'entry') {
+    const rawId = args[1];
+    if (args.length !== 2 || rawId === undefined) {
+      dependencies.io.stderr(USAGE);
+      return 2;
+    }
+    const id = uuidSchema.safeParse(rawId);
+    if (!id.success) {
+      dependencies.io.stderr(`Invalid space UUID: ${rawId}\n`);
+      return 2;
+    }
+    try {
+      await dependencies.repository.setEntrySpace(id.data);
+      dependencies.io.stdout(`Selected Entry Space ${id.data}\n`);
+      return 0;
+    } catch (error) {
+      dependencies.io.stderr(`Entry Space selection failed: ${describeError(error)}\n`);
+      return 1;
+    }
+  }
+
   if (args[0] === 'export') {
     const rawId = args[1];
     const destination = args[2];
@@ -111,12 +132,10 @@ export const runHyper = async (
     return 1;
   }
 
-  try {
-    const startup = await resolveDatabaseStartup(dependencies.repository, stored);
-    reportStartup(startup, dependencies.io);
-    return 0;
-  } catch (error) {
-    dependencies.io.stderr(`Database startup failed: ${describeError(error)}\n`);
-    return 1;
+  for (const space of stored) {
+    dependencies.io.stdout(
+      `Imported space ${space.snapshot.id} at revision ${space.revision.toString()}\n`,
+    );
   }
+  return 0;
 };

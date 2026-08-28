@@ -763,9 +763,9 @@ export function createSpaceAuthoring({
    * Layout's members **are** its position keys, and the completed placement is
    * what those keys are about to become. An Edge naming a Card outside it
    * derives a Space intake rejects, and `deriveCompletedEdit` answers an
-   * unloadable Space by throwing — right for a bug, wrong for a gesture the
-   * author can make. While the omitted-Card fallback band still draws a Card its
-   * Layout leaves out, they can: refusing here is what keeps that a refusal.
+   * unloadable Space by throwing — right for a bug, wrong for an eligibility
+   * query. Refusing here keeps the interaction boundary closed over the Layout
+   * even if a stale caller names a Card outside it.
    *
    * Reading the installed placement rather than the stored Layout is deliberate.
    * It is the same value the completion reports, so the preview and the

@@ -10,7 +10,7 @@ Content can be authored in version-controlled files and imported into the live p
 
 ## Running it
 
-Requirements: Node ≥ 24 and pnpm 9. Local PostgreSQL also requires Docker
+Requirements: Node ≥ 26.8.1 and pnpm 9. Local PostgreSQL also requires Docker
 Engine or Docker Desktop with Compose v2.
 
 ```sh
@@ -27,6 +27,7 @@ Then:
 3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart.
 4. Hover or select a card to reveal its four authoring handles. Drag to another card to add an Edge to the active Graph. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Card N`, its placement and the Edge.
 5. Press **Present** to traverse the Graph: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
+6. Watch the address bar. The Space, a Space View, a Card, a Graph and each Active Card reached while Presenting have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)); the Sidebar and the presenting chrome offer **Copy link** for the current one, browser Back and Forward follow the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
 
 The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored Graph edges stay legible.
 
@@ -83,6 +84,32 @@ database state, run the destructive reset `docker compose down --volumes`.
 A space is a **space directory**: a space file (`space.json`) plus one Markdown file per card. Cards are not listed anywhere — a card exists because its file does ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)), and they are discovered by scanning two locations **non-recursively**: `*.md` beside the space file, and `cards/*.md`. The bundled example lives in [`packages/app/example`](packages/app/example).
 
 "Manifest" is retired, as a word and as a type ([ADR 0010](docs/adr/0010-space-is-the-root-loaded-by-loadspace.md)): the top-level value is a **Space**, and it is minted only by `loadSpace`.
+
+### Durable URLs and HTTP resources
+
+Every addressable entity has a durable product URL built from its UUID. Product URLs encode UUIDs as unpadded 22-character base64url values; titles never participate in identity. A URL may name an entity canonically or add the Space View and Graph context needed to reopen the same canvas or Active Card while Presenting:
+
+| Product URL | Destination |
+| --- | --- |
+| `/spaces/:spaceId` | Space |
+| `/spaces/:spaceId/cards/:cardId` | Card, using the Space's current Space View when it contains the Card |
+| `/spaces/:spaceId/graphs/:graphId` | Graph in its owning Layout |
+| `/spaces/:spaceId/views/:spaceViewId` | Computed View or authored Layout |
+| `/spaces/:spaceId/views/:spaceViewId/cards/:cardId` | Card in an explicit Space View |
+| `/spaces/:spaceId/views/:spaceViewId/graphs/:graphId` | Graph in an explicit Space View |
+| `/spaces/:spaceId/views/:spaceViewId/graphs/:graphId/present/:cardId` | Presenting at its Active Card |
+
+These are navigation addresses, not persistence resources: resolving one never edits a Layout, Active Graph or Card. The browser and Node host share the same destination contract, so malformed addresses receive `400`, unresolved entities receive `404`, and direct requests return the same application destination that client-side navigation opens ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)).
+
+The JSON API deliberately stays smaller and keeps UUIDs in canonical spelling:
+
+| HTTP resource | Purpose |
+| --- | --- |
+| `GET /api/spaces` | List stored Spaces and revisions |
+| `GET /api/spaces/:uuid` | Load one Space snapshot and revision |
+| `PUT /api/spaces/:uuid` | Commit a complete Space snapshot against an expected revision |
+
+Cards, Layouts and Graphs are parts of the Space aggregate, so they have product URLs but no independent persistence endpoints. API failures use RFC 9457 Problem Details (`application/problem+json`).
 
 ### `space.json`
 
@@ -169,7 +196,7 @@ A pnpm workspace with strict TypeScript and enforced package boundaries:
 | `@project/persistence` | Browser-safe backend and session contracts, optimistic revisions, commit coalescing, failure/conflict handling, and the memory adapter. |
 | `@project/react-flow-adapter` | Owns React Flow projection and all elkjs specifics. Runs the ELK strategy and projects the domain model into coloured React Flow Card nodes and Edges. |
 | `@project/ui` | Reusable, framework-agnostic React: card renderer, Graph selector, Graph legend, presentation controls, app shell. |
-| `@project/app` | Wiring: TanStack Router, a Zustand store for presentation state, the example presentation, and Vite. |
+| `@project/app` | Wiring: Navigation, Space Authoring and Edge Authoring, product-URL navigation over the browser History API (no router library), the Zustand-backed render adapter, the canvas and its cameras, the example presentation, and Vite. |
 
 Design rules kept throughout: domain logic stays out of React components, React Flow specifics stay in the adapter, and app wiring stays in `@project/app`.
 
@@ -198,6 +225,5 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - Structural deletion for Edges, Cards and Graphs through the completed-Edit lifecycle.
 - Detached Card creation, without requiring an Edge from an existing Card.
 - Card content and metadata editing, plus creation, naming, recolouring and reordering of additional Graphs.
-- Encode the active Graph and card in the TanStack Router URL so a position is linkable and refresh-safe.
 - Authored camera hints (zoom/pan/highlight several nodes) and move transitions in the space file.
 - A traversal-native speaker view: current and next Card, notes, and elapsed time.

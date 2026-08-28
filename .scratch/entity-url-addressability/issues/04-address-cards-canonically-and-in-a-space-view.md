@@ -14,7 +14,7 @@
 
 ## Answer
 
-`@project/http` now formats and resolves canonical and contextual Card destinations, including Card existence and explicit Layout membership. Its snapshot resolver gives browser history the same parsing, collision and compatibility rules without a second backend load. The application translates every resolved destination through one pure `destinationOpening` core shared by startup and `popstate`, so canonical Cards consistently use the Space default when it contains them and otherwise appear in Flow without adding Layout membership or placement.
+`@project/http` now formats and resolves canonical and contextual Card destinations, including Card existence and explicit Layout membership. Its snapshot resolver gives browser history the same parsing, collision and compatibility rules without a second backend load. The application translates every resolved destination through one pure `destinationOpening` core shared by startup and `popstate`. Canonical Cards retain the Space's default renderer; when its Layout omits the Card, the Sidebar Cards collection reveals it without adding Layout membership or manufacturing a canvas position.
 
 Opening a Card destination selects, focuses and centres the existing Closed Card without authoring Open/Closed state. The Sidebar offers distinct canonical and current-Space-View copy commands. Browser coverage proves direct navigation, reload, Back/Forward, contextual omission as a real 404, byte-identical stored state, canonical restoration after contextual navigation, and both copied URL shapes.
 

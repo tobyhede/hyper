@@ -12,6 +12,9 @@ export interface E2eHttpRuntimeOptions {
 export const createApp = async (options: E2eHttpRuntimeOptions): Promise<SpaceHostApplication> => {
   const repository = new E2eMemorySpaceRepository();
   const imported = options.catalog === 'fixture' ? await importFixture(repository) : undefined;
-  if (options.startup === true) await resolveDatabaseStartup(repository, imported);
+  if (options.startup === true) {
+    if (imported !== undefined) await repository.setEntrySpace(imported.snapshot.id);
+    await resolveDatabaseStartup(repository);
+  }
   return createSpaceHost(repository);
 };

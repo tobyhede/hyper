@@ -17,12 +17,16 @@ import { validator } from 'hono/validator';
 import { hasValidUniqueMediaTypeParameters } from './media-type';
 
 export {
+  productAddress,
   productDestinationPath,
   resolveProductDestination,
   resolveProductDestinationInSnapshot,
+  type ProductAddress,
   type ProductDestination,
   type ProductDestinationResolution,
   type ProductDestinationSnapshotResolution,
+  type ProductRequestResolver,
+  type ProductResponse,
 } from './product-destination';
 
 export { HttpSpaceBackend } from './backend';

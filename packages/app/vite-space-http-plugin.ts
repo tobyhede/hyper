@@ -2,16 +2,16 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { getRequestListener } from '@hono/node-server';
 import type { Plugin } from 'vite';
+// Relative, and by rule: Vite loads this config in Node and externalizes bare
+// specifiers, so `@project/http` would hand Node the package's TypeScript
+// source and the dev server would not start at all. Type-only, so nothing of
+// the package reaches the bundle either way — what it buys is that the seam
+// this host writes is the one the runtime composes, rather than a second copy
+// of it here, which is what the two had already become.
+import type { ProductRequestResolver, ProductResponse } from '../http/src/index';
 
-interface FetchApplication {
+interface FetchApplication extends ProductRequestResolver {
   fetch(request: Request, env?: unknown): Response | Promise<Response>;
-  resolveProductRequest(pathname: string): Promise<ProductResponse | undefined>;
-}
-
-interface ProductResponse {
-  status: number;
-  headers?: Readonly<Record<string, string>>;
-  body?: string;
 }
 
 interface SpaceHttpRuntime {
@@ -74,7 +74,9 @@ const asRuntime = (loaded: unknown, modulePath: string): SpaceHttpRuntime => {
     throw new Error(`${modulePath} does not export a createApp function`);
   }
   // SAFETY: the guard above confirmed `loaded` is a non-null object whose
-  // `createApp` is a function — the two members `SpaceHttpRuntime` declares.
+  // `createApp` is a function — the one member `SpaceHttpRuntime` declares.
+  // What that application then *answers* is checked where it is created: this
+  // sees the module, and `resolveProductRequest` is on what `createApp` returns.
   return loaded as SpaceHttpRuntime;
 };
 
@@ -88,6 +90,16 @@ const installMiddleware = (
 ): void => {
   const host = runtime.then(async (loaded) => {
     const created = await asRuntime(loaded, modulePath).createApp(runtimeOptions);
+    // The module probe above sees `createApp`; this is the application it
+    // answers, and the two are different objects. A runtime that hands back a
+    // bare Hono app satisfies both the probe and this file's declared type, then
+    // fails on the first request off the API tree with `created
+    // .resolveProductRequest is not a function` — once per request, naming
+    // nothing that locates the runtime. Startup is the last place the module can
+    // still be named, so it is where the disagreement is reported.
+    if (typeof created.resolveProductRequest !== 'function') {
+      throw new Error(`${modulePath}'s createApp returns no resolveProductRequest`);
+    }
     // `getRequestListener` replaces `globalThis.Request`/`Response` with its own
     // lightweight classes unless `overrideGlobalObjects: false` is passed, and
     // it defines them non-writable and non-configurable, so the swap is
@@ -113,16 +125,24 @@ const installMiddleware = (
     }
 
     const productPath = pathname(request);
-    const resolvesProduct = request.method === 'GET' || request.method === 'HEAD';
-    if (!resolvesProduct || productPath === undefined) {
+    if (productPath === undefined) {
       next();
       return;
     }
+    // Every method, not only the ones a product address serves: which methods
+    // those are is the application's answer to give, and gating here returned
+    // the SPA fallback's 200 for a request the application had a status for.
+    // A `HEAD` response carries no body; nothing else is elided, so a rejection
+    // can still say why.
     void host
       .then(async ({ created }) => {
-        const product = await created.resolveProductRequest(productPath);
+        const product = await created.resolveProductRequest(
+          productPath,
+          request.method ?? '',
+          request.headers.accept,
+        );
         if (product === undefined) next();
-        else writeProductResponse(response, product, request.method === 'GET');
+        else writeProductResponse(response, product, request.method !== 'HEAD');
       })
       .catch(next);
   });
