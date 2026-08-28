@@ -50,12 +50,16 @@ const isApiRequest = (request: IncomingMessage): boolean => {
 const pathname = (request: IncomingMessage): string | undefined =>
   URL.parse(request.url ?? '/', 'http://hyper.invalid')?.pathname ?? undefined;
 
-const writeProductResponse = (response: ServerResponse, product: ProductResponse): void => {
+const writeProductResponse = (
+  response: ServerResponse,
+  product: ProductResponse,
+  includeBody: boolean,
+): void => {
   response.statusCode = product.status;
   for (const [name, value] of Object.entries(product.headers ?? {})) {
     response.setHeader(name, value);
   }
-  response.end(product.body);
+  response.end(includeBody ? product.body : undefined);
 };
 
 const asRuntime = (loaded: unknown, modulePath: string): SpaceHttpRuntime => {
@@ -109,7 +113,8 @@ const installMiddleware = (
     }
 
     const productPath = pathname(request);
-    if (request.method !== 'GET' || productPath === undefined) {
+    const resolvesProduct = request.method === 'GET' || request.method === 'HEAD';
+    if (!resolvesProduct || productPath === undefined) {
       next();
       return;
     }
@@ -117,7 +122,7 @@ const installMiddleware = (
       .then(async ({ created }) => {
         const product = await created.resolveProductRequest(productPath);
         if (product === undefined) next();
-        else writeProductResponse(response, product);
+        else writeProductResponse(response, product, request.method === 'GET');
       })
       .catch(next);
   });

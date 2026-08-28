@@ -212,6 +212,36 @@ describe('Vite Hono host', () => {
     await expect(response.text()).resolves.toBe('<main>Canonical Space</main>');
   });
 
+  it('resolves HEAD like GET while sending no product response body', async () => {
+    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID));
+    const { host } = await startHost(hostApp, (_request, response) => {
+      response.statusCode = 200;
+      response.end('<main>Vite fallback</main>');
+    });
+
+    const root = await fetch(`${host.url}/`, { method: 'HEAD', redirect: 'manual' });
+    expect(root.status).toBe(302);
+    expect(root.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
+    await expect(root.text()).resolves.toBe('');
+
+    const malformed = await fetch(`${host.url}/spaces/not-canonical`, { method: 'HEAD' });
+    expect(malformed.status).toBe(400);
+    await expect(malformed.text()).resolves.toBe('');
+
+    const missing = await fetch(`${host.url}/spaces/${encodeCompactUuid(CARD_ID)}`, {
+      method: 'HEAD',
+    });
+    expect(missing.status).toBe(404);
+    await expect(missing.text()).resolves.toBe('');
+
+    const existing = await fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`, {
+      method: 'HEAD',
+    });
+    expect(existing.status).toBe(200);
+    await expect(existing.text()).resolves.toBe('');
+  });
+
   it('serves the API from the built runtime and leaves the rest to preview static assets', async () => {
     const { host, createApp } = await startHost(
       createSpaceHttpApp(repository()),
