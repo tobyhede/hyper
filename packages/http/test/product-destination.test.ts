@@ -220,7 +220,7 @@ describe('product destinations', () => {
   });
 
   it('does not resolve a contextual Layout-and-Graph destination when the Layout does not own the Graph', async () => {
-    const otherLayout = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+    const otherLayout = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
     const withOtherLayout: LoadedSpace = {
       ...loaded,
       snapshot: {

@@ -278,6 +278,30 @@ describe('browser destination restoration', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Destination not found');
     expect(alert).toHaveTextContent('The requested address does not exist in this Space.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Layout' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('Destination not found')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('clears a failed restoration after choosing a valid Graph', async () => {
+    mount();
+    const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(missingView)}`,
+    );
+    fireEvent(window, new PopStateEvent('popstate'));
+    await screen.findByText('Destination not found');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Graph' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('Destination not found')).not.toBeInTheDocument(),
+    );
   });
 
   it('pushes a browser entry when presenting advances over a self-Edge', async () => {

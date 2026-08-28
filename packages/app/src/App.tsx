@@ -98,6 +98,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const [destinationNotFound, setDestinationNotFound] = useState(false);
     const syncDestination = useCallback(
       (method: 'push' | 'replace', destination: ProductDestination): void => {
+        setDestinationNotFound(false);
         const path = productDestinationPath(destination);
         if (method === 'push') window.history.pushState(null, '', path);
         else window.history.replaceState(null, '', path);

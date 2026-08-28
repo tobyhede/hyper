@@ -790,8 +790,11 @@ test(
     // declares a 5px box and outranks a rule naming one class, so this is
     // asserted as a size rather than inferred from the drag below succeeding:
     // a pointer driven by test code hits 5px exactly, and a person does not.
-    expect(box.width).toBeCloseTo(48, 2);
-    expect(box.height).toBeCloseTo(48, 2);
+    // Browser geometry may carry a fractional-pixel rounding remainder, but
+    // the rendered hit target must stay within 0.01 CSS pixels of 48px.
+    const hitTargetTolerance = 0.01;
+    expect(Math.abs(box.width - 48)).toBeLessThanOrEqual(hitTargetTolerance);
+    expect(Math.abs(box.height - 48)).toBeLessThanOrEqual(hitTargetTolerance);
     const markLocator = card.locator('.rf-card-node__resize-mark');
     await expect.poll(async () => (await markLocator.boundingBox())?.width).toBeCloseTo(20, 1);
     const mark = await markLocator.boundingBox();

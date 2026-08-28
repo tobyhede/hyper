@@ -10,7 +10,7 @@ Content can be authored in version-controlled files and imported into the live p
 
 ## Running it
 
-Requirements: Node ≥ 24 and pnpm 9. Local PostgreSQL also requires Docker
+Requirements: Node ≥ 26.8.1 and pnpm 9. Local PostgreSQL also requires Docker
 Engine or Docker Desktop with Compose v2.
 
 ```sh
@@ -27,7 +27,7 @@ Then:
 3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart.
 4. Hover or select a card to reveal its four authoring handles. Drag to another card to add an Edge to the active Graph. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Card N`, its placement and the Edge.
 5. Press **Present** to traverse the Graph: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
-6. Watch the address bar. The Space, a Space View, a Card, a Graph and each presentation point have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)); the Sidebar and the presenting chrome offer **Copy link** for the current one, browser Back and Forward walk the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
+6. Watch the address bar. The Space, a Space View, a Card, a Graph and each Active Card reached while Presenting have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)); the Sidebar and the presenting chrome offer **Copy link** for the current one, browser Back and Forward follow the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
 
 The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored Graph edges stay legible.
 
@@ -87,7 +87,7 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
 
 ### Durable URLs and HTTP resources
 
-Every addressable entity has a durable product URL built from its UUID. Product URLs encode UUIDs as unpadded 22-character base64url values; titles never participate in identity. A URL may name an entity canonically or add the Space View and Graph context needed to reopen the same canvas or presentation point:
+Every addressable entity has a durable product URL built from its UUID. Product URLs encode UUIDs as unpadded 22-character base64url values; titles never participate in identity. A URL may name an entity canonically or add the Space View and Graph context needed to reopen the same canvas or Active Card while Presenting:
 
 | Product URL | Destination |
 | --- | --- |
@@ -97,7 +97,7 @@ Every addressable entity has a durable product URL built from its UUID. Product 
 | `/spaces/:spaceId/views/:spaceViewId` | Computed View or authored Layout |
 | `/spaces/:spaceId/views/:spaceViewId/cards/:cardId` | Card in an explicit Space View |
 | `/spaces/:spaceId/views/:spaceViewId/graphs/:graphId` | Graph in an explicit Space View |
-| `/spaces/:spaceId/views/:spaceViewId/graphs/:graphId/present/:cardId` | Presentation at its current Card |
+| `/spaces/:spaceId/views/:spaceViewId/graphs/:graphId/present/:cardId` | Presenting at its Active Card |
 
 These are navigation addresses, not persistence resources: resolving one never edits a Layout, Active Graph or Card. The browser and Node host share the same destination contract, so malformed addresses receive `400`, unresolved entities receive `404`, and direct requests return the same application destination that client-side navigation opens ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)).
 
