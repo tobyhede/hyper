@@ -12,6 +12,7 @@ import type { CardResize } from '../src/render-adapter';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
@@ -29,6 +30,7 @@ const snapshot = spaceSnapshotSchema.parse({
         positions: {
           [CARD_ID]: { x: 0, y: 0, open: false },
           [OTHER_CARD_ID]: { x: 300, y: 0, open: false },
+          [ALIAS_ID]: { x: 600, y: 0, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -38,6 +40,7 @@ const snapshot = spaceSnapshotSchema.parse({
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A' } },
     { id: OTHER_CARD_ID, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: ALIAS_ID, document: { title: 'A again', kind: 'alias', target: CARD_ID } },
   ],
 });
 
@@ -71,6 +74,7 @@ const cardNode = (title: string, id: typeof CARD_ID = CARD_ID, selected = false)
 interface Harness {
   readonly view: RenderResult;
   readonly openCard: ReturnType<typeof vi.fn>;
+  readonly openAlias: ReturnType<typeof vi.fn>;
   readonly addCard: ReturnType<typeof vi.fn>;
   /** Re-render with Card authoring on or off, everything else unchanged. */
   readonly setTitleEditing: (enabled: boolean) => void;
@@ -126,6 +130,7 @@ function mountGraph(
   },
 ): Harness {
   const openCard = vi.fn();
+  const openAlias = vi.fn();
   const addCard = vi.fn();
   const nodesChanged = vi.fn();
   let nodes = initialNodes;
@@ -163,7 +168,10 @@ function mountGraph(
         nameOnCreation={null}
         authoring={testedAuthoring}
         spaceSession={spaceSession}
-        onOpenAlias={navigation.openCard}
+        onOpenAlias={(cardId) => {
+          openAlias(cardId);
+          navigation.openCard(cardId);
+        }}
         onBodyEditingChange={() => undefined}
         cardResize={cardResize}
         graphs={[]}
@@ -177,6 +185,7 @@ function mountGraph(
   return {
     view,
     openCard,
+    openAlias,
     addCard,
     nodesChanged,
     setNodes: (next) => {
@@ -357,6 +366,19 @@ describe.each([
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
   });
+});
+
+it.each(['Enter', ' '])('routes %s on a focused Alias through Alias opening', (key) => {
+  const alias = cardNode('A again', ALIAS_ID);
+  alias.data.kind = 'alias';
+  alias.data.aliasOf = 'A';
+  const { openAlias } = mountGraph([alias]);
+
+  const focusedAlias = nodeOf(ALIAS_ID);
+  focusedAlias.focus();
+  fireEvent.keyDown(focusedAlias, { key });
+
+  expect(openAlias).toHaveBeenCalledWith(ALIAS_ID);
 });
 
 describe('the Card affordance', () => {
@@ -719,6 +741,15 @@ describe("React Flow's delete keys", () => {
   it('does not re-subscribe the document listener on an unchanged re-render', () => {
     const { rerender } = mountGraph();
     const listen = vi.spyOn(document, 'addEventListener');
+
+    rerender();
+
+    expect(listen.mock.calls.filter(([type]) => type === 'keydown')).toEqual([]);
+  });
+
+  it('does not re-subscribe the F2 listener on an unrelated unchanged re-render', () => {
+    const { rerender } = mountGraph();
+    const listen = vi.spyOn(window, 'addEventListener');
 
     rerender();
 

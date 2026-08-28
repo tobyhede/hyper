@@ -217,10 +217,11 @@ export function SpaceCanvas({
     authoring,
     spaceSession,
     cardResize,
+    onOpenAlias,
     onSelectCard,
     onBodyEditingChange,
   });
-  const { bodyEditing, canAuthorOnCanvas, openCard: onOpenCard } = cardAuthoring;
+  const { bodyEditing, canAuthorOnCanvas, openCard: onOpenCard, beginTitleEditing } = cardAuthoring;
 
   const edgeSurface = useEdgeAuthoring({
     authoring: edgeAuthoring,
@@ -319,43 +320,17 @@ export function SpaceCanvas({
       const selected = nodes.find((node) => node.selected);
       if (selected === undefined) return;
       event.preventDefault();
-      cardAuthoring.beginTitleEditing(selected.id);
+      beginTitleEditing(selected.id);
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, [canAuthorOnCanvas, bodyEditing, nodes, cardAuthoring]);
+  }, [canAuthorOnCanvas, bodyEditing, nodes, beginTitleEditing]);
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
   // that depended on the object would be rebuilt every time.
   const deleteEdges = edgeSurface.deleteEdges;
-  const editableNodes = useMemo(
-    () =>
-      cardAuthoring.nodes.map((node) => {
-        if (node.data.kind !== 'alias' || !canAuthorOnCanvas) return node;
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            cardEditingEnabled: true,
-            onEditCard: (open: boolean) => {
-              if (open) {
-                onOpenAlias(node.data.cardId);
-                return 'completed';
-              }
-              const result = authoring.complete({
-                kind: 'closed-card',
-                cardId: node.data.cardId,
-              });
-              return result.kind === 'completed' || result.kind === 'unchanged'
-                ? 'completed'
-                : 'retained';
-            },
-          },
-        };
-      }),
-    [authoring, cardAuthoring.nodes, canAuthorOnCanvas, onOpenAlias],
-  );
+  const editableNodes = cardAuthoring.nodes;
 
   const connectionLineStyle = useMemo(
     () => ({

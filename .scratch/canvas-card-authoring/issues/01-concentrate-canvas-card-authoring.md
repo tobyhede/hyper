@@ -23,6 +23,6 @@ Canvas Card interaction now lives behind one React-local module interface. The a
 
 Verification:
 
-- `pnpm verify` — passed: 156 files, 1,753 tests passed, 8 skipped.
+- `pnpm verify` — passed: 156 files, 1,757 tests passed, 8 skipped.
 - `pnpm e2e` — passed: 117 tests.
 - `pnpm e2e:ladle` — passed: 51 tests.

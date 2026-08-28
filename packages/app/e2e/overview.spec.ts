@@ -432,7 +432,8 @@ test(
     await expect(recap).toBeVisible();
     await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
-    await openCard(recap, 'A′');
+    await recap.focus();
+    await page.keyboard.press('Enter');
     // Two fields, both the Alias's own, and nothing belonging to A.
     await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
     const target = page.getByRole('combobox', { name: 'Target' });

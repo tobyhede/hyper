@@ -22,6 +22,7 @@ export interface CanvasCardAuthoringInput {
   readonly authoring: SpaceAuthoring;
   readonly spaceSession: SpaceSession;
   readonly cardResize: CardResize;
+  readonly onOpenAlias: (cardId: CardId) => void;
   readonly onSelectCard: (cardId: CardId) => void;
   readonly onBodyEditingChange?: ((editing: boolean) => void) | undefined;
 }
@@ -48,6 +49,7 @@ export function useCanvasCardAuthoring({
   authoring,
   spaceSession,
   cardResize,
+  onOpenAlias,
   onSelectCard,
   onBodyEditingChange,
 }: CanvasCardAuthoringInput): CanvasCardAuthoring {
@@ -100,11 +102,14 @@ export function useCanvasCardAuthoring({
       if (!cardId.success) return 'retained';
       const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId.data);
       if (stored === undefined) return 'retained';
-      if (stored.document.kind === 'alias') return 'retained';
+      if (stored.document.kind === 'alias') {
+        onOpenAlias(cardId.data);
+        return 'completed';
+      }
       const result = authoring.complete({ kind: 'opened-card', cardId: cardId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
-    [authoring, enabled, spaceSession],
+    [authoring, enabled, onOpenAlias, spaceSession],
   );
 
   const closeCard = useCallback(
@@ -163,11 +168,7 @@ export function useCanvasCardAuthoring({
           ...node.data,
           titleEditingEnabled: canAuthorOnCanvas && !bodyEditing,
         };
-        if (
-          node.data.kind !== 'alias' &&
-          canAuthorOnCanvas &&
-          editableCardIds.has(node.data.cardId)
-        ) {
+        if (canAuthorOnCanvas && editableCardIds.has(node.data.cardId)) {
           data.cardEditingEnabled = true;
           data.onEditCard = (open) => (open ? openCard(node.id) : closeCard(node.data.cardId));
         }

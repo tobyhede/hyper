@@ -32,7 +32,11 @@ const snapshot = spaceSnapshotSchema.parse({
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } }],
 });
 
-const node = (expanded: boolean, cardId = CARD_ID): CardFlowNode => ({
+const node = (
+  expanded: boolean,
+  cardId = CARD_ID,
+  kind: 'markdown' | 'alias' = 'markdown',
+): CardFlowNode => ({
   id: cardId,
   type: 'card',
   position: { x: 0, y: 0 },
@@ -41,7 +45,7 @@ const node = (expanded: boolean, cardId = CARD_ID): CardFlowNode => ({
   data: {
     cardId,
     title: 'A',
-    kind: 'markdown',
+    kind,
     body: 'A source',
     expanded,
     active: false,
@@ -63,7 +67,10 @@ interface HookProps {
   readonly cardId: typeof CARD_ID;
 }
 
-const mountAuthoring = (onBodyEditingChange?: (editing: boolean) => void) => {
+const mountAuthoring = (
+  onBodyEditingChange?: (editing: boolean) => void,
+  projectedKind: 'markdown' | 'alias' = 'markdown',
+) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const { authoring, adapter } = composeApp({ spaceSession });
@@ -77,7 +84,7 @@ const mountAuthoring = (onBodyEditingChange?: (editing: boolean) => void) => {
   const hook = renderHook(
     ({ expanded, enabled, presenting, nameOnCreation, cardId }: HookProps) =>
       useCanvasCardAuthoring({
-        nodes: [node(expanded, cardId)],
+        nodes: [node(expanded, cardId, projectedKind)],
         editable: true,
         presenting,
         enabled,
@@ -85,6 +92,7 @@ const mountAuthoring = (onBodyEditingChange?: (editing: boolean) => void) => {
         authoring,
         spaceSession,
         cardResize: adapter.getState().cardResize,
+        onOpenAlias: () => undefined,
         onSelectCard: () => undefined,
         onBodyEditingChange,
       }),
@@ -227,17 +235,20 @@ describe('canvas Card authoring', () => {
     expect(onlyNode(result.current.nodes).data.bodyEditor).toBeDefined();
   });
 
-  it('withholds Card editing from a projected node absent from the working Space', () => {
-    const { result, rerender } = mountAuthoring();
-    rerender({
-      expanded: false,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      cardId: MISSING_CARD_ID,
-    });
-    expect(onlyNode(result.current.nodes).data.cardEditingEnabled).toBeUndefined();
-  });
+  it.each(['markdown', 'alias'] as const)(
+    'withholds Card editing from a projected %s Card absent from the working Space',
+    (kind) => {
+      const { result, rerender } = mountAuthoring(undefined, kind);
+      rerender({
+        expanded: false,
+        enabled: true,
+        presenting: false,
+        nameOnCreation: null,
+        cardId: MISSING_CARD_ID,
+      });
+      expect(onlyNode(result.current.nodes).data.cardEditingEnabled).toBeUndefined();
+    },
+  );
 
   it('forgets an observed body caret when the Card stops being Open', () => {
     const bodyEditingChanged = vi.fn();
