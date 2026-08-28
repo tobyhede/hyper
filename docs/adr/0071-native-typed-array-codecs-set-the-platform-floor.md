@@ -3,13 +3,14 @@
 Status: accepted
 Refines: 0069
 
-Hyper pins Node 26.8.1 and current evergreen browsers. TypeScript checks the
-ES2025 runtime library plus `ESNext.TypedArrays` as one deliberate newer
-capability, while Vite's emitted-language tooling target remains ES2024. Code
-may use the native `Uint8Array` base64 and hexadecimal codecs without a fallback
-or polyfill. This is a narrow exception beyond ES2025 rather than permission to
-assume every future platform proposal: another newer API has to justify its own
-floor.
+Hyper pins Node 26.8.1. Its browser floor is any current evergreen browser that
+natively implements the `Uint8Array` base64 and hexadecimal codecs; browser
+versions without those codecs are outside the product contract. TypeScript
+checks the ES2025 runtime library plus `ESNext.TypedArrays` as one deliberate
+newer capability, while Vite's emitted-language tooling target remains ES2024.
+Code may use those native codecs without a fallback or polyfill. This is a
+narrow exception beyond ES2025 rather than permission to assume every future
+platform proposal: another newer API has to justify its own floor.
 
 ADR 0069's compact UUID representation makes this floor useful now. Its
 canonical route codec operates directly on UUID bytes through

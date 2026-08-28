@@ -51,7 +51,7 @@ export const bootstrapEmptyDatabase = async (repository: SpaceRepository): Promi
   await repository.setEntrySpace(created.snapshot.id);
 };
 
-/** Resolve the initial durable Space from the database catalog. */
+/** Resolve the configured Entry Space; the database catalog only determines whether bootstrap is necessary. */
 export const resolveDatabaseStartup = async (
   repository: SpaceRepository,
   importedSpaces?: readonly LoadedSpace[],

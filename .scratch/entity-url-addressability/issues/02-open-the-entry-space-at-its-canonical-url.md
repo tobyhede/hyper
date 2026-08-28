@@ -6,8 +6,8 @@
 
 **Status:** resolved
 
-- [ ] Repository bootstrap establishes one explicit Entry Space without inferring it from ordering or cardinality.
-- [ ] `/` redirects without adding a redundant client-history entry, and a missing Entry Space returns an actual HTTP 404.
-- [ ] A well-formed existing Space address opens directly; malformed compact IDs return 400 and unresolved IDs return an actual 404.
-- [ ] Product routes use the canonical 22-character base64url representation while domain and persistence boundaries retain canonical UUID spelling.
-- [ ] The Space chooser is retired and `pnpm verify` plus `pnpm e2e` pass.
+- [x] Repository bootstrap establishes one explicit Entry Space without inferring it from ordering or cardinality.
+- [x] `/` redirects without adding a redundant client-history entry, and a missing Entry Space returns an actual HTTP 404.
+- [x] A well-formed existing Space address opens directly; malformed compact IDs return 400 and unresolved IDs return an actual 404.
+- [x] Product routes use the canonical 22-character base64url representation while domain and persistence boundaries retain canonical UUID spelling.
+- [x] The Space chooser is retired and `pnpm verify` plus `pnpm e2e` pass.

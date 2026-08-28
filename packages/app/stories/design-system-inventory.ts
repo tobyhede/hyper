@@ -52,7 +52,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/app/src/startup.tsx',
     reason:
-      'Startup composition. Its two rendered outcomes are catalogued separately — `operational-feedback-startup-failure` for the failure panel, and the condemned chooser above for the other.',
+      'Startup composition. It renders one opened outcome by mounting the application, while `operational-feedback-startup-failure` catalogues its failure panel.',
   },
   {
     module: 'packages/app/src/edge-authoring-react.tsx',
