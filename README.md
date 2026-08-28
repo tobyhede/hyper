@@ -85,6 +85,32 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
 
 "Manifest" is retired, as a word and as a type ([ADR 0010](docs/adr/0010-space-is-the-root-loaded-by-loadspace.md)): the top-level value is a **Space**, and it is minted only by `loadSpace`.
 
+### Durable URLs and HTTP resources
+
+Every addressable entity has a durable product URL built from its UUID. Product URLs encode UUIDs as unpadded 22-character base64url values; titles never participate in identity. A URL may name an entity canonically or add the Space View and Graph context needed to reopen the same canvas or presentation point:
+
+| Product URL | Destination |
+| --- | --- |
+| `/spaces/:spaceId` | Space |
+| `/spaces/:spaceId/cards/:cardId` | Card, using the Space's current Space View when it contains the Card |
+| `/spaces/:spaceId/graphs/:graphId` | Graph in its owning Layout |
+| `/spaces/:spaceId/views/:spaceViewId` | Computed View or authored Layout |
+| `/spaces/:spaceId/views/:spaceViewId/cards/:cardId` | Card in an explicit Space View |
+| `/spaces/:spaceId/views/:spaceViewId/graphs/:graphId` | Graph in an explicit Space View |
+| `/spaces/:spaceId/views/:spaceViewId/graphs/:graphId/present/:cardId` | Presentation at its current Card |
+
+These are navigation addresses, not persistence resources: resolving one never edits a Layout, Active Graph or Card. The browser and Node host share the same destination contract, so malformed addresses receive `400`, unresolved entities receive `404`, and direct requests return the same application destination that client-side navigation opens ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)).
+
+The JSON API deliberately stays smaller and keeps UUIDs in canonical spelling:
+
+| HTTP resource | Purpose |
+| --- | --- |
+| `GET /api/spaces` | List stored Spaces and revisions |
+| `GET /api/spaces/:uuid` | Load one Space snapshot and revision |
+| `PUT /api/spaces/:uuid` | Commit a complete Space snapshot against an expected revision |
+
+Cards, Layouts and Graphs are parts of the Space aggregate, so they have product URLs but no independent persistence endpoints. API failures use RFC 9457 Problem Details (`application/problem+json`).
+
 ### `space.json`
 
 ```json
