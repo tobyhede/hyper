@@ -411,8 +411,13 @@ export function SpaceCanvas({
       if (event.key !== 'Backspace' && event.key !== 'Delete') return;
       // The two exclusions the `C` binding above spells out, for the reasons it
       // gives: a command runs once per press, and a modifier makes the key a
-      // browser or OS shortcut rather than this canvas's.
-      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+      // browser or OS shortcut rather than this canvas's. `shiftKey` is in the
+      // list for a plainer reason than it is up there — the key is already the
+      // same key, so Shift only makes a chord this canvas never advertised, and
+      // one that belongs to somebody else in several places a browser runs.
+      // Nothing here holds Shift either: `selectionKeyCode` and
+      // `multiSelectionKeyCode` are both `null`.
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (!(event.target instanceof Element)) return;
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       const current = latestDeletion.current;

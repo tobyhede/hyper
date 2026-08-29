@@ -183,7 +183,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     occurrence: 1,
     key: 'Backspace',
     surface: 'Canvas',
-    behaviour: 'remove the selected Card or Edge through Space Authoring',
+    behaviour:
+      'remove the focused Card, else the selected Card or Edge, through Space Authoring, on an unmodified, non-repeating press',
   },
   {
     module: 'packages/app/src/components/SpaceCanvas.tsx',
@@ -191,7 +192,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     occurrence: 1,
     key: 'Delete',
     surface: 'Canvas',
-    behaviour: 'remove the selected Card or Edge through Space Authoring',
+    behaviour:
+      'remove the focused Card, else the selected Card or Edge, through Space Authoring, on an unmodified, non-repeating press',
   },
   {
     module: 'packages/app/src/edge-authoring-react.tsx',

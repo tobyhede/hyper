@@ -600,7 +600,19 @@ describe("the app's canvas delete key", () => {
     expect(session.getState().working.document.layouts?.[0]?.positions[CARD_A]).toBeDefined();
   });
 
-  it.each(['metaKey', 'ctrlKey', 'altKey'] as const)(
+  /**
+   * `shiftKey` belongs with the rest, and for a plainer reason than the `C`
+   * binding's.
+   *
+   * There, Shift has to be named because matching case-insensitively lets it
+   * through as the same character. Here the key is already the same key, so
+   * Shift makes an ordinary chord — one this canvas never advertised, since both
+   * assistive descriptions name backspace and delete unmodified, and one that is
+   * somebody else's in several places a browser runs (cut in a text control,
+   * permanent delete in a file manager). Nothing on this canvas holds Shift
+   * either: `selectionKeyCode` and `multiSelectionKeyCode` are both `null`.
+   */
+  it.each(['metaKey', 'ctrlKey', 'altKey', 'shiftKey'] as const)(
     'leaves a %s-modified Backspace to whatever else would have had it',
     (modifier) => {
       const { adapter, session } = mountCanvas();
@@ -609,6 +621,18 @@ describe("the app's canvas delete key", () => {
       fireEvent.keyDown(document.body, { key: 'Backspace', [modifier]: true });
 
       expect(session.getState().working.document.layouts?.[0]?.positions[CARD_A]).toBeDefined();
+    },
+  );
+
+  it.each(['metaKey', 'ctrlKey', 'altKey', 'shiftKey'] as const)(
+    'leaves the selected Edge standing under a %s-modified Delete',
+    (modifier) => {
+      const { adapter, session } = mountCanvas();
+      act(() => adapter.getState().selectEdge(SUBJECT));
+
+      fireEvent.keyDown(document.body, { key: 'Delete', [modifier]: true });
+
+      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
     },
   );
 
