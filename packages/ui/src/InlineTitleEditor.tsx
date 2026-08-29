@@ -86,11 +86,11 @@ export function InlineTitleEditor({
   }, []);
 
   const setDraft = (next: string): void => {
-    setLocalDraft(next);
+    if (!controlled) setLocalDraft(next);
     onDraftChange?.(next);
   };
   const setError = (next: string | null): void => {
-    setLocalError(next);
+    if (!controlled) setLocalError(next);
     onErrorChange?.(next);
   };
   const complete = (): string | null => {
@@ -125,7 +125,7 @@ export function InlineTitleEditor({
           closingByKey.current = false;
           return;
         }
-        complete();
+        if (complete() !== null) input.current?.focus();
       }}
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}

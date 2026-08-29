@@ -5,22 +5,22 @@ test('Open Spaces switches without closing or resetting a Space Sidebar', async 
 
   const openSpaces = page.getByRole('tablist', { name: 'Open Spaces' });
   const authored = page.getByRole('tab', { name: 'Space' });
-  const walkthrough = page.getByRole('tab', { name: /Walkthrough Save failed/ });
+  const traversal = page.getByRole('tab', { name: /Traversal Save failed/ });
 
   await expect(openSpaces).toHaveAttribute('aria-orientation', 'vertical');
-  await expect(walkthrough).toHaveAttribute('aria-selected', 'true');
+  await expect(traversal).toHaveAttribute('aria-selected', 'true');
   await expect(
-    page.getByRole('tabpanel').getByTestId('space-title').filter({ hasText: 'Walkthrough' }),
-  ).toHaveText('Walkthrough');
+    page.getByRole('tabpanel').getByTestId('space-title').filter({ hasText: 'Traversal' }),
+  ).toHaveText('Traversal');
 
   await authored.click();
   await expect(authored).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('tabpanel').getByTestId('space-title')).toHaveText('Space');
 
-  await walkthrough.click();
-  await expect(walkthrough).toHaveAttribute('aria-selected', 'true');
+  await traversal.click();
+  await expect(traversal).toHaveAttribute('aria-selected', 'true');
   await expect(
-    page.getByRole('tabpanel').getByRole('heading', { name: 'Walkthrough', exact: true }),
+    page.getByRole('tabpanel').getByRole('heading', { name: 'Traversal', exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('space-sidebar')).toHaveCount(3);
 });
@@ -32,12 +32,12 @@ test('Open Spaces uses one tab stop and vertical keyboard navigation', async ({ 
   await expect(entries).toHaveCount(3);
   await expect(page.locator('[role="tab"][tabindex="0"]')).toHaveCount(1);
 
-  const walkthrough = page.getByRole('tab', { name: /Walkthrough Save failed/ });
+  const traversal = page.getByRole('tab', { name: /Traversal Save failed/ });
   const deepDive = page.getByRole('tab', { name: 'Deep dive' });
-  await walkthrough.focus();
+  await traversal.focus();
   await page.keyboard.press('ArrowDown');
   await expect(deepDive).toBeFocused();
-  await expect(walkthrough).toHaveAttribute('aria-selected', 'true');
+  await expect(traversal).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Enter');
   await expect(deepDive).toHaveAttribute('aria-selected', 'true');
 });

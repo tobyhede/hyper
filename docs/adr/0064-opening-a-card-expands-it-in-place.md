@@ -93,7 +93,7 @@ The transient `openedCardId`, its `openCard`/`closeCard` navigation operations a
 the covering Card pane are replaced by Layout-owned expansion. Alias creation is
 unaffected: creating a Card that does not exist yet is not opening one.
 
-ADR 0073 replaces the Alias exception: an Alias now uses this Layout-owned Open
+ADR 0070 replaces the Alias exception: an Alias now uses this Layout-owned Open
 operation and fills the Open Card with its immutable Target's content read-only.
 
 ## The negative to remember

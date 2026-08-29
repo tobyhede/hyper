@@ -32,12 +32,14 @@ const STATUS_LABELS = {
  * different Space is showing.
  */
 export function OpenSpaces({ entries, activeId, onSelect }: OpenSpacesProps) {
-  if (entries.length === 0) return null;
+  const firstEntry = entries[0];
+  if (firstEntry === undefined) return null;
+  const selectedId = entries.some((entry) => entry.id === activeId) ? activeId : firstEntry.id;
 
   return (
     <Tabs
       orientation="vertical"
-      value={activeId}
+      value={selectedId}
       className="h-full w-full gap-0"
       data-testid="open-spaces"
     >

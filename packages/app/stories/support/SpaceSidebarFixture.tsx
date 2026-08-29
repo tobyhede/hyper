@@ -86,7 +86,7 @@ export function SpaceSidebarFixture({
   } = useStoryNavigation(readCurrentSpace, (composed) => {
     if (presenting) composed.present();
   });
-  const [authoring] = useState(() => {
+  const authoring = useMemo(() => {
     const selected = navigation.getState().selectedRenderer;
     const selectedLayout = readEditableSpace().lookup.layout(selected)?.layout;
     return createSpaceAuthoring({
@@ -97,7 +97,7 @@ export function SpaceSidebarFixture({
       initialPlacement: selectedLayout === undefined ? null : Placement.fromLayout(selectedLayout),
       newId: storyGraphIds(),
     });
-  });
+  }, [editSession, navigation, readEditableSpace, resolveRenderer]);
   // Where `presenting` is honoured now that Navigation outlives it. Reconciled
   // against the mode rather than applied, so the mount the initializer already
   // presented publishes nothing here, and so a story's own Present button — the

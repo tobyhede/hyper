@@ -620,7 +620,7 @@ describe('production component coverage', () => {
       'packages/app/stories/review/multiple-spaces.stories.tsx',
       `import { Thing } from '../../src/components/NewAlias';
 export default { title: 'Space/Multiple Spaces' };
-export const Draft = () => Thing;
+export const MultipleSpaces = () => Thing;
 `,
     );
 

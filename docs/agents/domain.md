@@ -20,10 +20,10 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 │   ├── README.md                       the accepted set, one line each
 │   ├── 0001-recursive-spaces.md
 │   ├── 0002-layout-view-separation.md
-│   ├── 0003-routes-may-conflict.md
+│   ├── ADR 0003
 │   ├── 0004-cards-are-the-graph.md
 │   ├── 0005-layout-is-a-strategy.md
-│   ├── 0007-routes-are-the-only-structure.md
+│   ├── ADR 0007
 │   └── superseded/                     retired decisions, kept as history
 │       ├── 0006-cards-show-titles-in-the-graph.md
 │       └── 0008-presentation-is-a-reveal-deck.md

@@ -164,7 +164,7 @@ A card is **one file**: frontmatter, then body ([ADR 0020](docs/adr/0020-a-card-
 
 A card's identity is its frontmatter `id`, never its filename, so renaming the file is not a data migration. Since the title lives in the same file as the body, a body may open with a heading — it is just a heading, not a repeat of a title held somewhere else.
 
-The graph draws a card's **title**, not its body ([ADR 0006](docs/adr/superseded/0006-cards-show-titles-in-the-graph.md)). Click a card to open it and read its Markdown **source**, verbatim; the one place a card is drawn *rendered* is presenting ([ADR 0011](docs/adr/superseded/0011-opening-shows-markdown-source.md)). Content reaches a node only when that node is the Card the Traversal history has reached, so it is not embedded in every node.
+The graph draws a closed Card's **title**, not its body ([ADR 0006](docs/adr/superseded/0006-cards-show-titles-in-the-graph.md)). Opening a Markdown Card expands it in place and renders its Markdown content on the Card ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md)); editing its source is a separate action. The same renderer shows the Active Card while presenting, so content is not embedded in every closed node.
 
 A card occupies exactly one position in the graph; there is no placement layer letting the same card sit in two places. Showing the same content at a second position is the job of an **alias** card ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
 

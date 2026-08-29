@@ -275,18 +275,18 @@ export const walkthroughSpace: Space = loaded(
     id: uuidSchema.parse('00000000-0000-4000-8000-000000000041'),
     document: {
       version: 1,
-      title: 'Walkthrough',
+      title: 'Traversal',
       defaultRenderer: WALKTHROUGH_LAYOUT,
       layouts: [
         {
           id: WALKTHROUGH_LAYOUT,
-          title: 'Walkthrough',
+          title: 'Traversal',
           kind: 'positioned',
           positions: traversalPositions(WALKTHROUGH_CARDS.map(([id]) => id)),
           graphs: [
             {
               id: uuidSchema.parse('00000000-0000-4000-8000-000000000061'),
-              title: 'Walkthrough',
+              title: 'Traversal',
               edges: [
                 { from: WALKTHROUGH_CARDS[0][0], to: WALKTHROUGH_CARDS[1][0] },
                 { from: WALKTHROUGH_CARDS[1][0], to: WALKTHROUGH_CARDS[2][0] },

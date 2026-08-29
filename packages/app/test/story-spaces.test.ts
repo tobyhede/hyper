@@ -140,7 +140,7 @@ describe('the story Spaces', () => {
    */
   it('opens each traversal Space on the Layout and Graph it declares', () => {
     for (const [space, title] of [
-      [walkthroughSpace, 'Walkthrough'],
+      [walkthroughSpace, 'Traversal'],
       [deepDiveSpace, 'Deep dive'],
     ] as const) {
       const opens = defaultRenderer(space);

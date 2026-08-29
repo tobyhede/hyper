@@ -45,9 +45,8 @@ belong to one kind of Card and mean nothing on another. Open and Close are
 shared, because ADR 0064 makes open and closed a Card-level state: a Space Card
 is as closable as a Markdown one. Edit, Save and Cancel are the Markdown
 front's. Choosing a Space View, choosing a Graph and entering a Space would be a
-Space Card's. An Alias Card's Open is the Alias kind's — it opens that Card's
-metadata editor rather than the Card, and ADR 0064 says an Alias does not
-expand.
+Space Card's. ADR 0070 makes an Alias Card's Open the same Layout-owned operation:
+the Card expands and renders its immutable Target's content read-only.
 
 The two sets are drawn identically. One rail means one control treatment, and a
 command does not announce whose it is by looking different. So the distinction

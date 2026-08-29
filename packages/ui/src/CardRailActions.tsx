@@ -46,7 +46,10 @@ export const CardRailActions = forwardRef<HTMLDivElement, CardRailActionsProps>(
   },
 );
 
-/** Whether a group holds nothing, and so should draw nothing at all. */
+/**
+ * Whether a group has no direct React children, and so should draw nothing.
+ * An empty Fragment is still one direct child even though it renders no controls.
+ */
 const emptyGroup = (children: ComponentProps<typeof ToolbarGroup>['children']): boolean =>
   Children.toArray(children).length === 0;
 

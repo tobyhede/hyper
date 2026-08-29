@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CanvasCard } from '../src';
 
@@ -35,7 +35,7 @@ const openMarkdownCard = () =>
   );
 
 describe('the Card rail is one toolbar', () => {
-  it('names the Card it commands, so its controls are heard as that Card"s', () => {
+  it("names the Card it commands, so its controls are heard as that Card's", () => {
     openMarkdownCard();
 
     const toolbar = screen.getByRole('toolbar', { name: 'Card A' });
@@ -82,15 +82,10 @@ describe('the Card rail is one toolbar', () => {
     expect(edit).toHaveFocus();
 
     fireEvent.keyDown(edit, { key: 'ArrowRight' });
-    // The composite moves focus in a microtask, after its own focus management
-    // has settled — so the assertion waits one turn rather than reading the
-    // frame the key was pressed in.
-    await Promise.resolve();
-    expect(close).toHaveFocus();
+    await waitFor(() => expect(close).toHaveFocus());
 
     fireEvent.keyDown(close, { key: 'ArrowLeft' });
-    await Promise.resolve();
-    expect(edit).toHaveFocus();
+    await waitFor(() => expect(edit).toHaveFocus());
   });
 
   it('keeps an unavailable command reachable, and refuses to run it', async () => {
@@ -120,14 +115,13 @@ describe('the Card rail is one toolbar', () => {
     // when disabled; this one is focusable, so it stays in the order — which
     // is precisely what the native `disabled` property took away.
     const cancel = screen.getByRole('button', { name: 'Cancel editing Card A' });
+    await waitFor(() => expect(screen.getByRole('textbox')).toHaveFocus());
     save.focus();
     fireEvent.keyDown(save, { key: 'ArrowRight' });
-    await Promise.resolve();
-    expect(cancel).toHaveFocus();
+    await waitFor(() => expect(cancel).toHaveFocus());
 
     fireEvent.keyDown(cancel, { key: 'ArrowRight' });
-    await Promise.resolve();
-    expect(close).toHaveFocus();
+    await waitFor(() => expect(close).toHaveFocus());
 
     fireEvent.click(close);
     expect(onOpenChange).not.toHaveBeenCalled();
@@ -156,7 +150,7 @@ describe('the Card rail is one toolbar', () => {
     const close = screen.getByRole('button', { name: 'Close Card A' });
     edit.focus();
     fireEvent.keyDown(edit, { key: 'ArrowRight' });
-    await Promise.resolve();
+    await waitFor(() => expect(close).toHaveFocus());
 
     // The toolbar handled it, and nothing above the Card saw it. React Flow
     // subscribes its own keys around the canvas this Card is drawn on.
@@ -169,7 +163,7 @@ const kindGroup = (name: string) => within(railActions()).getByRole('group', { n
 const sharedGroup = () => within(railActions()).getByRole('group', { name: 'Card commands' });
 
 describe('the rail says whose command each one is', () => {
-  it('puts a kind"s own command in that kind"s group', () => {
+  it("puts a kind's own command in that kind's group", () => {
     openMarkdownCard();
 
     const edit = screen.getByRole('button', { name: 'Edit Card A' });
@@ -191,7 +185,7 @@ describe('the rail says whose command each one is', () => {
     ]);
   });
 
-  it('keeps the shared group while an edit replaces the kind"s own commands', () => {
+  it("keeps the shared group while an edit replaces the kind's own commands", () => {
     render(
       <CanvasCard
         front={{
@@ -208,8 +202,8 @@ describe('the rail says whose command each one is', () => {
       />,
     );
 
-    // Save and Cancel are the Markdown front"s two ends and belong with Edit,
-    // which they replaced. Close is unavailable but still the Card"s.
+    // Save and Cancel are the Markdown front's two ends and belong with Edit,
+    // which they replaced. Close is unavailable but still the Card's.
     const markdown = kindGroup('Markdown Card commands');
     expect(within(markdown).getByRole('button', { name: 'Save Card A' })).toBeInTheDocument();
     expect(
@@ -228,10 +222,10 @@ describe('the rail says whose command each one is', () => {
       />,
     );
 
-    // An Alias does not expand, so it has no Open or Close of the Card. The
-    // Open it does draw opens its metadata editor, which is the Alias kind"s
-    // command — and an empty named group would announce a set of commands this
-    // Card does not have.
+    // ADR 0070 makes Alias Open the shared Layout-owned operation: it expands
+    // the Card and renders its immutable Target's content read-only. Until that
+    // contract is built, this fixture exercises the superseded Alias front,
+    // whose lone command belongs to its kind group.
     const groups = within(railActions()).getAllByRole('group');
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(['Alias commands']);
     expect(groups[0]).toContainElement(screen.getByRole('button', { name: 'Open Card A' }));
@@ -246,11 +240,10 @@ describe('the rail says whose command each one is', () => {
     expect(sharedGroup()).toContainElement(close);
 
     // One arrow crosses the group boundary, because the roving tabindex is the
-    // toolbar root"s and a group is semantics rather than a second composite.
+    // toolbar root's and a group is semantics rather than a second composite.
     edit.focus();
     fireEvent.keyDown(edit, { key: 'ArrowRight' });
-    await Promise.resolve();
-    expect(close).toHaveFocus();
+    await waitFor(() => expect(close).toHaveFocus());
     expect(tabStops()).toHaveLength(1);
   });
 });

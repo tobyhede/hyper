@@ -153,7 +153,7 @@ const opacityTransitionMs = (element: HTMLElement): number => {
     .map((property) => property.trim())
     .indexOf('opacity');
   const durations = style.transitionDuration.split(',').map((duration) => duration.trim());
-  const duration = durations[opacityIndex] ?? durations[0];
+  const duration = opacityIndex < 0 ? durations[0] : durations[opacityIndex % durations.length];
   if (duration === undefined) return 0;
   const milliseconds = duration.endsWith('ms')
     ? Number.parseFloat(duration)

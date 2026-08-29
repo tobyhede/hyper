@@ -28,6 +28,22 @@ function Fixture() {
 }
 
 describe('OpenSpaces', () => {
+  it('shows the first Space when the requested active Space is no longer open', () => {
+    render(
+      <OpenSpaces
+        activeId="closed"
+        onSelect={() => undefined}
+        entries={[
+          { id: 'one', title: 'One', content: <p>First panel</p> },
+          { id: 'two', title: 'Two', content: <p>Second panel</p> },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole('tab', { name: 'One' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('First panel')).toBeVisible();
+  });
+
   it('draws nothing beside a single Space', () => {
     render(
       <OpenSpaces
