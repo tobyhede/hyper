@@ -343,6 +343,10 @@ test('an exact presentation link starts fresh at its Card and moves through brow
   await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
   await page.reload();
   await expect(page).toHaveURL(atB);
+  await expect(page.getByTestId('presenting-chrome')).toBeVisible();
+  await expect(page.locator(`.react-flow__node[data-id="${CARD_B_ID}"]`)).toHaveClass(
+    /rf-card-node--active/,
+  );
   await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
 
   await page.keyboard.press('ArrowRight');
