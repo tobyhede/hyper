@@ -54,12 +54,15 @@ export {
   CloseCardIcon,
   EditIcon,
   FlowIcon,
+  FitViewIcon,
   GraphIcon,
   GridIcon,
   LayoutIcon,
   MarkdownIcon,
   OpenCardIcon,
   PlusIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
   PresentIcon,
 } from './icons';
 export {
@@ -136,6 +139,7 @@ export { Input } from './components/input';
 export { Kbd, KbdGroup } from './components/kbd';
 export { Label } from './components/label';
 export { Separator } from './components/separator';
+export { Slider } from './components/slider';
 export { Spinner } from './components/spinner';
 export { Textarea } from './components/textarea';
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/tooltip';

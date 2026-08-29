@@ -708,22 +708,28 @@ describe('the C shortcut', () => {
   });
 
   /**
-   * React Flow's own `<Controls>` renders *inside* the wrapper this shortcut is
+   * The canvas zoom controls render *inside* the wrapper this shortcut is
    * bound to, so its buttons are somewhere a `c` can be pressed while the graph
    * is still the event's path. A button is not text entry, but it is a control
    * answering keys of its own, and the F2 guard beside this one already says so
    * — the two disagreed, and the narrower one is a canvas that adds a Card when
    * the author meant to press Zoom in.
    */
-  it('is a keypress on a canvas control rather than a command', () => {
-    const { addCard } = mountGraph();
+  it.each(['Zoom in', 'Zoom slider'])(
+    'is a keypress on the %s control rather than a command',
+    async (name) => {
+      const { addCard } = mountGraph();
+      const control =
+        name === 'Zoom in'
+          ? await screen.findByRole('button', { name })
+          : Object.assign(document.createElement('input'), { type: 'range' });
+      if (name === 'Zoom slider') screen.getByRole('application').append(control);
 
-    const zoomIn = document.querySelector('.react-flow__controls-zoomin');
-    if (!(zoomIn instanceof HTMLElement)) throw new Error('React Flow drew no zoom control');
-    fireEvent.keyDown(zoomIn, { key: 'c' });
+      fireEvent.keyDown(control, { key: 'c' });
 
-    expect(addCard).not.toHaveBeenCalled();
-  });
+      expect(addCard).not.toHaveBeenCalled();
+    },
+  );
 });
 
 /** React Flow receives `null`, so deletion installs no document listener. */

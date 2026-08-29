@@ -8,7 +8,6 @@ import {
 } from 'react';
 import {
   Background,
-  Controls,
   ReactFlow,
   type Edge,
   type OnEdgesChange,
@@ -20,6 +19,7 @@ import {
   nodeTypes,
   GraphConnectionLine,
   GraphHud,
+  ZoomSlider,
   type CardFlowNode,
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
@@ -78,7 +78,7 @@ export const ADD_CARD_KEY = 'C';
  * canvas must not shadow. Both are cases where the key was not aimed here.
  */
 const NOT_A_CANVAS_COMMAND =
-  'input, textarea, select, button, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"], [data-sidebar]';
+  'input, textarea, select, button, [contenteditable="true"], [role="slider"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"], [data-sidebar]';
 
 export interface SpaceCanvasProps {
   nodes: CardFlowNode[];
@@ -481,7 +481,7 @@ export function SpaceCanvas({
       maxZoom={MAX_ZOOM}
     >
       <Background gap={24} />
-      <Controls showInteractive={false} />
+      <ZoomSlider />
       {graphs.length > 0 && (
         <GraphHud
           graphs={graphs}

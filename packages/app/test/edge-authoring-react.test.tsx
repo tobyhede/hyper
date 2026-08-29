@@ -604,6 +604,17 @@ describe("the app's canvas delete key", () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 
+  it('leaves the Edge standing when Delete reaches the zoom slider', () => {
+    const { adapter, session } = mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    const slider = Object.assign(document.createElement('input'), { type: 'range' });
+    screen.getByRole('application').append(slider);
+    fireEvent.keyDown(slider, { key: 'Delete' });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
+
   it('observes a pane refusal from the commit that publishes it', () => {
     const { adapter, session, setCovered } = mountCanvas(null, {
       deleteWhenCoveredCommits: true,
