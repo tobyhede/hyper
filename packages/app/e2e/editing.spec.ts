@@ -1812,15 +1812,9 @@ test('clicking a Card authoring handle neither opens the Card nor draws an Edge'
 });
 
 /**
- * The Delete key acts on the selected Edge through `onBeforeDelete`.
- *
- * React Flow's own document-level handler finds the selection and asks; Hyper
- * answers `false` so nothing is removed locally, and the completed Space Edit
- * supplies the next projection. That indirection is the point — a local removal
- * would put the canvas in a state the Space never agreed to.
- *
- * `deleteKeyCode` is `['Backspace', 'Delete']`: React Flow defaults to Backspace
- * alone, so both keys are exercised.
+ * The app-owned canvas key routes the selected Edge through its authoring
+ * operation. React Flow receives `deleteKeyCode={null}` and installs no
+ * document-level delete listener of its own.
  */
 for (const key of ['Backspace', 'Delete'] as const) {
   test(`${key} removes the selected Edge from its Graph and nothing else`, async ({ page }) => {
@@ -1846,52 +1840,53 @@ for (const key of ['Backspace', 'Delete'] as const) {
 }
 
 /**
- * A Card deletion and an Edge deletion arrive through the same callback.
- *
- * React Flow gathers every deletable Edge incident to a requested node *before*
- * calling `onBeforeDelete`, so without the canvas dispatcher one Card removal
- * would look like several independent Edge deletions — and would drop those
- * Edges while the Card stayed. Card deletion is package 8's, so the whole
- * payload is declined here; what this pins is that the Edges went with it.
+ * The app-owned canvas key removes a selected Card from this Layout through the
+ * completed Space Edit lifecycle. The Card still belongs to the Space; the
+ * projection loses it and the Layout-owned Edges incident to it together.
  */
-test('Backspace with a Card selected removes neither the Card nor its Edges', async ({ page }) => {
-  await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const drawnCards = await page.locator('.react-flow__node').count();
-  const drawn = await page.locator('.react-flow__edge').count();
+for (const key of ['Backspace', 'Delete'] as const) {
+  test(`${key} with a Card selected removes it and its Edges from this Layout`, async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const card = nodeByTitle(page, 'A').first();
+    await expect(card).toBeVisible();
+    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    const drawnCards = await page.locator('.react-flow__node').count();
+    const drawn = await page.locator('.react-flow__edge').count();
+    // Every Edge this Card is an endpoint of, counted before the Edit, so the
+    // assertion below is an exact remainder rather than "fewer than before" —
+    // which passed while a single incident Edge went and the rest stayed.
+    const incident = await page.getByLabel(/^Edge (from A to|from .* to A) /).count();
+    expect(incident).toBeGreaterThan(0);
 
-  const cardBox = (await card.boundingBox())!;
-  await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
-  await expect(card).toHaveClass(/selected/);
+    const cardBox = (await card.boundingBox())!;
+    await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+    await expect(card).toHaveClass(/selected/);
 
-  await page.keyboard.press('Backspace');
-  await page.keyboard.press('Delete');
-  await quiescent(page);
+    await page.keyboard.press(key);
+    await quiescent(page);
 
-  await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-});
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards - 1);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - incident);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  });
+}
 
 /**
  * The assistive description names the keys that actually do something.
  *
- * React Flow's defaults offer "press delete to remove it" for both kinds. For an
- * Edge that is now true and the description says so; for a Card it is not —
- * removing one is package 8's — so the Card keeps a description that names only
- * opening and moving. Sighted users never meet either claim; a screen reader
- * reads it out as the way to work with the graph.
+ * Both descriptions name the application-owned operations rather than React
+ * Flow's disabled local deletion.
  */
-test('the graph advertises the Edge delete it implements and no Card delete', async ({ page }) => {
+test('the graph advertises its Card and Edge delete commands', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
 
-  await expect(page.locator('[id^="react-flow__node-desc"]')).not.toContainText(/delete/i);
   await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/open a Card/i);
+  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/remove.*Layout/i);
   await expect(page.locator('[id^="react-flow__edge-desc"]')).toContainText(/delete/i);
 });
 

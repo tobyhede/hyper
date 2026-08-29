@@ -37,11 +37,11 @@ afterAll(() => vi.unstubAllGlobals());
 
 describe('DropdownMenu', () => {
   /**
-   * React Flow subscribes its delete key on `document`, and a portalled popup
-   * sits outside the canvas's own guard — the same reason Popover and Select
-   * carry `nokey` (docs/agents/ui.md).
+   * React Flow's live Space-key pan activation subscription reaches a
+   * portalled popup, so the popup must carry its own exclusion marker
+   * (docs/agents/ui.md).
    */
-  it('marks its portalled popup nokey', () => {
+  it('excludes its portalled popup from Space-key canvas panning', () => {
     render(
       <DropdownMenu>
         <DropdownMenuTrigger>Open</DropdownMenuTrigger>

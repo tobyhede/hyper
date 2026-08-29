@@ -159,6 +159,8 @@ export function PresentingChrome({
       // Its own container, so the responsive rule below reads the width the
       // chrome actually has rather than the viewport's: the Space Sidebar
       // takes 16rem of it above the breakpoint and none below.
+      // React Flow's live Space-key pan activation subscription reaches this
+      // chrome outside the canvas, so `.nokey` excludes all of its controls.
       className="nokey @container absolute inset-x-0 bottom-0 z-20 border-t border-border bg-background/90"
     >
       <div className="flex items-center gap-4 p-3 @max-3xl:flex-col @max-3xl:items-stretch">

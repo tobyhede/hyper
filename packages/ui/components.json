@@ -17,5 +17,8 @@
     "lib": "#lib",
     "utils": "#lib/utils",
     "ui": "#components"
+  },
+  "registries": {
+    "@reactflow": "https://ui.reactflow.dev/registry/{name}.json"
   }
 }

@@ -191,9 +191,9 @@ export const handRolledStyles = [
       "Placement and pointer-events for React Flow's `EdgeLabelRenderer` portal, whose layer disables pointer events by default. `SelectedEdgeControls` owns how those controls look.",
   },
   {
-    block: 'edge-refusal',
+    block: 'canvas-refusal',
     reason:
-      'Screen-fixed placement for the sentence a finished pointer gesture leaves behind. The gesture is over, so there is no surface left on the canvas to attach it to.',
+      'Screen-fixed placement for the sentence a finished canvas command leaves behind — a completed pointer gesture, or a refused Backspace. The interaction is over, so there is no surface left on the canvas to attach it to.',
   },
   {
     block: 'shell',

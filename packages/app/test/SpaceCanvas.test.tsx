@@ -708,37 +708,58 @@ describe('the C shortcut', () => {
   });
 
   /**
-   * React Flow's own `<Controls>` renders *inside* the wrapper this shortcut is
+   * The canvas zoom controls render *inside* the wrapper this shortcut is
    * bound to, so its buttons are somewhere a `c` can be pressed while the graph
    * is still the event's path. A button is not text entry, but it is a control
    * answering keys of its own, and the F2 guard beside this one already says so
    * — the two disagreed, and the narrower one is a canvas that adds a Card when
    * the author meant to press Zoom in.
    */
-  it('is a keypress on a canvas control rather than a command', () => {
-    const { addCard } = mountGraph();
+  it.each(['Zoom in', 'Zoom out', 'Fit view'] as const)(
+    'is a keypress on the %s control rather than a command',
+    async (name) => {
+      const { addCard } = mountGraph();
 
-    const zoomIn = document.querySelector('.react-flow__controls-zoomin');
-    if (!(zoomIn instanceof HTMLElement)) throw new Error('React Flow drew no zoom control');
-    fireEvent.keyDown(zoomIn, { key: 'c' });
+      fireEvent.keyDown(await screen.findByRole('button', { name }), { key: 'c' });
+
+      expect(addCard).not.toHaveBeenCalled();
+    },
+  );
+
+  /**
+   * The shipped slider, not a stand-in for one.
+   *
+   * Found by its label rather than its role because Base UI keeps a thumb
+   * `visibility: hidden` until it has measured the track, and jsdom measures
+   * nothing — so the real control is absent from the accessibility tree here
+   * while being an ordinary visible slider in a browser. What is asserted is
+   * the mechanism that excludes it: the `.nokey` its Panel already carries for
+   * React Flow's own subscriptions, which the canvas guard now reads too.
+   */
+  it('is a keypress on the zoom slider rather than a command', async () => {
+    const { addCard } = mountGraph();
+    const slider = await screen.findByLabelText('Zoom');
+    expect(slider).toHaveAttribute('type', 'range');
+    expect(slider.closest('.nokey')).not.toBeNull();
+
+    fireEvent.keyDown(slider, { key: 'c' });
 
     expect(addCard).not.toHaveBeenCalled();
   });
 });
 
 /**
- * `useKeyPress` keys both its `useMemo` and its listener `useEffect` on the
- * `deleteKeyCode` **value**, so a fresh array per render tears down and
- * re-attaches `keydown`/`keyup` on `document` — and, since the prop reaches the
- * `memo`'d `GraphView` and `FlowRenderer` on the way, defeats both of those too,
- * once per frame of a Card drag.
+ * React Flow still subscribes keys on `document` — just not the delete pair.
  *
- * Asserted on the listener rather than on the array: the pair of keys is already
- * pinned by value in `edge-authoring-react.test.tsx`, and a value assertion is
- * exactly what stayed green while the canvas spread the array into a new one.
+ * `deleteKeyCode` is `null`, so `useKeyPress` short-circuits for it, but the pan
+ * and zoom *activation* codes keep their default Space and Meta and are live.
+ * That is what makes the re-render assertion below worth keeping and what makes
+ * the flat "no keydown at all" reading of it wrong: `useKeyPress` has the key
+ * code in its listener effect's dependency array, so a fresh array per render
+ * re-attaches `keydown`/`keyup` on `document` for every code still subscribed.
  */
-describe("React Flow's delete keys", () => {
-  it('does not re-subscribe the document listener on an unchanged re-render', () => {
+describe("React Flow's document key subscriptions", () => {
+  it('does not re-subscribe them on an unchanged re-render', () => {
     const { rerender } = mountGraph();
     const listen = vi.spyOn(document, 'addEventListener');
 

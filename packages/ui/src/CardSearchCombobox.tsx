@@ -110,6 +110,8 @@ export function CardSearchCombobox({
           anchor={fieldRef}
           sideOffset={0}
           data-card-search-combobox=""
+          // React Flow's live Space-key pan activation subscription reaches
+          // this portalled picker, so its own `.nokey` ancestor excludes it.
           className="nokey"
         >
           <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>

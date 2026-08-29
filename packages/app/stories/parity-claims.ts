@@ -330,6 +330,13 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'A refused Delete stays on the surviving selected-Edge controls.',
   },
   {
+    id: 'canvas-zoom-control-operates-the-real-viewport',
+    storyFile: 'components/zoom-control.stories.tsx',
+    storyExport: 'Canvas',
+    claim:
+      'The themed canvas control continuously zooms with its slider, zooms with its buttons and fits the real React Flow viewport.',
+  },
+  {
     id: 'graph-hud-and-sidebar-agree-on-the-active-graph',
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',

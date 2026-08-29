@@ -39,6 +39,13 @@ function openList(content: Partial<ContentProps> = {}): HTMLElement {
 }
 
 describe('SelectContent placement', () => {
+  it('does not carry a canvas key marker without a production consumer', () => {
+    openList();
+
+    expect(screen.getByRole('combobox', { name: 'Pick' })).not.toHaveClass('nokey');
+    expect(screen.getByRole('listbox').closest('.nokey')).toBeNull();
+  });
+
   /**
    * Base UI's `alignItemWithTrigger` defaults to `true` and this wrapper keeps
    * that default, as shadcn's own `base-nova` select does. While it is active

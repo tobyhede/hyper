@@ -70,6 +70,24 @@ test('choosing a canvas or a Graph closes the mobile sidebar', async ({ page }) 
   await expect(sheet(page)).toHaveCount(0);
 });
 
+test('Delete on a mobile Sidebar control leaves the selected Card on the canvas', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await card.click();
+
+  await openMobileSidebar(page);
+  const renderer = page.getByRole('button', { name: 'Collection 1', exact: true });
+  await renderer.focus();
+  await page.keyboard.press('Delete');
+
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
 test('Card and Graph copy commands close the mobile sidebar', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();

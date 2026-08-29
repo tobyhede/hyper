@@ -90,13 +90,14 @@ export interface MarkdownCardBodyProps {
  * own that is not the author's text. The hint below names the keys; the rail
  * names the same two exits as controls, and each is drawn where it belongs.
  *
- * Three React Flow escape-hatch classes are applied while the caret is in, and
- * each answers a different collision: `nodrag` stops a text selection dragging
- * the Card out from under the caret, `nopan` stops a click-drag panning the
- * canvas, `nokey` stops the arrow keys moving the Card instead of the caret. The
- * fourth, `nowheel`, is deliberately absent — the wheel belongs to the canvas
- * everywhere (ADR 0064). They are class-name strings and not an import; nothing
- * here knows React Flow exists, exactly as `canvas-card.css` does not.
+ * Two React Flow escape-hatch classes are applied while the caret is in, and
+ * each answers a different pointer collision: `nodrag` stops a text selection
+ * dragging the Card out from under the caret, and `nopan` stops a click-drag
+ * panning the canvas. The CodeMirror target is itself contenteditable, which is
+ * the node-keyboard subscription's native exclusion; it needs no `.nokey`
+ * marker. `nowheel` is deliberately absent — the wheel belongs to the canvas
+ * everywhere (ADR 0064). These are class-name strings and not an import;
+ * nothing here knows React Flow exists, exactly as `canvas-card.css` does not.
  */
 export function MarkdownCardBody({
   source,
@@ -235,7 +236,7 @@ export function MarkdownCardBody({
     <div
       className={cn(
         'markdown-card-body',
-        editing && 'markdown-card-body--editing nodrag nopan nokey',
+        editing && 'markdown-card-body--editing nodrag nopan',
         className,
       )}
       onKeyDown={onKeyDown}

@@ -5,7 +5,9 @@ import {
   CornerDownRight,
   FileText,
   Grid2x2,
+  Maximize,
   Maximize2,
+  Minus,
   Minimize2,
   Network,
   PanelsTopLeft,
@@ -18,6 +20,7 @@ import {
 import type { ComponentProps } from 'react';
 
 type CardActionIconProps = ComponentProps<typeof Pencil>;
+type CanvasControlIconProps = ComponentProps<typeof Minus>;
 
 /** The computed View that draws Cards and every Graph in the Space. */
 export const FlowIcon = () => <Workflow size={16} />;
@@ -62,6 +65,15 @@ export const ChevronDownIcon = () => <ChevronDown size={14} />;
 
 /** Create a Markdown Card. */
 export const PlusIcon = () => <Plus size={14} />;
+
+/** Move the canvas camera one zoom step farther away. */
+export const ZoomOutIcon = (props: CanvasControlIconProps) => <Minus size={14} {...props} />;
+
+/** Move the canvas camera one zoom step closer. */
+export const ZoomInIcon = (props: CanvasControlIconProps) => <Plus size={14} {...props} />;
+
+/** Frame every visible canvas Card in the viewport. */
+export const FitViewIcon = (props: CanvasControlIconProps) => <Maximize size={14} {...props} />;
 
 /** The Card kind that points at another Card's content (ADR 0009). */
 export const AliasIcon = ({ size = 14 }: { size?: number }) => <CornerDownRight size={size} />;

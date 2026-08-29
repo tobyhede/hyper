@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Background, Controls, ReactFlow, type Edge } from '@xyflow/react';
+import { Background, ReactFlow, type Edge } from '@xyflow/react';
 import type { CardId, GraphId } from '@project/core';
-import { nodeTypes, edgeTypes, type CardFlowNode } from '@project/react-flow-adapter';
+import { nodeTypes, edgeTypes, ZoomSlider, type CardFlowNode } from '@project/react-flow-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '#src/camera';
 import { canvasProjection, type CanvasInteraction } from '#src/canvas-projection';
 import { CARD_SIZE, cardSizeVars } from '#src/card';
@@ -99,9 +99,25 @@ function RealReactFlow({
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={24} />
-        {controls && <Controls showInteractive={false} />}
+        {controls && <ZoomSlider />}
       </ReactFlow>
     </div>
+  );
+}
+
+/** The production zoom control on the same real React Flow canvas the app uses. */
+export function ZoomSliderSpecimen() {
+  const projected = useProjection(graphIds.long);
+  if (projected === null) return null;
+  if (projected instanceof Error) return <PlacementFailure reason={projected} />;
+
+  return (
+    <RealReactFlow
+      className="inv-card-node-stage inv-card-node-stage--large"
+      nodes={projected.nodes}
+      edges={projected.edges}
+      controls
+    />
   );
 }
 

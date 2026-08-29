@@ -294,7 +294,7 @@ body {
 /* The sentence a pointer gesture's refusal leaves behind. Screen-fixed at the
    top of the canvas because the gesture that produced it is over — there is no
    surface left to attach it to. */
-.edge-refusal {
+.canvas-refusal {
   position: absolute;
   top: 0.75rem;
   left: 50%;

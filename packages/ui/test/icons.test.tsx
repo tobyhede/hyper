@@ -7,6 +7,7 @@ import {
   ChevronDownIcon,
   CloseCardIcon,
   EditIcon,
+  FitViewIcon,
   FlowIcon,
   GraphIcon,
   GridIcon,
@@ -15,6 +16,8 @@ import {
   OpenCardIcon,
   PlusIcon,
   PresentIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
 } from '../src/index';
 
 describe('the public icon facade', () => {
@@ -60,6 +63,15 @@ describe('the public icon facade', () => {
         <span data-testid="check">
           <CheckIcon />
         </span>
+        <span data-testid="zoom-in">
+          <ZoomInIcon />
+        </span>
+        <span data-testid="zoom-out">
+          <ZoomOutIcon />
+        </span>
+        <span data-testid="fit-view">
+          <FitViewIcon />
+        </span>
       </div>,
     );
 
@@ -77,6 +89,9 @@ describe('the public icon facade', () => {
       'close-card': 'minimize-2',
       markdown: 'file-text',
       check: 'check',
+      'zoom-in': 'plus',
+      'zoom-out': 'minus',
+      'fit-view': 'maximize',
     } as const;
 
     for (const [icon, lucideName] of Object.entries(expectedLucideName)) {
