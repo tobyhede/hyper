@@ -139,7 +139,7 @@
 /* Unavailable, at any rail colour.
 
    Matched on `aria-disabled`, not `:disabled`. A rail control is a toolbar item
-   (ADR 0070) and a toolbar item stays focusable while unavailable, so it carries
+   (ADR 0073) and a toolbar item stays focusable while unavailable, so it carries
    the attribute rather than the native property — `:disabled` matches none of
    them, and `Button`'s own `disabled:` utilities do not apply either.
 

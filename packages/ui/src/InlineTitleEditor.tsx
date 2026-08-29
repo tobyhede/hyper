@@ -5,19 +5,42 @@ import { cn } from './lib/utils';
 
 export type InlineTitleEditorVariant = 'card' | 'sidebar' | 'header';
 
-export interface InlineTitleEditorProps {
+interface InlineTitleEditorBase {
   readonly title: string;
   readonly label: string;
   readonly variant: InlineTitleEditorVariant;
   readonly className?: string;
-  readonly draft?: string;
-  readonly error?: string | null;
-  readonly onDraftChange?: (draft: string) => void;
-  readonly onErrorChange?: (error: string | null) => void;
   readonly onComplete: (title: string) => string | null;
   readonly onCancel: () => void;
   readonly onReturnFocus: () => void;
 }
+
+/**
+ * The draft and its refusal, held by the caller.
+ *
+ * One shape rather than four independent optional props: a caller that supplied
+ * a change handler and no value got an editor that mounted blank instead of
+ * pre-filled with the title, selected nothing, and submitted `''` on the first
+ * Enter — a refusal for a rename the author never typed. Pairing them makes
+ * that unrepresentable rather than merely unlikely.
+ */
+interface InlineTitleEditorControlled {
+  readonly draft: string;
+  readonly error: string | null;
+  readonly onDraftChange: (draft: string) => void;
+  readonly onErrorChange: (error: string | null) => void;
+}
+
+/** The editor keeps the draft itself, which is what a Card's Title does. */
+interface InlineTitleEditorUncontrolled {
+  readonly draft?: never;
+  readonly error?: never;
+  readonly onDraftChange?: never;
+  readonly onErrorChange?: never;
+}
+
+export type InlineTitleEditorProps = InlineTitleEditorBase &
+  (InlineTitleEditorControlled | InlineTitleEditorUncontrolled);
 
 /**
  * One-line, refusable title editing shared by Cards and named Space chrome.
@@ -47,8 +70,12 @@ export function InlineTitleEditor({
 }: InlineTitleEditorProps) {
   const [localDraft, setLocalDraft] = useState(title);
   const [localError, setLocalError] = useState<string | null>(null);
-  const draft = onDraftChange === undefined ? localDraft : (controlledDraft ?? '');
-  const error = onErrorChange === undefined ? localError : (controlledError ?? null);
+  // Keyed on the value, not on whether a handler happened to be passed. The
+  // props type pairs the two, so `controlledDraft` is present exactly when
+  // `onDraftChange` is, and one test answers both.
+  const controlled = controlledDraft !== undefined;
+  const draft = controlled ? controlledDraft : localDraft;
+  const error = controlled ? (controlledError ?? null) : localError;
   const input = useRef<HTMLInputElement>(null);
   const closingByKey = useRef(false);
   const errorId = useId();

@@ -132,7 +132,7 @@ test(
     ],
   },
   async ({ page }) => {
-    await page.goto('/?story=components--space-sidebar--settled&mode=preview');
+    await page.goto('/?story=space--space--settled&mode=preview');
 
     await page.getByRole('button', { name: 'Copy link to Card 1' }).click();
     await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'card-canonical');

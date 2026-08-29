@@ -11,13 +11,13 @@
  *     all as icon buttons. The two selectors open dropdowns; the rail itself
  *     draws no words.
  *
- * Still open: whether the rail's action cluster is a plain group of buttons, as
- * today, or a real `role="toolbar"` with roving tabindex. The roving container
- * below is hand-rolled *for this story only* — Base UI ships `Toolbar`
- * (Root/Group/Button/Link/Separator) and production would compose that through
- * `@project/ui`; `app` may not import Base UI directly.
+ * Settled since: the action cluster is a real `role="toolbar"` with roving
+ * tabindex, and production composes Base UI's `Toolbar` through `@project/ui`
+ * as `CardRailActions` (ADR 0073). The roving container below is hand-rolled
+ * *for this story only* and is not what shipped — read `CardRailActions` for
+ * the built behaviour, not this.
  *
- * Delete this surface once the decision is made.
+ * Nothing here is open. The surface is kept only until issue `11` deletes it.
  */
 import {
   useEffect,
@@ -54,7 +54,7 @@ export default { title: 'Review/Space Card Rail' };
 
 const GRAPH_COLOR = '#ffc53d';
 const MARKDOWN_SOURCE =
-  'Presenting walks the Active Graph. A fork offers every outgoing Edge at once.';
+  'Presenting traverses the Active Graph. A fork offers every outgoing Edge at once.';
 const SPACE_VIEWS = ['Architecture layout', 'Flow', 'Grid'] as const;
 const GRAPHS = ['Main thread', 'Decision fork'] as const;
 

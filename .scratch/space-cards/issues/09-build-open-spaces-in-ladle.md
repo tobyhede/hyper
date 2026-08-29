@@ -6,7 +6,7 @@
 
 **Status:** done
 
-**Vocabulary.** ADR 0068 settled the names and this ticket uses them. The surface is **Open Spaces**; each item in it is an **entry**. "Rail" is ADR 0070's word for a Card's toolbar and is not reused. "Tab" is not a domain word — it means a browser tab. "Stack" names the model that was rejected, in which selecting an outer Space closes everything inside it. `CONTEXT.md` carries all three.
+**Vocabulary.** ADR 0068 settled the names and this ticket uses them. The surface is **Open Spaces**; each item in it is an **entry**. "Rail" is ADR 0073's word for a Card's toolbar and is not reused. "Tab" is not a domain word — it means a browser tab. "Stack" names the model that was rejected, in which selecting an outer Space closes everything inside it. `CONTEXT.md` carries all three.
 
 - [x] `@project/ui` gains Open Spaces as a presentation component over the `Tabs` primitive already in the package. It draws one vertical entry per open Space at a fixed height that does not change with how many are open, truncating a long title and scrolling once the set outgrows the column. The vertical-text treatment moves onto the component as a variant — it is styling, so it needs no ADR 0047 deviation, but it does not belong inline in `app`.
 - [x] It is a real tab set in the ARIA sense: one tab stop, arrow keys between Spaces, `Home`/`End` to the ends, and the `aria-controls`/`id` pairing that says which surface an entry governs. None of that is hand-written; `Tabs` supplies it, and `role="tab"` is markup rather than domain vocabulary. The panels stay mounted, which is how each Space keeps its own live Space View and Graph selection (ADR 0068).

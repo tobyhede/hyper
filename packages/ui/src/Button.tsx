@@ -28,7 +28,7 @@ const buttonVariants = cva(
         default: 'px-[0.8rem] py-[0.4rem]',
         // The small text button the command surfaces are built from. Named for
         // the shape rather than for a place: `Toolbar` is a component now
-        // (ADR 0070), and its own items are `size: 'icon'`, so a size called
+        // (ADR 0073), and its own items are `size: 'icon'`, so a size called
         // "toolbar" named neither where it is used nor what a toolbar carries.
         compact: 'px-[11px] py-[6px] text-[13px]',
         icon: 'size-7 p-0',

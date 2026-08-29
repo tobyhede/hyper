@@ -19,9 +19,13 @@
 }
 
 /* An `aria-disabled` control is still a button, so the production `:disabled`
-   rule does not reach it. Same values, matched on the attribute instead. */
-.canvas-card .card__rail-action[aria-disabled='true'],
-.canvas-card .card__rail-action[aria-disabled='true']:hover {
+   rule does not reach it. Same values, matched on the attribute instead.
+
+   Scoped to this prototype's own Card class. Ladle bundles every story's CSS
+   into one document, so a bare `.canvas-card` descendant selector here restyles
+   the shipped `CanvasCard` everywhere else in the catalogue. */
+.canvas-card.space-rail__card .card__rail-action[aria-disabled='true'],
+.canvas-card.space-rail__card .card__rail-action[aria-disabled='true']:hover {
   opacity: 1;
   border-color: color-mix(in srgb, var(--canvas-card-ink) 45%, var(--canvas-card-face));
   background: var(--canvas-card-face);
@@ -62,8 +66,12 @@
 
 /* The Title is the same bottom passenger on both kinds, and the content takes
    the room above it. The shipped rule is keyed on `[data-kind='markdown']`, so
-   the prototype restates it for the kind the domain does not have yet. */
-.canvas-card[data-kind='space'] .canvas-card__body {
+   the prototype restates it for its own Space Card.
+
+   `data-kind='space'` is a kind the domain now has, and `CanvasCard` emits it,
+   so this is scoped to the prototype's own Card class: unscoped it would
+   reorder the body of every real Space Card drawn anywhere in the catalogue. */
+.canvas-card.space-rail__card[data-kind='space'] .canvas-card__body {
   order: 2;
   flex: none;
   margin-top: auto;

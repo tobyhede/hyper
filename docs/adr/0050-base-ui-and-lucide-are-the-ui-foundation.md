@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0047
-Refined by: 0070
+Refined by: 0073
 
 Hyper uses shadcn's Base UI variants as its component foundation and Lucide as its default icon vocabulary. The shadcn workspaces declare the `base-nova` style, a `neutral` base colour and CSS-variable theming. This is one repository-wide choice: do not mix Radix and Base UI wrappers, or choose an icon source component by component.
 

@@ -155,13 +155,13 @@ export const parityClaims: readonly ParityClaim[] = [
   },
   {
     id: 'space-sidebar-copies-card-destinations',
-    storyFile: 'components/space-sidebar.stories.tsx',
+    storyFile: 'space/space.stories.tsx',
     storyExport: 'Settled',
     claim: 'A selected Card offers distinct canonical and current-Space-View copy commands.',
   },
   {
     id: 'space-sidebar-copies-graph-destinations',
-    storyFile: 'components/space-sidebar.stories.tsx',
+    storyFile: 'space/space.stories.tsx',
     storyExport: 'Settled',
     claim: 'The Active Graph offers distinct canonical and current-Space-View copy commands.',
   },

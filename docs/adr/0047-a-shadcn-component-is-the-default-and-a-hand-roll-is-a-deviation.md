@@ -1,7 +1,7 @@
 # A shadcn component is the default, and a hand-roll is a deviation
 
 Status: accepted
-Refined by: 0050, 0070
+Refined by: 0050, 0073
 Related: 0036, 0037, 0039, 0046
 
 Where shadcn ships a component for a surface this app needs, that component — and the headless primitive it composes — is what gets built on. Writing our own is a deviation, and it needs what any other deviation needs: an explicit product requirement, an interrogated reason, and that reason recorded where the next reader will find it. "Our case is special" is not a reason until it has been tested **against the primitive**, because the reasons that look strongest are the ones nobody checked.

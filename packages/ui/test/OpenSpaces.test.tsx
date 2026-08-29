@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { OpenSpaces } from '../src';
 
@@ -68,6 +68,52 @@ describe('OpenSpaces', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Two/ }));
     fireEvent.click(screen.getByRole('tab', { name: 'One' }));
 
+    expect(screen.getByRole('button', { name: 'one 1' })).toBeInTheDocument();
+  });
+
+  /**
+   * A `tablist` announces how many tabs it owns, and only its `tab` children
+   * count. A presentational wrapper between the two leaves the set size
+   * unresolvable, so a screen reader cannot say "tab 1 of 3".
+   */
+  it('owns its entries directly, so the tablist can announce its size', () => {
+    render(<Fixture />);
+    const list = screen.getByRole('tablist', { name: 'Open Spaces' });
+
+    expect(within(list).getAllByRole('tab')).toHaveLength(3);
+    for (const child of list.children) {
+      expect(child).toHaveAttribute('role', 'tab');
+    }
+  });
+
+  /**
+   * Closing a Space must not disturb the ones that stay open. The single-entry
+   * case draws no entry strip, and if it reaches that by rendering a different
+   * tree the surviving panel remounts — losing exactly the live command state
+   * this component exists to keep.
+   */
+  it('keeps the surviving Space mounted when the last other Space closes', () => {
+    function Closing() {
+      const [open, setOpen] = useState(['one', 'two']);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(['one'])}>
+            Close two
+          </button>
+          <OpenSpaces
+            activeId="one"
+            onSelect={() => undefined}
+            entries={open.map((id) => ({ id, title: id, content: <Counter label={id} /> }))}
+          />
+        </>
+      );
+    }
+    render(<Closing />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'one 0' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close two' }));
+
+    expect(screen.queryByRole('tablist', { name: 'Open Spaces' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'one 1' })).toBeInTheDocument();
   });
 

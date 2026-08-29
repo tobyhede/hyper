@@ -1435,7 +1435,7 @@ test(
 
     await page.reload();
     await selectCanvas(page, 'Studio');
-    await expect(sidebar(page).getByRole('button', { name: 'Journey' })).toBeVisible();
+    await expect(sidebar(page).getByRole('button', { name: 'Journey', exact: true })).toBeVisible();
   },
 );
 

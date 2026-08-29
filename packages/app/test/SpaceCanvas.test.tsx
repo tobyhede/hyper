@@ -344,31 +344,22 @@ describe('F2 while a control has focus', () => {
  * activation the button never got. The button was unusable by the input it is
  * there for, and its whole point is to open something the plain open does not.
  *
- * Activation is modelled as the browser does it — the keydown, then the click it
- * generates — because jsdom does not synthesize the second from the first.
+ * Base UI's composite handles Space on keydown, while Enter retains native
+ * click activation. jsdom supplies the former but not the latter.
  */
 describe.each([
-  ['Enter', 'Enter'],
-  ['Space', ' '],
-] as const)('%s on the focused Card affordance', (_name, key) => {
-  it("does not open the Card twice — the keydown is the button's, not the graph's", () => {
+  ['Enter', 'Enter', 'native'],
+  ['Space', ' ', 'composite'],
+] as const)('%s on the focused Card affordance', (_name, key, activation) => {
+  it('opens the Card once through the button rather than the graph', () => {
     const { openCard } = mountGraph();
     const button = screen.getByRole('button', { name: 'Open Card A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
+    if (activation === 'native') fireEvent.click(button);
 
-    expect(openCard).not.toHaveBeenCalled();
-  });
-
-  it('opens the Card', () => {
-    const { openCard } = mountGraph();
-    const button = screen.getByRole('button', { name: 'Open Card A' });
-    button.focus();
-
-    fireEvent.keyDown(button, { key });
-    fireEvent.click(button);
-
+    expect(openCard).toHaveBeenCalledTimes(1);
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
   });
 });
@@ -438,6 +429,16 @@ test('reports a live Card title edit so Space chrome can withdraw', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
   expect(titleEditingChanged).toHaveBeenLastCalledWith(true);
+});
+
+test('returns Space chrome when it unmounts over a live Card title edit', () => {
+  const { titleEditingChanged, view } = mountGraph([cardNode('A', CARD_ID, true)]);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
+  expect(titleEditingChanged).toHaveBeenLastCalledWith(true);
+  view.unmount();
+
+  expect(titleEditingChanged).toHaveBeenLastCalledWith(false);
 });
 
 /**

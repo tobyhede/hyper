@@ -84,6 +84,9 @@ export function useCanvasCardAuthoring({
   }, [bodyEditing, onBodyEditingChange]);
   useEffect(() => {
     onTitleEditingChange?.(editingTitleCardId !== null);
+    // A renderer change remounts the canvas and takes its draft with it.
+    // Return Space chrome even when no editor callback gets to settle the edit.
+    return () => onTitleEditingChange?.(false);
   }, [editingTitleCardId, onTitleEditingChange]);
 
   const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(canAuthorOnCanvas);
@@ -111,6 +114,7 @@ export function useCanvasCardAuthoring({
         onOpenAlias(cardId.data);
         return 'completed';
       }
+      if (stored.document.kind !== 'markdown') return 'retained';
       const result = authoring.complete({ kind: 'opened-card', cardId: cardId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },

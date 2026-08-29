@@ -323,8 +323,8 @@ describe('card frontmatter schema', () => {
     expect(inherited).not.toHaveProperty('graph');
   });
 
-  it.each(['flow', 'grid'] as const)(
-    'parses a Space Card selecting the built-in %s Space View',
+  it.each([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID] as const)(
+    'parses a Space Card selecting the computed %s Space View',
     (spaceView) => {
       const card = cardFrontmatterSchema.parse({
         id: '00000000-0000-4000-8000-000000000006',

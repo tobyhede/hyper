@@ -138,7 +138,7 @@ export type AuthoringCompletion =
   | { readonly kind: 'removed-card-from-layout'; readonly cardId: CardId }
   /** Delete Card from Space: the same removal, cascaded through every Layout. */
   | { readonly kind: 'deleted-card'; readonly cardId: CardId }
-  | { readonly kind: 'renamed-layout'; readonly title: string }
+  | { readonly kind: 'renamed-layout'; readonly layoutId: UUID; readonly title: string }
   | { readonly kind: 'added-graph' }
   | { readonly kind: 'renamed-graph'; readonly graphId: GraphId; readonly title: string }
   | { readonly kind: 'recolored-graph'; readonly graphId: GraphId; readonly color: string }
@@ -1110,6 +1110,11 @@ export function createSpaceAuthoring({
       activeGraphId = navigationState.activeGraphId;
     }
     if (completion.kind === 'renamed-layout') {
+      // Addressed by id, exactly as Rename Graph is (ADR 0040). The Sidebar row
+      // and the canvas header coordinate one draft on this id, so a rename that
+      // names a Layout other than the one this Edit resolves is a gesture aimed
+      // at something no longer drawing — an author's state, not a defect.
+      if (completion.layoutId !== layoutId) return refuse({ code: 'layout-not-found' });
       const title = trimmedNonBlankTitle(completion.title);
       if (title === null) return refuse({ code: 'layout-title-required' });
       if (title === layoutTitle) return UNCHANGED;

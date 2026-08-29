@@ -43,7 +43,7 @@ Five more, raised by the documents rather than by this ticket:
 | Does an entry remember how it was reached | No. Closing one Space never closes another. Back is the browser's history, not a pop. |
 | Where Exit lives | The Space's own Sidebar, so a refusal and its recovery sit together. Escape does not exit — it keeps ADR 0048's meaning. |
 | Exit on a Space that cannot save | Waits on an in-flight commit. Refuses on `failed` and `conflicted`. Warns and allows on `rejected`, because a refusal that names no recovery is a trap. |
-| Naming | "Rail" stays ADR 0070's, for a Card's toolbar. The surface is **Open Spaces** and its items are **entries**. "Tab" is not a domain word. "Stack" named the rejected model. `CONTEXT.md` carries all of it. |
+| Naming | "Rail" stays ADR 0073's, for a Card's toolbar. The surface is **Open Spaces** and its items are **entries**. "Tab" is not a domain word. "Stack" named the rejected model. `CONTEXT.md` carries all of it. |
 
 ### Two corrections this session made to the tickets
 

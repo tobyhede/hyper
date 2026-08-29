@@ -3,7 +3,7 @@
 Status: accepted
 Supersedes: 0055, 0058, 0059, 0060
 Refines: 0053, 0057
-Related: 0018, 0025, 0040, 0048, 0064, 0069, 0070
+Related: 0018, 0025, 0040, 0048, 0064, 0069, 0073
 
 The Space Card UX has been exercised by the review prototypes under
 `packages/app/stories/review/`, and this decision is accepted on what they
@@ -138,7 +138,7 @@ entry on one Space would be two live selections over one Space identity, and the
 second would show a stale derivation the moment the first edited. Two views of
 one Space at once is what a second browser tab on its address is for.
 
-**Naming.** Rail is ADR 0070's word, for a Card's toolbar, and is not reused
+**Naming.** Rail is ADR 0073's word, for a Card's toolbar, and is not reused
 here. Tab is not a domain word, so it keeps meaning a browser tab. The
 collection is an ordered set of open Spaces and is deliberately not a stack: a
 stack is the model in which selecting an outer Space closes everything inside

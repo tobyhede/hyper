@@ -618,7 +618,9 @@ describe('Rename Layout', () => {
     const { authoring, session } = openPositioned();
     const before = layoutOf(session.getState().working, LAYOUT_ID);
 
-    expect(authoring.complete({ kind: 'renamed-layout', title: '  Workshop  ' })).toEqual({
+    expect(
+      authoring.complete({ kind: 'renamed-layout', layoutId: LAYOUT_ID, title: '  Workshop  ' }),
+    ).toEqual({
       kind: 'completed',
     });
     const after = layoutOf(session.getState().working, LAYOUT_ID);
@@ -632,14 +634,37 @@ describe('Rename Layout', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'renamed-layout', title: '   ' })).toEqual({
+    expect(
+      authoring.complete({ kind: 'renamed-layout', layoutId: LAYOUT_ID, title: '   ' }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'layout-title-required' },
     });
     expect(session.getState().working).toBe(before);
-    expect(authoring.complete({ kind: 'renamed-layout', title: ' Layout 1 ' })).toEqual({
+    expect(
+      authoring.complete({ kind: 'renamed-layout', layoutId: LAYOUT_ID, title: ' Layout 1 ' }),
+    ).toEqual({
       kind: 'unchanged',
     });
+  });
+
+  /**
+   * The Edit is addressed by Layout id, as Rename Graph is by Graph id. Without
+   * that the rename lands on whichever Layout the renderer happens to resolve,
+   * so a draft begun on one Layout and completed after the drawing Layout
+   * changed writes the title onto a Layout the author never named.
+   */
+  it('refuses a rename addressed to a Layout other than the one drawing', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(
+      authoring.complete({ kind: 'renamed-layout', layoutId: OTHER_LAYOUT_ID, title: 'Workshop' }),
+    ).toEqual({
+      kind: 'refused',
+      refusal: { code: 'layout-not-found' },
+    });
+    expect(session.getState().working).toBe(before);
   });
 });
 

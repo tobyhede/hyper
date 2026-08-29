@@ -1,6 +1,6 @@
 # A card in the graph shows its title
 
-Source: conversation 2026-07-20, recorded as [ADR 0006](../../docs/adr/0006-cards-show-titles-in-the-graph.md).
+Source: conversation 2026-07-20, recorded as [ADR 0006](../../docs/adr/superseded/0006-cards-show-titles-in-the-graph.md).
 
 ## Problem
 

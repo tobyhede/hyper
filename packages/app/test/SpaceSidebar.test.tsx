@@ -149,9 +149,55 @@ describe('SpaceSidebar', () => {
     const row = screen.getByRole('textbox', { name: 'Layout name' });
     fireEvent.change(row, { target: { value: 'Workshop' } });
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Workshop');
+    // One draft, so the header mirrors it rather than offering a second way in:
+    // beginning again from the header would reset the draft to the committed
+    // title and discard what has been typed.
+    expect(screen.queryByRole('button', { name: /^Edit Space View/ })).not.toBeInTheDocument();
     fireEvent.change(row, { target: { value: '' } });
     fireEvent.keyDown(row, { key: 'Enter' });
     expect(screen.getByRole('alert')).toHaveTextContent('A Layout title is required.');
+  });
+
+  /**
+   * A covered Sidebar is located by `data-renderer`, because an open pane marks
+   * the root `inert` and the row leaves the accessibility tree
+   * (`docs/agents/ui.md`). A row that sheds that hook while its own rename is
+   * live is unreachable by role and by attribute at the same time.
+   */
+  it('keeps a renderer row addressable while its rename is live', () => {
+    function Fixture() {
+      const [draft, setDraft] = useState<string | null>(null);
+      const titleEdit: SpaceChromeTitleEdit = {
+        subject: draft === null ? null : { kind: 'layout', id: LAYOUT_ID },
+        surface: draft === null ? null : 'sidebar',
+        draft: draft ?? '',
+        error: null,
+        onBegin: (_subject, title) => setDraft(title),
+        onDraftChange: setDraft,
+        onErrorChange: () => undefined,
+        onComplete: () => null,
+        onCancel: () => setDraft(null),
+        onReturnFocus: () => undefined,
+      };
+      const base = withLayout(settledProps());
+      const props = { ...base, canvas: { ...base.canvas, current: LAYOUT } };
+      return <SpaceSidebar {...props} titleEdit={titleEdit} />;
+    }
+
+    draw(<Fixture />);
+    const before = screen.getAllByTestId('canvas-renderer').length;
+    fireEvent.click(screen.getByRole('button', { name: 'Layout 1', pressed: true }));
+
+    expect(screen.getByRole('textbox', { name: 'Layout name' })).toBeVisible();
+    expect(screen.getAllByTestId('canvas-renderer')).toHaveLength(before);
+    expect(document.querySelector(`[data-renderer="${LAYOUT_ID}"]`)).toBeInTheDocument();
+  });
+
+  it('names the Space View as plain text when no title edit is offered', () => {
+    draw(<SelectedCanvasRenderer renderer={LAYOUT} />);
+
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout 1');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('renders the persistent Sidebar commands and forwards Card creation', () => {

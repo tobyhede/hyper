@@ -7,6 +7,7 @@ import {
   ChevronDownIcon,
   CloseCardIcon,
   EditIcon,
+  FitViewIcon,
   FlowIcon,
   GraphIcon,
   GridIcon,

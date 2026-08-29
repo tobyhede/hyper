@@ -58,7 +58,8 @@ compiled CSS in the page — computed `text-wrap` on a `FieldDescription` under 
 `data-orientation="horizontal"` field: old selector `wrap` (inert, the defect), new selector
 `balance` (fixed), and `vertical` still `wrap` (correctly scoped, no over-reach).
 
-**Also updated.** `packages/app/stories/review/stacked-space-sidebar.stories.tsx` carried a
-"Known, and not this story's doing" note describing the separator defect as live in the
-production sidebar. That note is now stale, so it records the finding and its fix instead.
-The story is still deleted by issue 11.
+**Not updated, and the earlier claim here was wrong.** This section previously said a
+"Known, and not this story's doing" note in `packages/app/stories/review/stacked-space-sidebar.stories.tsx`
+had been rewritten to record the separator finding. That file exists in neither `main` nor
+this branch — it was never written — so no such note was ever edited. Nothing outside the
+two primitives above was touched.

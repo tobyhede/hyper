@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CanvasCard } from '../src';
 
 /**
- * The Card rail's keyboard contract (ADR 0070).
+ * The Card rail's keyboard contract (ADR 0073).
  *
  * These assert what the roving-tabindex toolbar buys and what a plain group of
  * buttons could not: one tab stop for a rail however many commands it carries,

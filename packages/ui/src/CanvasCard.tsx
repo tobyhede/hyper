@@ -247,7 +247,7 @@ export function CanvasCard(props: CanvasCardProps) {
     >
       <CardRail kind={visualKind} graphColor={graphColor} className="canvas-card__rail">
         {showActions && (
-          // ADR 0070. One tab stop for the whole rail, arrows between its
+          // ADR 0073. One tab stop for the whole rail, arrows between its
           // controls: a canvas carries many Cards and a Card's rail carries
           // several commands, so a control apiece would put the Cards
           // themselves out of reach behind their own actions. The keyboard
@@ -298,7 +298,7 @@ export function CanvasCard(props: CanvasCardProps) {
                   // not reshuffle while the author writes, and what is unavailable
                   // says so instead of vanishing.
                   //
-                  // A toolbar item stays focusable while disabled (ADR 0070), so
+                  // A toolbar item stays focusable while disabled (ADR 0073), so
                   // that promise now holds for the keyboard too — the control keeps
                   // its place in the arrow order and announces itself unavailable,
                   // instead of being drawn and unreachable.

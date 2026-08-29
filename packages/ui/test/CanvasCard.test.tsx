@@ -273,7 +273,7 @@ describe('CanvasCard Open and Close operation', () => {
       ),
     ).toEqual(['Save Card A', 'Cancel editing Card A', 'Close Card A']);
     // Unavailable through `aria-disabled` rather than the native property, so
-    // the control keeps its place in the rail's arrow order (ADR 0070). Drawn
+    // the control keeps its place in the rail's arrow order (ADR 0073). Drawn
     // and unreachable is the state this replaces.
     const close = screen.getByRole('button', { name: 'Close Card A' });
     expect(close).toHaveAttribute('aria-disabled', 'true');

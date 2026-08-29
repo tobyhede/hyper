@@ -270,13 +270,23 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
 
     useEffect(() => {
       if (chromeEditingDisabled) setSpaceChromeEdit(null);
-    }, [chromeEditingDisabled, authoringState.replacementEpoch]);
+    }, [chromeEditingDisabled]);
+
+    // A replacement discards every open Interaction draft (ADR 0042), and this
+    // one lives outside the canvas subtree `replacementEpoch` keys, so the
+    // remount does not reach it. Separate from the guard above because that
+    // guard reads only `chromeEditingDisabled`: listing the epoch beside it
+    // re-ran an effect whose body could then do nothing, which is how the two
+    // rules came to look like one.
+    useEffect(() => {
+      setSpaceChromeEdit(null);
+    }, [authoringState.replacementEpoch]);
 
     const completeSpaceChromeTitle = useCallback(
       (subject: NonNullable<SpaceChromeTitleEdit['subject']>, title: string): string | null => {
         const result =
           subject.kind === 'layout'
-            ? authoring.complete({ kind: 'renamed-layout', title })
+            ? authoring.complete({ kind: 'renamed-layout', layoutId: subject.id, title })
             : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
         if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
         setSpaceChromeEdit(null);
@@ -291,8 +301,10 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       draft: spaceChromeEdit?.draft ?? '',
       error: spaceChromeEdit?.error ?? null,
       disabled: chromeEditingDisabled,
-      onBegin: (subject, title, surface, returnFocus) =>
-        setSpaceChromeEdit({ subject, draft: title, error: null, surface, returnFocus }),
+      onBegin: (subject, title, surface, returnFocus) => {
+        setDestinationNotFound(false);
+        setSpaceChromeEdit({ subject, draft: title, error: null, surface, returnFocus });
+      },
       onDraftChange: (draft) =>
         setSpaceChromeEdit((current) => (current === null ? null : { ...current, draft })),
       onErrorChange: (error) =>

@@ -26,6 +26,10 @@ export function OpenSpaceSidebars({ spaces, activeId, onSelect }: OpenSpaceSideb
           content: <SpaceSidebar {...space.sidebar} collapsible="none" className="h-full w-full" />,
         }))}
         activeId={activeId}
+        // Not a pass-through: `OpenSpaces` is a presentation component and
+        // keys its entries by plain `string`, so the id comes back unbranded.
+        // The lookup is what turns it into the `UUID` this Space's own
+        // `onSelect` takes, and it drops an id no open Space answers to.
         onSelect={(id) => {
           const selected = spaces.find((space) => space.id === id);
           if (selected !== undefined) onSelect(selected.id);

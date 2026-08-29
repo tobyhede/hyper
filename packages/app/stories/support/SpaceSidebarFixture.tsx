@@ -139,7 +139,7 @@ export function SpaceSidebarFixture({
     onComplete: (subject, title) => {
       const result =
         subject.kind === 'layout'
-          ? authoring.complete({ kind: 'renamed-layout', title })
+          ? authoring.complete({ kind: 'renamed-layout', layoutId: subject.id, title })
           : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
       if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
       setTitleEdit(null);

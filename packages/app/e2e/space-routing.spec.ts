@@ -256,19 +256,19 @@ test('canonical and contextual Graph links restore navigation context without au
 
   expect((await page.goto(canonical))?.status()).toBe(200);
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
-  await expect(page.getByRole('button', { name: 'Present Long' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
 
   expect((await page.goto(contextual))?.status()).toBe(200);
   await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
-  await expect(page.getByRole('button', { name: 'Present Echo' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Present Echo' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(canonical);
-  await expect(page.getByRole('button', { name: 'Present Long' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
   await page.goForward();
   await expect(page).toHaveURL(contextual);
-  await expect(page.getByRole('button', { name: 'Present Echo' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
 
   const after = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
@@ -287,10 +287,10 @@ test('activating a Graph pushes a contextual destination restored by Back and Fo
   await expect(page).toHaveURL(mid);
   await page.goBack();
   await expect(page).toHaveURL(view);
-  await expect(page.getByRole('button', { name: 'Present Long' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
   await page.goForward();
   await expect(page).toHaveURL(mid);
-  await expect(page.getByRole('button', { name: 'Present Mid' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
 });
 
 test(
@@ -379,7 +379,7 @@ test('entering, advancing and retreating each append presentation history', asyn
   const atB = `${graph}/present/${encodeCompactUuid(CARD_B_ID)}`;
   await page.goto(graph);
 
-  await page.getByRole('button', { name: 'Present Long' }).click();
+  await page.getByRole('button', { name: 'Present' }).click();
   await expect(page).toHaveURL(atA);
   await page.keyboard.press('ArrowRight');
   await expect(page).toHaveURL(atB);
@@ -426,7 +426,7 @@ test('a self-Edge presentation move adds a same-URL browser entry', async ({ pag
   const point = `${graph}/present/${encodeCompactUuid(CARD_A_ID)}`;
   await page.goto(graph);
 
-  await page.getByRole('button', { name: 'Present Graph 1' }).click();
+  await page.getByRole('button', { name: 'Present' }).click();
   await expect(page).toHaveURL(point);
   await page.keyboard.press('ArrowRight');
   await expect(page).toHaveURL(point);

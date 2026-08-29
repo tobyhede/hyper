@@ -432,7 +432,7 @@ test('the rail is one toolbar: one tab stop, and its commands under the arrows',
 
   // One tab stop for the whole rail, whatever it carries. A canvas draws many
   // Cards and each rail carries several commands, so a stop apiece would put
-  // the Cards themselves behind their own actions (ADR 0070).
+  // the Cards themselves behind their own actions (ADR 0073).
   await card.hover();
   const edit = card.getByRole('button', { name: 'Edit Card Strategies' });
   const close = card.getByRole('button', { name: 'Close Card Strategies' });

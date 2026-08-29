@@ -12,6 +12,8 @@ import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
   Button,
+  buttonVariants,
+  cn,
   FALLBACK_GRAPH_COLOR,
   FlowIcon,
   GraphIcon,
@@ -245,7 +247,17 @@ function RendererGroup({
         return (
           <SidebarMenuItem key={canvasRendererKey(renderer.selection)} tabIndex={-1}>
             {isEditing ? (
-              <SidebarMenuButton render={<div />} isActive={active}>
+              // The row keeps its addressing hooks while its own rename is
+              // live: an open pane marks the root `inert`, so `data-renderer`
+              // is how a covered Sidebar is reached at all (docs/agents/ui.md).
+              // `aria-pressed` is not carried across — this branch renders a
+              // `div`, and pressed state on a non-button is not a thing to say.
+              <SidebarMenuButton
+                render={<div />}
+                isActive={active}
+                data-testid="canvas-renderer"
+                data-renderer={canvasRendererKey(renderer.selection)}
+              >
                 <RendererIcon renderer={renderer} />
                 <InlineTitleEditor
                   className="flex-1"
@@ -476,7 +488,12 @@ export function SpaceSidebar({
                   return (
                     <SidebarMenuItem key={candidate.id} tabIndex={-1}>
                       {isEditing && titleEdit !== undefined ? (
-                        <SidebarMenuButton render={<div />} isActive={active}>
+                        <SidebarMenuButton
+                          render={<div />}
+                          isActive={active}
+                          data-testid="graph-choice"
+                          data-graph-id={candidate.id}
+                        >
                           <GraphIcon color={graphColor(candidate, graph.colorByGraphId)} />
                           <InlineTitleEditor
                             className="flex-1"
@@ -611,8 +628,26 @@ export function SelectedCanvasRenderer({
           onCancel={titleEdit.onCancel}
           onReturnFocus={titleEdit.onReturnFocus}
         />
-      ) : layoutId === null || titleEdit?.disabled === true ? (
-        <span className="truncate text-sm font-medium">{shownTitle}</span>
+      ) : // Plain text unless this header is the surface that would begin the
+      // Edit. `sameEdit` is the case worth naming: the draft is already live on
+      // the Sidebar row, so the header is mirroring it — offering Edit here
+      // would call `onBegin` a second time and reset the draft to the committed
+      // title, discarding what the author has typed.
+      layoutId === null || titleEdit === undefined || titleEdit.disabled === true || sameEdit ? (
+        // The same box as the Button below, taken from the Button's own
+        // variants rather than restated: the two branches swap as the canvas
+        // choice moves between a computed View and a Layout, and a header that
+        // changes height on that swap moves the whole canvas under the author.
+        // Only the interactive affordances are dropped — this names the Space
+        // View, it does not offer anything.
+        <span
+          className={cn(
+            buttonVariants({ variant: 'ghost', size: 'compact' }),
+            'cursor-default truncate hover:border-transparent hover:bg-transparent hover:text-muted-foreground',
+          )}
+        >
+          {shownTitle}
+        </span>
       ) : (
         <Button
           variant="ghost"
@@ -620,7 +655,7 @@ export function SelectedCanvasRenderer({
           aria-label={`Edit Space View ${shownTitle}`}
           onClick={(event) => {
             const header = event.currentTarget.parentElement;
-            titleEdit?.onBegin({ kind: 'layout', id: layoutId }, renderer.title, 'header', () =>
+            titleEdit.onBegin({ kind: 'layout', id: layoutId }, renderer.title, 'header', () =>
               header?.focus(),
             );
           }}

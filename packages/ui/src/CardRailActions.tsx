@@ -10,7 +10,7 @@ import {
 import { cn } from './lib/utils';
 
 /**
- * The command cluster at a Card rail's trailing edge, as one toolbar (ADR 0070).
+ * The command cluster at a Card rail's trailing edge, as one toolbar (ADR 0073).
  *
  * The rail itself is `CardRail` and stays a plain band: it has a kind at one
  * edge and a slot at the other, and the Alias metadata editor mounts that same
@@ -130,7 +130,7 @@ export const CardRailSharedActions = forwardRef<HTMLDivElement, CardRailSharedAc
 
 /**
  * One command on a Card rail: the same box, the same glyph treatment and the
- * same trailing cluster, whatever the command is (ADR 0070).
+ * same trailing cluster, whatever the command is (ADR 0073).
  *
  * `variant` and `size` are deliberately not offered. One rail, one control
  * treatment — a command that carried its own box would read as a different
