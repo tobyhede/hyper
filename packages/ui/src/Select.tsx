@@ -18,13 +18,8 @@ export const SelectTrigger = forwardRef<
 >(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
-    // `nokey` here for the other half of the same mechanism: this trigger is
-    // not portalled anywhere, it is drawn in a toolbar that was never inside the
-    // flow to begin with — and a `document` listener does not care. It is a
-    // `button`, so no input tag excludes it, and Backspace pressed on it deleted
-    // whichever Edge the canvas had selected.
     className={cn(
-      'nokey inline-flex items-center justify-between gap-[0.4rem] rounded-[6px] border border-[var(--border)] bg-[var(--secondary)] px-[0.5rem] py-[0.35rem] text-[0.85rem] text-[var(--foreground)] transition-colors outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-[var(--foreground)]',
+      'inline-flex items-center justify-between gap-[0.4rem] rounded-[6px] border border-[var(--border)] bg-[var(--secondary)] px-[0.5rem] py-[0.35rem] text-[0.85rem] text-[var(--foreground)] transition-colors outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-[var(--foreground)]',
       className,
     )}
     {...props}
@@ -74,10 +69,8 @@ export const SelectContent = forwardRef<
     >
       <SelectPrimitive.Popup
         ref={ref}
-        // The popup is portalled to document.body, so its own `nokey` marker is
-        // what keeps React Flow's document-level delete handler out of the list.
         className={cn(
-          'nokey max-h-[var(--available-height)] min-w-[8rem] overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
+          'max-h-[var(--available-height)] min-w-[8rem] overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
           className,
         )}
         {...props}

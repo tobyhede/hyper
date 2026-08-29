@@ -556,9 +556,8 @@ describe("the app's canvas delete key", () => {
 
   it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches the sidebar', (key) => {
     // The real control, mounted where the real one is: outside the flow
-    // entirely, with no portal involved and so nothing for a `.nokey` inside
-    // the canvas to reach. A canvas choice is a focusable `button` that no
-    // input tag excludes, which is exactly the exposure this covers.
+    // entirely. The app-owned canvas command guard recognises the Sidebar
+    // ancestor rather than depending on a React Flow marker.
     const { adapter, session } = mountCanvas(appChrome);
     act(() => adapter.getState().selectEdge(SUBJECT));
 
@@ -630,11 +629,9 @@ describe("the app's canvas delete key", () => {
  * authorable.
  *
  * A hidden live gesture is the asymmetry that matters, and the delete key is
- * where it bites. `useGlobalKeyHandler` subscribes `deleteKeyCode` on
- * `document`, and its one exclusion, `isInputDOMNode`, covers
- * `INPUT`/`SELECT`/`TEXTAREA`, `contenteditable` and `.nokey` — a pane's `Done`
- * and `Cancel` are `Button`s with none of those, so a `Backspace` aimed at the
- * dialog the author is working in deleted the Edge selected behind it.
+ * where it bites. The app-owned canvas command listens on `window`, so its
+ * semantic guard must recognise the pane's dialog ancestor; a `Backspace`
+ * aimed at the dialog must not delete the Edge selected behind it.
  */
 describe('a pane covering the graph', () => {
   it('withdraws the Edge surface while the pane covers it', () => {
@@ -695,8 +692,8 @@ describe('a pane covering the graph', () => {
   it.each(['Backspace', 'Delete'] as const)(
     'leaves the selected Edge standing when %s reaches the pane',
     (key) => {
-      // A pane action button, mounted where the pane is: outside the flow, and
-      // carrying none of the tags or `.nokey` that would exclude it.
+      // A pane action button, mounted where the pane is outside the flow. The
+      // app-owned canvas command guard recognises its dialog ancestor.
       const { adapter, session } = mountCanvas(<button type="button">Cancel</button>, {
         covered: true,
       });

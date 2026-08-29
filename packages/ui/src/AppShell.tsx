@@ -30,9 +30,8 @@ export function AppShell({ sidebar, header, notice, children }: AppShellProps) {
       {sidebar}
       <SidebarInset className="min-h-0">
         <header className="shell__header">
-          {/* `nokey` for the same reason every other chrome control carries it:
-              React Flow's delete key listens on `document`, and this button sits
-              outside the canvas with nothing above it to exclude it. */}
+          {/* React Flow's live Space-key pan activation subscription reaches
+              this chrome button outside the canvas, so `.nokey` excludes it. */}
           <SidebarTrigger className="nokey" />
           {header}
         </header>

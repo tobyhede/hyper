@@ -149,7 +149,7 @@ describe('PresentingChrome', () => {
     expect(onCopyLink).toHaveBeenCalledOnce();
   });
 
-  it('guards its chrome controls from React Flow document shortcuts', () => {
+  it('guards its chrome controls from React Flow Space-key canvas panning', () => {
     render(chrome());
 
     expect(

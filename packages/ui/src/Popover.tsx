@@ -74,8 +74,8 @@ export const PopoverContent = forwardRef<
       >
         <PopoverPrimitive.Popup
           ref={ref}
-          // `nokey` because React Flow subscribes its delete key on `document`,
-          // while a portalled popup is outside the canvas's own guard.
+          // React Flow's live Space-key pan activation subscription reaches
+          // this portalled popup, so its own `.nokey` ancestor excludes it.
           className={cn(
             'nokey z-50 min-w-[15rem] rounded-[6px] border border-[var(--border)] bg-[var(--card)] p-[0.6rem] text-[var(--foreground)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] outline-none',
             className,

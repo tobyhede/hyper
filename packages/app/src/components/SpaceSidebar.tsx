@@ -262,9 +262,9 @@ export function SpaceSidebar({
       </SidebarHeader>
       <SidebarSeparator />
       {/* `nokey` sits on both control-bearing regions rather than on the root.
-          React Flow's remaining pan, zoom and node-keyboard subscriptions read
-          `.nokey`, and the mobile Sheet portals these regions somewhere a class
-          on the root would not be an ancestor at all. */}
+          React Flow's live Space-key pan activation subscription reads it, and
+          the mobile Sheet portals these regions somewhere a class on the root
+          would not be an ancestor at all. */}
       <SidebarContent className="nokey">
         <SidebarGroup>
           <SidebarGroupContent>

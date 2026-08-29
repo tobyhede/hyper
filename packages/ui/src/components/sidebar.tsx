@@ -189,8 +189,9 @@ function Sidebar({
       // The caller's own props and className go to the *content*, not to the
       // Dialog root: the root renders no DOM, so the registry drop silently
       // dropped the sidebar's id, data attributes and classes below the
-      // breakpoint — including the `nokey` React Flow's delete key reads and the
-      // test id this surface is found by. `open`/`onOpenChange` stay the root's.
+      // breakpoint — including the `nokey` React Flow's live Space-key pan
+      // activation subscription reads and the test id this surface is found by.
+      // `open`/`onOpenChange` stay the root's.
       <Sheet open={openMobile} onOpenChange={setOpenMobile}>
         <SheetContent
           dir={dir}

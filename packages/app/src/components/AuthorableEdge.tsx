@@ -12,9 +12,9 @@ import { SelectedEdgeControls } from './SelectedEdgeControls';
  * `EdgeLabelRenderer` is React Flow's own escape hatch for exactly this: it
  * portals children into a transformed div layered over the flow, so ordinary
  * buttons and popovers pan and zoom with the canvas. `nopan`/`nodrag` keep a
- * press on the controls from panning the canvas underneath them, and `.nokey`
- * keeps React Flow's document-level key handler from reading a keystroke typed
- * here as a canvas command.
+ * press on the controls from panning the canvas underneath them. `.nokey`
+ * excludes their buttons from React Flow's live Space-key pan activation
+ * subscription; canvas deletion belongs to the app instead.
  *
  * Placement only. What sits inside it is `SelectedEdgeControls`, which knows
  * nothing about React Flow.

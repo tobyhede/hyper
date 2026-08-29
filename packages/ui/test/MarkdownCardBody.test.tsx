@@ -321,7 +321,8 @@ describe('MarkdownCardBody', () => {
     expect(surface).not.toHaveClass('nodrag');
 
     rerender(body({ editor: { onComplete: vi.fn(), onEnd: vi.fn() } }));
-    expect(surface).toHaveClass('nodrag', 'nopan', 'nokey');
+    expect(surface).toHaveClass('nodrag', 'nopan');
+    expect(surface).not.toHaveClass('nokey');
     // `nowheel` is deliberately absent: the wheel belongs to the canvas
     // everywhere, so no Expanded Card is a hole to wheel-pan across (ADR 0064).
     expect(surface).not.toHaveClass('nowheel');
