@@ -51,7 +51,7 @@ export type SpaceReferenceErrorKind =
   | 'unresolved-alias-target'
   | 'alias-self-reference'
   | 'alias-targets-alias'
-  | 'alias-targets-non-markdown'
+  | 'alias-target-must-own-content'
   | 'space-card-reference-cycle';
 
 /**
@@ -280,7 +280,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     }
     if (target.kind !== 'markdown') {
       errors.push({
-        kind: 'alias-targets-non-markdown',
+        kind: 'alias-target-must-own-content',
         ref: card.target,
         message: `Alias "${card.id}" targets ${target.kind} Card "${card.target}"; aliases show Markdown content`,
       });

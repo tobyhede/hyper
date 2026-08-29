@@ -603,7 +603,7 @@ describe.each([
     it('refuses an alias whose target is a Space Card', () => {
       const errors = refused(load({ cards: [spaceCard(A, ABSENT), aliasTo(B, A)], layouts: [] }));
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'alias-targets-non-markdown', ref: A }),
+        expect.objectContaining({ kind: 'alias-target-must-own-content', ref: A }),
       );
     });
   });

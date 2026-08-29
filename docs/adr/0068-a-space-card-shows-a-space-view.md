@@ -3,6 +3,7 @@
 Status: accepted
 Supersedes: 0055, 0058, 0059, 0060
 Refines: 0053, 0057
+Refined by: 0072
 Related: 0018, 0025, 0040, 0048, 0064, 0069, 0073
 
 The Space Card UX has been exercised by the review prototypes under
