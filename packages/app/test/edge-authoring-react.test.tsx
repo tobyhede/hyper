@@ -198,14 +198,17 @@ const EDGES = [
  */
 function compose({
   connections,
+  selection = LAYOUT_ID,
 }: {
   connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
+  /** Which renderer opens. A Computed View is what refuses a Layout-only Edit. */
+  selection?: typeof LAYOUT_ID | undefined;
 } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const composed = composeApp({
     spaceSession: session,
-    selection: LAYOUT_ID,
+    selection,
     newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
     initialPlacement: Placement.fromEntries([
       [CARD_A, { x: 0, y: 0, open: false }],
@@ -276,14 +279,16 @@ function mountCanvas(
     presenting = false,
     deleteWhenCoveredCommits = false,
     connections,
+    selection,
   }: {
     covered?: boolean;
     presenting?: boolean;
     deleteWhenCoveredCommits?: boolean;
     connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
+    selection?: typeof LAYOUT_ID | undefined;
   } = {},
 ) {
-  const composed = compose({ connections });
+  const composed = compose({ connections, selection });
   const canvas = (paneOpen: boolean) => (
     <ReactFlowProvider>
       {beside}
@@ -540,6 +545,73 @@ describe("the app's canvas delete key", () => {
     },
   );
 
+  /**
+   * The key acts on the Card it was aimed at, not the one selected before.
+   *
+   * React Flow never selects a node on focus — its `onFocus` only auto-pans —
+   * and only the Edge half of this canvas has a focus-to-selection bridge. So a
+   * Tab to another Card leaves the selection where it was, while the node's own
+   * assistive description promises Delete removes *it*. The open command one
+   * branch above already resolves its Card from the event target; this one now
+   * agrees, and falls back to the selection when the key came from the pane.
+   */
+  it.each(DELETE_KEYS)('removes the focused Card rather than the selected one on %s', (key) => {
+    const { adapter, session } = mountCanvas();
+    act(() => adapter.getState().selectCard(CARD_A));
+    const focused = document.querySelector(`.react-flow__node[data-id="${CARD_B}"]`);
+    if (focused === null) throw new Error('The Card the key is aimed at must be on the canvas.');
+
+    fireEvent.keyDown(focused, { key, bubbles: true });
+
+    const layout = session.getState().working.document.layouts?.[0];
+    expect(layout?.positions[CARD_B]).toBeUndefined();
+    expect(layout?.positions[CARD_A]).toBeDefined();
+  });
+
+  /**
+   * A refused removal is announced rather than swallowed.
+   *
+   * `removed-card-from-layout` is Layout-only, so a Computed View refuses it
+   * outright — and the key has already been consumed by the time the refusal
+   * comes back. Issue 03 asked for "the same refusals" the Sidebar routes, and
+   * the copy for this one is already written; nothing reached it.
+   */
+  it.each(DELETE_KEYS)('announces the refusal when %s cannot remove the Card', async (key) => {
+    const { adapter } = mountCanvas(null, { selection: FLOW_SPACE_VIEW_ID });
+    act(() => adapter.getState().selectCard(CARD_A));
+
+    fireEvent.keyDown(document.body, { key });
+
+    expect(await screen.findByTestId('canvas-command-refusal')).toHaveTextContent(
+      'Select a Layout to remove a Card from it.',
+    );
+  });
+
+  /**
+   * The same two exclusions the `C` binding spells out, for the same reasons: a
+   * command runs once per press, and a modifier makes the key somebody else's.
+   */
+  it('ignores an auto-repeated Backspace so one press removes one Card', () => {
+    const { adapter, session } = mountCanvas();
+    act(() => adapter.getState().selectCard(CARD_A));
+
+    fireEvent.keyDown(document.body, { key: 'Backspace', repeat: true });
+
+    expect(session.getState().working.document.layouts?.[0]?.positions[CARD_A]).toBeDefined();
+  });
+
+  it.each(['metaKey', 'ctrlKey', 'altKey'] as const)(
+    'leaves a %s-modified Backspace to whatever else would have had it',
+    (modifier) => {
+      const { adapter, session } = mountCanvas();
+      act(() => adapter.getState().selectCard(CARD_A));
+
+      fireEvent.keyDown(document.body, { key: 'Backspace', [modifier]: true });
+
+      expect(session.getState().working.document.layouts?.[0]?.positions[CARD_A]).toBeDefined();
+    },
+  );
+
   it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its own editor', (key) => {
     const { adapter, session } = mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
@@ -604,13 +676,35 @@ describe("the app's canvas delete key", () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 
-  it('leaves the Edge standing when Delete reaches the zoom slider', () => {
+  /**
+   * The real control this canvas mounts, not a stand-in for it.
+   *
+   * A fabricated `input[type=range]` proved only that the guard's `input` entry
+   * works, which was true before the zoom controls existed. What has to hold is
+   * that the shipped `ZoomSlider` — a Base UI thumb inside a React Flow `Panel`,
+   * both of which this test renders for real — is excluded, and the entry that
+   * excludes it is the `.nokey` its Panel already carries for React Flow's own
+   * subscriptions.
+   */
+  it('leaves the Edge standing when Delete reaches the zoom slider', async () => {
     const { adapter, session } = mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
-    const slider = Object.assign(document.createElement('input'), { type: 'range' });
-    screen.getByRole('application').append(slider);
+    // Found by label rather than role: Base UI keeps a thumb `visibility:
+    // hidden` until it has measured the track, and jsdom measures nothing, so
+    // the real control is absent from the accessibility tree here.
+    const slider = await screen.findByLabelText('Zoom');
+    expect(slider.closest('.nokey')).not.toBeNull();
     fireEvent.keyDown(slider, { key: 'Delete' });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
+
+  it('leaves the Edge standing when Delete reaches a zoom button', async () => {
+    const { adapter, session } = mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Zoom in' }), { key: 'Delete' });
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
@@ -1206,7 +1300,8 @@ describe('the React Flow properties', () => {
     );
 
     expect(result.current.reactFlowProps).toMatchObject({
-      // React Flow defaults to Backspace alone.
+      // `null`, not a key pair: deletion is the app's command, answered once by
+      // `SpaceCanvas`, so React Flow subscribes no delete key at all.
       deleteKeyCode: null,
       // Reconnection and focusability are per-Edge, narrowed to the Active
       // Graph — and, for reconnection, to the selected Edge.

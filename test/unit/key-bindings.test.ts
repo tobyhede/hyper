@@ -23,14 +23,36 @@ const sourcesUnder = (directory: string): readonly string[] =>
       : [];
   });
 
-const isEventKey = (node: ts.Node): boolean =>
-  ts.isPropertyAccessExpression(node) &&
-  node.name.text === 'key' &&
-  ts.isIdentifier(node.expression) &&
-  node.expression.text === 'event';
+/**
+ * Whether a name reads as a keyboard event rather than some other record.
+ *
+ * The scan used to require the literal `event`, which made the ratchet a check
+ * on one spelling instead of on the binding: `e.key === 'Delete'` added an
+ * unlisted key and left this test green. Any identifier may carry `.key`,
+ * because a `.key` compared against a string literal is a key binding whatever
+ * the parameter is called. `.code` is narrower on purpose — `refusal.code` and
+ * its kin are domain identities (ADR 0057), not keystrokes — so it is read only
+ * off a name that already reads as an event.
+ */
+const readsAsEvent = (name: string): boolean => /^e([a-z]*)$/i.test(name) || /event/i.test(name);
+
+const isEventKey = (node: ts.Node): boolean => {
+  if (!ts.isPropertyAccessExpression(node) || !ts.isIdentifier(node.expression)) return false;
+  if (node.name.text === 'key') return true;
+  return node.name.text === 'code' && readsAsEvent(node.expression.text);
+};
+
+/**
+ * `({ key }) => key === 'Backspace'` is the same binding, destructured.
+ *
+ * No source in the scanned trees names a non-event local `key`, so a bare one
+ * compared against a string literal is a keystroke read every time it appears.
+ */
+const isDestructuredKey = (node: ts.Node): boolean =>
+  ts.isIdentifier(node) && (node.text === 'key' || node.text === 'eventKey');
 
 const containsEventKey = (node: ts.Node): boolean => {
-  if (isEventKey(node)) return true;
+  if (isEventKey(node) || isDestructuredKey(node)) return true;
   let found = false;
   node.forEachChild((child) => {
     if (containsEventKey(child)) found = true;

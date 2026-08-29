@@ -4,12 +4,22 @@ import { cn } from '../lib/utils';
 type SliderProps<Value extends number | readonly number[]> = SliderPrimitive.Root.Props<Value> & {
   /** Accessible name for each thumb, by index, as required by Base UI. */
   getAriaLabel?: SliderPrimitive.Thumb.Props['getAriaLabel'];
+  /**
+   * What the thumb announces instead of its raw number.
+   *
+   * A thumb's own prop in Base UI, forwarded here for the same reason
+   * `getAriaLabel` is: a caller composes the Root and never reaches the thumbs
+   * this component renders for it. Needed wherever the track's units are not
+   * the units the author is changing.
+   */
+  getAriaValueText?: SliderPrimitive.Thumb.Props['getAriaValueText'];
 };
 
 function Slider<Value extends number | readonly number[]>({
   className,
   defaultValue,
   getAriaLabel,
+  getAriaValueText,
   value,
   min = 0,
   max = 100,
@@ -52,6 +62,7 @@ function Slider<Value extends number | readonly number[]>({
             key={index}
             index={index}
             getAriaLabel={getAriaLabel}
+            getAriaValueText={getAriaValueText}
             className="relative block size-3 shrink-0 rounded-full border border-ring bg-background ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
           />
         ))}

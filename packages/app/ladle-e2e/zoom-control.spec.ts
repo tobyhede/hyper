@@ -8,6 +8,26 @@ const viewportZoom = (page: Page): Promise<number> =>
     return Number(match?.[1] ?? Number.NaN);
   });
 
+/**
+ * The zoom once the camera has stopped moving.
+ *
+ * Every control here animates over `CAMERA_MOVE_DURATION`, so a single read can
+ * land mid-flight. Two matching reads in a row is the cheapest proof it has
+ * settled, and it needs no knowledge of the duration.
+ */
+const stableZoom = async (page: Page): Promise<number> => {
+  let previous = Number.NaN;
+  await expect
+    .poll(async () => {
+      const current = await viewportZoom(page);
+      const settledHere = current === previous;
+      previous = current;
+      return settledHere;
+    })
+    .toBe(true);
+  return previous;
+};
+
 test(
   'the themed zoom control operates the real canvas viewport',
   { tag: '@parity:canvas-zoom-control-operates-the-real-viewport' },
@@ -35,11 +55,18 @@ test(
     await zoomIn.click();
     await expect.poll(() => viewportZoom(page)).toBeGreaterThan(zoomedOut);
 
-    const beforeSecondZoomOut = await viewportZoom(page);
-    await zoomOut.click();
-    await expect.poll(() => viewportZoom(page)).toBeLessThan(beforeSecondZoomOut);
-    const beforeFit = await viewportZoom(page);
+    // Fit view frames the Cards, so what it owes is one framing reached from
+    // either side — not a direction. A direction held only by arithmetic
+    // accident here: the fit zoom sits inside the range these clicks walk
+    // through, so a run ending just below it read as a zoom *out*, and the
+    // opening zoom is a different fit again (the camera's own overview options).
     await fitView.click();
-    await expect.poll(() => viewportZoom(page)).toBeGreaterThan(beforeFit);
+    const fitted = await stableZoom(page);
+
+    await zoomIn.click();
+    await expect.poll(() => viewportZoom(page)).toBeGreaterThan(fitted);
+
+    await fitView.click();
+    await expect.poll(() => viewportZoom(page)).toBeCloseTo(fitted, 2);
   },
 );

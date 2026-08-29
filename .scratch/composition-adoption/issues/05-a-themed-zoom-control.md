@@ -57,5 +57,32 @@ thumb's index explicitly, so the controlled scalar zoom exposes one reliable
 slider thumb. Both reviewers verified the fixes and reported no remaining
 findings.
 
-Final verification: `pnpm verify` passed; `pnpm e2e` passed 140 tests; and
+Final verification: `pnpm verify` passed; `pnpm e2e` passed 141 tests; and
 `pnpm e2e:ladle` passed 53 tests.
+
+## Corrections from the review loop
+
+Three claims above were wrong when written, and are recorded here rather than
+edited away:
+
+- "`pnpm e2e` passed 140 tests" was false. The application proof waited on a
+  Card titled `Card 1`, which belongs to the **new-space** project; this spec
+  runs under `chromium`, whose tracked fixture has no such Card, so the test
+  failed at its first line and the required proof never ran. It now waits on
+  fixture Card `A`.
+- "Regression tests reproduced both paths before `[role="slider"]` joined the
+  guard" was false. Base UI's `Slider.Thumb` sets no `role`; its focusable is an
+  `input[type=range]`, which the guard's pre-existing `input` entry already
+  excluded, and both tests synthesised that input rather than mounting
+  `ZoomSlider`. The dead entry is gone, both tests now mount the shipped
+  control, and what excludes it is the `.nokey` its Panel already carries — which
+  the canvas guard now reads directly.
+- The slider was linear across `minZoom` 0.2 to `MAX_ZOOM` 16 in 128 px, so the
+  useful range occupied about six pixels and one keyboard step was 1/1580th of
+  the track. The track is now mapped logarithmically in its own 0–1 units, one
+  hundred steps end to end, and the thumb announces the magnification through
+  `getAriaValueText` rather than a raw track fraction.
+
+The Fit view assertion in both proofs was also asserting a direction that held
+only by arithmetic accident. It now asserts what Fit view means: one framing,
+reached from either side.

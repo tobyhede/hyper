@@ -1844,29 +1844,36 @@ for (const key of ['Backspace', 'Delete'] as const) {
  * completed Space Edit lifecycle. The Card still belongs to the Space; the
  * projection loses it and the Layout-owned Edges incident to it together.
  */
-test('Backspace with a Card selected removes it and its Edges from this Layout', async ({
-  page,
-}) => {
-  await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const drawnCards = await page.locator('.react-flow__node').count();
-  const drawn = await page.locator('.react-flow__edge').count();
+for (const key of ['Backspace', 'Delete'] as const) {
+  test(`${key} with a Card selected removes it and its Edges from this Layout`, async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const card = nodeByTitle(page, 'A').first();
+    await expect(card).toBeVisible();
+    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    const drawnCards = await page.locator('.react-flow__node').count();
+    const drawn = await page.locator('.react-flow__edge').count();
+    // Every Edge this Card is an endpoint of, counted before the Edit, so the
+    // assertion below is an exact remainder rather than "fewer than before" —
+    // which passed while a single incident Edge went and the rest stayed.
+    const incident = await page.getByLabel(/^Edge (from A to|from .* to A) /).count();
+    expect(incident).toBeGreaterThan(0);
 
-  const cardBox = (await card.boundingBox())!;
-  await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
-  await expect(card).toHaveClass(/selected/);
+    const cardBox = (await card.boundingBox())!;
+    await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+    await expect(card).toHaveClass(/selected/);
 
-  await page.keyboard.press('Backspace');
-  await quiescent(page);
+    await page.keyboard.press(key);
+    await quiescent(page);
 
-  await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards - 1);
-  expect(await page.locator('.react-flow__edge').count()).toBeLessThan(drawn);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-});
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards - 1);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - incident);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  });
+}
 
 /**
  * The assistive description names the keys that actually do something.

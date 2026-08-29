@@ -127,7 +127,6 @@ export interface EdgeAuthoringInput {
 
 const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
 
-/** One shared instance, for the identity `useKeyPress` reads. See the prop above. */
 /**
  * Which `ElementDropTarget` the element under the pointer is. Both class names
  * are React Flow's published theming API.
@@ -661,7 +660,7 @@ export function useEdgeAuthoring({
         no longer has to infer it from an absent draft.
       */}
       {state.refusal?.kind === 'gesture' && (
-        <span role="alert" className="edge-refusal" data-testid="edge-gesture-refusal">
+        <span role="alert" className="canvas-refusal" data-testid="edge-gesture-refusal">
           {describeAuthoringRefusal(state.refusal.refusal)}
         </span>
       )}

@@ -715,26 +715,51 @@ describe('the C shortcut', () => {
    * — the two disagreed, and the narrower one is a canvas that adds a Card when
    * the author meant to press Zoom in.
    */
-  it.each(['Zoom in', 'Zoom slider'])(
+  it.each(['Zoom in', 'Zoom out', 'Fit view'] as const)(
     'is a keypress on the %s control rather than a command',
     async (name) => {
       const { addCard } = mountGraph();
-      const control =
-        name === 'Zoom in'
-          ? await screen.findByRole('button', { name })
-          : Object.assign(document.createElement('input'), { type: 'range' });
-      if (name === 'Zoom slider') screen.getByRole('application').append(control);
 
-      fireEvent.keyDown(control, { key: 'c' });
+      fireEvent.keyDown(await screen.findByRole('button', { name }), { key: 'c' });
 
       expect(addCard).not.toHaveBeenCalled();
     },
   );
+
+  /**
+   * The shipped slider, not a stand-in for one.
+   *
+   * Found by its label rather than its role because Base UI keeps a thumb
+   * `visibility: hidden` until it has measured the track, and jsdom measures
+   * nothing — so the real control is absent from the accessibility tree here
+   * while being an ordinary visible slider in a browser. What is asserted is
+   * the mechanism that excludes it: the `.nokey` its Panel already carries for
+   * React Flow's own subscriptions, which the canvas guard now reads too.
+   */
+  it('is a keypress on the zoom slider rather than a command', async () => {
+    const { addCard } = mountGraph();
+    const slider = await screen.findByLabelText('Zoom');
+    expect(slider).toHaveAttribute('type', 'range');
+    expect(slider.closest('.nokey')).not.toBeNull();
+
+    fireEvent.keyDown(slider, { key: 'c' });
+
+    expect(addCard).not.toHaveBeenCalled();
+  });
 });
 
-/** React Flow receives `null`, so deletion installs no document listener. */
-describe("React Flow's disabled delete keys", () => {
-  it('does not re-subscribe the document listener on an unchanged re-render', () => {
+/**
+ * React Flow still subscribes keys on `document` — just not the delete pair.
+ *
+ * `deleteKeyCode` is `null`, so `useKeyPress` short-circuits for it, but the pan
+ * and zoom *activation* codes keep their default Space and Meta and are live.
+ * That is what makes the re-render assertion below worth keeping and what makes
+ * the flat "no keydown at all" reading of it wrong: `useKeyPress` has the key
+ * code in its listener effect's dependency array, so a fresh array per render
+ * re-attaches `keydown`/`keyup` on `document` for every code still subscribed.
+ */
+describe("React Flow's document key subscriptions", () => {
+  it('does not re-subscribe them on an unchanged re-render', () => {
     const { rerender } = mountGraph();
     const listen = vi.spyOn(document, 'addEventListener');
 

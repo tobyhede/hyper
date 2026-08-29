@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import {
@@ -23,6 +24,7 @@ import {
   type CardFlowNode,
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
+import { describeAuthoringRefusal } from '../authoring-refusal';
 import { useCanvasCardAuthoring } from '../canvas-card-authoring';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import type { EdgeAuthoring } from '../edge-authoring';
@@ -68,17 +70,41 @@ export const ADD_CARD_KEY = 'C';
  * One selector for both shortcuts, because the two answers have to agree: `C`
  * and `F2` are pressed on the same tree, and a control missing from one list and
  * present in the other makes the same element a command target for one key and
- * not for the other. They disagreed — `C` named only text entry — and React
- * Flow's own `<Controls>` renders *inside* the wrapper both are bound to, so a
- * `c` with Zoom in focused added a Card.
+ * not for the other. They disagreed — `C` named only text entry — and the canvas
+ * zoom controls render *inside* the wrapper both are bound to, so a `c` with
+ * Zoom in focused added a Card.
  *
  * `button` and `select` are here for a different reason from `input`,
  * `textarea` and `contenteditable`: those are places an author is typing the
  * letter, while a button is a control with a keyboard model of its own that the
  * canvas must not shadow. Both are cases where the key was not aimed here.
+ *
+ * **`.nokey` is the first entry and the load-bearing one.** Every portalled and
+ * chrome surface in the tree already marks itself with it for React Flow's own
+ * `useKeyPress` subscriptions, whose `isInputDOMNode` walks `closest('.nokey')`.
+ * Reading the same marker is what stops this list drifting into a second,
+ * hand-maintained copy of an exclusion the components already declare: a
+ * surface has to opt out once, not once per listener. The roles below stay for
+ * the surfaces that carry no marker of their own — `CardSearchCombobox`'s popup
+ * is `role="presentation"`, not `dialog`, because its input sits outside the
+ * popup, so the marker rather than a role is what covers it.
  */
 const NOT_A_CANVAS_COMMAND =
-  'input, textarea, select, button, [contenteditable="true"], [role="slider"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"], [data-sidebar]';
+  '.nokey, input, textarea, select, button, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"], [data-sidebar]';
+
+/**
+ * The Card a key came from, or `null` if it came from anywhere else.
+ *
+ * Answered from the projection rather than from the DOM id alone, which is what
+ * keeps a second canvas's node — a story, a catalogue page — from naming a Card
+ * this renderer is not drawing.
+ */
+const focusedCard = (target: Element, nodes: readonly CardFlowNode[]): CardId | null => {
+  const element = target.closest<HTMLElement>('.react-flow__node[data-id]');
+  if (element === null) return null;
+  const id = element.dataset['id'];
+  return nodes.find((node) => node.id === id)?.data.cardId ?? null;
+};
 
 export interface SpaceCanvasProps {
   nodes: CardFlowNode[];
@@ -334,12 +360,35 @@ export function SpaceCanvas({
   const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = cardAuthoring.nodes;
 
+  /**
+   * What a refused canvas command left the author with, or `null`.
+   *
+   * The Edge half of this key has surfaces of its own to land a refusal on —
+   * the selected Edge's controls and its endpoint editor. The Card half has
+   * none: the press is over and the Card it named may not even be on screen, so
+   * this sentence is the whole of what the author is told. It is the same case
+   * `edge-authoring-react.tsx` calls a `gesture` refusal, and it shares that
+   * announcement's placement.
+   */
+  const [commandRefusal, setCommandRefusal] = useState<string | null>(null);
+  // A refusal names the selection it was made against, so a selection that moves
+  // takes it with it — the same rule Edge Authoring applies to a retained
+  // `deletion` refusal. Adjusted during render rather than in an effect, the way
+  // `canvas-card-authoring.ts` drops a caret when authoring is withdrawn: the
+  // stale sentence never reaches the DOM, and no cascading render is scheduled.
+  const [refusalSelection, setRefusalSelection] = useState(selection);
+  if (refusalSelection !== selection) {
+    setRefusalSelection(selection);
+    setCommandRefusal(null);
+  }
+
   const latestDeletion = useRef({
     authoring,
     bodyEditing,
     canAuthorOnCanvas,
     deleteEdges,
     edges: edgeSurface.edges,
+    nodes,
     selection,
   });
   // A native event can arrive after commit but before passive effects. Refresh
@@ -352,21 +401,41 @@ export function SpaceCanvas({
       canAuthorOnCanvas,
       deleteEdges,
       edges: edgeSurface.edges,
+      nodes,
       selection,
     };
-  }, [authoring, bodyEditing, canAuthorOnCanvas, deleteEdges, edgeSurface.edges, selection]);
+  }, [authoring, bodyEditing, canAuthorOnCanvas, deleteEdges, edgeSurface.edges, nodes, selection]);
 
   useEffect(() => {
     const deleteSelection = (event: KeyboardEvent): void => {
       if (event.key !== 'Backspace' && event.key !== 'Delete') return;
+      // The two exclusions the `C` binding above spells out, for the reasons it
+      // gives: a command runs once per press, and a modifier makes the key a
+      // browser or OS shortcut rather than this canvas's.
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
       if (!(event.target instanceof Element)) return;
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       const current = latestDeletion.current;
       if (!current.canAuthorOnCanvas || current.bodyEditing) return;
+      // The Card the key was *aimed at* wins over the one selected before it.
+      // React Flow never selects a node on focus — its `onFocus` only auto-pans
+      // — and only the Edge half of this canvas bridges the two, so a Tab to
+      // another Card leaves the selection behind while that Card's assistive
+      // description promises Delete removes *it*. The open branch above already
+      // resolves its Card this way; the selection is the fallback for a press
+      // that came from the pane rather than from a node.
+      const focusedCardId = focusedCard(event.target, current.nodes);
       const { selection } = current;
-      if (selection.kind === 'card') {
+      const cardId = focusedCardId ?? (selection.kind === 'card' ? selection.cardId : null);
+      if (cardId !== null) {
         event.preventDefault();
-        current.authoring.complete({ kind: 'removed-card-from-layout', cardId: selection.cardId });
+        const result = current.authoring.complete({
+          kind: 'removed-card-from-layout',
+          cardId,
+        });
+        setCommandRefusal(
+          result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null,
+        );
         return;
       }
       if (selection.kind === 'edge') {
@@ -481,6 +550,16 @@ export function SpaceCanvas({
       maxZoom={MAX_ZOOM}
     >
       <Background gap={24} />
+      {/*
+        The sentence a refused canvas command leaves behind. Placed and styled
+        exactly like Edge Authoring's `gesture` refusal, because it is the same
+        case: the press is over, and there is no surface left to attach it to.
+      */}
+      {commandRefusal !== null && (
+        <span role="alert" className="canvas-refusal" data-testid="canvas-command-refusal">
+          {commandRefusal}
+        </span>
+      )}
       <ZoomSlider />
       {graphs.length > 0 && (
         <GraphHud

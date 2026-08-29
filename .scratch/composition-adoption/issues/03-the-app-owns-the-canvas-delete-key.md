@@ -39,6 +39,27 @@ Today the canvas hands React Flow a delete key code, React Flow subscribes it on
   rationale names React Flow's still-live pan, zoom and node-keyboard readers;
   issue 04 records the complete subscription audit.
 
+## Corrections from the review loop
+
+- The command read the **stored selection** while the assistive description it
+  added promised it acts on the focused Card. React Flow never selects a node on
+  focus, and only the Edge half of this canvas bridges the two, so Tab to another
+  Card and press Delete removed the one selected before it. The command now
+  resolves the Card the key was aimed at, exactly as the open command beside it
+  does, and falls back to the selection for a press from the pane.
+- The refusal was **discarded after `preventDefault`**. `removed-card-from-layout`
+  is Layout-only, so on a Computed View the key was consumed in silence while
+  `authoring-refusal.ts` already carried the sentence for it. It is now announced
+  through the canvas-level `role="alert"` that a finished pointer gesture uses —
+  the same case, so the block is renamed `canvas-refusal`.
+- The guard checked neither `event.repeat` nor modifiers, which the `C` binding
+  sixty lines above rejects with a written rationale. Holding Backspace fired one
+  completion per repeat; `Cmd+Backspace` was eaten. Both are excluded now.
+- The guard hand-copied React Flow's exclusion list without the one entry every
+  excluded surface already declares. `.nokey` is now the first selector, so a
+  surface opts out once rather than once per listener — which is what covers
+  `CardSearchCombobox`'s popup, whose role is `presentation` rather than `dialog`.
+
 ## Leave the markers alone
 
 The marker classes stay exactly where they are in this ticket, dead but harmless, so this lands green on its own. Removing them is issue 04, which first has to establish that no live React Flow subscription still reads them.
