@@ -363,6 +363,7 @@ export function SpaceCanvas({
   // that depended on the object would be rebuilt every time.
   const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = cardAuthoring.nodes;
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   /**
    * What a refused canvas command left the author with, or `null`.
@@ -424,6 +425,7 @@ export function SpaceCanvas({
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (!(event.target instanceof Element)) return;
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
+      if (canvasRef.current?.contains(event.target) !== true) return;
       const current = latestDeletion.current;
       if (!current.canAuthorOnCanvas || current.bodyEditing) return;
       // The Card the key was *aimed at* wins over the one selected before it.
@@ -485,6 +487,7 @@ export function SpaceCanvas({
 
   return edgeSurface.provide(
     <ReactFlow
+      ref={canvasRef}
       nodes={editableNodes}
       edges={edgeSurface.edges}
       nodeTypes={nodeTypes}

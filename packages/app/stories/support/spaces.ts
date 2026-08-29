@@ -256,8 +256,8 @@ const traversalPositions = (ids: readonly CardId[]): Record<string, CardPlacemen
 const traversalCards = (titled: readonly (readonly [CardId, string])[]): SpaceSnapshot['cards'] =>
   titled.map(([id, title]) => ({ id, document: { title, kind: 'markdown', body: '' } }));
 
-const WALKTHROUGH_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
-const WALKTHROUGH_CARDS = [
+const TRAVERSAL_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+const TRAVERSAL_CARDS = [
   [uuidSchema.parse('00000000-0000-4000-8000-000000000062'), 'Introduction'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000063'), 'How it works'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000064'), 'Wrap up'],
@@ -270,33 +270,33 @@ const WALKTHROUGH_CARDS = [
  * what the one-move story has to show, and what a sink reached by advancing
  * twice through it has to end.
  */
-export const walkthroughSpace: Space = loaded(
+export const traversalSpace: Space = loaded(
   loadSpaceSnapshot({
     id: uuidSchema.parse('00000000-0000-4000-8000-000000000041'),
     document: {
       version: 1,
       title: 'Traversal',
-      defaultRenderer: WALKTHROUGH_LAYOUT,
+      defaultRenderer: TRAVERSAL_LAYOUT,
       layouts: [
         {
-          id: WALKTHROUGH_LAYOUT,
+          id: TRAVERSAL_LAYOUT,
           title: 'Traversal',
           kind: 'positioned',
-          positions: traversalPositions(WALKTHROUGH_CARDS.map(([id]) => id)),
+          positions: traversalPositions(TRAVERSAL_CARDS.map(([id]) => id)),
           graphs: [
             {
               id: uuidSchema.parse('00000000-0000-4000-8000-000000000061'),
               title: 'Traversal',
               edges: [
-                { from: WALKTHROUGH_CARDS[0][0], to: WALKTHROUGH_CARDS[1][0] },
-                { from: WALKTHROUGH_CARDS[1][0], to: WALKTHROUGH_CARDS[2][0] },
+                { from: TRAVERSAL_CARDS[0][0], to: TRAVERSAL_CARDS[1][0] },
+                { from: TRAVERSAL_CARDS[1][0], to: TRAVERSAL_CARDS[2][0] },
               ],
             },
           ],
         },
       ],
     },
-    cards: traversalCards(WALKTHROUGH_CARDS),
+    cards: traversalCards(TRAVERSAL_CARDS),
   }),
 );
 

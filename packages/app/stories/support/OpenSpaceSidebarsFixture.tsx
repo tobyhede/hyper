@@ -7,7 +7,7 @@ import { PersistenceControl } from '#components/PersistenceControl';
 import { OpenSpaceSidebars, type OpenSpaceSidebar } from '#components/OpenSpaceSidebars';
 import { SelectedCanvasRenderer, type SpaceSidebarProps } from '#components/SpaceSidebar';
 import { useStoryNavigation } from './navigation';
-import { authoredSpace, deepDiveSpace, walkthroughSpace } from './spaces';
+import { authoredSpace, deepDiveSpace, traversalSpace } from './spaces';
 
 function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
   const readSpace = useCallback(() => space, [space]);
@@ -60,16 +60,16 @@ function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
 /** Fixture-only state around the production Open Spaces and Sidebar composition. */
 export function OpenSpaceSidebarsFixture() {
   const authored = useOpenSpace(authoredSpace);
-  const walkthrough = useOpenSpace(walkthroughSpace, 'failed');
+  const traversal = useOpenSpace(traversalSpace, 'failed');
   const deepDive = useOpenSpace(deepDiveSpace);
-  const spaces = [authored.entry, walkthrough.entry, deepDive.entry] as const;
-  const [activeId, setActiveId] = useState(walkthrough.entry.id);
+  const spaces = [authored.entry, traversal.entry, deepDive.entry] as const;
+  const [activeId, setActiveId] = useState(traversal.entry.id);
   const current =
     activeId === authored.entry.id
       ? authored.current
       : activeId === deepDive.entry.id
         ? deepDive.current
-        : walkthrough.current;
+        : traversal.current;
 
   return (
     <AppShell

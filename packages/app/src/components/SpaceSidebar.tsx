@@ -618,7 +618,7 @@ export function SelectedCanvasRenderer({
       {isEditing ? (
         <InlineTitleEditor
           title={renderer.title}
-          label="Space View name"
+          label="Layout name"
           variant="header"
           draft={titleEdit.draft}
           error={titleEdit.error}

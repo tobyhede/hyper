@@ -512,7 +512,7 @@ describe('CanvasCard title editor', () => {
     );
     const input = screen.getByRole('textbox', { name: 'Card title' });
 
-    fireEvent.blur(input);
+    act(() => input.blur());
 
     expect(input).toHaveFocus();
   });

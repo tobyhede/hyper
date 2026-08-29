@@ -11,7 +11,7 @@ import {
   MINTED_GRAPH_ID_BASE,
   storyGraphIds,
   unauthoredSpace,
-  walkthroughSpace,
+  traversalSpace,
 } from '../stories/support/spaces';
 
 /**
@@ -98,7 +98,7 @@ describe('the story Spaces', () => {
 
     const declared = new Set<string>([
       authoredSnapshot.id,
-      ...[authoredSpace, edited.space, walkthroughSpace, deepDiveSpace].flatMap((space) => [
+      ...[authoredSpace, edited.space, traversalSpace, deepDiveSpace].flatMap((space) => [
         ...space.cards.map((card) => card.id),
         ...space.layouts.map((layout) => layout.id),
         ...space.graphs.map((graph) => graph.id),
@@ -140,7 +140,7 @@ describe('the story Spaces', () => {
    */
   it('opens each traversal Space on the Layout and Graph it declares', () => {
     for (const [space, title] of [
-      [walkthroughSpace, 'Traversal'],
+      [traversalSpace, 'Traversal'],
       [deepDiveSpace, 'Deep dive'],
     ] as const) {
       const opens = defaultRenderer(space);
@@ -169,7 +169,7 @@ describe('the story Spaces', () => {
     };
 
     expect(outDegree(deepDiveSpace)).toBe(4);
-    expect(outDegree(walkthroughSpace)).toBe(1);
+    expect(outDegree(traversalSpace)).toBe(1);
   });
 
   /**

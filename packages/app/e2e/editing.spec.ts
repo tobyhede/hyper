@@ -1411,7 +1411,7 @@ test(
     await selectedCanvas(page)
       .getByRole('button', { name: 'Edit Space View Collection 1' })
       .click();
-    const layoutName = page.getByRole('textbox', { name: 'Space View name' });
+    const layoutName = page.getByRole('textbox', { name: 'Layout name' });
     await layoutName.fill('Workshop');
     await expect(
       sidebar(page).getByRole('button', { name: 'Workshop', pressed: true }),

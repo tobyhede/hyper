@@ -383,6 +383,12 @@ const edgeElement = (id: string): HTMLElement => {
   return element;
 };
 
+const canvasElement = (): HTMLElement => {
+  const canvas = document.querySelector<HTMLElement>('.react-flow');
+  if (canvas === null) throw new Error('The canvas must be mounted.');
+  return canvas;
+};
+
 /**
  * Only the Active Graph's Edges are tab stops. An Edge belonging to another
  * Graph the Layout draws is there to be seen; putting it in the tab order would
@@ -526,7 +532,7 @@ describe("the app's canvas delete key", () => {
     const { adapter, session } = mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
-    fireEvent.keyDown(document.body, { key });
+    fireEvent.keyDown(canvasElement(), { key });
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([]);
   });
@@ -537,11 +543,23 @@ describe("the app's canvas delete key", () => {
       const { adapter, session } = mountCanvas();
       act(() => adapter.getState().selectCard(CARD_A));
 
-      fireEvent.keyDown(document.body, { key });
+      fireEvent.keyDown(canvasElement(), { key });
 
       const current = session.getState().working;
       expect(current.cards.map(({ id }) => id)).toContain(CARD_A);
       expect(current.document.layouts?.[0]?.positions[CARD_A]).toBeUndefined();
+    },
+  );
+
+  it.each(DELETE_KEYS)(
+    'leaves the selected Card standing when %s is aimed outside the canvas',
+    (key) => {
+      const { adapter, session } = mountCanvas(<main tabIndex={-1}>Outside the canvas</main>);
+      act(() => adapter.getState().selectCard(CARD_A));
+
+      fireEvent.keyDown(screen.getByText('Outside the canvas'), { key });
+
+      expect(session.getState().working.document.layouts?.[0]?.positions[CARD_A]).toBeDefined();
     },
   );
 
@@ -580,7 +598,7 @@ describe("the app's canvas delete key", () => {
     const { adapter } = mountCanvas(null, { selection: FLOW_SPACE_VIEW_ID });
     act(() => adapter.getState().selectCard(CARD_A));
 
-    fireEvent.keyDown(document.body, { key });
+    fireEvent.keyDown(canvasElement(), { key });
 
     expect(await screen.findByTestId('canvas-command-refusal')).toHaveTextContent(
       'Select a Layout to remove a Card from it.',
