@@ -726,18 +726,8 @@ describe('the C shortcut', () => {
   });
 });
 
-/**
- * `useKeyPress` keys both its `useMemo` and its listener `useEffect` on the
- * `deleteKeyCode` **value**, so a fresh array per render tears down and
- * re-attaches `keydown`/`keyup` on `document` — and, since the prop reaches the
- * `memo`'d `GraphView` and `FlowRenderer` on the way, defeats both of those too,
- * once per frame of a Card drag.
- *
- * Asserted on the listener rather than on the array: the pair of keys is already
- * pinned by value in `edge-authoring-react.test.tsx`, and a value assertion is
- * exactly what stayed green while the canvas spread the array into a new one.
- */
-describe("React Flow's delete keys", () => {
+/** React Flow receives `null`, so deletion installs no document listener. */
+describe("React Flow's disabled delete keys", () => {
   it('does not re-subscribe the document listener on an unchanged re-render', () => {
     const { rerender } = mountGraph();
     const listen = vi.spyOn(document, 'addEventListener');

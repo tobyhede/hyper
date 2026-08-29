@@ -261,12 +261,10 @@ export function SpaceSidebar({
         </h1>
       </SidebarHeader>
       <SidebarSeparator />
-      {/* `nokey` on both control-bearing regions rather than on the root: React
-          Flow subscribes its delete key on `document` and excludes a target only
-          by tag or by a `.nokey` ancestor, and the mobile Sheet renders these
-          same regions through a portal where a class on the root would not be an
-          ancestor at all. Without it, Delete with focus on a canvas choice
-          removes the selected Edge. */}
+      {/* `nokey` sits on both control-bearing regions rather than on the root.
+          React Flow's remaining pan, zoom and node-keyboard subscriptions read
+          `.nokey`, and the mobile Sheet portals these regions somewhere a class
+          on the root would not be an ancestor at all. */}
       <SidebarContent className="nokey">
         <SidebarGroup>
           <SidebarGroupContent>

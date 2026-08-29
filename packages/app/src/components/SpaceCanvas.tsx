@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import {
   Background,
   Controls,
   ReactFlow,
   type Edge,
-  type OnBeforeDelete,
   type OnEdgesChange,
   type OnNodesChange,
 } from '@xyflow/react';
@@ -28,13 +34,10 @@ import { OverviewCamera, PresentingCamera } from './cameras';
 /**
  * What the graph tells assistive technology it can do.
  *
- * React Flow's defaults offer "Press delete to remove it" for both a node and an
- * edge. **Only the Edge half is true.** Deleting an Edge is built (package 7)
- * and routed through `onBeforeDelete` into a completed Space Edit; deleting a
- * Card from a Layout or from the Space is package 8's, and until it lands the
- * key is inert for a node — a removal applied to the live node array is undone
- * by the next projection sync. Sighted users never meet the claim; a screen
- * reader reads it out as the way to work with a Card.
+ * React Flow's defaults describe its own local deletion. Hyper instead routes
+ * both Cards and Edges through the completed Space Edit lifecycle, so these
+ * labels describe the application-owned commands rather than a local array
+ * mutation.
  *
  * Both node keys are set because React Flow picks between them on
  * `disableKeyboardA11y`, and the one it names `keyboardDisabled` is the one an
@@ -42,9 +45,9 @@ import { OverviewCamera, PresentingCamera } from './cameras';
  */
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default':
-    'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
+    'Press enter or space to open a Card, backspace or delete to remove it from this Layout, the arrow keys to move it, and escape to cancel.',
   'node.a11yDescription.keyboardDisabled':
-    'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
+    'Press enter or space to open a Card, backspace or delete to remove it from this Layout, the arrow keys to move it, and escape to cancel.',
   'edge.a11yDescription.default':
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
@@ -74,7 +77,8 @@ export const ADD_CARD_KEY = 'C';
  * letter, while a button is a control with a keyboard model of its own that the
  * canvas must not shadow. Both are cases where the key was not aimed here.
  */
-const NOT_A_CANVAS_COMMAND = 'input, textarea, select, button, [contenteditable="true"]';
+const NOT_A_CANVAS_COMMAND =
+  'input, textarea, select, button, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"], [data-sidebar]';
 
 export interface SpaceCanvasProps {
   nodes: CardFlowNode[];
@@ -202,11 +206,9 @@ export function SpaceCanvas({
    * exactly these, and so is every control drawn on a Card.
    *
    * **Edge authoring was the one thing reading a shorter rule**, and the gap was
-   * not cosmetic. React Flow subscribes the delete key on `document`, excluding
-   * only inputs and `.nokey`; a pane's `Done` and `Cancel` are neither, so a
-   * `Backspace` aimed at the open dialog deleted whichever Edge was selected
-   * behind it. The Card controls and spatial Edge gestures agree here, and
-   * `edge-authoring-react.test.tsx` holds them to it.
+   * not cosmetic. A pane covering the canvas must withdraw its keyboard
+   * commands as well as its spatial gestures. The Card controls and Edge
+   * lifecycle agree here, and `edge-authoring-react.test.tsx` holds them to it.
    */
   const cardAuthoring = useCanvasCardAuthoring({
     nodes,
@@ -310,7 +312,7 @@ export function SpaceCanvas({
   // happened to be selected — a different one, once focus had moved. Two
   // handlers for one key means one of them is the unguarded one; don't add a
   // second back.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!canAuthorOnCanvas || bodyEditing) return;
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
       if (event.key !== 'F2') return;
@@ -332,39 +334,58 @@ export function SpaceCanvas({
   const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = cardAuthoring.nodes;
 
+  const latestDeletion = useRef({
+    authoring,
+    bodyEditing,
+    canAuthorOnCanvas,
+    deleteEdges,
+    edges: edgeSurface.edges,
+    selection,
+  });
+  // A native event can arrive after commit but before passive effects. Refresh
+  // the snapshot in the synchronous commit phase so the stable listener cannot
+  // act on the previous selection or refusal state.
+  useLayoutEffect(() => {
+    latestDeletion.current = {
+      authoring,
+      bodyEditing,
+      canAuthorOnCanvas,
+      deleteEdges,
+      edges: edgeSurface.edges,
+      selection,
+    };
+  }, [authoring, bodyEditing, canAuthorOnCanvas, deleteEdges, edgeSurface.edges, selection]);
+
+  useEffect(() => {
+    const deleteSelection = (event: KeyboardEvent): void => {
+      if (event.key !== 'Backspace' && event.key !== 'Delete') return;
+      if (!(event.target instanceof Element)) return;
+      if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
+      const current = latestDeletion.current;
+      if (!current.canAuthorOnCanvas || current.bodyEditing) return;
+      const { selection } = current;
+      if (selection.kind === 'card') {
+        event.preventDefault();
+        current.authoring.complete({ kind: 'removed-card-from-layout', cardId: selection.cardId });
+        return;
+      }
+      if (selection.kind === 'edge') {
+        const selectedEdges = current.edges.filter((edge) => edge.selected);
+        if (selectedEdges.length === 0) return;
+        event.preventDefault();
+        current.deleteEdges(selectedEdges);
+      }
+    };
+    window.addEventListener('keydown', deleteSelection);
+    return () => window.removeEventListener('keydown', deleteSelection);
+  }, []);
+
   const connectionLineStyle = useMemo(
     () => ({
       stroke: activeGraphColor(colorByGraphId, activeGraphId),
       strokeWidth: 3,
     }),
     [activeGraphId, colorByGraphId],
-  );
-
-  /**
-   * Dispatch one deletion request, and never apply it locally.
-   *
-   * React Flow calls `onBeforeDelete` once for the *combined* payload, having
-   * already gathered every deletable Edge incident to a requested node. So a
-   * payload carrying nodes is a Card deletion whose Edges are consequences, not
-   * several independent Edge deletions — routing on that shape is event
-   * translation, not a deletion rule.
-   *
-   * Returning `false` for the whole payload is what keeps the Space
-   * authoritative: React Flow removes nothing, and the completed Edit supplies
-   * the next controlled projection. A refusal therefore leaves the Edge exactly
-   * where it was, with its reason on the surface that asked.
-   */
-  const beforeDelete = useCallback<OnBeforeDelete<CardFlowNode>>(
-    ({ nodes: requestedNodes, edges: requestedEdges }) => {
-      // Card deletion is package 8's. Until it lands the request is declined
-      // whole, incident Edges included — dropping the Edges of a Card that is
-      // not going anywhere would be a deletion the author never asked for.
-      if (requestedNodes.length === 0) deleteEdges(requestedEdges);
-      // A promise because React Flow awaits this, and `false` because a
-      // completed Edit — not React Flow — supplies the next projection.
-      return Promise.resolve(false);
-    },
-    [deleteEdges],
   );
 
   const {
@@ -392,7 +413,6 @@ export function SpaceCanvas({
       edgeTypes={edgeSurface.edgeTypes}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onBeforeDelete={beforeDelete}
       // Edge Authoring's own properties, named one by one rather than spread, so
       // no property order below can silently replace one of its handlers.
       onConnect={onConnect}

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
-import { useContext, type ReactNode } from 'react';
+import { useContext, useLayoutEffect, type ReactNode } from 'react';
 import {
   Position,
   ReactFlowProvider,
@@ -265,8 +265,8 @@ afterAll(() => vi.unstubAllGlobals());
 
 /**
  * `beside` mounts a control *outside* the flow wrapper, the way the app's
- * toolbar sits beside the canvas. React Flow's delete listener is on `document`,
- * so what such a control does with a key press is a fact about this canvas even
+ * toolbar sits beside the canvas. The app-owned listener is on `window`, so
+ * what such a control does with a key press is a fact about this canvas even
  * though it is not part of it.
  */
 function mountCanvas(
@@ -274,10 +274,12 @@ function mountCanvas(
   {
     covered = false,
     presenting = false,
+    deleteWhenCoveredCommits = false,
     connections,
   }: {
     covered?: boolean;
     presenting?: boolean;
+    deleteWhenCoveredCommits?: boolean;
     connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
   } = {},
 ) {
@@ -286,6 +288,7 @@ function mountCanvas(
     <ReactFlowProvider>
       {beside}
       <CanvasHarness {...composed} covered={paneOpen} presenting={presenting} />
+      {deleteWhenCoveredCommits ? <DeleteWhenCommitted armed={paneOpen} /> : null}
     </ReactFlowProvider>
   );
   const view = render(canvas(covered));
@@ -302,6 +305,15 @@ function mountCanvas(
      */
     setCovered: (paneOpen: boolean) => view.rerender(canvas(paneOpen)),
   };
+}
+
+function DeleteWhenCommitted({ armed }: { readonly armed: boolean }) {
+  useLayoutEffect(() => {
+    if (armed) {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+    }
+  }, [armed]);
+  return null;
 }
 
 /** The composition `App` performs, narrowed to what an Edge test needs. */
@@ -497,26 +509,36 @@ describe('the Edge toolbar', () => {
 });
 
 /**
- * React Flow's delete key reaches the whole page, and `.nokey` only covers what
- * is beneath it in the DOM.
- *
- * `useGlobalKeyHandler` subscribes `deleteKeyCode` through `useKeyPress` with no
- * target, so the listener is on `document` and nothing about it is scoped to the
- * flow. Its one exclusion is `isInputDOMNode`, which reads the target's tag and
- * then walks the target's DOM *ancestors* for `.nokey` — so a control Radix has
- * portalled to `document.body` has none of the app's above it, however many are
- * placed inside the flow, and a toolbar control was never inside it at all.
- *
- * The Edge the key removes is the *selected* one, which is the same Edge whose
- * editor is open: the author's own Edge, deleted from under the editor they
- * opened on it.
- *
- * **Asserted on the Space, not on the drawing.** `onBeforeDelete` returns false
- * and nothing is removed locally, so the Edge stays on screen either way and
- * only the working snapshot says whether an Edit ran.
+ * The application owns one window listener and excludes every surface with its
+ * own keyboard model before routing the selected subject through Authoring.
+ * Assertions read the working Space, because the completed Edit rather than a
+ * local React Flow array mutation is the behavior under test.
  */
-describe("React Flow's document-level delete key", () => {
+describe("the app's canvas delete key", () => {
   const DELETE_KEYS = ['Backspace', 'Delete'] as const;
+
+  it.each(DELETE_KEYS)('removes the selected Edge when %s is aimed at the canvas', (key) => {
+    const { adapter, session } = mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    fireEvent.keyDown(document.body, { key });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([]);
+  });
+
+  it.each(DELETE_KEYS)(
+    'removes the selected Card from its Layout when %s is aimed at the canvas',
+    (key) => {
+      const { adapter, session } = mountCanvas();
+      act(() => adapter.getState().selectCard(CARD_A));
+
+      fireEvent.keyDown(document.body, { key });
+
+      const current = session.getState().working;
+      expect(current.cards.map(({ id }) => id)).toContain(CARD_A);
+      expect(current.document.layouts?.[0]?.positions[CARD_A]).toBeUndefined();
+    },
+  );
 
   it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its own editor', (key) => {
     const { adapter, session } = mountCanvas();
@@ -560,6 +582,39 @@ describe("React Flow's document-level delete key", () => {
       expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
     },
   );
+
+  it.each([
+    ['menu', 'menu'],
+    ['listbox', 'listbox'],
+    ['dialog', 'dialog'],
+  ] as const)('leaves the Edge standing when Delete reaches a %s', (_name, role) => {
+    const { adapter, session } = mountCanvas(<div role={role} tabIndex={0} aria-label={role} />);
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    fireEvent.keyDown(screen.getByRole(role), { key: 'Delete' });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
+
+  it('leaves the Edge standing while presenting', () => {
+    const { adapter, session } = mountCanvas(null, { presenting: true });
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    fireEvent.keyDown(document.body, { key: 'Delete' });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
+
+  it('observes a pane refusal from the commit that publishes it', () => {
+    const { adapter, session, setCovered } = mountCanvas(null, {
+      deleteWhenCoveredCommits: true,
+    });
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    setCovered(true);
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
 });
 
 /**
@@ -1144,7 +1199,7 @@ describe('the React Flow properties', () => {
 
     expect(result.current.reactFlowProps).toMatchObject({
       // React Flow defaults to Backspace alone.
-      deleteKeyCode: ['Backspace', 'Delete'],
+      deleteKeyCode: null,
       // Reconnection and focusability are per-Edge, narrowed to the Active
       // Graph — and, for reconnection, to the selected Edge.
       edgesReconnectable: false,
