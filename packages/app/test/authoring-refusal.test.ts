@@ -19,6 +19,7 @@ const EVERY_REFUSAL = {
   'card-not-found': { code: 'card-not-found' },
   'card-kind-immutable': { code: 'card-kind-immutable' },
   'card-title-required': { code: 'card-title-required' },
+  'layout-title-required': { code: 'layout-title-required' },
   'alias-target-not-found': { code: 'alias-target-not-found', targetId: TARGET_ID },
   'alias-target-must-own-content': { code: 'alias-target-must-own-content', targetId: TARGET_ID },
   'card-already-in-layout': { code: 'card-already-in-layout' },

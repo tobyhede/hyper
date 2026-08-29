@@ -599,6 +599,13 @@ describe.each([
         expect.objectContaining({ kind: 'alias-targets-alias', ref: B }),
       );
     });
+
+    it('refuses an alias whose target is a Space Card', () => {
+      const errors = refused(load({ cards: [spaceCard(A, ABSENT), aliasTo(B, A)], layouts: [] }));
+      expect(errors).toContainEqual(
+        expect.objectContaining({ kind: 'alias-targets-non-markdown', ref: A }),
+      );
+    });
   });
 
   describe('Space Card reference cycles (ADR 0068)', () => {

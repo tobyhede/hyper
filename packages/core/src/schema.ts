@@ -16,6 +16,19 @@ export const uuidSchema = z.string().uuid().brand<'UUID'>();
 
 const idSchema = uuidSchema;
 
+/** The automatic Space Views that have stable persisted identities (ADR 0025). */
+export const BUILT_IN_VIEW_IDS = ['flow', 'grid'] as const;
+
+export type BuiltInViewId = (typeof BUILT_IN_VIEW_IDS)[number];
+
+export function isBuiltInViewId(id: string): id is BuiltInViewId {
+  // SAFETY: widened only so `.includes` accepts an arbitrary `string`; the
+  // values actually held are still exactly `BUILT_IN_VIEW_IDS`'s two literals.
+  return (BUILT_IN_VIEW_IDS as readonly string[]).includes(id);
+}
+
+const spaceViewIdSchema = z.union([z.enum(BUILT_IN_VIEW_IDS), idSchema]);
+
 /**
  * Mint a durable identity. The one place a UUID is generated (issue `11`).
  *
@@ -58,7 +71,7 @@ export const spaceCardFrontmatterSchema = z.object({
   title: z.string().min(1),
   kind: z.literal('space'),
   spaceId: idSchema,
-  spaceView: idSchema.optional(),
+  spaceView: spaceViewIdSchema.optional(),
   graph: idSchema.optional(),
 });
 

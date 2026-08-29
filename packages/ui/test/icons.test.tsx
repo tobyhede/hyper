@@ -7,7 +7,6 @@ import {
   ChevronDownIcon,
   CloseCardIcon,
   EditIcon,
-  FitViewIcon,
   FlowIcon,
   GraphIcon,
   GridIcon,
@@ -16,6 +15,7 @@ import {
   OpenCardIcon,
   PlusIcon,
   PresentIcon,
+  StopPresentingIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from '../src/index';
@@ -38,6 +38,9 @@ describe('the public icon facade', () => {
         </span>
         <span data-testid="present">
           <PresentIcon color="#123456" />
+        </span>
+        <span data-testid="stop-presenting">
+          <StopPresentingIcon color="#123456" />
         </span>
         <span data-testid="edit">
           <EditIcon />
@@ -81,6 +84,7 @@ describe('the public icon facade', () => {
       layout: 'panels-top-left',
       graph: 'network',
       present: 'play',
+      'stop-presenting': 'square',
       edit: 'pencil',
       chevron: 'chevron-down',
       plus: 'plus',
@@ -106,6 +110,7 @@ describe('the public icon facade', () => {
       <>
         <GraphIcon color="#123456" size={13} />
         <PresentIcon color="#654321" />
+        <StopPresentingIcon color="#abcdef" />
         <AliasIcon size={11} />
         <MarkdownIcon size={14} />
       </>,
@@ -116,8 +121,10 @@ describe('the public icon facade', () => {
     expect(glyphs[0]).toHaveAttribute('height', '13');
     expect(glyphs[0]).toHaveAttribute('stroke', '#123456');
     expect(glyphs[1]).toHaveAttribute('stroke', '#654321');
-    expect(glyphs[2]).toHaveAttribute('width', '11');
-    expect(glyphs[3]).toHaveAttribute('width', '14');
+    expect(glyphs[2]).toHaveAttribute('width', '12');
+    expect(glyphs[2]).toHaveAttribute('stroke', '#abcdef');
+    expect(glyphs[3]).toHaveAttribute('width', '11');
+    expect(glyphs[4]).toHaveAttribute('width', '14');
   });
 
   it('keeps Card-kind glyphs decorative while their wrapper names the kind', () => {

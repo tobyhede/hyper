@@ -1,10 +1,15 @@
-import { createRef, type ReactElement } from 'react';
+import { createRef, useState, type ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID, uuidSchema } from '@project/core';
 import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
 import type { CanvasRenderer } from '../src/canvas-renderers';
-import { SpaceSidebar, type SpaceSidebarProps } from '../src/components/SpaceSidebar';
+import {
+  SelectedCanvasRenderer,
+  SpaceSidebar,
+  type SpaceChromeTitleEdit,
+  type SpaceSidebarProps,
+} from '../src/components/SpaceSidebar';
 
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -111,6 +116,44 @@ const withLayout = (props: SpaceSidebarProps): SpaceSidebarProps => ({
 });
 
 describe('SpaceSidebar', () => {
+  it('coordinates one Layout draft between its active row and Space View label', () => {
+    function Fixture() {
+      const [edit, setEdit] = useState<{ draft: string; error: string | null } | null>(null);
+      const titleEdit: SpaceChromeTitleEdit = {
+        subject: edit === null ? null : { kind: 'layout', id: LAYOUT_ID },
+        surface: edit === null ? null : 'sidebar',
+        draft: edit?.draft ?? '',
+        error: edit?.error ?? null,
+        onBegin: (_subject, title) => setEdit({ draft: title, error: null }),
+        onDraftChange: (draft) =>
+          setEdit((current) => (current === null ? null : { ...current, draft })),
+        onErrorChange: (error) =>
+          setEdit((current) => (current === null ? null : { ...current, error })),
+        onComplete: (_subject, title) =>
+          title.trim() === '' ? 'A Layout title is required.' : null,
+        onCancel: () => setEdit(null),
+        onReturnFocus: () => undefined,
+      };
+      const base = withLayout(settledProps());
+      const props = { ...base, canvas: { ...base.canvas, current: LAYOUT } };
+      return (
+        <>
+          <SpaceSidebar {...props} titleEdit={titleEdit} />
+          <SelectedCanvasRenderer renderer={LAYOUT} titleEdit={titleEdit} />
+        </>
+      );
+    }
+
+    draw(<Fixture />);
+    fireEvent.click(screen.getByRole('button', { name: 'Layout 1', pressed: true }));
+    const row = screen.getByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(row, { target: { value: 'Workshop' } });
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Workshop');
+    fireEvent.change(row, { target: { value: '' } });
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('A Layout title is required.');
+  });
+
   it('renders the persistent Sidebar commands and forwards Card creation', () => {
     const props = settledProps();
     draw(<SpaceSidebar {...props} />);
@@ -293,7 +336,7 @@ describe('SpaceSidebar', () => {
     };
     draw(<SpaceSidebar {...props} />);
 
-    const present = screen.getByRole('button', { name: 'Present Graph 1' });
+    const present = screen.getByRole('button', { name: 'Present' });
     expect(present).toBeDisabled();
     fireEvent.click(present);
     expect(props.graph.onPresent).not.toHaveBeenCalled();
@@ -318,13 +361,13 @@ describe('SpaceSidebar', () => {
     };
     draw(<SpaceSidebar {...props} />);
 
-    const present = screen.getByRole('button', { name: 'Present Graph 1' });
+    const present = screen.getByRole('button', { name: 'Present' });
     expect(present).toBeDisabled();
     fireEvent.click(present);
     expect(props.graph.onPresent).not.toHaveBeenCalled();
   });
 
-  it('exits presenting through the Overview action', () => {
+  it('exits through the presentation action', () => {
     const base = settledProps();
     const props: SpaceSidebarProps = {
       ...base,
@@ -337,13 +380,13 @@ describe('SpaceSidebar', () => {
     };
     draw(<SpaceSidebar {...props} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
 
     expect(props.graph.onExitPresenting).toHaveBeenCalledOnce();
     expect(props.graph.onPresent).not.toHaveBeenCalled();
   });
 
-  it('names and colours Present with the active Graph', () => {
+  it('colours Present with the active Graph', () => {
     const base = settledProps();
     const props: SpaceSidebarProps = {
       ...base,
@@ -362,7 +405,7 @@ describe('SpaceSidebar', () => {
     };
     draw(<SpaceSidebar {...props} />);
 
-    const present = screen.getByRole('button', { name: 'Present Authored' });
+    const present = screen.getByRole('button', { name: 'Present' });
     expect(present).toBeEnabled();
     expect(present.querySelector('svg')).toHaveAttribute('stroke', '#123456');
   });
@@ -514,7 +557,7 @@ describe('SpaceSidebar', () => {
       };
       openSheet(props);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Present Graph 1' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Present' }));
 
       expect(props.graph.onPresent).toHaveBeenCalledOnce();
       await dismissed();

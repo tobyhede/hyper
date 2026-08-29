@@ -117,12 +117,27 @@ function FieldTitle({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/**
+ * The supporting line under a field's label.
+ *
+ * Taken as generated bar **one correction**, the same class of registry drift
+ * `components/tabs.tsx` records. The registry balances the text on
+ * `group-has-data-horizontal/field:`, which asks for a descendant carrying a
+ * bare `data-horizontal`; nothing in the tree emits that attribute. `Field`
+ * writes its orientation as `data-orientation` — which is what `tabs.tsx` and
+ * `separator.tsx` already read — so the rule is inert as generated and a
+ * horizontal field's description never balances. The selector is respelled to
+ * the attribute this version actually has and nothing else is: same rule, same
+ * intent. `responsive` is deliberately not included, being `vertical` until its
+ * container query fires. Re-check this when regenerating from the registry,
+ * which will bring the unmatched spelling back.
+ */
 function FieldDescription({ className, ...props }: React.ComponentProps<'p'>) {
   return (
     <p
       data-slot="field-description"
       className={cn(
-        'text-left text-sm leading-normal font-normal text-muted-foreground group-has-data-horizontal/field:text-balance [[data-variant=legend]+&]:-mt-1.5',
+        'text-left text-sm leading-normal font-normal text-muted-foreground group-data-[orientation=horizontal]/field:text-balance [[data-variant=legend]+&]:-mt-1.5',
         'last:mt-0 nth-last-2:-mt-1',
         '[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary',
         className,

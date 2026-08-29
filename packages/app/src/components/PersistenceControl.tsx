@@ -87,7 +87,7 @@ export function PersistenceNotice({ persistence, onRetry }: PersistenceNoticePro
       <AlertAction>
         <Button
           variant="secondary"
-          size="toolbar"
+          size="compact"
           data-testid="persistence-retry"
           onClick={onRetry}
         >

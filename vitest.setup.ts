@@ -262,3 +262,31 @@ if (typeof window !== 'undefined' && typeof declaredMatchMedia !== 'function') {
     }),
   });
 }
+
+/**
+ * jsdom ships no `PointerEvent`, and Base UI constructs one to activate a
+ * toolbar item from the keyboard.
+ *
+ * `Space` on a composite item does not rely on the browser's own activation
+ * behaviour: Base UI dispatches a constructed `click` so it carries the source
+ * key's modifier state, which `HTMLElement.click()` always reports as
+ * unpressed (`dispatchClickWithModifiers`). It builds that event as a
+ * `PointerEvent`, and under jsdom the constructor is simply absent — so the
+ * Card rail's controls, which are toolbar items under ADR 0070, throw on
+ * `Space` inside a `dispatchEvent` no test body can catch. Vitest then prints
+ * every test as passing and exits 1 on the unhandled error.
+ *
+ * `PointerEvent` extends `MouseEvent`, and every field this path sets — the
+ * three propagation flags, `detail` and the four modifier keys — is a
+ * `MouseEvent` field. So `MouseEvent` *is* the honest jsdom answer rather than
+ * a simplification of one: the pointer-specific geometry jsdom cannot produce
+ * is geometry a keyboard activation never carries. Guarded like the stubs
+ * above, so a real implementation always wins.
+ */
+if (typeof window !== 'undefined' && !('PointerEvent' in window)) {
+  Object.defineProperty(window, 'PointerEvent', {
+    configurable: true,
+    writable: true,
+    value: MouseEvent,
+  });
+}

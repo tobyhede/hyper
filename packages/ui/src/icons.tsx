@@ -14,6 +14,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Square,
   SquareSquare,
   Workflow,
   X,
@@ -43,6 +44,11 @@ export const GraphIcon = ({
 
 /** Start presenting the active Graph. */
 export const PresentIcon = ({ color }: { color: string }) => <Play color={color} size={12} />;
+
+/** Stop presenting and return to the Space overview. */
+export const StopPresentingIcon = ({ color }: { color: string }) => (
+  <Square color={color} size={12} />
+);
 
 /** Edit the content of a Markdown Card. */
 export const EditIcon = (props: CardActionIconProps) => <Pencil size={14} {...props} />;

@@ -442,6 +442,28 @@ describe('Add Alias', () => {
     expect(session.getState().working).toBe(before);
   });
 
+  it('refuses a Space Card Target, because an Alias can only show Markdown content', () => {
+    const withSpaceCard: SpaceSnapshot = {
+      ...positionedSnapshot,
+      cards: [
+        positionedSnapshot.cards[0]!,
+        {
+          id: CARD_B,
+          document: { title: 'Nested Space', kind: 'space', spaceId: UNKNOWN_CARD },
+        },
+      ],
+    };
+    const { authoring, session } = open(withSpaceCard);
+    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'created-alias', target: CARD_B, anchor: CENTRE })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'alias-target-must-own-content', targetId: CARD_B },
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
   it('refuses a Target the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
@@ -587,6 +609,36 @@ describe('Edit Graph', () => {
     ).toEqual({
       kind: 'refused',
       refusal: { code: 'layout-required', operation: 'renamed-graph' },
+    });
+  });
+});
+
+describe('Rename Layout', () => {
+  it('trims and replaces only the Layout title', () => {
+    const { authoring, session } = openPositioned();
+    const before = layoutOf(session.getState().working, LAYOUT_ID);
+
+    expect(authoring.complete({ kind: 'renamed-layout', title: '  Workshop  ' })).toEqual({
+      kind: 'completed',
+    });
+    const after = layoutOf(session.getState().working, LAYOUT_ID);
+    expect(after?.title).toBe('Workshop');
+    expect(after?.id).toBe(before?.id);
+    expect(after?.positions).toEqual(before?.positions);
+    expect(after?.graphs).toEqual(before?.graphs);
+  });
+
+  it('refuses a blank title and treats the stored title with padding as unchanged', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'renamed-layout', title: '   ' })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'layout-title-required' },
+    });
+    expect(session.getState().working).toBe(before);
+    expect(authoring.complete({ kind: 'renamed-layout', title: ' Layout 1 ' })).toEqual({
+      kind: 'unchanged',
     });
   });
 });

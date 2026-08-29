@@ -78,7 +78,7 @@ export function AddCardControl({
     <div className="inline-flex items-stretch gap-[2px]">
       <Button
         variant="secondary"
-        size="toolbar"
+        size="compact"
         data-testid="add-card"
         // The control that performs the shortcut is the one that announces it.
         // `undefined` leaves the attribute off entirely, which is the honest

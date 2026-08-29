@@ -323,6 +323,21 @@ describe('card frontmatter schema', () => {
     expect(inherited).not.toHaveProperty('graph');
   });
 
+  it.each(['flow', 'grid'] as const)(
+    'parses a Space Card selecting the built-in %s Space View',
+    (spaceView) => {
+      const card = cardFrontmatterSchema.parse({
+        id: '00000000-0000-4000-8000-000000000006',
+        title: 'Nested space',
+        kind: 'space',
+        spaceId: '00000000-0000-4000-8000-000000000007',
+        spaceView,
+      });
+
+      expect(card).toMatchObject({ kind: 'space', spaceView });
+    },
+  );
+
   it('rejects an alias with no target', () => {
     expect(
       cardFrontmatterSchema.safeParse({

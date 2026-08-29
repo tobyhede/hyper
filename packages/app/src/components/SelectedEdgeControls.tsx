@@ -161,7 +161,7 @@ export function SelectedEdgeControls({
             render={
               <Button
                 variant="ghost"
-                size="toolbar"
+                size="compact"
                 className={GROUPED_COMMAND}
                 data-testid="edge-edit"
                 aria-label="Edit this Edge"
@@ -173,7 +173,7 @@ export function SelectedEdgeControls({
           <Separator orientation="vertical" />
           <Button
             variant="ghost"
-            size="toolbar"
+            size="compact"
             className={GROUPED_COMMAND}
             data-testid="edge-delete"
             aria-label="Delete this Edge"

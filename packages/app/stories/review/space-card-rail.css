@@ -1,0 +1,122 @@
+/* THROWAWAY UX REVIEW STYLES — deleted with the story.
+
+   Everything the Card itself draws comes from the shipped `canvas-card.css` and
+   `card-rail.css`, including every rail control: the Space Card's selectors and
+   Enter are the same `card__rail-action` box as Edit and Close, so nothing here
+   styles them. What is written here is only what the prototype adds — the
+   embedded-view stand-in, the Markdown body stand-in, and the unavailable
+   treatment for a control that is `aria-disabled` rather than `disabled`, since
+   the production rule targets `:disabled` and there is nothing to change there
+   until the decision is taken. */
+
+.space-rail__row {
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.space-rail__card {
+  position: relative;
+}
+
+/* An `aria-disabled` control is still a button, so the production `:disabled`
+   rule does not reach it. Same values, matched on the attribute instead. */
+.canvas-card .card__rail-action[aria-disabled='true'],
+.canvas-card .card__rail-action[aria-disabled='true']:hover {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--canvas-card-ink) 45%, var(--canvas-card-face));
+  background: var(--canvas-card-face);
+  color: color-mix(in srgb, var(--canvas-card-ink) 32%, var(--canvas-card-face));
+  cursor: not-allowed;
+}
+
+.space-rail__content {
+  gap: 0;
+}
+
+.space-rail__embedded {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--canvas-card-ink) 5%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.space-rail__embedded-note {
+  color: var(--canvas-card-muted);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+/* Neither prototype kind is drawn by the shadcn `Card`, which is what supplies
+   the flex column the shipped Card relies on. */
+.canvas-card.space-rail__card {
+  display: flex;
+  flex-direction: column;
+  border-style: solid;
+}
+
+/* The Title is the same bottom passenger on both kinds, and the content takes
+   the room above it. The shipped rule is keyed on `[data-kind='markdown']`, so
+   the prototype restates it for the kind the domain does not have yet. */
+.canvas-card[data-kind='space'] .canvas-card__body {
+  order: 2;
+  flex: none;
+  margin-top: auto;
+}
+
+/* The prototype's Markdown body, standing in for the shared sanitised renderer
+   and the source editor so the rail's editing state can be exercised. */
+.space-rail__markdown {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 12px;
+}
+
+.space-rail__prose {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.space-rail__source {
+  margin: 0;
+  padding: 6px 8px;
+  border-left: 3px solid var(--canvas-card-graph);
+  background: color-mix(in srgb, var(--canvas-card-ink) 6%, transparent);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+/* What a keyboard reaches inside one specimen. Not a Card treatment — review
+   instrumentation, printed under the specimen it measured. */
+.space-rail__stops {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 8px 0 0;
+  max-width: 560px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.space-rail__stops dt {
+  color: color-mix(in srgb, currentcolor 55%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.space-rail__stops dd {
+  margin: 0;
+}
+
+.space-rail__stops dd[data-count] {
+  font-weight: 700;
+}

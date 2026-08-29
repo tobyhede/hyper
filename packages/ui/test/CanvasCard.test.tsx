@@ -272,7 +272,12 @@ describe('CanvasCard Open and Close operation', () => {
         button.getAttribute('aria-label'),
       ),
     ).toEqual(['Save Card A', 'Cancel editing Card A', 'Close Card A']);
-    expect(screen.getByRole('button', { name: 'Close Card A' })).toBeDisabled();
+    // Unavailable through `aria-disabled` rather than the native property, so
+    // the control keeps its place in the rail's arrow order (ADR 0070). Drawn
+    // and unreachable is the state this replaces.
+    const close = screen.getByRole('button', { name: 'Close Card A' });
+    expect(close).toHaveAttribute('aria-disabled', 'true');
+    expect(close).not.toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Edit Title A' })).not.toBeInTheDocument();
     // The one fact the stylesheet reads to keep the rail up while the caret is
     // in the body, where no hover or focus of the rail's own is true.

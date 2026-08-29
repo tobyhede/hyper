@@ -138,6 +138,7 @@ export type AuthoringCompletion =
   | { readonly kind: 'removed-card-from-layout'; readonly cardId: CardId }
   /** Delete Card from Space: the same removal, cascaded through every Layout. */
   | { readonly kind: 'deleted-card'; readonly cardId: CardId }
+  | { readonly kind: 'renamed-layout'; readonly title: string }
   | { readonly kind: 'added-graph' }
   | { readonly kind: 'renamed-graph'; readonly graphId: GraphId; readonly title: string }
   | { readonly kind: 'recolored-graph'; readonly graphId: GraphId; readonly color: string }
@@ -183,6 +184,7 @@ type LayoutRequiredOperation = Extract<
   | { readonly kind: 'opened-card' }
   | { readonly kind: 'closed-card' }
   | { readonly kind: 'resized-card' }
+  | { readonly kind: 'renamed-layout' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
   | { readonly kind: 'deleted-graph' }
@@ -198,6 +200,7 @@ export type AuthoringRefusal =
   | { readonly code: 'card-not-found' }
   | { readonly code: 'card-kind-immutable' }
   | { readonly code: 'card-title-required' }
+  | { readonly code: 'layout-title-required' }
   | { readonly code: 'alias-target-not-found'; readonly targetId: CardId }
   | { readonly code: 'alias-target-must-own-content'; readonly targetId: CardId }
   | { readonly code: 'card-already-in-layout' }
@@ -460,6 +463,7 @@ const LAYOUT_ONLY = new Set<LayoutRequiredOperation>([
   'opened-card',
   'closed-card',
   'resized-card',
+  'renamed-layout',
   'renamed-graph',
   'recolored-graph',
   'deleted-graph',
@@ -551,9 +555,9 @@ const aliasTargetRefusal = (space: Space, document: CardDocument): AuthoringRefu
   if (document.kind !== 'alias') return null;
   const target = space.lookup.card(document.target);
   if (target === undefined) return { code: 'alias-target-not-found', targetId: document.target };
-  // Single-hop by construction (ADR 0009): the Target must own its content, so
-  // an Alias pointing at an Alias — including at itself — is refused here.
-  if (target.kind === 'alias') {
+  // Single-hop by construction (ADR 0009): the Target must own Markdown
+  // content, so neither another Alias nor a Space Card can be targeted.
+  if (target.kind !== 'markdown') {
     return { code: 'alias-target-must-own-content', targetId: document.target };
   }
   return null;
@@ -1104,6 +1108,12 @@ export function createSpaceAuthoring({
       layoutTitle = layout.title;
       ownedGraphs = layout.graphs;
       activeGraphId = navigationState.activeGraphId;
+    }
+    if (completion.kind === 'renamed-layout') {
+      const title = trimmedNonBlankTitle(completion.title);
+      if (title === null) return refuse({ code: 'layout-title-required' });
+      if (title === layoutTitle) return UNCHANGED;
+      layoutTitle = title;
     }
     // Applied only now: conversion is over the Space as it stands, and these are
     // what the Edit adds to it and takes away.

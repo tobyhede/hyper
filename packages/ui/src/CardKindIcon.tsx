@@ -27,6 +27,13 @@ const KIND_NAMES = {
   space: 'Space Card',
 } satisfies Record<Card['kind'], string>;
 
+/**
+ * What this kind of Card is called, for a surface that names one in words
+ * rather than drawing it. The same names the glyph announces, so a Card's kind
+ * reads identically however it is reached.
+ */
+export const cardKindName = (kind: Card['kind']): string => KIND_NAMES[kind];
+
 export interface CardKindIconProps {
   readonly kind: Card['kind'];
   readonly size?: number;

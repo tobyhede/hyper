@@ -126,13 +126,9 @@ export function selectedCanvas(page: Page): Locator {
  * that already owns Edges.
  */
 export async function selectCanvas(page: Page, title: string): Promise<void> {
-  await sidebar(page).getByRole('button', { name: title, exact: true }).click();
+  const choice = sidebar(page).getByRole('button', { name: title, exact: true });
+  if ((await choice.getAttribute('aria-pressed')) !== 'true') await choice.click();
   await expect(selectedCanvas(page)).toContainText(title);
-}
-
-/** Whether the canvas is drawing a computed View or an authored Layout. */
-export function canvasKind(page: Page): Locator {
-  return page.getByTestId('selected-canvas-kind');
 }
 
 /** The row of the Graph the Sidebar is emphasising, or nothing when none is. */

@@ -56,8 +56,8 @@ describe('the Space Sidebar story fixture', () => {
    * stops meaning anything once a story is mounted is worse than the rebuild it
    * replaced. Both directions, because the prop is a mode and not a trigger.
    *
-   * The footer button is the observable: the sidebar draws `Overview` over an
-   * exit while a traversal is on, and `Present` otherwise.
+   * The Graph-section button is the observable: the sidebar draws an exit action
+   * while a traversal is on, and `Present` otherwise.
    */
   it('still starts and ends presenting when the prop that says so changes', () => {
     const { rerender } = render(<SpaceSidebarFixture />);

@@ -51,6 +51,7 @@ export type SpaceReferenceErrorKind =
   | 'unresolved-alias-target'
   | 'alias-self-reference'
   | 'alias-targets-alias'
+  | 'alias-targets-non-markdown'
   | 'space-card-reference-cycle';
 
 /**
@@ -274,6 +275,14 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         kind: 'alias-targets-alias',
         ref: card.target,
         message: `Alias "${card.id}" targets alias "${card.target}"; aliasing is a single hop`,
+      });
+      continue;
+    }
+    if (target.kind !== 'markdown') {
+      errors.push({
+        kind: 'alias-targets-non-markdown',
+        ref: card.target,
+        message: `Alias "${card.id}" targets ${target.kind} Card "${card.target}"; aliases show Markdown content`,
       });
     }
   }

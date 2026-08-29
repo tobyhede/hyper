@@ -1,13 +1,11 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button } from './Button';
+import {
+  CardRailAction,
+  CardRailActions,
+  CardRailKindActions,
+  CardRailSharedActions,
+} from './CardRailActions';
 import { CardContentEditProvider, type CardContentEdit } from './card-content-edit';
 import { CardRail } from './CardRail';
 import { Card, CardContent, CardTitle } from './components/card';
@@ -19,12 +17,11 @@ import {
 } from './MarkdownCardBody';
 import './canvas-card.css';
 import { usePresence } from './use-presence';
+import { InlineTitleEditor } from './InlineTitleEditor';
 
 /**
  * What a Card front draws beyond its shared Title (ADR 0051): a kind-owned
- * choice, not a kind tag plus an optional field every other kind ignores. A
- * Space Card variant is deliberately not modelled here — building one ahead
- * of the domain schema would be a Card front nothing can render.
+ * choice, not a kind tag plus an optional field every other kind ignores.
  */
 interface CanvasMarkdownCardFront {
   readonly kind: 'markdown';
@@ -60,6 +57,10 @@ export type CanvasCardFront =
       readonly aliasOf: string;
       /** Open this Alias's metadata editor; Alias Cards do not expand. */
       readonly onOpen?: () => void;
+    }
+  | {
+      /** Interim closed treatment; embedding the selected Space View belongs to issue 01. */
+      readonly kind: 'space';
     };
 
 /** The two authored operations that end a live Markdown body edit. */
@@ -110,25 +111,15 @@ type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /**
- * The one visual Card front shared by the production canvas and its stories.
- *
- * The deep production module for Markdown and Alias Card fronts, title
- * editing, refusal display and interaction-state visual treatment. React Flow
- * geometry, connection state, selection/drag translation and containment stay
- * with the adapter that renders this component (`@project/react-flow-adapter`
- * `CardNode`) — nothing here imports React Flow or reaches into its DOM. Its
- * own visual treatment lives in `canvas-card.css`, colocated with this module.
- */
-/**
  * What the rail's Edit control runs, or `undefined` when the Card has no such
  * control to draw.
  *
  * On an open Card it is simply the caret operation the caller supplied. On a
- * **closed** one it is ADR 0064's rule — open the Card, then place the caret
- * — composed from the Card's own two existing operations and nothing else. Opening is not reimplemented or
- * approximated here: `onOpenChange` is the same call the Open control makes, so
- * the growth, the neighbours' displacement and the transition are the ones
- * opening always produces.
+ * **closed** one it is ADR 0064's rule — open the Card, then place the caret —
+ * composed from the Card's own two existing operations and nothing else.
+ * Opening is not reimplemented or approximated here: `onOpenChange` is the same
+ * call the Open control makes, so the growth, the neighbours' displacement and
+ * the transition are the ones opening always produces.
  *
  * A closed Card that cannot be opened has no Edit control, because the first
  * half of that pair would be missing and the caret would have nowhere to land.
@@ -146,27 +137,49 @@ const contentEditAction = (
   };
 };
 
+/**
+ * How long the content's own opacity transition runs, in milliseconds.
+ *
+ * Read from the computed style rather than restated in TypeScript, so the
+ * stylesheet stays the one place the Card's timing is written. `transition`
+ * shorthand expands to a list, and the durations are positional — so the
+ * opacity duration is the one at opacity's index in `transition-property`,
+ * falling back to the first when the property is not named individually.
+ */
+const opacityTransitionMs = (element: HTMLElement): number => {
+  const style = getComputedStyle(element);
+  const opacityIndex = style.transitionProperty
+    .split(',')
+    .map((property) => property.trim())
+    .indexOf('opacity');
+  const durations = style.transitionDuration.split(',').map((duration) => duration.trim());
+  const duration = durations[opacityIndex] ?? durations[0];
+  if (duration === undefined) return 0;
+  const milliseconds = duration.endsWith('ms')
+    ? Number.parseFloat(duration)
+    : Number.parseFloat(duration) * 1000;
+  return Number.isFinite(milliseconds) ? milliseconds : 0;
+};
+
+/**
+ * The one visual Card front shared by the production canvas and its stories.
+ *
+ * The deep production module for Markdown and Alias Card fronts, title
+ * editing, refusal display and interaction-state visual treatment. React Flow
+ * geometry, connection state, selection/drag translation and containment stay
+ * with the adapter that renders this component (`@project/react-flow-adapter`
+ * `CardNode`) — nothing here imports React Flow or reaches into its DOM. Its
+ * own visual treatment lives in `canvas-card.css`, colocated with this module.
+ */
 export function CanvasCard(props: CanvasCardProps) {
   const { front, title, graphColor, onBeginTitleEdit, state } = props;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   const open = front.kind === 'markdown' && front.open;
   const contentControl = useRef<HTMLDivElement>(null);
-  const contentExitDuration = useCallback(() => {
-    const content = contentControl.current;
-    if (content === null) return 0;
-    const style = getComputedStyle(content);
-    const opacityIndex = style.transitionProperty
-      .split(',')
-      .map((property) => property.trim())
-      .indexOf('opacity');
-    const durations = style.transitionDuration.split(',').map((duration) => duration.trim());
-    const duration = durations[opacityIndex] ?? durations[0];
-    if (duration === undefined) return 0;
-    const milliseconds = duration.endsWith('ms')
-      ? Number.parseFloat(duration)
-      : Number.parseFloat(duration) * 1000;
-    return Number.isFinite(milliseconds) ? milliseconds : 0;
-  }, []);
+  const contentExitDuration = useCallback(
+    () => (contentControl.current === null ? 0 : opacityTransitionMs(contentControl.current)),
+    [],
+  );
   const contentPresence = usePresence(open, contentExitDuration);
   const onOpenChange = front.kind === 'markdown' ? front.onOpenChange : undefined;
   const onOpenAlias = front.kind === 'alias' ? front.onOpen : undefined;
@@ -234,77 +247,83 @@ export function CanvasCard(props: CanvasCardProps) {
     >
       <CardRail kind={visualKind} graphColor={graphColor} className="canvas-card__rail">
         {showActions && (
-          <div className="canvas-card__actions" data-testid="canvas-card-actions">
-            {contentEdit === null ? (
-              beginContentEdit !== undefined && (
-                <Button
-                  ref={editControl}
-                  variant="ghost"
-                  size="icon"
-                  className="card__rail-action nodrag nopan"
-                  aria-label={`Edit Card ${title}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    beginContentEdit();
-                  }}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => event.stopPropagation()}
-                >
-                  <EditIcon data-icon="inline-start" />
-                </Button>
-              )
-            ) : (
-              <ContentEditActions title={title} edit={contentEdit} />
-            )}
-            {onOpenChange !== undefined && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="card__rail-action nodrag nopan"
-                aria-label={`${open ? 'Close' : 'Open'} Card ${title}`}
-                // Closing mid-edit would drop the Card's box out from under a
-                // live caret with a draft in it. The control keeps its slot and
-                // goes disabled rather than disappearing: the rail's row does not
-                // reshuffle while the author writes, and what is unavailable says
-                // so instead of vanishing.
-                disabled={contentEdit !== null}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onOpenChange(!open);
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
-              >
-                {open ? (
-                  <CloseCardIcon data-icon="inline-start" />
-                ) : (
+          // ADR 0070. One tab stop for the whole rail, arrows between its
+          // controls: a canvas carries many Cards and a Card's rail carries
+          // several commands, so a control apiece would put the Cards
+          // themselves out of reach behind their own actions. The keyboard
+          // contract, the shared control treatment and the canvas suppression
+          // every one of these needs are `CardRailActions`' and
+          // `CardRailAction`'s; what is left here is which commands this Card
+          // has, and what each one runs.
+          //
+          // The two groups are the answer to "whose command is this?". Editing
+          // this Card's Markdown is the Markdown front's business and means
+          // nothing on another kind; opening and closing is every Card's, and
+          // stays in the same place whatever kind it is drawn on.
+          <CardRailActions
+            aria-label={`Card ${title}`}
+            className="canvas-card__actions"
+            data-testid="canvas-card-actions"
+          >
+            <CardRailKindActions kind={visualKind}>
+              {contentEdit === null ? (
+                beginContentEdit !== undefined && (
+                  <CardRailAction
+                    ref={editControl}
+                    aria-label={`Edit Card ${title}`}
+                    onClick={beginContentEdit}
+                  >
+                    <EditIcon data-icon="inline-start" />
+                  </CardRailAction>
+                )
+              ) : (
+                <ContentEditActions title={title} edit={contentEdit} />
+              )}
+              {/* An Alias does not expand, so its Open is its own kind's
+                  command — it opens the Alias's metadata editor rather than
+                  the Card. It is not the shared Open below. */}
+              {onOpenAlias !== undefined && (
+                <CardRailAction aria-label={`Open Card ${title}`} onClick={onOpenAlias}>
                   <OpenCardIcon data-icon="inline-start" />
-                )}
-              </Button>
-            )}
-            {onOpenAlias !== undefined && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="card__rail-action nodrag nopan"
-                aria-label={`Open Card ${title}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onOpenAlias();
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
-              >
-                <OpenCardIcon data-icon="inline-start" />
-              </Button>
-            )}
-          </div>
+                </CardRailAction>
+              )}
+            </CardRailKindActions>
+            <CardRailSharedActions>
+              {onOpenChange !== undefined && (
+                <CardRailAction
+                  aria-label={`${open ? 'Close' : 'Open'} Card ${title}`}
+                  // Closing mid-edit would drop the Card's box out from under a
+                  // live caret with a draft in it. The control keeps its slot and
+                  // goes unavailable rather than disappearing: the rail's row does
+                  // not reshuffle while the author writes, and what is unavailable
+                  // says so instead of vanishing.
+                  //
+                  // A toolbar item stays focusable while disabled (ADR 0070), so
+                  // that promise now holds for the keyboard too — the control keeps
+                  // its place in the arrow order and announces itself unavailable,
+                  // instead of being drawn and unreachable.
+                  disabled={contentEdit !== null}
+                  onClick={() => {
+                    onOpenChange(!open);
+                  }}
+                >
+                  {open ? (
+                    <CloseCardIcon data-icon="inline-start" />
+                  ) : (
+                    <OpenCardIcon data-icon="inline-start" />
+                  )}
+                </CardRailAction>
+              )}
+            </CardRailSharedActions>
+          </CardRailActions>
         )}
       </CardRail>
       <CardContent className="canvas-card__body">
         {state === 'editing' ? (
-          <TitleEditor
+          <InlineTitleEditor
             title={title}
+            label="Card title"
+            variant="card"
             onComplete={props.onCompleteTitleEdit}
             onCancel={props.onCancelTitleEdit}
             onReturnFocus={props.onReturnFocus}
@@ -383,163 +402,36 @@ interface ContentEditActionsProps {
  * the Edit control had. Close keeps its own slot beside them — it belongs to the
  * Card rather than to the edit, and a Card stays closable while one runs.
  *
- * The same `card__rail-action` icon buttons as everything else on the rail: same
- * box, same border, same paper and ink, same hover inversion. The key each one
- * spends is stated with `aria-keyshortcuts` and drawn by the body's own shortcut
- * hint, which is where a canvas Card names a key.
+ * The same `CardRailAction` as everything else on the rail: same box, same
+ * border, same paper and ink, same hover inversion. The key each one spends is
+ * stated with `aria-keyshortcuts` and drawn by the body's own shortcut hint,
+ * which is where a canvas Card names a key.
  *
- * **A press here must not take the caret with it.** These controls sit on the
- * Card's rail and the caret sits in its content, so the pointer press that
- * activates one is also a focus leaving the writing surface — taking the
- * author's selection and the editor's own focus treatment with it, mid-edit and
- * for a control that may well be Cancel. Suppressing the default on `mousedown`
- * keeps the focus where it is, so the edit stays intact right up to the exit the
- * author actually chose.
+ * `holdFocus` is the one thing these two ask for that the other rail controls
+ * do not, and it is asked for because the caret is in the content while the
+ * control is on the band: without it the press that activates one is also a
+ * focus leaving the writing surface, mid-edit and for a control that may well
+ * be Cancel.
  */
 function ContentEditActions({ title, edit }: ContentEditActionsProps) {
-  const hold = (event: { preventDefault: () => void }): void => event.preventDefault();
-  const run = (operation: () => void) => (event: { stopPropagation: () => void }) => {
-    event.stopPropagation();
-    operation();
-  };
-
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="card__rail-action nodrag nopan"
+      <CardRailAction
+        holdFocus
         aria-label={`Save Card ${title}`}
         aria-keyshortcuts="Meta+Enter Control+Enter"
-        onClick={run(edit.onSave)}
-        onMouseDown={hold}
-        onPointerDown={(event) => event.stopPropagation()}
-        onKeyDown={(event) => event.stopPropagation()}
+        onClick={edit.onSave}
       >
         <CommitEditIcon data-icon="inline-start" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="card__rail-action nodrag nopan"
+      </CardRailAction>
+      <CardRailAction
+        holdFocus
         aria-label={`Cancel editing Card ${title}`}
         aria-keyshortcuts="Escape"
-        onClick={run(edit.onCancel)}
-        onMouseDown={hold}
-        onPointerDown={(event) => event.stopPropagation()}
-        onKeyDown={(event) => event.stopPropagation()}
+        onClick={edit.onCancel}
       >
         <AbandonEditIcon data-icon="inline-start" />
-      </Button>
+      </CardRailAction>
     </>
-  );
-}
-
-interface TitleEditorProps {
-  readonly title: string;
-  readonly onComplete: (title: string) => string | null;
-  readonly onCancel: () => void;
-  readonly onReturnFocus: () => void;
-}
-
-/**
- * The Card's own in-place title editor: initial focus and selection, draft
- * state, refusal display, blur completion, Enter completion and Escape
- * cancellation. Focus return is requested through `onReturnFocus` rather than
- * taken directly — this module has no React Flow selector or DOM ancestry of
- * its own to reach the Card with.
- */
-function TitleEditor({ title, onComplete, onCancel, onReturnFocus }: TitleEditorProps) {
-  const [draft, setDraft] = useState(title);
-  const [error, setError] = useState<string | null>(null);
-  const input = useRef<HTMLInputElement>(null);
-  const closingByKey = useRef(false);
-  const errorId = useId();
-
-  // Focus on mount whichever control opened this editor, pointer or keyboard.
-  // A created Card enters here with its neutral title *selected*, and an
-  // unfocused input has no selection an author can type over.
-  useEffect(() => {
-    input.current?.focus();
-    input.current?.select();
-  }, []);
-
-  /**
-   * Submit the draft and show whatever came back, answering the refusal so a
-   * caller can tell an accepted completion from a refused one — which is the
-   * only thing the two exits disagree about.
-   */
-  const complete = (): string | null => {
-    const refusal = onComplete(draft);
-    setError(refusal);
-    return refusal;
-  };
-
-  /**
-   * Enter and Escape both leave the editor, and neither may leave focus on
-   * `<body>`. Taken *before* the caller unmounts the input: focus moves to a
-   * node that is already in the tree, and the unmount that follows has
-   * nothing left to displace. That move blurs the input, which is why
-   * `closingByKey` is raised first — the blur handler completes the draft,
-   * and it must not complete a second time on the way out of a completion,
-   * nor at all on the way out of a cancellation.
-   *
-   * Only the keyboard paths restore. A blur is the author clicking somewhere
-   * else, and taking focus back from wherever they clicked would be a steal.
-   */
-  const returnFocus = (): void => {
-    closingByKey.current = true;
-    onReturnFocus();
-  };
-
-  return (
-    <div className="card__title-editor nodrag nopan nowheel">
-      <input
-        ref={input}
-        className="card__title-input"
-        aria-label="Card title"
-        aria-invalid={error !== null}
-        aria-describedby={error === null ? undefined : errorId}
-        value={draft}
-        onChange={(event) => {
-          setDraft(event.currentTarget.value);
-          setError(null);
-          // Typing says the key exit did not take: the editor is still open and
-          // still being edited, so the blur ahead is a real completion rather
-          // than the one a focus move would have produced. Cleared here because
-          // a caller whose `onReturnFocus` moves no focus fires no blur to
-          // clear it, and a raised flag would swallow that completion.
-          closingByKey.current = false;
-        }}
-        onBlur={() => {
-          if (closingByKey.current) {
-            closingByKey.current = false;
-            return;
-          }
-          complete();
-        }}
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => event.stopPropagation()}
-        onKeyDown={(event) => {
-          event.stopPropagation();
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            // A refused draft keeps the editor open, so focus stays in the
-            // field with the message beside it rather than leaving for a Card
-            // whose name the author has not settled.
-            if (complete() === null) returnFocus();
-          } else if (event.key === 'Escape') {
-            event.preventDefault();
-            returnFocus();
-            onCancel();
-          }
-        }}
-      />
-      {error !== null && (
-        <span id={errorId} role="alert" className="card__field-error">
-          {error}
-        </span>
-      )}
-    </div>
   );
 }

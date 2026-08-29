@@ -84,6 +84,8 @@ interface Harness {
   readonly setNodes: (next: CardFlowNode[]) => void;
   /** Every change React Flow proposed to the node array. */
   readonly nodesChanged: ReturnType<typeof vi.fn>;
+  /** What the canvas told its parent about a live Card title edit. */
+  readonly titleEditingChanged: ReturnType<typeof vi.fn>;
 }
 
 /**
@@ -132,6 +134,7 @@ function mountGraph(
   const openCard = vi.fn();
   const openAlias = vi.fn();
   const addCard = vi.fn();
+  const titleEditingChanged = vi.fn();
   const nodesChanged = vi.fn();
   let nodes = initialNodes;
   const edgeAuthoring = inertEdgeAuthoring();
@@ -173,6 +176,7 @@ function mountGraph(
           navigation.openCard(cardId);
         }}
         onBodyEditingChange={() => undefined}
+        onTitleEditingChange={titleEditingChanged}
         cardResize={cardResize}
         graphs={[]}
         colorByGraphId={{}}
@@ -187,6 +191,7 @@ function mountGraph(
     openCard,
     openAlias,
     addCard,
+    titleEditingChanged,
     nodesChanged,
     setNodes: (next) => {
       nodes = next;
@@ -425,6 +430,14 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
       expect(openCard).not.toHaveBeenCalled();
     },
   );
+});
+
+test('reports a live Card title edit so Space chrome can withdraw', () => {
+  const { titleEditingChanged } = mountGraph([cardNode('A', CARD_ID, true)]);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
+
+  expect(titleEditingChanged).toHaveBeenLastCalledWith(true);
 });
 
 /**

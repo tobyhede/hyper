@@ -138,28 +138,34 @@
 
 /* Unavailable, at any rail colour.
 
+   Matched on `aria-disabled`, not `:disabled`. A rail control is a toolbar item
+   (ADR 0070) and a toolbar item stays focusable while unavailable, so it carries
+   the attribute rather than the native property — `:disabled` matches none of
+   them, and `Button`'s own `disabled:` utilities do not apply either.
+
    Two things go wrong on a coloured band and both are fixed the same way. First,
-   `Button`'s own `disabled:opacity-50` makes the control semi-transparent, and
-   what is behind it is the rail's Active-Graph colour — the paper and the ink
-   both take that colour on, and the result reads as a differently-coloured
-   control rather than an unavailable one. Second, a border pulled close to the
-   paper leaves an edgeless square floating on the band, which washes out against
-   a mid-tone rail and disappears entirely against a pale one.
+   a semi-transparent control lets the rail's Active-Graph colour through — the
+   paper and the ink both take that colour on, and the result reads as a
+   differently-coloured control rather than an unavailable one. Second, a border
+   pulled close to the paper leaves an edgeless square floating on the band,
+   which washes out against a mid-tone rail and disappears entirely against a
+   pale one.
 
    So: full opacity, opaque paper, and a border that is still unambiguously an
    edge. Every value is mixed from the Card's own **ink** and **paper** and
    nothing is mixed from the rail, which is what makes one rule hold for every
    Graph colour the Space has. The quieting is a step down from the ink the
    enabled controls use, not a step toward whatever is behind. */
-.canvas-card .card__rail-action:disabled,
-.canvas-card .card__rail-action:disabled:hover {
+.canvas-card .card__rail-action[aria-disabled='true'],
+.canvas-card .card__rail-action[aria-disabled='true']:hover {
   opacity: 1;
   border-color: color-mix(in srgb, var(--canvas-card-ink) 45%, var(--canvas-card-face));
   background: var(--canvas-card-face);
   color: color-mix(in srgb, var(--canvas-card-ink) 32%, var(--canvas-card-face));
+  cursor: not-allowed;
 }
 
-.canvas-card .card__rail-action:not(:disabled):hover {
+.canvas-card .card__rail-action:not([aria-disabled='true']):hover {
   border-color: var(--canvas-card-ink);
   background: var(--canvas-card-ink);
   color: var(--canvas-card-graph);
@@ -286,8 +292,14 @@
   width: 100%;
 }
 
+.canvas-card .card__title-editor {
+  display: block;
+}
+
 .canvas-card .card__title-input {
   display: block;
+  height: auto;
+  min-height: 0;
   padding: 0;
   border: 0;
   border-radius: 0;

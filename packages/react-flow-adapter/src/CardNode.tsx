@@ -125,7 +125,8 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
     const openAlias = data.onEditCard;
     aliasFront.onOpen = () => openAlias(true);
   }
-  const front: CanvasCardFront = data.kind === 'alias' ? aliasFront : markdownFront;
+  const front: CanvasCardFront =
+    data.kind === 'alias' ? aliasFront : data.kind === 'space' ? { kind: 'space' } : markdownFront;
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle

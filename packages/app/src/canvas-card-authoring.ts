@@ -25,6 +25,7 @@ export interface CanvasCardAuthoringInput {
   readonly onOpenAlias: (cardId: CardId) => void;
   readonly onSelectCard: (cardId: CardId) => void;
   readonly onBodyEditingChange?: ((editing: boolean) => void) | undefined;
+  readonly onTitleEditingChange?: ((editing: boolean) => void) | undefined;
 }
 
 export interface CanvasCardAuthoring {
@@ -52,6 +53,7 @@ export function useCanvasCardAuthoring({
   onOpenAlias,
   onSelectCard,
   onBodyEditingChange,
+  onTitleEditingChange,
 }: CanvasCardAuthoringInput): CanvasCardAuthoring {
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleCardId = caret?.field === 'title' ? caret.cardId : null;
@@ -80,6 +82,9 @@ export function useCanvasCardAuthoring({
   useEffect(() => {
     onBodyEditingChange?.(bodyEditing);
   }, [bodyEditing, onBodyEditingChange]);
+  useEffect(() => {
+    onTitleEditingChange?.(editingTitleCardId !== null);
+  }, [editingTitleCardId, onTitleEditingChange]);
 
   const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(canAuthorOnCanvas);
   if (canvasAuthoringWasEnabled !== canAuthorOnCanvas) {

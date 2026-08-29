@@ -25,6 +25,8 @@ export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
       return 'A Card keeps the kind it was created with.';
     case 'card-title-required':
       return 'A Card title is required.';
+    case 'layout-title-required':
+      return 'A Layout title is required.';
     case 'alias-target-not-found':
       return 'That Target is no longer part of the Space.';
     case 'alias-target-must-own-content':
@@ -83,6 +85,7 @@ const titleAndTargetPlacements = {
   'card-not-found': form,
   'card-kind-immutable': form,
   'card-title-required': 'title',
+  'layout-title-required': form,
   'alias-target-not-found': 'target',
   'alias-target-must-own-content': 'target',
   'card-already-in-layout': form,
@@ -129,6 +132,7 @@ const correctableByCardChoice = {
   'card-not-found': false,
   'card-kind-immutable': false,
   'card-title-required': false,
+  'layout-title-required': false,
   'alias-target-not-found': false,
   'alias-target-must-own-content': false,
   'card-already-in-layout': false,

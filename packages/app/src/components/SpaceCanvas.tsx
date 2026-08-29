@@ -172,6 +172,8 @@ export interface SpaceCanvasProps {
    * one bit a sibling surface needs to stay out of the way.
    */
   onBodyEditingChange?: (editing: boolean) => void;
+  /** Reports the Card title draft so sibling naming surfaces stay withdrawn. */
+  onTitleEditingChange?: (editing: boolean) => void;
   cardResize: CardResize;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
@@ -201,6 +203,7 @@ export function SpaceCanvas({
   spaceSession,
   onOpenAlias,
   onBodyEditingChange,
+  onTitleEditingChange,
   cardResize,
   graphs,
   colorByGraphId,
@@ -248,6 +251,7 @@ export function SpaceCanvas({
     onOpenAlias,
     onSelectCard,
     onBodyEditingChange,
+    onTitleEditingChange,
   });
   const { bodyEditing, canAuthorOnCanvas, openCard: onOpenCard, beginTitleEditing } = cardAuthoring;
 
