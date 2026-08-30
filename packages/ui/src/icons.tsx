@@ -14,6 +14,8 @@ import {
   Pencil,
   Play,
   Plus,
+  Square,
+  SquareSquare,
   Workflow,
   X,
 } from 'lucide-react';
@@ -42,6 +44,11 @@ export const GraphIcon = ({
 
 /** Start presenting the active Graph. */
 export const PresentIcon = ({ color }: { color: string }) => <Play color={color} size={12} />;
+
+/** Stop presenting and return to the Space overview. */
+export const StopPresentingIcon = ({ color }: { color: string }) => (
+  <Square color={color} size={12} />
+);
 
 /** Edit the content of a Markdown Card. */
 export const EditIcon = (props: CardActionIconProps) => <Pencil size={14} {...props} />;
@@ -80,6 +87,9 @@ export const AliasIcon = ({ size = 14 }: { size?: number }) => <CornerDownRight 
 
 /** The Card kind that owns the Markdown it draws. */
 export const MarkdownIcon = ({ size = 14 }: { size?: number }) => <FileText size={size} />;
+
+/** The Card kind that shows one selected view of another Space (ADR 0068). */
+export const SpaceCardIcon = ({ size = 14 }: { size?: number }) => <SquareSquare size={size} />;
 
 /** Mark the selected item in a list. */
 export const CheckIcon = () => <Check color="var(--accent)" size={14} />;

@@ -22,23 +22,20 @@ test(
 test(
   'Space Sidebar story renders one exclusive canvas choice',
   {
-    tag: [
-      '@parity:space-sidebar-marks-one-current-renderer',
-      '@parity:space-sidebar-shows-pending-persistence',
-    ],
+    tag: '@parity:space-sidebar-marks-one-current-renderer',
   },
   async ({ page }) => {
-    await page.goto('/?story=components--space-sidebar--pending&mode=preview');
+    await page.goto('/?story=space--space--settled&mode=preview');
 
     const flow = page.getByRole('button', { name: 'Flow' });
     const grid = page.getByRole('button', { name: 'Grid' });
-    const collection = page.getByRole('button', { name: 'Collection 1' });
+    const collection = page
+      .getByTestId('space-sidebar')
+      .getByRole('button', { name: 'Collection 1' });
 
     await expect(collection).toHaveAttribute('aria-pressed', 'true');
     await expect(flow).toHaveAttribute('aria-pressed', 'false');
     await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
-    await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Authored layout');
-    await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
     await expect(page.getByText('None', { exact: true })).toHaveCount(0);
 
     await grid.click();
@@ -46,7 +43,6 @@ test(
     await expect(grid).toHaveAttribute('aria-pressed', 'true');
     await expect(collection).toHaveAttribute('aria-pressed', 'false');
     await expect(page.getByTestId('selected-canvas')).toContainText('Grid');
-    await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
   },
 );
 
@@ -56,7 +52,7 @@ test(
  * popup opens, dismisses or has focus to return.
  */
 test('Space Sidebar story defines the canvas renderer keyboard contract', async ({ page }) => {
-  await page.goto('/?story=components--space-sidebar--pending&mode=preview');
+  await page.goto('/?story=space--space--settled&mode=preview');
 
   const flow = page.getByRole('button', { name: 'Flow' });
   const grid = page.getByRole('button', { name: 'Grid' });
@@ -71,8 +67,53 @@ test('Space Sidebar story defines the canvas renderer keyboard contract', async 
   await expect(page.getByTestId('selected-canvas')).toContainText('Grid');
 });
 
+test(
+  'Space chrome shares Layout drafts and keeps blank refusals field-local',
+  { tag: '@parity:space-chrome-edits-names' },
+  async ({ page }) => {
+    await page.goto('/?story=space--space--settled&mode=preview');
+    await page.getByRole('button', { name: 'Collection 1', pressed: true }).click();
+    const row = page.getByRole('textbox', { name: 'Layout name' });
+    await row.fill('Workshop');
+    await expect(page.getByTestId('selected-canvas')).toContainText('Workshop');
+    await row.fill('');
+    await row.press('Enter');
+    await expect(page.getByText('A Layout title is required.')).toBeVisible();
+    await row.press('Escape');
+    await expect(row).toHaveCount(0);
+
+    const storedRow = page.getByRole('button', { name: 'Collection 1', pressed: true });
+    await storedRow.click();
+    const accepted = page.getByRole('textbox', { name: 'Layout name' });
+    await expect(accepted).toBeFocused();
+    await expect
+      .poll(() =>
+        accepted.evaluate((input) =>
+          input instanceof HTMLInputElement ? [input.selectionStart, input.selectionEnd] : null,
+        ),
+      )
+      .toEqual([0, 'Collection 1'.length]);
+    await accepted.fill('Workshop');
+    await accepted.press('Enter');
+    await expect(page.getByRole('button', { name: 'Workshop', pressed: true })).toBeVisible();
+    await expect(page.getByTestId('selected-canvas')).toContainText('Workshop');
+  },
+);
+
+test('Space chrome edits the active Graph name', async ({ page }) => {
+  await page.goto('/?story=space--space--settled&mode=preview');
+  await page.getByRole('button', { name: 'Long', pressed: true }).click();
+  const graphName = page.getByRole('textbox', { name: 'Graph name' });
+  await graphName.fill('');
+  await graphName.press('Enter');
+  await expect(page.getByText('A Graph title is required.')).toBeVisible();
+  await graphName.fill('Journey');
+  await page.getByText('Graphs', { exact: true }).first().click();
+  await expect(page.getByRole('button', { name: 'Journey', pressed: true })).toBeVisible();
+});
+
 test('Space Sidebar story keeps the Add Card split control whole', async ({ page }) => {
-  await page.goto('/?story=components--space-sidebar--pending&mode=preview');
+  await page.goto('/?story=space--space--settled&mode=preview');
 
   const moreKinds = page.getByRole('button', { name: 'More Card kinds' });
   await moreKinds.click();
@@ -91,7 +132,7 @@ test(
     ],
   },
   async ({ page }) => {
-    await page.goto('/?story=components--space-sidebar--settled&mode=preview');
+    await page.goto('/?story=space--space--settled&mode=preview');
 
     await page.getByRole('button', { name: 'Copy link to Card 1' }).click();
     await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'card-canonical');
@@ -117,14 +158,13 @@ test(
   'Space Sidebar story says an unauthored Space has nothing yet',
   { tag: '@parity:space-sidebar-names-unauthored-state' },
   async ({ page }) => {
-    await page.goto('/?story=components--space-sidebar--unauthored&mode=preview');
+    await page.goto('/?story=space--space--unauthored&mode=preview');
 
     await expect(page.getByRole('button', { name: 'Flow' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
     await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
-    await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
     await expect(page.getByTestId('space-title')).toHaveText('New space');
     await expect(page.getByTestId('no-authored-layouts')).toBeVisible();
     await expect(page.getByTestId('no-graphs')).toBeVisible();
@@ -141,13 +181,15 @@ test(
     ],
   },
   async ({ page }) => {
-    await page.goto('/?story=components--space-sidebar--settled&mode=preview');
-    await expect(page.getByRole('button', { name: 'Collection 1' })).toBeVisible();
+    await page.goto('/?story=space--space--settled&mode=preview');
+    await expect(
+      page.getByTestId('space-sidebar').getByRole('button', { name: 'Collection 1' }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden();
 
-    await page.goto('/?story=components--space-sidebar--failed&mode=preview');
-    // Two surfaces for one condition: a red dot that leaves the sidebar footer's
-    // geometry alone, and the notice pinned under the canvas header carrying
+    await page.goto('/?story=space--messaging--save-failed&mode=preview');
+    // Two surfaces for one condition: a red dot beside the Space title, and the
+    // notice pinned under the canvas header carrying
     // reason and action.
     await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeVisible();
     const failure = page.getByTestId('persistence-failure');
@@ -170,7 +212,7 @@ test(
     // And the retry saves that same work rather than replacing it.
     await expect(unsaved).toBeVisible();
 
-    await page.goto('/?story=components--space-sidebar--presenting&mode=preview');
+    await page.goto('/?story=space--space--presenting&mode=preview');
     await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Card' })).toBeDisabled();
   },
@@ -186,7 +228,7 @@ test(
 test('Space Sidebar story draws and activates only the selected Layout graphs', async ({
   page,
 }) => {
-  await page.goto('/?story=components--space-sidebar--settled&mode=preview');
+  await page.goto('/?story=space--space--settled&mode=preview');
 
   await expect(page.getByRole('button', { name: 'Long', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mid', exact: true })).toBeVisible();
@@ -206,10 +248,10 @@ test('Space Sidebar story draws and activates only the selected Layout graphs', 
   );
   await expect(page.getByRole('button', { name: 'Long', exact: true })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Present Echo' }).click();
-  await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
-  await page.getByRole('button', { name: 'Overview' }).click();
-  await expect(page.getByRole('button', { name: 'Present Echo' })).toBeVisible();
+  await page.getByRole('button', { name: 'Present' }).click();
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
 });
 
 test(
@@ -221,7 +263,7 @@ test(
     ],
   },
   async ({ page }) => {
-    await page.goto('/?story=components--space-sidebar--conflicted&mode=preview');
+    await page.goto('/?story=space--messaging--save-conflict&mode=preview');
 
     await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
@@ -233,7 +275,7 @@ test(
       'The remote space is invalid and was not accepted.',
     );
 
-    await page.goto('/?story=components--space-sidebar--rejected&mode=preview');
+    await page.goto('/?story=space--messaging--save-rejected&mode=preview');
     await expect(
       page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' }),
     ).toBeVisible();
@@ -249,7 +291,7 @@ test(
  * real catalogue navigation while the story owns its own viewport.
  */
 test('Space Sidebar stories are isolated from the Ladle catalogue', async ({ page }) => {
-  await page.goto('/?story=components--space-sidebar--conflicted');
+  await page.goto('/?story=space--messaging--save-conflict');
 
   const storyFrame = page.frameLocator('iframe');
   await expect(storyFrame.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
@@ -260,7 +302,7 @@ test('Space Sidebar stories are isolated from the Ladle catalogue', async ({ pag
   await page.getByRole('link', { name: 'Lifecycle' }).click();
   await expect(page).toHaveURL(/story=components--persistence-indicator--lifecycle/);
 
-  await page.goto('/?story=components--space-sidebar--settled');
+  await page.goto('/?story=space--space--settled');
   await expect(page.frameLocator('iframe').getByTestId('space-sidebar')).toBeVisible();
   await expect(page.getByLabel('Search stories')).toBeVisible();
 });

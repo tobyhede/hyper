@@ -6,11 +6,15 @@ export { Button, buttonVariants } from './Button';
 export type { ButtonProps } from './Button';
 export { PersistenceIndicator } from './PersistenceIndicator';
 export type { PersistenceIndicatorProps, PersistenceIndicatorState } from './PersistenceIndicator';
+export { OpenSpaces } from './OpenSpaces';
+export type { OpenSpaceEntry, OpenSpacesProps, OpenSpaceStatus } from './OpenSpaces';
 export { StatusBusy, StatusFailure } from './StatusPanel';
 export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
 export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CanvasCard } from './CanvasCard';
+export { InlineTitleEditor } from './InlineTitleEditor';
+export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
 export type {
   CanvasCardBodyEditor,
   CanvasCardFront,
@@ -21,7 +25,19 @@ export { usePresence } from './use-presence';
 export type { Presence, PresenceState } from './use-presence';
 export { CardRail } from './CardRail';
 export type { CardRailProps } from './CardRail';
-export { CardKindIcon } from './CardKindIcon';
+export {
+  CardRailAction,
+  CardRailActions,
+  CardRailKindActions,
+  CardRailSharedActions,
+} from './CardRailActions';
+export type {
+  CardRailActionProps,
+  CardRailActionsProps,
+  CardRailKindActionsProps,
+  CardRailSharedActionsProps,
+} from './CardRailActions';
+export { CardKindIcon, cardKindName } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
 export { CardSearchCombobox } from './CardSearchCombobox';
 export type { CardChoice, CardSearchComboboxProps } from './CardSearchCombobox';
@@ -64,6 +80,7 @@ export {
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,
+  StopPresentingIcon,
 } from './icons';
 export {
   Select,
@@ -142,6 +159,9 @@ export { Separator } from './components/separator';
 export { Slider } from './components/slider';
 export { Spinner } from './components/spinner';
 export { Textarea } from './components/textarea';
+export { Tabs, TabsContent, TabsList, TabsTrigger, tabsListVariants } from './components/tabs';
+export { Toolbar, ToolbarButton, ToolbarGroup } from './components/toolbar';
+export type { ToolbarButtonProps } from './components/toolbar';
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/tooltip';
 export {
   Sidebar,

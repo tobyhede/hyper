@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { loadSpaceSnapshot } from '@project/graph';
 import { editedSnapshot } from '../stories/support/spaces';
@@ -56,8 +56,8 @@ describe('the Space Sidebar story fixture', () => {
    * stops meaning anything once a story is mounted is worse than the rebuild it
    * replaced. Both directions, because the prop is a mode and not a trigger.
    *
-   * The footer button is the observable: the sidebar draws `Overview` over an
-   * exit while a traversal is on, and `Present` otherwise.
+   * The Graph-section button is the observable: the sidebar draws an exit action
+   * while a traversal is on, and `Present` otherwise.
    */
   it('still starts and ends presenting when the prop that says so changes', () => {
     const { rerender } = render(<SpaceSidebarFixture />);
@@ -97,5 +97,24 @@ describe('the Space Sidebar story fixture', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Collection 3' }));
 
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Collection 3');
+  });
+
+  it('authors a title against the Space it is handed now', async () => {
+    const edited = loadSpaceSnapshot(editedSnapshot);
+    if (!edited.ok) throw new Error(edited.errors.map((error) => error.message).join('\n'));
+
+    const { rerender } = render(<SpaceSidebarFixture />);
+    rerender(<SpaceSidebarFixture space={edited.space} />);
+
+    const collection = screen.getByRole('button', { name: 'Collection 3' });
+    fireEvent.click(collection);
+    fireEvent.click(collection);
+    const title = screen.getByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(title, { target: { value: 'Renamed collection' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Renamed collection' })).toBeVisible(),
+    );
   });
 });

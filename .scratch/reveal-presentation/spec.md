@@ -1,6 +1,6 @@
 # Presenting is a reveal.js deck
 
-Source: conversation 2026-07-20, recorded as [ADR 0008](../../docs/adr/0008-presentation-is-a-reveal-deck.md).
+Source: conversation 2026-07-20, recorded as [ADR 0008](../../docs/adr/superseded/0008-presentation-is-a-reveal-deck.md).
 
 Status: superseded by [ADR 0024](../../docs/adr/0024-presenting-is-traversing-a-route.md)
 and [ADR 0027](../../docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md).

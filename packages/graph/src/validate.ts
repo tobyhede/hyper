@@ -13,9 +13,11 @@ import { repeatedGraphEdges } from './graph-edges';
  * an edge endpoint is a card of *that* layout.
  */
 export interface Referenceable {
+  readonly id: UUID;
   readonly cards: readonly Card[];
   readonly layouts?: readonly Layout[] | undefined;
   readonly defaultRenderer?: UUID | undefined;
+  readonly ancestorSpaceIds: readonly UUID[];
 }
 
 /**
@@ -48,7 +50,9 @@ export type SpaceReferenceErrorKind =
   | 'duplicate-graph-edge'
   | 'unresolved-alias-target'
   | 'alias-self-reference'
-  | 'alias-targets-alias';
+  | 'alias-targets-alias'
+  | 'alias-target-must-own-content'
+  | 'space-card-reference-cycle';
 
 /**
  * One failed cross-reference. Named for the space whose references it is about,
@@ -272,7 +276,25 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         ref: card.target,
         message: `Alias "${card.id}" targets alias "${card.target}"; aliasing is a single hop`,
       });
+      continue;
     }
+    if (target.kind !== 'markdown') {
+      errors.push({
+        kind: 'alias-target-must-own-content',
+        ref: card.target,
+        message: `Alias "${card.id}" targets ${target.kind} Card "${card.target}"; aliases show Markdown content`,
+      });
+    }
+  }
+
+  const cycleTargets = new Set<UUID>([space.id, ...space.ancestorSpaceIds]);
+  for (const card of space.cards) {
+    if (card.kind !== 'space' || !cycleTargets.has(card.spaceId)) continue;
+    errors.push({
+      kind: 'space-card-reference-cycle',
+      ref: card.spaceId,
+      message: `Space Card "${card.id}" targets Space "${card.spaceId}", which is the current Space or one of its open ancestors`,
+    });
   }
 
   return errors;

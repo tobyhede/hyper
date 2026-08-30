@@ -301,6 +301,29 @@ describe('CardNode canvas Card state adapter', () => {
 
     expect(screen.getByRole('img', { name: 'Markdown Card' })).toBeVisible();
   });
+
+  it('renders a Space Card through an explicit non-Markdown front', () => {
+    const onEditCard = vi.fn();
+    const onBeginBodyEditing = vi.fn();
+    render(
+      <CardNode
+        {...props({
+          kind: 'space',
+          expanded: true,
+          body: 'must not render',
+          cardEditingEnabled: true,
+          onEditCard,
+          onBeginBodyEditing,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'space');
+    expect(screen.getByRole('img', { name: 'Space Card' })).toBeVisible();
+    expect(screen.queryByText('must not render')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open Card A' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit Card A' })).toBeNull();
+  });
 });
 
 describe('CardNode Open authoring', () => {

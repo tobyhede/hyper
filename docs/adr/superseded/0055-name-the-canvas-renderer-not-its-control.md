@@ -1,8 +1,8 @@
 # Name the canvas renderer, not its control
 
-Status: accepted
+Status: superseded
+Superseded by: 0068
 Refines: 0053
-Refined by: 0072
 
 A **canvas renderer** is a View or Layout in the role of drawing the canvas. Its
 in-memory identity is `CanvasRendererId`, a tagged choice between a built-in View

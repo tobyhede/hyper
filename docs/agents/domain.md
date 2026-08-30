@@ -17,14 +17,16 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 /
 ├── CONTEXT.md
 ├── docs/adr/
+│   ├── README.md                       the accepted set, one line each
 │   ├── 0001-recursive-spaces.md
 │   ├── 0002-layout-view-separation.md
-│   ├── 0003-routes-may-conflict.md
+│   ├── ADR 0003
 │   ├── 0004-cards-are-the-graph.md
 │   ├── 0005-layout-is-a-strategy.md
-│   ├── 0006-cards-show-titles-in-the-graph.md
-│   ├── 0007-routes-are-the-only-structure.md
-│   └── 0008-presentation-is-a-reveal-deck.md
+│   ├── ADR 0007
+│   └── superseded/                     retired decisions, kept as history
+│       ├── 0006-cards-show-titles-in-the-graph.md
+│       └── 0008-presentation-is-a-reveal-deck.md
 └── packages/
 ```
 
@@ -36,7 +38,7 @@ When your output names a domain concept (in an issue title, a refactor proposal,
 
 If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap to record during domain review.
 
-Check an ADR's `Status:` before relying on it — a superseded one is history, not a rule. Its `Refines`/`Refined by` links point at the decisions that narrowed it. Never edit an accepted ADR; see `docs/agents/workflow.md`.
+A superseded ADR lives in `docs/adr/superseded/`, so the top-level listing is the live set; `docs/adr/README.md` states each accepted decision in one line. Check an ADR's `Status:` before relying on it — a superseded one is history, not a rule. Its `Refines`/`Refined by` links point at the decisions that narrowed it. Never edit an accepted ADR; see `docs/agents/workflow.md`.
 
 ## Flag ADR conflicts
 

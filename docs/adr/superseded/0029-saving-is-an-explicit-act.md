@@ -1,6 +1,7 @@
 # Saving is an explicit act, and an edit never writes
 
-Status: superseded by ADR 0030
+Status: superseded
+Superseded by: 0030
 Refines: 0025
 Related: 0018, 0021, 0028
 

@@ -736,10 +736,14 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
   }
 
   const storiesRoot = join(repositoryRoot, 'packages/app/stories');
-  const prefixes = new Map([
-    ['components', 'Components/'],
-    ['surfaces', 'Surfaces/'],
-    ['review', 'Review/'],
+  const categories = new Map([
+    ['components', { prefixes: ['Components/'], stable: true }],
+    ['surfaces', { prefixes: ['Surfaces/'], stable: true }],
+    ['space', { prefixes: ['Space/'], stable: true }],
+    // Review remains an evidence boundary, not a navigation bucket. A staged
+    // production surface may sit beside the stable stories it will eventually
+    // join without becoming parity evidence before the application reaches it.
+    ['review', { prefixes: ['Review/', 'Space/'], stable: false }],
   ]);
   const stories: string[] = [];
   const stableExports = new Set<string>();
@@ -747,16 +751,16 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
   for (const path of filesBelow(storiesRoot, '.stories.tsx')) {
     const storyPath = relative(storiesRoot, path).split(sep).join('/');
     const category = storyPath.split('/')[0] ?? '';
-    const prefix = prefixes.get(category);
+    const taxonomy = categories.get(category);
     const storySource = sourceFile(path);
     const title = literalStoryTitle(storySource);
-    if (prefix === undefined) problems.push(`${storyPath} is outside the catalogue taxonomy`);
+    if (taxonomy === undefined) problems.push(`${storyPath} is outside the catalogue taxonomy`);
     else if (title === null) problems.push(`${storyPath} must declare a literal default title`);
-    else if (!title.startsWith(prefix))
-      problems.push(`${storyPath} title must start with ${prefix}`);
+    else if (!taxonomy.prefixes.some((prefix) => title.startsWith(prefix)))
+      problems.push(`${storyPath} title must start with ${taxonomy.prefixes.join(' or ')}`);
     else {
       stories.push(title);
-      if (category === 'components' || category === 'surfaces') {
+      if (taxonomy.stable) {
         stableStoryFiles.push(path);
         for (const name of namedStoryExports(storySource))
           stableExports.add(`${storyPath}#${name}`);

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CanvasCard } from '../src';
 
@@ -272,7 +272,12 @@ describe('CanvasCard Open and Close operation', () => {
         button.getAttribute('aria-label'),
       ),
     ).toEqual(['Save Card A', 'Cancel editing Card A', 'Close Card A']);
-    expect(screen.getByRole('button', { name: 'Close Card A' })).toBeDisabled();
+    // Unavailable through `aria-disabled` rather than the native property, so
+    // the control keeps its place in the rail's arrow order (ADR 0073). Drawn
+    // and unreachable is the state this replaces.
+    const close = screen.getByRole('button', { name: 'Close Card A' });
+    expect(close).toHaveAttribute('aria-disabled', 'true');
+    expect(close).not.toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Edit Title A' })).not.toBeInTheDocument();
     // The one fact the stylesheet reads to keep the rail up while the caret is
     // in the body, where no hover or focus of the rail's own is true.
@@ -493,6 +498,25 @@ describe('CanvasCard title editor', () => {
     expect(onReturnFocus).toHaveBeenCalledOnce();
   });
 
+  it('restores focus to a title draft refused on blur', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="editing"
+        title="A"
+        graphColor="#ffc53d"
+        onCompleteTitleEdit={() => 'A Card title is required.'}
+        onCancelTitleEdit={() => undefined}
+        onReturnFocus={() => undefined}
+      />,
+    );
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+
+    act(() => input.blur());
+
+    expect(input).toHaveFocus();
+  });
+
   it('completes on blur, cancels and returns focus on Escape, and leaks no editor event', () => {
     const onCompleteTitleEdit = vi.fn(() => null);
     const onCancelTitleEdit = vi.fn();
@@ -571,6 +595,38 @@ describe('CanvasCard title editor', () => {
 });
 
 describe('CanvasCard open Markdown front', () => {
+  it('repeats transition durations cyclically when timing the opacity exit', async () => {
+    vi.useFakeTimers();
+    const computed = document.createElement('div').style;
+    computed.transitionProperty = 'color, transform, width, opacity';
+    computed.transitionDuration = '10ms, 100ms';
+    const style = vi.spyOn(window, 'getComputedStyle').mockReturnValue(computed);
+    const { rerender } = render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: 'Leaving body', open: true }}
+        state="rest"
+        title="Strategies"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    rerender(
+      <CanvasCard
+        front={{ kind: 'markdown', source: 'Leaving body', open: false }}
+        state="rest"
+        title="Strategies"
+        graphColor="#ffc53d"
+      />,
+    );
+    await act(() => vi.advanceTimersByTime(99));
+    expect(screen.getByText('Leaving body')).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByText('Leaving body')).not.toBeInTheDocument();
+
+    style.mockRestore();
+    vi.useRealTimers();
+  });
+
   it('draws nothing below its Title while authored closed state says so', () => {
     render(
       <CanvasCard

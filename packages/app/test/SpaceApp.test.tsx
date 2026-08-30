@@ -335,7 +335,7 @@ describe('Space app failure reporting', () => {
       presentationCardId: null,
     });
 
-    expect(await screen.findByRole('button', { name: 'Present Addressed' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Present' })).toBeVisible();
     expect(session.getState().working).toEqual(addressed);
   });
 

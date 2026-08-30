@@ -10,7 +10,6 @@ import {
   authoringHandle,
   AUTHORING_HANDLE_SIDES,
   boxOf,
-  canvasKind,
   connectHandles,
   connectToEmptyWithAlt,
   dragBy,
@@ -577,7 +576,6 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await expect(persistence).toHaveText('Persisted');
   await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(canvasKind(page)).toHaveText('Authored layout');
 
   const to = await positionOf(a);
   expect(to.y).toBeGreaterThan(from.y + 100);
@@ -638,7 +636,6 @@ test(
     ).toHaveCount(1);
 
     await selectCanvas(page, 'Grid');
-    await expect(canvasKind(page)).toHaveText('Computed view');
     await expect(sidebar(page).getByRole('button', { name: 'Grid' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -667,12 +664,10 @@ test('opening from Flow is refused without converting or moving Cards', async ({
   await settled(page);
   const before = await allPositions(page);
   const persistence = page.getByTestId('persistence-status');
-  await expect(canvasKind(page)).toHaveText('Computed view');
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
   await openCard(card, 'A');
 
-  await expect(canvasKind(page)).toHaveText('Computed view');
   await expect(selectedCanvas(page)).toContainText('Flow');
   await expect(persistence).toHaveAttribute('data-revision', '0');
   expect(await allPositions(page)).toEqual(before);
@@ -1311,7 +1306,6 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
       const before = await allPositions(page);
       const persistence = page.getByTestId('persistence-status');
       await expect(persistence).toHaveAttribute('data-revision', String(index));
-      await expect(canvasKind(page)).toHaveText('Computed view');
 
       await expect(sourceHandle).toHaveCSS('opacity', '1');
       const from = (await sourceHandle.boundingBox())!;
@@ -1328,7 +1322,6 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
       await quiescent(page);
       await expect(persistence).toHaveAttribute('data-revision', String(index));
       await expect(persistence).toHaveText('Persisted');
-      await expect(canvasKind(page)).toHaveText('Computed view');
       expect(await allPositions(page)).toEqual(before);
 
       await source.hover();
@@ -1343,7 +1336,6 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
       await expect(persistence).toHaveAttribute('data-revision', String(index + 1));
       await expect(persistence).toHaveText('Persisted');
       await expect(selectedCanvas(page)).toContainText(`Layout ${index + 1}`);
-      await expect(canvasKind(page)).toHaveText('Authored layout');
       await settled(page);
       expect(await allPositions(page)).toEqual(before);
     });
@@ -1407,6 +1399,45 @@ test('editing an existing Layout updates it instead of creating another one', as
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(sidebar(page).getByRole('button', { name: 'Layout 1', exact: true })).toHaveCount(1);
 });
+
+test(
+  'Layout and Graph names edit from Space chrome and survive reload',
+  { tag: '@parity:space-chrome-edits-names' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await selectedCanvas(page)
+      .getByRole('button', { name: 'Edit Space View Collection 1' })
+      .click();
+    const layoutName = page.getByRole('textbox', { name: 'Layout name' });
+    await layoutName.fill('Workshop');
+    await expect(
+      sidebar(page).getByRole('button', { name: 'Workshop', pressed: true }),
+    ).toBeVisible();
+    await layoutName.press('Enter');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    await expect(selectedCanvas(page)).toContainText('Workshop');
+
+    await sidebar(page).getByRole('button', { name: 'Workshop', pressed: true }).click();
+    const sidebarLayoutName = page.getByRole('textbox', { name: 'Layout name' });
+    await sidebarLayoutName.fill('Studio');
+    await expect(selectedCanvas(page)).toContainText('Studio');
+    await sidebarLayoutName.press('Enter');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+
+    await sidebar(page).getByRole('button', { name: 'Long', pressed: true }).click();
+    const graphName = page.getByRole('textbox', { name: 'Graph name' });
+    await graphName.fill('Journey');
+    await graphName.press('Enter');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
+
+    await page.reload();
+    await selectCanvas(page, 'Studio');
+    await expect(sidebar(page).getByRole('button', { name: 'Journey', exact: true })).toBeVisible();
+  },
+);
 
 /**
  * Dragged in an authored Layout, because that is where a Card and the Edges
@@ -1676,7 +1707,6 @@ test('drawing an Edge the emphasised Graph already holds converts rather than re
   const before = await allPositions(page);
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '0');
-  await expect(canvasKind(page)).toHaveText('Computed view');
 
   await source.hover();
   await connectHandles(
@@ -2111,7 +2141,6 @@ test(
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
     // The tracked fixture names no `defaultRenderer`, so this opens in Flow.
-    await expect(canvasKind(page)).toHaveText('Computed view');
 
     await selectAnEdge(page);
     await page.getByRole('button', { name: 'Edit this Edge' }).click();
@@ -2143,7 +2172,6 @@ test(
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
-    await expect(canvasKind(page)).toHaveText('Computed view');
     const drawn = await page.locator('.react-flow__edge').count();
 
     await selectAnEdge(page);
@@ -2572,7 +2600,6 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await expect(page.getByTestId('new-alias')).toHaveCount(0);
   await quiescent(page);
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
-  await expect(canvasKind(page)).toHaveText('Computed view');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
   await expect(page.getByTestId('add-card-menu')).toBeFocused();
 });

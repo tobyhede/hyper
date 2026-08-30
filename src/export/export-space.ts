@@ -117,9 +117,18 @@ const canonicalCard = (
     id,
     title: document.title,
   };
-  return document.kind === 'alias'
-    ? { ...common, kind: 'alias', target: document.target }
-    : { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
+  if (document.kind === 'alias') return { ...common, kind: 'alias', target: document.target };
+  if (document.kind === 'space') {
+    const card: Extract<Card, { kind: 'space' }> = {
+      ...common,
+      kind: 'space',
+      spaceId: document.spaceId,
+    };
+    if (document.spaceView !== undefined) card.spaceView = document.spaceView;
+    if (document.graph !== undefined) card.graph = document.graph;
+    return card;
+  }
+  return { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
 };
 
 const exists = async (path: string): Promise<boolean> => {

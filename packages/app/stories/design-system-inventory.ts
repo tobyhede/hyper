@@ -65,6 +65,11 @@ export const uncataloguedComponents = [
       'The `ReactFlow` instance itself — nodes, edges, viewport, gestures. Stories that need a real canvas build their own instance from the same production projection (`GraphHudFixture`, `SelectedEdgeCanvasFixture`, `ReactFlowCanvas`) rather than mounting the application-wired one, which would carry the session with it.',
   },
   {
+    module: 'packages/app/src/components/OpenSpaceSidebars.tsx',
+    reason:
+      'Production composition staged by `space-cards/09` under `stories/review`: issue 11 supplies the application path and promotes it with parity evidence. Until then a stable story would claim production reachability the application does not have.',
+  },
+  {
     module: 'packages/app/src/components/AuthorableEdge.tsx',
     reason:
       'Debt with an owner. It is rendered on a real canvas by `Review/Selected Edge On Canvas`, which carries no parity claim on purpose — the Edge line, its colour and its reconnection affordance have no stable story yet. Promoting that review story is the remaining Edge work, and it is blocked on the reconnected-Edge selection defect recorded in `findings/reconnected-edge-loses-its-selection.md`.',
@@ -105,6 +110,11 @@ export const uncataloguedComponents = [
       'The line React Flow draws between the pointer and its origin during a connection drag. Like the new-Card preview above, it exists only for the duration of a gesture and has no still state to render.',
   },
   {
+    module: 'packages/ui/src/OpenSpaces.tsx',
+    reason:
+      'Production presentation staged by `space-cards/09` under `stories/review`: issue 11 supplies the application path and promotes it with parity evidence. Its own tabs interaction and mounted-panel behavior are covered by `packages/ui/test/OpenSpaces.test.tsx` meanwhile.',
+  },
+  {
     module: 'packages/ui/src/Select.tsx',
     reason:
       'Deliberately without a consumer. ADR 0053 deleted the three renderer selectors it drew, and ADR 0050 names `Select` a foundation primitive, so retiring it is a foundation decision rather than a surface one (AGENTS.md). It keeps its own test in `packages/ui/test`.',
@@ -113,6 +123,11 @@ export const uncataloguedComponents = [
     module: 'packages/ui/src/Command.tsx',
     reason:
       'Deliberately without a consumer, like `Select` above. It wraps cmdk, which ADR 0050 kept rather than migrating; `CardSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
+  },
+  {
+    module: 'packages/ui/src/components/tabs.tsx',
+    reason:
+      "Consumed by `OpenSpaces`, which `space-cards/09` stages under `stories/review` until issue 11 supplies an application path and stable parity evidence. Its direct tests still hold the Base UI wrapper's vertical roving tabindex and `keepMounted` behavior independently of that composition.",
   },
   {
     module: 'packages/ui/src/components/empty.tsx',

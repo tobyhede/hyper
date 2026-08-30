@@ -271,6 +271,27 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
   });
 
   /**
+   * The Space chrome's own title draft, which lives outside the keyed canvas
+   * subtree and so is reached by none of the mechanisms above. A Layout rename
+   * left uncompleted names a Layout the accepted Space may not hold, and
+   * completing it afterwards writes against whatever Layout now resolves.
+   */
+  it('discards a Layout rename holding an uncompleted draft', async () => {
+    const session = await mountedSpaceApp();
+    fireEvent.click(screen.getByRole('button', { name: 'Layout', pressed: true }));
+    const name = screen.getByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(name, { target: { value: 'Name nobody pressed Enter on' } });
+    expect(name).toHaveValue('Name nobody pressed Enter on');
+
+    await raiseConflict(session);
+    acceptRemote();
+
+    await replacementLanded();
+    expect(screen.queryByRole('textbox', { name: 'Layout name' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Name nobody pressed Enter on')).not.toBeInTheDocument();
+  });
+
+  /**
    * React Flow's drag attempt, which ADR 0042 names alongside the title fields.
    *
    * A drag in flight is a draft in two places at once: the render adapter's

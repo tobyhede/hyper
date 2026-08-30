@@ -3,7 +3,7 @@
 Status: accepted
 Supersedes: 0006, 0011, 0037
 Refines: 0048, 0063
-Refined by: 0066, 0070
+Refined by: 0066, 0070, 0073
 Related: 0024, 0025, 0027, 0036, 0040, 0045, 0051, 0058, 0065
 
 Opening a Card draws its content **on the Card**, by growing that Card on the

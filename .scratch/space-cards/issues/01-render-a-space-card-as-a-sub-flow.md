@@ -1,87 +1,28 @@
-# Render a Space Card as a sub flow
+# 01 — Draw an open Space Card as a compound-canvas sub flow
 
-Status: needs-triage
-Blocked by: 02 — Grill the Space Card model (resolved; ADR 0058); 03 — Build the Space Card kind in core
+**What to build:** An open Space Card draws the Space View it selects, in place on the containing canvas, as React Flow sub-flow nodes in the containing instance.
 
-Surfaced by: asking how a Space Card should be drawn, while deciding the View
-interface for ADR 0045
+**Blocked by:** 03 — Build the Space Card kind in core.
 
-## The idea
+**Status:** ready-for-agent
 
-A Space Card points at another Space. Today nothing says what it looks like on
-the canvas beyond being a Card. The proposal is that it renders as a **frame**
-containing the Space it points at — a portal onto the target Space's current
-canvas renderer, drawn in place rather than only on open.
+Rewritten by issue 08 against ADR 0068, which is now accepted. Most of what this ticket originally listed as undecided is decided; what is left is adapter work and one open UX question.
 
-```
-[Card]
+- [ ] Opening a Space Card embeds the **Space View the Card selects** — not the target Space's own active selection. Both renderer subjects are in scope: a selected Layout uses its authored placement, and a Computed View resolves its strategy and uses the computed placement. Opening is not an Edit, so it never converts a Computed View (ADR 0025).
+- [ ] The embedded Space draws as sub-flow nodes in the containing React Flow instance — the **compound canvas** ADR 0068's UX review favours — with `parentId` set. One store, one viewport. This is the embedded open-Card case only: Enter is exempt and gets its own instance and camera (ADR 0068, issue 11).
+- [ ] `elkStrategy` gains ELK's compound-node support. It builds a flat graph today, and the seam that feels it is `LayoutStrategyGraph`, which has no notion of a nested Card set.
+- [ ] A drag from a Card inside the frame to a Card outside it is **not** refused any more. ADR 0068 makes it a cross-Space Edge owned by the containing Graph, with `GraphEdgeEndpoint = CardId | { spaceCard, graph, card }`. Exactly one qualified endpoint is legal; two is not, because one Edge crosses exactly one Space Card. Intake resolves both endpoint forms before traversal or rendering reads them.
+- [ ] Removing a Space Card from a Layout removes its incident local **and** cross-Space Edges from that Layout's Graphs, since the Space Card is semantically incident to every Edge crossing its boundary even when it is not an endpoint.
+- [ ] Presenting pauses on a Space Card only when an authored Edge actually reaches that Card. A direct Edge into the target Space manufactures no hidden stop, and a Space Card serving only as an overview needs no Edge at all.
 
-[Space Card      ]
-[ [Card] [Card]  ]
-[                ]
-```
+## Still a hypothesis, and this ticket has to settle it
 
-Expandable: collapsed it is an ordinary Card Front; expanded it draws the
-target Space's current canvas renderer. Making the nested Space *editable*
-through the frame is a separate question and explicitly not part of this one.
+ADR 0068 leaves two things open by name: **how a cross-Space Edge is drawn across the open Space Card**, and how several leaving one Card are offered as a fork. They are not limited to one — several are the same kind of fork as several local Edges. The camera question is smaller than it was: the compound canvas shares the containing camera by construction, so `fitView` at a Space Card frames the Card, and framing something inside it is a nested-presenting question this ticket does not open.
 
-React Flow calls this a **sub flow** and it is a documented feature: "A sub flow
-is a flow inside a node." It is not a second canvas — it is nodes inside one
-canvas with `parentId` set, sharing one store and one viewport. The mechanism
-and its constraints are recorded in
-`.scratch/react-flow-guidance/findings.md` §8.
+## No longer blocking
 
-**Both renderer subjects are in scope.** If the target currently selects a
-Layout, the frame uses that Layout's authored placement and Graphs. If it
-selects an Algorithmic View, the frame resolves that View's strategy and uses
-its computed placement and Graphs. Expanding the Space Card does not convert an
-Algorithmic View because rendering alone is not an Edit.
-
-## What blocks it outright
-
-**There is still no Space Card in the schema.** `cardSchema` is
-`z.discriminatedUnion('kind', [markdownCardSchema, aliasCardSchema])`
-(`packages/core/src/schema.ts:117`) and `'space'` appears nowhere in `core`.
-This is now an implementation gap rather than an open design question: Issue
-02 settled what a Space Card is (ADR 0058) — kind `space`, a bare
-`{ spaceId }` reference with no pinned Layout/View, ownership rather than a
-retargetable pointer, atomic creation, cascading deletion, and cycle
-rejection at `loadSpace` intake. The "Space plus a configured Layout/View"
-framing this ticket originally floated was rejected: a Space Card always
-opens to whatever the target Space's own renderer choice currently is.
-
-## What it runs into, once the kind exists
-
-**One viewport.** A sub flow shares the parent's store and camera, and a child's
-position is relative to the parent's top-left. The nested renderer's
-coordinates therefore need transforming into the parent's space rather than
-passing through, and the nested content renders at the parent's zoom.
-
-**ELK does not do the hierarchy today.** `elkStrategy` builds a flat graph.
-Arranging a Layout containing an expanded Space Card needs ELK's compound-node
-support — real adapter work, and the seam that would feel it is
-`LayoutStrategyGraph`, which has no notion of a nested card set.
-
-**React Flow permits an Edge the domain forbids.** Sub flows explicitly allow
-"connections that go from a sub flow to an outer node". ADR 0040 closes every
-Edge over its owning Layout's Card set, and a nested Space's Cards are not
-members of the outer Layout. That gesture has to be refused deliberately — a
-connection dragged from a Card inside the frame to a Card outside it is
-something the library will happily offer.
-
-**Presenting and the camera.** ADR 0044 frames the presented Card with one
-`fitView({ nodes: [{ id }] })`. What that means for a Space Card — frame the
-card, or frame something inside it — is undecided, and traversing *into* a
-nested Space during presenting is a Graph navigation question ADR 0024 does not
-cover.
+The original ticket listed the missing kind, the ownership model, and cycle rejection as blockers. Issue 03 builds the kind, and ADR 0068 settled the model: the reference is not ownership, references may converge but not cycle, and the Card carries its own Space View and Graph selections.
 
 ## Not in scope here
 
-Editing the nested Space through the frame. Nested presenting. Whether a Space
-Card can be expanded in more than one Layout at once. Recursion depth and what
-stops a Space containing itself — ADR 0009's single-hop rule is about Aliases
-and says nothing about Space nesting.
-
-## Suggested next step
-
-Blocked on Issue 03 (build the kind in `core`). Schedulable once that lands.
+Entering a Space Card and the Open Spaces surface (issue 11). Nested presenting. Editing the embedded Space through the frame.

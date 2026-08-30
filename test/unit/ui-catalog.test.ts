@@ -115,6 +115,35 @@ describe('UI catalogue', () => {
     expect(() => buildUiCatalog(root)).toThrowError(/title must start with Surfaces\//);
   });
 
+  it('treats Space as a stable application-surface section', () => {
+    const root = fixture();
+    write(
+      root,
+      'packages/app/stories/space/space.stories.tsx',
+      "export default { title: 'Space/Space' }; export const Settled = () => null;",
+    );
+    write(
+      root,
+      'packages/app/stories/parity-claims.ts',
+      `export const parityClaims = [
+        { id: 'button-is-operable', storyFile: 'components/button.stories.tsx', storyExport: 'Primary', claim: 'The Button can be operated.' },
+        { id: 'space-is-composed', storyFile: 'space/space.stories.tsx', storyExport: 'Settled', claim: 'The Space surface is composed.' }
+      ] as const;`,
+    );
+    write(
+      root,
+      'packages/app/ladle-e2e/space.spec.ts',
+      `test('space story', { tag: '@parity:space-is-composed' }, async () => undefined);`,
+    );
+    write(
+      root,
+      'packages/app/e2e/space.spec.ts',
+      `test('space application', { tag: '@parity:space-is-composed' }, async () => undefined);`,
+    );
+
+    expect(buildUiCatalog(root).stories).toContain('Space/Space');
+  });
+
   it('rejects a stable story without one proof in each Playwright suite', () => {
     const root = fixture();
     write(
@@ -576,6 +605,23 @@ describe('production component coverage', () => {
       root,
       'packages/app/stories/review/proposal.stories.tsx',
       `import { Thing } from '../../src/components/NewAlias';\nexport default { title: 'Review/Proposal' };\nexport const Draft = () => Thing;\n`,
+    );
+
+    expect(() => buildUiCatalog(root)).toThrowError(
+      /packages\/app\/src\/components\/NewAlias\.tsx is rendered by no stable story/,
+    );
+  });
+
+  it('lets a review-only surface appear beside its future Space stories', () => {
+    const root = fixture();
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(
+      root,
+      'packages/app/stories/review/multiple-spaces.stories.tsx',
+      `import { Thing } from '../../src/components/NewAlias';
+export default { title: 'Space/Multiple Spaces' };
+export const MultipleSpaces = () => Thing;
+`,
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(

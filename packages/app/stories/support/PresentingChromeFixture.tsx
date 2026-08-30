@@ -7,7 +7,7 @@ import { canRetreat } from '#src/navigation';
 import { usePresentingKeys } from '#src/presenting-keys';
 import { PresentingChrome } from '#components/PresentingChrome';
 import { useStoryNavigation } from './navigation';
-import { walkthroughSpace } from './spaces';
+import { traversalSpace } from './spaces';
 
 export interface PresentingChromeFixtureProps {
   /** Which Space is traversed. See `./spaces`. */
@@ -52,7 +52,7 @@ export interface PresentingChromeFixtureProps {
  * is nothing about a canvas for a facsimile to get wrong or right.
  */
 export function PresentingChromeFixture({
-  space = walkthroughSpace,
+  space = traversalSpace,
   advances = 0,
   width = '100%',
 }: PresentingChromeFixtureProps) {

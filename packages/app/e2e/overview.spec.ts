@@ -135,7 +135,6 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
   // Declaring Layouts is not naming one to open in: `defaultRenderer` is absent, so
   // the fixture arrives in Flow with no Layout selected.
   await expect(selectedCanvas(page)).toContainText('Flow');
-  await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
   await expect(sidebar(page).getByTestId('canvas-renderer')).toHaveCount(4);
 
   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.

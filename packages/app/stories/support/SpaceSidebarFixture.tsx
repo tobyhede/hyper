@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import type { Space } from '@project/graph';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Placement, type Space } from '@project/graph';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
@@ -12,11 +12,18 @@ import { AppShell } from '@project/ui';
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { canvasRenderers, currentRenderer } from '#src/canvas-renderers';
 import { graphColorMap } from '#src/colors';
-import { createWorkingSpaceReader } from '#src/snapshot';
+import { describeAuthoringRefusal } from '#src/authoring-refusal';
+import { createWorkingSpaceReader, snapshotFromSpace } from '#src/snapshot';
+import { createSpaceAuthoring } from '#src/space-authoring';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
-import { SelectedCanvasRenderer, SpaceSidebar } from '#components/SpaceSidebar';
+import {
+  SelectedCanvasRenderer,
+  SpaceSidebar,
+  type SpaceChromeTitleEdit,
+  type SpaceChromeTitleSubject,
+} from '#components/SpaceSidebar';
 import { useStoryNavigation } from './navigation';
-import { authoredSnapshot, authoredSpace, editedSnapshot } from './spaces';
+import { authoredSnapshot, authoredSpace, editedSnapshot, storyGraphIds } from './spaces';
 
 export interface SpaceSidebarFixtureProps {
   /** Which Space the sidebar reports on. See `./spaces`. */
@@ -49,8 +56,29 @@ export function SpaceSidebarFixture({
   acknowledgedRevision = 4n,
   onRetry = () => undefined,
 }: SpaceSidebarFixtureProps) {
-  const suppliedSpace = useCallback(() => space, [space]);
-  const readCurrentSpace = currentSpace ?? suppliedSpace;
+  const [titleEdit, setTitleEdit] = useState<{
+    readonly subject: SpaceChromeTitleSubject;
+    readonly draft: string;
+    readonly error: string | null;
+    readonly surface: 'sidebar' | 'header';
+    readonly returnFocus: () => void;
+  } | null>(null);
+  const editSession = useMemo(() => {
+    const snapshot = snapshotFromSpace(space);
+    return openSpaceSession(
+      new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]),
+      { snapshot, revision: 0n, exportedRevision: null },
+    );
+  }, [space]);
+  const readEditedSpace = useMemo(() => createWorkingSpaceReader(), []);
+  const editSessionState = useSyncExternalStore(editSession.subscribe, editSession.getState);
+  const editedSpace = readEditedSpace(editSessionState.working);
+  const readEditableSpace = useCallback(
+    () => readEditedSpace(editSession.getState().working),
+    [editSession, readEditedSpace],
+  );
+  const readCurrentSpace = currentSpace ?? readEditableSpace;
+  const displayedSpace = currentSpace === undefined ? editedSpace : space;
   const {
     navigation,
     state: navigationState,
@@ -58,6 +86,18 @@ export function SpaceSidebarFixture({
   } = useStoryNavigation(readCurrentSpace, (composed) => {
     if (presenting) composed.present();
   });
+  const authoring = useMemo(() => {
+    const selected = navigation.getState().selectedRenderer;
+    const selectedLayout = readEditableSpace().lookup.layout(selected)?.layout;
+    return createSpaceAuthoring({
+      session: editSession,
+      navigation,
+      currentSpace: readEditableSpace,
+      resolveRenderer,
+      initialPlacement: selectedLayout === undefined ? null : Placement.fromLayout(selectedLayout),
+      newId: storyGraphIds(),
+    });
+  }, [editSession, navigation, readEditableSpace, resolveRenderer]);
   // Where `presenting` is honoured now that Navigation outlives it. Reconciled
   // against the mode rather than applied, so the mount the initializer already
   // presented publishes nothing here, and so a story's own Present button — the
@@ -73,23 +113,47 @@ export function SpaceSidebarFixture({
   // the header below reads the row it named rather than a title of the
   // fixture's own. The selected renderer, its Active Graph and its mode are all
   // Navigation's published state.
-  const renderers = canvasRenderers(space);
+  const renderers = canvasRenderers(displayedSpace);
   const current = currentRenderer(renderers, navigationState.selectedRenderer);
-  const renderer = resolveRenderer(space, navigationState.selectedRenderer);
+  const renderer = resolveRenderer(displayedSpace, navigationState.selectedRenderer);
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
-  const colorByGraphId = graphColorMap(space);
-  const linkedCard = space.cards[0];
+  const colorByGraphId = graphColorMap(displayedSpace);
+  const linkedCard = displayedSpace.cards[0];
   const recordCopyCommand = (command: string) => () => {
     document.body.dataset['copyCommand'] = command;
+  };
+  const chromeTitleEdit: SpaceChromeTitleEdit = {
+    subject: presenting || authoringDisabled ? null : (titleEdit?.subject ?? null),
+    surface: presenting || authoringDisabled ? null : (titleEdit?.surface ?? null),
+    draft: titleEdit?.draft ?? '',
+    error: titleEdit?.error ?? null,
+    disabled: authoringDisabled || presenting,
+    onBegin: (subject, title, surface, returnFocus) =>
+      setTitleEdit({ subject, draft: title, error: null, surface, returnFocus }),
+    onDraftChange: (draft) =>
+      setTitleEdit((current) => (current === null ? null : { ...current, draft })),
+    onErrorChange: (error) =>
+      setTitleEdit((current) => (current === null ? null : { ...current, error })),
+    onComplete: (subject, title) => {
+      const result =
+        subject.kind === 'layout'
+          ? authoring.complete({ kind: 'renamed-layout', layoutId: subject.id, title })
+          : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
+      if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
+      setTitleEdit(null);
+      return null;
+    },
+    onCancel: () => setTitleEdit(null),
+    onReturnFocus: () => titleEdit?.returnFocus(),
   };
 
   return (
     <AppShell
       sidebar={
         <SpaceSidebar
-          spaceTitle={space.title}
+          spaceTitle={displayedSpace.title}
           canvas={{ renderers, current, onSelect: navigation.selectRenderer }}
           graph={{
             graphs: renderer.subject.graphs,
@@ -131,9 +195,10 @@ export function SpaceSidebarFixture({
                   onCopyContextual: recordCopyCommand('card-contextual'),
                 }
           }
+          titleEdit={chromeTitleEdit}
         />
       }
-      header={<SelectedCanvasRenderer renderer={current} />}
+      header={<SelectedCanvasRenderer renderer={current} titleEdit={chromeTitleEdit} />}
       notice={<PersistenceNotice persistence={persistence} onRetry={onRetry} />}
     >
       <div data-testid="space-canvas-stand-in" />

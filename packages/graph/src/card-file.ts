@@ -29,7 +29,7 @@ export type ParseImportCardFileResult =
   { ok: true; card: ImportCard } | { ok: false; errors: CardFileError[] };
 
 type CardFileFailure = { ok: false; errors: CardFileError[] };
-type Frontmatter = { kind: 'markdown' } | { kind: 'alias' };
+type Frontmatter = { kind: 'markdown' } | { kind: 'alias' } | { kind: 'space' };
 type DecodedCandidate<T extends Frontmatter> = T extends { kind: 'markdown' }
   ? T & { body: string }
   : T;
@@ -116,12 +116,11 @@ function decodeCardFile<T extends Frontmatter>(
     };
   }
 
-  // An alias is physically stored in a markdown file, but it owns no markdown
-  // content (ADR 0009). Check the post-frontmatter bytes before constructing
-  // the domain value: once `body` is absent from the alias schema, Zod would
-  // otherwise strip it as an unknown key and silently discard authored prose.
-  if (parsed.data.kind === 'alias' && split.body !== '') {
-    return fail('invalid-frontmatter', 'body: alias cards may not have a body');
+  // Only a Markdown Card owns the bytes after the frontmatter. Check before
+  // constructing the domain value: the other schemas would otherwise strip a
+  // body as an unknown key and silently discard authored prose.
+  if (parsed.data.kind !== 'markdown' && split.body !== '') {
+    return fail('invalid-frontmatter', `body: ${parsed.data.kind} cards may not have a body`);
   }
 
   const candidate =
@@ -149,7 +148,7 @@ function decodeCardFile<T extends Frontmatter>(
  * without knowing the default.
  */
 export function serializeCardFile(card: Card): string {
-  if (card.kind === 'alias') {
+  if (card.kind !== 'markdown') {
     return `${FENCE}${stringifyYaml(card)}${FENCE}\n`;
   }
 

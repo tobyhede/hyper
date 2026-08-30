@@ -358,12 +358,28 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/**
+ * The rule between two sidebar groups.
+ *
+ * Taken as generated bar **one correction**, the same class of registry drift
+ * `components/tabs.tsx` records. The registry writes the width as a bare
+ * `w-auto` beside `mx-2`, while `Separator`'s own base sets
+ * `data-[orientation=horizontal]:w-full`. twMerge groups a class by its
+ * modifiers as well as its property, so a bare `w-auto` and a variant-scoped
+ * `w-full` are different groups and neither replaces the other: both survive to
+ * the element, and the attribute selector is the more specific rule, so the
+ * separator takes the full content width and `mx-2` pushes it past both edges.
+ * `SidebarContent` then reports a `scrollWidth` 16px over its `clientWidth` — a
+ * permanent horizontal scrollbar in the sidebar. Scoping `w-auto` to the same
+ * variant puts the two in one group so the override merges. Re-check this when
+ * regenerating from the registry, which will bring the bare spelling back.
+ */
 function SidebarSeparator({ className, ...props }: React.ComponentProps<typeof Separator>) {
   return (
     <Separator
       data-slot="sidebar-separator"
       data-sidebar="separator"
-      className={cn('mx-2 w-auto bg-sidebar-border', className)}
+      className={cn('mx-2 bg-sidebar-border data-[orientation=horizontal]:w-auto', className)}
       {...props}
     />
   );

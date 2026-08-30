@@ -422,6 +422,59 @@ test('the rail replaces its Edit action with the two ends of a running edit', as
   await expect(actions).toHaveCSS('opacity', '1');
 });
 
+test('the rail is one toolbar: one tab stop, and its commands under the arrows', async ({
+  page,
+}) => {
+  await open(page, markdownStory);
+  const card = page.getByRole('article', { name: 'Strategies' });
+  const toolbar = card.getByRole('toolbar', { name: 'Card Strategies' });
+  await expect(toolbar).toHaveAttribute('aria-orientation', 'horizontal');
+
+  // One tab stop for the whole rail, whatever it carries. A canvas draws many
+  // Cards and each rail carries several commands, so a stop apiece would put
+  // the Cards themselves behind their own actions (ADR 0073).
+  await card.hover();
+  const edit = card.getByRole('button', { name: 'Edit Card Strategies' });
+  const close = card.getByRole('button', { name: 'Close Card Strategies' });
+  expect(
+    await toolbar
+      .getByRole('button')
+      .evaluateAll((buttons) => buttons.filter((button) => button.tabIndex === 0).length),
+  ).toBe(1);
+
+  await edit.focus();
+  await edit.press('ArrowRight');
+  await expect(close).toBeFocused();
+  await close.press('ArrowLeft');
+  await expect(edit).toBeFocused();
+});
+
+test('an unavailable rail command keeps its place under the arrows', async ({ page }) => {
+  await open(page, markdownStory);
+  const card = page.getByRole('article', { name: 'Strategies' });
+  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
+
+  const save = card.getByRole('button', { name: 'Save Card Strategies' });
+  const cancel = card.getByRole('button', { name: 'Cancel editing Card Strategies' });
+  const close = card.getByRole('button', { name: 'Close Card Strategies' });
+
+  // Unavailable through `aria-disabled`, so it is still there to arrow to. The
+  // native property drew the control and took it off the keyboard, which made
+  // ADR 0064's "keeps its slot" a promise to the eye only.
+  await expect(close).toHaveAttribute('aria-disabled', 'true');
+  await save.focus();
+  await save.press('ArrowRight');
+  await expect(cancel).toBeFocused();
+  await cancel.press('ArrowRight');
+  await expect(close).toBeFocused();
+
+  // Reachable is not runnable: the Card must not collapse out from under the
+  // caret and the draft it is holding.
+  await close.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeVisible();
+});
+
 test('a Card running an edit is not drawn at rest, however it is left', async ({ page }) => {
   await open(page, markdownStory);
   const card = page.getByRole('article', { name: 'Strategies' });

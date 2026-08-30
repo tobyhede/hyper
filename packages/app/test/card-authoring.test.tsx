@@ -5,6 +5,8 @@ import {
   FLOW_SPACE_VIEW_ID,
   spaceSnapshotSchema,
   uuidSchema,
+  type CardId,
+  type LayoutPosition,
   type SpaceSnapshot,
 } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
@@ -18,6 +20,8 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
 /** Replace CodeMirror source through its public editable surface. */
 const replaceMarkdownSource = (value: string): HTMLElement => {
@@ -308,7 +312,7 @@ describe('browser destination restoration', () => {
     mount(selfEdge);
     const pushState = vi.spyOn(window.history, 'pushState');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Present Graph' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Present' }));
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     fireEvent.click(await screen.findByRole('button', { name: 'Back' }));
 
@@ -556,7 +560,51 @@ describe('authoring an opened Card', () => {
   });
 });
 
+/** The same Space with a Space Card placed beside the two Markdown Cards (ADR 0068). */
+const withSpaceCard: SpaceSnapshot = spaceSnapshotSchema.parse({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    layouts: [
+      {
+        ...snapshot.document.layouts![0]!,
+        positions: {
+          ...snapshot.document.layouts![0]!.positions,
+          [SPACE_CARD_ID]: { x: 600, y: 20, open: false },
+        },
+      },
+    ],
+  },
+  cards: [
+    ...snapshot.cards,
+    { id: SPACE_CARD_ID, document: { title: 'Nested', kind: 'space', spaceId: TARGET_SPACE_ID } },
+  ],
+});
+
+/** What a Layout records for one Card, which is where Open is authored (ADR 0064). */
+const placementOf = (session: SpaceSession, cardId: CardId): LayoutPosition | undefined =>
+  (session.getState().working.document.layouts ?? [])[0]?.positions[cardId];
+
 describe('the Card affordance on the graph', () => {
+  /**
+   * Opening is a Layout-owned Edit, and the strategies, the placement and the
+   * projection each read `open` without asking what kind the Card is. A kind
+   * with nothing to draw Open must therefore never reach that state: the Card
+   * would take its Open rect in the placement, displace its `+x`/`+y`
+   * neighbours, and still be drawn Closed with no control to close it.
+   */
+  it('does not Open a Space Card, which has no Open body to draw', async () => {
+    const session = mount(withSpaceCard);
+    const before = placementOf(session, SPACE_CARD_ID);
+
+    fireEvent.keyDown(await screen.findByTestId(`rf__node-${SPACE_CARD_ID}`), { key: 'Enter' });
+
+    await waitFor(() => expect(screen.getByText('Nested')).toBeVisible());
+    expect(placementOf(session, SPACE_CARD_ID)).toEqual(before);
+    expect(screen.queryByRole('button', { name: 'Close Card Nested' })).not.toBeInTheDocument();
+    await settled(session);
+  });
+
   it('opens the Card on rendered Markdown in place', async () => {
     const session = mount();
 

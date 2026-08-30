@@ -298,6 +298,46 @@ describe('card frontmatter schema', () => {
     expect('body' in alias).toBe(false);
   });
 
+  it('parses a Space Card with optional Space View and Graph selections', () => {
+    const selected = cardFrontmatterSchema.parse({
+      id: '00000000-0000-4000-8000-000000000006',
+      title: 'Nested space',
+      kind: 'space',
+      spaceId: '00000000-0000-4000-8000-000000000007',
+      spaceView: '00000000-0000-4000-8000-000000000008',
+      graph: '00000000-0000-4000-8000-000000000009',
+    });
+    const inherited = cardFrontmatterSchema.parse({
+      id: '00000000-0000-4000-8000-000000000010',
+      title: 'Nested space with inherited selections',
+      kind: 'space',
+      spaceId: '00000000-0000-4000-8000-000000000007',
+    });
+
+    expect(selected).toMatchObject({
+      kind: 'space',
+      spaceView: '00000000-0000-4000-8000-000000000008',
+      graph: '00000000-0000-4000-8000-000000000009',
+    });
+    expect(inherited).not.toHaveProperty('spaceView');
+    expect(inherited).not.toHaveProperty('graph');
+  });
+
+  it.each([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID] as const)(
+    'parses a Space Card selecting the computed %s Space View',
+    (spaceView) => {
+      const card = cardFrontmatterSchema.parse({
+        id: '00000000-0000-4000-8000-000000000006',
+        title: 'Nested space',
+        kind: 'space',
+        spaceId: '00000000-0000-4000-8000-000000000007',
+        spaceView,
+      });
+
+      expect(card).toMatchObject({ kind: 'space', spaceView });
+    },
+  );
+
   it('rejects an alias with no target', () => {
     expect(
       cardFrontmatterSchema.safeParse({

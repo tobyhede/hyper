@@ -46,6 +46,24 @@ describe('serializeCardFile', () => {
     );
   });
 
+  it('writes a Space Card with both of its selections, and no body', () => {
+    const card: Card = {
+      id: uuid('00000000-0000-4000-8000-00000000000d'),
+      title: 'Nested space',
+      kind: 'space',
+      spaceId: uuid('00000000-0000-4000-8000-000000000010'),
+      spaceView: uuid('00000000-0000-4000-8000-000000000011'),
+      graph: uuid('00000000-0000-4000-8000-000000000012'),
+    };
+
+    const parsed = parseCardFile({ path: 'cards/nested.md', text: serializeCardFile(card) });
+
+    expect(parsed).toEqual({ ok: true, card });
+    expect(serializeCardFile(card)).toMatch(
+      /graph: 00000000-0000-4000-8000-000000000012\n---\n\n$/,
+    );
+  });
+
   it('writes only shared and kind-owned fields', () => {
     const card: Card = {
       id: uuid('00000000-0000-4000-8000-000000000002'),

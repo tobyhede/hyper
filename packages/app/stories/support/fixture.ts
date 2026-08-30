@@ -6,7 +6,7 @@ import {
   type SpaceFile,
   type UUID,
 } from '@project/core';
-import { loadSpace, type CardFile, type Space } from '@project/graph';
+import { loadSpace, serializeCardFile, type CardFile, type Space } from '@project/graph';
 import { GRAPH_PALETTE as PRODUCTION_GRAPH_PALETTE } from '#src/colors';
 
 /**
@@ -145,20 +145,10 @@ export const layouts: readonly Layout[] = [
 
 export const spaceTitle = 'Graph-native presentations';
 
-const cardFiles: CardFile[] = cards.map((card) => {
-  const common = [`id: ${card.id}`, `title: ${JSON.stringify(card.title)}`];
-  if (card.kind === 'alias') {
-    return {
-      path: `cards/${card.id}.md`,
-      text: `---\n${[...common, 'kind: alias', `target: ${card.target}`].join('\n')}\n---\n`,
-    };
-  }
-
-  return {
-    path: `cards/${card.id}.md`,
-    text: `---\n${common.join('\n')}\n---\n\n${card.body}`,
-  };
-});
+const cardFiles: CardFile[] = cards.map((card) => ({
+  path: `cards/${card.id}.md`,
+  text: serializeCardFile(card),
+}));
 
 const spaceFile: SpaceFile = {
   version: 1,

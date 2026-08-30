@@ -11,6 +11,7 @@ import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
 import { canvasRenderers, currentRenderer } from './canvas-renderers';
 import { canvasContent } from './canvas-content';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { canRetreat } from './navigation';
@@ -30,7 +31,11 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
-import { SelectedCanvasRenderer, SpaceSidebar } from './components/SpaceSidebar';
+import {
+  SelectedCanvasRenderer,
+  SpaceSidebar,
+  type SpaceChromeTitleEdit,
+} from './components/SpaceSidebar';
 
 export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOpening) => {
   // What an opened Space is composed of, stated once (`compose-app.ts`): one
@@ -93,6 +98,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      * modality, and the editor is still there when it closes.
      */
     const [editingCardBody, setEditingCardBody] = useState(false);
+    const [editingCardTitle, setEditingCardTitle] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const [destinationNotFound, setDestinationNotFound] = useState(false);
@@ -247,6 +253,66 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const hasCardsOnCanvas = liveProjection !== null;
     const canvas = canvasContent(placement, hasCardsOnCanvas);
     const editable = hasCardsOnCanvas;
+    const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
+      readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;
+      readonly draft: string;
+      readonly error: string | null;
+      readonly surface: 'sidebar' | 'header';
+      readonly returnFocus: () => void;
+    } | null>(null);
+    const chromeEditingDisabled =
+      !editable ||
+      presenting ||
+      openedCardId !== null ||
+      creatingAlias ||
+      editingCardBody ||
+      editingCardTitle;
+
+    useEffect(() => {
+      if (chromeEditingDisabled) setSpaceChromeEdit(null);
+    }, [chromeEditingDisabled]);
+
+    // A replacement discards every open Interaction draft (ADR 0042), and this
+    // one lives outside the canvas subtree `replacementEpoch` keys, so the
+    // remount does not reach it. Separate from the guard above because that
+    // guard reads only `chromeEditingDisabled`: listing the epoch beside it
+    // re-ran an effect whose body could then do nothing, which is how the two
+    // rules came to look like one.
+    useEffect(() => {
+      setSpaceChromeEdit(null);
+    }, [authoringState.replacementEpoch]);
+
+    const completeSpaceChromeTitle = useCallback(
+      (subject: NonNullable<SpaceChromeTitleEdit['subject']>, title: string): string | null => {
+        const result =
+          subject.kind === 'layout'
+            ? authoring.complete({ kind: 'renamed-layout', layoutId: subject.id, title })
+            : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
+        if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
+        setSpaceChromeEdit(null);
+        return null;
+      },
+      [],
+    );
+
+    const titleEdit: SpaceChromeTitleEdit = {
+      subject: spaceChromeEdit?.subject ?? null,
+      surface: spaceChromeEdit?.surface ?? null,
+      draft: spaceChromeEdit?.draft ?? '',
+      error: spaceChromeEdit?.error ?? null,
+      disabled: chromeEditingDisabled,
+      onBegin: (subject, title, surface, returnFocus) => {
+        setDestinationNotFound(false);
+        setSpaceChromeEdit({ subject, draft: title, error: null, surface, returnFocus });
+      },
+      onDraftChange: (draft) =>
+        setSpaceChromeEdit((current) => (current === null ? null : { ...current, draft })),
+      onErrorChange: (error) =>
+        setSpaceChromeEdit((current) => (current === null ? null : { ...current, error })),
+      onComplete: completeSpaceChromeTitle,
+      onCancel: () => setSpaceChromeEdit(null),
+      onReturnFocus: () => spaceChromeEdit?.returnFocus(),
+    };
 
     // One decision resolved from one Space, applied in an order that cannot
     // leave the two collaborators disagreeing.
@@ -258,6 +324,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     // too: deciding from a snapshot Navigation will not consult is one decision
     // with two sources of truth.
     const installDestinationOpening = useCallback((opening: DestinationOpening) => {
+      setSpaceChromeEdit(null);
       const resolved = resolveRenderer(currentSpace(), opening.selection);
       const changesRenderer = navigation.getState().selectedRenderer !== opening.selection;
       if (opening.graphId === null) navigation.selectRenderer(opening.selection);
@@ -611,13 +678,12 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      * Every Card an Alias may name.
      *
      * The single-hop rule read forwards (ADR 0009): a Target must own its
-     * content, so an Alias never appears — including the one being retargeted,
-     * which is what stops a chain from being offered rather than refused. The
+     * Markdown content, so only Markdown Cards appear. The
      * Space's own Cards, not the Layout's: an Alias points at content, and
      * content is not a thing a Layout owns.
      */
     const aliasTargets = useMemo(
-      () => rendererSpace.cards.filter((card) => card.kind !== 'alias'),
+      () => rendererSpace.cards.filter((card) => card.kind === 'markdown'),
       [rendererSpace],
     );
     // Scans every title in the Space, so it must not re-run on every drag
@@ -710,7 +776,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
               }),
           },
           onPresent: present,
-          canPresent: !editingCardBody,
+          canPresent: !editingCardBody && spaceChromeEdit === null,
           presenting,
           onExitPresenting: exitPresenting,
         }}
@@ -725,7 +791,12 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
           // (ADR 0064) — so a live toolbar created a Card and then swallowed the
           // naming it exists to begin.
           disabled:
-            !editable || presenting || openedCardId !== null || creatingAlias || editingCardBody,
+            !editable ||
+            presenting ||
+            openedCardId !== null ||
+            creatingAlias ||
+            editingCardBody ||
+            spaceChromeEdit !== null,
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
         }}
@@ -776,13 +847,14 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
                   : undefined,
               }
         }
+        titleEdit={titleEdit}
       />
     );
 
     return (
       <AppShell
         sidebar={sidebar}
-        header={<SelectedCanvasRenderer renderer={current} />}
+        header={<SelectedCanvasRenderer renderer={current} titleEdit={titleEdit} />}
         notice={
           <>
             {clipboardFailure === null ? null : (
@@ -849,7 +921,9 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
                 // The toolbar's Add Card already reads the pair; this read only
                 // the opened Card, so `C` and the inline title editor stayed
                 // live behind an open Alias creation pane.
-                titleEditingEnabled={openedCardId === null && !creatingAlias}
+                titleEditingEnabled={
+                  openedCardId === null && !creatingAlias && spaceChromeEdit === null
+                }
                 onNodesChange={changeNodes}
                 onEdgesChange={changeEdges}
                 edgeAuthoring={edgeAuthoring}
@@ -864,6 +938,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
                 spaceSession={spaceSession}
                 onOpenAlias={openCard}
                 onBodyEditingChange={setEditingCardBody}
+                onTitleEditingChange={setEditingCardTitle}
                 cardResize={cardResize}
                 graphs={projection.visibleGraphs}
                 colorByGraphId={projection.colors}

@@ -268,7 +268,7 @@ test(
 /**
  * Entering presentation with the pointer, then advancing with Space.
  *
- * The Sidebar's Present button is the one DOM node that relabels to Overview, so
+ * The Sidebar's Present button is the one DOM node that relabels to Stop, so
  * React keeps focus on it across the click. Left there, the presenter holds the
  * control that *leaves* — and Space, which advances, defers to whatever has
  * focus, so the first press dropped straight back to the overview. The chrome
@@ -290,12 +290,12 @@ test('Space advances on the first press after entering with the pointer', async 
  * The same deference, on a control the chrome does not own.
  *
  * The rule is about interactive controls rather than about one button, and the
- * Sidebar's Overview is the other one a presenter can be focused on. Had the
+ * Sidebar's exit action is the other one a presenter can be focused on. Had the
  * global handler taken this press it would have called `preventDefault`, the
  * button would never have activated, and the traversal would have advanced
  * instead — so the chrome being gone is the whole proof.
  */
-test('Space on the Sidebar Overview leaves presentation rather than advancing', async ({
+test('Space on the Sidebar exit action leaves presentation rather than advancing', async ({
   page,
 }) => {
   await present(page);

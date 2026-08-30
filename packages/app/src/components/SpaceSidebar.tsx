@@ -12,19 +12,23 @@ import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
   Button,
+  buttonVariants,
+  cn,
   FALLBACK_GRAPH_COLOR,
   FlowIcon,
   GraphIcon,
   graphColor,
   GridIcon,
   LayoutIcon,
+  InlineTitleEditor,
   PresentIcon,
+  StopPresentingIcon,
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -38,6 +42,22 @@ import { canvasRendererKey, type CanvasRendererId } from '../renderer';
 export interface SpaceSidebarProps {
   /** The Space's title. The canvas header names what is drawing it (ADR 0053). */
   readonly spaceTitle: string;
+  /**
+   * How this sidebar collapses, passed straight to the primitive. Defaults to
+   * the application's `offcanvas`.
+   *
+   * `none` exists for Open Spaces: shadcn's own `sidebar-09` composes
+   * several sidebars by nesting `collapsible="none"` ones inside a single
+   * collapsible root, so the root keeps the offcanvas behaviour, `cmd/ctrl+B`
+   * and the mobile Sheet while each nested sidebar is a plain column.
+   */
+  readonly collapsible?: 'offcanvas' | 'icon' | 'none';
+  /**
+   * Passed to the primitive. A Space Sidebar inside Open Spaces gives up the
+   * `w-(--sidebar-width)` the root reserves because the entries and the active
+   * Sidebar share that fixed width.
+   */
+  readonly className?: string;
   readonly canvas: {
     /** The computed and authored rows `canvasRenderers` derives from the Space. */
     readonly renderers: CanvasRenderers;
@@ -111,7 +131,40 @@ export interface SpaceSidebarProps {
         readonly onCopyContextual?: (() => void) | undefined;
       }
     | undefined;
+  readonly titleEdit?: SpaceChromeTitleEdit;
 }
+
+export interface SpaceChromeTitleEdit {
+  readonly subject: SpaceChromeTitleSubject | null;
+  readonly surface: 'sidebar' | 'header' | null;
+  readonly draft: string;
+  readonly error: string | null;
+  readonly disabled?: boolean;
+  readonly onBegin: (
+    subject: SpaceChromeTitleSubject,
+    title: string,
+    surface: 'sidebar' | 'header',
+    returnFocus: () => void,
+  ) => void;
+  readonly onDraftChange: (draft: string) => void;
+  readonly onErrorChange: (error: string | null) => void;
+  readonly onComplete: (subject: SpaceChromeTitleSubject, title: string) => string | null;
+  readonly onCancel: () => void;
+  readonly onReturnFocus: () => void;
+}
+
+export type SpaceChromeTitleSubject =
+  | {
+      readonly kind: 'layout';
+      readonly id: UUID;
+    }
+  | { readonly kind: 'graph'; readonly id: GraphId };
+
+const editing = (
+  edit: SpaceChromeTitleEdit | undefined,
+  kind: 'layout' | 'graph',
+  id: string,
+): boolean => edit?.subject?.kind === kind && edit.subject.id === id;
 
 /**
  * One glyph per Computed View, beside the id it draws.
@@ -170,28 +223,87 @@ function RendererGroup({
   renderers,
   selected,
   onSelect,
+  titleEdit,
 }: {
   readonly renderers: readonly CanvasRenderer[];
   readonly selected: CanvasRenderer;
   readonly onSelect: (selection: CanvasRendererId) => void;
+  readonly titleEdit: SpaceChromeTitleEdit | undefined;
 }) {
   const selectedKey = canvasRendererKey(selected.selection);
   return (
     <SidebarMenu>
       {renderers.map((renderer) => {
         const active = canvasRendererKey(renderer.selection) === selectedKey;
+        const layoutId = renderer.kind === 'authored' ? renderer.selection : null;
+        const isEditing =
+          layoutId !== null &&
+          editing(titleEdit, 'layout', layoutId) &&
+          titleEdit?.surface === 'sidebar';
+        const shownTitle =
+          layoutId !== null && editing(titleEdit, 'layout', layoutId)
+            ? (titleEdit?.draft ?? renderer.title)
+            : renderer.title;
         return (
-          <SidebarMenuItem key={canvasRendererKey(renderer.selection)}>
-            <SidebarMenuButton
-              isActive={active}
-              aria-pressed={active}
-              data-testid="canvas-renderer"
-              data-renderer={canvasRendererKey(renderer.selection)}
-              onClick={() => onSelect(renderer.selection)}
-            >
-              <RendererIcon renderer={renderer} />
-              <span>{renderer.title}</span>
-            </SidebarMenuButton>
+          <SidebarMenuItem key={canvasRendererKey(renderer.selection)} tabIndex={-1}>
+            {isEditing ? (
+              // The row keeps its addressing hooks while its own rename is
+              // live: an open pane marks the root `inert`, so `data-renderer`
+              // is how a covered Sidebar is reached at all (docs/agents/ui.md).
+              // `aria-pressed` is not carried across — this branch renders a
+              // `div`, and pressed state on a non-button is not a thing to say.
+              <SidebarMenuButton
+                render={<div />}
+                isActive={active}
+                data-testid="canvas-renderer"
+                data-renderer={canvasRendererKey(renderer.selection)}
+              >
+                <RendererIcon renderer={renderer} />
+                <InlineTitleEditor
+                  className="flex-1"
+                  title={renderer.title}
+                  label="Layout name"
+                  variant="sidebar"
+                  draft={titleEdit.draft}
+                  error={titleEdit.error}
+                  onDraftChange={titleEdit.onDraftChange}
+                  onErrorChange={titleEdit.onErrorChange}
+                  onComplete={(title) =>
+                    titleEdit.onComplete({ kind: 'layout', id: layoutId }, title)
+                  }
+                  onCancel={titleEdit.onCancel}
+                  onReturnFocus={titleEdit.onReturnFocus}
+                />
+              </SidebarMenuButton>
+            ) : (
+              <SidebarMenuButton
+                isActive={active}
+                aria-pressed={active}
+                data-testid="canvas-renderer"
+                data-renderer={canvasRendererKey(renderer.selection)}
+                onClick={(event) => {
+                  if (
+                    active &&
+                    layoutId !== null &&
+                    titleEdit !== undefined &&
+                    titleEdit.disabled !== true
+                  ) {
+                    const row = event.currentTarget.closest('li');
+                    titleEdit.onBegin(
+                      { kind: 'layout', id: layoutId },
+                      renderer.title,
+                      'sidebar',
+                      () => row?.focus(),
+                    );
+                  } else {
+                    onSelect(renderer.selection);
+                  }
+                }}
+              >
+                <RendererIcon renderer={renderer} />
+                <span>{shownTitle}</span>
+              </SidebarMenuButton>
+            )}
           </SidebarMenuItem>
         );
       })}
@@ -223,6 +335,9 @@ export function SpaceSidebar({
   persistence,
   cardsCollection,
   cardLinks,
+  titleEdit,
+  collapsible = 'offcanvas',
+  className,
 }: SpaceSidebarProps) {
   // Below the primitive's breakpoint this whole surface is a modal Sheet drawn
   // *over* the canvas, with a focus trap and everything behind it inert. Every
@@ -254,11 +369,23 @@ export function SpaceSidebar({
     (graph.canPresent === false || activeGraph === undefined || activeGraph.edges.length === 0);
 
   return (
-    <Sidebar collapsible="offcanvas" data-testid="space-sidebar">
-      <SidebarHeader>
-        <h1 data-testid="space-title" className="truncate px-2 text-sm font-semibold">
-          {spaceTitle}
-        </h1>
+    <Sidebar collapsible={collapsible} className={className} data-testid="space-sidebar">
+      <SidebarHeader className="nokey">
+        <div className="flex min-w-0 items-center gap-2 px-2">
+          <h1 data-testid="space-title" className="min-w-0 flex-1 truncate text-sm font-semibold">
+            {spaceTitle}
+          </h1>
+          {persistence.control}
+          <span
+            hidden
+            aria-hidden="true"
+            data-testid="persistence-status"
+            data-persistence-state={persistence.state}
+            data-revision={persistence.acknowledgedRevision.toString()}
+          >
+            {persistence.state === 'settled' ? 'Persisted' : persistence.state}
+          </span>
+        </div>
       </SidebarHeader>
       <SidebarSeparator />
       {/* `nokey` sits on both control-bearing regions rather than on the root.
@@ -277,19 +404,14 @@ export function SpaceSidebar({
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Computed views</SidebarGroupLabel>
+          <SidebarGroupLabel>Space View</SidebarGroupLabel>
           <SidebarGroupContent>
             <RendererGroup
               renderers={canvas.renderers.computed}
               selected={canvas.current}
               onSelect={onCanvas(canvas.onSelect)}
+              titleEdit={titleEdit}
             />
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Authored layouts</SidebarGroupLabel>
-          <SidebarGroupContent>
             {canvas.renderers.authored.length === 0 ? (
               <NothingYet testId="no-authored-layouts">
                 None yet — editing a view creates one.
@@ -299,6 +421,7 @@ export function SpaceSidebar({
                 renderers={canvas.renderers.authored}
                 selected={canvas.current}
                 onSelect={onCanvas(canvas.onSelect)}
+                titleEdit={titleEdit}
               />
             )}
           </SidebarGroupContent>
@@ -340,24 +463,78 @@ export function SpaceSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Graphs</SidebarGroupLabel>
           <SidebarGroupContent>
+            <Button
+              variant="secondary"
+              size="compact"
+              className="mb-2 w-full justify-start gap-2"
+              data-testid={graph.presenting ? 'exit-presenting-button' : 'present-button'}
+              disabled={presentDisabled}
+              onClick={onCanvas(graph.presenting ? graph.onExitPresenting : graph.onPresent)}
+            >
+              {graph.presenting ? (
+                <StopPresentingIcon color={activeGraphColor} />
+              ) : (
+                <PresentIcon color={activeGraphColor} />
+              )}
+              {graph.presenting ? 'Stop' : 'Present'}
+            </Button>
             {graph.graphs.length === 0 ? (
               <NothingYet testId="no-graphs">None yet — the first Layout mints one.</NothingYet>
             ) : (
               <SidebarMenu>
                 {graph.graphs.map((candidate) => {
                   const active = candidate.id === graph.activeGraphId;
+                  const isEditing = editing(titleEdit, 'graph', candidate.id);
                   return (
-                    <SidebarMenuItem key={candidate.id}>
-                      <SidebarMenuButton
-                        isActive={active}
-                        aria-pressed={active}
-                        data-testid="graph-choice"
-                        data-graph-id={candidate.id}
-                        onClick={onCanvas(() => graph.onActivate(candidate.id))}
-                      >
-                        <GraphIcon color={graphColor(candidate, graph.colorByGraphId)} />
-                        <span>{candidate.title}</span>
-                      </SidebarMenuButton>
+                    <SidebarMenuItem key={candidate.id} tabIndex={-1}>
+                      {isEditing && titleEdit !== undefined ? (
+                        <SidebarMenuButton
+                          render={<div />}
+                          isActive={active}
+                          data-testid="graph-choice"
+                          data-graph-id={candidate.id}
+                        >
+                          <GraphIcon color={graphColor(candidate, graph.colorByGraphId)} />
+                          <InlineTitleEditor
+                            className="flex-1"
+                            title={candidate.title}
+                            label="Graph name"
+                            variant="sidebar"
+                            draft={titleEdit.draft}
+                            error={titleEdit.error}
+                            onDraftChange={titleEdit.onDraftChange}
+                            onErrorChange={titleEdit.onErrorChange}
+                            onComplete={(title) =>
+                              titleEdit.onComplete({ kind: 'graph', id: candidate.id }, title)
+                            }
+                            onCancel={titleEdit.onCancel}
+                            onReturnFocus={titleEdit.onReturnFocus}
+                          />
+                        </SidebarMenuButton>
+                      ) : (
+                        <SidebarMenuButton
+                          isActive={active}
+                          aria-pressed={active}
+                          data-testid="graph-choice"
+                          data-graph-id={candidate.id}
+                          onClick={(event) => {
+                            if (active && titleEdit !== undefined && titleEdit.disabled !== true) {
+                              const row = event.currentTarget.closest('li');
+                              titleEdit.onBegin(
+                                { kind: 'graph', id: candidate.id },
+                                candidate.title,
+                                'sidebar',
+                                () => row?.focus(),
+                              );
+                            } else {
+                              onCanvas(graph.onActivate)(candidate.id);
+                            }
+                          }}
+                        >
+                          <GraphIcon color={graphColor(candidate, graph.colorByGraphId)} />
+                          <span>{candidate.title}</span>
+                        </SidebarMenuButton>
+                      )}
                     </SidebarMenuItem>
                   );
                 })}
@@ -367,7 +544,7 @@ export function SpaceSidebar({
               <div className="grid gap-1 pt-1">
                 <Button
                   variant="secondary"
-                  size="toolbar"
+                  size="compact"
                   className="w-full justify-start"
                   onClick={onCanvas(() => graph.links?.onCopyCanonical(activeGraph.id))}
                 >
@@ -375,7 +552,7 @@ export function SpaceSidebar({
                 </Button>
                 <Button
                   variant="secondary"
-                  size="toolbar"
+                  size="compact"
                   className="w-full justify-start"
                   onClick={onCanvas(() => graph.links?.onCopyContextual(activeGraph.id))}
                 >
@@ -386,13 +563,12 @@ export function SpaceSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
       <SidebarFooter className="nokey">
         {cardLinks !== undefined && (
           <div className="grid gap-1">
             <Button
               variant="secondary"
-              size="toolbar"
+              size="compact"
               onClick={onCanvas(cardLinks.onCopyCanonical)}
             >
               Copy link to {cardLinks.title}
@@ -400,7 +576,7 @@ export function SpaceSidebar({
             {cardLinks.onCopyContextual !== undefined && (
               <Button
                 variant="secondary"
-                size="toolbar"
+                size="compact"
                 onClick={onCanvas(cardLinks.onCopyContextual)}
               >
                 Copy link in this Space View
@@ -408,37 +584,6 @@ export function SpaceSidebar({
             )}
           </div>
         )}
-        <Button
-          variant="secondary"
-          size="toolbar"
-          className="w-full justify-start gap-2"
-          data-testid={graph.presenting ? 'exit-presenting-button' : 'present-button'}
-          disabled={presentDisabled}
-          onClick={onCanvas(graph.presenting ? graph.onExitPresenting : graph.onPresent)}
-        >
-          {graph.presenting ? null : <PresentIcon color={activeGraphColor} />}
-          {/* The visible text is the accessible name. It carries the active
-              Graph because the button acts on that Graph and on no other, and
-              an `aria-label` naming something else would leave voice control
-              unable to speak what is on the button. */}
-          {graph.presenting
-            ? 'Overview'
-            : activeGraph === undefined
-              ? 'Present'
-              : `Present ${activeGraph.title}`}
-        </Button>
-        <div className="flex items-center justify-end px-1">
-          {persistence.control}
-          <span
-            hidden
-            aria-hidden="true"
-            data-testid="persistence-status"
-            data-persistence-state={persistence.state}
-            data-revision={persistence.acknowledgedRevision.toString()}
-          >
-            {persistence.state === 'settled' ? 'Persisted' : persistence.state}
-          </span>
-        </div>
       </SidebarFooter>
     </Sidebar>
   );
@@ -457,16 +602,67 @@ export function SpaceSidebar({
  * and the header and the list it reports on are free to disagree again. Taking
  * the row means the only way to draw this is to have built the list.
  */
-export function SelectedCanvasRenderer({ renderer }: { readonly renderer: CanvasRenderer }) {
+export function SelectedCanvasRenderer({
+  renderer,
+  titleEdit,
+}: {
+  readonly renderer: CanvasRenderer;
+  readonly titleEdit?: SpaceChromeTitleEdit;
+}) {
+  const layoutId = renderer.kind === 'authored' ? renderer.selection : null;
+  const sameEdit = layoutId !== null && editing(titleEdit, 'layout', layoutId);
+  const isEditing = sameEdit && titleEdit?.surface === 'header';
+  const shownTitle = sameEdit ? (titleEdit?.draft ?? renderer.title) : renderer.title;
   return (
-    <div data-testid="selected-canvas" className="flex min-w-0 items-baseline gap-2">
-      <span className="truncate text-sm font-medium">{renderer.title}</span>
-      <span
-        data-testid="selected-canvas-kind"
-        className="shrink-0 text-xs whitespace-nowrap text-muted-foreground"
-      >
-        {renderer.kind === 'authored' ? 'Authored layout' : 'Computed view'}
-      </span>
+    <div data-testid="selected-canvas" className="flex min-w-0" tabIndex={-1}>
+      {isEditing ? (
+        <InlineTitleEditor
+          title={renderer.title}
+          label="Layout name"
+          variant="header"
+          draft={titleEdit.draft}
+          error={titleEdit.error}
+          onDraftChange={titleEdit.onDraftChange}
+          onErrorChange={titleEdit.onErrorChange}
+          onComplete={(title) => titleEdit.onComplete({ kind: 'layout', id: layoutId }, title)}
+          onCancel={titleEdit.onCancel}
+          onReturnFocus={titleEdit.onReturnFocus}
+        />
+      ) : // Plain text unless this header is the surface that would begin the
+      // Edit. `sameEdit` is the case worth naming: the draft is already live on
+      // the Sidebar row, so the header is mirroring it — offering Edit here
+      // would call `onBegin` a second time and reset the draft to the committed
+      // title, discarding what the author has typed.
+      layoutId === null || titleEdit === undefined || titleEdit.disabled === true || sameEdit ? (
+        // The same box as the Button below, taken from the Button's own
+        // variants rather than restated: the two branches swap as the canvas
+        // choice moves between a computed View and a Layout, and a header that
+        // changes height on that swap moves the whole canvas under the author.
+        // Only the interactive affordances are dropped — this names the Space
+        // View, it does not offer anything.
+        <span
+          className={cn(
+            buttonVariants({ variant: 'ghost', size: 'compact' }),
+            'cursor-default truncate hover:border-transparent hover:bg-transparent hover:text-muted-foreground',
+          )}
+        >
+          {shownTitle}
+        </span>
+      ) : (
+        <Button
+          variant="ghost"
+          size="compact"
+          aria-label={`Edit Space View ${shownTitle}`}
+          onClick={(event) => {
+            const header = event.currentTarget.parentElement;
+            titleEdit.onBegin({ kind: 'layout', id: layoutId }, renderer.title, 'header', () =>
+              header?.focus(),
+            );
+          }}
+        >
+          {shownTitle}
+        </Button>
+      )}
     </div>
   );
 }

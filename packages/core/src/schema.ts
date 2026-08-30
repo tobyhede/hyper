@@ -52,6 +52,16 @@ export const aliasCardFrontmatterSchema = z.object({
   target: idSchema,
 });
 
+/** A Card that shows one selected view of another independently stored Space (ADR 0068). */
+export const spaceCardFrontmatterSchema = z.object({
+  id: idSchema,
+  title: z.string().min(1),
+  kind: z.literal('space'),
+  spaceId: idSchema,
+  spaceView: uuidSchema.optional(),
+  graph: idSchema.optional(),
+});
+
 const defaultMarkdownKind = (value: unknown): unknown =>
   typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
     ? { ...value, kind: 'markdown' }
@@ -65,7 +75,11 @@ const defaultMarkdownKind = (value: unknown): unknown =>
  */
 export const cardFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
-  z.discriminatedUnion('kind', [markdownCardFrontmatterSchema, aliasCardFrontmatterSchema]),
+  z.discriminatedUnion('kind', [
+    markdownCardFrontmatterSchema,
+    aliasCardFrontmatterSchema,
+    spaceCardFrontmatterSchema,
+  ]),
 );
 
 export const importMarkdownCardFrontmatterSchema = markdownCardFrontmatterSchema.extend({
@@ -74,11 +88,15 @@ export const importMarkdownCardFrontmatterSchema = markdownCardFrontmatterSchema
 export const importAliasCardFrontmatterSchema = aliasCardFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
+export const importSpaceCardFrontmatterSchema = spaceCardFrontmatterSchema.extend({
+  id: uuidSchema.optional(),
+});
 export const importCardFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
   z.discriminatedUnion('kind', [
     importMarkdownCardFrontmatterSchema,
     importAliasCardFrontmatterSchema,
+    importSpaceCardFrontmatterSchema,
   ]),
 );
 
@@ -88,13 +106,20 @@ export const markdownCardSchema = markdownCardFrontmatterSchema.extend({ body: z
 /** A card that shows its target's content at a second position (ADR 0009). */
 export const aliasCardSchema = aliasCardFrontmatterSchema;
 
+/** A card that embeds one selected view of another Space (ADR 0068). */
+export const spaceCardSchema = spaceCardFrontmatterSchema;
+
 /**
  * A card parsed from its file (ADR 0020). A markdown card carries the file body
  * that stores its content; an alias carries only the pointer to its target's
  * content (ADR 0009). No default for `kind` here — by the time a card exists
  * its frontmatter has been parsed, and that is where the default was applied.
  */
-export const cardSchema = z.discriminatedUnion('kind', [markdownCardSchema, aliasCardSchema]);
+export const cardSchema = z.discriminatedUnion('kind', [
+  markdownCardSchema,
+  aliasCardSchema,
+  spaceCardSchema,
+]);
 
 /**
  * One edge of a graph: a directed connection from one card to another (ADR
@@ -312,9 +337,11 @@ export const spaceDocumentSchema = spaceFileSchema.omit({ id: true });
 /** The JSONB document stored beside a card's relational UUID. */
 export const markdownCardDocumentSchema = markdownCardSchema.omit({ id: true });
 export const aliasCardDocumentSchema = aliasCardSchema.omit({ id: true });
+export const spaceCardDocumentSchema = spaceCardSchema.omit({ id: true });
 export const cardDocumentSchema = z.discriminatedUnion('kind', [
   markdownCardDocumentSchema,
   aliasCardDocumentSchema,
+  spaceCardDocumentSchema,
 ]);
 
 /** A complete, fully identified aggregate exchanged at persistence seams. */
