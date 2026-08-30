@@ -1,4 +1,4 @@
-import { Background, ReactFlow, ReactFlowProvider, type Node } from '@xyflow/react';
+import type { Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { GraphId } from '@project/core';
 import { graphCardIds } from '@project/graph';
@@ -9,6 +9,7 @@ import { GraphHud } from '@project/react-flow-adapter';
 import { CARD_SIZE } from '#src/card';
 import { graphColorMap } from '#src/colors';
 import { authoredSpace } from './spaces';
+import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
 
 /**
  * The HUD's Graphs, colours and Active Graph, derived the way the canvas derives
@@ -88,20 +89,15 @@ export function GraphHudFixture({ activeGraphId = openingGraph() }: GraphHudFixt
   );
 
   return (
-    <div className="h-[26rem] w-full bg-background p-[0.75rem] text-foreground">
-      <div className="h-full overflow-hidden rounded-[8px] border border-border">
-        <ReactFlowProvider>
-          <ReactFlow nodes={[...NODES]} edges={[]} fitView minZoom={0.05}>
-            <Background gap={24} />
-            <GraphHud
-              graphs={SPACE.graphs}
-              colorByGraphId={COLORS}
-              activeGraphId={activeGraphId}
-              activeGraphCardIds={activeGraphCardIds}
-            />
-          </ReactFlow>
-        </ReactFlowProvider>
-      </div>
-    </div>
+    <StoryCanvasFrame height="h-[26rem]">
+      <StoryCanvas nodes={NODES} viewport={{ fit: true }} minZoom={0.05} className="h-full">
+        <GraphHud
+          graphs={SPACE.graphs}
+          colorByGraphId={COLORS}
+          activeGraphId={activeGraphId}
+          activeGraphCardIds={activeGraphCardIds}
+        />
+      </StoryCanvas>
+    </StoryCanvasFrame>
   );
 }

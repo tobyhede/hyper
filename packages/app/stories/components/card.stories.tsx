@@ -106,6 +106,7 @@ export const Hover: Story = () => (
     </CatalogueSection>
   </div>
 );
+Hover.meta = { iframed: true };
 
 /** A specimen that keeps its own size in state, so a real drag on the real
  *  production control actually grows the real node — the round trip
@@ -156,6 +157,7 @@ export const ResizeControl: Story = () => (
   </div>
 );
 ResizeControl.storyName = 'Resize control';
+ResizeControl.meta = { iframed: true };
 
 /**
  * One instance wired the way `CardNode` wires the production component: real
@@ -281,3 +283,4 @@ export const OpenAndClose: Story = () => {
     </div>
   );
 };
+OpenAndClose.meta = { iframed: true };

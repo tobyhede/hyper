@@ -69,6 +69,7 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
   );
 }
 
+/** The Title opens its editor with the value selected, keeps a refused draft field-local, and completes on Enter or cancels on Escape — for both a Closed and an Open Card. */
 export const Title: Story = () => (
   <div className="flex flex-wrap items-start gap-8 p-8">
     <section aria-label="Closed Card title editing" className="flex flex-col gap-2">
@@ -100,6 +101,7 @@ A **Layout** owns explicit Card rects. The strategy only supplies a computed Vie
 
 type Mode = 'rendered' | 'focused' | 'unfocused';
 
+/** An open Markdown Card begins editing from its rendered body or rail, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter. */
 export const Markdown: Story = () => {
   const [source, setSource] = useState(markdown);
   const [mode, setMode] = useState<Mode>('rendered');

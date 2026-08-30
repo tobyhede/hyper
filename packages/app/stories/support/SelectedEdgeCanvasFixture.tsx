@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Background, ReactFlow, ReactFlowProvider, type EdgeTypes } from '@xyflow/react';
+import type { EdgeTypes } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { GraphEdge, GraphId } from '@project/core';
 import type { LayoutStrategyGraph } from '@project/graph';
@@ -21,6 +21,7 @@ import {
   type EdgeAuthoringCommands,
 } from '#src/components/edge-authoring-context';
 import { authoredSpace, storyGraphIds } from './spaces';
+import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
 
 /**
  * The selected Edge's controls where they actually live: on a routed Edge, on a
@@ -162,31 +163,20 @@ export function SelectedEdgeCanvasFixture({
         );
 
   return (
-    <div className="h-[30rem] w-full bg-background p-[0.75rem] text-foreground">
-      <div className="h-full overflow-hidden rounded-[8px] border border-border">
-        <ReactFlowProvider>
-          {/* The provider wraps the flow rather than sitting inside it: React
-              Flow renders Edges as a sibling of the children it is given, so a
-              provider in the children reaches no Edge at all. */}
-          <EdgeAuthoringContext.Provider value={commands}>
-            <ReactFlow
-              nodes={projected === null ? [] : [...projected.nodes]}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              edgeTypes={EDGE_TYPES}
-              // One camera property or the other, never both and never an
-              // explicit `undefined`: `exactOptionalPropertyTypes` reads a
-              // passed `undefined` as a value rather than an absence.
-              {...(zoom === 'fit' ? { fitView: true } : { defaultViewport: CLOSE_VIEWPORT })}
-              minZoom={0.05}
-              maxZoom={4}
-            >
-              <Background gap={24} />
-            </ReactFlow>
-          </EdgeAuthoringContext.Provider>
-        </ReactFlowProvider>
-      </div>
-    </div>
+    <StoryCanvasFrame height="h-[30rem]">
+      <EdgeAuthoringContext.Provider value={commands}>
+        <StoryCanvas
+          nodes={projected === null ? [] : projected.nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={EDGE_TYPES}
+          viewport={zoom === 'fit' ? { fit: true } : { fit: false, ...CLOSE_VIEWPORT }}
+          minZoom={0.05}
+          maxZoom={4}
+          className="h-full"
+        />
+      </EdgeAuthoringContext.Provider>
+    </StoryCanvasFrame>
   );
 }
 
