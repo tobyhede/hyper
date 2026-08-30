@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@tes
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
+import { productDestinationPath } from '@project/http';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
@@ -16,6 +17,9 @@ const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const OWNED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const OUTSIDE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
 const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
@@ -442,5 +446,96 @@ describe('Space app failure reporting', () => {
 
     expect(screen.getByTestId('space-app-failure')).toHaveTextContent(MISSING_CARD_ID);
     expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
+  });
+});
+
+describe('Space app Cards drawer', () => {
+  it('keeps the Cards drawer closed after the reader closes it, even once the Space gains another Card', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const local: SpaceSnapshot = {
+      ...base,
+      cards: [
+        ...base.cards,
+        { id: OUTSIDE_CARD_ID, document: { title: 'Outside card', kind: 'markdown', body: '' } },
+      ],
+    };
+    const stored = { snapshot: local, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+
+    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app), {
+      selection: LAYOUT_ID,
+      cardId: OUTSIDE_CARD_ID,
+      graphId: null,
+      presentationCardId: null,
+    });
+
+    expect(screen.getByRole('button', { name: 'Add Outside card to Layout' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
+    expect(
+      screen.queryByRole('button', { name: 'Add Outside card to Layout' }),
+    ).not.toBeInTheDocument();
+
+    const addCardButton = await waitFor(() => {
+      const button = screen.getByRole('button', { name: 'Add Card' });
+      expect(button).toBeEnabled();
+      return button;
+    });
+    const before = session.getState().working.cards.length;
+    fireEvent.click(addCardButton);
+    expect(session.getState().working.cards.length).toBe(before + 1);
+
+    expect(
+      screen.queryByRole('button', { name: 'Add Outside card to Layout' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('reveals the addressed Card again in a newly adopted default Layout that omits it, even though the same Card was already addressed once', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const local: SpaceSnapshot = {
+      ...base,
+      document: {
+        ...base.document,
+        layouts: [
+          ...(base.document.layouts ?? []),
+          {
+            id: OTHER_LAYOUT_ID,
+            title: 'Other Layout',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
+          },
+        ],
+        // The canonical Card link below resolves to the Space's default
+        // renderer, so this second navigation lands on the Layout that omits
+        // the Card rather than the one it started on.
+        defaultRenderer: OTHER_LAYOUT_ID,
+      },
+    };
+    const stored = { snapshot: local, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+
+    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app), {
+      selection: LAYOUT_ID,
+      cardId: CARD_ID,
+      graphId: null,
+      presentationCardId: null,
+    });
+
+    // Card is a member of the selected Layout, so there is nothing to reveal yet.
+    expect(screen.queryByRole('button', { name: 'Add Card to Layout' })).not.toBeInTheDocument();
+
+    // The canonical Card link carries no Space View of its own — it opens
+    // wherever the Space's default renderer is, which is now the Layout that
+    // omits this Card.
+    window.history.replaceState(
+      null,
+      '',
+      productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: CARD_ID }),
+    );
+    fireEvent(window, new PopStateEvent('popstate'));
+
+    expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Layout');
+    expect(await screen.findByRole('button', { name: 'Add Card to Layout' })).toBeVisible();
   });
 });

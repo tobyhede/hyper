@@ -77,7 +77,14 @@ function sampleGraph(): LayoutStrategyGraph {
   return buildLayoutStrategyGraph(cardIds, handlesByCard, edges, () => SIZE);
 }
 
-/** Positions for `positionedStrategy`, which reads an authored Layout. */
+/**
+ * Positions for `positionedStrategy`, which reads an authored Layout.
+ *
+ * Also covers `00000000...0099`, the single card `arranges a single card with
+ * no edges` below builds ad hoc: `positionedStrategy` only draws a card its
+ * Placement names (ADR 0040), so the shared cross-strategy contract needs this
+ * Layout to have authored a position for it too.
+ */
 const authored = (): Placement =>
   Placement.fromEntries([
     [uuid('00000000-0000-4000-8000-000000000002'), { x: 0, y: 100, open: false }],
@@ -85,6 +92,7 @@ const authored = (): Placement =>
     [uuid('00000000-0000-4000-8000-000000000005'), { x: 400, y: 200, open: false }],
     [uuid('00000000-0000-4000-8000-000000000006'), { x: 800, y: 100, open: false }],
     [uuid('00000000-0000-4000-8000-000000000008'), { x: 1200, y: 100, open: false }],
+    [uuid('00000000-0000-4000-8000-000000000099'), { x: 0, y: 0, open: false }],
   ]);
 
 const STRATEGIES: [name: string, make: () => LayoutStrategy][] = [

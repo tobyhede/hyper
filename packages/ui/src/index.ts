@@ -76,6 +76,7 @@ export {
   LayoutIcon,
   MarkdownIcon,
   OpenCardIcon,
+  SearchIcon,
   PlusIcon,
   ZoomInIcon,
   ZoomOutIcon,
@@ -133,6 +134,20 @@ export {
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
 export {
+  DRAWER_WIDTH,
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerPopup,
+  DrawerPortal,
+  DrawerTitle,
+  DrawerTrigger,
+  DrawerViewport,
+} from './components/drawer';
+export type { DrawerHeaderProps, DrawerPopupProps, DrawerSide } from './components/drawer';
+export {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -153,6 +168,14 @@ export {
   FieldTitle,
 } from './components/field';
 export { Input } from './components/input';
+export {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupText,
+  InputGroupTextarea,
+} from './components/input-group';
 export { Kbd, KbdGroup } from './components/kbd';
 export { Label } from './components/label';
 export { Separator } from './components/separator';

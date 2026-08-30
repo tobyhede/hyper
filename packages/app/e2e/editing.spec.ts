@@ -1379,6 +1379,177 @@ test('creating from an Algorithmic View freezes existing Cards and places Card 1
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 });
 
+test(
+  'adding an existing Card from the Cards drawer authors Layout membership',
+  { tag: '@parity:cards-drawer-adds-existing-layout-members' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await page.getByRole('button', { name: 'Cards' }).click();
+    const source = page.getByRole('button', { name: 'Add E to Layout' });
+    await expect(source).toBeVisible();
+    await source.click();
+
+    await expect(source).not.toBeVisible();
+    await expect(nodeByTitle(page, 'E')).toBeVisible();
+    await expect(nodeByTitle(page, 'E')).toHaveClass(/selected/);
+  },
+);
+
+test(
+  'the Cards drawer dismisses on Escape and survives working on the canvas behind it',
+  { tag: '@parity:cards-drawer-opens-and-dismisses-without-locking-the-canvas' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    const trigger = page.getByRole('button', { name: 'Cards' });
+    const drawer = page.getByRole('dialog', { name: 'Cards' });
+
+    await expect(drawer).toHaveCount(0);
+    await trigger.click();
+    await expect(drawer).toBeVisible();
+
+    // Selecting a Card on the canvas is the ordinary press this drawer has to
+    // live through: it is how a Card is dropped, and a drawer that closed on it
+    // could only ever add one Card per opening.
+    await nodeByTitle(page, 'A').click();
+    await expect(nodeByTitle(page, 'A')).toHaveClass(/selected/);
+    await expect(drawer).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(drawer).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  },
+);
+
+test('the open Cards drawer leaves the Graph key and overview visible beside it', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  const legend = page.getByTestId('graph-legend');
+  const overview = page.getByRole('img', { name: 'Graph overview' });
+  await expect(legend).toBeVisible();
+
+  await page.getByRole('button', { name: 'Cards' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Cards' });
+  await expect(drawer).toBeVisible();
+
+  // The drawer overlays the end edge and the HUD is pinned to the same one, so
+  // the shell yields the panel's width instead of letting it cover the Graph
+  // key and the pannable overview. Geometry, because "visible" is true of an
+  // element sitting underneath an opaque panel.
+  const panel = await boxOf(drawer, 'the Cards drawer');
+  for (const [what, locator] of [
+    ['the Graph key', legend],
+    ['the Graph overview', overview],
+  ] as const) {
+    const box = await boxOf(locator, what);
+    expect(box.x + box.width, `${what} ends before the drawer begins`).toBeLessThanOrEqual(panel.x);
+  }
+
+  // And it is still the reader's to operate, not just to look at.
+  await expect(legend).toContainText('Graph');
+  await overview.click({ position: { x: 4, y: 4 } });
+  await expect(drawer).toBeVisible();
+});
+
+test('leaving a presentation closes the Cards drawer rather than reopening it over the canvas', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  const drawer = page.getByRole('dialog', { name: 'Cards' });
+  await page.getByRole('button', { name: 'Cards' }).click();
+  await expect(drawer).toBeVisible();
+
+  await page.getByRole('button', { name: 'Present' }).click();
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+  await expect(drawer).toHaveCount(0);
+
+  // A drawer that sprang back would also take focus with it — `Drawer.Popup`
+  // moves focus in on every open, however that open was caused — landing the
+  // reader in the Cards list instead of on the canvas they returned to.
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
+  await expect(drawer).toHaveCount(0);
+  await expect(page.locator('[data-slot="drawer-popup"]')).toHaveCount(0);
+});
+
+test('keyboard placement moves focus from the Cards drawer to the added canvas Card', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  await page.getByRole('button', { name: 'Cards' }).click();
+  const source = page.getByRole('button', { name: 'Add E to Layout' });
+  await source.focus();
+  await source.press('Enter');
+
+  await expect(nodeByTitle(page, 'E')).toBeFocused();
+});
+
+test('dragging from the Cards drawer uses transformed canvas coordinates then ordinary Card dragging', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await settled(page);
+
+  await page.getByRole('button', { name: 'Cards' }).click();
+  const source = page.getByRole('button', { name: 'Add E to Layout' });
+  const pane = page.locator('.react-flow__pane');
+  const paneBox = await boxOf(pane, 'the React Flow pane');
+  const targetPosition = { x: paneBox.width * 0.5, y: paneBox.height * 0.8 };
+  const dropPoint = { x: paneBox.x + targetPosition.x, y: paneBox.y + targetPosition.y };
+  await source.dragTo(pane, { targetPosition });
+
+  const added = nodeByTitle(page, 'E');
+  await expect(added).toBeVisible();
+  // Zoomed in, so a screen pixel is a fraction of a flow unit — sub-pixel
+  // rounding through that scale is expected, not evidence of a wrong drop.
+  const addedBox = await boxOf(added, 'the added Card');
+  expect(addedBox.x + addedBox.width / 2).toBeCloseTo(dropPoint.x, -1);
+  expect(addedBox.y + addedBox.height / 2).toBeCloseTo(dropPoint.y, -1);
+
+  const dropped = await positionOf(added);
+  await dragBy(page, added, 48, 32);
+  await expect
+    .poll(async () => {
+      const moved = await positionOf(added);
+      return moved.x > dropped.x + 30 && moved.y > dropped.y + 20;
+    })
+    .toBe(true);
+});
+
+test('the Cards toggle is withdrawn while presenting, matching the drawer it controls', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  const toggle = page.getByRole('button', { name: 'Cards' });
+  await expect(toggle).toBeEnabled();
+
+  await page.getByRole('button', { name: 'Present' }).click();
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+
+  await expect(toggle).toBeDisabled();
+});
+
 test('editing an existing Layout updates it instead of creating another one', async ({ page }) => {
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();

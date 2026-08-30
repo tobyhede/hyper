@@ -13,6 +13,17 @@ export interface AppShellProps {
    * work that caused it.
    */
   notice?: ReactNode;
+  /**
+   * A width the main area yields at its end edge, for a surface overlaying it.
+   *
+   * The shell positions its own chrome, so it is the shell that has to know
+   * something covers that edge — the canvas is pinned to it, and so is the
+   * notice above. Yielding the strip rather than layering over it is what keeps
+   * a Card the reader is dragging, the Graph key and a standing notice all
+   * visible beside the panel instead of behind it. Any CSS length; omitted
+   * means nothing overlays and the main area is full-bleed.
+   */
+  insetEnd?: string | undefined;
   children: ReactNode;
 }
 
@@ -24,7 +35,7 @@ export interface AppShellProps {
  * Space title: the sidebar header names the Space and this names what is
  * drawing it (ADR 0053).
  */
-export function AppShell({ sidebar, header, notice, children }: AppShellProps) {
+export function AppShell({ sidebar, header, notice, insetEnd, children }: AppShellProps) {
   return (
     <SidebarProvider className="shell">
       {sidebar}
@@ -35,12 +46,19 @@ export function AppShell({ sidebar, header, notice, children }: AppShellProps) {
           <SidebarTrigger className="nokey" />
           {header}
         </header>
-        <div className="shell__main">
-          {children}
-          {/* The slot is unconditional and its own CSS hides it while the notice
-              renders nothing, so a caller passes one component for the whole
-              condition rather than repeating that component's own test here. */}
-          <div className="shell__notice">{notice}</div>
+        <div className="shell__main" style={{ paddingInlineEnd: insetEnd }}>
+          {/* The padding is the yielded strip, and this fills what is left of it.
+              An absolutely positioned box resolves against its containing block's
+              *padding* box, so the notice below would ignore that padding and sit
+              under the overlay — this element is what gives it a containing block
+              the strip has already been taken out of. */}
+          <div className="shell__area">
+            {children}
+            {/* The slot is unconditional and its own CSS hides it while the notice
+                renders nothing, so a caller passes one component for the whole
+                condition rather than repeating that component's own test here. */}
+            <div className="shell__notice">{notice}</div>
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

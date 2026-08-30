@@ -1,4 +1,4 @@
-import type { LayoutStrategyCard, LayoutStrategyGraph, LayoutStrategy } from './layout';
+import type { LayoutStrategyGraph, LayoutStrategy } from './layout';
 import { Placement } from './placement';
 
 /**
@@ -15,74 +15,30 @@ import { Placement } from './placement';
  *
  * Positions are deliberately **sparse**. A space can hold several positioned
  * layouts, so a card created while one was active genuinely has no position in
- * another; that is correct rather than a hole to backfill. Cards the map omits
- * are laid out in a grid strictly below everything the map does place, so they
- * read as unplaced instead of stacking at the origin — and, being below the
- * lowest authored card, they cannot overlap one.
+ * another; that is Layout non-membership rather than a hole to backfill. Cards
+ * the map omits are therefore omitted from the projected graph and remain
+ * available through the Cards drawer.
  */
-
-/** Matches `gridStrategy`'s spacing, so the unplaced band looks like what it is. */
-const GAP = 80;
-
-interface Bounds {
-  minX: number;
-  maxY: number;
-}
-
-function boundsOf(cards: readonly LayoutStrategyCard[]): Bounds | null {
-  let minX = Infinity;
-  let maxY = -Infinity;
-  for (const card of cards) {
-    if (card.x === undefined || card.y === undefined) continue;
-    minX = Math.min(minX, card.x);
-    maxY = Math.max(maxY, card.y + card.height);
-  }
-  return minX === Infinity ? null : { minX, maxY };
-}
 
 export function positionedStrategy(positions: Placement): LayoutStrategy {
   // Uniformly-async contract (ADR 0005); there is nothing to await.
   // eslint-disable-next-line @typescript-eslint/require-await
   return async (strategyGraph: LayoutStrategyGraph): Promise<LayoutStrategyGraph> => {
     const drawn = Placement.drawn(positions);
-    const placed = strategyGraph.cards.map((card) => {
-      const at = drawn.get(card.id);
-      return at
-        ? {
-            ...card,
-            x: at.x,
-            y: at.y,
-            width: at.open ? at.openSize.width : card.width,
-            height: at.open ? at.openSize.height : card.height,
-          }
-        : card;
-    });
-
-    const unplaced = placed.filter((card) => card.x === undefined || card.y === undefined);
-    if (unplaced.length === 0) return { cards: placed, edges: strategyGraph.edges };
-
-    // The unplaced band: a square-ish grid starting below the authored cards.
-    const bounds = boundsOf(placed);
-    const originX = bounds?.minX ?? 0;
-    const originY = bounds === null ? 0 : bounds.maxY + GAP;
-    const columns = Math.ceil(Math.sqrt(unplaced.length));
-    const cellWidth = Math.max(...unplaced.map((c) => c.width));
-    const cellHeight = Math.max(...unplaced.map((c) => c.height));
-
-    const slots = new Map(
-      unplaced.map((card, index) => [
-        card.id,
-        {
-          x: originX + (index % columns) * (cellWidth + GAP),
-          y: originY + Math.floor(index / columns) * (cellHeight + GAP),
-        },
-      ]),
-    );
-
     return {
-      cards: placed.map((card) => {
-        const slot = slots.get(card.id);
-        return slot ? { ...card, x: slot.x, y: slot.y } : card;
+      cards: strategyGraph.cards.flatMap((card) => {
+        const at = drawn.get(card.id);
+        return at === undefined
+          ? []
+          : [
+              {
+                ...card,
+                x: at.x,
+                y: at.y,
+                width: at.open ? at.openSize.width : card.width,
+                height: at.open ? at.openSize.height : card.height,
+              },
+            ];
       }),
       edges: strategyGraph.edges,
     };

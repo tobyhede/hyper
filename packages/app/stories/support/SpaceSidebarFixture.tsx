@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import { Placement, type Space } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -21,9 +29,12 @@ import {
   SpaceSidebar,
   type SpaceChromeTitleEdit,
   type SpaceChromeTitleSubject,
+  type SpaceSidebarProps,
 } from '#components/SpaceSidebar';
 import { useStoryNavigation } from './navigation';
 import { authoredSnapshot, authoredSpace, editedSnapshot, storyGraphIds } from './spaces';
+
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 export interface SpaceSidebarFixtureProps {
   /** Which Space the sidebar reports on. See `./spaces`. */
@@ -36,6 +47,14 @@ export interface SpaceSidebarFixtureProps {
   readonly remoteRefusal?: string | null;
   readonly acknowledgedRevision?: bigint;
   readonly onRetry?: () => void;
+  /** Real AppShell canvas content supplied by a story-specific fixture. */
+  readonly children?: ReactNode;
+  /** Story-specific controls beside the real selected-renderer header. */
+  readonly headerActions?: ReactNode;
+  /** Whether this fixture supplies the selected Card's URL commands. */
+  readonly showCardLinks?: boolean;
+  /** Whether this fixture supplies the active Graph's URL commands. */
+  readonly showGraphLinks?: boolean;
 }
 
 /**
@@ -55,6 +74,10 @@ export function SpaceSidebarFixture({
   remoteRefusal = null,
   acknowledgedRevision = 4n,
   onRetry = () => undefined,
+  children,
+  headerActions,
+  showCardLinks = true,
+  showGraphLinks = true,
 }: SpaceSidebarFixtureProps) {
   const [titleEdit, setTitleEdit] = useState<{
     readonly subject: SpaceChromeTitleSubject;
@@ -149,6 +172,14 @@ export function SpaceSidebarFixture({
     onReturnFocus: () => titleEdit?.returnFocus(),
   };
 
+  const graphLinksProps: Mutable<Pick<SpaceSidebarProps['graph'], 'links'>> = {};
+  if (showGraphLinks) {
+    graphLinksProps.links = {
+      onCopyCanonical: recordCopyCommand('graph-canonical'),
+      onCopyContextual: recordCopyCommand('graph-contextual'),
+    };
+  }
+
   return (
     <AppShell
       sidebar={
@@ -160,13 +191,10 @@ export function SpaceSidebarFixture({
             activeGraphId: navigationState.activeGraphId,
             colorByGraphId,
             onActivate: navigation.activateGraph,
-            links: {
-              onCopyCanonical: recordCopyCommand('graph-canonical'),
-              onCopyContextual: recordCopyCommand('graph-contextual'),
-            },
             onPresent: navigation.present,
             presenting: navigationState.mode === 'presenting',
             onExitPresenting: navigation.exitPresenting,
+            ...graphLinksProps,
           }}
           addCard={{
             onAddCard: () => undefined,
@@ -187,7 +215,7 @@ export function SpaceSidebarFixture({
             acknowledgedRevision,
           }}
           cardLinks={
-            linkedCard === undefined
+            !showCardLinks || linkedCard === undefined
               ? undefined
               : {
                   title: linkedCard.title,
@@ -198,10 +226,15 @@ export function SpaceSidebarFixture({
           titleEdit={chromeTitleEdit}
         />
       }
-      header={<SelectedCanvasRenderer renderer={current} titleEdit={chromeTitleEdit} />}
+      header={
+        <>
+          <SelectedCanvasRenderer renderer={current} titleEdit={chromeTitleEdit} />
+          {headerActions}
+        </>
+      }
       notice={<PersistenceNotice persistence={persistence} onRetry={onRetry} />}
     >
-      <div data-testid="space-canvas-stand-in" />
+      {children ?? <div data-testid="space-canvas-stand-in" />}
     </AppShell>
   );
 }

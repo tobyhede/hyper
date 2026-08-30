@@ -176,18 +176,6 @@ describe('Placement.next', () => {
     expect(Placement.next(null, rendered, [])).toBe(rendered);
   });
 
-  it('leaves an unplaced Card unplaced however often it is drawn', () => {
-    // The Card is drawn in `positionedStrategy`'s fallback band, so the renderer
-    // reports coordinates for it. Reporting is not authoring.
-    const authored = at({ '00000000-0000-4000-8000-000000000002': [10, 20] });
-    const rendered = at({
-      '00000000-0000-4000-8000-000000000002': [10, 20],
-      '00000000-0000-4000-8000-000000000003': [0, 400],
-    });
-
-    expect([...Placement.next(authored, rendered, []).keys()]).toEqual([CARD_A]);
-  });
-
   it('promotes only the Cards a completed gesture placed', () => {
     const authored = at({ '00000000-0000-4000-8000-000000000002': [10, 20] });
     const rendered = at({
@@ -488,7 +476,7 @@ describe('Placement properties', () => {
             { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
           ]),
         );
-        // Everything on screen, including the fallback band the omitted Cards sit in.
+        // A positioned projection contains exactly the authored Layout members.
         const laid = await positionedStrategy(authored)({ cards: cardsOf(...ids), edges: [] });
         const rendered = Placement.fromLayoutStrategyGraph(laid);
 

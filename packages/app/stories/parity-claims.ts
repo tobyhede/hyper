@@ -16,6 +16,20 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
+    id: 'cards-drawer-adds-existing-layout-members',
+    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    storyExport: 'AvailableCards',
+    claim:
+      'The right Cards drawer shows full production Card fronts without canvas handles, filters the Cards absent from a Layout, and activates an existing Card through the application Add to Layout path.',
+  },
+  {
+    id: 'cards-drawer-opens-and-dismisses-without-locking-the-canvas',
+    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    storyExport: 'AvailableCards',
+    claim:
+      'The Cards drawer opens from its own trigger as a dialog named Cards, dismisses on Escape with focus returning to that trigger, and leaves the surface behind it both live and undismissing — which is what dropping a Card onto the canvas is.',
+  },
+  {
     id: 'canvas-card-fills-authored-node-rect',
     storyFile: 'components/card.stories.tsx',
     storyExport: 'ResizeControl',

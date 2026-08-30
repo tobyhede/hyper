@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
+import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
+  AppShell,
+  DRAWER_WIDTH,
+} from '@project/ui';
 import { type Card, type CardId, type GraphId, type LayoutPosition } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import { graphCardIds } from '@project/graph';
@@ -25,6 +32,7 @@ import { adoptedRendererDestination, destinationRestoration } from './destinatio
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CardDestinationFocus } from './components/CardDestinationFocus';
+import { CardsDrawer } from './components/CardsDrawer';
 import { NewAlias } from './components/NewAlias';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
@@ -118,6 +126,12 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     }, []);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
+    const [cardsDrawerOpen, setCardsDrawerOpen] = useState(false);
+    const [addedCardToFocus, setAddedCardToFocus] = useState<CardId | null>(null);
+    const cardsDrag = useRef<{
+      readonly cardId: CardId;
+      readonly rendererId: CanvasRendererId;
+    } | null>(null);
     const rendererSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
@@ -157,6 +171,9 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const openCard = navigation.openCard;
     const closeCard = navigation.closeCard;
     const presenting = navigationState.mode === 'presenting';
+    useEffect(() => {
+      cardsDrag.current = null;
+    }, [selectedRenderer, presenting, openedCardId, authoringState.replacementEpoch]);
     // There is a Card to go back to only once a traversal has left its first, and only
     // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
@@ -202,12 +219,61 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       selectedCard === undefined ||
       renderer.kind !== 'layout' ||
       renderer.resolvedLayout.layout.positions[selectedCard.id] !== undefined;
-    const cardsOutsideSelectedLayout =
-      renderer.kind === 'layout'
-        ? rendererSpace.cards.filter(
-            (card) => renderer.resolvedLayout.layout.positions[card.id] === undefined,
-          )
-        : [];
+    const cardsOutsideSelectedLayout = useMemo(
+      () =>
+        renderer.kind === 'layout'
+          ? rendererSpace.cards.filter(
+              (card) => renderer.resolvedLayout.layout.positions[card.id] === undefined,
+            )
+          : [],
+      [renderer, rendererSpace.cards],
+    );
+    // The one condition the toggle's `disabled` and the drawer's own open state
+    // both read, so neither can drift from the other into an enabled control
+    // over a drawer that will not open.
+    const cardsDrawerAvailable =
+      renderer.kind === 'layout' && !presenting && openedCardId === null && !creatingAlias;
+    // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
+    // `cardsDrawerOpen`. Presenting, opening a Card and creating an Alias all pass
+    // through here, and a drawer that reopened itself on the way back would take
+    // focus with it — `Drawer.Popup` moves focus in on every open, so Stop would
+    // land the reader in the Cards list instead of on the canvas they returned to.
+    useEffect(() => {
+      if (!cardsDrawerAvailable) setCardsDrawerOpen(false);
+    }, [cardsDrawerAvailable]);
+    // Reveals the drawer once per (renderer, address) rather than on every
+    // dependency change: an unrelated edit elsewhere in the Space still
+    // recomputes `cardsOutsideSelectedLayout` with a fresh array identity, and
+    // re-running on that alone would reopen a drawer the reader just closed.
+    // The renderer is part of the key, not just the Card id — a canonical Card
+    // link addresses no Space View of its own, so the same Card can be
+    // revealed once in one Layout and then adopt a different default renderer
+    // that omits it, and that is a second reveal rather than a repeat.
+    const revealedAddressRef = useRef<{
+      readonly renderer: CanvasRendererId;
+      readonly cardId: CardId;
+    } | null>(null);
+    useEffect(() => {
+      if (addressedCardId === null) {
+        // Only a real navigation clears the address — choosing a Space View,
+        // activating a Graph, or restoring a destination that names no Card —
+        // so leaving it is the reader moving on rather than the incidental
+        // recomputation this guard absorbs. Arriving back at the same address
+        // afterwards is a fresh reveal, not the repeat being suppressed.
+        revealedAddressRef.current = null;
+        return;
+      }
+      if (
+        revealedAddressRef.current?.renderer === selectedRenderer &&
+        revealedAddressRef.current.cardId === addressedCardId
+      ) {
+        return;
+      }
+      if (cardsOutsideSelectedLayout.some(({ id }) => id === addressedCardId)) {
+        setCardsDrawerOpen(true);
+      }
+      revealedAddressRef.current = { renderer: selectedRenderer, cardId: addressedCardId };
+    }, [addressedCardId, selectedRenderer, cardsOutsideSelectedLayout]);
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
@@ -243,6 +309,17 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     }, [projected, syncProjection]);
 
     const liveProjection = useRenderAdapter((s) => s.projection);
+    useEffect(() => {
+      if (
+        addedCardToFocus === null ||
+        !liveProjection?.nodes.some(({ id }) => id === addedCardToFocus)
+      )
+        return;
+      document
+        .querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(addedCardToFocus)}"]`)
+        ?.focus();
+      setAddedCardToFocus(null);
+    }, [addedCardToFocus, liveProjection]);
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
     const cardResize = useRenderAdapter((s) => s.cardResize);
@@ -524,6 +601,33 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     // Card must land *somewhere*, and a refusal would be the wrong answer to a
     // question about geometry.
     const centreAnchor = (): LayoutPosition => visibleCentre.current?.() ?? { x: 0, y: 0 };
+
+    /**
+     * A silent refusal, deliberately: both `added-card-to-layout` outcomes it
+     * can produce (`card-already-in-layout`, `card-not-found`) mean this row's
+     * own Card just left `cardsOutsideSelectedLayout` — the drawer that called
+     * this has already removed the row the reader activated. There is nothing
+     * on screen left to attach a refusal sentence to.
+     */
+    const addExistingCard = useCallback(
+      (cardId: CardId, anchor: LayoutPosition, focus: boolean): void => {
+        const result = authoring.complete({ kind: 'added-card-to-layout', cardId, anchor });
+        if (result.kind !== 'completed') return;
+        useRenderAdapter.getState().selectCard(cardId);
+        if (focus) setAddedCardToFocus(cardId);
+      },
+      [],
+    );
+
+    const dropExistingCard = useCallback(
+      (cardId: CardId, anchor: LayoutPosition): void => {
+        const drag = cardsDrag.current;
+        cardsDrag.current = null;
+        if (drag?.cardId !== cardId || drag.rendererId !== selectedRenderer) return;
+        addExistingCard(cardId, anchor, false);
+      },
+      [addExistingCard, selectedRenderer],
+    );
 
     /**
      * Add Card: one completed Edit, and then the naming continuation.
@@ -811,11 +915,6 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
           state: sessionState.persistence.kind,
           acknowledgedRevision: sessionState.acknowledgedRevision,
         }}
-        cardsCollection={
-          renderer.kind === 'layout'
-            ? { cards: cardsOutsideSelectedLayout, revealedCardId: addressedCardId }
-            : undefined
-        }
         cardLinks={
           selectedCard === undefined
             ? undefined
@@ -854,7 +953,38 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     return (
       <AppShell
         sidebar={sidebar}
-        header={<SelectedCanvasRenderer renderer={current} titleEdit={titleEdit} />}
+        // The drawer overlays the end edge of the main area, and the canvas, the
+        // Graph key and a standing notice are all pinned to that same edge. The
+        // shell yields exactly the panel's own width so the three stay beside it
+        // rather than behind it — `DRAWER_WIDTH` is the one place that number is.
+        insetEnd={cardsDrawerOpen ? DRAWER_WIDTH : undefined}
+        header={
+          <>
+            <SelectedCanvasRenderer renderer={current} titleEdit={titleEdit} />
+            {/* Trigger and panel are one component: only the trigger renders
+                here, the drawer portalling its popup over the canvas. That is
+                what stops the toggle's `disabled` and the surface it names from
+                drifting apart — they are now the same `cardsDrawerAvailable`
+                read in one place rather than two 850 lines apart. */}
+            <CardsDrawer
+              open={cardsDrawerOpen}
+              onOpenChange={setCardsDrawerOpen}
+              disabled={!cardsDrawerAvailable}
+              cards={cardsOutsideSelectedLayout}
+              allCards={rendererSpace.cards}
+              onAdd={(card, activation) =>
+                addExistingCard(card.id, centreAnchor(), activation === 'keyboard')
+              }
+              onDragStart={(cardId) => {
+                cardsDrag.current = { cardId, rendererId: selectedRenderer };
+              }}
+              onDragEnd={() => {
+                cardsDrag.current = null;
+              }}
+              revealedCardId={addressedCardId}
+            />
+          </>
+        }
         notice={
           <>
             {clipboardFailure === null ? null : (
@@ -880,7 +1010,10 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
           </>
         }
       >
-        <div className="graph-area" style={cardSizeVars}>
+        {/* One child, not a row: the Cards drawer portals over this rather than
+            sitting beside it, so a toggle that says nothing about the Layout no
+            longer re-flows the canvas and re-measures every Card on it. */}
+        <div className="graph-area size-full min-w-0" style={cardSizeVars}>
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />
           ) : canvas.kind === 'cards' ? (
@@ -933,6 +1066,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
                 subjectCards={renderer.subject.cards}
                 newCardTitle={newCardTitle}
                 onAddCard={addCard}
+                onAddExistingCard={dropExistingCard}
                 nameOnCreation={createdCardId}
                 authoring={authoring}
                 spaceSession={spaceSession}

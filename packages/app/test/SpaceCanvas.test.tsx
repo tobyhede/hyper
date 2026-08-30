@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
+import { CARD_DRAG_TYPE } from '../src/components/CardsDrawer';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
 import type { EdgeAuthoring } from '../src/edge-authoring';
@@ -168,6 +169,7 @@ function mountGraph(
         subjectCards={[]}
         newCardTitle="Card 2"
         onAddCard={addCard}
+        onAddExistingCard={() => undefined}
         nameOnCreation={null}
         authoring={testedAuthoring}
         spaceSession={spaceSession}
@@ -815,5 +817,23 @@ describe.each([
     fireEvent.keyDown(field, { key });
 
     expect(openCard).not.toHaveBeenCalled();
+  });
+});
+
+describe('dragging a Card from the Cards drawer over canvas chrome', () => {
+  it('does not offer a drop the pane will refuse', () => {
+    mountGraph();
+    const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
+    expect(zoomIn.closest('.react-flow__pane')).toBeNull();
+
+    const dataTransfer = {
+      types: [CARD_DRAG_TYPE],
+      dropEffect: 'none',
+      setData: () => undefined,
+      getData: () => '',
+    };
+    fireEvent.dragOver(zoomIn, { dataTransfer });
+
+    expect(dataTransfer.dropEffect).toBe('none');
   });
 });
