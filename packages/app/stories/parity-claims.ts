@@ -241,13 +241,13 @@ export const parityClaims: readonly ParityClaim[] = [
   },
   {
     id: 'operational-feedback-startup-failure',
-    storyFile: 'space/messaging.stories.tsx',
+    storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Startup',
     claim: 'A Space the backend cannot open fails startup with the real diagnostic detail.',
   },
   {
     id: 'operational-feedback-space-app-failure',
-    storyFile: 'space/messaging.stories.tsx',
+    storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'SpaceApp',
     claim:
       "The Space app's error boundary reports a mounted app's render throw instead of leaving a blank page.",
@@ -267,13 +267,13 @@ export const parityClaims: readonly ParityClaim[] = [
   },
   {
     id: 'operational-feedback-placement-failure',
-    storyFile: 'space/messaging.stories.tsx',
+    storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Placement',
     claim: 'A strategy that cannot produce positions fails placement with its own diagnostic.',
   },
   {
     id: 'operational-feedback-placement-pending',
-    storyFile: 'space/messaging.stories.tsx',
+    storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Arranging',
     claim: 'The canvas shows a busy state while a strategy is still arranging Cards.',
   },

@@ -1,5 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Background, ReactFlow, type Edge } from '@xyflow/react';
+import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
+import {
+  Background,
+  ReactFlow,
+  ReactFlowProvider,
+  type Edge,
+  type EdgeTypes,
+  type Node,
+  type NodeTypes,
+} from '@xyflow/react';
 import type { CardId, GraphId } from '@project/core';
 import { nodeTypes, edgeTypes, ZoomSlider, type CardFlowNode } from '@project/react-flow-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '#src/camera';
@@ -30,6 +38,8 @@ const interaction = (
 });
 
 type ProjectedCanvas = ReturnType<typeof pending.project>;
+
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /**
  * A story that cannot lay out says so. Left unhandled, a rejected strategy
@@ -68,6 +78,110 @@ function PlacementFailure({ reason }: { readonly reason: Error }) {
   return <p role="alert">Placement failed: {reason.message}</p>;
 }
 
+/**
+ * Where a canvas is fixed, not `defaultViewport`'s frame: `fit` is what an
+ * author sees on opening, and an explicit `x`/`y`/`zoom` is a story pinning the
+ * camera to a spot worth looking at. A discriminated union rather than optional
+ * `defaultViewport`/`fitView` props, because passing both at once to
+ * `<ReactFlow>` invites exactly the drift this exists to stop — one story fit,
+ * the next hand-rolling a `defaultViewport` beside an unset `fitView` and
+ * hoping the combination still means what it did elsewhere.
+ */
+export type StoryCanvasViewport =
+  | { readonly fit: true }
+  | { readonly fit: false; readonly x: number; readonly y: number; readonly zoom: number };
+
+export interface StoryCanvasProps {
+  readonly nodes: readonly Node[];
+  readonly edges?: readonly Edge[];
+  readonly nodeTypes?: NodeTypes;
+  readonly edgeTypes?: EdgeTypes;
+  readonly viewport: StoryCanvasViewport;
+  readonly minZoom?: number;
+  readonly maxZoom?: number;
+  /** Production Cards only: connect-by-drag and the same ceiling `SpaceCanvas` uses. */
+  readonly interactive?: boolean;
+  /** The mount's own size and stage dressing; the surrounding frame is `StoryCanvasFrame`'s. */
+  readonly className: string;
+  readonly children?: ReactNode;
+}
+
+/**
+ * The one real React Flow instance every canvas-hosting story mounts.
+ *
+ * Every fixture that puts nodes on a real canvas — the HUD, the selected Edge
+ * controls, the Card specimens, the zoom control, the Layout preview — goes
+ * through this rather than instantiating `<ReactFlow>` itself. `Background`,
+ * `minZoom`/`maxZoom` defaults, `proOptions` and whether `ReactFlowProvider`
+ * wraps the flow are this component's decisions so a new fixture cannot drift
+ * from them by omission. `cardSizeVars` is applied unconditionally: a fixture
+ * that mounts the production `CardNode` needs it to size correctly and one
+ * that doesn't is unaffected, so there is no reason to make a caller ask for it.
+ */
+export function StoryCanvas({
+  nodes,
+  edges = [],
+  nodeTypes: nodeTypesProp,
+  edgeTypes: edgeTypesProp,
+  viewport,
+  minZoom = 0.2,
+  maxZoom = MAX_ZOOM,
+  interactive = false,
+  className,
+  children,
+}: StoryCanvasProps) {
+  const typeProps: Mutable<Pick<ComponentProps<typeof ReactFlow>, 'nodeTypes' | 'edgeTypes'>> = {};
+  if (nodeTypesProp !== undefined) typeProps.nodeTypes = nodeTypesProp;
+  if (edgeTypesProp !== undefined) typeProps.edgeTypes = edgeTypesProp;
+
+  return (
+    <div className={className} style={cardSizeVars}>
+      <ReactFlowProvider>
+        <ReactFlow
+          nodes={[...nodes]}
+          edges={[...edges]}
+          {...typeProps}
+          {...(viewport.fit
+            ? { fitView: true, fitViewOptions: OVERVIEW_FIT }
+            : { defaultViewport: { x: viewport.x, y: viewport.y, zoom: viewport.zoom } })}
+          minZoom={minZoom}
+          maxZoom={maxZoom}
+          nodesConnectable={interactive}
+          nodesDraggable={false}
+          zoomOnDoubleClick={false}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={24} />
+          {children}
+        </ReactFlow>
+      </ReactFlowProvider>
+    </div>
+  );
+}
+
+/**
+ * The bordered, padded box a canvas-hosting story mounts `StoryCanvas` inside.
+ *
+ * The height is the one thing that legitimately varies per story — the HUD's
+ * minimap needs less room than the selected-Edge controls do to show a routed
+ * Edge clearly — so it stays a caller-supplied Tailwind height class rather
+ * than a second enum this module would have to keep in step with content it
+ * cannot see.
+ */
+export function StoryCanvasFrame({
+  height,
+  children,
+}: {
+  readonly height: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className={`${height} w-full bg-background p-[0.75rem] text-foreground`}>
+      <div className="h-full overflow-hidden rounded-[8px] border border-border">{children}</div>
+    </div>
+  );
+}
+
 function RealReactFlow({
   nodes,
   edges,
@@ -82,26 +196,18 @@ function RealReactFlow({
   readonly zoom?: number | undefined;
 }) {
   return (
-    <div className={className} style={cardSizeVars}>
-      <ReactFlow
-        nodes={[...nodes]}
-        edges={[...edges]}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        fitView={zoom === undefined}
-        fitViewOptions={OVERVIEW_FIT}
-        defaultViewport={{ x: 0, y: 0, zoom: zoom ?? 1 }}
-        minZoom={0.2}
-        maxZoom={MAX_ZOOM}
-        nodesConnectable
-        nodesDraggable={false}
-        zoomOnDoubleClick={false}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background gap={24} />
-        {controls && <ZoomSlider />}
-      </ReactFlow>
-    </div>
+    <StoryCanvas
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      viewport={zoom === undefined ? { fit: true } : { fit: false, x: 0, y: 0, zoom }}
+      maxZoom={MAX_ZOOM}
+      interactive
+      className={className}
+    >
+      {controls && <ZoomSlider />}
+    </StoryCanvas>
   );
 }
 
