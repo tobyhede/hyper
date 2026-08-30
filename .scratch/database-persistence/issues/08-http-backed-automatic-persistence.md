@@ -5,6 +5,7 @@
 **Blocked by:** 02 — Memory-backed automatic persistence; 04 — PostgreSQL space repository.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] `HttpSpaceBackend` passes the same behavioral contract suite as `MemorySpaceBackend`.
 - [x] HTTP handlers translate list, load, and revision-checked commit requests without duplicating repository validation or transaction rules, mapping the narrower repository result into HTTP outcomes.

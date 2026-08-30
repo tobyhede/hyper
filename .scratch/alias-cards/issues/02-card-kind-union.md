@@ -1,6 +1,7 @@
 # Make Card a kind: Markdown | Alias
 
 Status: resolved
+Tags: release/v1
 
 ## Context
 

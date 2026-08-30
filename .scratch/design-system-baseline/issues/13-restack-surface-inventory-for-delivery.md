@@ -13,7 +13,14 @@ scope and acceptance criteria. The agent must read both before changing code.
 
 **Blocked by:** None.
 
-**Status:** claimed
+**Status:** resolved
+Tags: release/v1
+
+## Answer
+
+The bounded delivery issues in the ownership map have landed or carry their own
+explicit remaining owner. This coordination mission no longer represents live
+product work and must not remain on the V1 frontier.
 
 ## The big picture
 

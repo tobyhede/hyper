@@ -4,21 +4,14 @@
 
 **Blocked by:** None (can start immediately). It gates issue 03.
 
-**Status:** done
+**Status:** ready-for-agent
 
-- [x] A tracked module declares the bindings as data: each entry names the key or chord, the surface that owns it, and the behaviour. Both packages' surfaces appear in it — the Markdown source editor's withheld keys, the Markdown Card body, the registry Sidebar's own shortcut, the Canvas Card, the canvas itself, the open Card, presenting, Edge authoring and the selected-Edge controls — along with the key codes handed to React Flow as props.
-- [x] A test under the repo-level unit suite scans both source trees and fails on a key literal no entry names, in the manner of the vocabulary and CodeMirror-encapsulation scans that already live there. It fails in both directions: an entry naming a binding no module makes is also a failure, so the list cannot outlive the code.
-- [x] The scan's shape is written into the test as a comment: what counts as a binding (a key comparison, a keymap entry, a React Flow key-code prop), and what does not. A primitive's own internal key handling is out of scope — Base UI owns those and we do not bind them.
-- [x] Where two surfaces bind the same key, the list says so explicitly rather than recording one and losing the other. That overlap is the finding this ticket exists to surface, and ADR 0048 and ADR 0051 already decide who wins in the cases they cover.
-- [x] The list is reachable from `docs/agents/ui.md`, which currently documents key ownership in prose across several bullets and names no single place to look.
-- [x] `pnpm verify` is green and reported.
-
-Verification: `pnpm verify` passed after review fixes (160 test files, 1,833
-tests passed and 8 skipped). The inventory test first failed with all 25 live
-occurrences missing, then passed once the tracked rows named them. Review found
-that inline React Flow key-code props and CodeMirror-style keymap entries could
-evade the first scanner; two focused regressions failed on those shapes before
-the structural scanner support made them pass.
+- [ ] A tracked module declares the bindings as data: each entry names the key or chord, the surface that owns it, and the behaviour. Both packages' surfaces appear in it — the Markdown source editor's withheld keys, the Markdown Card body, the registry Sidebar's own shortcut, the Canvas Card, the canvas itself, the open Card, presenting, Edge authoring and the selected-Edge controls — along with the key codes handed to React Flow as props.
+- [ ] A test under the repo-level unit suite scans both source trees and fails on a key literal no entry names, in the manner of the vocabulary and CodeMirror-encapsulation scans that already live there. It fails in both directions: an entry naming a binding no module makes is also a failure, so the list cannot outlive the code.
+- [ ] The scan's shape is written into the test as a comment: what counts as a binding (a key comparison, a keymap entry, a React Flow key-code prop), and what does not. A primitive's own internal key handling is out of scope — Base UI owns those and we do not bind them.
+- [ ] Where two surfaces bind the same key, the list says so explicitly rather than recording one and losing the other. That overlap is the finding this ticket exists to surface, and ADR 0048 and ADR 0051 already decide who wins in the cases they cover.
+- [ ] The list is reachable from `docs/agents/ui.md`, which currently documents key ownership in prose across several bullets and names no single place to look.
+- [ ] `pnpm verify` is green and reported.
 
 ## Not in scope
 

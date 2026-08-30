@@ -1,6 +1,7 @@
 # The reading surface and the deck render markdown differently
 
 Status: resolved
+Tags: release/v1
 
 ## Context
 

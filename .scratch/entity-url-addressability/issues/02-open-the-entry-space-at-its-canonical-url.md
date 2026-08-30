@@ -5,6 +5,7 @@
 **Blocked by:** 01 — Give Computed Views durable Space View IDs.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] Repository bootstrap establishes one explicit Entry Space without inferring it from ordering or cardinality.
 - [x] `/` redirects without adding a redundant client-history entry, and a missing Entry Space returns an actual HTTP 404.

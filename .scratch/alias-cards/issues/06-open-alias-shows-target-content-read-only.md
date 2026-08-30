@@ -1,6 +1,7 @@
 # Open an Alias on its Target content read-only
 
 Status: ready-for-agent
+Tags: release/v1
 Type: feature
 
 ## Decision
@@ -37,5 +38,5 @@ Implement ADR 0070. An Alias chooses its immutable Target at creation, Opens thr
 - [ ] Stable stories and Ladle E2E cover the read-only Markdown presentation.
 - [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
 
-Space Card Target integration is tracked separately in issue 07 because ADR 0068 remains proposed and unbuilt.
-
+Space Card Target integration is deferred under issue 07; V1 Aliases target
+Markdown Cards only.

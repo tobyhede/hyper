@@ -5,6 +5,7 @@
 **Blocked by:** None — can start immediately.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] Renaming a Computed View leaves its authored selections and public identity unchanged.
 - [x] A Space rejects or reports a Layout whose Id collides with an available Computed View.

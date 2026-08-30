@@ -5,6 +5,7 @@
 **Blocked by:** 03 — Prisma Next PostgreSQL foundation; 04 — PostgreSQL space repository.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] CI provisions the same pinned PostgreSQL image used by local Compose and waits for its health check before database commands run.
 - [x] The database name, user, password, and `DATABASE_URL` are job-scoped CI values; no credential is committed or exposed in logs.

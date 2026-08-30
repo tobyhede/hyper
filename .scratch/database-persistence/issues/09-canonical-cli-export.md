@@ -5,6 +5,7 @@
 **Blocked by:** 01 — Version 2 UUID migration; 04 — PostgreSQL space repository; 05 — Single-space CLI import.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] `hyper export <space-uuid> <destination-directory>` exports exactly one stored space and rejects an unknown or malformed UUID.
 - [x] Output contains `space.json` and one `cards/<card-uuid>.md` per card, with every generated entity id explicit.

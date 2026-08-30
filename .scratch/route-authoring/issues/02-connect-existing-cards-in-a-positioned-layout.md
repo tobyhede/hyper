@@ -5,6 +5,7 @@
 **Blocked by:** 01 — Route intake permits cycles and enforces Edge-set uniqueness.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] A hovered or selected Card shows four small circular source handles, one centered on each side.
 - [x] Every source handle uses the active Route's colour.

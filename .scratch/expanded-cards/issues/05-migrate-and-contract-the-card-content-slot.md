@@ -5,6 +5,7 @@
 **Blocked by:** 04 — Deepen the Markdown Card contract.
 
 **Status:** done
+Tags: release/v1
 
 - [x] The React Flow adapter supplies Markdown source, open/edit state and authored operations without constructing the Card's body surface.
 - [x] Stable stories and title/body editing examples supply state and operations without constructing the Card's body surface.

@@ -8,6 +8,7 @@ but a developer's memory executes it.
 **Blocked by:** None — can start immediately.
 
 **Status:** resolved — delivered in PR #83, green on CI in 1m12s. **One criterion
+Tags: release/v1
 stays open and it is not the repository's to close**: making the `ladle` check
 *required* to merge is a branch-protection rule on `main`, which the human sets
 in GitHub. Until then the job reports without gating. See "Answer".
