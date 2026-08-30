@@ -36,6 +36,8 @@ test-results/
 .scratch/**
 !.scratch/**/
 !.scratch/**/*.md
+# Generated dogfood Spaces are rebuilt from their release tag and issue blockers.
+.scratch/**/roadmap-space/**
 
 # Package-local spike harnesses: runnable code that proved something and was
 # never meant to ship. What they proved belongs in a finding or an ADR, in

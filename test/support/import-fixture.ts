@@ -6,13 +6,20 @@ import type { LoadedSpace } from '@project/persistence';
 
 const fixtureDirectory = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
 
-/** Import the tracked abstract-layout fixture through the production file importer. */
-export const importFixture = async (repository: SpaceRepository): Promise<LoadedSpace> => {
-  const input = await readSingleSpace(fixtureDirectory);
+/** Import one Space directory through the production file importer. */
+export const importSpaceDirectory = async (
+  repository: SpaceRepository,
+  directory: string,
+): Promise<LoadedSpace> => {
+  const input = await readSingleSpace(directory);
   const imported = requireImportedSpaces(await repository.importSpaces([input], 'insert'));
   const fixture = imported[0];
   if (fixture === undefined || imported.length !== 1) {
-    throw new Error(`Tracked fixture import returned ${imported.length} Spaces`);
+    throw new Error(`Space directory import returned ${imported.length} Spaces`);
   }
   return fixture;
 };
+
+/** Import the tracked abstract-layout fixture through the production file importer. */
+export const importFixture = (repository: SpaceRepository): Promise<LoadedSpace> =>
+  importSpaceDirectory(repository, fixtureDirectory);

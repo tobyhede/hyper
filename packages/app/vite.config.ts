@@ -7,10 +7,19 @@ import { workspaceAliases } from './workspace-aliases';
 
 export default defineConfig(({ mode }) => {
   const repositoryFile = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
-  const e2eCatalog =
-    mode === 'e2e-fixture' ? 'fixture' : mode === 'e2e-empty' ? 'empty' : undefined;
+  const memoryCatalog =
+    mode === 'e2e-fixture'
+      ? { catalog: 'fixture' as const }
+      : mode === 'e2e-empty'
+        ? { catalog: 'empty' as const }
+        : mode === 'roadmap'
+          ? {
+              catalog: 'directory' as const,
+              directory: repositoryFile('../../.scratch/v1-release/roadmap-space'),
+            }
+          : undefined;
   const developmentModule =
-    e2eCatalog === undefined
+    memoryCatalog === undefined
       ? repositoryFile('../../src/http/postgres-http-runtime.ts')
       : repositoryFile('../../test/support/e2e-http-runtime.ts');
 
@@ -18,8 +27,8 @@ export default defineConfig(({ mode }) => {
     developmentModule,
     previewModule: repositoryFile('./dist-http/postgres-http-runtime.js'),
   };
-  if (e2eCatalog !== undefined) {
-    spaceHttpOptions.runtimeOptions = { catalog: e2eCatalog, startup: true };
+  if (memoryCatalog !== undefined) {
+    spaceHttpOptions.runtimeOptions = { ...memoryCatalog, startup: true };
   }
 
   return {
