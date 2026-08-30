@@ -5,14 +5,18 @@ Graph-native technical content. Cards of content live in spatial Layouts; author
 ## The space
 
 **Space**:
-The whole authored world, and the top-level of the domain model: Cards organised into spatial Layouts, with each Layout carrying the Graphs authored across its Cards. Everything else — Cards, Layouts and their Graphs — belongs within a Space; Computed Views are supplied for it. Spaces may reference one another through Space Cards, and whichever Space is loaded independently is the root of that navigation context.
+The whole authored world, and the top-level of the domain model: Cards organised into spatial Layouts, with each Layout carrying the Graphs authored across its Cards. Everything else — Cards, Layouts and their Graphs — belongs within a Space; Computed Views are supplied for it. Spaces may reference one another through Space Cards, and whichever Space is loaded independently is the root of that navigation context — loading a Space changes what you are navigating, never what owns it.
 _Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable thing — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph, workspace (used loosely for the loaded Space and for the app chrome around it — say Space, or Sidebar/canvas for the chrome).
 
 A **new space** is one Card, centered in an authored Layout with its initial empty Active Graph — not an empty canvas (ADR 0018, ADR 0068). The empty Graph can be authored but not presented. One Card is the starting state, not a permanent minimum: deliberate deletion may later leave the Space with no Cards.
 
 **Entry Space**:
-The one Space the application opens when no Space has been named. Entry is application-level context rather than a kind or property of Space; any Space loaded independently is the root of its own navigation context.
+The one Space the application opens when no Space has been named. Entry is application-level context rather than a kind or property of Space; any Space loaded independently is the root of its own navigation context. This is what exists: a mutable repository-level flag that `hyper entry` changes (ADR 0069).
 _Avoid_: Root Space as a special kind, home Space, default Space.
+
+**Meta Space**:
+The one permanent Space, at the root of Space Card ownership. No Space Card creates it and no deletion reaches it, so it is the only Space that need not be referenced to survive (ADR 0074). Every ordinary Space is created by creating its first Space Card and deleted by deleting its last, which is what makes every Space operation a Card operation. **Not built**: the Entry Space above is the current implementation, and `.scratch/v1-release/issues/01` replaces it with this.
+_Avoid_: root Space, home Space, default Space, Space directory.
 
 **Id**:
 The durable UUID that names a referenceable thing — a Space, Card, Space View, or Graph. It is the entity's only identifier and is unique within that entity's scope: Space and Computed View ids are global, while Card, Layout and Graph ids are unique within their owning Space. A Graph belongs to one Layout but its id is unique across the whole Space, because a Computed View drawing every Graph flattened across Layouts keys colour, handles and activation on that id alone (ADR 0045). Different entity kinds may carry the same UUID, and ids scoped to one Space may be reused in another, with one exception: Computed Views and Layouts share the Space View id namespace and may not collide for a Space. References carry the id directly in the scope that resolves it rather than pairing it with a second authored or machine-facing name.
@@ -31,7 +35,7 @@ A card is one of three kinds, and the kind is what its content is: **Markdown** 
 _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a table, a diagram or code, not only writing), body (works for markdown, but a space card's content is a graph).
 
 **Space Card**:
-A card of kind **space**: a reference to another Space, shown through the target's selected Space View and Graph. The Space reference is immutable but the selections are authored on the Card; many Space Cards may show the same Space differently, and deleting one never deletes its target. Space Card references may converge but may not form a cycle.
+A card of kind **space**: a reference to another Space, shown through the target's selected Space View and Graph. The Space reference is immutable but the selections are authored on the Card; many Space Cards may show the same Space differently. The Space Cards referencing a Space own its lifetime together: deleting one leaves the target alive while another reference remains, and deleting the last one deletes the target and every Space below it that nothing else references (ADR 0074). Space Card references may converge but may not form a cycle.
 _Avoid_: subspace, portal, link, nested space (as a second name for the same thing — it is a Space, full stop).
 
 **Alias**:

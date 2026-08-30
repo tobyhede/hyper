@@ -29,6 +29,18 @@ The most valuable ADRs capture a **negative** — the thing a future review will
 
 Skip ADRs for ephemeral reasons ("not worth it right now"), self-evident choices, and anything the glossary already implies.
 
+UI treatment is normally ephemeral. ADRs may record durable state ownership,
+module boundaries, persistence semantics or accessibility obligations, but not
+visual treatment, layout, control placement, gestures, shortcuts, responsive
+geometry, component choice, animation or canvas-composition technique. Those
+belong in issues, prototypes, stories and behavior tests where UX iteration can
+replace them directly.
+
+When an accepted ADR describes UI that has since changed, determine whether the
+durable boundary changed. If it did, write a refining or superseding ADR. If
+only the treatment changed, update the live issue/story/tests and leave the ADR
+as historical context; do not force the UI back into agreement.
+
 Format: a title that states the decision as a sentence, a status block, then a few paragraphs. Numbered `docs/adr/NNNN-<slug>.md`.
 
 ## ADRs are append-only
