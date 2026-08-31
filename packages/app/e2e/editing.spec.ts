@@ -1387,6 +1387,62 @@ test(
 );
 
 test(
+  'the Cards drawer names an empty Layout after every absent Card is added',
+  { tag: '@parity:cards-drawer-distinguishes-an-empty-layout' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await page.getByRole('button', { name: 'Cards' }).click();
+    const choices = page.getByRole('button', { name: /^Add .* to Layout$/ });
+    while ((await choices.count()) > 0) {
+      const before = await choices.count();
+      await choices.first().click();
+      await expect(choices).toHaveCount(before - 1);
+    }
+
+    await expect(page.getByText('All Cards are in this Layout.')).toBeVisible();
+  },
+);
+
+test(
+  'a long Cards list scrolls independently on a narrow screen',
+  { tag: '@parity:cards-drawer-scrolls-a-long-list-on-a-narrow-screen' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    await page.setViewportSize({ width: 480, height: 360 });
+
+    await page.getByRole('button', { name: 'Cards' }).click();
+    await expect(page.getByRole('textbox', { name: 'Search cards' })).toBeVisible();
+    const list = page.locator('[data-base-ui-swipe-ignore]');
+    expect(await list.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
+      true,
+    );
+  },
+);
+
+test(
+  'a repeated activation reports the stale Add in the Cards drawer',
+  { tag: '@parity:cards-drawer-keeps-an-add-refusal-on-its-surface' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await page.getByRole('button', { name: 'Cards' }).click();
+    await page.getByRole('button', { name: 'Add E to Layout' }).evaluate((button) => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await expect(page.getByRole('alert')).toContainText('already in this Layout');
+  },
+);
+
+test(
   'the Cards drawer dismisses on Escape and survives working on the canvas behind it',
   { tag: '@parity:cards-drawer-opens-and-dismisses-without-locking-the-canvas' },
   async ({ page }) => {
@@ -1487,6 +1543,29 @@ test('keyboard placement moves focus from the Cards drawer to the added canvas C
   await expect(nodeByTitle(page, 'E')).toBeFocused();
 });
 
+test('Delete Card confirms before removing the Card from the whole Space', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  const card = nodeByTitle(page, 'B');
+  await card.click();
+  await page.getByRole('button', { name: 'Delete Card B' }).click();
+
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete Card B?' });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Cancel' }).click();
+  await expect(card).toBeVisible();
+
+  await page.getByRole('button', { name: 'Delete Card B' }).click();
+  await confirmation.getByRole('button', { name: 'Delete Card' }).click();
+
+  await expect(nodeByTitle(page, 'B')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Cards' }).click();
+  await expect(page.getByRole('button', { name: 'Add B to Layout' })).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
+
 test('dragging from the Cards drawer uses transformed canvas coordinates then ordinary Card dragging', async ({
   page,
 }) => {
@@ -1522,21 +1601,25 @@ test('dragging from the Cards drawer uses transformed canvas coordinates then or
     .toBe(true);
 });
 
-test('the Cards toggle is withdrawn while presenting, matching the drawer it controls', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
+test(
+  'the Cards toggle is withdrawn while presenting, matching the drawer it controls',
+  {
+    tag: '@parity:cards-drawer-withdraws-while-authoring-is-unavailable',
+  },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
 
-  const toggle = page.getByRole('button', { name: 'Cards' });
-  await expect(toggle).toBeEnabled();
+    const toggle = page.getByRole('button', { name: 'Cards' });
+    await expect(toggle).toBeEnabled();
 
-  await page.getByRole('button', { name: 'Present' }).click();
-  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await page.getByRole('button', { name: 'Present' }).click();
+    await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
 
-  await expect(toggle).toBeDisabled();
-});
+    await expect(toggle).toBeDisabled();
+  },
+);
 
 test('editing an existing Layout updates it instead of creating another one', async ({ page }) => {
   await page.goto('/');
@@ -2039,6 +2122,15 @@ for (const key of ['Backspace', 'Delete'] as const) {
     await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards - 1);
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - incident);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+
+    await page.getByRole('button', { name: 'Cards' }).click();
+    const restoreMembership = page.getByRole('button', { name: 'Add A to Layout' });
+    await expect(restoreMembership).toBeVisible();
+    await restoreMembership.click();
+
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - incident);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   });
 }
 

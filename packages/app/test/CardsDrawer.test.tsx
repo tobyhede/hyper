@@ -29,7 +29,7 @@ function Fixture({
   readonly cards?: readonly Card[];
   readonly allCards?: readonly Card[];
   readonly disabled?: boolean;
-  readonly onAdd?: (card: Card, activation: 'keyboard' | 'pointer') => void;
+  readonly onAdd?: (card: Card, activation: 'keyboard' | 'pointer') => string | null;
   readonly onDragStart?: (cardId: Card['id']) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -133,6 +133,16 @@ describe('CardsDrawer', () => {
 
     expect(onAdd).toHaveBeenCalledWith(CARDS[0], 'pointer');
     expect(screen.queryByRole('button', { name: 'Add Alpha to Layout' })).not.toBeInTheDocument();
+  });
+
+  it('keeps an authoring refusal in the drawer that asked for the Card', async () => {
+    render(<Fixture onAdd={() => 'This Card is no longer available.'} />);
+    await openDrawer();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Zulu to Layout' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('This Card is no longer available.');
+    expect(screen.getByRole('button', { name: 'Add Zulu to Layout' })).toBeVisible();
   });
 
   it('carries the Card id on the drag it starts', async () => {

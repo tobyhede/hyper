@@ -2,6 +2,9 @@ import { useMemo, useState, type DragEvent } from 'react';
 import type { Card, CardId } from '@project/core';
 import {
   Button,
+  Alert,
+  AlertDescription,
+  AlertTitle,
   CanvasCard,
   ChevronDownIcon,
   Drawer,
@@ -37,7 +40,8 @@ export interface CardsDrawerProps {
   readonly onOpenChange: (open: boolean) => void;
   /** Withdraws the trigger without unmounting the surface it names. */
   readonly disabled?: boolean;
-  readonly onAdd: (card: Card, activation: Activation) => void;
+  /** Returns a refusal that remains on this surface, or null after a completed Add. */
+  readonly onAdd: (card: Card, activation: Activation) => string | null;
   readonly onDragStart: (cardId: CardId) => void;
   readonly onDragEnd?: () => void;
   readonly revealedCardId?: CardId | null;
@@ -101,6 +105,7 @@ export function CardsDrawer({
 }: CardsDrawerProps) {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
+  const [refusal, setRefusal] = useState<string | null>(null);
   const titleById = useMemo(
     () => new Map(allCards.map((card) => [card.id, card.title])),
     [allCards],
@@ -141,6 +146,7 @@ export function CardsDrawer({
         if (!next) {
           setQuery('');
           setKind('all');
+          setRefusal(null);
         }
         onOpenChange(next);
       }}
@@ -172,6 +178,12 @@ export function CardsDrawer({
               <DrawerTitle>Cards</DrawerTitle>
             </DrawerHeader>
             <DrawerContent>
+              {refusal === null ? null : (
+                <Alert variant="destructive" className="m-4 mb-0 shrink-0">
+                  <AlertTitle>Card not added</AlertTitle>
+                  <AlertDescription>{refusal}</AlertDescription>
+                </Alert>
+              )}
               <div className="shrink-0 space-y-2 border-b p-4">
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger
@@ -236,7 +248,9 @@ export function CardsDrawer({
                       aria-current={card.id === revealedCardId ? 'true' : undefined}
                       onDragStart={(event) => beginDrag(event, card.id)}
                       onDragEnd={onDragEnd}
-                      onClick={(event) => onAdd(card, event.detail === 0 ? 'keyboard' : 'pointer')}
+                      onClick={(event) =>
+                        setRefusal(onAdd(card, event.detail === 0 ? 'keyboard' : 'pointer'))
+                      }
                       className="block rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       aria-label={`Add ${card.title} to Layout`}
                     >

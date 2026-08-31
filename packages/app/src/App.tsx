@@ -600,11 +600,13 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      * on screen left to attach a refusal sentence to.
      */
     const addExistingCard = useCallback(
-      (cardId: CardId, anchor: LayoutPosition, focus: boolean): void => {
+      (cardId: CardId, anchor: LayoutPosition, focus: boolean): string | null => {
         const result = authoring.complete({ kind: 'added-card-to-layout', cardId, anchor });
-        if (result.kind !== 'completed') return;
+        if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
+        if (result.kind !== 'completed') return null;
         useRenderAdapter.getState().selectCard(cardId);
         if (focus) setAddedCardToFocus(cardId);
+        return null;
       },
       [],
     );
@@ -890,6 +892,15 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
                         cardId: selectedCard.id,
                       })
                   : undefined,
+                onDelete: () => {
+                  const result = authoring.complete({
+                    kind: 'deleted-card',
+                    cardId: selectedCard.id,
+                  });
+                  return result.kind === 'refused'
+                    ? describeAuthoringRefusal(result.refusal)
+                    : null;
+                },
               }
         }
         titleEdit={titleEdit}
