@@ -228,8 +228,8 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     // over a drawer that will not open.
     const cardsDrawerAvailable = renderer.kind === 'layout' && !presenting && !creatingAlias;
     // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
-    // `cardsDrawerOpen`. Presenting, opening a Card and creating an Alias all pass
-    // through here, and a drawer that reopened itself on the way back would take
+    // `cardsDrawerOpen`. Presenting and creating an Alias both pass through here,
+    // and a drawer that reopened itself on the way back would take
     // focus with it — `Drawer.Popup` moves focus in on every open, so Stop would
     // land the reader in the Cards list instead of on the canvas they returned to.
     useEffect(() => {
@@ -777,22 +777,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     // intermediate drag position, but `sessionState.working` only changes on
     // a completed Edit.
     const newCardTitle = useMemo(() => nextCardTitle(sessionState.working), [sessionState.working]);
-    /**
-     * Closing an opened Card returns focus to that Card.
-     *
-     * The pane cannot do this itself. The obvious target is the control that
-     * opened it, and opening destroys that control — `titleEditingEnabled` goes
-     * false while a Card is open, so every Card affordance is withdrawn — which
-     * left a closed dialog dropping focus on `<body>`. The Card survives, is
-     * focusable outside presenting, and is where the author was.
-     *
-     * Runs after the pane has unmounted and the graph has re-rendered, so the
-     * node is back in the tree by the time it is asked for. Presenting is
-     * excluded because it closes the opened Card on its way in and takes the
-     * nodes out of the tab order behind it.
-     */
-    // An opened Card covers the graph and owns its own keys, so the global
-    // Traversal commands are bound only while a traversal is the thing on screen.
+    // Global Traversal commands are bound only while presenting.
     usePresentingKeys(presenting, {
       advance,
       retreat,

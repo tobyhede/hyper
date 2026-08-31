@@ -168,6 +168,68 @@ const MINTED_GRAPH_IDS = [
 
 const pick = <T>(items: readonly T[], at: number): T | undefined => items[at];
 
+it('keeps an existing Alias Target immutable while accepting Title edits', () => {
+  fc.assert(
+    fc.property(
+      fc.constantFrom(CARD_A, CARD_B),
+      fc.oneof(
+        fc.constant('Alias'),
+        fc
+          .string({ minLength: 1, maxLength: 8 })
+          .filter((title) => title.trim().length > 0 && title.trim() !== 'Alias'),
+      ),
+      (target, proposedTitle) => {
+        const alternativeTarget = target === CARD_A ? CARD_B : CARD_A;
+        const snapshot: SpaceSnapshot = {
+          ...start,
+          cards: start.cards.map((card) =>
+            card.id === CARD_C
+              ? { id: CARD_C, document: { title: 'Alias', kind: 'alias', target } }
+              : card,
+          ),
+        };
+        const loaded = { snapshot, revision: 0n, exportedRevision: null };
+        const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+        const { authoring } = composeApp({
+          spaceSession: session,
+          selection: OTHER_LAYOUT_ID,
+          newGraphId: mintingGraphIds(...MINTED_GRAPH_IDS),
+          initialPlacement: null,
+        });
+        const aliasLayout = snapshot.document.layouts?.find(
+          (layout) => layout.id === OTHER_LAYOUT_ID,
+        );
+        if (aliasLayout === undefined)
+          throw new Error('property fixture must include the Alias Layout');
+        authoring.replacePlacement(Placement.fromLayout(aliasLayout));
+
+        expect(
+          authoring.complete({
+            kind: 'edited-card',
+            cardId: CARD_C,
+            document: { title: proposedTitle, kind: 'alias', target },
+          }),
+        ).toEqual(proposedTitle === 'Alias' ? { kind: 'unchanged' } : { kind: 'completed' });
+        expect(session.getState().working.cards).toContainEqual({
+          id: CARD_C,
+          document: { title: proposedTitle.trim(), kind: 'alias', target },
+        });
+
+        const beforeRetarget = session.getState().working;
+        expect(
+          authoring.complete({
+            kind: 'edited-card',
+            cardId: CARD_C,
+            document: { title: proposedTitle, kind: 'alias', target: alternativeTarget },
+          }),
+        ).toEqual({ kind: 'refused', refusal: { code: 'alias-target-immutable' } });
+        expect(session.getState().working).toBe(beforeRetarget);
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
 it('keeps the working Space loadable through any sequence of semantic operations', () => {
   fc.assert(
     fc.property(

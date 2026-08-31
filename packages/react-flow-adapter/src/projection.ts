@@ -88,18 +88,17 @@ export type CardNodeData = {
    */
   titleEditor?: CardTitleEditor;
   /**
-   * Whether the Layout has Expanded this Card, so it draws its content on the
-   * Card rather than its title alone (ADR 0064).
+   * Whether the Layout has Opened this Card, so it draws its content on the Card
+   * rather than its title alone (ADR 0064).
    *
    * Authored, not derived: it is a fact about the Layout, and the Card's rect
    * follows from it rather than the other way round. The adapter cannot read it
-   * off the geometry — a Card is not Expanded because it is large.
+   * off the geometry — a Card is not Open just because it is large.
    *
-   * The Alias kind has no Expanded front yet (ADR 0064 leaves it open), so
-   * nothing sets this for one.
+   * An Open Alias draws its immutable Target's content through the same front.
    */
   expanded?: boolean;
-  /** Present only when activating the Expanded body may place a caret. */
+  /** Present only when activating the Open body may place a caret. */
   onBeginBodyEditing?: () => void;
   /**
    * The live body edit, absent on a Card whose rendered Markdown is at rest.

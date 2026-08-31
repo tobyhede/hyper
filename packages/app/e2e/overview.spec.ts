@@ -4,10 +4,12 @@ import { expect, test, type Locator, type Page } from './fixtures';
 import {
   activateGraph,
   activeGraph,
+  boxOf,
   graphLegendSwatchColor,
   openCard,
   selectCanvas,
   selectedCanvas,
+  settled,
   sidebar,
 } from './graph';
 
@@ -427,14 +429,68 @@ test(
     await recap.focus();
     await page.keyboard.press('Space');
     await expect(recap.getByText('entry point')).toBeVisible();
-    await expect(recap.locator('.react-flow__resize-control')).toHaveCount(1);
-    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await recap.click({ position: { x: 8, y: 8 } });
+    const resizeControl = recap.locator('.react-flow__resize-control.handle.bottom.right');
+    await expect(resizeControl).toBeVisible();
+    await recap.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveText('Persisted');
+    const beforeResizeRevisionValue = await persistence.getAttribute('data-revision');
+    if (beforeResizeRevisionValue === null) {
+      throw new Error('Persisted Alias A′ has no revision');
+    }
+    const beforeResizeRevision = Number(beforeResizeRevisionValue);
+    const openSize = await recap.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await settled(page);
+    const resizeBox = await boxOf(resizeControl, "Alias A′'s resize control");
+    await page.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + resizeBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      resizeBox.x + resizeBox.width / 2 + 120,
+      resizeBox.y + resizeBox.height / 2 + 80,
+      { steps: 6 },
+    );
+    await page.mouse.up();
+    await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 1));
+    await recap.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const resizedSize = await recap.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    expect(resizedSize.width).toBeGreaterThan(openSize.width);
+    expect(resizedSize.height).toBeGreaterThan(openSize.height);
+
+    await recap.getByRole('button', { name: 'Close Card A′' }).click();
+    await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 2));
+    await openCard(recap, 'A′');
+    await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 3));
+    await recap.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const reopenedSize = await recap.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    expect(reopenedSize).toEqual(resizedSize);
 
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A′');
     await expect(persisted.getByText('entry point')).toBeVisible();
     await expect(persisted.getByRole('button', { name: 'Close Card A′' })).toBeVisible();
+    const persistedSize = await persisted.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    expect(persistedSize).toEqual(resizedSize);
     await expect(persisted.getByRole('textbox')).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
 
