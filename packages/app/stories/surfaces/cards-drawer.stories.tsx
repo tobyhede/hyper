@@ -1,8 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
-import { uuidSchema, type Card } from '@project/core';
+import { uuidSchema, type Card, type SpaceSnapshot } from '@project/core';
+import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { CardsDrawer } from '#components/CardsDrawer';
 import { PersistenceNotice } from '#components/PersistenceControl';
+import { describeAuthoringRefusal } from '#src/authoring-refusal';
+import { composeApp } from '#src/compose-app';
+import { authoredSnapshot } from '../support/spaces';
 
 export default { title: 'Surfaces/Cards Drawer' };
 
@@ -32,13 +36,11 @@ function CardsDrawerFixture({
   cards = CARDS,
   allCards = cards,
   disabled = false,
-  refusal = null,
   notice,
 }: {
   readonly cards?: readonly Card[];
   readonly allCards?: readonly Card[];
   readonly disabled?: boolean;
-  readonly refusal?: string | null;
   readonly notice?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -54,7 +56,6 @@ function CardsDrawerFixture({
           onOpenChange={setOpen}
           disabled={disabled}
           onAdd={(card) => {
-            if (refusal !== null) return refusal;
             setAdded((titles) => [...titles, card.title]);
             return null;
           }}
@@ -70,6 +71,53 @@ function CardsDrawerFixture({
         The canvas behind it
       </button>
       <p className="shrink-0 border-t p-2 text-sm">Added: {added.join(', ')}</p>
+    </div>
+  );
+}
+
+const sparseSnapshot = (): SpaceSnapshot => {
+  const sparseLayout = authoredSnapshot.document.layouts?.[1];
+  if (sparseLayout === undefined) throw new Error('Cards drawer story needs its sparse Layout');
+  return {
+    ...authoredSnapshot,
+    document: { ...authoredSnapshot.document, defaultRenderer: sparseLayout.id },
+  };
+};
+
+/** The production Authoring composition behind the browser-reachable repeated-activation refusal. */
+function RefusedAdd() {
+  const session = useMemo(() => {
+    const snapshot = sparseSnapshot();
+    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    return openSpaceSession(new MemorySpaceBackend([stored]), stored);
+  }, []);
+  const composed = useMemo(() => composeApp({ spaceSession: session }), [session]);
+  useSyncExternalStore(session.subscribe, session.getState);
+  const space = composed.currentSpace();
+  const layout = space.lookup.layout(composed.navigation.getState().selectedRenderer)?.layout;
+  const cards =
+    layout === undefined
+      ? []
+      : space.cards.filter((card) => layout.positions[card.id] === undefined);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="flex h-screen items-start bg-background p-2 text-foreground">
+      <CardsDrawer
+        cards={cards}
+        allCards={space.cards}
+        open={open}
+        onOpenChange={setOpen}
+        onAdd={(card) => {
+          const result = composed.authoring.complete({
+            kind: 'added-card-to-layout',
+            cardId: card.id,
+            anchor: { x: 0, y: 0 },
+          });
+          return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
+        }}
+        onDragStart={() => undefined}
+      />
     </div>
   );
 }
@@ -95,9 +143,7 @@ LongList.meta = { iframed: true };
 export const Disabled: Story = () => <CardsDrawerFixture disabled />;
 Disabled.meta = { iframed: true };
 
-export const Refused: Story = () => (
-  <CardsDrawerFixture refusal="This Card is no longer available in this Layout." />
-);
+export const Refused: Story = () => <RefusedAdd />;
 Refused.meta = { iframed: true };
 
 export const PersistenceFailure: Story = () => (

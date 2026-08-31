@@ -62,6 +62,7 @@ describe('CardsDrawer', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(await openDrawer()).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Cards' })).not.toBeInTheDocument();
   });
 
   it('withdraws its trigger without losing the surface it names', () => {

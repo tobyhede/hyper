@@ -175,7 +175,7 @@ export function CardsDrawer({
               other portalled surface in the tree does. */}
           <DrawerPopup className="nokey">
             <DrawerHeader>
-              <DrawerTitle>Cards</DrawerTitle>
+              <DrawerTitle hidden>Cards</DrawerTitle>
             </DrawerHeader>
             <DrawerContent>
               {refusal === null ? null : (

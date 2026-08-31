@@ -66,11 +66,12 @@ test(
   async ({ page }) => {
     await page.goto(story('refused'));
     await page.getByRole('button', { name: 'Cards' }).click();
-    await page.getByRole('button', { name: 'Add API boundaries to Layout' }).click();
+    await page.getByRole('button', { name: 'Add Card 3 to Layout' }).evaluate((button) => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
 
-    await expect(page.getByRole('alert')).toContainText(
-      'This Card is no longer available in this Layout.',
-    );
+    await expect(page.getByRole('alert')).toContainText('This Card is already in this Layout.');
   },
 );
 
