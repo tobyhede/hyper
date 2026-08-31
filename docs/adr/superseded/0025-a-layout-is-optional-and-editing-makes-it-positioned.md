@@ -1,6 +1,7 @@
 # A Layout is optional; the app supplies an algorithmic default, and editing makes it positioned
 
-Status: accepted
+Status: superseded
+Superseded by: 0075
 Supersedes: 0013, 0017
 Refines: 0018
 Refined by: 0028, 0029, 0031, 0040, 0041

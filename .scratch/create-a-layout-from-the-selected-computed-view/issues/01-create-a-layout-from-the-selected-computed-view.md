@@ -13,9 +13,10 @@ existing creation contract or any Layout the Space already owns.
       inactive Computed Views and authored Layouts do not.
 - [ ] The command is unavailable until the selected Computed View's placement is
       ready and never captures stale or unresolved placement.
-- [ ] Creation captures every visible Card and position without moving them,
-      gives the new Layout the next neutral title, and asks the Computed View for
-      freshly identified owned Graphs under its existing policy.
+- [ ] Creation captures every Card in the Computed View output and its resolved
+      position without moving any Card, gives the new Layout the next neutral
+      title, and asks the Computed View for freshly identified owned Graphs under
+      its existing policy.
 - [ ] Creation leaves existing Layouts untouched, selects the new Layout, makes
       it the default renderer, and enters normal automatic persistence.
 - [ ] A refused creation adds no Layout and leaves the Computed View selected
@@ -24,4 +25,3 @@ existing creation contract or any Layout the Space already owns.
       Layouts.
 - [ ] Unit, application, E2E and Ladle evidence cover ready, pending, successful
       and refused states on desktop and narrow screens.
-

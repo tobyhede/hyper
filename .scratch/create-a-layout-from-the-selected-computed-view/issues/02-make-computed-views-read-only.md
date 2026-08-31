@@ -11,8 +11,10 @@ authoring workflow remains available after a Layout has been created or selected
 
 - [ ] No Card, Alias, placement, Open state, Graph or Edge operation implicitly
       creates a Layout while a Computed View is selected.
-- [ ] Authoring controls are absent or disabled on Computed Views with an
-      accessible explanation that a Layout must be created before editing.
+- [ ] Card, Alias, placement, Open state, Graph and Edge authoring controls are
+      absent or disabled on Computed Views with an accessible explanation that a
+      Layout must be created before editing; Create Layout remains available for
+      the active Computed View.
 - [ ] Authoring pointer gestures, connection handles and keyboard shortcuts do
       not begin interactions on a Computed View; keyboard attempts announce the
       same read-only reason where feedback is required.
@@ -26,4 +28,3 @@ authoring workflow remains available after a Layout has been created or selected
       unchanged.
 - [ ] Live agent guidance and release documentation describe Computed Views as
       read-only and explicit creation as the sole crossing into a Layout.
-
