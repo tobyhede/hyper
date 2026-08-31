@@ -610,8 +610,10 @@ describe('Space Authoring', () => {
    * The half of that policy that is **not** a mechanical mirror, and the one
    * that fails silently if it is got wrong.
    *
-   * Explicit creation first makes a fresh, empty Graph. The later Edge joins
-   * that Graph, not the Graph that happened to be emphasised in the Computed View.
+   * Explicit creation copies every Computed View Graph's title, colour and
+   * Edges under a fresh identity; only a View with no Graphs receives a fresh
+   * empty fallback. A later Edge therefore joins the copied Graph rather than
+   * reaching back into the Graph its source Layout still owns.
    *
    * The emphasis is still only emphasis (ADR 0028): `Main` already holds
    * exactly this Edge, and it neither blocks the gesture nor receives it.

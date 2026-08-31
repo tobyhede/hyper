@@ -455,6 +455,35 @@ describe('Space app failure reporting', () => {
 });
 
 describe('Space app Cards drawer', () => {
+  it('keeps stale Cards visible but withdraws authoring while an authored Layout replacement is pending', async () => {
+    const local = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: local, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+
+    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app), {
+      selection: LAYOUT_ID,
+      cardId: null,
+      graphId: null,
+      presentationCardId: null,
+    });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add Card' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: 'Open Card Card' })).toBeInTheDocument();
+
+    act(() => {
+      session.submit(snapshot('Space', 'Card', 700, 500));
+    });
+
+    // The render adapter deliberately retains the previous projection until the
+    // replacement placement resolves, so the old Card does not blink away.
+    expect(screen.getByTestId('card')).toBeVisible();
+    // Retained pixels are not an authored placement for the selected Layout.
+    expect(screen.getByRole('button', { name: 'Add Card' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Open Card Card' })).not.toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add Card' })).toBeEnabled());
+  });
+
   it('keeps the Cards drawer closed after the reader closes it, even once the Space gains another Card', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const local: SpaceSnapshot = {

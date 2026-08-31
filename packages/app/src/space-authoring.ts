@@ -1038,12 +1038,13 @@ export function createSpaceAuthoring({
     // Which Layout this Edit writes, and what it owns afterwards.
     //
     // The two branches are explicit Create Layout conversion and ordinary
-    // authored Layout editing. Conversion asks the *View* for the Layout's Graphs,
-    // because that is where the choice
-    // lives (ADR 0045) — Flow answers a fresh empty one, and the renderer has
-    // already held that answer to closure, non-emptiness and fresh identity. A
-    // selected Layout keeps its id, its title and the Graph
-    // identities it already owns, and the Edit writes into them.
+    // authored Layout editing. Conversion asks the *View* for the Layout's
+    // Graphs, because that is where the choice lives (ADR 0045) — Flow and Grid
+    // preserve every subject Graph's title, colour and Edges under a fresh
+    // identity, falling back to one fresh empty Graph only when the subject has
+    // none. The renderer has already held that answer to closure, non-emptiness
+    // and fresh identity. A selected Layout keeps its id, its title and the
+    // Graph identities it already owns, and the Edit writes into them.
     let layoutId: UUID;
     let layoutTitle: string;
     let ownedGraphs: readonly Graph[];
@@ -1057,8 +1058,8 @@ export function createSpaceAuthoring({
       // The first Graph a conversion returns is the one the new Layout opens
       // on — the same rule an absent `activeGraph` is read by (ADR 0026), taken
       // here rather than left to be resolved because what is written down must
-      // not depend on Graph order (ADR 0028). The Graph the author was merely
-      // emphasising belongs to another Layout and does not come across.
+      // not depend on Graph order (ADR 0028). A source Graph's identity remains
+      // with its owning Layout; only its content is copied into the new owner.
       activeGraphId = converted.graphs[0].id;
       // Add Graph *is* the conversion here. The new Layout's initial Graph is
       // the Graph the author asked for, rather than a predecessor the requested
