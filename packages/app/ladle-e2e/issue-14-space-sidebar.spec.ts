@@ -54,6 +54,10 @@ test(
 
     const create = page.getByRole('button', { name: 'Create Layout' });
     await expect(create).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
+    await expect(create).toHaveAccessibleDescription(
+      'Computed Views are read-only. Create a Layout to edit.',
+    );
     await create.click();
     await expect(page.locator('body')).toHaveAttribute('data-create-layout', 'requested');
   },
@@ -83,7 +87,7 @@ test(
     const create = page.getByRole('button', { name: 'Create Layout' });
     await expect(create).toBeDisabled();
     await expect(create).toHaveAccessibleDescription(
-      'This view has not finished placing its Cards, so there is nowhere to write yet.',
+      'Computed Views are read-only. Create a Layout to edit. This view has not finished placing its Cards, so there is nowhere to write yet.',
     );
   },
 );

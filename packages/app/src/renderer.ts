@@ -78,7 +78,7 @@ export interface ViewConversion {
   readonly graphs: readonly [Graph, ...Graph[]];
 }
 
-/** An application-supplied View: it computes placement, and editing converts it. */
+/** An application-supplied read-only View that explicit Layout creation may capture. */
 export interface ResolvedViewRenderer {
   readonly kind: 'view';
   readonly id: UUID;

@@ -65,7 +65,7 @@ _Avoid_: link, connection, transition, arrow, step, relationship.
 **Active Graph**:
 The one Graph selected in the current Layout — drawn emphasized, and the Graph an author's new Edges join. There is one concept here, not two: a Graph is active, and highlighting is how that is shown. A Layout may name which Graph opens active; failing that it is the Layout's first Graph. Changing it is a deliberate act, never a side effect of drawing or reading.
 
-Activating is not itself an edit — it touches no Card and no Graph, so it converts nothing. Which Graph is active may become the authored selection when another Edit records the surrounding Space View. On a Computed View, where no Layout is selected, emphasis is the whole of it: the emphasised Graph is not the one a new Edge joins, because conversion returns Graphs of the Computed View's own (ADR 0045).
+Activating is not itself an edit — it touches no Card and no Graph. Which Graph is active may become the authored selection when an Edit records the surrounding Layout. On a Computed View, where no Layout is selected, emphasis is the whole of it; authoring begins only after Create Layout captures the View.
 _Avoid_: selected Graph and current Graph as a second concept alongside this one, focus, mode.
 
 **Authoring**:
@@ -101,7 +101,7 @@ One way of seeing a Space's Cards. A Space View is either a Computed View the ap
 _Avoid_: View alone, canvas renderer, screen, page, panel, mode.
 
 **Computed View**:
-An application-supplied Space View that carries no authored Space state. It receives a subject of Cards and Graphs and uses an automatic Layout strategy; editing converts what it shows into a new Layout without retaining a relationship to the Computed View.
+An application-supplied, read-only Space View that carries no authored Space state. It receives a subject of Cards and Graphs and uses an automatic Layout strategy. Create Layout explicitly captures what it shows as a new Layout without retaining a relationship to the Computed View.
 
 A Computed View's Id is stable independently of its mutable product name and is the same in every Space for which the application supplies it. Different subjects do not make named kinds of Computed View: Grid, Flow, sorts and future trees or clusters are simply different ways of seeing Cards.
 _Avoid_: Algorithmic View, built-in View, layout, arrangement, algorithm.
@@ -109,13 +109,13 @@ _Avoid_: Algorithmic View, built-in View, layout, arrangement, algorithm.
 **Layout**:
 A card-to-rect map the author wrote — which of a Space's Cards are in the Layout, where they sit, their Open/Closed state, and the Open Size each remembers. It belongs to the Space and is part of what the Space is. A Space may hold several Layouts, and may hold none. Membership, position, Open/Closed state and Open Size are properties of the Layout, never of the Card: the same Card may be absent from one Layout, sit at different coordinates in others, and be Open at different sizes in each. A Layout may not name Cards the Space does not have.
 
-A Layout is the authored kind of **Space View**; the computed kind is not a layout at all but a **Computed View** using an automatic layout strategy (ADR 0014). Editing a Computed View turns it into a Layout by returning the Cards and positions already on screen along with one or more Graphs, so nothing moves at the moment it happens. Every Graph it returns carries a new identity owned by the new Layout, so no conversion can leave two Layouts owning one Graph (ADR 0045).
+A Layout is the authored kind of **Space View**; the computed kind is not a layout at all but a **Computed View** using an automatic layout strategy (ADR 0014). Create Layout turns the selected Computed View into a Layout by returning the Cards and positions already on screen along with one or more Graphs, so nothing moves at the moment it happens. Every Graph it returns carries a new identity owned by the new Layout, so no conversion can leave two Layouts owning one Graph (ADR 0045).
 
 A Layout owns a non-empty ordered collection of Graphs over its Cards. Several Graphs may share Cards within that Layout. A Layout may also name which of its Graphs opens active; otherwise its first Graph opens active.
 _Avoid_: Computed View, placement as a synonym (a Layout *holds* a placement, and adds an identity, a title and its owned Graphs), diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
 
 **Placement**:
-The card-to-rect map itself — which Cards are present, where they sit, whether each is **Open** or **Closed**, and its remembered **Open Size**, and nothing more. A **Layout** is the authored thing a Space holds; the placement is the map inside it. Every Closed Card has the same **Closed Size** by domain rule, so that fixed size is not authored alongside each Card. Placement is also what an automatic **layout strategy** computes and what the positioned strategy reads, and it is the same value in both directions: editing a Computed View copies the computed placement into the new Layout, which is the crossing ADR 0025 describes.
+The card-to-rect map itself — which Cards are present, where they sit, whether each is **Open** or **Closed**, and its remembered **Open Size**, and nothing more. A **Layout** is the authored thing a Space holds; the placement is the map inside it. Every Closed Card has the same **Closed Size** by domain rule, so that fixed size is not authored alongside each Card. Placement is also what an automatic **layout strategy** computes and what the positioned strategy reads, and it is the same value in both directions: Create Layout copies the computed placement into the new Layout, which is the crossing ADR 0025 describes.
 
 A Layout's placement is **sparse** relative to the Space, and omission is meaningful: a Card the map leaves out is not in that Layout and is not rendered there. Adding an existing Card to a Layout writes its position. Removing it from the Layout removes that entry and the incident Edges the Layout owns without deleting the Card from the Space. Omission is never the origin.
 
@@ -133,7 +133,7 @@ A strategy is either **automatic** or **positioned**. An automatic strategy comp
 
 No strategy is the primary one. A space is arranged by whichever the author or the application chose, the set of them grows, and any particular graph-layout engine is one member of it rather than the thing layout means.
 
-An automatic strategy has nowhere to record where an author put a card, so editing a Computed View **converts** it: the positions the strategy computed are copied into a new Layout and the edit is written there. That crossing — computed positions becoming authored — is the only one between them, and an edit is what triggers it.
+An automatic strategy has nowhere to record where an author put a Card, so a Computed View is read-only. The explicit Create Layout command **converts** it: the positions the strategy computed are copied into a new Layout. That crossing — computed positions becoming authored — is the only one between them; attempted authoring never triggers or replays it.
 _Avoid_: arrangement (applying a strategy produces no separate entity — the cards themselves carry the positions), algorithm, engine.
 
 **Cards View**:

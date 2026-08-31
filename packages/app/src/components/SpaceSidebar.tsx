@@ -445,6 +445,7 @@ export function SpaceSidebar({
   // and there is nothing to dismiss.
   const { isMobile, setOpenMobile } = useSidebar();
   const createLayoutReasonId = useId();
+  const computedViewReadOnlyId = useId();
   const onCanvas =
     <Args extends readonly unknown[]>(command: (...args: Args) => void) =>
     (...args: Args): void => {
@@ -461,7 +462,7 @@ export function SpaceSidebar({
   // Graph is active, or the active Graph holds no Edges — and the second is not
   // a defensive nicety. Creating a Layout creates its initial Active Graph empty
   // in the same Edit (ADR 0040), so a Layout converted out of a View by a plain
-  // Card drag is always in this state until the author draws something.
+  // explicit Create Layout Edit is always in this state until the author draws something.
   const presentDisabled =
     !graph.presenting &&
     (graph.canPresent === false || activeGraph === undefined || activeGraph.edges.length === 0);
@@ -503,15 +504,17 @@ export function SpaceSidebar({
           the mobile Sheet portals these regions somewhere a class on the root
           would not be an ancestor at all. */}
       <SidebarContent className="nokey">
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <AddCardControl
-              {...addCard}
-              onAddCard={onCanvas(addCard.onAddCard)}
-              onAddAlias={onCanvas(addCard.onAddAlias)}
-            />
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {createLayout === undefined ? (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <AddCardControl
+                {...addCard}
+                onAddCard={onCanvas(addCard.onAddCard)}
+                onAddAlias={onCanvas(addCard.onAddAlias)}
+              />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
 
         <SidebarGroup>
           <SidebarGroupLabel>Space View</SidebarGroupLabel>
@@ -543,16 +546,19 @@ export function SpaceSidebar({
                   size="compact"
                   className="w-full justify-start gap-2"
                   disabled={createLayout.disabled}
-                  aria-describedby={
+                  aria-describedby={`${computedViewReadOnlyId}${
                     createLayout.disabled && createLayout.unavailableReason !== null
-                      ? createLayoutReasonId
-                      : undefined
-                  }
+                      ? ` ${createLayoutReasonId}`
+                      : ''
+                  }`}
                   onClick={onCanvas(createLayout.onCreate)}
                 >
                   <LayoutIcon />
                   Create Layout
                 </Button>
+                <p id={computedViewReadOnlyId} className="text-xs text-muted-foreground">
+                  Computed Views are read-only. Create a Layout to edit.
+                </p>
                 {createLayout.disabled && createLayout.unavailableReason !== null ? (
                   <p id={createLayoutReasonId} className="text-xs text-muted-foreground">
                     {createLayout.unavailableReason}

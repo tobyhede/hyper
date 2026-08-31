@@ -196,6 +196,7 @@ type LayoutRequiredOperation = Extract<
 /** Stable identities for every expected refusal at the Authoring seam. */
 export type AuthoringRefusal =
   | { readonly code: 'placement-pending' }
+  | { readonly code: 'computed-view-read-only' }
   | { readonly code: 'layout-not-found' }
   | { readonly code: 'layout-required'; readonly operation: LayoutRequiredOperation }
   | { readonly code: 'card-not-found' }
@@ -447,37 +448,6 @@ const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>
 /** Where an Edge sits in a Graph, or -1. An exact duplicate is invalid, so there is at most one. */
 const indexOfEdge = (edges: readonly GraphEdge[], edge: GraphEdge): number =>
   edges.findIndex((candidate) => sameEdge(candidate, edge));
-
-/**
- * The operations with no answer at all until a Layout is selected, and what to
- * tell the author who reached one from an Algorithmic View.
- *
- * The matrix's "not applicable / not available without a Layout" rows. Every
- * *other* operation crosses an Algorithmic View by converting it (ADR 0025);
- * these cannot, because each names something a Layout owns — its membership,
- * one of its Graphs, or an Edge in one — and a view that has not been converted
- * owns none of it. Add Graph is deliberately absent: it converts, and the Graph
- * it asked for becomes the new Layout's initial one.
- */
-const LAYOUT_ONLY = new Set<LayoutRequiredOperation>([
-  'added-card-to-layout',
-  'removed-card-from-layout',
-  'opened-card',
-  'closed-card',
-  'resized-card',
-  'renamed-layout',
-  'renamed-graph',
-  'recolored-graph',
-  'deleted-graph',
-  'reconnected-edge',
-  'deleted-edge',
-]);
-// SAFETY: `Set<LayoutRequiredOperation>.has` requires its argument narrowed to
-// that type, but the `.has` call itself is this function's own type predicate
-// check — its boolean result is what proves the narrowing true.
-const requiresLayout = (
-  operation: AuthoringCompletion['kind'],
-): operation is LayoutRequiredOperation => LAYOUT_ONLY.has(operation as LayoutRequiredOperation);
 
 /** What a reconnected endpoint settles to, before anything has been written. */
 type ReconnectOutcome =
@@ -744,14 +714,11 @@ export function createSpaceAuthoring({
   };
 
   /**
-   * The Graph a connection drawn right now would land in, or `null` when the
-   * Edit would mint one.
+   * The Graph a connection drawn right now would land in, or `null` when no
+   * selected Layout owns one.
    *
-   * **Only a selected Layout has an answer.** An Algorithmic View is *converted*
-   * by the Edit (ADR 0025), and the Layout that conversion produces owns a Graph
-   * the View mints on the way out (ADR 0045) — so the Edge joins a Graph that
-   * does not exist yet, whatever Graph the author happens to be emphasising.
-   * That emphasis belongs to some other Layout and is not where the Edge goes.
+   * **Only a selected Layout has an answer.** A Computed View is read-only, so
+   * the caller's eligibility gate refuses before this absence can author state.
    *
    * A Layout the Space no longer holds answers `null` too: it names no Graph,
    * and the completion that follows refuses for that reason rather than this one.
@@ -776,8 +743,8 @@ export function createSpaceAuthoring({
    * Reading the installed placement rather than the stored Layout is deliberate.
    * It is the same value the completion reports, so the preview and the
    * completion cannot disagree; and it is the only one that answers on an
-   * Algorithmic View, which has no Layout to consult and whose conversion
-   * returns exactly these Cards.
+   * Computed View before explicit creation, although its read-only eligibility
+   * guard refuses authoring before this predicate is used.
    */
   const connectable = (cardId: CardId): boolean =>
     placement !== null &&
@@ -793,15 +760,11 @@ export function createSpaceAuthoring({
    * `to === null` is the Option/Alt empty drop, whose target Card does not exist
    * yet (ADR 0033).
    *
-   * The duplicate refusal is **conditional on a selected Layout**, and that is
-   * not an omission on the other branch. An exact duplicate within one Graph is
-   * what intake rejects (ADR 0032), so it can only be a duplicate of an Edge in
-   * the Graph the Edge is about to join — and on an Algorithmic View that Graph
-   * is the empty one conversion is about to mint, which holds nothing to
-   * duplicate. Refusing there would refuse the *first* connection an author
-   * draws on a Space that already has Graphs, silently and with no way to tell
-   * why. A created Card cannot duplicate anything either, which is the whole of
-   * why the two callers below differ.
+   * The duplicate refusal is conditional on a selected Layout because a
+   * Computed View is refused as read-only before connection-specific checks.
+   * An exact duplicate within one Graph is what intake rejects (ADR 0032), so it
+   * can only be a duplicate of an Edge in the Graph the Edge is about to join.
+   * A created Card cannot duplicate anything, which is why the callers differ.
    */
   const connectRefusal = (from: CardId, to: CardId | null): AuthoringRefusal | null => {
     if (!connectable(from) || (to !== null && !connectable(to))) {
@@ -826,21 +789,15 @@ export function createSpaceAuthoring({
    * still change before the completion asks again.
    */
   const edgeEligibility = (proposal: EdgeProposal): EdgeEligibility => {
+    if (selectedResolvedRenderer().kind === 'view') {
+      return { kind: 'refused', refusal: { code: 'computed-view-read-only' } };
+    }
     if (proposal.kind !== 'reconnect') {
       const refusal = connectRefusal(
         proposal.from,
         proposal.kind === 'connect' ? proposal.to : null,
       );
       return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
-    }
-    // Reconnection has no answer at all without a Layout, and refusing here
-    // rather than converting is the same rule `LAYOUT_ONLY` states for the
-    // completion: an Algorithmic View owns no Edge to move an endpoint of.
-    if (selectedResolvedRenderer().kind === 'view') {
-      return {
-        kind: 'refused',
-        refusal: { code: 'layout-required', operation: 'reconnected-edge' },
-      };
     }
     if (placement === null) {
       return {
@@ -873,13 +830,16 @@ export function createSpaceAuthoring({
     completion,
     placement: reportedPlacement,
   }: ReportedCompletion): DerivedCompletion => {
+    const selection = navigation.getState().selectedRenderer;
+    if (isComputedViewId(selection) && completion.kind !== 'created-layout') {
+      return refuse({ code: 'computed-view-read-only' });
+    }
     if (reportedPlacement === null) {
       return refuse({ code: 'placement-pending' });
     }
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
-    const selection = navigationState.selectedRenderer;
     const space = currentSpace();
     // A selected Layout the Space no longer holds is not an Edit. Checked before
     // resolving, because the resolver answers that case by throwing.
@@ -894,13 +854,6 @@ export function createSpaceAuthoring({
       return refuse({ code: 'layout-not-found' });
     }
     const renderer = resolveRenderer(space, selection);
-    // The operations with no answer at all before a Layout exists, refused
-    // *before* conversion rather than after it. An Algorithmic View has no
-    // membership to add to and no Graph to manage, and converting first would
-    // mint a Layout whose only purpose was to fail the next line.
-    if (renderer.kind === 'view' && requiresLayout(completion.kind)) {
-      return refuse({ code: 'layout-required', operation: completion.kind });
-    }
     /**
      * What this Edit does to the placement, held rather than applied.
      *
@@ -1084,12 +1037,12 @@ export function createSpaceAuthoring({
     }
     // Which Layout this Edit writes, and what it owns afterwards.
     //
-    // The two branches are the whole of ADR 0025's "editing an Algorithmic View
-    // converts it", now that a Graph is an owned value (ADR 0040). Converting
-    // asks the *View* for the Layout's Graphs, because that is where the choice
+    // The two branches are explicit Create Layout conversion and ordinary
+    // authored Layout editing. Conversion asks the *View* for the Layout's Graphs,
+    // because that is where the choice
     // lives (ADR 0045) — Flow answers a fresh empty one, and the renderer has
     // already held that answer to closure, non-emptiness and fresh identity. A
-    // selected Layout is not converted: it keeps its id, its title and the Graph
+    // selected Layout keeps its id, its title and the Graph
     // identities it already owns, and the Edit writes into them.
     let layoutId: UUID;
     let layoutTitle: string;
@@ -1337,8 +1290,19 @@ export function createSpaceAuthoring({
   };
 
   let completing = false;
+  let creatingLayout = false;
   const queued: QueuedCompletion[] = [];
   const complete = (completion: AuthoringCompletion): AuthoringResult => {
+    // Explicit Layout creation publishes the captured Space before Navigation
+    // selects the new Layout. An observer can reenter during that publication,
+    // but its attempted Edit still belongs to the selected Computed View: refuse
+    // it now rather than queueing it to be replayed after selection moves.
+    if (
+      completion.kind !== 'created-layout' &&
+      (creatingLayout || isComputedViewId(navigation.getState().selectedRenderer))
+    ) {
+      return refuse({ code: 'computed-view-read-only' });
+    }
     // A pointer gesture reports where React Flow has drawn the Cards, and that
     // report is merged under `Placement.next`'s rules. Every other operation is
     // written into the placement already installed — there is no second source
@@ -1361,6 +1325,7 @@ export function createSpaceAuthoring({
       return { kind: 'queued' };
     }
     completing = true;
+    creatingLayout = completion.kind === 'created-layout';
     try {
       const result = performCompletion(reported);
       // Drain what arrived during publication. A queued Edit that cannot produce
@@ -1405,6 +1370,7 @@ export function createSpaceAuthoring({
       return result;
     } finally {
       completing = false;
+      creatingLayout = false;
       // Empty on the ordinary path, since the drain above ran it down. Anything
       // still here was enqueued by an observer and then abandoned by a throw
       // partway through the drain: those Edits are gone, and saying so is the

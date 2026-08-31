@@ -41,6 +41,7 @@ const { updateNodeInternals, connection } = vi.hoisted(() => {
 /** React Flow's `Handle` decides on its own whether a drag may start or end at
  *  it; the stand-in records the two answers it was given. */
 type MockHandleProps = HTMLAttributes<HTMLButtonElement> & {
+  isConnectable?: boolean;
   isConnectableStart?: boolean;
   isConnectableEnd?: boolean;
 };
@@ -108,6 +109,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       style,
       'aria-label': ariaLabel,
       'aria-hidden': ariaHidden,
+      isConnectable,
       isConnectableStart,
       isConnectableEnd,
     }: MockHandleProps) => (
@@ -116,6 +118,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
         style={style}
         aria-label={ariaLabel}
         aria-hidden={ariaHidden}
+        data-connectable={String(isConnectable)}
         data-connectable-start={String(isConnectableStart)}
         data-connectable-end={String(isConnectableEnd)}
       />
@@ -588,6 +591,11 @@ describe('CardNode graph authoring', () => {
       render(<CardNode {...props({ selected: true, isConnectable: false })} />);
 
       expect(connectable(label, end)).toEqual([false, false, false, false]);
+      expect(
+        screen
+          .getAllByRole('button', { name: new RegExp(`^${label} `) })
+          .map((handle) => handle.getAttribute('data-connectable') === 'true'),
+      ).toEqual([false, false, false, false]);
     },
   );
 });

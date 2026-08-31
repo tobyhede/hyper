@@ -27,6 +27,14 @@ test('database persistence never writes structural edits back to imported author
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await settled(page);
 
+  await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
+    'Computed Views are read-only. Create a Layout to edit.',
+  );
+  await expect(authoringHandle(card, 'source', 'right')).not.toHaveClass(/connectable/);
+  await page.getByRole('button', { name: 'Create Layout' }).click();
+  await expect(page.getByRole('button', { name: 'Add Card' })).toBeEnabled();
+
   await card.hover();
   await connectToEmptyWithAlt(page, authoringHandle(card, 'source', 'right'));
   const created = nodeByTitle(page, 'Card 1');
@@ -38,10 +46,9 @@ test('database persistence never writes structural edits back to imported author
   // was drawn, so a commit that recorded a placement and dropped the Edge fails
   // here rather than passing as "persisted".
   await expect(page.getByLabel(/^Edge from A to Card 1 in /)).toBeVisible();
-  // The Alt-drop converted the Algorithmic View, and the Layout it produced owns
-  // one fresh Graph holding exactly this Edge (ADR 0045).
+  // The explicit command created the Layout; the later Alt-drop authors its Edge.
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   expect(readFixture()).toEqual(before);

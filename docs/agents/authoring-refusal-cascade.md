@@ -22,30 +22,30 @@ disagreeing with the function.
 
 ## Universal guards
 
-Every action asks these three, in order, before its own checks:
+Every action asks the applicable guards before its own checks:
 
-1. Placement reported? → `placement-pending`
-2. Selected Layout still exists? → `layout-not-found`
-3. On a View, does this action need a Layout already authored? → `layout-required` — only the 7 actions marked **layout-required** below; every other action converts the View into a fresh Layout instead (ADR 0025) and keeps going
+1. Is a Computed View selected for anything except `created-layout`? → `computed-view-read-only`, before placement readiness can obscure the read-only reason
+2. Placement reported? → `placement-pending`; this is the first guard for `created-layout`
+3. Does a selected authored Layout still exist? → `layout-not-found`
 
 ## Per-action checks
 
-Guards above are omitted below since they never vary by action. "On a View"
-names what gate 3 does for that action.
+Guards above are omitted below. "On a View" names what the first guard does for
+that action.
 
 ### Card edits
 
 | Action | On a View | Its own checks, in order |
 | --- | --- | --- |
-| `edited-card` | converts | `card-not-found` → `card-kind-immutable` → `alias-target-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
-| `created-card` | converts | none → completed |
-| `created-alias` | converts | `alias-target-not-found` → `alias-target-must-own-content` → completed |
-| `opened-card` | converts | `card-not-in-layout` → (already Open ⇒ `unchanged`) → completed |
-| `closed-card` | **layout-required** | `card-not-in-layout` → (already Closed ⇒ `unchanged`) → completed |
-| `resized-card` | **layout-required** | `card-not-in-layout` → `card-not-expanded` → (same size ⇒ `unchanged`) → completed |
-| `added-card-to-layout` | **layout-required** | `card-not-found` → `card-already-in-layout` → completed |
-| `removed-card-from-layout` | **layout-required** | `card-not-in-layout` → completed |
-| `deleted-card` | converts | `card-not-found` → `card-has-aliases` → completed |
+| `edited-card` | `computed-view-read-only` | `card-not-found` → `card-kind-immutable` → `alias-target-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
+| `created-card` | `computed-view-read-only` | none → completed |
+| `created-alias` | `computed-view-read-only` | `alias-target-not-found` → `alias-target-must-own-content` → completed |
+| `opened-card` | `computed-view-read-only` | `card-not-in-layout` → (already Open ⇒ `unchanged`) → completed |
+| `closed-card` | `computed-view-read-only` | `card-not-in-layout` → (already Closed ⇒ `unchanged`) → completed |
+| `resized-card` | `computed-view-read-only` | `card-not-in-layout` → `card-not-expanded` → (same size ⇒ `unchanged`) → completed |
+| `added-card-to-layout` | `computed-view-read-only` | `card-not-found` → `card-already-in-layout` → completed |
+| `removed-card-from-layout` | `computed-view-read-only` | `card-not-in-layout` → completed |
+| `deleted-card` | `computed-view-read-only` | `card-not-found` → `card-has-aliases` → completed |
 
 `card-not-expanded` is the code `resized-card` raises for a Card that is
 **Closed**. The prose in this file speaks `CONTEXT.md`'s Open/Closed vocabulary;
@@ -59,19 +59,19 @@ that has not been decided.
 
 | Action | On a View | Its own checks, in order |
 | --- | --- | --- |
-| `create-and-connect` | converts | `edge-card-outside-layout` → `layout-active-graph-required` → completed |
-| `connected-cards` | converts | `edge-card-outside-layout` → `layout-active-graph-required` → `edge-already-exists` → completed |
-| `reconnected-edge` | **layout-required** | `graph-not-owned` → `edge-not-found` → (dropped back to its own Card ⇒ `unchanged`) → `edge-card-outside-layout` → `edge-already-exists` → completed |
-| `deleted-edge` | **layout-required** | `graph-not-owned` → `edge-not-found` → completed |
+| `create-and-connect` | `computed-view-read-only` | `edge-card-outside-layout` → `layout-active-graph-required` → completed |
+| `connected-cards` | `computed-view-read-only` | `edge-card-outside-layout` → `layout-active-graph-required` → `edge-already-exists` → completed |
+| `reconnected-edge` | `computed-view-read-only` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Card ⇒ `unchanged`) → `edge-card-outside-layout` → `edge-already-exists` → completed |
+| `deleted-edge` | `computed-view-read-only` | `graph-not-owned` → `edge-not-found` → completed |
 
 ### Graph edits
 
 | Action | On a View | Its own checks, in order |
 | --- | --- | --- |
-| `added-graph` | is the conversion | none → completed |
-| `renamed-graph` | **layout-required** | `graph-not-owned` → `graph-title-required` → (same title ⇒ `unchanged`) → completed |
-| `recolored-graph` | **layout-required** | `graph-not-owned` → (same color ⇒ `unchanged`) → completed |
-| `deleted-graph` | **layout-required** | `graph-not-owned` → `layout-must-keep-graph` → completed |
+| `added-graph` | `computed-view-read-only` | none → completed |
+| `renamed-graph` | `computed-view-read-only` | `graph-not-owned` → `graph-title-required` → (same title ⇒ `unchanged`) → completed |
+| `recolored-graph` | `computed-view-read-only` | `graph-not-owned` → (same color ⇒ `unchanged`) → completed |
+| `deleted-graph` | `computed-view-read-only` | `graph-not-owned` → `layout-must-keep-graph` → completed |
 
 ### Layout creation
 
@@ -83,11 +83,11 @@ that has not been decided.
 
 | Action | On a View | Its own checks, in order |
 | --- | --- | --- |
-| `settled-card-movement` | converts | none → completed |
+| `settled-card-movement` | `computed-view-read-only` | none → completed |
 
-## The 21 codes
+## The 22 codes
 
-3 universal (`placement-pending`, `layout-not-found`, `layout-required`) plus
+4 contextual (`placement-pending`, `layout-not-found`, `layout-required`, `computed-view-read-only`) plus
 the 18 action-specific codes tabulated above — none is produced anywhere else.
 Count the codes, not the cells: several serve more than one action —
 `card-not-found`, `card-not-in-layout`, `graph-not-owned`,

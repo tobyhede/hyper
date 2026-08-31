@@ -223,6 +223,10 @@ describe('SpaceSidebar', () => {
       />,
     );
 
+    expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
+      'Computed Views are read-only. Create a Layout to edit.',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Create Layout' }));
     expect(onCreate).toHaveBeenCalledOnce();
     unmount();
@@ -248,7 +252,7 @@ describe('SpaceSidebar', () => {
 
     expect(screen.getByRole('button', { name: 'Create Layout' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
-      'This view has not finished placing its Cards, so there is nowhere to write yet.',
+      'Computed Views are read-only. Create a Layout to edit. This view has not finished placing its Cards, so there is nowhere to write yet.',
     );
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });

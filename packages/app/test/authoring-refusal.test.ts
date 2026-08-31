@@ -13,6 +13,7 @@ const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
 const EVERY_REFUSAL = {
   'placement-pending': { code: 'placement-pending' },
+  'computed-view-read-only': { code: 'computed-view-read-only' },
   'layout-not-found': { code: 'layout-not-found' },
   'layout-required': { code: 'layout-required', operation: 'added-card-to-layout' },
   'card-not-found': { code: 'card-not-found' },

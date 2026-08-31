@@ -356,8 +356,8 @@ export function createNavigation(
     // The **edge-less Graph** below was once the shape `graphSchema` forbade,
     // and its guard was type ceremony. It is now ordinary: creating a Layout
     // creates its initial Active Graph *empty* in the same Edit (ADR 0040), and
-    // the Flow view converts by returning exactly that (ADR 0045), so every
-    // Layout a plain Card drag produces sits here until the author draws an
+    // a Computed View converts only through Create Layout by returning exactly
+    // that (ADR 0045), so every explicitly created Layout sits here until the author draws an
     // Edge. `graphStartCard` has no answer for such a Graph. Presenting has
     // something real to decline.
     //

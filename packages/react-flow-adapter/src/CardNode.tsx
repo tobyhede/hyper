@@ -169,6 +169,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       // ports below are `isConnectable={false}` outright — so dropping it left
       // the flow-level flag governing nothing but whether the connection line
       // rendered, with CSS and a pane's backdrop standing in for the withdrawal.
+      isConnectable={isConnectable}
       isConnectableStart={isConnectable && role === 'source' && !connectionInProgress}
       isConnectableEnd={isConnectable && role === seeking}
       // A handle is a drag affordance, and a click is not a drag. A press and

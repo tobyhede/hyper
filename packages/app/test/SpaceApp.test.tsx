@@ -570,6 +570,10 @@ describe('explicit Layout creation', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Create Layout' })).toBeEnabled(),
     );
+    expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
+      'Computed Views are read-only. Create a Layout to edit.',
+    );
 
     act(() => {
       session.submit({
@@ -587,7 +591,7 @@ describe('explicit Layout creation', () => {
     const pendingCreateLayout = screen.getByRole('button', { name: 'Create Layout' });
     expect(pendingCreateLayout).toBeDisabled();
     expect(pendingCreateLayout).toHaveAccessibleDescription(
-      'This view has not finished placing its Cards, so there is nowhere to write yet.',
+      'Computed Views are read-only. Create a Layout to edit. This view has not finished placing its Cards, so there is nowhere to write yet.',
     );
   });
 });

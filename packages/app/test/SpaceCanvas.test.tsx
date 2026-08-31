@@ -130,6 +130,7 @@ function mountGraph(
     finishResize: () => undefined,
     cancelResize: () => undefined,
   },
+  editable = true,
 ): Harness {
   const openCard = vi.fn();
   const addCard = vi.fn();
@@ -156,7 +157,7 @@ function mountGraph(
         projectedNodes={null}
         activeCardId={null}
         presenting={false}
-        editable={true}
+        editable={editable}
         titleEditingEnabled={titleEditing}
         onNodesChange={nodesChanged}
         onEdgesChange={() => undefined}
@@ -370,6 +371,35 @@ it.each(['Enter', ' '])('opens a focused Alias with %s', (key) => {
   fireEvent.keyDown(focusedAlias, { key });
 
   expect(openCard).toHaveBeenCalledWith(ALIAS_ID);
+});
+
+describe.each([
+  ['Card', cardNode('A'), CARD_ID],
+  [
+    'Alias',
+    {
+      ...cardNode('A again', ALIAS_ID),
+      data: { ...cardNode('A again', ALIAS_ID).data, kind: 'alias' as const, aliasOf: 'A' },
+    },
+    ALIAS_ID,
+  ],
+] as const)('a focused %s in a read-only Computed View', (_kind, projected, id) => {
+  it.each(['Enter', ' '])('does not open with %s', (key) => {
+    const { openCard, openAlias } = mountGraph([projected], undefined, undefined, false);
+    const focused = nodeOf(id);
+    focused.focus();
+
+    fireEvent.keyDown(focused, { key });
+
+    expect(openCard).not.toHaveBeenCalled();
+    expect(openAlias).not.toHaveBeenCalled();
+  });
+
+  it('does not announce authoring keyboard commands', () => {
+    mountGraph([projected], undefined, undefined, false);
+
+    expect(nodeOf(id)).toHaveAccessibleDescription('This Card is read-only in a Computed View.');
+  });
 });
 
 describe('the Card affordance', () => {

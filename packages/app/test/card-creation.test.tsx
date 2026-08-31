@@ -79,7 +79,20 @@ const aliased: SpaceSnapshot = spaceSnapshotSchema.parse({
  */
 const noCards: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
-  document: { version: 1, title: 'Space' },
+  document: {
+    version: 1,
+    title: 'Space',
+    layouts: [
+      {
+        id: LAYOUT_ID,
+        title: 'Layout',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+      },
+    ],
+    defaultRenderer: LAYOUT_ID,
+  },
   cards: [],
 });
 
@@ -250,21 +263,21 @@ describe('Add Card', () => {
     await settled(session);
   });
 
-  /**
-   * Creating a Card from an Algorithmic View converts it (ADR 0025), and that
-   * conversion is one Edit: the Cards on screen keep their positions, and the
-   * Layout it produces owns the initial empty Graph a Layout is created with.
-   */
-  it('converts an Algorithmic View exactly once', async () => {
+  it('requires explicit Layout creation before Card creation', async () => {
     const session = mount(noLayouts);
     expect(layoutsOf(session)).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
+
+    const createLayout = await screen.findByRole('button', { name: 'Create Layout' });
+    await waitFor(() => expect(createLayout).toBeEnabled());
+    fireEvent.click(createLayout);
+    await waitFor(() => expect(layoutsOf(session)).toHaveLength(1));
 
     fireEvent.click(await readyToAuthor());
 
-    await waitFor(() => expect(layoutsOf(session)).toHaveLength(1));
     const layout = layoutsOf(session)[0]!;
     expect(layout.graphs).toEqual([expect.objectContaining({ edges: [] })]);
-    // Every Card the View was drawing, plus the new one.
+    // Every Card the View captured, plus the later explicit creation.
     expect(Object.keys(layout.positions)).toHaveLength(3);
     await settled(session);
   });
