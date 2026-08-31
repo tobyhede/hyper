@@ -60,6 +60,7 @@ const cardNode = (title: string, id: typeof CARD_ID = CARD_ID, selected = false)
   data: {
     cardId: id,
     title,
+    readOnly: false,
     kind: 'markdown',
     active: false,
     selectedForAuthoring: false,

@@ -57,6 +57,8 @@ export type CardTitleEditor = {
 export type CardNodeData = {
   cardId: CardId;
   title: string;
+  /** Whether the Card's reusable component must withhold authoring affordances. */
+  readOnly: boolean;
   /**
    * What kind of Card this is, drawn as a persistent glyph on the Front.
    *
@@ -197,6 +199,8 @@ export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
 const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
 
 export interface ProjectCardNodesOptions {
+  /** Draw Cards without any Card-owned authoring controls or handles. */
+  readOnly?: boolean;
   /** Card id reached during traversal, if any, to flag as active. */
   activeCardId?: CardId | null;
   /** Ordinary renderer selection used to expose continued-authoring handles. */
@@ -375,6 +379,7 @@ export function projectCardNodes(
       data: {
         cardId: card.id,
         title: card.title,
+        readOnly: options.readOnly ?? false,
         kind: card.kind,
         active,
         selectedForAuthoring: card.id === (options.selectedCardId ?? null),

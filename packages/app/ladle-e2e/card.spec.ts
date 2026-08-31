@@ -114,6 +114,17 @@ test(
   },
 );
 
+test('a read-only Card owns the absence of authoring controls and handles', async ({ page }) => {
+  await page.goto('/?story=components--card--hover&mode=preview');
+
+  const node = specimen(page, 'read-only · no authoring affordances').locator('.react-flow__node');
+  await node.hover();
+
+  await expect(node.getByTestId('canvas-card-actions')).toHaveCount(0);
+  await expect(node.locator('.rf-card-node__authoring-handle')).toHaveCount(0);
+  await expect(node.getByRole('button', { name: /^Edit Title / })).toHaveCount(0);
+});
+
 test(
   'production Canvas Cards expose Alias identity and keyboard-focusable actions',
   { tag: '@parity:canvas-card-exposes-kind-and-keyboard-actions' },

@@ -227,6 +227,7 @@ describe('SpaceSidebar', () => {
     expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
       'Computed Views are read-only. Create a Layout to edit.',
     );
+    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveClass('bg-primary');
     fireEvent.click(screen.getByRole('button', { name: 'Create Layout' }));
     expect(onCreate).toHaveBeenCalledOnce();
     unmount();

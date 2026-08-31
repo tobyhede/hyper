@@ -144,6 +144,7 @@ function cardNode(id: string, x: number, title: string): CardFlowNode {
     data: {
       cardId: uuidSchema.parse(id),
       title,
+      readOnly: false,
       kind: 'markdown',
       active: false,
       selectedForAuthoring: false,

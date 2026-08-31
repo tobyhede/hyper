@@ -284,6 +284,7 @@ export interface CanvasCardNodeSpecimenProps {
   readonly zoom?: number | undefined;
   readonly title?: string;
   readonly body?: string;
+  readonly readOnly?: boolean;
 }
 
 /**
@@ -304,6 +305,7 @@ export function CanvasCardNodeSpecimen({
   zoom,
   title,
   body,
+  readOnly = false,
 }: CanvasCardNodeSpecimenProps) {
   const projected = useProjection(graphIds.long);
   if (projected === null) return null;
@@ -314,6 +316,7 @@ export function CanvasCardNodeSpecimen({
 
   const data: CardFlowNode['data'] = {
     ...source.data,
+    readOnly,
     titleEditingEnabled: true,
     cardEditingEnabled: cardEditingEnabled ?? source.data.kind === 'markdown',
     onEditCard: onOpenChange ?? (() => 'completed'),

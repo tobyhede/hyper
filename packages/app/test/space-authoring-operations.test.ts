@@ -170,9 +170,8 @@ describe('Create Layout', () => {
         graphs: [
           {
             id: MINTED_GRAPH,
-            title: 'Graph 1',
-            color: GRAPH_PALETTE[0],
-            edges: [],
+            title: 'Main',
+            edges: [{ from: CARD_A, to: CARD_B }],
           },
         ],
         activeGraph: MINTED_GRAPH,

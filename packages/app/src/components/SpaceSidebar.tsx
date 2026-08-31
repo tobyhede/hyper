@@ -542,7 +542,7 @@ export function SpaceSidebar({
             {createLayout === undefined ? null : (
               <div className="mt-2 space-y-2">
                 <Button
-                  variant="secondary"
+                  variant="default"
                   size="compact"
                   className="w-full justify-start gap-2"
                   disabled={createLayout.disabled}

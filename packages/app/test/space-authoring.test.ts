@@ -616,7 +616,7 @@ describe('Space Authoring', () => {
    * The emphasis is still only emphasis (ADR 0028): `Main` already holds
    * exactly this Edge, and it neither blocks the gesture nor receives it.
    */
-  it('offers an Edge the emphasised Graph already holds, and lands it in the minted one', () => {
+  it('copies the emphasised Graph and refuses an Edge it already holds', () => {
     // A Space whose only Layout owns `Main`, opened in the Flow view rather than
     // in that Layout — so the flatten draws `Main`, and it is what is emphasised.
     const { authoring, session, navigation } = openAuthoring(
@@ -637,9 +637,10 @@ describe('Space Authoring', () => {
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
 
     expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
-    expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(true);
+    expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
-      kind: 'completed',
+      kind: 'refused',
+      refusal: { code: 'edge-already-exists' },
     });
 
     const layouts = session.getState().working.document.layouts ?? [];
@@ -647,16 +648,11 @@ describe('Space Authoring', () => {
     // Untouched: the Graph that was emphasised belongs to the Layout that owns
     // it, and nothing about this Edit reached across.
     expect(layouts[0]?.graphs).toEqual([MAIN_GRAPH]);
-    // `Graph 1`, not `Graph 2`: the numbering runs above the highest `Graph N`
-    // already taken, and `Main` is a title an author wrote rather than a number.
+    // The Computed View's Graph is a snapshot under a fresh owned identity.
     expect(layouts[1]?.graphs).toEqual([
       {
         id: MINTED_GRAPH_ID,
-        title: 'Graph 1',
-        // The first palette slot, although the Space already holds `Main`: the
-        // rotation is Layout-local, and creation makes the Layout, so its
-        // initial Graph occupies the first position in it.
-        color: GRAPH_PALETTE[0],
+        title: 'Main',
         edges: [{ from: CARD_A, to: CARD_B }],
       },
     ]);
@@ -735,9 +731,8 @@ describe('Space Authoring', () => {
    *
    * The author emphasises `Aside`, which a second Layout owns, and then draws an
    * Edge. Activation itself submits nothing — no Layout appears, no revision
-   * moves. And the Edge does not go to `Aside`: it goes to the initial Graph the
-   * explicit creation mints for the Layout, because that is the only Graph the
-   * new Layout owns. Emphasis does not choose where an Edge lands.
+   * moves. Conversion snapshots both Graphs; the first becomes Active, so the
+   * later Edge joins that copy rather than the Graph that was emphasised.
    */
   it('submits nothing on activation, and lands the next Edge in the minted Graph', () => {
     const ASIDE_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
@@ -793,13 +788,23 @@ describe('Space Authoring', () => {
 
     const layouts = session.getState().working.document.layouts ?? [];
     expect(layouts).toHaveLength(3);
-    // Neither existing Layout was touched, and the Edge is in the minted Graph.
+    // Neither existing Layout was touched, and both Computed View Graphs were copied.
     expect(layouts[1]?.graphs).toEqual([
       { id: ASIDE_GRAPH, title: 'Aside', edges: [{ from: CARD_B, to: CARD_A }] },
     ]);
     expect(layouts[2]).toMatchObject({
       id: CONVERTED_LAYOUT_ID,
-      graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_B, to: CARD_A }] }],
+      graphs: [
+        {
+          id: MINTED_GRAPH_ID,
+          title: 'Main',
+          edges: [
+            { from: CARD_A, to: CARD_B },
+            { from: CARD_B, to: CARD_A },
+          ],
+        },
+        { title: 'Aside', edges: [{ from: CARD_B, to: CARD_A }] },
+      ],
       activeGraph: MINTED_GRAPH_ID,
     });
     expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH_ID);

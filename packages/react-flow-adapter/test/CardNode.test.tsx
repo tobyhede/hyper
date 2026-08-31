@@ -162,6 +162,7 @@ interface Overrides {
   resize?: CardNodeData['resize'];
   sourceHandles?: CardHandle[];
   targetHandles?: CardHandle[];
+  readOnly?: boolean;
 }
 
 function props({
@@ -183,6 +184,7 @@ function props({
   resize,
   sourceHandles = [outHandle(graphId, 50)],
   targetHandles = [],
+  readOnly = false,
 }: Overrides = {}): NodeProps<CardFlowNode> {
   const data: CardFlowNode['data'] = {
     cardId,
@@ -198,6 +200,7 @@ function props({
     emphasis: 'subtle',
     sourceHandles,
     targetHandles,
+    readOnly,
   };
   if (aliasOf !== undefined) data.aliasOf = aliasOf;
   if (onEditCard !== undefined)
@@ -388,6 +391,17 @@ describe('CardNode withholds a control the composition supplied no operation for
 });
 
 describe('CardNode title authoring', () => {
+  it('withdraws an active title editor when the Card becomes read-only', () => {
+    const titleEditor = { onComplete: vi.fn(() => null), onCancel: vi.fn() };
+    const { rerender } = render(<CardNode {...props({ titleEditor })} />);
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toBeVisible();
+
+    rerender(<CardNode {...props({ titleEditor, readOnly: true })} />);
+
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
+  });
+
   it('draws no shared Description slot on the Card front', () => {
     render(<CardNode {...props()} />);
 
@@ -511,6 +525,13 @@ const connectable = (label: 'Connect from' | 'Connect to', end: 'start' | 'end')
     .map((handle) => handle.getAttribute(`data-connectable-${end}`) === 'true');
 
 describe('CardNode graph authoring', () => {
+  it('renders no authoring handles when the Card is read-only', () => {
+    render(<CardNode {...props({ selected: true, readOnly: true })} />);
+
+    expect(screen.queryByRole('button', { name: /^Connect from / })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Connect to / })).not.toBeInTheDocument();
+  });
+
   it('shows four active-Graph-coloured spatial source handles on a selected Card', () => {
     render(<CardNode {...props({ selected: true })} />);
 

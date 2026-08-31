@@ -71,6 +71,7 @@ const node = (
   data: {
     cardId,
     title: 'A',
+    readOnly: false,
     kind,
     body: 'A source',
     expanded,
