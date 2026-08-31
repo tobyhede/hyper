@@ -21,8 +21,8 @@ visually a no-op: no Card moves when the Layout is created.
 This reverses ADR 0025's decision that any interaction touching a Card or Graph
 implicitly converts, and narrows ADR 0031's uniform conversion rule to the
 explicit command. Wherever later ADRs describe opening, connecting or another
-Edit as converting an Algorithmic or Computed View, that trigger no longer
-applies; their behavior on an authored Layout remains unchanged.
+Edit as converting a Computed View, that trigger no longer applies; their
+behavior on an authored Layout remains unchanged.
 
 Implicit conversion made a reading surface appear authorable and let an
 accidental gesture author positions for every Card. It also made a command that
