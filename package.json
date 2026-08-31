@@ -14,6 +14,7 @@
     "dev:roadmap": "pnpm roadmap:space && pnpm --filter @project/app dev:roadmap",
     "ladle": "pnpm --filter @project/app ladle",
     "ladle:build": "pnpm --filter @project/app ladle:build",
+    "chrome:cdp": "tsx scripts/launch-chrome-cdp.ts",
     "prebuild": "pnpm contract:emit",
     "build": "pnpm --filter @project/app build",
     "http-server:build": "pnpm --filter @project/app http-server:build",
