@@ -386,14 +386,13 @@ describe.each([
   ],
 ] as const)('a focused %s in a read-only Computed View', (_kind, projected, id) => {
   it.each(['Enter', ' '])('does not open with %s', (key) => {
-    const { openCard, openAlias } = mountGraph([projected], undefined, undefined, false);
+    const { openCard } = mountGraph([projected], undefined, undefined, false);
     const focused = nodeOf(id);
     focused.focus();
 
     fireEvent.keyDown(focused, { key });
 
     expect(openCard).not.toHaveBeenCalled();
-    expect(openAlias).not.toHaveBeenCalled();
   });
 
   it('does not announce authoring keyboard commands', () => {

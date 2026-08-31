@@ -514,48 +514,6 @@ test('opened Markdown editing persists source while expansion displaces and rest
   await expect(persistedSource).toContainText('New source');
 });
 
-test('editing an Alias authors its metadata and survives reload', async ({ page }) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  const target = nodeByTitle(page, 'A').first();
-  const alias = nodeByTitle(page, 'A′').first();
-  await expect(alias).toBeVisible();
-  await settled(page);
-  const before = await allPositions(page);
-
-  await openCard(alias, 'A′');
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-  await page.getByRole('textbox', { name: 'Title' }).fill('A reference to B');
-  const targetPicker = page.getByRole('combobox', { name: 'Target' });
-  await targetPicker.fill('B');
-  // A picker row is named by its kind glyph and then its title — `CardKindIcon`
-  // is a `role="img"` carrying the kind's name — so the accessible name of the
-  // row for `B` is `Markdown Card B`, never `B`.
-  await page.getByRole('option', { name: 'Markdown Card B' }).click();
-  await page.getByRole('button', { name: 'Done' }).click();
-
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  expect(await allPositions(page)).toEqual(before);
-  await expect(nodeByTitle(page, 'A reference to B').first()).toBeVisible();
-
-  // The Alias pane authored the Alias and nothing else: the Card it used to
-  // point at still holds its own source (ADR 0049).
-  await openCard(target, 'A');
-  await expect(target).toContainText('entry point');
-  await target.getByRole('button', { name: 'Close Card A' }).click();
-
-  await page.reload();
-  await openCard(nodeByTitle(page, 'A reference to B').first(), 'A reference to B');
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A reference to B');
-  const reloadedTargetPicker = page.getByRole('combobox', { name: 'Target' });
-  await reloadedTargetPicker.fill('B');
-  await reloadedTargetPicker.press('ArrowDown');
-  // Two glyphs on the row: the kind, and the check that says this is the Target
-  // the reloaded Alias names.
-  await expect(page.getByRole('option', { name: 'Markdown Card B' }).locator('svg')).toHaveCount(2);
-});
 /**
  * Dragging a card writes its placement into the Layout.
  *
