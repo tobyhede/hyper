@@ -169,6 +169,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       // ports below are `isConnectable={false}` outright — so dropping it left
       // the flow-level flag governing nothing but whether the connection line
       // rendered, with CSS and a pane's backdrop standing in for the withdrawal.
+      isConnectable={isConnectable}
       isConnectableStart={isConnectable && role === 'source' && !connectionInProgress}
       isConnectableEnd={isConnectable && role === seeking}
       // A handle is a drag affordance, and a click is not a drag. A press and
@@ -207,7 +208,8 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   /* The editor's presence is the editing state, and it arrives with the two
      operations that end it — so nothing here has to stand in for a completion
      the composition did not supply. */
-  const titleEditor = data.bodyEditor === undefined ? data.titleEditor : undefined;
+  const titleEditor =
+    !data.readOnly && data.bodyEditor === undefined ? data.titleEditor : undefined;
 
   /*
    * What an open Card draws below its title (ADR 0064).
@@ -347,7 +349,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         those handles would be invisible to that rule; anything before the Card
         is harmless to it.
       */}
-      {expanded && resize !== undefined && (
+      {!data.readOnly && expanded && resize !== undefined && (
         <>
           <span
             className="rf-card-node__resize-mark"
@@ -375,6 +377,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         </div>
       ) : titleEditor !== undefined ? (
         <CanvasCard
+          readOnly={data.readOnly}
           front={front}
           title={data.title}
           graphColor={data.activeGraphColor}
@@ -386,6 +389,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         />
       ) : (
         <CanvasCard
+          readOnly={data.readOnly}
           front={front}
           title={data.title}
           graphColor={data.activeGraphColor}
@@ -403,8 +407,8 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         `position` on the handle itself, so the four sides are unaffected by the
         order they are declared in. `CardNode.test.tsx` pins the ordering.
       */}
-      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
-      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
+      {!data.readOnly && AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
+      {!data.readOnly && AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
       {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>
   );

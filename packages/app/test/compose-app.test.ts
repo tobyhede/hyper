@@ -152,7 +152,7 @@ describe('the connection completion Edge Authoring is given', () => {
  * identities it is about to assert on (ADR 0016).
  */
 describe('where a composition mints identities', () => {
-  it('mints an Edit’s Layout and a converted Graph from the functions it was given', () => {
+  it('mints an explicitly created Layout and its Graph from the functions it was given', () => {
     const viewOnly: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 1, title: 'New space' },
@@ -168,9 +168,7 @@ describe('where a composition mints identities', () => {
       initialPlacement: rendered,
     });
 
-    expect(
-      authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A, rendered }),
-    ).toEqual({ kind: 'completed' });
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
 
     const layouts = spaceSession.getState().working.document.layouts ?? [];
     expect(layouts.map((layout) => layout.id)).toEqual([MINTED_LAYOUT_ID]);

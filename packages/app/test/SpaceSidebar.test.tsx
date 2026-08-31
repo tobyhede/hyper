@@ -213,6 +213,71 @@ describe('SpaceSidebar', () => {
     expect(screen.getByTestId('persistence-status')).toHaveAttribute('data-revision', '4');
   });
 
+  it('offers Create Layout only for the selected Computed View', () => {
+    const onCreate = vi.fn();
+    const computed = settledProps();
+    const { unmount } = draw(
+      <SpaceSidebar
+        {...computed}
+        createLayout={{ disabled: false, unavailableReason: null, refusal: null, onCreate }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
+      'Computed Views are read-only. Create a Layout to edit.',
+    );
+    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveClass('bg-primary');
+    fireEvent.click(screen.getByRole('button', { name: 'Create Layout' }));
+    expect(onCreate).toHaveBeenCalledOnce();
+    unmount();
+
+    const authored = withLayout(settledProps());
+    draw(<SpaceSidebar {...authored} canvas={{ ...authored.canvas, current: LAYOUT }} />);
+    expect(screen.queryByRole('button', { name: 'Create Layout' })).not.toBeInTheDocument();
+  });
+
+  it('keeps Create Layout unavailable while placement is pending and describes why', () => {
+    draw(
+      <SpaceSidebar
+        {...settledProps()}
+        createLayout={{
+          disabled: true,
+          unavailableReason:
+            'This view has not finished placing its Cards, so there is nowhere to write yet.',
+          refusal: null,
+          onCreate: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Create Layout' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
+      'Computed Views are read-only. Create a Layout to edit. This view has not finished placing its Cards, so there is nowhere to write yet.',
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps a refused Create Layout explanation beside the still-selected Computed View', () => {
+    draw(
+      <SpaceSidebar
+        {...settledProps()}
+        createLayout={{
+          disabled: false,
+          unavailableReason: null,
+          refusal: { code: 'placement-pending' },
+          onCreate: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Flow', pressed: true })).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('Layout not created');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This view has not finished placing its Cards, so there is nowhere to write yet.',
+    );
+  });
+
   it("opens a row's entity-actions menu from its trailing icon, not only from a right click", async () => {
     const onSelect = vi.fn();
     const props: SpaceSidebarProps = {

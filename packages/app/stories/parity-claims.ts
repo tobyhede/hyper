@@ -194,6 +194,38 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'An unauthored Space names its empty Layout and Graph groups and cannot present.',
   },
   {
+    id: 'space-sidebar-creates-layout-from-computed-view',
+    storyFile: 'space/space.stories.tsx',
+    storyExport: 'ComputedViewReady',
+    claim:
+      'The selected Computed View offers one enabled Create Layout command that dispatches its production callback.',
+  },
+  {
+    id: 'mobile-space-sidebar-creates-layout-from-computed-view',
+    storyFile: 'space/space.stories.tsx',
+    storyExport: 'ComputedViewReady',
+    claim:
+      'The narrow Sidebar offers Create Layout and dismisses after selecting the new authored Layout.',
+  },
+  {
+    id: 'space-sidebar-withholds-layout-creation-until-placement-is-ready',
+    storyFile: 'space/space.stories.tsx',
+    storyExport: 'ComputedViewPending',
+    claim:
+      'Create Layout is disabled while the selected Computed View placement is pending and the reason is announced.',
+    applicationEvidence:
+      'The production placement-pending state is already covered by operational-feedback-placement-pending; SpaceSidebar.test.tsx proves this command-specific disabled state and announcement through the production component.',
+  },
+  {
+    id: 'space-sidebar-explains-refused-layout-creation',
+    storyFile: 'space/space.stories.tsx',
+    storyExport: 'ComputedViewRefused',
+    claim:
+      'A refused Create Layout leaves the Computed View selected and explains the refusal beside the command.',
+    applicationEvidence:
+      'space-authoring-operations.test.ts proves the refusal changes no authored state; SpaceSidebar.test.tsx proves operational feedback through the production component.',
+  },
+  {
     id: 'space-sidebar-shows-pending-persistence',
     storyFile: 'space/messaging.stories.tsx',
     storyExport: 'Saving',

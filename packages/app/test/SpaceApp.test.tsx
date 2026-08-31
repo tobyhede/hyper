@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  GRID_SPACE_VIEW_ID,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { productDestinationPath } from '@project/http';
 import {
@@ -537,5 +542,56 @@ describe('Space app Cards drawer', () => {
 
     expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Layout');
     expect(await screen.findByRole('button', { name: 'Add Card to Layout' })).toBeVisible();
+  });
+});
+
+describe('explicit Layout creation', () => {
+  it('withholds Create Layout while a changed Computed View is replacing its placement', async () => {
+    const local = spaceSnapshotSchema.parse({
+      id: SPACE_ID,
+      document: {
+        version: 1,
+        title: 'Computed space',
+        layouts: [],
+        defaultRenderer: GRID_SPACE_VIEW_ID,
+      },
+      cards: [
+        {
+          id: CARD_ID,
+          document: { title: 'Card', kind: 'markdown', body: '' },
+        },
+      ],
+    });
+    const stored = { snapshot: local, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+
+    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Create Layout' })).toBeEnabled(),
+    );
+    expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
+      'Computed Views are read-only. Create a Layout to edit.',
+    );
+
+    act(() => {
+      session.submit({
+        ...local,
+        cards: [
+          ...local.cards,
+          {
+            id: OUTSIDE_CARD_ID,
+            document: { title: 'Another card', kind: 'markdown', body: '' },
+          },
+        ],
+      });
+    });
+
+    const pendingCreateLayout = screen.getByRole('button', { name: 'Create Layout' });
+    expect(pendingCreateLayout).toBeDisabled();
+    expect(pendingCreateLayout).toHaveAccessibleDescription(
+      'Computed Views are read-only. Create a Layout to edit. This view has not finished placing its Cards, so there is nowhere to write yet.',
+    );
   });
 });

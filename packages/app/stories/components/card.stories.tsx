@@ -102,6 +102,9 @@ export const Hover: Story = () => (
         <Specimen label="selected · hover for combined state">
           <CanvasCardNodeSpecimen selected />
         </Specimen>
+        <Specimen label="read-only · no authoring affordances">
+          <CanvasCardNodeSpecimen readOnly selected />
+        </Specimen>
       </div>
     </CatalogueSection>
   </div>

@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { CanvasCard } from '../src';
+import { CanvasCard, type CanvasCardFront } from '../src';
 
 describe('CanvasCard kind and interaction state', () => {
   it('does not expose entity actions when every supplied group is empty', () => {
@@ -103,6 +103,48 @@ describe('CanvasCard kind and interaction state', () => {
 });
 
 describe('CanvasCard Open and Close operation', () => {
+  it('owns its read-only state and withholds supplied authoring operations', () => {
+    render(
+      <CanvasCard
+        readOnly
+        front={{
+          kind: 'markdown',
+          source: '',
+          open: false,
+          onOpenChange: vi.fn(() => 'completed' as const),
+          onBeginEdit: vi.fn(),
+        }}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+        onBeginTitleEdit={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /Card A$/ })).not.toBeInTheDocument();
+  });
+
+  it('withdraws an active body editor when the Card becomes read-only', () => {
+    const front: CanvasCardFront = {
+      kind: 'markdown',
+      source: 'Draft',
+      open: true,
+      editor: { onComplete: vi.fn(), onEnd: vi.fn() },
+    };
+    const { rerender } = render(
+      <CanvasCard front={front} state="rest" title="A" graphColor="#ffc53d" />,
+    );
+    expect(screen.getByRole('button', { name: 'Save Card A' })).toBeVisible();
+
+    rerender(<CanvasCard readOnly front={front} state="rest" title="A" graphColor="#ffc53d" />);
+
+    expect(screen.queryByRole('button', { name: 'Save Card A' })).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute(
+      'data-content-editing',
+      'false',
+    );
+  });
+
   it('owns the rendered body of an open Markdown front', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(

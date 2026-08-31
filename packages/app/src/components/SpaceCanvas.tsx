@@ -58,6 +58,13 @@ const ARIA_LABEL_CONFIG = {
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
 
+/** A Computed View keeps Cards readable without advertising authored gestures. */
+const READ_ONLY_ARIA_LABEL_CONFIG = {
+  ...ARIA_LABEL_CONFIG,
+  'node.a11yDescription.default': 'This Card is read-only in a Computed View.',
+  'node.a11yDescription.keyboardDisabled': 'This Card is read-only in a Computed View.',
+} as const;
+
 /**
  * The one unmodified authoring shortcut, named where it is bound.
  *
@@ -119,11 +126,9 @@ export interface SpaceCanvasProps {
   activeCardId: string | null;
   presenting: boolean;
   /**
-   * Whether there are Cards on the canvas to drag yet: false for the one frame before
-   * the layout resolves, true afterwards, for every view. Every view is editable
-   * (ADR 0025) — an automatic one gets its Layout by being edited — so this is a
-   * readiness gate and not a permission. Not an edit mode either: there is
-   * nothing to toggle and nothing to keep in sync.
+   * Whether the selected renderer may be authored and its placement is ready.
+   * Computed Views pass `false`; authored Layouts pass `true` after placement.
+   * This is derived renderer state, not an edit mode to toggle or synchronize.
    */
   editable: boolean;
   /**
@@ -298,7 +303,7 @@ export function SpaceCanvas({
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       if (presenting || !(event.target instanceof Element)) return;
       if (event.key === 'Enter' || event.key === ' ') {
-        if (bodyEditing) return;
+        if (!canAuthorOnCanvas || bodyEditing) return;
         // The same exclusion the `C` branch below makes, and now load-bearing
         // rather than defensive: an Expanded Card draws its editor *inside* the
         // node, so a Space typed into it would otherwise be cancelled here
@@ -584,7 +589,7 @@ export function SpaceCanvas({
       // the presented-Card connection `editing.spec.ts` has always asserted. An
       // expression nothing reads is not a decision that was made.
       nodesConnectable={canConnectOnCanvas}
-      ariaLabelConfig={ARIA_LABEL_CONFIG}
+      ariaLabelConfig={editable ? ARIA_LABEL_CONFIG : READ_ONLY_ARIA_LABEL_CONFIG}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the
       // authoring handles refuse via `isConnectableEnd` and the graph ports via

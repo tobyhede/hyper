@@ -553,9 +553,9 @@ describe('render adapter', () => {
     expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([CARD_A, CARD_B]);
   });
 
-  it('captures every projected Card when an Algorithmic View converts', () => {
+  it('captures every projected Card when a Layout is explicitly created', () => {
     // No Layout, so no Graph either: a Graph is a nested owned value and a Space
-    // with nothing to own one holds none (ADR 0040). Converting is what gives
+    // with nothing to own one holds none (ADR 0040). Explicit creation gives
     // this Space both.
     const snapshot: SpaceSnapshot = {
       id: SPACE_ID,
@@ -574,7 +574,7 @@ describe('render adapter', () => {
         },
       ],
     };
-    // Converting mints the Layout's Graph before the Layout itself.
+    // Explicit creation mints the Layout's Graph before the Layout itself.
     const { session, store, authoring } = sessionBackedAdapter(
       snapshot,
       FLOW_SPACE_VIEW_ID,
@@ -584,13 +584,9 @@ describe('render adapter', () => {
     );
 
     store.getState().syncProjection(PROJECTED, []);
-    expect(
-      connections(store, authoring).connect(
-        uuidSchema.parse(CARD_B),
-        uuidSchema.parse(CARD_A),
-        PROJECTED,
-      ),
-    ).toEqual({ kind: 'completed', cardId: CARD_A });
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({
+      kind: 'completed',
+    });
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20, open: false },

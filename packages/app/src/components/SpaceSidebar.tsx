@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from 'react';
+import { useId, type ReactNode, type Ref } from 'react';
 import {
   FLOW_SPACE_VIEW_ID,
   GRID_SPACE_VIEW_ID,
@@ -10,6 +10,10 @@ import {
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
   Button,
   buttonVariants,
   cn,
@@ -40,7 +44,9 @@ import {
 } from '@project/ui';
 import type { EntityActionGroup } from '@project/ui';
 import type { CanvasRenderers, CanvasRenderer } from '../canvas-renderers';
+import { describeAuthoringRefusal } from '../authoring-refusal';
 import { canvasRendererKey, type CanvasRendererId } from '../renderer';
+import type { AuthoringRefusal } from '../space-authoring';
 
 export interface SpaceSidebarProps {
   /** The Space's title. The canvas header names what is drawing it (ADR 0053). */
@@ -110,6 +116,14 @@ export interface SpaceSidebarProps {
     readonly keyShortcut?: string;
     readonly menuTriggerRef?: Ref<HTMLButtonElement>;
   };
+  readonly createLayout?:
+    | {
+        readonly disabled: boolean;
+        readonly unavailableReason: string | null;
+        readonly refusal: AuthoringRefusal | null;
+        readonly onCreate: () => void;
+      }
+    | undefined;
   readonly persistence: {
     readonly control: ReactNode;
     readonly state: SpaceSessionState['persistence']['kind'];
@@ -414,6 +428,7 @@ export function SpaceSidebar({
   canvas,
   graph,
   addCard,
+  createLayout,
   persistence,
   cardLinks,
   entityActions,
@@ -429,6 +444,8 @@ export function SpaceSidebar({
   // instead of the result. Above the breakpoint the sidebar is beside the canvas
   // and there is nothing to dismiss.
   const { isMobile, setOpenMobile } = useSidebar();
+  const createLayoutReasonId = useId();
+  const computedViewReadOnlyId = useId();
   const onCanvas =
     <Args extends readonly unknown[]>(command: (...args: Args) => void) =>
     (...args: Args): void => {
@@ -445,7 +462,7 @@ export function SpaceSidebar({
   // Graph is active, or the active Graph holds no Edges — and the second is not
   // a defensive nicety. Creating a Layout creates its initial Active Graph empty
   // in the same Edit (ADR 0040), so a Layout converted out of a View by a plain
-  // Card drag is always in this state until the author draws something.
+  // explicit Create Layout Edit is always in this state until the author draws something.
   const presentDisabled =
     !graph.presenting &&
     (graph.canPresent === false || activeGraph === undefined || activeGraph.edges.length === 0);
@@ -487,15 +504,17 @@ export function SpaceSidebar({
           the mobile Sheet portals these regions somewhere a class on the root
           would not be an ancestor at all. */}
       <SidebarContent className="nokey">
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <AddCardControl
-              {...addCard}
-              onAddCard={onCanvas(addCard.onAddCard)}
-              onAddAlias={onCanvas(addCard.onAddAlias)}
-            />
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {createLayout === undefined ? (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <AddCardControl
+                {...addCard}
+                onAddCard={onCanvas(addCard.onAddCard)}
+                onAddAlias={onCanvas(addCard.onAddAlias)}
+              />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
 
         <SidebarGroup>
           <SidebarGroupLabel>Space View</SidebarGroupLabel>
@@ -509,7 +528,7 @@ export function SpaceSidebar({
             />
             {canvas.renderers.authored.length === 0 ? (
               <NothingYet testId="no-authored-layouts">
-                None yet — editing a view creates one.
+                None yet — create one from the selected Computed View.
               </NothingYet>
             ) : (
               <RendererGroup
@@ -519,6 +538,42 @@ export function SpaceSidebar({
                 titleEdit={titleEdit}
                 entityActions={entityActions}
               />
+            )}
+            {createLayout === undefined ? null : (
+              <div className="mt-2 space-y-2">
+                <Button
+                  variant="default"
+                  size="compact"
+                  className="w-full justify-start gap-2"
+                  disabled={createLayout.disabled}
+                  aria-describedby={`${computedViewReadOnlyId}${
+                    createLayout.disabled && createLayout.unavailableReason !== null
+                      ? ` ${createLayoutReasonId}`
+                      : ''
+                  }`}
+                  onClick={onCanvas(createLayout.onCreate)}
+                >
+                  <LayoutIcon />
+                  Create Layout
+                </Button>
+                <p id={computedViewReadOnlyId} className="text-xs text-muted-foreground">
+                  Computed Views are read-only. Create a Layout to edit.
+                </p>
+                {createLayout.disabled && createLayout.unavailableReason !== null ? (
+                  <p id={createLayoutReasonId} className="text-xs text-muted-foreground">
+                    {createLayout.unavailableReason}
+                  </p>
+                ) : null}
+                {createLayout.refusal === null ? null : (
+                  <Alert variant="destructive">
+                    <AlertIcon />
+                    <AlertTitle>Layout not created</AlertTitle>
+                    <AlertDescription>
+                      {describeAuthoringRefusal(createLayout.refusal)}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
             )}
           </SidebarGroupContent>
         </SidebarGroup>

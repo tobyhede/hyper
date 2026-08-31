@@ -214,13 +214,13 @@ describe('authoring a Card title on the graph', () => {
  * Neither half proves this on its own: the refusal is in Navigation and the
  * enablement is in `GraphSelector`, and what went wrong was that they disagreed.
  */
-describe('presenting after a conversion', () => {
+describe('presenting after explicit Layout creation', () => {
   const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
     ...snapshot,
     document: { version: 1, title: 'Space' },
   });
 
-  it('offers no Present action while the converted Layout’s Graph is empty', async () => {
+  it('offers no Present action while the created Layout’s Graph is empty', async () => {
     window.history.replaceState(
       null,
       '',
@@ -231,13 +231,17 @@ describe('presenting after a conversion', () => {
     // has no Graphs at all, so there is no Active Graph.
     expect(await screen.findByTestId('present-button')).toBeDisabled();
 
+    const createLayout = await screen.findByRole('button', { name: 'Create Layout' });
+    await waitFor(() => expect(createLayout).toBeEnabled());
+    fireEvent.click(createLayout);
+
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
     const input = screen.getByRole('textbox', { name: 'Card title' });
     fireEvent.change(input, { target: { value: 'Renamed A' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    // The Edit converted: there is a Layout now, and it is active on the empty
-    // Graph the conversion minted for it.
+    // Explicit creation made a Layout active on its fresh empty Graph; the
+    // later title Edit changed only the Card.
     await waitFor(() =>
       expect(session.getState().working.document.layouts?.[0]?.graphs).toEqual([
         expect.objectContaining({ edges: [] }),

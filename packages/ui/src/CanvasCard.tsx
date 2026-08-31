@@ -80,6 +80,12 @@ interface CanvasCardCommonProps {
   readonly front: CanvasCardFront;
   readonly title: string;
   readonly graphColor: string;
+  /**
+   * Draw this Card as content only. Authoring callbacks may still be present in
+   * an upstream composition, but this boundary does not expose them as title,
+   * open or edit controls while the Card belongs to a read-only surface.
+   */
+  readonly readOnly?: boolean;
   /** Present only when activating the displayed Title may begin a rename. */
   readonly onBeginTitleEdit?: () => void;
   /**
@@ -186,7 +192,8 @@ const opacityTransitionMs = (element: HTMLElement): number => {
  * own visual treatment lives in `canvas-card.css`, colocated with this module.
  */
 export function CanvasCard(props: CanvasCardProps) {
-  const { front, title, graphColor, onBeginTitleEdit, entityActions, state } = props;
+  const { front, title, graphColor, entityActions, state, readOnly = false } = props;
+  const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   const contentFront = front.kind === 'markdown' || front.kind === 'alias' ? front : undefined;
   const open = contentFront?.open === true;
@@ -196,8 +203,8 @@ export function CanvasCard(props: CanvasCardProps) {
     [],
   );
   const contentPresence = usePresence(open, contentExitDuration);
-  const onOpenChange = contentFront?.onOpenChange;
-  const onBeginContentEdit = front.kind === 'markdown' ? front.onBeginEdit : undefined;
+  const onOpenChange = readOnly ? undefined : contentFront?.onOpenChange;
+  const onBeginContentEdit = !readOnly && front.kind === 'markdown' ? front.onBeginEdit : undefined;
   /**
    * The edit running inside the Markdown front this Card owns.
    *
@@ -206,6 +213,7 @@ export function CanvasCard(props: CanvasCardProps) {
    * the Save and Cancel closures for its current draft (`card-content-edit.ts`).
    */
   const [contentEdit, setContentEdit] = useState<CardContentEdit | null>(null);
+  const visibleContentEdit = readOnly ? null : contentEdit;
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
@@ -213,7 +221,7 @@ export function CanvasCard(props: CanvasCardProps) {
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
-    (contentEdit !== null ||
+    (visibleContentEdit !== null ||
       onOpenChange !== undefined ||
       actionableEntityActions ||
       beginContentEdit !== undefined);
@@ -222,10 +230,10 @@ export function CanvasCard(props: CanvasCardProps) {
     Pick<MarkdownCardBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>
   > = {};
   if (onBeginContentEdit !== undefined) markdownBodyProps.onBeginEdit = onBeginContentEdit;
-  if (front.kind === 'markdown' && front.editor !== undefined) {
+  if (!readOnly && front.kind === 'markdown' && front.editor !== undefined) {
     markdownBodyProps.editor = front.editor;
   }
-  if (front.kind === 'markdown' && front.autoFocusEditor !== undefined) {
+  if (!readOnly && front.kind === 'markdown' && front.autoFocusEditor !== undefined) {
     markdownBodyProps.autoFocus = front.autoFocusEditor;
   }
 
@@ -257,7 +265,7 @@ export function CanvasCard(props: CanvasCardProps) {
       // A running edit is not a hover, so the controls that end it are read off
       // this instead — an author writing in the body must be able to see the way
       // out without going looking for it with the pointer.
-      data-content-editing={contentEdit !== null}
+      data-content-editing={visibleContentEdit !== null}
       style={style}
     >
       <CardRail kind={visualKind} graphColor={graphColor} className="canvas-card__rail">
@@ -281,7 +289,7 @@ export function CanvasCard(props: CanvasCardProps) {
             data-testid="canvas-card-actions"
           >
             <CardRailKindActions kind={visualKind}>
-              {contentEdit === null ? (
+              {visibleContentEdit === null ? (
                 beginContentEdit !== undefined && (
                   <CardRailAction
                     ref={editControl}
@@ -292,7 +300,7 @@ export function CanvasCard(props: CanvasCardProps) {
                   </CardRailAction>
                 )
               ) : (
-                <ContentEditActions title={title} edit={contentEdit} />
+                <ContentEditActions title={title} edit={visibleContentEdit} />
               )}
             </CardRailKindActions>
             <CardRailSharedActions>
@@ -321,7 +329,7 @@ export function CanvasCard(props: CanvasCardProps) {
                   // that promise now holds for the keyboard too — the control keeps
                   // its place in the arrow order and announces itself unavailable,
                   // instead of being drawn and unreachable.
-                  disabled={contentEdit !== null}
+                  disabled={visibleContentEdit !== null}
                   onClick={() => {
                     onOpenChange(!open);
                   }}
@@ -338,7 +346,7 @@ export function CanvasCard(props: CanvasCardProps) {
         )}
       </CardRail>
       <CardContent className="canvas-card__body">
-        {state === 'editing' ? (
+        {state === 'editing' && !readOnly ? (
           <InlineTitleEditor
             title={title}
             label="Card title"
@@ -350,12 +358,12 @@ export function CanvasCard(props: CanvasCardProps) {
         ) : (
           <CardTitle
             className="canvas-card__title"
-            data-editable={onBeginTitleEdit !== undefined && contentEdit === null}
+            data-editable={onBeginTitleEdit !== undefined && visibleContentEdit === null}
             role="heading"
             aria-level={2}
             aria-label={title}
           >
-            {onBeginTitleEdit === undefined || contentEdit !== null ? (
+            {onBeginTitleEdit === undefined || visibleContentEdit !== null ? (
               title
             ) : (
               // ADR 0065 composes the shared shadcn/Base Button inside the

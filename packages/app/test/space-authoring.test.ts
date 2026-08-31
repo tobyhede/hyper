@@ -332,7 +332,7 @@ const openConflictedAgainstStoredSpace = async () => {
 describe('Space Authoring', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('renames a Card and converts the Algorithmic View from the completed placement', () => {
+  it('renames a Card after explicitly creating a Layout from the completed placement', () => {
     const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
       newId: mintingIds(LAYOUT_ID),
     });
@@ -343,6 +343,7 @@ describe('Space Authoring', () => {
         [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
     expect(
       authoring.complete({
         kind: 'edited-card',
@@ -362,18 +363,15 @@ describe('Space Authoring', () => {
       [CARD_B]: { x: 300, y: 40, open: false },
     });
     expect(session.getState().working.document.layouts?.[0]?.graphs[0]?.id).toBe(MINTED_GRAPH_ID);
-    // Written *and* selected. A conversion that stored the Layout without
-    // repointing the renderer leaves the graph drawing the Algorithmic View it
-    // just replaced, so the next placement would be computed rather than read
-    // back from the Layout this Edit created.
+    // Written *and* selected. Creation that stored the Layout without repointing
+    // the renderer would leave the graph drawing the Computed View, so the next
+    // placement would be computed rather than read from the Layout just created.
     expect(navigation.getState().selectedRenderer).toEqual(LAYOUT_ID);
   });
 
-  it('binds a Card value to the completion that reports it', () => {
+  it('refuses Card editing in a Computed View before and after placement resolves', () => {
     const { authoring, session } = openAuthoring();
-    // No placement: an Algorithmic View has nothing to write the Edit into yet.
-    // A refusal rather than `unchanged`, because the author's rename is real and
-    // the reason it cannot land is context they can be told about.
+    // Read-only is the stable reason regardless of whether placement has resolved.
     expect(
       complete(authoring, {
         kind: 'edited-card',
@@ -382,7 +380,7 @@ describe('Space Authoring', () => {
       }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'placement-pending' },
+      refusal: { code: 'computed-view-read-only' },
     });
 
     replacePlacementForTest(
@@ -399,11 +397,11 @@ describe('Space Authoring', () => {
         cardId: CARD_A,
         document: automaticSnapshot.cards[0]!.document,
       }),
-    ).toEqual({ kind: 'unchanged' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'computed-view-read-only' } });
     expect(session.getState().working.cards).toEqual(automaticSnapshot.cards);
   });
 
-  it('treats an unchanged Card as no Edit before converting or submitting', () => {
+  it('refuses even an unchanged Card completion in a Computed View without submitting', () => {
     // Counting this Space's own minting, rather than every call the process
     // makes to the ambient generator: what the refusal has to leave untouched is
     // the identity *this* Edit would have created.
@@ -430,7 +428,7 @@ describe('Space Authoring', () => {
         cardId: CARD_A,
         document: automaticSnapshot.cards[0]!.document,
       }),
-    ).toEqual({ kind: 'unchanged' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'computed-view-read-only' } });
     expect(session.getState().working).toBe(before);
     expect(control.attempts).toEqual([]);
     expect(minted).not.toHaveBeenCalled();
@@ -533,13 +531,13 @@ describe('Space Authoring', () => {
   });
 
   /**
-   * The conversion ADR 0045 describes, in one Edit: the Cards already on screen
+   * Explicit Layout creation captures the Cards already on screen
    * become a Layout, and that Layout owns exactly one fresh, empty Graph, which
    * is also the Graph it opens on. Nothing is left at the Space level, because
    * there is no Space level left for a Graph to be written to.
    */
-  it('converts an Algorithmic View into a Layout owning one fresh empty Graph', () => {
-    // Only the Layout: this Edit mints no Card, and the Graph its conversion
+  it('explicitly creates a Layout owning one fresh empty Graph from a Computed View', () => {
+    // Only the Layout: this Edit mints no Card, and the Graph its creation
     // returns is identified by the resolver composed above.
     const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
       newId: mintingIds(LAYOUT_ID),
@@ -552,7 +550,7 @@ describe('Space Authoring', () => {
       ]),
     );
 
-    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
 
     expect(session.getState().working.document.layouts).toEqual([
       {
@@ -612,16 +610,15 @@ describe('Space Authoring', () => {
    * The half of that policy that is **not** a mechanical mirror, and the one
    * that fails silently if it is got wrong.
    *
-   * On an Algorithmic View the Edge does not join the Graph the author is
-   * emphasising — it joins the fresh, empty Graph the conversion is about to
-   * mint (ADR 0045). No duplicate is possible against a Graph that holds
-   * nothing, so refusing here would refuse the *first* connection drawn on any
-   * Space that already has Graphs, with no way for the author to tell why.
+   * Explicit creation copies every Computed View Graph's title, colour and
+   * Edges under a fresh identity; only a View with no Graphs receives a fresh
+   * empty fallback. A later Edge therefore joins the copied Graph rather than
+   * reaching back into the Graph its source Layout still owns.
    *
    * The emphasis is still only emphasis (ADR 0028): `Main` already holds
    * exactly this Edge, and it neither blocks the gesture nor receives it.
    */
-  it('offers an Edge the emphasised Graph already holds, and lands it in the minted one', () => {
+  it('copies the emphasised Graph and refuses an Edge it already holds', () => {
     // A Space whose only Layout owns `Main`, opened in the Flow view rather than
     // in that Layout — so the flatten draws `Main`, and it is what is emphasised.
     const { authoring, session, navigation } = openAuthoring(
@@ -641,9 +638,11 @@ describe('Space Authoring', () => {
     );
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
 
-    expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(true);
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
+    expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
-      kind: 'completed',
+      kind: 'refused',
+      refusal: { code: 'edge-already-exists' },
     });
 
     const layouts = session.getState().working.document.layouts ?? [];
@@ -651,16 +650,11 @@ describe('Space Authoring', () => {
     // Untouched: the Graph that was emphasised belongs to the Layout that owns
     // it, and nothing about this Edit reached across.
     expect(layouts[0]?.graphs).toEqual([MAIN_GRAPH]);
-    // `Graph 1`, not `Graph 2`: the numbering runs above the highest `Graph N`
-    // already taken, and `Main` is a title an author wrote rather than a number.
+    // The Computed View's Graph is a snapshot under a fresh owned identity.
     expect(layouts[1]?.graphs).toEqual([
       {
         id: MINTED_GRAPH_ID,
-        title: 'Graph 1',
-        // The first palette slot, although the Space already holds `Main`: the
-        // rotation is Layout-local, and a conversion creates the Layout, so its
-        // initial Graph occupies the first position in it.
-        color: GRAPH_PALETTE[0],
+        title: 'Main',
         edges: [{ from: CARD_A, to: CARD_B }],
       },
     ]);
@@ -735,13 +729,12 @@ describe('Space Authoring', () => {
 
   /**
    * Activating a Graph is emphasis and nothing else (ADR 0028), and on an
-   * Algorithmic View that stays true right through the Edit that follows.
+   * Computed View that stays true until explicit Layout creation.
    *
    * The author emphasises `Aside`, which a second Layout owns, and then draws an
    * Edge. Activation itself submits nothing — no Layout appears, no revision
-   * moves. And the Edge does not go to `Aside`: it goes to the initial Graph the
-   * conversion mints for the Layout it creates, because that is the only Graph
-   * the new Layout owns (ADR 0045). Emphasis does not choose where an Edge lands.
+   * moves. Conversion snapshots both Graphs; the first becomes Active, so the
+   * later Edge joins that copy rather than the Graph that was emphasised.
    */
   it('submits nothing on activation, and lands the next Edge in the minted Graph', () => {
     const ASIDE_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
@@ -789,6 +782,7 @@ describe('Space Authoring', () => {
     expect(session.getState().working).toBe(before);
     expect(control.attempts).toEqual([]);
 
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
     expect(offersConnection(authoring, CARD_B, CARD_A)).toBe(true);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
@@ -796,13 +790,23 @@ describe('Space Authoring', () => {
 
     const layouts = session.getState().working.document.layouts ?? [];
     expect(layouts).toHaveLength(3);
-    // Neither existing Layout was touched, and the Edge is in the minted Graph.
+    // Neither existing Layout was touched, and both Computed View Graphs were copied.
     expect(layouts[1]?.graphs).toEqual([
       { id: ASIDE_GRAPH, title: 'Aside', edges: [{ from: CARD_B, to: CARD_A }] },
     ]);
     expect(layouts[2]).toMatchObject({
       id: CONVERTED_LAYOUT_ID,
-      graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_B, to: CARD_A }] }],
+      graphs: [
+        {
+          id: MINTED_GRAPH_ID,
+          title: 'Main',
+          edges: [
+            { from: CARD_A, to: CARD_B },
+            { from: CARD_B, to: CARD_A },
+          ],
+        },
+        { title: 'Aside', edges: [{ from: CARD_B, to: CARD_A }] },
+      ],
       activeGraph: MINTED_GRAPH_ID,
     });
     expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
@@ -869,7 +873,7 @@ describe('Space Authoring', () => {
    * The renderer and the Active Graph reach Navigation as **one** answer, and it
    * is the answer this Edit produced rather than the one it began in.
    *
-   * Converting an Algorithmic View is where that is visible at all: the Edit
+   * Creating a Layout from a Computed View is where that is visible at all: the Edit
    * began on the Flow view and produced a Layout, so the two renderers are
    * different values — where an Edit written back into a selected Layout leaves
    * them sharing an id and every question about which was asked answers alike.
@@ -920,9 +924,7 @@ describe('Space Authoring', () => {
       Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]),
     );
 
-    expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
-      kind: 'completed',
-    });
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
 
     expect(adopted).toEqual([{ renderer: LAYOUT_ID, graphId: MINTED_GRAPH_ID }]);
     expect(real.getState()).toMatchObject({
@@ -935,7 +937,7 @@ describe('Space Authoring', () => {
         id: MINTED_GRAPH_ID,
         title: 'Graph 1',
         color: GRAPH_PALETTE[0],
-        edges: [{ from: CARD_A, to: CARD_A }],
+        edges: [],
       },
     ]);
     expect(
@@ -943,9 +945,9 @@ describe('Space Authoring', () => {
     ).toEqual([MINTED_GRAPH_ID]);
   });
 
-  it('creates the Card, first Graph, Edge and Layout as one Edit with internal identities', () => {
-    // Card, then Layout — the order the one Edit mints them in. The Graph is
-    // not in this list: the conversion boundary identifies it, from the
+  it('creates a Card and Edge after explicit Layout creation with internal identities', () => {
+    // Layout, then Card — the order the two explicit Edits mint them in. The
+    // Graph is not in this list: the creation boundary identifies it from the
     // resolver's own minter.
     const graphLess: SpaceSnapshot = {
       id: SPACE_ID,
@@ -953,13 +955,14 @@ describe('Space Authoring', () => {
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
     const { authoring, session } = openAuthoring(graphLess, undefined, {
-      newId: mintingIds(CREATED_CARD_ID, LAYOUT_ID),
+      newId: mintingIds(LAYOUT_ID, CREATED_CARD_ID),
     });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([[CARD_A, { x: 120, y: 240, open: false }]]),
     );
 
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
     expect(offersEmptyDrop(authoring, CARD_A)).toBe(true);
     expect(
       complete(authoring, {
@@ -1066,20 +1069,8 @@ describe('Space Authoring', () => {
     expect(reentrantResult).toEqual({ kind: 'queued' });
   });
 
-  /**
-   * The case the queue's other test cannot reach: what a queued completion is
-   * an Edit *to* when the Edit ahead of it converted an Algorithmic View.
-   *
-   * A completion carries the interaction and its rendered geometry and never a
-   * `ResolvedRenderer`, so the drain resolves one against the Space and the
-   * selection as they stand — by which time the conversion has installed its
-   * Layout and Navigation has moved to it. Retaining the renderer instead would
-   * convert a second time, and the two Layouts would each hold half the
-   * author's work with nothing to say which is the Space's.
-   */
-  it('applies a completion queued behind a conversion to the Layout that conversion created', () => {
-    // Two identities rather than one repeated: a second conversion then shows up
-    // as the second Layout it would really be, instead of overwriting the first.
+  it('refuses a completion reentered during explicit Layout creation instead of replaying it', () => {
+    // A spare identity proves the refused movement does not create another Layout.
     const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
       newId: mintingIds(CONVERTED_LAYOUT_ID, COMPETING_LAYOUT_ID),
     });
@@ -1105,19 +1096,22 @@ describe('Space Authoring', () => {
       reentrantResult = complete(authoring, { kind: 'settled-card-movement' });
     });
 
-    complete(authoring, { kind: 'settled-card-movement' });
+    authoring.complete({ kind: 'created-layout' });
 
-    expect(reentrantResult).toEqual({ kind: 'queued' });
+    expect(reentrantResult).toEqual({
+      kind: 'refused',
+      refusal: { code: 'computed-view-read-only' },
+    });
     const { working } = session.getState();
-    // One Layout and one Graph, both from the first Edit: the queued one found
-    // them by re-resolving rather than minting a competing pair of its own.
+    // One Layout and one Graph, both from the explicit creation Edit.
     expect(working.document.layouts?.map((layout) => layout.id)).toEqual([CONVERTED_LAYOUT_ID]);
     expect(graphsOf(working).map((graph) => graph.id)).toEqual([MINTED_GRAPH_ID]);
-    // And it is the queued gesture's geometry that survives, written into that
-    // same Layout rather than into a second one.
+    // The attempted movement is not replayed after Navigation selects the new
+    // Layout: creation captures the Computed View placement that was current
+    // before the reentrant attempt.
     expect(working.document.layouts?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 500, y: 400, open: false },
+      [CARD_B]: { x: 300, y: 40, open: false },
     });
     expect(navigation.getState().selectedRenderer).toEqual(CONVERTED_LAYOUT_ID);
   });
@@ -1182,7 +1176,7 @@ describe('Space Authoring', () => {
       });
     });
 
-    complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A });
+    authoring.complete({ kind: 'created-layout' });
 
     expect(observed).toEqual([{ defaultRenderer: LAYOUT_ID, renderer: LAYOUT_ID }]);
   });
@@ -1333,7 +1327,7 @@ describe('Space Authoring', () => {
     expect(authoring.authoredPlacement()).toBeNull();
   });
 
-  it('adopts every rendered Card on conversion and only placed Cards in a Layout', () => {
+  it('adopts every rendered Card on explicit creation and only placed Cards in a Layout', () => {
     fc.assert(
       fc.property(
         fc.record({
@@ -1363,11 +1357,7 @@ describe('Space Authoring', () => {
             newId: mintingIds(LAYOUT_ID),
           });
           converting.authoring.reportRendered(rendered);
-          converting.authoring.complete({
-            kind: 'settled-card-movement',
-            rendered,
-            placed: [CARD_A],
-          });
+          converting.authoring.complete({ kind: 'created-layout' });
           expect(converting.session.getState().working.document.layouts?.[0]?.positions).toEqual({
             [CARD_A]: { x: renderedAX, y: renderedAY, open: false },
             [CARD_B]: { x: renderedBX, y: renderedBY, open: false },
@@ -1507,7 +1497,7 @@ describe('Space Authoring', () => {
     // took an id from the real generator — invisible, because the assertions are
     // about titles.
     const { authoring, session } = openAuthoring(numbered, undefined, {
-      newId: mintingIds(CREATED_CARD_ID, LAYOUT_ID),
+      newId: mintingIds(LAYOUT_ID, CREATED_CARD_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1517,6 +1507,7 @@ describe('Space Authoring', () => {
       ]),
     );
 
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
     expect(
       complete(authoring, { kind: 'create-and-connect', from: CARD_A, position: { x: 5, y: 6 } }),
     ).toEqual({ kind: 'completed', createdCardId: CREATED_CARD_ID });
@@ -1532,7 +1523,7 @@ describe('Space Authoring', () => {
    * report that says they are gone.
    */
   it('contains a reporter that throws while reporting a failed queued completion', () => {
-    const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const real = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
     let submits = 0;
     const session: SpaceSession = {
@@ -1546,9 +1537,9 @@ describe('Space Authoring', () => {
     const reported: unknown[] = [];
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: FLOW_SPACE_VIEW_ID,
+      selection: LAYOUT_ID,
       newGraphId: graphIds(),
-      newId: mintingIds(LAYOUT_ID),
+      newId: mintingIds(CREATED_CARD_ID),
       initialPlacement: null,
       reportObserverError: (error) => {
         reported.push(error);
@@ -1744,7 +1735,7 @@ describe('Space Authoring', () => {
    * the Layout it carries owns the Graph handed over with it. What is pinned is
    * that the guarantee does not depend on that argument staying true.
    *
-   * A converted View is used because it is where the half-applied state is
+   * Explicit creation from a Computed View is used because the half-applied state is
    * visible at all: the renderer Navigation keeps is plainly not the one the
    * Edit produced.
    */
@@ -1785,9 +1776,7 @@ describe('Space Authoring', () => {
     const published: NavigationState[] = [];
     authoring.subscribe(() => published.push(authoring.getState().navigation));
 
-    expect(() =>
-      complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_A }),
-    ).toThrow('adoption failed');
+    expect(() => authoring.complete({ kind: 'created-layout' })).toThrow('adoption failed');
 
     // The session took the Edit; Navigation refused it and is still on the View
     // the Edit began in. That is the half-applied state, and the publication in
@@ -1806,7 +1795,7 @@ describe('Space Authoring', () => {
   });
 
   it('reports the completions a failed drain discards', () => {
-    const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const real = openSpaceSession(backend, loaded);
     let submits = 0;
@@ -1821,9 +1810,9 @@ describe('Space Authoring', () => {
     const reported: unknown[] = [];
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: FLOW_SPACE_VIEW_ID,
+      selection: LAYOUT_ID,
       newGraphId: graphIds(),
-      newId: mintingIds(LAYOUT_ID),
+      newId: mintingIds(CREATED_CARD_ID),
       initialPlacement: null,
       reportObserverError: (error) => reported.push(error),
     });

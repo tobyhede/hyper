@@ -25,5 +25,47 @@ Settled.meta = { iframed: true };
 export const Unauthored: Story = () => <SpaceSidebarFixture space={unauthoredSpace} />;
 Unauthored.meta = { iframed: true };
 
+export const ComputedViewReady: Story = () => (
+  <SpaceSidebarFixture
+    space={unauthoredSpace}
+    createLayout={{
+      disabled: false,
+      unavailableReason: null,
+      refusal: null,
+      onCreate: () => {
+        document.body.dataset['createLayout'] = 'requested';
+      },
+    }}
+  />
+);
+ComputedViewReady.meta = { iframed: true };
+
+export const ComputedViewPending: Story = () => (
+  <SpaceSidebarFixture
+    space={unauthoredSpace}
+    createLayout={{
+      disabled: true,
+      unavailableReason:
+        'This view has not finished placing its Cards, so there is nowhere to write yet.',
+      refusal: null,
+      onCreate: () => undefined,
+    }}
+  />
+);
+ComputedViewPending.meta = { iframed: true };
+
+export const ComputedViewRefused: Story = () => (
+  <SpaceSidebarFixture
+    space={unauthoredSpace}
+    createLayout={{
+      disabled: false,
+      unavailableReason: null,
+      refusal: { code: 'placement-pending' },
+      onCreate: () => undefined,
+    }}
+  />
+);
+ComputedViewRefused.meta = { iframed: true };
+
 export const Presenting: Story = () => <SpaceSidebarFixture presenting authoringDisabled />;
 Presenting.meta = { iframed: true };

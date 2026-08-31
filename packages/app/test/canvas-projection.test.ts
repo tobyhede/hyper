@@ -77,6 +77,16 @@ function handledGraphIds(nodes: readonly CardFlowNode[]): string[] {
 }
 
 describe('canvasProjection', () => {
+  it('marks Computed View Cards read-only and authored Layout Cards editable', async () => {
+    const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
+
+    const computed = await projectThrough(space);
+    const authored = await projectThrough(space, AT_REST, LAYOUT);
+
+    expect(computed.nodes.map((node) => node.data.readOnly)).toEqual([true, true]);
+    expect(authored.nodes.map((node) => node.data.readOnly)).toEqual([false, false]);
+  });
+
   it('projects every Space Card when the Space has no Graphs', async () => {
     const { nodes } = await projectThrough(spaceWith());
 

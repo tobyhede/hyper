@@ -78,7 +78,7 @@ export interface ViewConversion {
   readonly graphs: readonly [Graph, ...Graph[]];
 }
 
-/** An application-supplied View: it computes placement, and editing converts it. */
+/** An application-supplied read-only View that explicit Layout creation may capture. */
 export interface ResolvedViewRenderer {
   readonly kind: 'view';
   readonly id: UUID;
@@ -308,29 +308,25 @@ const spaceSubject = (space: Space): RendererSubject => ({
 });
 
 /**
- * One fresh Graph holding no Edges, numbered and coloured above the Graphs being
- * shown.
- *
- * The **View's choice** among legal outputs and not a rule of the boundary (ADR
- * 0045) — a copy of the Graph the author was emphasising would satisfy every
- * obligation just as well. It is not what these Views do, because a copy is how
- * two Graphs carrying one title begin diverging in silence. An author surprised
- * once by finding their Edge in a new Graph has been surprised; an author whose
- * two "Onboarding" Graphs drifted apart over a month has been harmed.
- *
- * It needs no input Graph, which is what lets either View render a new Space
- * with none: the empty Graph exists only because an Edit is creating a Layout,
- * and a Layout's Graph collection is non-empty (ADR 0040).
- *
- * The stored colour is the same rule Graph management's Add Graph uses, so a
- * Graph does not come out with different properties according to whether the
- * author asked for it or drew the first connection that minted it. A conversion
- * creates the Layout, so this Graph occupies its first position and takes the
- * first palette colour, whatever the View was drawing.
+ * Carry every Graph the Computed View draws into the new Layout, with identity
+ * absent so the conversion boundary mints a fresh one for each new owner. A
+ * Space with no Graphs still needs the one empty Graph every valid Layout owns.
  */
-const freshEmptyGraph: ViewGraphPolicy = (_space, subject) => [
-  { title: nextGraphTitle(subject.graphs), color: nextGraphColor(0), edges: [] },
-];
+const preserveSubjectGraphs: ViewGraphPolicy = (_space, subject) => {
+  if (subject.graphs.length === 0) {
+    return [{ title: nextGraphTitle(subject.graphs), color: nextGraphColor(0), edges: [] }];
+  }
+  const graphs = subject.graphs.map((graph) =>
+    graph.color === undefined
+      ? { title: graph.title, edges: graph.edges }
+      : { title: graph.title, color: graph.color, edges: graph.edges },
+  );
+  // The branch above proves the mapped collection is non-empty. Naming its
+  // head restores the policy's tuple contract without a type assertion.
+  const [head, ...tail] = graphs;
+  if (head === undefined) throw new Error('A non-empty Graph subject mapped to no Graphs.');
+  return [head, ...tail];
+};
 
 /**
  * The Computed Views, closed.
@@ -353,14 +349,14 @@ const COMPUTED_VIEWS: PerComputedView<ComputedViewDefinition> = [
     title: 'Flow',
     selectSubject: spaceSubject,
     createStrategy: elkStrategy,
-    graphPolicy: freshEmptyGraph,
+    graphPolicy: preserveSubjectGraphs,
   },
   {
     id: GRID_SPACE_VIEW_ID,
     title: 'Grid',
     selectSubject: spaceSubject,
     createStrategy: gridStrategy,
-    graphPolicy: freshEmptyGraph,
+    graphPolicy: preserveSubjectGraphs,
   },
 ];
 

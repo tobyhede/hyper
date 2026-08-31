@@ -144,6 +144,7 @@ function cardNode(id: string, x: number, title: string): CardFlowNode {
     data: {
       cardId: uuidSchema.parse(id),
       title,
+      readOnly: false,
       kind: 'markdown',
       active: false,
       selectedForAuthoring: false,
@@ -600,7 +601,7 @@ describe("the app's canvas delete key", () => {
     fireEvent.keyDown(canvasElement(), { key });
 
     expect(await screen.findByTestId('canvas-command-refusal')).toHaveTextContent(
-      'Select a Layout to remove a Card from it.',
+      'Create a Layout from this Computed View before editing.',
     );
   });
 

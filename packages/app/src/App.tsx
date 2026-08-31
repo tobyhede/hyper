@@ -106,6 +106,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const [editingCardBody, setEditingCardBody] = useState(false);
     const [editingCardTitle, setEditingCardTitle] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
+    const [createLayoutRefusal, setCreateLayoutRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const [destinationNotFound, setDestinationNotFound] = useState(false);
     const syncDestination = useCallback(
@@ -317,13 +318,13 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
     const cardResize = useRenderAdapter((s) => s.cardResize);
-    // There are Cards on the canvas to drag once the layout has resolved and the
-    // store has taken it. Not a permission — every view is editable (ADR 0025) —
-    // but it is false for the frame before the first placement resolves, and again
-    // after `selectRenderer` clears the projection until the next one is published.
+    // There are Cards on the canvas to interact with once placement resolves and
+    // the store has taken it. Authoring additionally requires an authored Layout:
+    // a Computed View is a read-only preview until its explicit Create Layout Edit.
     const hasCardsOnCanvas = liveProjection !== null;
     const canvas = canvasContent(placement, hasCardsOnCanvas);
-    const editable = hasCardsOnCanvas;
+    const editable = hasCardsOnCanvas && current.kind === 'authored';
+    useEffect(() => setCreateLayoutRefusal(null), [selectedRenderer]);
     const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
       readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;
       readonly draft: string;
@@ -633,7 +634,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      *
      * Both refusals it can produce also turn on state the control is already
      * withdrawn in. `disabled` on `AddCardControl` and `canAuthorCards` in
-     * `SpaceCanvas` are both gated on `editable`, which is `hasCardsOnCanvas` —
+     * `SpaceCanvas` are both gated on `editable`, which requires an authored Layout with Cards on the canvas —
      * and no Cards on the canvas is the first refusal ("nowhere to write yet"). The
      * second is a Layout that has left the Space, which would have taken the
      * canvas drawing it, and `editable` with it. Neither is reachable from
@@ -828,6 +829,27 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
         }}
+        createLayout={
+          current.kind === 'computed'
+            ? {
+                disabled: placement.kind !== 'ready',
+                unavailableReason:
+                  placement.kind === 'ready'
+                    ? null
+                    : placement.kind === 'failed'
+                      ? describeAuthoringRefusal({
+                          code: 'placement-failed',
+                          error: placement.error,
+                        })
+                      : describeAuthoringRefusal({ code: 'placement-pending' }),
+                refusal: createLayoutRefusal,
+                onCreate: () => {
+                  const result = authoring.complete({ kind: 'created-layout' });
+                  setCreateLayoutRefusal(result.kind === 'refused' ? result.refusal : null);
+                },
+              }
+            : undefined
+        }
         persistence={{
           control: (
             <PersistenceControl

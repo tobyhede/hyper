@@ -10,7 +10,7 @@ import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { composeApp } from '../src/compose-app';
-import type { SpaceAuthoring } from '../src/space-authoring';
+import type { AuthoringCompletion, SpaceAuthoring } from '../src/space-authoring';
 import type { CanvasRendererId } from '../src/renderer';
 import { mintingGraphIds, mintingIds } from './minting';
 
@@ -143,6 +143,100 @@ const openAutomatic = (newId: () => UUID = mintingIds(MINTED)) => {
   return opened;
 };
 
+describe('Create Layout', () => {
+  it('captures the selected Computed View without changing existing Layouts', () => {
+    const { authoring, navigation, session } = open(
+      positionedSnapshot,
+      FLOW_SPACE_VIEW_ID,
+      mintingIds(MINTED),
+    );
+    place(authoring, {
+      [CARD_A]: [80, 120],
+      [CARD_B]: [440, 260],
+    });
+
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
+
+    expect(session.getState().working.document.layouts).toEqual([
+      positionedSnapshot.document.layouts![0],
+      {
+        id: MINTED,
+        title: 'Layout 2',
+        kind: 'positioned',
+        positions: {
+          [CARD_A]: { x: 80, y: 120, open: false },
+          [CARD_B]: { x: 440, y: 260, open: false },
+        },
+        graphs: [
+          {
+            id: MINTED_GRAPH,
+            title: 'Main',
+            edges: [{ from: CARD_A, to: CARD_B }],
+          },
+        ],
+        activeGraph: MINTED_GRAPH,
+      },
+    ]);
+    expect(session.getState().working.document.defaultRenderer).toBe(MINTED);
+    expect(navigation.getState().selectedRenderer).toBe(MINTED);
+  });
+
+  it('refuses while the selected Computed View placement is unresolved', () => {
+    const { authoring, navigation, session } = open(
+      positionedSnapshot,
+      FLOW_SPACE_VIEW_ID,
+      mintingIds(MINTED),
+    );
+
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'placement-pending' },
+    });
+    expect(session.getState().working).toEqual(positionedSnapshot);
+    expect(navigation.getState().selectedRenderer).toBe(FLOW_SPACE_VIEW_ID);
+  });
+});
+
+describe('Computed View authoring', () => {
+  const rendered = Placement.fromEntries([
+    [CARD_A, { x: 10, y: 20 }],
+    [CARD_B, { x: 300, y: 40 }],
+  ]);
+  const attempts: readonly [string, AuthoringCompletion][] = [
+    ['Card creation', { kind: 'created-card', anchor: CENTRE }],
+    ['Alias creation', { kind: 'created-alias', target: CARD_A, anchor: CENTRE }],
+    [
+      'Card editing',
+      {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: 'Edited', kind: 'markdown', body: 'Edited' },
+      },
+    ],
+    ['Card movement', { kind: 'settled-card-movement', rendered, placed: [CARD_A] }],
+    ['Card opening', { kind: 'opened-card', cardId: CARD_A }],
+    ['Card deletion', { kind: 'deleted-card', cardId: CARD_A }],
+    ['Graph creation', { kind: 'added-graph' }],
+    ['Edge creation', { kind: 'connected-cards', from: CARD_A, to: CARD_B, rendered }],
+    [
+      'Card-and-Edge creation',
+      { kind: 'create-and-connect', from: CARD_A, position: CENTRE, rendered },
+    ],
+  ];
+
+  it.each(attempts)('%s is refused without implicit conversion', (_name, completion) => {
+    const { authoring, navigation, session } = openAutomatic();
+    const before = session.getState().working;
+
+    expect(authoring.complete(completion)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'computed-view-read-only' },
+    });
+    expect(session.getState().working).toBe(before);
+    expect(navigation.getState().selectedRenderer).toBe(FLOW_SPACE_VIEW_ID);
+  });
+});
+
 describe('Add Card', () => {
   it('creates one neutrally titled detached Card at the anchor it was given', () => {
     const { authoring, session } = openPositioned();
@@ -216,28 +310,17 @@ describe('Add Card', () => {
     });
   });
 
-  it('converts an Algorithmic View in the same Edit, leaving the Cards on screen where they are', () => {
+  it('refuses Card creation from a Computed View without changing the Space', () => {
     const { authoring, session, navigation } = openAutomatic(mintingIds(MINTED, LAYOUT_ID));
+    const before = session.getState().working;
+    const selectedRenderer = navigation.getState().selectedRenderer;
 
     expect(authoring.complete({ kind: 'created-card', anchor: CENTRE })).toEqual({
-      kind: 'completed',
-      createdCardId: MINTED,
+      kind: 'refused',
+      refusal: { code: 'computed-view-read-only' },
     });
-
-    expect(layoutOf(session.getState().working, LAYOUT_ID)).toEqual({
-      id: LAYOUT_ID,
-      title: 'Layout 1',
-      kind: 'positioned',
-      positions: {
-        [CARD_A]: { x: 10, y: 20, open: false },
-        [CARD_B]: { x: 300, y: 40, open: false },
-        [MINTED]: CENTRE,
-      },
-      graphs: [{ id: MINTED_GRAPH, title: 'Graph 1', color: GRAPH_PALETTE[0], edges: [] }],
-      activeGraph: MINTED_GRAPH,
-    });
-    expect(navigation.getState().selectedRenderer).toEqual(LAYOUT_ID);
-    expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH);
+    expect(session.getState().working).toBe(before);
+    expect(navigation.getState().selectedRenderer).toEqual(selectedRenderer);
   });
 });
 
@@ -370,7 +453,7 @@ describe('Expanded Card geometry', () => {
 
     expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
       kind: 'refused',
-      refusal: { code: 'layout-required', operation: 'opened-card' },
+      refusal: { code: 'computed-view-read-only' },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -540,20 +623,15 @@ describe('Add Graph', () => {
     ]);
   });
 
-  it('uses the requested Graph as a converted Layout initial Graph rather than adding a second', () => {
-    const { authoring, session, navigation } = openAutomatic(mintingIds(LAYOUT_ID));
+  it('refuses Graph creation from a Computed View', () => {
+    const { authoring, session } = openAutomatic(mintingIds(LAYOUT_ID));
+    const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'added-graph' })).toEqual({
-      kind: 'completed',
-      createdGraphId: MINTED_GRAPH,
+      kind: 'refused',
+      refusal: { code: 'computed-view-read-only' },
     });
-
-    // One Graph, not two: the conversion's initial Graph *is* the one the author
-    // asked for, rather than a predecessor it gets appended behind.
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.graphs).toEqual([
-      { id: MINTED_GRAPH, title: 'Graph 1', color: GRAPH_PALETTE[0], edges: [] },
-    ]);
-    expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH);
+    expect(session.getState().working).toBe(before);
   });
 });
 
@@ -608,7 +686,7 @@ describe('Edit Graph', () => {
       authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Renamed' }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'layout-required', operation: 'renamed-graph' },
+      refusal: { code: 'computed-view-read-only' },
     });
   });
 });
@@ -1082,20 +1160,16 @@ describe('Edge eligibility', () => {
     expect(authoring.complete({ ...absent, kind: 'reconnected-edge' })).toEqual(refusal);
   });
 
-  /**
-   * Reconnection has no answer at all without a Layout — an Algorithmic View
-   * owns no Edge to move an endpoint of — while the two connecting gestures
-   * cross one by converting it (ADR 0025).
-   */
-  it('refuses a reconnection from an Algorithmic View while still offering a connection', () => {
+  it('refuses every Edge gesture from a Computed View with the same reason', () => {
     const { authoring } = openAutomatic();
 
     expect(authoring.edgeEligibility({ ...RECONNECT, cardId: CARD_A })).toEqual({
       kind: 'refused',
-      refusal: { code: 'layout-required', operation: 'reconnected-edge' },
+      refusal: { code: 'computed-view-read-only' },
     });
     expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B })).toEqual({
-      kind: 'eligible',
+      kind: 'refused',
+      refusal: { code: 'computed-view-read-only' },
     });
   });
 });
@@ -1187,7 +1261,7 @@ describe('Layout membership', () => {
       authoring.complete({ kind: 'added-card-to-layout', cardId: CARD_A, anchor: CENTRE }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'layout-required', operation: 'added-card-to-layout' },
+      refusal: { code: 'computed-view-read-only' },
     });
     // Refused *before* converting: a Layout minted only to fail the next line
     // would leave the Space carrying a Layout the author never asked for.
@@ -1362,19 +1436,15 @@ describe('Delete Card from Space', () => {
     expect(session.getState().working.cards).toEqual(aliased.cards);
   });
 
-  it('converts an Algorithmic View and then applies the deletion to what it produced', () => {
+  it('refuses deletion from a Computed View without changing the Space', () => {
     const { authoring, session } = openAutomatic(mintingIds(LAYOUT_ID));
+    const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_B })).toEqual({
-      kind: 'completed',
+      kind: 'refused',
+      refusal: { code: 'computed-view-read-only' },
     });
-
-    expect(session.getState().working.cards).toEqual([automaticSnapshot.cards[0]]);
-    // The converted Layout never holds the deleted Card, so nothing has to
-    // remove it afterwards.
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-    });
+    expect(session.getState().working).toBe(before);
   });
 
   it('refuses a Card the Space no longer holds', () => {
@@ -1447,12 +1517,12 @@ describe('Stale identities', () => {
     ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
   });
 
-  it('refuses every operation before the view has arranged anything', () => {
+  it('reports read-only before placement for authoring on a Computed View', () => {
     const { authoring } = open(automaticSnapshot, FLOW_SPACE_VIEW_ID);
 
     expect(authoring.complete({ kind: 'created-card', anchor: CENTRE })).toEqual({
       kind: 'refused',
-      refusal: { code: 'placement-pending' },
+      refusal: { code: 'computed-view-read-only' },
     });
   });
 });

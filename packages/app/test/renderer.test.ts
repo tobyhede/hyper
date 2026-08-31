@@ -336,34 +336,33 @@ describe('converting a View into a Layout’s Graphs', () => {
     [B, { x: 400, y: 250, open: false }],
   ]);
 
-  it('answers a fresh empty Graph, numbered above the Graphs it was showing', () => {
-    // Flow's choice among legal outputs, not the boundary's rule (ADR 0045): a
-    // copy of the emphasised Graph would satisfy every obligation and is how two
-    // Graphs carrying one title start diverging in silence.
+  it.each([
+    ['Flow', FLOW_SPACE_VIEW_ID],
+    ['Grid', GRID_SPACE_VIEW_ID],
+  ])('copies every %s subject Graph and its Edges under fresh identities', (_title, selection) => {
     const { resolve, minted } = deterministicResolver();
-    const renderer = resolve(spaceWith({ layouts: [WORKING, SECOND] }));
+    const renderer = resolve(spaceWith({ layouts: [WORKING, SECOND] }), selection);
     if (renderer.kind !== 'view') throw new Error('expected a View renderer');
 
     const converted = renderer.convert(onScreen);
 
-    expect(converted.graphs).toHaveLength(1);
-    expect(converted.graphs[0].edges).toEqual([]);
-    expect(converted.graphs[0].title).toBe('Graph 1');
-    expect(converted.graphs[0].id).toBe(minted[0]);
-    expect(renderer.subject.graphs.map((graph) => graph.id)).not.toContain(converted.graphs[0].id);
+    expect(converted.graphs).toEqual([
+      { ...MAIN, id: minted[0] },
+      { ...ASIDE, id: minted[1] },
+    ]);
+    expect(minted).toHaveLength(2);
+    expect(converted.graphs.map((graph) => graph.id)).not.toEqual(
+      renderer.subject.graphs.map((graph) => graph.id),
+    );
   });
 
-  it('starts the converted Layout palette at its first position', () => {
-    // A conversion creates the Layout, so its initial Graph occupies the first
-    // Layout-order position whatever the View was drawing.
-    expect(
-      asView(spaceWith({ layouts: [WORKING, SECOND] })).convert(onScreen).graphs[0].color,
-    ).toBe(GRAPH_PALETTE[0]);
-  });
-
-  it('numbers the minted Graph above the highest already taken', () => {
-    const space = spaceWith({ layouts: [{ ...WORKING, graphs: [{ ...MAIN, title: 'Graph 4' }] }] });
-    expect(asView(space).convert(onScreen).graphs[0].title).toBe('Graph 5');
+  it('preserves a subject Graph’s authored title and colour', () => {
+    const space = spaceWith({
+      layouts: [{ ...WORKING, graphs: [{ ...MAIN, title: 'Graph 4', color: GRAPH_PALETTE[2] }] }],
+    });
+    const converted = asView(space).convert(onScreen).graphs[0];
+    expect(converted.title).toBe('Graph 4');
+    expect(converted.color).toBe(GRAPH_PALETTE[2]);
   });
 
   it('mints a fresh identity on every conversion', () => {
@@ -377,6 +376,8 @@ describe('converting a View into a Layout’s Graphs', () => {
     const converted = asView(spaceWith({ layouts: [] })).convert(onScreen);
     expect(converted.graphs).toHaveLength(1);
     expect(converted.graphs[0].title).toBe('Graph 1');
+    expect(converted.graphs[0].color).toBe(GRAPH_PALETTE[0]);
+    expect(converted.graphs[0].edges).toEqual([]);
   });
 
   it('has nothing to convert once a Layout is selected', () => {

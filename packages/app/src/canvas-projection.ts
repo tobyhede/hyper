@@ -114,6 +114,7 @@ export function canvasProjection(
 
       return {
         nodes: projectCardNodes(space, handles, colors, {
+          readOnly: renderer.kind === 'view',
           activeCardId: interaction.activeCardId,
           selectedCardId: interaction.selectedCardId,
           showActiveCardContent: interaction.presenting,
