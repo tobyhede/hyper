@@ -323,7 +323,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     // a Computed View is a read-only preview until its explicit Create Layout Edit.
     const hasCardsOnCanvas = liveProjection !== null;
     const canvas = canvasContent(placement, hasCardsOnCanvas);
-    const editable = placement.kind === 'ready' && hasCardsOnCanvas && current.kind === 'authored';
+    const editable = hasCardsOnCanvas && current.kind === 'authored';
     useEffect(() => setCreateLayoutRefusal(null), [selectedRenderer]);
     const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
       readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;

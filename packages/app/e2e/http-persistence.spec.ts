@@ -66,6 +66,7 @@ test(
     });
 
     await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
     const card = nodeByTitle(page, 'A').first();
     await expect(card).toBeVisible();
     await settled(page);
@@ -116,6 +117,7 @@ test(
     await page.route('**/api/spaces/*', failFirstCommit);
 
     await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
     const card = nodeByTitle(page, 'A').first();
     await expect(card).toBeVisible();
     await dragBy(page, card, 0, 180);
@@ -160,6 +162,7 @@ test(
     });
 
     await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
     const card = nodeByTitle(page, 'A').first();
     await expect(card).toBeVisible();
     await settled(page);
@@ -180,6 +183,10 @@ test(
     const stalePage = await page.context().newPage();
     try {
       await Promise.all([page.goto('/'), stalePage.goto('/')]);
+      await Promise.all([
+        selectCanvas(page, 'Collection 1'),
+        selectCanvas(stalePage, 'Collection 1'),
+      ]);
       const currentCard = nodeByTitle(page, 'A').first();
       const staleCard = nodeByTitle(stalePage, 'A').first();
       await expect(currentCard).toBeVisible();
@@ -242,9 +249,9 @@ test(
       await settled(stalePage);
       expect(await positionOf(acceptedCard)).toEqual(remotePosition);
       // Fresh Navigation over the stored Space, not the emphasis this page was
-      // left in: Reload opens the Layout the other page's drag converted, whose
-      // minted Graph is first, without replacing the mounted application surface.
-      await expect(activeGraph(stalePage)).toHaveText('Graph 1');
+      // left in: Reload opens the authored Layout the other page changed on its
+      // first owned Graph, without replacing the mounted application surface.
+      await expect(activeGraph(stalePage)).toHaveText('Long');
       await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();
       expect(
         await mountedGraphArea!.evaluate(

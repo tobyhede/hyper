@@ -53,6 +53,9 @@ test('Add Card from the mobile sidebar names the new Card on the canvas', async 
   await settled(page);
 
   await openMobileSidebar(page);
+  await page.getByRole('button', { name: 'Collection 1', exact: true }).click();
+  await expect(sheet(page)).toHaveCount(0);
+  await openMobileSidebar(page);
   await page.getByTestId('add-card').click();
 
   await expect(sheet(page)).toHaveCount(0);
@@ -66,6 +69,9 @@ test('Add Alias from the mobile sidebar opens the Target picker', async ({ page 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
+  await openMobileSidebar(page);
+  await page.getByRole('button', { name: 'Collection 1', exact: true }).click();
+  await expect(sheet(page)).toHaveCount(0);
   await openMobileSidebar(page);
   await page.getByTestId('add-card-menu').click();
   await page.getByRole('menuitem', { name: 'Add Alias' }).click();
