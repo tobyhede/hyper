@@ -1,4 +1,5 @@
 import { encodeCompactUuid, uuidSchema } from '@project/core';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
 import { createApp, type E2eHttpRuntimeOptions } from '../support/e2e-http-runtime';
@@ -52,6 +53,15 @@ describe('e2e HTTP runtime', () => {
     const backend = await startRuntime({ catalog: 'empty' });
 
     await expect(backend.listSpaces()).resolves.toEqual([]);
+  });
+
+  it('imports an explicit Space directory for generated catalogues', async () => {
+    const directory = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
+    const backend = await startRuntime({ catalog: 'directory', directory });
+
+    await expect(backend.listSpaces()).resolves.toEqual([
+      { id: FIXTURE_ID, title: 'Layout fixture' },
+    ]);
   });
 
   it('applies the database zero-space startup policy when hosting the browser', async () => {

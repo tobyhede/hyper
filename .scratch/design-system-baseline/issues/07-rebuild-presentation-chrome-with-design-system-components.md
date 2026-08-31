@@ -5,6 +5,7 @@
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 
 **Status:** resolved — delivered in `107a54e`, with the review findings addressed
+Tags: release/v1
 in `ca22964`. See "Answer" and "Verification" below.
 
 - [x] Available moves, selected moves and the end state are visually and accessibly distinct without changing traversal behaviour.

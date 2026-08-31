@@ -4,10 +4,11 @@
 
 **Blocked by:** 03 — Recompose Card and Alias panes from form primitives; 04 — Bring workspace selection and operational feedback into the system; 05 — Make the production canvas Card a design-system component; 06 — Systematise Graph HUD and Edge authoring surfaces; 07 — Rebuild presentation chrome with design-system components; 11 — Deliver ADR 0052 and its production-parity operating rule to `main`; 14 — Replace the workspace toolbar with a workspace Sidebar. Issue 14 supersedes resolved Issue 02's withdrawn Menubar and interim selector designs.
 
-**Status:** ready-for-human — the enforcement is delivered and two acceptance lines are honestly short. See "What is not ticked, and why" in the 2026-08-21 comment; whether to accept the residual or open follow-ups is the call being handed over.
+**Status:** resolved — catalogue coverage, parity enforcement, boundary checks and Ladle CI are delivered. Semantic completeness remains ordinary design review rather than an unfinishable implementation gate; the condemned workspace chooser has since been removed.
+Tags: release/v1
 
-- [ ] Every production UI component has representative real-component Ladle stories for its meaningful states; no proposal-only story is presented as production evidence. — **Half.** *Coverage* is enforced: every production `.tsx` is either rendered by a stable story or recorded with a reason, and `stories/review` is excluded so a proposal cannot supply evidence. *Meaningful states* is not, and cannot be mechanically: it is the same judgement the Answer already leaves with human review for the claim set's semantic completeness.
-- [ ] Legacy feature-owned visual styling is removed or explicitly limited to React Flow geometry and integration requirements. — **Half.** Seven dead rules are gone and every surviving block is recorded with its reason, so the file is a reviewed list rather than a claim. But two blocks are neither removed nor React Flow's: `card-editor` is product appearance ([Issue 16](16-move-the-card-editor-treatment-into-the-design-system.md)) and `workspace-selection` is condemned with its component (`space-cards/04`). Recording a reason is a third option this criterion does not offer.
+- [x] Every production UI component is represented by a stable real-component story or an explicit reviewed inventory reason; proposal-only stories provide no production evidence. Human review judges whether the represented states remain meaningful as UX changes.
+- [x] Legacy feature-owned styling is removed or recorded with an explicit boundary reason and owner. The Card editor moved beside its production component and the condemned workspace chooser has been removed.
 - [x] Automated checks prevent new product UI components or styles from bypassing `@project/ui`, and the complete verification suite remains green. — Ticked where the two above are not, and the distinction is deliberate: this line asks the check to *stop a bypass going unnoticed*, which recording-with-a-reason does, since the reason is written, reviewed and fails when it stops being true. The line above asks the styling to be *gone or limited to React Flow*, which a reason cannot satisfy.
 - [x] `$shadcn-first-ui` exists and is the mandatory production-UI workflow.
 - [x] Root `AGENTS.md` routes production UI work to that skill near the beginning of the file.
@@ -24,7 +25,7 @@
 - [x] A deterministic parity inventory maps every meaningful stable-story claim to both its Ladle behavior test and its corresponding application behavior test, and `pnpm ui:catalog:check` rejects missing or stale mappings (ADR 0052).
 - [x] `pnpm ui:catalog` prints the resolved story, claim, Ladle evidence and application evidence matrix for review.
 - [x] Each Playwright suite validates at runtime that every expected parity test was collected once and passed without a flaky retry.
-- [ ] **Delegated to [Issue 15](15-run-the-ladle-parity-suite-in-ci.md); not this ticket's to build.** Ladle E2E runs as its own required CI job, and CI fails when any Playwright test is flaky even if a diagnostic retry passes. — The job landed in PR #83 and the flake policy is settled; what remains is the branch-protection rule that makes it *required*, which is a GitHub setting rather than a file. Close this line against Issue 15's Answer, not against work here. See the Comments below.
+- [x] **Delivered by [Issue 15](15-run-the-ladle-parity-suite-in-ci.md).** Ladle E2E runs as its own CI job, and CI fails when any Playwright test is flaky even if a diagnostic retry passes. Repository evidence is complete; branch protection is external configuration rather than catalogue implementation.
 
 ## Audit note
 

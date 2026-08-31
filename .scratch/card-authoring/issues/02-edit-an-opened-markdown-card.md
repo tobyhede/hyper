@@ -8,6 +8,7 @@ Authoring without introducing a separate reading mode (ADR 0037).
 remounting.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] Opening a Markdown Card presents its editable fields immediately but does
       not by itself create an Edit, convert a View or submit persistence (ADR

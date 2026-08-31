@@ -5,6 +5,7 @@
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] Card and Alias fields, descriptions, validation errors, target picker and actions compose shared form and dialog primitives.
 - [x] A pane still commits only through Done; Cancel and Escape still discard all pending values, and no field independently commits or intercepts Escape.

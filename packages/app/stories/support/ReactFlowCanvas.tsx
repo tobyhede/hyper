@@ -41,6 +41,13 @@ type ProjectedCanvas = ReturnType<typeof pending.project>;
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
+export interface FixtureCanvasCard {
+  readonly id: string;
+  readonly title: string;
+  readonly x: number;
+  readonly y: number;
+}
+
 /**
  * A story that cannot lay out says so. Left unhandled, a rejected strategy
  * leaves `projected` null for good — a permanently blank story that reads as
@@ -223,6 +230,42 @@ export function ZoomSliderSpecimen() {
       nodes={projected.nodes}
       edges={projected.edges}
       controls
+    />
+  );
+}
+
+/**
+ * The real React Flow canvas, adapter nodes, Edges, background and zoom control
+ * for application-framed Ladle stories. Extra Cards reuse the production
+ * CardNode projection; stories supply only identity, title and placement.
+ */
+export function LayoutCanvasFixture({
+  cards = [],
+}: {
+  readonly cards?: readonly FixtureCanvasCard[];
+}) {
+  const projected = useProjection(graphIds.long);
+  if (projected === null) return null;
+  if (projected instanceof Error) return <PlacementFailure reason={projected} />;
+  const template = projected.nodes[0];
+  const additions =
+    template === undefined
+      ? []
+      : cards.map((card): CardFlowNode => ({
+          ...template,
+          id: card.id,
+          position: { x: card.x, y: card.y },
+          selected: true,
+          data: { ...template.data, title: card.title },
+        }));
+
+  return (
+    <RealReactFlow
+      className="size-full"
+      nodes={[...projected.nodes, ...additions]}
+      edges={projected.edges}
+      controls
+      zoom={0.65}
     />
   );
 }

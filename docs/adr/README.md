@@ -37,6 +37,7 @@ under `superseded/`.
 | [0046](0046-an-occurrence-authors-its-own-title-and-target.md) | An occurrence authors its own Title and Target in the pane that opens it. |
 | [0070](0070-an-open-alias-shows-immutable-target-content-read-only.md) | An Alias keeps its Target for life and shows that content read-only. |
 | [0068](0068-a-space-card-shows-a-space-view.md) | A Space Card shows one selected Space View of another Space. |
+| [0074](0074-space-card-references-own-the-target-space.md) | The Space Cards referencing a Space own its lifetime. Deleting the last one deletes the Space. |
 
 ## Layout, View and Graph
 

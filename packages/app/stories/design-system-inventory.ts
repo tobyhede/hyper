@@ -178,7 +178,8 @@ export const handRolledStyles = [
   },
   {
     block: 'graph-area',
-    reason: 'The absolutely positioned box the `ReactFlow` instance fills.',
+    reason:
+      'The flex item the `ReactFlow` instance fills beside the optional Cards drawer; it owns React Flow integration geometry rather than product appearance.',
   },
   {
     block: 'root',

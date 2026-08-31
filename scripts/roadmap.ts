@@ -1,6 +1,15 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { basename, join, relative, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /**
@@ -39,6 +48,8 @@ export interface ScratchIssue {
   readonly state: IssueState;
   /** The status line's own words, first line only, trimmed of markdown emphasis. */
   readonly status: string;
+  /** Orthogonal collections this issue belongs to, such as a release scope. */
+  readonly tags: readonly string[];
   readonly blockers: readonly BlockerReference[];
   /** Blockers that are not settled yet, rendered for a human. */
   readonly unmetBlockers: readonly string[];
@@ -66,6 +77,17 @@ export interface Roadmap {
   readonly openCount: number;
 }
 
+export interface ReleaseScope {
+  readonly title: string;
+  readonly tag: string;
+  readonly goal: string;
+  readonly definition: string | null;
+  /** Open issue whose completion closes the release dependency graph. */
+  readonly gate: string | null;
+  /** Generated, importable Space directory relative to `.scratch/`. */
+  readonly space: string | null;
+}
+
 /**
  * Both `Status: resolved` and `**Status:** resolved` are current, and one family
  * bolds the whole line (`**Status: delivered.**`). A scan that misses a spelling
@@ -73,6 +95,12 @@ export interface Roadmap {
  */
 const STATUS_PATTERN = /^\*{0,2}status:\*{0,2}[ \t]+(.+)$/iu;
 const BLOCKED_PATTERN = /^\*{0,2}blocked by:?\*{0,2}[ \t]*(.*)$/iu;
+const TAGS_PATTERN = /^\*{0,2}tags:\*{0,2}[ \t]+(.+)$/iu;
+const RELEASE_TAG_PATTERN = /^tag:[ \t]+(.+)$/iu;
+const RELEASE_GOAL_PATTERN = /^goal:[ \t]+(.+)$/iu;
+const RELEASE_DEFINITION_PATTERN = /^definition:[ \t]+(.+)$/iu;
+const RELEASE_GATE_PATTERN = /^gate:[ \t]+(.+)$/iu;
+const RELEASE_SPACE_PATTERN = /^space:[ \t]+(.+)$/iu;
 const HEADING_PATTERN = /^#[ \t]+(.+?)[ \t]*$/u;
 const NUMBERED_TITLE_PATTERN = /^\d{2}[ \t]*[—–-][ \t]*/u;
 const FILE_NUMBER_PATTERN = /^(\d{2})-/u;
@@ -165,6 +193,22 @@ const readBlockers = (lines: readonly string[]): readonly BlockerReference[] => 
   return [];
 };
 
+const readTags = (lines: readonly string[]): readonly string[] => {
+  for (const line of lines) {
+    const matched = TAGS_PATTERN.exec(line);
+    if (matched === null) continue;
+    return [
+      ...new Set(
+        (matched[1] ?? '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      ),
+    ];
+  }
+  return [];
+};
+
 const readDeferrals = (lines: readonly string[], state: IssueState): readonly string[] => {
   if (!isSettled(state)) return [];
   return lines
@@ -183,6 +227,7 @@ interface ParsedIssue {
   readonly title: string;
   readonly state: IssueState;
   readonly status: string;
+  readonly tags: readonly string[];
   readonly blockers: readonly BlockerReference[];
   readonly deferrals: readonly string[];
 }
@@ -200,6 +245,7 @@ const parseFile = (root: string, file: string): ParsedIssue | null => {
     title: readTitle(lines, name.replace(/\.md$/u, '')),
     state,
     status,
+    tags: readTags(lines),
     blockers: readBlockers(lines),
     deferrals: readDeferrals(lines, state),
   };
@@ -286,14 +332,32 @@ export const buildRoadmap = (root: string): Roadmap => {
   return { features, issueCount, openCount };
 };
 
-/**
- * `ROADMAP.md` holds the one thing a scan cannot answer: which effort is next and
- * why. Reading it here keeps that intent in front of whoever runs the tool, rather
- * than in a file that has to be remembered.
- */
-export const readIntent = (root: string): string | null => {
+const readMetadata = (lines: readonly string[], pattern: RegExp): string | null => {
+  for (const line of lines) {
+    const matched = pattern.exec(line);
+    if (matched !== null) return (matched[1] ?? '').trim();
+  }
+  return null;
+};
+
+/** `ROADMAP.md` declares the release collection that the issue scan renders. */
+export const readReleaseScope = (root: string): ReleaseScope | null => {
   const file = join(root, 'ROADMAP.md');
-  return existsSync(file) ? readFileSync(file, 'utf8').trimEnd() : null;
+  if (!existsSync(file)) return null;
+  const lines = readFileSync(file, 'utf8').split('\n');
+  const tag = readMetadata(lines, RELEASE_TAG_PATTERN);
+  const goal = readMetadata(lines, RELEASE_GOAL_PATTERN);
+  if (tag === null || goal === null) {
+    throw new Error('ROADMAP.md must declare both `Tag:` and `Goal:`.');
+  }
+  return {
+    title: readTitle(lines, 'Release scope'),
+    tag,
+    goal,
+    definition: readMetadata(lines, RELEASE_DEFINITION_PATTERN),
+    gate: readMetadata(lines, RELEASE_GATE_PATTERN),
+    space: readMetadata(lines, RELEASE_SPACE_PATTERN),
+  };
 };
 
 const byPhase = (roadmap: Roadmap, phase: FeaturePhase): readonly FeatureRoadmap[] =>
@@ -329,7 +393,134 @@ const wrapSlugs = (features: readonly FeatureRoadmap[]): readonly string[] => {
   return lines;
 };
 
-export const renderRoadmap = (roadmap: Roadmap, intent: string | null = null): string => {
+interface TaggedIssue {
+  readonly feature: string;
+  readonly issue: ScratchIssue;
+}
+
+export interface PlannedReleaseIssue extends TaggedIssue {
+  readonly reference: string;
+  /** Longest open dependency distance from a currently unblocked release issue. */
+  readonly depth: number;
+}
+
+export interface ReleasePlan {
+  readonly criticalPath: readonly PlannedReleaseIssue[];
+  readonly parallel: readonly PlannedReleaseIssue[];
+}
+
+const issuesTagged = (roadmap: Roadmap, tag: string): readonly TaggedIssue[] =>
+  roadmap.features.flatMap((feature) =>
+    feature.issues
+      .filter((issue) => issue.tags.includes(tag))
+      .map((issue) => ({ feature: feature.slug, issue })),
+  );
+
+const taggedReference = ({ feature, issue }: TaggedIssue): string =>
+  `${feature}/${issue.number ?? '--'}`;
+
+/**
+ * Unit-weight critical path to the declared release gate. Issue files remain the
+ * dependency source; `ROADMAP.md` names only which sink means "release done".
+ */
+export const planRelease = (roadmap: Roadmap, release: ReleaseScope): ReleasePlan => {
+  const taggedIssues = issuesTagged(roadmap, release.tag).map((tagged) => ({
+    ...tagged,
+    reference: taggedReference(tagged),
+  }));
+  const open = taggedIssues.filter(({ issue }) => !isSettled(issue.state));
+  const byReference = new Map(open.map((tagged) => [tagged.reference, tagged]));
+
+  const missing = open.flatMap(({ issue, reference }) =>
+    issue.unmetBlockers
+      .filter((blocker) => !byReference.has(blocker))
+      .map((blocker) => `${reference} → ${blocker}`),
+  );
+  if (missing.length > 0) {
+    throw new Error(`Open release blockers must carry tag ${release.tag}: ${missing.join(', ')}`);
+  }
+
+  const depths = new Map<string, number>();
+  const depthInProgress = new Set<string>();
+  const depthOf = (reference: string): number => {
+    const known = depths.get(reference);
+    if (known !== undefined) return known;
+    if (depthInProgress.has(reference))
+      throw new Error(`Release dependency cycle at ${reference}.`);
+    depthInProgress.add(reference);
+    const tagged = byReference.get(reference);
+    if (tagged === undefined) throw new Error(`Unknown open release issue ${reference}.`);
+    const depth =
+      tagged.issue.unmetBlockers.length === 0
+        ? 0
+        : Math.max(...tagged.issue.unmetBlockers.map((blocker) => depthOf(blocker))) + 1;
+    depthInProgress.delete(reference);
+    depths.set(reference, depth);
+    return depth;
+  };
+
+  const planned = open.map((tagged) => ({ ...tagged, depth: depthOf(tagged.reference) }));
+  /** Every open issue as flat parallel work, for the two cases with no path to draw. */
+  const withoutCriticalPath = (): ReleasePlan => ({
+    criticalPath: [],
+    parallel: [...planned].sort(
+      (left, right) => left.depth - right.depth || left.reference.localeCompare(right.reference),
+    ),
+  });
+  if (release.gate === null) return withoutCriticalPath();
+  if (!byReference.has(release.gate)) {
+    // Reaching the gate is how a release ends, not a misconfiguration to refuse
+    // every command over. A settled gate leaves no critical path to trace to it,
+    // and any tagged work that outlived it is ordinary parallel work. Only a gate
+    // naming nothing tagged for this release is an error.
+    if (!taggedIssues.some(({ reference }) => reference === release.gate)) {
+      throw new Error(`Release gate ${release.gate} is not an issue tagged ${release.tag}.`);
+    }
+    return withoutCriticalPath();
+  }
+
+  const paths = new Map<string, readonly string[]>();
+  const pathTo = (reference: string): readonly string[] => {
+    const known = paths.get(reference);
+    if (known !== undefined) return known;
+    const tagged = byReference.get(reference);
+    if (tagged === undefined) throw new Error(`Unknown open release issue ${reference}.`);
+    const candidates = tagged.issue.unmetBlockers
+      .map((blocker) => pathTo(blocker))
+      .sort(
+        (left, right) =>
+          right.length - left.length || left.join('\u0000').localeCompare(right.join('\u0000')),
+      );
+    const path = [...(candidates[0] ?? []), reference];
+    paths.set(reference, path);
+    return path;
+  };
+
+  const criticalReferences = pathTo(release.gate);
+  const criticalSet = new Set(criticalReferences);
+  const plannedByReference = new Map(planned.map((issue) => [issue.reference, issue]));
+  return {
+    criticalPath: criticalReferences.map((reference) => {
+      const issue = plannedByReference.get(reference);
+      if (issue === undefined) throw new Error(`Missing planned release issue ${reference}.`);
+      return issue;
+    }),
+    parallel: planned
+      .filter(({ reference }) => !criticalSet.has(reference))
+      .sort(
+        (left, right) => left.depth - right.depth || left.reference.localeCompare(right.reference),
+      ),
+  };
+};
+
+const releaseIssueLine = ({ feature, issue }: TaggedIssue): string => {
+  const reference = `${feature}/${issue.number ?? '--'}`;
+  const blocked =
+    issue.unmetBlockers.length > 0 ? `  blocked by ${issue.unmetBlockers.join(', ')}` : '';
+  return `  ${reference.padEnd(44)} ${issue.state.padEnd(15)} ${issue.title}${blocked}`;
+};
+
+export const renderRoadmap = (roadmap: Roadmap, release: ReleaseScope | null = null): string => {
   const inFlight = [...byPhase(roadmap, 'in-flight')].sort(
     (left, right) => openIssues(left).length - openIssues(right).length,
   );
@@ -356,10 +547,34 @@ export const renderRoadmap = (roadmap: Roadmap, intent: string | null = null): s
   const unstatused = roadmap.features.flatMap((feature) =>
     feature.unstatused.map((path) => `  ${path}`),
   );
+  const releaseIssues = release === null ? [] : issuesTagged(roadmap, release.tag);
+  const releaseSettled = releaseIssues.filter(({ issue }) => isSettled(issue.state)).length;
+  const openReleaseIssues = releaseIssues.filter(({ issue }) => !isSettled(issue.state));
+  const releasePlan = release === null ? null : planRelease(roadmap, release);
 
   const lines: string[] = [
     `.scratch — ${roadmap.features.length} efforts · ${roadmap.issueCount} issues · ${roadmap.openCount} open`,
-    ...(intent === null ? [] : ['', intent, '']),
+    ...(release === null
+      ? []
+      : [
+          '',
+          `${release.title.toUpperCase()} — ${releaseSettled}/${releaseIssues.length} settled`,
+          `  ${release.goal}`,
+          ...(release.definition === null ? [] : [`  Definition: ${release.definition}`]),
+          ...(release.space === null ? [] : [`  Space: ${release.space}`]),
+          // Keyed on whether there is a path to draw rather than on whether a
+          // gate was declared: `planRelease` answers an empty critical path for
+          // a gate already reached as well as for a release that declared none,
+          // and an open gate always contributes at least itself.
+          ...(releasePlan === null || releasePlan.criticalPath.length === 0
+            ? openReleaseIssues.map(releaseIssueLine)
+            : [
+                `  CRITICAL PATH — ${releasePlan.criticalPath.length}`,
+                ...releasePlan.criticalPath.map(releaseIssueLine),
+                `  PARALLEL WORK — ${releasePlan.parallel.length}`,
+                ...releasePlan.parallel.map(releaseIssueLine),
+              ]),
+        ]),
     '',
     `IN FLIGHT — ${inFlight.length}`,
     ...inFlight.flatMap(featureBlock),
@@ -388,6 +603,148 @@ export const renderRoadmap = (roadmap: Roadmap, intent: string | null = null): s
   return lines.join('\n');
 };
 
+const stableRoadmapUuid = (name: string): string => {
+  const hex = createHash('sha256').update(`hyper-release-roadmap:${name}`).digest('hex');
+  const variant = ((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+};
+
+const markdownCard = (
+  id: string,
+  planned: PlannedReleaseIssue,
+  cardsDirectory: string,
+  scratchRoot: string,
+): string => {
+  const issuePath = relative(cardsDirectory, join(scratchRoot, planned.issue.path)).replaceAll(
+    sep,
+    '/',
+  );
+  const blockers =
+    planned.issue.unmetBlockers.length === 0
+      ? 'None'
+      : planned.issue.unmetBlockers.map((blocker) => `\`${blocker}\``).join(', ');
+  return [
+    '---',
+    `id: ${id}`,
+    `title: ${JSON.stringify(`${planned.reference} — ${planned.issue.title}`)}`,
+    'kind: markdown',
+    '---',
+    '',
+    `# ${planned.issue.title}`,
+    '',
+    `- **Reference:** \`${planned.reference}\``,
+    `- **Status:** \`${planned.issue.state}\``,
+    `- **Blocked by:** ${blockers}`,
+    '',
+    `[Open issue](${issuePath})`,
+    '',
+  ].join('\n');
+};
+
+/** Generate one ordinary Space that dogfoods the open release dependency graph. */
+export const writeReleaseSpace = (
+  root: string,
+  roadmap: Roadmap,
+  release: ReleaseScope,
+): string | null => {
+  if (release.space === null) return null;
+  const scratchRoot = resolve(root);
+  const destination = resolve(scratchRoot, release.space);
+  if (destination === scratchRoot || !destination.startsWith(`${scratchRoot}${sep}`)) {
+    throw new Error(`Release Space must stay inside ${scratchRoot}: ${release.space}`);
+  }
+
+  const plan = planRelease(roadmap, release);
+  const issues = [...plan.criticalPath, ...plan.parallel].sort((left, right) =>
+    left.reference.localeCompare(right.reference),
+  );
+  const idByReference = new Map(
+    issues.map(({ reference }) => [reference, stableRoadmapUuid(`issue:${reference}`)]),
+  );
+  const cardId = (reference: string): string => {
+    const id = idByReference.get(reference);
+    if (id === undefined) throw new Error(`No roadmap Card for ${reference}.`);
+    return id;
+  };
+
+  const cardsDirectory = join(destination, 'cards');
+  rmSync(cardsDirectory, { recursive: true, force: true });
+  mkdirSync(cardsDirectory, { recursive: true });
+  for (const planned of issues) {
+    writeFileSync(
+      join(cardsDirectory, `${planned.reference.replace('/', '-')}.md`),
+      markdownCard(cardId(planned.reference), planned, cardsDirectory, scratchRoot),
+    );
+  }
+
+  const criticalEdges = plan.criticalPath.slice(1).map((issue, index) => ({
+    from: cardId(plan.criticalPath[index]?.reference ?? ''),
+    to: cardId(issue.reference),
+  }));
+  const criticalKeys = new Set(criticalEdges.map(({ from, to }) => `${from}\u0000${to}`));
+  const parallelEdges = issues.flatMap((planned) =>
+    planned.issue.unmetBlockers.flatMap((blocker) => {
+      const edge = { from: cardId(blocker), to: cardId(planned.reference) };
+      return criticalKeys.has(`${edge.from}\u0000${edge.to}`) ? [] : [edge];
+    }),
+  );
+
+  const parallelSlotByDepth = new Map<number, number>();
+  const criticalIndex = new Map(
+    plan.criticalPath.map(({ reference }, index) => [reference, index]),
+  );
+  const positions = Object.fromEntries(
+    issues.map((planned) => {
+      const onCriticalPath = criticalIndex.get(planned.reference);
+      if (onCriticalPath !== undefined) {
+        return [cardId(planned.reference), { x: 0, y: onCriticalPath * 300, open: false }];
+      }
+      const slot = parallelSlotByDepth.get(planned.depth) ?? 0;
+      parallelSlotByDepth.set(planned.depth, slot + 1);
+      return [
+        cardId(planned.reference),
+        { x: 460 + slot * 420, y: planned.depth * 300, open: false },
+      ];
+    }),
+  );
+
+  const layoutId = stableRoadmapUuid(`layout:${release.tag}`);
+  const criticalGraphId = stableRoadmapUuid(`graph:${release.tag}:critical`);
+  const parallelGraphId = stableRoadmapUuid(`graph:${release.tag}:parallel`);
+  const space = {
+    version: 1,
+    id: stableRoadmapUuid(`space:${release.tag}`),
+    title: `${release.title} roadmap`,
+    layouts: [
+      {
+        id: layoutId,
+        title: 'Release dependency map',
+        kind: 'positioned',
+        positions,
+        graphs: [
+          {
+            id: criticalGraphId,
+            title: 'Critical path',
+            color: '#dc2626',
+            edges: criticalEdges,
+          },
+          {
+            id: parallelGraphId,
+            title: 'Parallel paths',
+            color: '#2563eb',
+            edges: parallelEdges,
+          },
+        ],
+        activeGraph: criticalGraphId,
+      },
+    ],
+    defaultRenderer: layoutId,
+  };
+  mkdirSync(destination, { recursive: true });
+  writeFileSync(join(destination, 'space.json'), `${JSON.stringify(space, null, 2)}\n`);
+  return destination;
+};
+
 const escapeHtml = (text: string): string =>
   text
     .replace(/&/gu, '&amp;')
@@ -398,47 +755,6 @@ const escapeHtml = (text: string): string =>
 /** Ticket titles and deferral notes carry inline code spans; keep them readable. */
 const inlineMarkup = (text: string): string =>
   escapeHtml(text).replace(/`([^`]+)`/gu, '<code>$1</code>');
-
-/**
- * `ROADMAP.md` is authored here, so this handles the subset it uses — headings,
- * bullets with wrapped continuation lines, and inline code. Anything else lands
- * as a paragraph, which is the honest degradation for a hand-written file.
- */
-const intentHtml = (markdown: string): string => {
-  const html: string[] = [];
-  let list: string[] = [];
-  let paragraph: string[] = [];
-  const closeList = (): void => {
-    if (list.length > 0) html.push(`<ul>${list.join('')}</ul>`);
-    list = [];
-  };
-  const closeParagraph = (): void => {
-    if (paragraph.length > 0) html.push(`<p>${paragraph.join(' ')}</p>`);
-    paragraph = [];
-  };
-  for (const line of markdown.split('\n')) {
-    const trimmed = line.trim();
-    if (trimmed === '' || trimmed.startsWith('# ')) {
-      closeParagraph();
-      closeList();
-      continue;
-    }
-    if (trimmed.startsWith('## ')) {
-      closeParagraph();
-      closeList();
-      html.push(`<h3>${inlineMarkup(trimmed.slice(3))}</h3>`);
-    } else if (trimmed.startsWith('- ')) {
-      closeParagraph();
-      list.push(`<li>${inlineMarkup(trimmed.slice(2))}</li>`);
-    } else if (list.length > 0) {
-      const open = list.pop() ?? '';
-      list.push(open.replace(/<\/li>$/u, ` ${inlineMarkup(trimmed)}</li>`));
-    } else paragraph.push(inlineMarkup(trimmed));
-  }
-  closeParagraph();
-  closeList();
-  return html.join('');
-};
 
 const htmlIssue = (issue: ScratchIssue): string => {
   const blocked =
@@ -482,6 +798,56 @@ const htmlSection = (title: string, count: number, body: string): string =>
   body === ''
     ? ''
     : `<section><h2>${escapeHtml(title)}<span class="tally">${count}</span></h2>${body}</section>`;
+
+const htmlReleaseIssue = ({ feature, issue }: TaggedIssue): string => {
+  const blocked =
+    issue.unmetBlockers.length > 0
+      ? `<span class="blocked">blocked by ${issue.unmetBlockers.map((key) => escapeHtml(key)).join(', ')}</span>`
+      : '';
+  return [
+    '<li class="issue">',
+    `<span class="ref">${escapeHtml(feature)}/${escapeHtml(issue.number ?? '--')}</span>`,
+    `<span class="badge ${issue.state}">${issue.state}</span>`,
+    `<a class="title" href="${escapeHtml(issue.path)}">${inlineMarkup(issue.title)}</a>`,
+    blocked,
+    '</li>',
+  ].join('');
+};
+
+const htmlReleaseScope = (roadmap: Roadmap, release: ReleaseScope): string => {
+  const issues = issuesTagged(roadmap, release.tag);
+  const settled = issues.filter(({ issue }) => isSettled(issue.state)).length;
+  const open = issues.filter(({ issue }) => !isSettled(issue.state));
+  const plan = planRelease(roadmap, release);
+  const definition =
+    release.definition === null
+      ? ''
+      : `<p><a href="${escapeHtml(release.definition)}">Definition of Done</a></p>`;
+  const space =
+    release.space === null
+      ? ''
+      : `<p><a href="${escapeHtml(`${release.space}/space.json`)}">Dogfood roadmap Space</a></p>`;
+  // As in `renderRoadmap`: an empty critical path is a release with no gate
+  // declared or one whose gate has been reached, and neither has a path to draw.
+  const issueLists =
+    plan.criticalPath.length === 0
+      ? `<ul>${open.map(htmlReleaseIssue).join('')}</ul>`
+      : [
+          `<h3>Critical path<span class="tally">${plan.criticalPath.length}</span></h3>`,
+          `<ol class="release-path">${plan.criticalPath.map(htmlReleaseIssue).join('')}</ol>`,
+          `<h3>Parallel work<span class="tally">${plan.parallel.length}</span></h3>`,
+          `<ul>${plan.parallel.map(htmlReleaseIssue).join('')}</ul>`,
+        ].join('');
+  return [
+    '<section class="release-scope">',
+    `<h2>${escapeHtml(release.title)}<span class="tally">${settled}/${issues.length} settled</span></h2>`,
+    `<p>${inlineMarkup(release.goal)}</p>`,
+    definition,
+    space,
+    issueLists,
+    '</section>',
+  ].join('');
+};
 
 const STYLE = `
 :root {
@@ -557,17 +923,24 @@ details .path { font-family: ui-monospace, monospace; font-size: .78rem; color: 
   margin: 0 .3rem .4rem 0; font-size: .8rem; font-family: ui-monospace, monospace;
 }
 .chip em { font-style: normal; color: var(--muted); font-size: .72rem; }
-.intent {
+.release-scope {
   background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent);
-  border-radius: 10px; padding: .4rem 1.2rem 1.1rem;
+  border-radius: 10px; padding: .4rem 1.2rem 1.1rem; margin-bottom: 2.5rem;
 }
-.intent h3 { font-size: .95rem; margin: 1.2rem 0 .4rem; }
-.intent p { margin: .5rem 0; color: var(--ink); }
-.intent ul { margin: .5rem 0 0; padding-left: 1.1rem; }
-.intent li { margin: .3rem 0; }
+.release-scope h2 { margin-top: .8rem; }
+.release-scope h3 {
+  display: flex; align-items: center; gap: .5rem; font-size: .82rem; margin: 1.2rem 0 .4rem;
+}
+.release-scope p { margin: .5rem 0; color: var(--ink); }
+.release-scope ul, .release-scope ol { list-style: none; margin: .4rem 0 0; padding: 0; }
+.release-path .issue { border-left: 2px solid var(--accent); padding-left: .65rem; }
+.release-scope .ref { font-family: ui-monospace, monospace; color: var(--muted); font-size: .8rem; }
 `;
 
-export const renderRoadmapHtml = (roadmap: Roadmap, intent: string | null = null): string => {
+export const renderRoadmapHtml = (
+  roadmap: Roadmap,
+  release: ReleaseScope | null = null,
+): string => {
   const inFlight = [...byPhase(roadmap, 'in-flight')].sort(
     (left, right) => openIssues(left).length - openIssues(right).length,
   );
@@ -606,7 +979,7 @@ export const renderRoadmapHtml = (roadmap: Roadmap, intent: string | null = null
     '</head><body><main>',
     '<h1>Where we are</h1>',
     `<p class="summary">${roadmap.features.length} efforts · ${roadmap.issueCount} issues · ${roadmap.openCount} open</p>`,
-    intent === null ? '' : `<section class="intent">${intentHtml(intent)}</section>`,
+    release === null ? '' : htmlReleaseScope(roadmap, release),
     htmlSection('In flight', inFlight.length, inFlight.map(htmlFeature).join('')),
     htmlSection(
       'Not started',
@@ -666,16 +1039,35 @@ if (entryPoint !== undefined && import.meta.url === pathToFileURL(resolve(entryP
   const root = join(process.cwd(), '.scratch');
   if (existsSync(root) && statSync(root).isDirectory()) {
     const roadmap = buildRoadmap(root);
-    const intent = readIntent(root);
-    if (process.argv.includes('--html')) {
-      // `.scratch/**` is gitignored except for markdown, so the render never enters the tree.
+    const release = readReleaseScope(root);
+    const wantsHtml = process.argv.includes('--html');
+    // `--html` only *implies* a Space, so a render with no Space to generate is
+    // a complete run. `--space` asks for one outright, and a run that produces
+    // nothing has to say so rather than exit 0 on an empty stdout.
+    const explicitSpace = process.argv.includes('--space');
+    const wantsSpace = explicitSpace || wantsHtml;
+    if (wantsHtml) {
+      // The generated render and dogfood Space are ignored build artifacts.
       const destination = join(root, 'roadmap.html');
-      writeFileSync(destination, `${renderRoadmapHtml(roadmap, intent)}\n`);
+      writeFileSync(destination, `${renderRoadmapHtml(roadmap, release)}\n`);
       console.log(destination);
       if (process.argv.includes('--open')) {
         execFileSync(OPEN_COMMANDS.get(process.platform) ?? 'xdg-open', [destination]);
       }
-    } else console.log(renderRoadmap(roadmap, intent));
+    }
+    if (wantsSpace) {
+      const space = release === null ? null : writeReleaseSpace(root, roadmap, release);
+      if (space !== null) console.log(space);
+      else if (explicitSpace) {
+        console.error(
+          release === null
+            ? `--space needs a release scope: no ROADMAP.md at ${join(root, 'ROADMAP.md')}.`
+            : 'ROADMAP.md declares no `Space:`, so --space has nowhere to write.',
+        );
+        process.exitCode = 1;
+      }
+    }
+    if (!wantsHtml && !wantsSpace) console.log(renderRoadmap(roadmap, release));
   } else {
     console.error(`No .scratch directory at ${root}`);
     process.exitCode = 1;

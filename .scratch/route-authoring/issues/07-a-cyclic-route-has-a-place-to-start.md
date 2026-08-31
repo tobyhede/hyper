@@ -8,6 +8,7 @@ closes user story 32, which the effort's other six tickets never covered.
 structure (ADR 0032); this is the presenting half of that decision.
 
 **Status:** resolved
+Tags: release/v1
 
 ## The defect
 

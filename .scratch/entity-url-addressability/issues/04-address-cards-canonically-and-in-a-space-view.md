@@ -5,6 +5,7 @@
 **Blocked by:** 03 — Address every Space View.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] Canonical and contextual Card links survive direct navigation, reload, Back and Forward.
 - [x] A Closed Card stays Closed; an included Card is focused and centered without producing an Edit.

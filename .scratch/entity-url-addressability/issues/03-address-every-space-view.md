@@ -5,6 +5,7 @@
 **Blocked by:** 01 — Give Computed Views durable Space View IDs; 02 — Open the Entry Space at its canonical URL.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] One route shape resolves both Computed Views and Layouts by Space View Id without exposing their variant.
 - [x] Choosing a Space View pushes browser history and direct navigation or reload restores it without changing authored active selections.

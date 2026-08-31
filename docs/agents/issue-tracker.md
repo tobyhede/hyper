@@ -8,6 +8,10 @@ Issues and specs (you may know a spec as a PRD) for this repo live as markdown f
 - The spec is `.scratch/<feature-slug>/spec.md`
 - Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` — never a single combined tickets file
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
+- Optional orthogonal collections are recorded as a comma-separated `Tags:` line
+  near the top of an issue. Release membership uses a namespaced tag such as
+  `Tags: release/v1`; the issue remains in its ordinary effort and may appear in
+  both generated roadmap sections.
 - **Two spellings of that line are in the tree and both are current**: bare `Status: resolved`, and `**Status:** resolved` in the ticket families that bold every field label (`**What to build:**`, `**Why:**`). Don't normalise them — the bold form is consistent *within* those files. Do write scans that tolerate both, because `grep '^Status:'` silently misses 37 files across seven whole efforts (`database-persistence`, `fetch-native-http`, `space-authoring`, `route-authoring`, `card-authoring`, `card-gestures`, `opening-is-editing`) and reports them as unstatused. Use `grep -iE '^\*{0,2}Status:\*{0,2}[[:space:]]+'` — the colon and the trailing space are required, or the scan also matches any line merely beginning with the word.
 - A `Status:` line is not the whole picture: a **resolved** ticket can still carry deliberately-deferred work in its tail. Scanning statuses alone will not surface it — grep the bodies for `deferred`/`out of scope`/`follow-up` too.
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
@@ -19,4 +23,3 @@ Create a new file under `.scratch/<feature-slug>/` (creating the directory if ne
 ## When a skill says "fetch the relevant ticket"
 
 Read the file at the referenced path. The user will normally pass the path or the issue number directly.
-

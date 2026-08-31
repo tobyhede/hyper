@@ -45,16 +45,6 @@ const graph: LayoutStrategyGraph = {
 const at = (entries: Record<string, [number, number]>): Placement =>
   Placement.fromEntries(Object.entries(entries).map(([id, [x, y]]) => [uuid(id), { x, y }]));
 
-/** Do two placed cards' boxes intersect? Touching edges do not count. */
-function overlaps(a: LayoutStrategyCard, b: LayoutStrategyCard): boolean {
-  return (
-    a.x! < b.x! + b.width &&
-    b.x! < a.x! + a.width &&
-    a.y! < b.y! + b.height &&
-    b.y! < a.y! + a.height
-  );
-}
-
 describe('positionedStrategy', () => {
   it('draws authored expansion and neighbour displacement', async () => {
     const positions = Placement.fromEntries([
@@ -97,27 +87,22 @@ describe('positionedStrategy', () => {
     ]);
   });
 
-  it('lays cards the map omits below everything it places', async () => {
+  it('omits cards the authored placement omits', async () => {
     const laid = await positionedStrategy(
       at({
         '00000000-0000-4000-8000-000000000002': [0, 0],
         '00000000-0000-4000-8000-000000000003': [200, 400],
       }),
     )(graph);
-    const c = laid.cards.find((card) => card.id === '00000000-0000-4000-8000-000000000005')!;
-    // Below the lowest authored card (b, whose box ends at 450), so an omitted
-    // card reads as unplaced and cannot overlap an authored one.
-    expect(c.y!).toBeGreaterThan(450);
-    expect(c.x).toBe(0); // left-aligned with the authored cards
+    expect(laid.cards.map((card) => card.id)).toEqual([
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+    ]);
   });
 
-  it('degrades to a grid at the origin when the map is empty', async () => {
+  it('draws no cards when the authored placement is empty', async () => {
     const laid = await positionedStrategy(Placement.empty())(graph);
-    expect(laid.cards.map((c) => [c.x, c.y])).toEqual([
-      [0, 0],
-      [180, 0],
-      [0, 130],
-    ]);
+    expect(laid.cards).toEqual([]);
   });
 
   it('never places ports, leaving the render layer to spread them', async () => {
@@ -180,7 +165,7 @@ const idsArb = fc
 const coordArb = fc.integer({ min: -1000, max: 1000 });
 
 describe('positionedStrategy properties', () => {
-  it('positions every card, whether or not the map mentions it', async () => {
+  it('positions exactly the cards the authored placement mentions', async () => {
     await fc.assert(
       fc.asyncProperty(idsArb, fc.array(coordArb), async (ids, coords) => {
         // Authored positions for a prefix of the cards; the rest are omitted.
@@ -193,35 +178,10 @@ describe('positionedStrategy properties', () => {
         );
         const laid = await positionedStrategy(positions)({ cards: cardsOf(...ids), edges: [] });
 
-        expect(laid.cards).toHaveLength(ids.length);
+        expect(laid.cards.map((card) => card.id)).toEqual(authored);
         for (const card of laid.cards) {
           expect(card.x).toBeTypeOf('number');
           expect(card.y).toBeTypeOf('number');
-        }
-      }),
-    );
-  });
-
-  it('never overlaps a card the map omits with any other card', async () => {
-    await fc.assert(
-      fc.asyncProperty(idsArb, fc.array(coordArb), async (ids, coords) => {
-        const authored = ids.slice(0, Math.floor(coords.length / 2));
-        const positions = Placement.fromEntries(
-          authored.map((id, i) => [
-            id,
-            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
-          ]),
-        );
-        const laid = await positionedStrategy(positions)({ cards: cardsOf(...ids), edges: [] });
-
-        // Authored cards may overlap each other — that is the author's business.
-        // A card the map omits is ours to place, and must clash with nothing.
-        const omitted = laid.cards.filter((c) => !positions.has(c.id));
-        for (const card of omitted) {
-          for (const other of laid.cards) {
-            if (other.id === card.id) continue;
-            expect(overlaps(card, other)).toBe(false);
-          }
         }
       }),
     );

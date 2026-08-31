@@ -6,6 +6,7 @@ import {
 } from '@project/core';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { selectCanvas } from './graph';
 import { SEEDED_GRAPH_ID, SEEDED_LAYOUT_ID, seedPositionedLayout } from './seed';
 
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
@@ -190,7 +191,7 @@ test('a canonical Card omitted by the default Layout is revealed only in the Car
 
   expect((await page.goto(canonical))?.status()).toBe(200);
   await expect(page.getByTestId('selected-canvas')).toContainText('Sparse Layout');
-  await expect(page.getByText('Cards', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
   await expect(page.locator(`[data-card-id="${omitted.id}"]`)).toHaveAttribute(
     'aria-current',
     'true',
@@ -199,6 +200,37 @@ test('a canonical Card omitted by the default Layout is revealed only in the Car
 
   await page.reload();
   await expect(page.getByTestId('selected-canvas')).toContainText('Sparse Layout');
+  await expect(page.locator(`[data-card-id="${omitted.id}"]`)).toHaveAttribute(
+    'aria-current',
+    'true',
+  );
+});
+
+test('returning to a canonical Card address reveals it again', async ({ page }) => {
+  const seeded = await seedPositionedLayout(page, 'Sparse Layout', (snapshot) => {
+    const included = snapshot.cards[0];
+    expect(included).toBeDefined();
+    return included === undefined ? {} : { [included.id]: { x: 0, y: 0, open: false as const } };
+  });
+  const omitted = seeded.snapshot.cards[1];
+  expect(omitted).toBeDefined();
+  if (omitted === undefined) return;
+  const canonical = `/spaces/${encodeCompactUuid(seeded.snapshot.id)}/cards/${encodeCompactUuid(omitted.id)}`;
+
+  expect((await page.goto(canonical))?.status()).toBe(200);
+  await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+
+  // A Computed View owns no Layout membership, so choosing one withdraws the
+  // drawer and leaves the address behind. This is the reader moving on.
+  await selectCanvas(page, 'Grid');
+  await expect(page.getByRole('dialog', { name: 'Cards' })).toBeHidden();
+
+  // Back is a second arrival at the address, not a repeat of the first, so the
+  // Card it names is revealed rather than left invisible off the Layout.
+  await page.goBack();
+  await expect(page).toHaveURL(canonical);
+  await expect(page.getByTestId('selected-canvas')).toContainText('Sparse Layout');
+  await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
   await expect(page.locator(`[data-card-id="${omitted.id}"]`)).toHaveAttribute(
     'aria-current',
     'true',

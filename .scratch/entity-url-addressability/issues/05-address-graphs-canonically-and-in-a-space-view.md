@@ -5,6 +5,7 @@
 **Blocked by:** 03 — Address every Space View.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] A canonical Graph link opens its owning Layout and activates the Graph for navigation only.
 - [x] A contextual Graph link establishes the named compatible Space View and Active Graph.

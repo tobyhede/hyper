@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import {
@@ -13,8 +14,9 @@ import {
   type Edge,
   type OnEdgesChange,
   type OnNodesChange,
+  useReactFlow,
 } from '@xyflow/react';
-import type { Card, CardId, Graph, GraphId } from '@project/core';
+import { uuidSchema, type Card, type CardId, type Graph, type GraphId } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import {
   nodeTypes,
@@ -31,6 +33,8 @@ import type { EdgeAuthoring } from '../edge-authoring';
 import type { CanvasSelection, CardResize, EdgeSubject } from '../render-adapter';
 import type { SpaceAuthoring } from '../space-authoring';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
+import { CARD_SIZE } from '../card';
+import { CARD_DRAG_TYPE } from './CardsDrawer';
 import { OverviewCamera, PresentingCamera } from './cameras';
 
 /**
@@ -150,6 +154,8 @@ export interface SpaceCanvasProps {
    * toolbar twin lives outside this component.
    */
   onAddCard: () => void;
+  /** Complete an external Cards View drop at an authored top-left anchor. */
+  onAddExistingCard: (cardId: CardId, anchor: { readonly x: number; readonly y: number }) => void;
   /**
    * The Card a completed creation asks to be named, or `null`.
    *
@@ -198,6 +204,7 @@ export function SpaceCanvas({
   subjectCards,
   newCardTitle,
   onAddCard,
+  onAddExistingCard,
   nameOnCreation,
   authoring,
   spaceSession,
@@ -210,6 +217,7 @@ export function SpaceCanvas({
   activeGraphId,
   activeGraphCardIds,
 }: SpaceCanvasProps) {
+  const { screenToFlowPosition } = useReactFlow();
   /**
    * Whether a drag may begin at a Card's authoring handles.
    *
@@ -485,6 +493,33 @@ export function SpaceCanvas({
     selectionOnDrag,
   } = edgeSurface.reactFlowProps;
 
+  const onExternalDragOver = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      if (!canAuthorOnCanvas || !event.dataTransfer.types.includes(CARD_DRAG_TYPE)) return;
+      if (!(event.target instanceof Element) || event.target.closest('.react-flow__pane') === null)
+        return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    },
+    [canAuthorOnCanvas],
+  );
+
+  const onExternalDrop = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      if (!canAuthorOnCanvas || !(event.target instanceof Element)) return;
+      if (event.target.closest('.react-flow__pane') === null) return;
+      const cardId = uuidSchema.safeParse(event.dataTransfer.getData(CARD_DRAG_TYPE));
+      if (!cardId.success) return;
+      event.preventDefault();
+      const point = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      onAddExistingCard(cardId.data, {
+        x: point.x - CARD_SIZE.width / 2,
+        y: point.y - CARD_SIZE.height / 2,
+      });
+    },
+    [canAuthorOnCanvas, onAddExistingCard, screenToFlowPosition],
+  );
+
   return edgeSurface.provide(
     <ReactFlow
       ref={canvasRef}
@@ -504,6 +539,8 @@ export function SpaceCanvas({
       onReconnect={onReconnect}
       onReconnectEnd={onReconnectEnd}
       onMouseMove={onMouseMove}
+      onDragOver={onExternalDragOver}
+      onDrop={onExternalDrop}
       edgesReconnectable={edgesReconnectable}
       edgesFocusable={edgesFocusable}
       // Passed through rather than copied: `useKeyPress` has this value in the

@@ -5,6 +5,7 @@
 **Blocked by:** None — can start immediately.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] When Title authoring is available, the displayed Title exposes a semantic control with an accessible name that identifies the edit action and Card; click, `Enter`, and `Space` replace it in place with the Title field, focus the field, and select its complete value.
 - [x] Activating the Title neither selects nor Opens the Card, clicking elsewhere still selects it, the rail's Edit control still Opens it, and double-click is no longer an additional Title-editing convention.

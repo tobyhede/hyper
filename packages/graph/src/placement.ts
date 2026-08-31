@@ -25,12 +25,9 @@ declare const PLACEMENT: unique symbol;
  *
  * ## Sparse, and omission means something
  *
- * A placement may omit a card, and that card is **unplaced** — whoever renders it
- * places it themselves, which `positionedStrategy` does in a band below
- * everything authored. Omission is never the origin, and a position a renderer
- * supplied for an unplaced card is not a placement the author made. Promoting
- * one to authored is an Edit, so it happens through `next` with the cards a
- * completed gesture actually placed, never by adopting whatever is on screen.
+ * A placement may omit a card, and that Card is not a member of the Layout.
+ * `positionedStrategy` consequently omits it from the canvas; adding membership
+ * and its authored position is an explicit Edit rather than a rendering concern.
  *
  * ## Branded, because ad-hoc construction is the bug this module exists for
  *
@@ -171,10 +168,8 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * With an authored placement, the rendered geometry is a **report, not an
  * authorship claim**, and `placed` is the whole of what may be read out of it —
  * refreshing a card that was dragged and admitting one that was not in the map
- * before. Every other card keeps the coordinate it had, so a card the Layout
- * omits stays unplaced no matter how many times it is drawn in the fallback
- * band, and a card the report caught **in flight** keeps the place the author
- * last left it.
+ * before. Every other card keeps the coordinate it had, and a card the report
+ * caught **in flight** keeps the place the author last left it.
  *
  * That last one is why refreshing every authored card from the report is wrong
  * rather than merely broader. A reprojection can land mid-gesture — an activated

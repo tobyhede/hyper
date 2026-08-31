@@ -8,6 +8,7 @@ performs one Close Edit and preserves the previous Open Size for the next Open.
 **Blocked by:** 03 — Preview resizing through one canvas draft.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] The magnetic distance is an application-owned UX token measured in canvas
       coordinates, not persisted state or a general spatial grid.

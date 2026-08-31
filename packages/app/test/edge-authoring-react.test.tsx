@@ -359,6 +359,7 @@ function CanvasHarness({
       subjectCards={currentSpace().cards}
       newCardTitle="Card 4"
       onAddCard={() => undefined}
+      onAddExistingCard={() => undefined}
       nameOnCreation={null}
       authoring={authoring}
       spaceSession={session}

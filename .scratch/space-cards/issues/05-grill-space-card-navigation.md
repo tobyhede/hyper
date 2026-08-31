@@ -1,6 +1,6 @@
 # 05 — Grill Space Card navigation
 
-Status: needs-triage
+Status: superseded by `entity-url-addressability/08` and ADR 0068
 Type: grilling
 
 ## Context
@@ -31,3 +31,14 @@ Walk the decision tree with the user (`/grilling`), covering at minimum:
 ## Not in scope here
 
 Anything issues 03 and 04 already settled: what a Space Card references, ownership/cascade-delete, cycle rejection, WorkspaceSelection's retirement. This ticket is purely about how an author moves once a Space Card exists.
+
+## Answer
+
+ADR 0068 and `entity-url-addressability/08` now own the decision and delivery:
+Open embeds the selected Space View, Enter adopts the target command surface,
+an explicit Exit is the one thing that closes an entered Space, and independent
+opening uses the target's canonical URL. Entering does not unwind — every Space
+entered and not exited stays open, and entering an already-open Space focuses
+its existing entry. ADR 0068 withdrew the earlier "Back or Escape returns to the
+containing Space": Back is the browser's linear history under ADR 0069 rather
+than a pop, and Escape keeps the meaning ADR 0048 gives it.

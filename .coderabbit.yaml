@@ -175,7 +175,11 @@ reviews:
         Graph, and both fallbacks live there; Navigation takes that answer as
         an argument rather than reaching for the Space's first Graph, because
         two places answering it would disagree the moment a Layout filters.
-        There is no Save action, and card markdown stays behind DOMPurify.
+        There is no *persistence* Save action: ADR 0030 retired it with file
+        write-back, and every completed Edit commits on its own. That is a
+        different action from ADR 0064's Save, which replaces Edit while
+        Markdown editing is live and is current — do not read either one as
+        evidence against the other. Card markdown stays behind DOMPurify.
 
     - path: '{,packages/*/}*.config.ts'
       instructions: >-

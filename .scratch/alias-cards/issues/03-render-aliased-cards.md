@@ -1,6 +1,7 @@
 # Render aliased cards
 
 Status: resolved
+Tags: release/v1
 
 ## Context
 

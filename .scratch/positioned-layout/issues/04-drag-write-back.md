@@ -1,6 +1,7 @@
 # 04 — Controlled `GraphView` + drag write-back
 
 Status: resolved
+Tags: release/v1
 Type: task
 Blocked by: 03
 

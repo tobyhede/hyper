@@ -34,7 +34,6 @@ const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006')
 const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 
 const PROJECTED = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
-const SPARSE_PROJECTED = [...PROJECTED, node(CARD_C, 600, 20)];
 
 /**
  * One projected Graph Edge, in the shape `projectGraphEdges` builds: the id is
@@ -163,12 +162,11 @@ function sessionBackedAdapter(
 }
 
 /**
- * A Space whose Layout places Cards A and B, leaving C unplaced.
+ * A Space whose Layout places Cards A and B, leaving C outside the Layout.
  *
  * The Layout's position keys are its Card membership and every Edge of a Graph
  * it owns is closed over them (ADR 0040), so the omitted Card is one the Graph
- * never names — C, which the projection still draws and which no Edit here may
- * quietly author.
+ * never names — C, which the positioned projection does not draw.
  */
 function sparsePositionedAdapter(newId?: () => UUID) {
   const snapshot: SpaceSnapshot = {
@@ -533,25 +531,6 @@ describe('render adapter', () => {
     expect(store.getState().projection?.nodes.map((entry) => entry.id)).toEqual([CARD_A, CARD_B]);
   });
 
-  it('preserves unplaced Cards when an existing Layout is edited', () => {
-    const { session, store, authoring } = sparsePositionedAdapter();
-
-    store.getState().syncProjection(SPARSE_PROJECTED, []);
-    expect(
-      connections(store, authoring).connect(
-        uuidSchema.parse(CARD_B),
-        uuidSchema.parse(CARD_A),
-        SPARSE_PROJECTED,
-      ),
-    ).toEqual({ kind: 'completed', cardId: CARD_A });
-
-    // C was rendered and is still not a member of this Layout.
-    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 20, open: false },
-    });
-  });
-
   it('keeps the Cards on screen when a connection completes with no fresh projection', () => {
     // A Space change starts a replacement placement, so the render path has no
     // projection to hand over — while the canvas deliberately keeps drawing the
@@ -619,19 +598,6 @@ describe('render adapter', () => {
     });
   });
 
-  it('authors only the previously unplaced Card that the author moves', () => {
-    const { session, store } = sparsePositionedAdapter();
-    store.getState().syncProjection(SPARSE_PROJECTED, []);
-
-    completeDrag(store, CARD_C, 400, 120);
-
-    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 20, open: false },
-      [CARD_C]: { x: 400, y: 120, open: false },
-    });
-  });
-
   /*
    * A reprojection can land while a Card is in flight — an activated Graph or a
    * selection redraws the graph without the gesture ending. The nodes it reports
@@ -643,10 +609,10 @@ describe('render adapter', () => {
    */
   it('keeps the authored position when a reprojection lands mid-drag', () => {
     const { authoring, store } = sparsePositionedAdapter();
-    store.getState().syncProjection(SPARSE_PROJECTED, []);
+    store.getState().syncProjection(PROJECTED, []);
 
     store.getState().changeNodes(moving(CARD_A, 90, 90));
-    store.getState().syncProjection(SPARSE_PROJECTED, []);
+    store.getState().syncProjection(PROJECTED, []);
     // The gesture ends where it began, so no Edit completes and nothing reports.
     store.getState().changeNodes(settled(CARD_A, 10, 20));
 
@@ -660,7 +626,7 @@ describe('render adapter', () => {
 
   it('adds a newly created Card without placing other omitted Cards', () => {
     const { session, store, authoring } = sparsePositionedAdapter(mintingIds(CREATED_CARD_ID));
-    store.getState().syncProjection(SPARSE_PROJECTED, []);
+    store.getState().syncProjection(PROJECTED, []);
 
     expect(
       connections(store, authoring).createAndConnect(

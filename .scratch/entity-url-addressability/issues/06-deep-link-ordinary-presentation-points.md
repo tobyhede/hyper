@@ -5,6 +5,7 @@
 **Blocked by:** 04 — Address Cards canonically and in a Space View; 05 — Address Graphs canonically and in a Space View.
 
 **Status:** resolved
+Tags: release/v1
 
 - [x] Presentation has an explicit URL distinct from ordinary Card reading and resolves the named Space View, Graph and current Card.
 - [x] Opening a copied presentation link starts at that Card without encoding or inventing earlier Traversal history.

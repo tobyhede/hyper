@@ -1,6 +1,7 @@
 # Accepting a stored Space discards an opened Card's Markdown draft with no acknowledgement
 
 Status: ready-for-human
+Tags: release/v1
 
 Surfaced by: resolving `02-interaction-draft-invalidation-is-mostly-already-covered.md`
 

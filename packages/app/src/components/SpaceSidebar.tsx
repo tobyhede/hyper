@@ -2,7 +2,6 @@ import type { ReactNode, Ref } from 'react';
 import {
   FLOW_SPACE_VIEW_ID,
   GRID_SPACE_VIEW_ID,
-  type CardId,
   type Graph,
   type GraphId,
   type PerComputedView,
@@ -112,19 +111,13 @@ export interface SpaceSidebarProps {
     readonly state: SpaceSessionState['persistence']['kind'];
     readonly acknowledgedRevision: bigint;
   };
-  readonly cardsCollection?:
-    | {
-        readonly cards: readonly { readonly id: CardId; readonly title: string }[];
-        readonly revealedCardId: CardId | null;
-      }
-    | undefined;
   readonly cardLinks?:
     | {
         readonly title: string;
         readonly onCopyCanonical: () => void;
         /**
          * Absent when the Card has no address in the current Space View — a
-         * Card the selected Layout omits and the Cards collection reveals. The
+         * Card the selected Layout omits and the Cards drawer reveals. The
          * command is withheld rather than shown and refused, because the
          * destination it would copy does not exist.
          */
@@ -333,7 +326,6 @@ export function SpaceSidebar({
   graph,
   addCard,
   persistence,
-  cardsCollection,
   cardLinks,
   titleEdit,
   collapsible = 'offcanvas',
@@ -426,37 +418,6 @@ export function SpaceSidebar({
             )}
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {cardsCollection !== undefined && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Cards</SidebarGroupLabel>
-            <SidebarGroupContent>
-              {cardsCollection.cards.length === 0 ? (
-                <NothingYet testId="no-cards-outside-layout">
-                  All Cards are in this Layout.
-                </NothingYet>
-              ) : (
-                <SidebarMenu>
-                  {cardsCollection.cards.map((card) => {
-                    const revealed = card.id === cardsCollection.revealedCardId;
-                    return (
-                      <SidebarMenuItem key={card.id}>
-                        <SidebarMenuButton
-                          render={<span />}
-                          isActive={revealed}
-                          aria-current={revealed ? 'true' : undefined}
-                          data-card-id={card.id}
-                        >
-                          <span>{card.title}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              )}
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         <SidebarSeparator />
 

@@ -14,6 +14,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Search,
   Square,
   SquareSquare,
   Workflow,
@@ -69,6 +70,9 @@ export const CloseCardIcon = (props: CardActionIconProps) => <Minimize2 size={14
 
 /** The shared affordance for a trigger that opens a list or menu. */
 export const ChevronDownIcon = () => <ChevronDown size={14} />;
+
+/** Search within the collection named by the surrounding input. */
+export const SearchIcon = () => <Search size={16} />;
 
 /** Create a Markdown Card. */
 export const PlusIcon = () => <Plus size={14} />;

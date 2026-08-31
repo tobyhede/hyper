@@ -45,16 +45,35 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+/* `padding-inline-end` is the strip yielded to a surface overlaying the end
+   edge — the Cards drawer.
+
+   Deliberately not animated, although the panel beside it slides. React Flow
+   re-measures this container continuously, so an animated width moves the
+   canvas under a pointer that is already dragging a Card out of the drawer, and
+   the Card lands somewhere other than where it was dropped. The strip is taken
+   in one step, which is also what the flex layout this replaced did. */
 .shell__main {
-  position: relative;
   flex: 1;
   min-height: 0;
+}
+
+/* What is left of the main area once the strip is yielded, and the containing
+   block everything positioned inside it resolves against. */
+.shell__area {
+  position: relative;
+  height: 100%;
 }
 
 /*
  * Pinned under the canvas header. Above the canvas but not over its controls:
  * the width is capped so the graph stays visible beside it, and pointer events
  * are the notice's own — nothing invisible is laid over the canvas.
+ *
+ * It stays at `5`, under the Cards drawer and every modal surface, because the
+ * drawer no longer reaches it: `.shell__area` is already the main area minus
+ * the yielded strip, so the notice is beside the panel rather than under it and
+ * nothing has to be layered over anything.
  */
 .shell__notice {
   position: absolute;
@@ -74,8 +93,7 @@ body {
 .graph-area {
   --card-placement-duration: 200ms;
   --card-placement-easing: ease;
-  position: absolute;
-  inset: 0;
+  position: relative;
 }
 
 /* ---- Card node ---- */
