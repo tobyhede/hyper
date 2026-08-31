@@ -243,10 +243,12 @@
   white-space: nowrap;
 }
 
-/* A Markdown Title is the same bottom passenger before, during and after the
-   React Flow wrapper moves. Expansion adds the writing surface above it; it
-   never switches the Title's layout in the middle of that motion. */
-.canvas-card[data-kind='markdown'] .canvas-card__body {
+/* A Title is the same bottom passenger before, during and after the React Flow
+   wrapper moves. Opening adds the content surface above it; it never switches
+   the Title's layout in the middle of that motion. Both kinds that draw content
+   claim it, so an Open Alias reads exactly as an Open Markdown Card does
+   (ADR 0070) — the `space` kind has no content front to sit above a Title. */
+.canvas-card:is([data-kind='markdown'], [data-kind='alias']) .canvas-card__body {
   order: 2;
   flex: none;
   margin-top: auto;

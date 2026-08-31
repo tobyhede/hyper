@@ -518,15 +518,9 @@ describe('Space Authoring', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  /**
-   * Retargeting is an ordinary Edit of the Alias, made through the same Card
-   * editor as its title (ADR 0009, the Alias prototype's Frame 4) — the Card
-   * editor is the one canonical place a Target changes, so it is the completion
-   * that carries it. The Alias keeps its id, its own title and its position; the
-   * old Target keeps everything.
-   */
-  it("replaces an Alias's Target while preserving its identity and title", () => {
+  it("refuses changing an existing Alias's immutable Target", () => {
     const { authoring, session } = openRefusalFixture();
+    const before = session.getState().working;
 
     expect(
       complete(authoring, {
@@ -534,39 +528,7 @@ describe('Space Authoring', () => {
         cardId: CARD_B,
         document: { title: 'A again', kind: 'alias', target: CARD_C },
       }),
-    ).toEqual({ kind: 'completed' });
-
-    expect(session.getState().working.cards).toEqual([
-      { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-      { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_C } },
-      { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
-    ]);
-    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 40, open: false },
-      [CARD_C]: { x: 600, y: 40, open: false },
-    });
-    expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
-  });
-
-  it('refuses an Alias Target that does not own its content', () => {
-    const { authoring, session } = openRefusalFixture();
-    const before = session.getState().working;
-
-    // `CARD_B` is itself the Alias, so this asks for a chain. Intake rejects one
-    // too, but by then the Edit has already been derived — refusing here is what
-    // keeps a reachable authoring mistake an author-facing sentence rather than
-    // the throw a broken invariant gets.
-    expect(
-      complete(authoring, {
-        kind: 'edited-card',
-        cardId: CARD_B,
-        document: { title: 'A again', kind: 'alias', target: CARD_B },
-      }),
-    ).toEqual({
-      kind: 'refused',
-      refusal: { code: 'alias-target-must-own-content', targetId: CARD_B },
-    });
+    ).toEqual({ kind: 'refused', refusal: { code: 'alias-target-immutable' } });
     expect(session.getState().working).toBe(before);
   });
 
@@ -1443,7 +1405,7 @@ describe('Space Authoring', () => {
       published += 1;
     });
 
-    navigation.openCard(CARD_A);
+    navigation.selectRenderer(GRID_SPACE_VIEW_ID);
     expect(published).toBe(1);
 
     // The session outlives any Authoring composed over it, so one that never
@@ -1452,7 +1414,7 @@ describe('Space Authoring', () => {
     // accepting the stored Space is an edit to this one, but releasing the
     // subscriptions is still this object's to do.
     authoring.dispose();
-    navigation.openCard(CARD_B);
+    navigation.selectRenderer(GRID_SPACE_VIEW_ID);
     session.submit({
       ...automaticSnapshot,
       document: { ...automaticSnapshot.document, title: 'Renamed' },
@@ -1914,7 +1876,7 @@ describe('Space Authoring', () => {
     // shape indirectly and never trips it.
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     authoring.subscribe(() => Promise.reject(new Error('observer rejected')));
-    navigation.openCard(CARD_A);
+    navigation.selectRenderer(GRID_SPACE_VIEW_ID);
 
     await vi.waitFor(() => expect(reported.map(String)).toEqual(['Error: observer rejected']));
   });
@@ -1938,7 +1900,7 @@ describe('Space Authoring', () => {
       notified.push('behind it');
     });
 
-    expect(() => navigation.openCard(CARD_A)).not.toThrow();
+    expect(() => navigation.selectRenderer(GRID_SPACE_VIEW_ID)).not.toThrow();
 
     expect(notified).toEqual(['throwing', 'behind it']);
     expect(reported).toEqual([observerFailed]);
@@ -2123,7 +2085,6 @@ describe('Space Authoring', () => {
     complete(authoring, { kind: 'settled-card-movement' });
     navigation.selectRenderer(GRID_SPACE_VIEW_ID);
     navigation.present();
-    navigation.openCard(CARD_B);
 
     expect(authoring.acceptStoredSpace()).toBeNull();
     expect(
@@ -2146,7 +2107,6 @@ describe('Space Authoring', () => {
         selectedRenderer: LAYOUT_ID,
         activeGraphId: STORED_GRAPH_ID,
         mode: 'overview',
-        openedCardId: null,
       },
     });
     expect(authoring.authoredPlacement()).toEqual(

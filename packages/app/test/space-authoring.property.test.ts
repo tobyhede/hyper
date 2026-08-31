@@ -118,9 +118,7 @@ const operation = fc.oneof(
   fc.record({ op: fc.constant('created-card' as const), anchor }),
   fc.record({ op: fc.constant('created-alias' as const), card: index, anchor }),
   /**
-   * Card editing, including retargeting an Alias — the one operation that can
-   * reach the Alias rules from *both* sides, since `retarget` may name a Card
-   * that has since become an Alias, been deleted, or is the Alias itself. The
+   * Card editing includes attempts to change an Alias's immutable Target. The
    * title is generated blank sometimes on purpose: an empty one must refuse
    * rather than reach intake.
    */
@@ -128,7 +126,7 @@ const operation = fc.oneof(
     op: fc.constant('edited-card' as const),
     card: index,
     title: fc.oneof(fc.constant(''), fc.constant('  '), fc.string({ maxLength: 8 })),
-    retarget: fc.option(index, { nil: undefined }),
+    proposedTarget: fc.option(index, { nil: undefined }),
   }),
   fc.record({ op: fc.constant('added-card-to-layout' as const), card: index, anchor }),
   fc.record({ op: fc.constant('removed-card-from-layout' as const), card: index }),
@@ -169,6 +167,68 @@ const MINTED_GRAPH_IDS = [
 ] as const;
 
 const pick = <T>(items: readonly T[], at: number): T | undefined => items[at];
+
+it('keeps an existing Alias Target immutable while accepting Title edits', () => {
+  fc.assert(
+    fc.property(
+      fc.constantFrom(CARD_A, CARD_B),
+      fc.oneof(
+        fc.constant('Alias'),
+        fc
+          .string({ minLength: 1, maxLength: 8 })
+          .filter((title) => title.trim().length > 0 && title.trim() !== 'Alias'),
+      ),
+      (target, proposedTitle) => {
+        const alternativeTarget = target === CARD_A ? CARD_B : CARD_A;
+        const snapshot: SpaceSnapshot = {
+          ...start,
+          cards: start.cards.map((card) =>
+            card.id === CARD_C
+              ? { id: CARD_C, document: { title: 'Alias', kind: 'alias', target } }
+              : card,
+          ),
+        };
+        const loaded = { snapshot, revision: 0n, exportedRevision: null };
+        const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+        const { authoring } = composeApp({
+          spaceSession: session,
+          selection: OTHER_LAYOUT_ID,
+          newGraphId: mintingGraphIds(...MINTED_GRAPH_IDS),
+          initialPlacement: null,
+        });
+        const aliasLayout = snapshot.document.layouts?.find(
+          (layout) => layout.id === OTHER_LAYOUT_ID,
+        );
+        if (aliasLayout === undefined)
+          throw new Error('property fixture must include the Alias Layout');
+        authoring.replacePlacement(Placement.fromLayout(aliasLayout));
+
+        expect(
+          authoring.complete({
+            kind: 'edited-card',
+            cardId: CARD_C,
+            document: { title: proposedTitle, kind: 'alias', target },
+          }),
+        ).toEqual(proposedTitle === 'Alias' ? { kind: 'unchanged' } : { kind: 'completed' });
+        expect(session.getState().working.cards).toContainEqual({
+          id: CARD_C,
+          document: { title: proposedTitle.trim(), kind: 'alias', target },
+        });
+
+        const beforeRetarget = session.getState().working;
+        expect(
+          authoring.complete({
+            kind: 'edited-card',
+            cardId: CARD_C,
+            document: { title: proposedTitle, kind: 'alias', target: alternativeTarget },
+          }),
+        ).toEqual({ kind: 'refused', refusal: { code: 'alias-target-immutable' } });
+        expect(session.getState().working).toBe(beforeRetarget);
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
 
 it('keeps the working Space loadable through any sequence of semantic operations', () => {
   fc.assert(
@@ -257,8 +317,8 @@ function resolve(
         };
       }
       const { id: _id, ...document } = card;
-      const retargeted =
-        generated.retarget === undefined ? undefined : pick(cards, generated.retarget);
+      const proposedTarget =
+        generated.proposedTarget === undefined ? undefined : pick(cards, generated.proposedTarget);
       return {
         kind: 'edited-card',
         cardId: card.id,
@@ -267,7 +327,7 @@ function resolve(
             ? {
                 ...document,
                 title: generated.title,
-                target: uuidSchema.parse(retargeted?.id ?? document.target),
+                target: uuidSchema.parse(proposedTarget?.id ?? document.target),
               }
             : { ...document, title: generated.title },
       };

@@ -98,22 +98,6 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'begin renaming the selected Card',
   },
   {
-    module: 'packages/app/src/components/OpenCard.tsx',
-    sourceKey: 'Enter',
-    occurrence: 1,
-    key: 'Mod-Enter',
-    surface: 'Open Card editor',
-    behaviour: 'submit the Card edit form',
-  },
-  {
-    module: 'packages/app/src/components/OpenCard.tsx',
-    sourceKey: 'Enter',
-    occurrence: 2,
-    key: 'Enter',
-    surface: 'Open Alias title',
-    behaviour: 'move focus to the Alias Target picker',
-  },
-  {
     module: 'packages/app/src/presenting-keys.ts',
     sourceKey: ' ',
     occurrence: 1,

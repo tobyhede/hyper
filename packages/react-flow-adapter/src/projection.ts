@@ -69,7 +69,16 @@ export type CardNodeData = {
   kind: Card['kind'];
   /** Local Card-authoring controls supplied by the application composition. */
   titleEditingEnabled?: boolean;
-  /** Whether this Card owns content to edit — an Alias does not. */
+  /**
+   * Whether Card-level authoring is offered here: this Card is in the working
+   * Space and the canvas is authorable.
+   *
+   * **Not "owns content to edit"**, which is what it meant while an Alias had no
+   * Open front. It gates `onEditCard`, and an Alias Opens and Closes through
+   * that same operation (ADR 0070), so an Alias sets it exactly as a Markdown
+   * Card does. What separates the kinds is `onBeginBodyEditing`, which the
+   * application withholds from everything but `markdown`.
+   */
   cardEditingEnabled?: boolean;
   onEditCard?: (open: boolean) => 'completed' | 'retained';
   onBeginTitleEditing?: () => void;
@@ -88,18 +97,17 @@ export type CardNodeData = {
    */
   titleEditor?: CardTitleEditor;
   /**
-   * Whether the Layout has Expanded this Card, so it draws its content on the
-   * Card rather than its title alone (ADR 0064).
+   * Whether the Layout has Opened this Card, so it draws its content on the Card
+   * rather than its title alone (ADR 0064).
    *
    * Authored, not derived: it is a fact about the Layout, and the Card's rect
    * follows from it rather than the other way round. The adapter cannot read it
-   * off the geometry — a Card is not Expanded because it is large.
+   * off the geometry — a Card is not Open just because it is large.
    *
-   * The Alias kind has no Expanded front yet (ADR 0064 leaves it open), so
-   * nothing sets this for one.
+   * An Open Alias draws its immutable Target's content through the same front.
    */
   expanded?: boolean;
-  /** Present only when activating the Expanded body may place a caret. */
+  /** Present only when activating the Open body may place a caret. */
   onBeginBodyEditing?: () => void;
   /**
    * The live body edit, absent on a Card whose rendered Markdown is at rest.
@@ -342,7 +350,9 @@ export function projectCardNodes(
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
     const showContent = active && showActiveCardContent;
-    const open = options.openCardIds?.has(card.id) === true && card.kind === 'markdown';
+    const open =
+      options.openCardIds?.has(card.id) === true &&
+      (card.kind === 'markdown' || card.kind === 'alias');
     // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
     const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).

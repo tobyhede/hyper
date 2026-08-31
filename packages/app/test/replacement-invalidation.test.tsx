@@ -30,7 +30,7 @@ import { mountSpaceApp } from '../src/SpaceApp';
  * - **K** — delete `key={authoringState.replacementEpoch}` from `App.tsx`.
  * - **R** — stop the render adapter's epoch subscriber clearing
  *   `projection`/`dragOrigins`/`selection` (`render-adapter.ts`).
- * - **N** — make `navigation.openFresh` retain `openedCardId`.
+ * - **N** — make `navigation.openFresh` retain the previous Space's navigation.
  *
  * | case | K | R | K+R | N |
  * |---|---|---|---|---|

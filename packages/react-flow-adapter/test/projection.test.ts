@@ -376,6 +376,38 @@ describe('projectCardNodes', () => {
       'Card A',
     );
   });
+
+  it("resolves an Open Alias's Target Markdown under the Alias identity", () => {
+    const aliasId = uuid('00000000-0000-4000-8000-000000000007');
+    const withAlias = load(
+      spaceFile([
+        {
+          id: '00000000-0000-4000-8000-000000000004',
+          title: 'Main',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000002',
+              to: aliasId,
+            },
+          ],
+        },
+      ]),
+      [
+        cardFile('00000000-0000-4000-8000-000000000002', 'Opening', '## Authored once'),
+        aliasFile(aliasId, 'Return', '00000000-0000-4000-8000-000000000002'),
+      ],
+    );
+
+    const nodes = projectCardNodes(withAlias, buildCardHandles(withAlias), colors, {
+      openCardIds: new Set([aliasId]),
+    });
+    expect(nodes.find((node) => node.id === aliasId)?.data).toMatchObject({
+      title: 'Return',
+      kind: 'alias',
+      expanded: true,
+      body: '## Authored once',
+    });
+  });
 });
 
 describe('projectGraphEdges', () => {

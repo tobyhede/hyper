@@ -120,10 +120,11 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   const aliasFront: AliasFront = {
     kind: 'alias',
     aliasOf: data.aliasOf ?? '',
+    source: data.body ?? '',
+    open: data.expanded === true,
   };
   if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
-    const openAlias = data.onEditCard;
-    aliasFront.onOpen = () => openAlias(true);
+    aliasFront.onOpenChange = data.onEditCard;
   }
   const front: CanvasCardFront =
     data.kind === 'alias' ? aliasFront : data.kind === 'space' ? { kind: 'space' } : markdownFront;
@@ -213,15 +214,15 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    *
    * **Not a fourth arm of the branch below.** It is a prop handed to whichever
    * arm the *title* state selects, so a Card can be open while it is being
-   * renamed — expansion is what the Layout authored and the caret is a gesture,
+   * renamed — Opening is what the Layout authored and the caret is a gesture,
    * and a branch would have made them exclusive. It is not `showContent`
-   * either: both presenting and expanding draw through the one rendered-Markdown
+   * either: both presenting and Opening draw through the one rendered-Markdown
    * seam, while the open Card swaps that display for source only during an
    * edit.
    *
-   * The Alias kind has no open front yet, so authored `expanded` state is false
-   * for one. `CanvasCard` receives the Markdown source, authored open state and
-   * live editor as one front rather than receiving body markup from this adapter.
+   * For an Alias, the projection resolves the immutable Target's Markdown source.
+   * `CanvasCard` receives that source and authored open state as one front rather
+   * than receiving body markup from this adapter.
    */
   const resize = data.resize;
   const resizeOperation = useRef(resize);

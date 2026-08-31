@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
-  presentAliasCardRefusal,
   presentEdgeDeletionRefusal,
   presentEdgeEndpointRefusal,
   presentNewAliasRefusal,
@@ -18,6 +17,7 @@ const EVERY_REFUSAL = {
   'layout-required': { code: 'layout-required', operation: 'added-card-to-layout' },
   'card-not-found': { code: 'card-not-found' },
   'card-kind-immutable': { code: 'card-kind-immutable' },
+  'alias-target-immutable': { code: 'alias-target-immutable' },
   'card-title-required': { code: 'card-title-required' },
   'layout-title-required': { code: 'layout-title-required' },
   'alias-target-not-found': { code: 'alias-target-not-found', targetId: TARGET_ID },
@@ -35,9 +35,38 @@ const EVERY_REFUSAL = {
   'layout-active-graph-required': { code: 'layout-active-graph-required' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;
 
-describe('Alias Card editing and New Alias creation place every refusal identically', () => {
+/**
+ * The New Alias pane owns two fields and nothing else, so every refusal it can
+ * be handed lands on the Title, on the Target, or on the form.
+ *
+ * The two lists are written out rather than read from `titleAndTargetPlacements`
+ * — a test that consults the same table the code does agrees with it by
+ * construction and can never disagree. What they say is which refusals are
+ * *about a field the author can reach*: an empty Title is the Title's, a Target
+ * that does not resolve or owns no content is the Target's. Everything else,
+ * `alias-target-immutable` included, is the form's — an Alias created here has
+ * no Target to keep, so that refusal names no field on this pane.
+ */
+describe('New Alias creation places every refusal on the field that owns it', () => {
+  const onTheTitle: readonly AuthoringRefusal['code'][] = ['card-title-required'];
+  const onTheTarget: readonly AuthoringRefusal['code'][] = [
+    'alias-target-not-found',
+    'alias-target-must-own-content',
+  ];
+
   it.each(Object.values(EVERY_REFUSAL))('for $code', (refusal) => {
-    expect(presentAliasCardRefusal(refusal)).toEqual(presentNewAliasRefusal(refusal));
+    const errors = presentNewAliasRefusal(refusal);
+    const message = describeAuthoringRefusal(refusal);
+
+    if (onTheTitle.includes(refusal.code)) {
+      expect(errors).toEqual({ fields: { title: message } });
+      return;
+    }
+    if (onTheTarget.includes(refusal.code)) {
+      expect(errors).toEqual({ fields: { target: message } });
+      return;
+    }
+    expect(errors).toEqual({ fields: {}, form: message });
   });
 });
 

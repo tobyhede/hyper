@@ -22,7 +22,6 @@ export interface CanvasCardAuthoringInput {
   readonly authoring: SpaceAuthoring;
   readonly spaceSession: SpaceSession;
   readonly cardResize: CardResize;
-  readonly onOpenAlias: (cardId: CardId) => void;
   readonly onSelectCard: (cardId: CardId) => void;
   readonly onBodyEditingChange?: ((editing: boolean) => void) | undefined;
   readonly onTitleEditingChange?: ((editing: boolean) => void) | undefined;
@@ -50,7 +49,6 @@ export function useCanvasCardAuthoring({
   authoring,
   spaceSession,
   cardResize,
-  onOpenAlias,
   onSelectCard,
   onBodyEditingChange,
   onTitleEditingChange,
@@ -110,15 +108,12 @@ export function useCanvasCardAuthoring({
       if (!cardId.success) return 'retained';
       const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId.data);
       if (stored === undefined) return 'retained';
-      if (stored.document.kind === 'alias') {
-        onOpenAlias(cardId.data);
-        return 'completed';
-      }
-      if (stored.document.kind !== 'markdown') return 'retained';
+      if (stored.document.kind !== 'markdown' && stored.document.kind !== 'alias')
+        return 'retained';
       const result = authoring.complete({ kind: 'opened-card', cardId: cardId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
-    [authoring, enabled, onOpenAlias, spaceSession],
+    [authoring, enabled, spaceSession],
   );
 
   const closeCard = useCallback(

@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const openCloseStory = '/?story=components--card--open-and-close&mode=preview';
 const markdownStory = '/?story=components--card--editing--markdown&mode=preview';
 const resizeControlStory = '/?story=components--card--resize-control&mode=preview';
+const openAliasStory = '/?story=components--card--open-alias&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {
   await page.goto(story);
@@ -10,6 +11,30 @@ const open = async (page: Page, story: string): Promise<void> => {
     timeout: 20_000,
   });
 };
+
+test(
+  'Open Alias story renders Target Markdown read-only under the Alias Title',
+  { tag: '@parity:open-alias-shows-target-markdown-read-only' },
+  async ({ page }) => {
+    await page.goto(openAliasStory);
+    const alias = page.getByRole('article', { name: 'Strategy overview' });
+    await expect(alias.getByRole('heading', { name: 'Strategy overview' })).toBeVisible();
+    // Exact, both of them. The Target's source has to reach the renderer as real
+    // Markdown: a body carrying literal escapes draws one run-on heading that a
+    // substring match still finds, which is the claim passing on the wrong page.
+    await expect(alias.getByRole('heading', { name: 'Strategies', exact: true })).toBeVisible();
+    await expect(alias.getByText('No strategy is privileged.', { exact: true })).toBeVisible();
+    await expect(alias.getByRole('textbox')).toHaveCount(0);
+    await expect(alias.getByRole('button', { name: /Edit Card/ })).toHaveCount(0);
+    await expect(alias.getByRole('button', { name: 'Close Card Strategy overview' })).toBeVisible();
+    // The Target's content is the Open Card's top passenger and the Alias Title
+    // its bottom one, the same treatment an Open Markdown Card draws (ADR 0070).
+    const contentBox = await alias.locator('.canvas-card__content').boundingBox();
+    const titleBox = await alias.locator('.canvas-card__body').boundingBox();
+    if (contentBox === null || titleBox === null) throw new Error('Open Alias drew no content');
+    expect(contentBox.y + contentBox.height).toBeLessThanOrEqual(titleBox.y + 1);
+  },
+);
 
 test(
   'Open and Close retain one Card and Title treatment',

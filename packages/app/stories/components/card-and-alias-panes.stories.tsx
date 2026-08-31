@@ -2,7 +2,6 @@ import { useState, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
 import { uuidSchema, type Card } from '@project/core';
 import { NewAlias } from '#components/NewAlias';
-import { OpenCard } from '#components/OpenCard';
 import { CatalogueSection } from '../support/Catalogue';
 import '../support/inventory.css';
 
@@ -37,7 +36,6 @@ function PaneSheet({
 export default { title: 'Components/Alias Panes' };
 
 const MARKDOWN_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000101');
-const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000103');
 
 const markdown: Extract<Card, { kind: 'markdown' }> = {
   id: MARKDOWN_ID,
@@ -55,43 +53,6 @@ No strategy is privileged. Grid, sorts, trees, clusters, and ELK are choices ove
 
 Opening authors one Card in place. Presenting traverses the Active Graph.`,
 };
-
-const alias: Extract<Card, { kind: 'alias' }> = {
-  id: ALIAS_ID,
-  title: 'Placement recap',
-  kind: 'alias',
-  target: MARKDOWN_ID,
-};
-
-/** The production Alias metadata editor with its current Target available. */
-export const Alias: Story = () => {
-  const [open, setOpen] = useState(true);
-  const [message, setMessage] = useState('No edit completed.');
-
-  return (
-    <PaneSheet
-      title="Alias editor"
-      note="The Alias metadata editor authors the Alias's own Title and Target and never its Target's content (ADR 0049). Alias Cards do not expand."
-    >
-      {open ? (
-        <OpenCard
-          through={alias}
-          occurrence={{
-            targets: [markdown],
-            onEdit: ({ title }) => {
-              setMessage(`Completed ${title}.`);
-              return null;
-            },
-          }}
-          onCancel={() => setOpen(false)}
-        />
-      ) : (
-        <p>{message}</p>
-      )}
-    </PaneSheet>
-  );
-};
-Alias.meta = { iframed: true };
 
 /**
  * The same editor opened on an Alias that does not exist yet.

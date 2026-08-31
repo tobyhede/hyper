@@ -327,13 +327,12 @@ function CanvasHarness({
   edgeAuthoring,
   currentSpace,
   authoring,
-  navigation,
   session,
   covered,
   presenting,
 }: Pick<
   ReturnType<typeof compose>,
-  'adapter' | 'edgeAuthoring' | 'currentSpace' | 'authoring' | 'navigation' | 'session'
+  'adapter' | 'edgeAuthoring' | 'currentSpace' | 'authoring' | 'session'
 > & {
   /** A modal pane is open over the graph — what `App` reports as no title editing. */
   readonly covered: boolean;
@@ -363,7 +362,6 @@ function CanvasHarness({
       nameOnCreation={null}
       authoring={authoring}
       spaceSession={session}
-      onOpenAlias={navigation.openCard}
       cardResize={{
         beginResize: () => undefined,
         previewResize: () => undefined,
@@ -770,7 +768,7 @@ describe("the app's canvas delete key", () => {
  *
  * `titleEditingEnabled` is named for the first control it took away and means
  * "no modal pane covers the graph": `App` passes
- * `openedCardId === null && !creatingAlias`, and both panes are `CardPane` —
+ * `!creatingAlias && spaceChromeEdit === null`, both of them modal surfaces —
  * `role="dialog" aria-modal="true"`, a backdrop at `inset: 0` over the whole
  * graph area, and a focus trap. The canvas fed it to every Card control and
  * *not* to Edge authoring, so the two disagreed about when the graph is

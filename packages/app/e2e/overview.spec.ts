@@ -4,10 +4,12 @@ import { expect, test, type Locator, type Page } from './fixtures';
 import {
   activateGraph,
   activeGraph,
+  boxOf,
   graphLegendSwatchColor,
   openCard,
   selectCanvas,
   selectedCanvas,
+  settled,
   sidebar,
 } from './graph';
 
@@ -400,50 +402,99 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
   expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
 });
 
-/**
- * Opening an Alias opens an editor for the Alias, and only for the Alias.
- *
- * This used to open the delegated content editor over the Card the Alias points
- * at — `Opened through A′`, `Editing content on A`, and A's own Markdown source
- * in the pane. ADR 0049 withdrew that: a pane has one edit subject, and to
- * author A's content the author opens A.
- */
 test(
-  'an alias node names the card it redraws and opens its own metadata',
-  { tag: '@parity:alias-pane-authors-metadata' },
+  'an Alias Opens on its Target Markdown read-only with click, Enter and Space',
+  { tag: '@parity:open-alias-shows-target-markdown-read-only' },
   async ({ page }) => {
     await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
 
-    // A′ is an alias of A. It is drawn as its own node, carrying its own title, with
-    // a muted marker naming the card it shows, so a redraw reads as a deliberate
-    // return (ADR 0009).
     const recap = nodeByTitle(page, 'A′');
     await expect(recap).toBeVisible();
     await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
+    await openCard(recap, 'A′');
+    await expect(recap.getByText('entry point')).toBeVisible();
+    await expect(recap.getByRole('heading', { name: 'A′', exact: true })).toBeVisible();
+    await expect(recap.getByRole('textbox')).toHaveCount(0);
+    await expect(recap.getByRole('button', { name: /Edit Card/ })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
+    await recap.getByRole('button', { name: 'Close Card A′' }).click();
+
     await recap.focus();
     await page.keyboard.press('Enter');
-    // Two fields, both the Alias's own, and nothing belonging to A.
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-    const target = page.getByRole('combobox', { name: 'Target' });
-    await expect(target).toBeVisible();
-    await target.press('ArrowDown');
-    await expect(page.getByRole('option', { name: 'Markdown Card A' }).locator('svg')).toHaveCount(
-      2,
+    await expect(recap.getByRole('button', { name: 'Close Card A′' })).toBeVisible();
+    await recap.getByRole('button', { name: 'Close Card A′' }).click();
+
+    await recap.focus();
+    await page.keyboard.press('Space');
+    await expect(recap.getByText('entry point')).toBeVisible();
+    await recap.click({ position: { x: 8, y: 8 } });
+    const resizeControl = recap.locator('.react-flow__resize-control.handle.bottom.right');
+    await expect(resizeControl).toBeVisible();
+    await recap.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveText('Persisted');
+    const beforeResizeRevisionValue = await persistence.getAttribute('data-revision');
+    if (beforeResizeRevisionValue === null) {
+      throw new Error('Persisted Alias A′ has no revision');
+    }
+    const beforeResizeRevision = Number(beforeResizeRevisionValue);
+    const openSize = await recap.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await settled(page);
+    const resizeBox = await boxOf(resizeControl, "Alias A′'s resize control");
+    await page.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + resizeBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      resizeBox.x + resizeBox.width / 2 + 120,
+      resizeBox.y + resizeBox.height / 2 + 80,
+      { steps: 6 },
     );
-    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-    await target.press('Escape');
-    await expect(page.getByTestId('open-card')).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.mouse.up();
+    await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 1));
+    await recap.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const resizedSize = await recap.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    expect(resizedSize.width).toBeGreaterThan(openSize.width);
+    expect(resizedSize.height).toBeGreaterThan(openSize.height);
 
-    // Pointer and keyboard activation are separate production paths. Keep both:
-    // this affordance is the Alias front's explicit Open operation.
+    await recap.getByRole('button', { name: 'Close Card A′' }).click();
+    await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 2));
     await openCard(recap, 'A′');
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 3));
+    await recap.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const reopenedSize = await recap.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    expect(reopenedSize).toEqual(resizedSize);
 
-    // Its own title is still authored, inline on the graph.
-    await recap.getByRole('button', { name: 'Edit Title A′', exact: true }).click();
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    const persisted = nodeByTitle(page, 'A′');
+    await expect(persisted.getByText('entry point')).toBeVisible();
+    await expect(persisted.getByRole('button', { name: 'Close Card A′' })).toBeVisible();
+    const persistedSize = await persisted.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    expect(persistedSize).toEqual(resizedSize);
+    await expect(persisted.getByRole('textbox')).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
+
+    await persisted.getByRole('button', { name: 'Edit Title A′', exact: true }).click();
     await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('A′');
   },
 );

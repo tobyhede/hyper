@@ -203,7 +203,7 @@ test(
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
     await card.getByRole('button', { name: 'Edit Title A' }).click();
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-    await expect(page.getByTestId('open-card')).toHaveCount(0);
+    await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
     const title = page.getByRole('textbox', { name: 'Card title' });
     await title.fill('Renamed A');
     await title.press('Enter');
@@ -223,7 +223,7 @@ test(
     await keyboardTitle.fill('');
     await nodeByTitle(page, 'B').first().click();
     await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.getByTestId('open-card')).toHaveCount(0);
+    await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
     await quiescent(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
     await keyboardTitle.focus();
@@ -262,7 +262,7 @@ test("a short Title control's hit-area hugs its text, not the whole Card body", 
   };
   await page.mouse.click(blankSpace.x, blankSpace.y);
   await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveCount(0);
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
 });
 
 test('a click selects a Card, and no pointer gesture on its body opens it', async ({ page }) => {
@@ -274,12 +274,12 @@ test('a click selects a Card, and no pointer gesture on its body opens it', asyn
 
   await card.click();
   await expect(card).toHaveClass(/selected/);
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
 
   // Off the Title, which has its own control. React Flow zooms on a double click
   // by default and its filter exempts only `.nopan`, which a Card is not.
   await card.dblclick({ position: { x: 24, y: 12 } });
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
   expect(await viewportTransform(page)).toEqual(transform);
 });
 
@@ -413,10 +413,12 @@ test('the Markdown editor code loads only when a Markdown Card opens', async ({ 
   await settled(page);
   expect(editorRequests).toEqual([]);
 
-  await openCard(nodeByTitle(page, 'A′').first(), 'A′');
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
+  const alias = nodeByTitle(page, 'A′').first();
+  await openCard(alias, 'A′');
+  await expect(alias).toContainText('entry point');
+  await expect(alias.getByRole('textbox')).toHaveCount(0);
   expect(editorRequests).toEqual([]);
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  await alias.getByRole('button', { name: 'Close Card A′' }).click();
 
   await openCard(card, 'A');
   expect(editorRequests).toEqual([]);
@@ -501,48 +503,6 @@ test('opened Markdown editing persists source while expansion displaces and rest
   const persistedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
   await expect(persistedSource).toContainText('# Edited');
   await expect(persistedSource).toContainText('New source');
-});
-
-test('editing an Alias authors its metadata and survives reload', async ({ page }) => {
-  await page.goto('/');
-  const target = nodeByTitle(page, 'A').first();
-  const alias = nodeByTitle(page, 'A′').first();
-  await expect(alias).toBeVisible();
-  await settled(page);
-  const before = await allPositions(page);
-
-  await openCard(alias, 'A′');
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-  await page.getByRole('textbox', { name: 'Title' }).fill('A reference to B');
-  const targetPicker = page.getByRole('combobox', { name: 'Target' });
-  await targetPicker.fill('B');
-  // A picker row is named by its kind glyph and then its title — `CardKindIcon`
-  // is a `role="img"` carrying the kind's name — so the accessible name of the
-  // row for `B` is `Markdown Card B`, never `B`.
-  await page.getByRole('option', { name: 'Markdown Card B' }).click();
-  await page.getByRole('button', { name: 'Done' }).click();
-
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  expect(await allPositions(page)).toEqual(before);
-  await expect(nodeByTitle(page, 'A reference to B').first()).toBeVisible();
-
-  // The Alias pane authored the Alias and nothing else: the Card it used to
-  // point at still holds its own source (ADR 0049).
-  await openCard(target, 'A');
-  await expect(target).toContainText('entry point');
-  await target.getByRole('button', { name: 'Close Card A' }).click();
-
-  await page.reload();
-  await openCard(nodeByTitle(page, 'A reference to B').first(), 'A reference to B');
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A reference to B');
-  const reloadedTargetPicker = page.getByRole('combobox', { name: 'Target' });
-  await reloadedTargetPicker.fill('B');
-  await reloadedTargetPicker.press('ArrowDown');
-  // Two glyphs on the row: the kind, and the check that says this is the Target
-  // the reloaded Alias names.
-  await expect(page.getByRole('option', { name: 'Markdown Card B' }).locator('svg')).toHaveCount(2);
 });
 
 /**
@@ -1754,7 +1714,7 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
     'opacity',
     '1',
   );
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
 });
 
 test('an authored Edge is immediately available when presenting the Graph', async ({ page }) => {
@@ -2007,7 +1967,7 @@ test('clicking a Card authoring handle neither opens the Card nor draws an Edge'
   const handleBox = (await authoringHandle(card, 'source', 'right').boundingBox())!;
   await page.mouse.click(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
 
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
@@ -2825,10 +2785,10 @@ test('Escape discards a typed Alias title and closes the pane', async ({ page })
 });
 
 /**
- * Choosing a Target is the creation, and the editor stays open on what it made.
+ * Choosing a Target is the creation, and shared Title editing begins on what it made.
  */
 test(
-  'choosing a Target creates the Alias and leaves its editor open',
+  'choosing a Target creates the Alias and begins shared Title editing',
   { tag: '@parity:new-alias-completes-on-the-target-chosen' },
   async ({ page }) => {
     await page.goto('/');
@@ -2846,14 +2806,10 @@ test(
     await page.getByRole('combobox', { name: 'Target' }).fill('B');
     await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
-    // The pane it is now on is the Alias's own editor: its Title and its Target,
-    // and nothing belonging to the Card its Target resolves to (ADR 0049).
     await expect(page.getByTestId('new-alias')).toHaveCount(0);
-    await expect(page.getByTestId('open-card')).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('B');
-    await expect(page.getByRole('combobox', { name: 'Target' })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('B');
+    await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
+    await page.getByRole('textbox', { name: 'Card title' }).press('Escape');
 
     // An empty title takes the Target's, so the Alias is a second Card called B.
     await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
@@ -2873,7 +2829,7 @@ test(
  *
  * The editor retains the pane contract: only its labelled Done action commits.
  */
-test('an Alias is renamed in the editor its creation leaves open', async ({ page }) => {
+test('an Alias is renamed by the shared Title editor creation begins', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
@@ -2883,18 +2839,12 @@ test('an Alias is renamed in the editor its creation leaves open', async ({ page
   await page.getByRole('combobox', { name: 'Target' }).fill('B');
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
-  const title = page.getByRole('textbox', { name: 'Title' });
+  const title = page.getByRole('textbox', { name: 'Card title' });
   await expect(title).toHaveValue('B');
-  // The reopened editor opens on its Target picker, not the title it just left.
-  const target = page.getByRole('combobox', { name: 'Target' });
-  await expect(target).toBeFocused();
-  const targetFrame = target.locator('xpath=ancestor::*[@data-slot="input-group"]');
-  await expect(targetFrame).toHaveCSS('outline-style', 'solid');
-  await expect(targetFrame).toHaveCSS('outline-offset', '2px');
+  await expect(title).toBeFocused();
   await title.fill('Recap');
-  await page.getByRole('button', { name: 'Done' }).click();
+  await title.press('Enter');
 
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
   // The Target keeps its own: one Card called B, the one that was always there.
   await expect(nodeByTitle(page, 'B')).toHaveCount(1);
@@ -2925,12 +2875,11 @@ test('Escape discards an Alias rename without undoing the Alias', async ({ page 
   await page.getByRole('menuitem', { name: 'Add Alias' }).click();
   await page.getByRole('combobox', { name: 'Target' }).fill('B');
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
-  const title = page.getByRole('textbox', { name: 'Title' });
+  const title = page.getByRole('textbox', { name: 'Card title' });
   await title.fill('Recap');
 
   await title.press('Escape');
 
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
   await quiescent(page);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(0);
   await expect(nodeByTitle(page, 'B')).toHaveCount(2);

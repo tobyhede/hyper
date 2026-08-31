@@ -199,6 +199,7 @@ export type AuthoringRefusal =
   | { readonly code: 'layout-required'; readonly operation: LayoutRequiredOperation }
   | { readonly code: 'card-not-found' }
   | { readonly code: 'card-kind-immutable' }
+  | { readonly code: 'alias-target-immutable' }
   | { readonly code: 'card-title-required' }
   | { readonly code: 'layout-title-required' }
   | { readonly code: 'alias-target-not-found'; readonly targetId: CardId }
@@ -543,8 +544,8 @@ const reconnectOutcome = (
 /**
  * Why a Card document's Alias Target may not be authored, or `null`.
  *
- * One rule for both the Alias that is being created and the one being
- * retargeted, because they are the same question asked at two moments. It
+ * This is the creation-time rule for choosing an Alias Target. Existing Alias
+ * Targets are immutable and are refused before this validation is reached. It
  * duplicates what `validateReferences` already enforces, and deliberately:
  * intake reports by failing the whole snapshot, which this derivation answers
  * by throwing, and an author choosing the wrong Target has made a mistake that
@@ -939,6 +940,13 @@ export function createSpaceAuthoring({
       // this Card.
       if (card.document.kind !== completion.document.kind) {
         return refuse({ code: 'card-kind-immutable' });
+      }
+      if (
+        card.document.kind === 'alias' &&
+        completion.document.kind === 'alias' &&
+        card.document.target !== completion.document.target
+      ) {
+        return refuse({ code: 'alias-target-immutable' });
       }
       // Trimmed and refused *here* rather than only at the surface that typed
       // it. A blank title is the empty case wearing different bytes, and intake

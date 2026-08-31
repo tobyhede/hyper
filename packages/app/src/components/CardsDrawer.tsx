@@ -52,7 +52,12 @@ const targetTitle = (card: Card, titleById: ReadonlyMap<CardId, string>): string
 
 const frontOf = (card: Card, titleById: ReadonlyMap<CardId, string>) => {
   if (card.kind === 'alias')
-    return { kind: 'alias' as const, aliasOf: targetTitle(card, titleById) };
+    return {
+      kind: 'alias' as const,
+      aliasOf: targetTitle(card, titleById),
+      source: '',
+      open: false,
+    };
   if (card.kind === 'space') return { kind: 'space' as const };
   return { kind: 'markdown' as const, source: card.body, open: false as const };
 };

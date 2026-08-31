@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  cn,
   Dialog,
   DialogBackdrop,
   DialogPopup,
@@ -13,7 +12,6 @@ import { PANE_INITIAL_FOCUS } from './pane-focus';
 export interface CardPaneProps {
   readonly ariaLabel: string;
   readonly testId: string;
-  readonly variant?: 'default' | 'card-editor';
   /** Cancel and Escape both discard this surface's draft (ADR 0048). */
   readonly onDismiss: () => void;
   readonly children: ReactNode;
@@ -23,13 +21,7 @@ export interface CardPaneProps {
  * A modal surface shared by opening a Card and creating an Alias. Base UI owns
  * containment, Escape and accessible dialog semantics; App owns focus return.
  */
-export function CardPane({
-  ariaLabel,
-  testId,
-  variant = 'default',
-  onDismiss,
-  children,
-}: CardPaneProps) {
+export function CardPane({ ariaLabel, testId, onDismiss, children }: CardPaneProps) {
   const popup = useRef<HTMLDivElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const captureOwnerDocument = useCallback((node: HTMLSpanElement | null) => {
@@ -59,14 +51,11 @@ export function CardPane({
       <span ref={captureOwnerDocument} hidden />
       {portalContainer !== null && (
         <DialogPortal container={portalContainer}>
-          <DialogViewport className="card-pane" data-variant={variant} data-testid={testId}>
+          <DialogViewport className="card-pane" data-testid={testId}>
             <DialogBackdrop className="card-pane__backdrop" />
             <DialogPopup
               ref={popup}
-              className={cn(
-                'card-pane__panel',
-                variant === 'card-editor' && 'card-pane__panel--card-editor',
-              )}
+              className="card-pane__panel"
               // The primitive still owns modality; the effect above supplies the
               // declared field instead of its generic first-tabbable default.
               initialFocus={false}

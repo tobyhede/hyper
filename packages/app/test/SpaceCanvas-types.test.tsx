@@ -11,7 +11,7 @@ import type { SpaceCanvasProps } from '../src/components/SpaceCanvas';
  *
  * These assertions are a runtime no-op: `expectTypeOf` compiles to nothing and
  * `pnpm test` will pass this file whatever the props type says. The root
- * `pnpm typecheck` is what enforces it, as with `OpenCard-types.test.tsx`.
+ * `pnpm typecheck` is what enforces it.
  */
 
 it('carries the branded GraphId through, not a plain string', () => {

@@ -23,6 +23,8 @@ export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
       return 'This Card is no longer part of the Space.';
     case 'card-kind-immutable':
       return 'A Card keeps the kind it was created with.';
+    case 'alias-target-immutable':
+      return 'An Alias keeps the Target it was created with.';
     case 'card-title-required':
       return 'A Card title is required.';
     case 'layout-title-required':
@@ -38,7 +40,7 @@ export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
     case 'card-not-expanded':
       return 'Open this Card before resizing it.';
     case 'card-has-aliases':
-      return `Retarget or delete the Aliases of this Card first: ${refusal.aliasTitles.join(', ')}.`;
+      return `Delete the Aliases of this Card first: ${refusal.aliasTitles.join(', ')}.`;
     case 'graph-title-required':
       return 'A Graph title is required.';
     case 'layout-must-keep-graph':
@@ -77,13 +79,14 @@ const presentRefusal = <Field extends string>(
 
 const form = null;
 
-/** Alias editing and Alias creation both own Title and Target, and nothing else. */
+/** Alias creation owns Title and Target, and nothing else. */
 const titleAndTargetPlacements = {
   'placement-pending': form,
   'layout-not-found': form,
   'layout-required': form,
   'card-not-found': form,
   'card-kind-immutable': form,
+  'alias-target-immutable': form,
   'card-title-required': 'title',
   'layout-title-required': form,
   'alias-target-not-found': 'target',
@@ -101,12 +104,7 @@ const titleAndTargetPlacements = {
   'layout-active-graph-required': form,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | 'target' | null>>;
 
-export type AliasCardRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
 export type NewAliasRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
-
-/** Error placement for an Alias editor, which owns Title and Target. */
-export const presentAliasCardRefusal = (refusal: AuthoringRefusal): AliasCardRefusalErrors =>
-  presentRefusal(refusal, titleAndTargetPlacements);
 
 /** Error placement for Alias creation, which owns Title and Target. */
 export const presentNewAliasRefusal = (refusal: AuthoringRefusal): NewAliasRefusalErrors =>
@@ -131,6 +129,7 @@ const correctableByCardChoice = {
   'layout-required': false,
   'card-not-found': false,
   'card-kind-immutable': false,
+  'alias-target-immutable': false,
   'card-title-required': false,
   'layout-title-required': false,
   'alias-target-not-found': false,
