@@ -213,6 +213,65 @@ describe('SpaceSidebar', () => {
     expect(screen.getByTestId('persistence-status')).toHaveAttribute('data-revision', '4');
   });
 
+  it("opens a row's entity-actions menu from its trailing icon, not only from a right click", async () => {
+    const onSelect = vi.fn();
+    const props: SpaceSidebarProps = {
+      ...withLayout(settledProps()),
+      entityActions: () => [[], [{ id: 'copy', label: 'Copy link', onSelect }], []],
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    // The icon is a real tab stop and the only path that does not need a
+    // pointer, so it is the one that has to work: ADR 0052's parity aside, the
+    // right click is explicitly an accelerator over it (`.scratch/link-ux`).
+    const trigger = screen.getByRole('button', { name: 'Actions for Space View Layout 1' });
+    fireEvent.click(trigger);
+
+    const item = await screen.findByRole('menuitem', { name: 'Copy link' });
+    fireEvent.click(item);
+    expect(onSelect).toHaveBeenCalledOnce();
+  });
+
+  it('does not expose entity actions when every supplied group is empty', () => {
+    const props: SpaceSidebarProps = {
+      ...withLayout(settledProps()),
+      entityActions: () => [[], []],
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Space View Layout 1' }),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="entity-actions"]')).not.toBeInTheDocument();
+  });
+
+  it('does not expose a context menu while a row title is being edited', () => {
+    const titleEdit: SpaceChromeTitleEdit = {
+      subject: { kind: 'layout', id: LAYOUT_ID },
+      surface: 'sidebar',
+      draft: 'Layout 1',
+      error: null,
+      onBegin: vi.fn(),
+      onDraftChange: vi.fn(),
+      onErrorChange: vi.fn(),
+      onComplete: vi.fn(() => null),
+      onCancel: vi.fn(),
+      onReturnFocus: vi.fn(),
+    };
+    const base = withLayout(settledProps());
+    const props: SpaceSidebarProps = {
+      ...base,
+      canvas: { ...base.canvas, current: LAYOUT },
+      titleEdit,
+      entityActions: () => [[{ id: 'rename', label: 'Rename', onSelect: vi.fn() }]],
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    const editor = screen.getByRole('textbox', { name: 'Layout name' });
+    expect(editor).toBeVisible();
+    expect(editor.closest('[data-slot="entity-actions"]')).not.toBeInTheDocument();
+  });
+
   it('offers distinct canonical and contextual copy commands for a selected Card', () => {
     const props: SpaceSidebarProps = {
       ...settledProps(),

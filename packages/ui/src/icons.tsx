@@ -5,6 +5,7 @@ import {
   CornerDownRight,
   FileText,
   Grid2x2,
+  Link,
   Maximize,
   Maximize2,
   Minus,
@@ -107,3 +108,15 @@ export const AlertIcon = () => <CircleAlert />;
 
 /** Close the surface that contains the control. */
 export const CloseIcon = () => <X size={14} strokeWidth={3} />;
+
+/**
+ * Open an entity's actions menu — the two link forms it can be reached by,
+ * plus rename where the entity has one.
+ *
+ * A link glyph rather than the conventional kebab. Every other control on a
+ * Card rail names its command (`EditIcon`, `OpenCardIcon`, `CloseCardIcon`), so
+ * a generic "more" glyph beside them would be the one control saying nothing
+ * about what it does — and what this menu is mostly for is the entity's
+ * addresses (ADR 0069, ADR 0072).
+ */
+export const LinkActionsIcon = (props: CardActionIconProps) => <Link size={14} {...props} />;

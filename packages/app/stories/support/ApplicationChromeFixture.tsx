@@ -6,7 +6,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 export interface ApplicationChromeFixtureProps extends Pick<
   SpaceSidebarFixtureProps,
-  'space' | 'persistence' | 'presenting'
+  'space' | 'persistence' | 'presenting' | 'entityActions'
 > {
   readonly headerActions?: ReactNode;
   readonly rightPanel?: ReactNode;
@@ -25,6 +25,7 @@ export function ApplicationChromeFixture({
   space,
   persistence,
   presenting,
+  entityActions,
   headerActions,
   rightPanel,
   canvasCards,
@@ -33,12 +34,16 @@ export function ApplicationChromeFixture({
   onCanvasDrop,
 }: ApplicationChromeFixtureProps) {
   const sidebarOptionalProps: Mutable<
-    Pick<SpaceSidebarFixtureProps, 'space' | 'persistence' | 'presenting' | 'headerActions'>
+    Pick<
+      SpaceSidebarFixtureProps,
+      'space' | 'persistence' | 'presenting' | 'headerActions' | 'entityActions'
+    >
   > = {};
   if (space !== undefined) sidebarOptionalProps.space = space;
   if (persistence !== undefined) sidebarOptionalProps.persistence = persistence;
   if (presenting !== undefined) sidebarOptionalProps.presenting = presenting;
   if (headerActions !== undefined) sidebarOptionalProps.headerActions = headerActions;
+  if (entityActions !== undefined) sidebarOptionalProps.entityActions = entityActions;
   const canvasOptionalProps: Mutable<Pick<ComponentProps<typeof LayoutCanvasFixture>, 'cards'>> =
     {};
   if (canvasCards !== undefined) canvasOptionalProps.cards = canvasCards;

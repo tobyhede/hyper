@@ -57,6 +57,13 @@ export {
   CommandItem,
   CommandList,
 } from './Command';
+export { EntityActions, EntityActionsTrigger } from './EntityActionsMenu';
+export type {
+  EntityAction,
+  EntityActionGroup,
+  EntityActionsProps,
+  EntityActionsTriggerProps,
+} from './EntityActionsMenu';
 export { FALLBACK_GRAPH_COLOR, graphColor } from './graph-color';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
@@ -74,6 +81,7 @@ export {
   GraphIcon,
   GridIcon,
   LayoutIcon,
+  LinkActionsIcon,
   MarkdownIcon,
   OpenCardIcon,
   SearchIcon,
@@ -116,6 +124,15 @@ export {
   CardHeader,
   CardTitle,
 } from './components/card';
+export {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from './components/context-menu';
 export {
   DropdownMenu,
   DropdownMenuCheckboxItem,

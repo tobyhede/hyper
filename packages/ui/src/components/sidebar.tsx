@@ -567,17 +567,32 @@ function SidebarMenuButton({
   );
 }
 
-function SidebarMenuAction({
-  className,
-  render,
-  showOnHover = false,
-  ...props
-}: useRender.ComponentProps<'button'> &
-  React.ComponentProps<'button'> & {
-    showOnHover?: boolean;
-  }) {
+/**
+ * A row's trailing command.
+ *
+ * `forwardRef`, and that is load-bearing rather than tidy. This is rendered as
+ * the `render` prop of a Base UI trigger — `EntityActionsTrigger` hands it to
+ * `Menu.Trigger` — and those prop types include `ref`. A plain function
+ * component under React 18 advertises one and then drops it silently, which
+ * leaves the trigger with no element: the menu opens on the press and is
+ * dismissed again by the same press, because the dismissal cannot attribute it
+ * to a trigger it never got. `toolbar.tsx` states the same rule for the Card
+ * rail's controls, which is why the rail's menu worked while this one did not.
+ *
+ * `fireEvent.click` does not reproduce it — it fires `click` alone, never the
+ * pointerdown/mouseup pair a real press does — so `Sidebar.test.tsx` asserts
+ * the ref itself.
+ */
+const SidebarMenuAction = React.forwardRef<
+  HTMLButtonElement,
+  useRender.ComponentProps<'button'> &
+    React.ComponentProps<'button'> & {
+      showOnHover?: boolean;
+    }
+>(function SidebarMenuAction({ className, render, showOnHover = false, ...props }, ref) {
   return useRender({
     defaultTagName: 'button',
+    ref,
     props: mergeProps<'button'>(
       {
         className: cn(
@@ -595,7 +610,7 @@ function SidebarMenuAction({
       sidebar: 'menu-action',
     },
   });
-}
+});
 
 function SidebarMenuBadge({ className, ...props }: React.ComponentProps<'div'>) {
   return (
