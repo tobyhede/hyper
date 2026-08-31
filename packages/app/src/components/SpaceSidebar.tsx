@@ -13,6 +13,8 @@ import {
   Button,
   buttonVariants,
   cn,
+  EntityActions,
+  EntityActionsTrigger,
   FALLBACK_GRAPH_COLOR,
   FlowIcon,
   GraphIcon,
@@ -30,11 +32,13 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
   useSidebar,
 } from '@project/ui';
+import type { EntityActionGroup } from '@project/ui';
 import type { CanvasRenderers, CanvasRenderer } from '../canvas-renderers';
 import { canvasRendererKey, type CanvasRendererId } from '../renderer';
 
@@ -124,8 +128,32 @@ export interface SpaceSidebarProps {
         readonly onCopyContextual?: (() => void) | undefined;
       }
     | undefined;
+  /**
+   * What commands each entity in this Sidebar offers, asked one entity at a
+   * time. Absent leaves every row exactly as it was.
+   *
+   * A function rather than a built list, because the two things these commands
+   * are made of are not the Sidebar's: an address comes from the product
+   * destination table (ADR 0069, ADR 0072) and a rename runs a completed Edit.
+   * The Sidebar knows which entities it is drawing and where their controls go;
+   * what a command *is* stays with the composition that already owns both.
+   */
+  readonly entityActions?: (entity: SpaceEntity) => readonly EntityActionGroup[];
   readonly titleEdit?: SpaceChromeTitleEdit;
 }
+
+/**
+ * An entity this Sidebar draws a row for, named the way the row knows it.
+ *
+ * It carries the whole `CanvasRenderer`/`Graph` rather than an id, for the
+ * reason `SelectedCanvasRenderer` takes the row: handed an id, a caller has to
+ * find the thing again down a second path, and the Sidebar and the menu on its
+ * own row are then free to disagree about what they are naming.
+ */
+export type SpaceEntity =
+  | { readonly kind: 'space' }
+  | { readonly kind: 'space-view'; readonly renderer: CanvasRenderer }
+  | { readonly kind: 'graph'; readonly graph: Graph; readonly renderer: CanvasRenderer };
 
 export interface SpaceChromeTitleEdit {
   readonly subject: SpaceChromeTitleSubject | null;
@@ -217,11 +245,13 @@ function RendererGroup({
   selected,
   onSelect,
   titleEdit,
+  entityActions,
 }: {
   readonly renderers: readonly CanvasRenderer[];
   readonly selected: CanvasRenderer;
   readonly onSelect: (selection: CanvasRendererId) => void;
   readonly titleEdit: SpaceChromeTitleEdit | undefined;
+  readonly entityActions: SpaceSidebarProps['entityActions'];
 }) {
   const selectedKey = canvasRendererKey(selected.selection);
   return (
@@ -239,68 +269,127 @@ function RendererGroup({
             : renderer.title;
         return (
           <SidebarMenuItem key={canvasRendererKey(renderer.selection)} tabIndex={-1}>
-            {isEditing ? (
-              // The row keeps its addressing hooks while its own rename is
-              // live: an open pane marks the root `inert`, so `data-renderer`
-              // is how a covered Sidebar is reached at all (docs/agents/ui.md).
-              // `aria-pressed` is not carried across — this branch renders a
-              // `div`, and pressed state on a non-button is not a thing to say.
-              <SidebarMenuButton
-                render={<div />}
-                isActive={active}
-                data-testid="canvas-renderer"
-                data-renderer={canvasRendererKey(renderer.selection)}
-              >
-                <RendererIcon renderer={renderer} />
-                <InlineTitleEditor
-                  className="flex-1"
-                  title={renderer.title}
-                  label="Layout name"
-                  variant="sidebar"
-                  draft={titleEdit.draft}
-                  error={titleEdit.error}
-                  onDraftChange={titleEdit.onDraftChange}
-                  onErrorChange={titleEdit.onErrorChange}
-                  onComplete={(title) =>
-                    titleEdit.onComplete({ kind: 'layout', id: layoutId }, title)
-                  }
-                  onCancel={titleEdit.onCancel}
-                  onReturnFocus={titleEdit.onReturnFocus}
-                />
-              </SidebarMenuButton>
-            ) : (
-              <SidebarMenuButton
-                isActive={active}
-                aria-pressed={active}
-                data-testid="canvas-renderer"
-                data-renderer={canvasRendererKey(renderer.selection)}
-                onClick={(event) => {
-                  if (
-                    active &&
-                    layoutId !== null &&
-                    titleEdit !== undefined &&
-                    titleEdit.disabled !== true
-                  ) {
-                    const row = event.currentTarget.closest('li');
-                    titleEdit.onBegin(
-                      { kind: 'layout', id: layoutId },
-                      renderer.title,
-                      'sidebar',
-                      () => row?.focus(),
-                    );
-                  } else {
-                    onSelect(renderer.selection);
-                  }
-                }}
-              >
-                <RendererIcon renderer={renderer} />
-                <span>{shownTitle}</span>
-              </SidebarMenuButton>
-            )}
+            <EntityActionsRow
+              entity={{ kind: 'space-view', renderer }}
+              entityActions={entityActions}
+              label={`Actions for Space View ${renderer.title}`}
+              editing={isEditing}
+            >
+              {isEditing ? (
+                // The row keeps its addressing hooks while its own rename is
+                // live: an open pane marks the root `inert`, so `data-renderer`
+                // is how a covered Sidebar is reached at all (docs/agents/ui.md).
+                // `aria-pressed` is not carried across — this branch renders a
+                // `div`, and pressed state on a non-button is not a thing to say.
+                <SidebarMenuButton
+                  render={<div />}
+                  isActive={active}
+                  data-testid="canvas-renderer"
+                  data-renderer={canvasRendererKey(renderer.selection)}
+                >
+                  <RendererIcon renderer={renderer} />
+                  <InlineTitleEditor
+                    className="flex-1"
+                    title={renderer.title}
+                    label="Layout name"
+                    variant="sidebar"
+                    draft={titleEdit.draft}
+                    error={titleEdit.error}
+                    onDraftChange={titleEdit.onDraftChange}
+                    onErrorChange={titleEdit.onErrorChange}
+                    onComplete={(title) =>
+                      titleEdit.onComplete({ kind: 'layout', id: layoutId }, title)
+                    }
+                    onCancel={titleEdit.onCancel}
+                    onReturnFocus={titleEdit.onReturnFocus}
+                  />
+                </SidebarMenuButton>
+              ) : (
+                <SidebarMenuButton
+                  isActive={active}
+                  aria-pressed={active}
+                  data-testid="canvas-renderer"
+                  data-renderer={canvasRendererKey(renderer.selection)}
+                  onClick={(event) => {
+                    if (
+                      active &&
+                      layoutId !== null &&
+                      titleEdit !== undefined &&
+                      titleEdit.disabled !== true
+                    ) {
+                      const row = event.currentTarget.closest('li');
+                      titleEdit.onBegin(
+                        { kind: 'layout', id: layoutId },
+                        renderer.title,
+                        'sidebar',
+                        () => row?.focus(),
+                      );
+                    } else {
+                      onSelect(renderer.selection);
+                    }
+                  }}
+                >
+                  <RendererIcon renderer={renderer} />
+                  <span>{shownTitle}</span>
+                </SidebarMenuButton>
+              )}
+            </EntityActionsRow>
           </SidebarMenuItem>
         );
       })}
     </SidebarMenu>
+  );
+}
+
+/**
+ * A row that answers a right click and carries a trailing menu icon, or the row
+ * exactly as it was when nothing supplies its commands.
+ *
+ * Both paths open the same list, which is `EntityActions`' and
+ * `EntityActionsTrigger`'s doing rather than this module's. What is decided
+ * here is only *where* on a Sidebar row the icon goes: `SidebarMenuAction`,
+ * hover- and focus-revealed, which is the registry Sidebar's own trailing-action
+ * slot and already resolves to permanently visible below the `md` breakpoint
+ * where there is no hover to reveal it with.
+ *
+ * Withheld while the row's title is being edited: the icon's slot is where the
+ * editor's own box now is, and a menu offering Rename over a live rename is
+ * offering a second start to an Edit already running.
+ */
+function EntityActionsRow({
+  entity,
+  entityActions,
+  label,
+  editing: isEditing,
+  children,
+}: {
+  readonly entity: SpaceEntity;
+  readonly entityActions: SpaceSidebarProps['entityActions'];
+  readonly label: string;
+  readonly editing: boolean;
+  readonly children: ReactNode;
+}) {
+  if (entityActions === undefined) return children;
+  const groups = entityActions(entity);
+  if (!groups.some((group) => group.length > 0)) return children;
+  if (isEditing) return children;
+  return (
+    <>
+      <EntityActions groups={groups}>{children}</EntityActions>
+      {/* A **sibling** of the right-click surface, never inside it: Base UI's
+          own "Using with Menu" pattern pairs a `ContextMenu` with a `Menu`
+          side by side, and a `Menu.Root` under a `ContextMenu.Root` risks
+          being read as that context menu's submenu, which opens on hover
+          rather than on a press.
+
+          This is the documented shape, not a fix for the trigger being inert
+          — that is still open, and un-nesting did not resolve it. */}
+      <EntityActionsTrigger
+        groups={groups}
+        label={label}
+        render={<SidebarMenuAction showOnHover />}
+      />
+    </>
   );
 }
 
@@ -327,6 +416,7 @@ export function SpaceSidebar({
   addCard,
   persistence,
   cardLinks,
+  entityActions,
   titleEdit,
   collapsible = 'offcanvas',
   className,
@@ -363,10 +453,22 @@ export function SpaceSidebar({
   return (
     <Sidebar collapsible={collapsible} className={className} data-testid="space-sidebar">
       <SidebarHeader className="nokey">
-        <div className="flex min-w-0 items-center gap-2 px-2">
-          <h1 data-testid="space-title" className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {spaceTitle}
-          </h1>
+        {/* The Space's own actions hang off its title, not off standing
+            Sidebar chrome — the entity carries its commands. There is no
+            trailing-icon slot here as there is on a row, so the trigger sits
+            in the title's row beside the persistence control; the right click
+            covers the whole title area. */}
+        <div className="group/menu-item relative flex min-w-0 items-center gap-2 px-2">
+          <EntityActionsRow
+            entity={{ kind: 'space' }}
+            entityActions={entityActions}
+            label={`Actions for Space ${spaceTitle}`}
+            editing={false}
+          >
+            <h1 data-testid="space-title" className="min-w-0 flex-1 truncate text-sm font-semibold">
+              {spaceTitle}
+            </h1>
+          </EntityActionsRow>
           {persistence.control}
           <span
             hidden
@@ -403,6 +505,7 @@ export function SpaceSidebar({
               selected={canvas.current}
               onSelect={onCanvas(canvas.onSelect)}
               titleEdit={titleEdit}
+              entityActions={entityActions}
             />
             {canvas.renderers.authored.length === 0 ? (
               <NothingYet testId="no-authored-layouts">
@@ -414,6 +517,7 @@ export function SpaceSidebar({
                 selected={canvas.current}
                 onSelect={onCanvas(canvas.onSelect)}
                 titleEdit={titleEdit}
+                entityActions={entityActions}
               />
             )}
           </SidebarGroupContent>
@@ -448,54 +552,65 @@ export function SpaceSidebar({
                   const isEditing = editing(titleEdit, 'graph', candidate.id);
                   return (
                     <SidebarMenuItem key={candidate.id} tabIndex={-1}>
-                      {isEditing && titleEdit !== undefined ? (
-                        <SidebarMenuButton
-                          render={<div />}
-                          isActive={active}
-                          data-testid="graph-choice"
-                          data-graph-id={candidate.id}
-                        >
-                          <GraphIcon color={graphColor(candidate, graph.colorByGraphId)} />
-                          <InlineTitleEditor
-                            className="flex-1"
-                            title={candidate.title}
-                            label="Graph name"
-                            variant="sidebar"
-                            draft={titleEdit.draft}
-                            error={titleEdit.error}
-                            onDraftChange={titleEdit.onDraftChange}
-                            onErrorChange={titleEdit.onErrorChange}
-                            onComplete={(title) =>
-                              titleEdit.onComplete({ kind: 'graph', id: candidate.id }, title)
-                            }
-                            onCancel={titleEdit.onCancel}
-                            onReturnFocus={titleEdit.onReturnFocus}
-                          />
-                        </SidebarMenuButton>
-                      ) : (
-                        <SidebarMenuButton
-                          isActive={active}
-                          aria-pressed={active}
-                          data-testid="graph-choice"
-                          data-graph-id={candidate.id}
-                          onClick={(event) => {
-                            if (active && titleEdit !== undefined && titleEdit.disabled !== true) {
-                              const row = event.currentTarget.closest('li');
-                              titleEdit.onBegin(
-                                { kind: 'graph', id: candidate.id },
-                                candidate.title,
-                                'sidebar',
-                                () => row?.focus(),
-                              );
-                            } else {
-                              onCanvas(graph.onActivate)(candidate.id);
-                            }
-                          }}
-                        >
-                          <GraphIcon color={graphColor(candidate, graph.colorByGraphId)} />
-                          <span>{candidate.title}</span>
-                        </SidebarMenuButton>
-                      )}
+                      <EntityActionsRow
+                        entity={{ kind: 'graph', graph: candidate, renderer: canvas.current }}
+                        entityActions={entityActions}
+                        label={`Actions for Graph ${candidate.title}`}
+                        editing={isEditing}
+                      >
+                        {isEditing && titleEdit !== undefined ? (
+                          <SidebarMenuButton
+                            render={<div />}
+                            isActive={active}
+                            data-testid="graph-choice"
+                            data-graph-id={candidate.id}
+                          >
+                            <GraphIcon color={graphColor(candidate, graph.colorByGraphId)} />
+                            <InlineTitleEditor
+                              className="flex-1"
+                              title={candidate.title}
+                              label="Graph name"
+                              variant="sidebar"
+                              draft={titleEdit.draft}
+                              error={titleEdit.error}
+                              onDraftChange={titleEdit.onDraftChange}
+                              onErrorChange={titleEdit.onErrorChange}
+                              onComplete={(title) =>
+                                titleEdit.onComplete({ kind: 'graph', id: candidate.id }, title)
+                              }
+                              onCancel={titleEdit.onCancel}
+                              onReturnFocus={titleEdit.onReturnFocus}
+                            />
+                          </SidebarMenuButton>
+                        ) : (
+                          <SidebarMenuButton
+                            isActive={active}
+                            aria-pressed={active}
+                            data-testid="graph-choice"
+                            data-graph-id={candidate.id}
+                            onClick={(event) => {
+                              if (
+                                active &&
+                                titleEdit !== undefined &&
+                                titleEdit.disabled !== true
+                              ) {
+                                const row = event.currentTarget.closest('li');
+                                titleEdit.onBegin(
+                                  { kind: 'graph', id: candidate.id },
+                                  candidate.title,
+                                  'sidebar',
+                                  () => row?.focus(),
+                                );
+                              } else {
+                                onCanvas(graph.onActivate)(candidate.id);
+                              }
+                            }}
+                          >
+                            <GraphIcon color={graphColor(candidate, graph.colorByGraphId)} />
+                            <span>{candidate.title}</span>
+                          </SidebarMenuButton>
+                        )}
+                      </EntityActionsRow>
                     </SidebarMenuItem>
                   );
                 })}

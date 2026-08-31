@@ -55,6 +55,8 @@ export interface SpaceSidebarFixtureProps {
   readonly showCardLinks?: boolean;
   /** Whether this fixture supplies the active Graph's URL commands. */
   readonly showGraphLinks?: boolean;
+  /** The per-entity actions menu the real Sidebar draws on its rows. */
+  readonly entityActions?: SpaceSidebarProps['entityActions'];
 }
 
 /**
@@ -78,6 +80,7 @@ export function SpaceSidebarFixture({
   headerActions,
   showCardLinks = true,
   showGraphLinks = true,
+  entityActions,
 }: SpaceSidebarFixtureProps) {
   const [titleEdit, setTitleEdit] = useState<{
     readonly subject: SpaceChromeTitleSubject;
@@ -172,6 +175,9 @@ export function SpaceSidebarFixture({
     onReturnFocus: () => titleEdit?.returnFocus(),
   };
 
+  const entityActionsProps: Mutable<Pick<SpaceSidebarProps, 'entityActions'>> = {};
+  if (entityActions !== undefined) entityActionsProps.entityActions = entityActions;
+
   const graphLinksProps: Mutable<Pick<SpaceSidebarProps['graph'], 'links'>> = {};
   if (showGraphLinks) {
     graphLinksProps.links = {
@@ -224,6 +230,7 @@ export function SpaceSidebarFixture({
                 }
           }
           titleEdit={chromeTitleEdit}
+          {...entityActionsProps}
         />
       }
       header={

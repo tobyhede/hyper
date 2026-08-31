@@ -4,6 +4,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { CanvasCard } from '../src';
 
 describe('CanvasCard kind and interaction state', () => {
+  it('does not expose entity actions when every supplied group is empty', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="selected"
+        title="Empty"
+        graphColor="#ffc53d"
+        entityActions={[[], []]}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Card Empty' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('draws a creation preview without authored Markdown or open state', () => {
     render(
       <CanvasCard front={{ kind: 'preview' }} state="rest" title="Card 2" graphColor="#ffc53d" />,

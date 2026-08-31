@@ -7,6 +7,7 @@ import {
   CardRailSharedActions,
 } from './CardRailActions';
 import { CardContentEditProvider, type CardContentEdit } from './card-content-edit';
+import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { CardRail } from './CardRail';
 import { Card, CardContent, CardTitle } from './components/card';
 import { AbandonEditIcon, CloseCardIcon, CommitEditIcon, EditIcon, OpenCardIcon } from './icons';
@@ -78,6 +79,16 @@ interface CanvasCardCommonProps {
   readonly graphColor: string;
   /** Present only when activating the displayed Title may begin a rename. */
   readonly onBeginTitleEdit?: () => void;
+  /**
+   * This Card's own commands — rename it, copy an address it can be reached by,
+   * open it elsewhere — drawn as one more control on the rail.
+   *
+   * Absent by default, and absent means no control rather than an empty menu:
+   * a Card drawn where none of those commands can run (a creation ghost, a
+   * story with nothing behind it) offers nothing instead of offering a menu
+   * that refuses.
+   */
+  readonly entityActions?: readonly EntityActionGroup[];
 }
 
 /**
@@ -172,7 +183,7 @@ const opacityTransitionMs = (element: HTMLElement): number => {
  * own visual treatment lives in `canvas-card.css`, colocated with this module.
  */
 export function CanvasCard(props: CanvasCardProps) {
-  const { front, title, graphColor, onBeginTitleEdit, state } = props;
+  const { front, title, graphColor, onBeginTitleEdit, entityActions, state } = props;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   const open = front.kind === 'markdown' && front.open;
   const contentControl = useRef<HTMLDivElement>(null);
@@ -195,12 +206,14 @@ export function CanvasCard(props: CanvasCardProps) {
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
+  const actionableEntityActions = entityActions?.some((group) => group.length > 0) === true;
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
     (contentEdit !== null ||
       onOpenChange !== undefined ||
       onOpenAlias !== undefined ||
+      actionableEntityActions ||
       beginContentEdit !== undefined);
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
   const markdownBodyProps: Mutable<
@@ -225,7 +238,7 @@ export function CanvasCard(props: CanvasCardProps) {
     }
   }, [contentPresence.state]);
 
-  return (
+  const card = (
     <Card
       role="article"
       aria-label={title}
@@ -289,6 +302,18 @@ export function CanvasCard(props: CanvasCardProps) {
               )}
             </CardRailKindActions>
             <CardRailSharedActions>
+              {/* Ahead of Open/Close, so the control that changes what the
+                  author is looking at stays the last thing on the rail and
+                  keeps the position it has always had. Adding the new command
+                  after it would move Close under a pointer already trained on
+                  it. */}
+              {actionableEntityActions && (
+                <EntityActionsTrigger
+                  groups={entityActions}
+                  label={`Actions for Card ${title}`}
+                  render={<CardRailAction />}
+                />
+              )}
               {onOpenChange !== undefined && (
                 <CardRailAction
                   aria-label={`${open ? 'Close' : 'Open'} Card ${title}`}
@@ -389,6 +414,11 @@ export function CanvasCard(props: CanvasCardProps) {
         </div>
       )}
     </Card>
+  );
+  return actionableEntityActions ? (
+    <EntityActions groups={entityActions}>{card}</EntityActions>
+  ) : (
+    card
   );
 }
 

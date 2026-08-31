@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { createRef, useEffect } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   Sidebar,
+  SidebarMenuAction,
   SidebarMenuSkeleton,
   SidebarProvider,
   SidebarTrigger,
@@ -82,6 +83,23 @@ describe('Sidebar', () => {
     expect(mobileSidebar).not.toHaveClass('[&>button]:hidden');
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByTestId('sidebar-under-test')).not.toBeInTheDocument());
+  });
+
+  /**
+   * `toolbar.tsx` states the rule this holds the registry Sidebar to: a Base UI
+   * prop type includes `ref`, so a plain function component under React 18
+   * advertises one and then drops it — silently, and at the call site that
+   * needed it most. A dropped ref here leaves `Menu.Trigger` with no trigger
+   * element, and the menu it opens is dismissed by the same press that opened
+   * it. `fireEvent.click` never reproduces that, because it fires `click`
+   * alone and never the pointerdown/mouseup pair a real press does; the ref is
+   * the fact underneath, so the ref is what this asserts.
+   */
+  it('forwards a ref to the DOM control, as a Base UI trigger render prop requires', () => {
+    const ref = createRef<HTMLButtonElement>();
+    render(<SidebarMenuAction ref={ref} aria-label="Row actions" />);
+
+    expect(ref.current).toBe(screen.getByRole('button', { name: 'Row actions' }));
   });
 
   it('takes skeleton width from its composer instead of generating it during render', () => {

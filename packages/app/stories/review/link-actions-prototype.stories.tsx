@@ -1,429 +1,180 @@
 /**
- * THROWAWAY UX PROTOTYPE — three replacements for the Sidebar's persistent
- * "Copy link to X" / "Copy link in this Space View" buttons, switchable with
- * `?variant=smart|menu|share`. Nothing here copies to the real clipboard,
- * navigates, or authors anything: every action only appends to the on-screen
- * log so the interaction can be judged without side effects. See
- * `.scratch/link-ux/issues/01-choose-the-link-action-pattern.md` for the
- * question this answers and the recommendation drawn from it.
+ * One entity-actions menu — Rename, Copy link, Copy permanent link, Open in a
+ * new tab — reachable two ways: a trailing icon on the entity's own row or
+ * rail, and a right click anywhere on it. See
+ * `.scratch/link-ux/issues/01-choose-the-link-action-pattern.md`.
+ *
+ * **Review, not stable.** The menu is drawn by the real `SpaceSidebar` and the
+ * real `CanvasCard` here, but nothing in the application supplies their
+ * `entityActions` yet, so no state below is production-reachable and no ADR
+ * 0052 parity claim attaches (`stories/story-template.tsx`). What is fixture is
+ * only what the commands *do*: the addresses are built by `@project/http`'s own
+ * `productDestinationPath` from the fixture Space's real ids, but copying,
+ * navigating and renaming are replaced by a line in the on-screen log so the
+ * interaction can be judged without side effects.
  */
 import type { Story } from '@ladle/react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState } from 'react';
+import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
-  Button,
-  CardKindIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  GraphIcon,
-  LayoutIcon,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
+  CanvasCard,
+  cn,
+  type CanvasCardState,
+  type EntityAction,
+  type EntityActionGroup,
 } from '@project/ui';
+import { cardSizeVars } from '#src/card';
+import type { SpaceEntity } from '#components/SpaceSidebar';
 import { ApplicationChromeFixture } from '../support/ApplicationChromeFixture';
+import { authoredSpace } from '../support/spaces';
 
 export default { title: 'Review/Link Actions' };
 
-type Variant = 'smart' | 'menu' | 'share';
-
-const VARIANTS: readonly { readonly id: Variant; readonly label: string }[] = [
-  { id: 'smart', label: 'A — Smart default' },
-  { id: 'menu', label: 'B — Actions menu' },
-  { id: 'share', label: 'C — Share popover' },
-];
-
-const isVariant = (value: string | null): value is Variant =>
-  value === 'smart' || value === 'menu' || value === 'share';
-
-/** Which of an entity's link commands a control fired. */
-type Which = 'default' | 'permanent';
-
-interface LinkDestination {
-  /** Plain-language description of where the link opens, never "canonical"/"contextual". */
-  readonly label: string;
-  readonly url: string;
-}
-
-type EntityKind = 'card' | 'graph' | 'space-view' | 'space';
-
-interface LinkEntity {
-  readonly id: string;
-  readonly kind: EntityKind;
-  readonly title: string;
-  readonly subtitle: string;
-  /** What a single click copies — the address that reproduces what's on screen. */
-  readonly default: LinkDestination;
-  /** The Card/Graph's own durable address, offered only when it differs from `default`. */
-  readonly permanent?: LinkDestination;
-}
-
-const ENTITIES: readonly LinkEntity[] = [
-  {
-    id: 'card-in-layout',
-    kind: 'card',
-    title: 'Constraints',
-    subtitle: 'Card · in Layout 1',
-    default: {
-      label: 'Opens Constraints inside Layout 1, selected the way it is now',
-      url: '/spaces/8fQmZ2/views/R7yUxa/cards/Kx91Lp',
-    },
-    permanent: {
-      label: "Always opens Constraints on its own, wherever it's placed",
-      url: '/spaces/8fQmZ2/cards/Kx91Lp',
-    },
-  },
-  {
-    id: 'card-outside-layout',
-    kind: 'card',
-    title: 'Deployment notes',
-    subtitle: "Card · not in Layout 1 — shown from the Space's Cards",
-    default: {
-      label: "Opens Deployment notes on its own — Layout 1 doesn't place it",
-      url: '/spaces/8fQmZ2/cards/Qz4Tmn',
-    },
-  },
-  {
-    id: 'graph',
-    kind: 'graph',
-    title: 'Golden path',
-    subtitle: 'Graph · active in Layout 1',
-    default: {
-      label: 'Opens Golden path inside Layout 1, at the current step',
-      url: '/spaces/8fQmZ2/views/R7yUxa/graphs/N4tPqe',
-    },
-    permanent: {
-      label: 'Always opens Golden path, in whichever Space View draws it',
-      url: '/spaces/8fQmZ2/graphs/N4tPqe',
-    },
-  },
-  {
-    id: 'space-view',
-    kind: 'space-view',
-    title: 'Layout 1',
-    subtitle: 'Space View',
-    default: {
-      label: 'Opens Layout 1 exactly as authored',
-      url: '/spaces/8fQmZ2/views/R7yUxa',
-    },
-  },
-  {
-    id: 'space',
-    kind: 'space',
-    title: 'Presentation kit',
-    subtitle: 'Space',
-    default: {
-      label: "Opens Presentation kit at the Space's own entry view",
-      url: '/spaces/8fQmZ2',
-    },
-  },
-];
-
-const destinationOf = (entity: LinkEntity, which: Which): LinkDestination | undefined =>
-  which === 'permanent' ? entity.permanent : entity.default;
-
-/** Row action controls share this hover-and-focus reveal so no variant leaves a persistent button in view. */
-const REVEAL_ON_HOVER =
-  'ml-auto flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/link-row:opacity-100 group-focus-within/link-row:opacity-100 max-md:opacity-100';
-
-function EntityGlyph({ kind }: { readonly kind: EntityKind }) {
-  if (kind === 'card') return <CardKindIcon kind="markdown" />;
-  if (kind === 'graph') return <GraphIcon />;
-  if (kind === 'space-view') return <LayoutIcon />;
-  return (
-    <span aria-hidden="true" className="inline-block size-4 text-center text-muted-foreground">
-      ◆
-    </span>
-  );
-}
-
-/** What every variant reports so the log and confirmation stay uniform even though each control differs. */
-function useLinkActions() {
-  const [copied, setCopied] = useState<{ readonly entityId: string; readonly which: Which } | null>(
-    null,
-  );
-  const [log, setLog] = useState<readonly { readonly id: number; readonly line: string }[]>([]);
-  const clearTimer = useRef<number | undefined>(undefined);
-  const nextLogId = useRef(0);
-
-  useEffect(() => () => window.clearTimeout(clearTimer.current), []);
-
-  const append = (line: string) => {
-    nextLogId.current += 1;
-    const entry = { id: nextLogId.current, line };
-    setLog((current) => [entry, ...current].slice(0, 4));
-  };
-
-  const copyLink = (entity: LinkEntity, which: Which) => {
-    const destination = destinationOf(entity, which);
-    if (destination === undefined) return;
-    setCopied({ entityId: entity.id, which });
-    append(`Copied → ${destination.url}`);
-    window.clearTimeout(clearTimer.current);
-    clearTimer.current = window.setTimeout(() => setCopied(null), 1600);
-  };
-
-  const openInNewTab = (entity: LinkEntity, which: Which = 'default') => {
-    const destination = destinationOf(entity, which);
-    if (destination === undefined) return;
-    append(`Would open in a new tab → ${destination.url}`);
-  };
-
-  const isCopied = (entity: LinkEntity, which: Which) =>
-    copied !== null && copied.entityId === entity.id && copied.which === which;
-
-  return { log, copyLink, openInNewTab, isCopied };
-}
-
-type LinkActions = ReturnType<typeof useLinkActions>;
-
-interface RowActionProps {
-  readonly entity: LinkEntity;
-  readonly actions: LinkActions;
+/** What the reviewer sees in place of a clipboard write or a navigation. */
+interface Logged {
+  readonly id: number;
+  readonly line: string;
 }
 
 /**
- * Variant A — one "Copy link" action that copies the useful default outright;
- * a second, smaller control opens the one alternative only when it exists.
+ * The recorder every command reports through.
+ *
+ * One shared `useRef` counter rather than the log's own length, because two
+ * entries added in the same tick off a stale length collide on their key.
  */
-function SmartDefaultAction({ entity, actions }: RowActionProps) {
-  return (
-    <div className={REVEAL_ON_HOVER}>
-      <Button
-        variant="ghost"
-        size="icon"
-        title={entity.default.label}
-        aria-label={`Copy link to ${entity.title}`}
-        onClick={() => actions.copyLink(entity, 'default')}
-      >
-        {actions.isCopied(entity, 'default') ? <CheckIcon /> : <span aria-hidden="true">🔗</span>}
-      </Button>
-      {entity.permanent !== undefined && (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`More link options for ${entity.title}`}
-              />
-            }
-          >
-            <ChevronDownIcon />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <DropdownMenuItem onClick={() => actions.copyLink(entity, 'permanent')}>
-              <div className="flex flex-col gap-0.5">
-                <span>
-                  {actions.isCopied(entity, 'permanent') ? 'Copied' : 'Copy permanent link'}
-                </span>
-                <span className="text-xs text-muted-foreground">{entity.permanent.label}</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => actions.openInNewTab(entity, 'default')}>
-              Open in new tab
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-    </div>
-  );
+function useActivityLog() {
+  const [log, setLog] = useState<readonly Logged[]>([]);
+  const nextId = useRef(0);
+  return {
+    log,
+    record: (line: string) => {
+      nextId.current += 1;
+      const entry = { id: nextId.current, line };
+      setLog((current) => [entry, ...current].slice(0, 5));
+    },
+  };
 }
 
-/**
- * Variant B — one actions menu naming every link command explicitly. Nothing
- * is guessed: a Card or Graph with two addresses lists both, each with its
- * own plain-language destination.
- */
-function ActionsMenu({ entity, actions }: RowActionProps) {
-  return (
-    <div className={REVEAL_ON_HOVER}>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button variant="ghost" size="icon" aria-label={`${entity.title} link actions`} />
-          }
-        >
-          <span aria-hidden="true">⋯</span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72">
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>{entity.title}</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => actions.copyLink(entity, 'default')}>
-              <div className="flex flex-col gap-0.5">
-                <span>{actions.isCopied(entity, 'default') ? 'Copied' : 'Copy link'}</span>
-                <span className="text-xs text-muted-foreground">{entity.default.label}</span>
-              </div>
-            </DropdownMenuItem>
-            {entity.permanent !== undefined && (
-              <DropdownMenuItem onClick={() => actions.copyLink(entity, 'permanent')}>
-                <div className="flex flex-col gap-0.5">
-                  <span>
-                    {actions.isCopied(entity, 'permanent') ? 'Copied' : 'Copy permanent link'}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{entity.permanent.label}</span>
-                </div>
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => actions.openInNewTab(entity, 'default')}>
-            Open in new tab
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
-
-function ShareRow({
+/** A copy command, built from the address the application would really copy. */
+const copy = (
+  id: string,
+  label: string,
+  description: string,
+  destination: ProductDestination,
+  record: (line: string) => void,
+): EntityAction => ({
+  id,
   label,
-  copied,
-  onCopy,
-  onOpenNewTab,
-}: {
-  readonly label: string;
-  readonly copied: boolean;
-  readonly onCopy: () => void;
-  readonly onOpenNewTab: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-md border border-border p-2">
-      <p className="min-w-0 flex-1 text-xs text-muted-foreground">{label}</p>
-      <Button size="compact" variant={copied ? 'default' : 'secondary'} onClick={onCopy}>
-        {copied ? 'Copied' : 'Copy'}
-      </Button>
-      <Button size="icon" variant="ghost" aria-label="Open in new tab" onClick={onOpenNewTab}>
-        <span aria-hidden="true">↗</span>
-      </Button>
-    </div>
-  );
-}
+  description,
+  confirmation: 'Copied',
+  onSelect: () => record(`Copied → ${productDestinationPath(destination)}`),
+});
+
+const rename = (id: string, subject: string, record: (line: string) => void): EntityAction => ({
+  id,
+  label: 'Rename',
+  onSelect: () => record(`Would begin renaming → ${subject}`),
+});
+
+const openInNewTab = (
+  id: string,
+  destination: ProductDestination,
+  record: (line: string) => void,
+): EntityAction => ({
+  id,
+  label: 'Open in new tab',
+  onSelect: () => record(`Would open in a new tab → ${productDestinationPath(destination)}`),
+});
 
 /**
- * Variant C — a popover that explains each destination in a sentence before
- * it's copied, and stays open afterward so a second destination can be
- * copied too.
+ * What each Sidebar entity offers.
+ *
+ * Three groups throughout — rename, then the addresses, then where to open —
+ * so a menu's shape does not change with what the entity happens to have. A
+ * command the entity lacks leaves its group shorter or empty, and an empty
+ * group draws neither items nor its rule (`EntityActionsMenu`).
+ *
+ * A Space gets no Rename: production has no Space rename affordance today, and
+ * this prototype does not invent one.
  */
-function SharePopover({ entity, actions }: RowActionProps) {
-  return (
-    <div className={REVEAL_ON_HOVER}>
-      <Popover>
-        <PopoverTrigger
-          render={<Button variant="ghost" size="icon" aria-label={`Share ${entity.title}`} />}
-        >
-          <span aria-hidden="true">🔗</span>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-80">
-          <p className="mb-2 text-sm font-medium">{entity.title}</p>
-          <div className="grid gap-2">
-            <ShareRow
-              label={entity.default.label}
-              copied={actions.isCopied(entity, 'default')}
-              onCopy={() => actions.copyLink(entity, 'default')}
-              onOpenNewTab={() => actions.openInNewTab(entity, 'default')}
-            />
-            {entity.permanent !== undefined && (
-              <ShareRow
-                label={entity.permanent.label}
-                copied={actions.isCopied(entity, 'permanent')}
-                onCopy={() => actions.copyLink(entity, 'permanent')}
-                onOpenNewTab={() => actions.openInNewTab(entity, 'permanent')}
-              />
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
+function sidebarActions(
+  entity: SpaceEntity,
+  record: (line: string) => void,
+): readonly EntityActionGroup[] {
+  const spaceId = authoredSpace.id;
+  if (entity.kind === 'space') {
+    const destination: ProductDestination = { kind: 'space', spaceId };
+    return [
+      [],
+      [
+        copy(
+          'space-link',
+          'Copy link',
+          `Opens ${authoredSpace.title} at the view it opens on`,
+          destination,
+          record,
+        ),
+      ],
+      [openInNewTab('space-new-tab', destination, record)],
+    ];
+  }
+  if (entity.kind === 'space-view') {
+    const { renderer } = entity;
+    const destination: ProductDestination = {
+      kind: 'space-view',
+      spaceId,
+      spaceViewId: renderer.selection,
+    };
+    return [
+      // A Computed View has no stored title to rename; an authored Layout does.
+      renderer.kind === 'authored' ? [rename('view-rename', renderer.title, record)] : [],
+      [
+        copy(
+          'view-link',
+          'Copy link',
+          `Opens ${renderer.title} exactly as it draws now`,
+          destination,
+          record,
+        ),
+      ],
+      [openInNewTab('view-new-tab', destination, record)],
+    ];
+  }
+  const { graph, renderer } = entity;
+  return [
+    [rename('graph-rename', graph.title, record)],
+    [
+      copy(
+        'graph-here',
+        'Copy link',
+        `Opens ${graph.title} inside the Space View drawing now`,
+        { kind: 'space-view-graph', spaceId, spaceViewId: renderer.selection, graphId: graph.id },
+        record,
+      ),
+      copy(
+        'graph-permanent',
+        'Copy permanent link',
+        `Always opens ${graph.title}, in whichever Space View draws it`,
+        { kind: 'graph', spaceId, graphId: graph.id },
+        record,
+      ),
+    ],
+    [openInNewTab('graph-new-tab', { kind: 'graph', spaceId, graphId: graph.id }, record)],
+  ];
 }
 
-function LinkEntityRow({ entity, children }: { readonly entity: LinkEntity; children: ReactNode }) {
-  return (
-    <SidebarMenuItem className="group/link-row flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-sidebar-accent">
-      <EntityGlyph kind={entity.kind} />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm">{entity.title}</span>
-        <span className="truncate text-xs text-muted-foreground">{entity.subtitle}</span>
-      </span>
-      {children}
-    </SidebarMenuItem>
-  );
-}
-
-function LinkActionsPanel({
-  variant,
-  actions,
-}: {
-  readonly variant: Variant;
-  readonly actions: LinkActions;
-}) {
-  return (
-    <Sidebar side="right" collapsible="none" className="w-96 shrink-0 overflow-y-auto border-l">
-      <SidebarHeader className="gap-1 border-b border-neutral-300 p-4">
-        <h2 className="font-semibold">Link actions — states</h2>
-        <p className="text-xs text-neutral-500">
-          One trigger per selected entity, revealed on hover or focus. Hover a row (or tab to it) to
-          see the control this variant uses.
-        </p>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Card, Graph, Space View, Space</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {ENTITIES.map((entity) => (
-                <LinkEntityRow key={entity.id} entity={entity}>
-                  {variant === 'smart' && <SmartDefaultAction entity={entity} actions={actions} />}
-                  {variant === 'menu' && <ActionsMenu entity={entity} actions={actions} />}
-                  {variant === 'share' && <SharePopover entity={entity} actions={actions} />}
-                </LinkEntityRow>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-  );
-}
-
-function PrototypeBanner() {
-  return (
-    <div className="fixed inset-x-0 top-0 z-50 bg-amber-400 px-3 py-1 text-center text-xs font-semibold text-amber-950">
-      PROTOTYPE — Link UX exploration. Nothing here copies to the clipboard, navigates, or writes to
-      the Space.
-    </div>
-  );
-}
-
-function ActivityLog({
-  log,
-}: {
-  readonly log: readonly { readonly id: number; readonly line: string }[];
-}) {
+/** Where the reviewer reads what a command would have done. */
+function ActivityLog({ log, className }: { readonly log: readonly Logged[]; className?: string }) {
   return (
     <div
-      aria-live="polite"
-      className="absolute right-4 bottom-4 z-10 w-80 rounded-md border bg-background/95 p-3 font-mono text-[11px] shadow-sm"
+      className={cn(
+        'w-80 rounded-md border bg-background/95 p-3 font-mono text-[11px] shadow-sm',
+        className,
+      )}
     >
       <p className="mb-1 font-sans text-xs font-semibold text-muted-foreground">Last actions</p>
       {log.length === 0 ? (
-        <p className="text-muted-foreground">Nothing yet — try a row's link control.</p>
+        <p className="text-muted-foreground">Nothing yet — try a row's actions.</p>
       ) : (
         <ul className="grid gap-1">
           {log.map((entry) => (
@@ -435,72 +186,116 @@ function ActivityLog({
   );
 }
 
-function useVariant(): [Variant, (variant: Variant) => void] {
-  const initial = new URLSearchParams(window.location.search).get('variant');
-  const [variant, setVariant] = useState<Variant>(isVariant(initial) ? initial : 'smart');
-  const choose = (next: Variant) => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('variant', next);
-    window.history.replaceState({}, '', url);
-    setVariant(next);
-  };
-  return [variant, choose];
-}
-
-function PrototypeSwitcher({
-  variant,
-  onChange,
-}: {
-  readonly variant: Variant;
-  readonly onChange: (v: Variant) => void;
-}) {
-  const index = VARIANTS.findIndex(({ id }) => id === variant);
-  const move = (delta: number) => {
-    const next = VARIANTS[(index + delta + VARIANTS.length) % VARIANTS.length];
-    if (next !== undefined) onChange(next.id);
-  };
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const target = event.target;
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
-      if (event.key === 'ArrowLeft') move(-1);
-      if (event.key === 'ArrowRight') move(1);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-
+function PrototypeBanner({ children }: { readonly children: string }) {
   return (
-    <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-neutral-700 bg-neutral-950 px-2 py-2 text-white shadow-2xl">
-      <Button size="icon" variant="ghost" aria-label="Previous variant" onClick={() => move(-1)}>
-        ←
-      </Button>
-      <span className="min-w-44 text-center text-xs font-semibold">{VARIANTS[index]?.label}</span>
-      <Button size="icon" variant="ghost" aria-label="Next variant" onClick={() => move(1)}>
-        →
-      </Button>
+    <div className="bg-amber-400 px-3 py-1 text-center text-xs font-semibold text-amber-950">
+      PROTOTYPE — {children} Nothing here copies, navigates or renames.
     </div>
   );
 }
 
-function LinkActionsPrototype() {
-  const [variant, setVariant] = useVariant();
-  const actions = useLinkActions();
-
+/**
+ * The real Space Sidebar drawing the menu on every row it owns: each Space
+ * View, each Graph, and the Space's own title.
+ *
+ * The Sidebar's existing "Copy link to …" buttons are switched off, because the
+ * menu is what replaces them — showing both would put two paths to one command
+ * in front of a reviewer being asked to judge one of them.
+ */
+export const Sidebar: Story = () => {
+  const { log, record } = useActivityLog();
   return (
-    <>
-      <PrototypeBanner />
-      <div className="pt-6">
+    <div className="flex h-screen flex-col">
+      <PrototypeBanner>
+        Right-click any Space View, Graph or the Space title — or press the link icon that appears
+        on it — for the same menu.
+      </PrototypeBanner>
+      <div className="min-h-0 flex-1">
         <ApplicationChromeFixture
-          rightPanel={<LinkActionsPanel variant={variant} actions={actions} />}
-          canvasOverlay={<ActivityLog log={actions.log} />}
+          entityActions={(entity) => sidebarActions(entity, record)}
+          canvasOverlay={<ActivityLog log={log} className="absolute right-4 bottom-4 z-10" />}
         />
       </div>
-      <PrototypeSwitcher variant={variant} onChange={setVariant} />
-    </>
+    </div>
   );
-}
+};
+Sidebar.meta = { iframed: true };
 
-export const Variants: Story = () => <LinkActionsPrototype />;
-Variants.meta = { iframed: true };
+/**
+ * The Card's own rail carrying the menu, at four of the states a Card is drawn
+ * in.
+ *
+ * The rail is `CanvasCard`'s, not a replica: the icon sits in the shared
+ * command group ahead of Open/Close, so what a reviewer is looking at is the
+ * order `[link][open-or-close]` on the real control cluster, with the real
+ * roving-tabindex keyboard contract (ADR 0073) over it. Hover a Card, or Tab to
+ * it and press ArrowRight, to reach the icon.
+ *
+ * Right click is deliberately absent here. Wiring it across a Card body means
+ * settling how it sits with React Flow's own pan, drag, multi-select and
+ * connection handling, which the ticket leaves open — so the Card answers the
+ * icon only, and the Sidebar story above is where the right click is judged.
+ */
+export const CardRail: Story = () => {
+  const { log, record } = useActivityLog();
+  const spaceId = authoredSpace.id;
+  const spaceViewId = authoredSpace.layouts[0]?.id;
+  if (spaceViewId === undefined) throw new Error('CardRail fixture requires an authored Layout');
+  const cards = authoredSpace.cards.slice(0, 4);
+  return (
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <PrototypeBanner>
+        The link icon is one more control on the real Card rail, ahead of Open/Close.
+      </PrototypeBanner>
+      <div className="flex flex-1 flex-wrap items-start gap-6 p-6" style={cardSizeVars}>
+        {cards.map((card, index) => {
+          const state: CanvasCardState = index === 1 ? 'selected' : 'rest';
+          const destination: ProductDestination = { kind: 'card', spaceId, cardId: card.id };
+          return (
+            <div key={card.id} className="grid gap-2">
+              <p className="text-xs text-muted-foreground">card · {state}</p>
+              <CanvasCard
+                front={{
+                  kind: 'markdown',
+                  source: '',
+                  open: false,
+                  onOpenChange: () => 'retained',
+                }}
+                title={card.title}
+                state={state}
+                graphColor="#ffc53d"
+                entityActions={[
+                  [rename(`${card.id}-rename`, card.title, record)],
+                  [
+                    copy(
+                      `${card.id}-here`,
+                      'Copy link',
+                      `Opens ${card.title} inside the Space View drawing now`,
+                      {
+                        kind: 'space-view-card',
+                        spaceId,
+                        spaceViewId,
+                        cardId: card.id,
+                      },
+                      record,
+                    ),
+                    copy(
+                      `${card.id}-permanent`,
+                      'Copy permanent link',
+                      `Always opens ${card.title} on its own, wherever it is placed`,
+                      destination,
+                      record,
+                    ),
+                  ],
+                  [openInNewTab(`${card.id}-new-tab`, destination, record)],
+                ]}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <ActivityLog log={log} className="m-6" />
+    </div>
+  );
+};
+CardRail.meta = { iframed: true };
