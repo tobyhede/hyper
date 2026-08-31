@@ -174,6 +174,24 @@ describe('canvas Card authoring', () => {
     expect(spaceSession.getState().working.document.layouts?.[0]?.positions[ALIAS_ID]?.open).toBe(
       true,
     );
+
+    rerender({
+      expanded: true,
+      enabled: true,
+      presenting: false,
+      nameOnCreation: null,
+      cardId: ALIAS_ID,
+    });
+
+    // Open and read-only are the two halves of ADR 0070, and this Alias is in
+    // the working Space, so nothing else is withholding these. Opening keeps
+    // Close and the shared Title interaction; it never hands the Alias the
+    // caret or the editor that would let it author the Target's content.
+    const alias = onlyNode(result.current.nodes);
+    expect(alias.data.onEditCard).toBeDefined();
+    expect(alias.data.titleEditingEnabled).toBe(true);
+    expect(alias.data.onBeginBodyEditing).toBeUndefined();
+    expect(alias.data.bodyEditor).toBeUndefined();
   });
 
   it('forgets a title caret when canvas authoring is withdrawn', () => {

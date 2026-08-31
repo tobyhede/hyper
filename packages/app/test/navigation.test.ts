@@ -157,32 +157,6 @@ it('selects a renderer and its active Graph without changing the Space', () => {
   expect(navigation.getState().selectedRenderer).toEqual(GRID_SPACE_VIEW_ID);
 });
 
-/**
- * Selecting a renderer closes an opened Card, and that is a change: this used to
- * retain it, on the reasoning that the author was still *reading* it and the
- * Cards underneath were none of that reading's business.
- *
- * ADR 0037 removed the reading state, so what is retained now is an editor — and
- * an Algorithmic View installs no placement until its strategy resolves, which
- * is a window in which the Edit that editor completes is refused for having no
- * positions to write. The pane closed on `Done` either way, so a refusal was
- * indistinguishable from success and the author's typing was simply gone.
- *
- * Closing removes the window rather than reporting from inside it. The cost is
- * that a draft is discarded when the author changes what they are looking at —
- * visibly, and at the moment they ask for it, which is what `present()` has
- * always done with an opened Card.
- */
-it('closes an opened Card when the renderer changes, so no editor outlives its placement', () => {
-  const space = fixture();
-  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
-  navigation.openCard(uuid('00000000-0000-4000-8000-000000000002'));
-
-  navigation.selectRenderer(LAYOUT);
-
-  expect(navigation.getState().openedCardId).toBeNull();
-});
-
 it('traverses an Edge from the changing working Space without installing a copy', () => {
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
@@ -333,7 +307,6 @@ it('leaves no Traversal history behind when presenting ends', () => {
     selectedRenderer: FLOW_SPACE_VIEW_ID,
     activeGraphId: GRAPH_ONE,
     mode: 'overview',
-    openedCardId: null,
   });
   expect(navigation.activeCardId()).toBeNull();
 });
@@ -374,7 +347,6 @@ it('activating a Graph ends the current Traversal history without changing the S
 it('opens a Graph destination in its named renderer with one navigation publication', () => {
   const space = fixture();
   const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
-  navigation.openCard(CARD_A);
   const observed: NavigationState[] = [];
   navigation.subscribe(() => observed.push(navigation.getState()));
 
@@ -384,7 +356,6 @@ it('opens a Graph destination in its named renderer with one navigation publicat
   expect(navigation.getState()).toEqual({
     selectedRenderer: LAYOUT,
     activeGraphId: GRAPH_TWO,
-    openedCardId: null,
     mode: 'overview',
   });
   expect(space.defaultRenderer).toBeUndefined();
@@ -404,7 +375,6 @@ it('opens an exact presentation Card with fresh Traversal history in one publica
   expect(navigation.getState()).toEqual({
     selectedRenderer: LAYOUT,
     activeGraphId: GRAPH_TWO,
-    openedCardId: null,
     mode: 'presenting',
     traversalHistory: [CARD_C],
     branchIndex: 0,
@@ -602,38 +572,16 @@ it('refuses a renderer the current Space does not hold, leaving navigation untou
   expect(navigation.getState()).toBe(before);
 });
 
-it('opens and closes Cards, and closes an opened Card when presenting starts', () => {
-  const space = fixture();
-  const card = uuid('00000000-0000-4000-8000-000000000003');
-  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
-
-  navigation.openCard(card);
-  expect(navigation.getState().openedCardId).toBe(card);
-  navigation.closeCard();
-  expect(navigation.getState().openedCardId).toBeNull();
-
-  navigation.openCard(card);
-  navigation.present();
-  expect(navigation.getState()).toMatchObject({ mode: 'presenting', openedCardId: null });
-  expect(navigation.activeCardId()).toBe(uuid('00000000-0000-4000-8000-000000000002'));
-  navigation.exitPresenting();
-  expect(navigation.getState()).toMatchObject({ mode: 'overview' });
-  expect(navigation.activeCardId()).toBeNull();
-});
-
 /*
  * Opening a replacement Space is not navigating to a renderer within the one
- * already open, and the difference is what each retains. Both clear
- * `openedCardId`; the reason differs, and only this one is about there being no
- * Space left for that Card to belong to.
+ * already open, and the difference is what each retains. This one retains
+ * nothing, because there is no Space left for any of it to belong to.
  */
 it('opens a replacement Space as new navigation, retaining no reading state', () => {
   const space = fixture();
-  const card = uuid('00000000-0000-4000-8000-000000000003');
   const navigation = navigationFor(() => space, GRID_SPACE_VIEW_ID);
   navigation.present();
   navigation.advance();
-  navigation.openCard(card);
 
   navigation.openFresh(LAYOUT);
 
@@ -641,7 +589,6 @@ it('opens a replacement Space as new navigation, retaining no reading state', ()
     selectedRenderer: LAYOUT,
     activeGraphId: GRAPH_TWO,
     mode: 'overview',
-    openedCardId: null,
   });
 });
 

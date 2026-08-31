@@ -69,7 +69,16 @@ export type CardNodeData = {
   kind: Card['kind'];
   /** Local Card-authoring controls supplied by the application composition. */
   titleEditingEnabled?: boolean;
-  /** Whether this Card owns content to edit — an Alias does not. */
+  /**
+   * Whether Card-level authoring is offered here: this Card is in the working
+   * Space and the canvas is authorable.
+   *
+   * **Not "owns content to edit"**, which is what it meant while an Alias had no
+   * Open front. It gates `onEditCard`, and an Alias Opens and Closes through
+   * that same operation (ADR 0070), so an Alias sets it exactly as a Markdown
+   * Card does. What separates the kinds is `onBeginBodyEditing`, which the
+   * application withholds from everything but `markdown`.
+   */
   cardEditingEnabled?: boolean;
   onEditCard?: (open: boolean) => 'completed' | 'retained';
   onBeginTitleEditing?: () => void;

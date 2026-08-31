@@ -298,7 +298,7 @@ export const OpenAlias: Story = () => {
         expanded={open}
         onOpenChange={changeOpen}
         cardEditingEnabled
-        body="## Strategies\n\nNo strategy is privileged."
+        body={'## Strategies\n\nNo strategy is privileged.'}
         nodeSize={open ? openFrame : closedFrame}
         stageClassName="inv-card-node-stage--large"
       />

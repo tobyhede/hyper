@@ -29,7 +29,7 @@ export interface CardRailProps {
  * at the trailing edge, coloured by the Active Graph.
  *
  * `CanvasCard` draws it on the canvas, where it is hidden at rest and revealed
- * with the Card. The Alias metadata editor also composes it in its modal surface.
+ * with the Card.
  * Shared geometry and colour live in `card-rail.css`; a Card that hides its own
  * rail at rest overrides it from its own stylesheet, because that is the Card's
  * state rather than the rail's.

@@ -933,8 +933,8 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
   /**
    * The dead-rule half of the ratchet, over the stylesheets that live beside their
    * component rather than in `styles.css` — `canvas-card.css` beside `CanvasCard`,
-   * `card-editor.css` beside `OpenCard`, `card-search-combobox.css` beside
-   * `CardSearchCombobox`.
+   * `card-search-combobox.css` beside `CardSearchCombobox`,
+   * `markdown-source-editor.css` beside `MarkdownSourceEditor`.
    *
    * Only that half. Colocation is the *approved* home for product appearance, so these
    * owe no inventory entry — recording them would turn the inventory into a list of

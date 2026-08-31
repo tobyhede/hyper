@@ -113,8 +113,8 @@ describe('CodeMirror stays behind its wrapper', () => {
    * module graph only: a built chunk is content-hashed, so the name it matches on is
    * gone. What actually decides the split is the import, so that is what this holds.
    *
-   * A type-only import is erased and costs nothing, which is why `OpenCard` may keep
-   * one for the handle. A value import is what would pull the stack back in.
+   * A type-only import is erased and costs nothing, so a consumer may keep one
+   * for the handle. A value import is what would pull the stack back in.
    */
   it.each(SPECIALIST_IMPORTS)(
     'is reached from $tree by dynamic import only',

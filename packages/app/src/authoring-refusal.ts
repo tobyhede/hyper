@@ -79,7 +79,7 @@ const presentRefusal = <Field extends string>(
 
 const form = null;
 
-/** Alias editing and Alias creation both own Title and Target, and nothing else. */
+/** Alias creation owns Title and Target, and nothing else. */
 const titleAndTargetPlacements = {
   'placement-pending': form,
   'layout-not-found': form,

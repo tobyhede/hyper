@@ -412,9 +412,9 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      * Choosing a Space View row, including the row already current.
      *
      * The repeated choice is not a no-op and must not be skipped here:
-     * `navigation.selectRenderer` publishes `openedCardId: null` and
-     * `mode: 'overview'`, so choosing the current row is how an author closes an
-     * open Card or leaves a presentation. What the repeat may not do is *push* —
+     * `navigation.selectRenderer` publishes `mode: 'overview'`, so choosing the
+     * current row is how an author leaves a presentation. What the repeat may
+     * not do is *push* —
      * the destination has not changed, and a pushed entry would make Back a
      * no-op. It still replaces, because the address it is leaving may be a
      * narrower destination in this same Space View (a Card, a Graph, a
@@ -693,7 +693,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       // The surface comes down only where the continuations below will run,
       // which is why the narrowing precedes it rather than following it.
       // `queued` is an Edit that lands later from the drain, and it cannot
-      // honour "the editor stays open on the Alias that now exists" — so it
+      // honour "the caret lands on the Alias that now exists" — so it
       // must not take the creation pane with it either, or an empty title
       // leaves the author holding two identically titled Cards and no
       // surface to rename either from. `unchanged` this operation cannot
@@ -748,9 +748,8 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     /**
      * Presenting closes the Alias creation state, creating nothing.
      *
-     * Navigation already does this for an opened Card — `present` clears
-     * `openedCardId` — but this surface is App's own, and the toolbar it is
-     * started from is not covered by the pane. Keyed on the fact rather than
+     * This surface is App's own, and the toolbar it is started from is not
+     * covered by the pane. Keyed on the fact rather than
      * wrapped around the control, so a second way into presenting cannot leave a
      * creation state open over a presentation.
      */

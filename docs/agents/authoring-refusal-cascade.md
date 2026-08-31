@@ -37,7 +37,7 @@ names what gate 3 does for that action.
 
 | Action | On a View | Its own checks, in order |
 | --- | --- | --- |
-| `edited-card` | converts | `card-not-found` → `card-kind-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
+| `edited-card` | converts | `card-not-found` → `card-kind-immutable` → `alias-target-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
 | `created-card` | converts | none → completed |
 | `created-alias` | converts | `alias-target-not-found` → `alias-target-must-own-content` → completed |
 | `opened-card` | converts | `card-not-in-layout` → (already Open ⇒ `unchanged`) → completed |

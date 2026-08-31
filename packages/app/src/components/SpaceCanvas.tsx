@@ -130,12 +130,14 @@ export interface SpaceCanvasProps {
    * Whether the graph is uncovered — no modal pane is open over it.
    *
    * **Named for the first control it took away, and read by all of them.** `App`
-   * passes `openedCardId === null && !creatingAlias`, and both of those are a
-   * `CardPane`: `role="dialog" aria-modal="true"`, a backdrop across the whole
+   * passes `!creatingAlias && spaceChromeEdit === null`, and both of those are a
+   * modal surface: `role="dialog" aria-modal="true"`, a backdrop across the whole
    * graph area, and a focus trap. So this says nothing about titles — it says
    * one authoring surface at a time, the same rule `AddCardControl` is
-   * withdrawn on. The name is stale vocabulary rather than a second concept;
-   * renaming it is its own change (`docs/agents/workflow.md`).
+   * withdrawn on. An Open Card is *not* one of them: Opening is an ordinary
+   * Layout Edit on the canvas (ADR 0064), so it leaves title editing alone.
+   * The name is stale vocabulary rather than a second concept; renaming it is
+   * its own change (`docs/agents/workflow.md`).
    */
   titleEditingEnabled: boolean;
   onNodesChange: OnNodesChange<CardFlowNode>;

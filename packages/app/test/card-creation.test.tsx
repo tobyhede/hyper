@@ -375,137 +375,6 @@ describe('Add Alias', () => {
     await settled(session);
   });
 
-  it.skip('replaced by the Alias-metadata Dialog flow', async () => {
-    const session = mount();
-    await openAliasCreation();
-
-    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
-
-    const created = cardsOf(session)[2]!;
-    expect(created.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
-    expect(layoutsOf(session)[0]?.positions[created.id]).toBeDefined();
-    // "The editor remains open on the now-authored Alias", which for an Alias is
-    // the delegated editor over the content its Target owns.
-    expect(screen.queryByTestId('new-alias')).not.toBeInTheDocument();
-    expect(await screen.findByText('Opened through A')).toBeVisible();
-    await settled(session);
-  });
-
-  /**
-   * The pane an author is left standing in has to be able to undo the one thing
-   * creation just did to them.
-   *
-   * An empty title takes the Target's, so the Space now holds two Cards called
-   * `A` — and the editor that stays open is the delegated one, which drew no
-   * Title field at all. The rename had to be reachable from where the author
-   * already is, and it has to reach the *Alias*: the Card that owns the content
-   * keeps its own title.
-   */
-  it.skip('replaced by the Alias-metadata Dialog flow', async () => {
-    const session = mount();
-    await openAliasCreation();
-    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
-    await screen.findByText('Opened through A');
-
-    const title = screen.getByRole('textbox', { name: 'Title' });
-    expect(title).toHaveValue('A');
-    fireEvent.change(title, { target: { value: 'Recap' } });
-    fireEvent.keyDown(title, { key: 'Enter' });
-
-    expect(cardsOf(session)[2]?.document).toEqual({
-      title: 'Recap',
-      kind: 'alias',
-      target: CARD_ID,
-    });
-    expect(cardsOf(session)[0]?.document).toEqual({
-      title: 'A',
-      kind: 'markdown',
-      body: 'A source',
-    });
-    await settled(session);
-  });
-
-  /**
-   * Cancel cancels the rename too, and the pointer path is where that is hard.
-   *
-   * The Title commits on blur, and a mousedown on Cancel blurs it — `<button>`
-   * is exempt from the pane's focus containment, deliberately — so the blur
-   * lands before the click that closes the pane. Without care the author
-   * presses Cancel and the rename is committed anyway, with the pane gone
-   * before they could see it happen.
-   */
-  it.skip('replaced by ADR 0049 Alias metadata cancellation coverage', async () => {
-    const session = mount();
-    await openAliasCreation();
-    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
-    await screen.findByText('Opened through A');
-    const title = screen.getByRole('textbox', { name: 'Title' });
-    fireEvent.change(title, { target: { value: 'Recap' } });
-    const cancel = screen.getByRole('button', { name: 'Cancel' });
-
-    // The browser's own order: focus moves on mousedown, so the field blurs
-    // before the click arrives.
-    fireEvent.mouseDown(cancel);
-    fireEvent.blur(title, { relatedTarget: cancel });
-    fireEvent.click(cancel);
-
-    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
-    expect(cardsOf(session)[2]?.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
-    await settled(session);
-  });
-
-  /**
-   * The occurrence's Title is the one field on this pane whose Escape has two
-   * answers to give, because it is the only one holding a draft against a
-   * stored value: "Dirty field restores value before surface closes".
-   *
-   * Restoring has to leave the Alias unwritten as well as the field — a rename
-   * commits on Enter and on blur, and a cancelled draft is neither.
-   */
-  it.skip('replaced by Dialog Escape-as-Cancel coverage for Alias metadata', async () => {
-    const session = mount();
-    await openAliasCreation();
-    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
-    await screen.findByText('Opened through A');
-    const title = screen.getByRole('textbox', { name: 'Title' });
-    fireEvent.change(title, { target: { value: 'Recap' } });
-
-    fireEvent.keyDown(title, { key: 'Escape' });
-
-    expect(title).toHaveValue('A');
-    expect(screen.getByTestId('open-card')).toBeVisible();
-    expect(cardsOf(session)[2]?.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
-
-    fireEvent.keyDown(title, { key: 'Escape' });
-
-    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
-    expect(cardsOf(session)[2]?.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
-    await settled(session);
-  });
-
-  /**
-   * A refused rename leaves the field dirty *and* erroring, so the restore has
-   * to take the message with it — an alert naming a draft that is no longer on
-   * screen outlives the thing it describes.
-   */
-  it.skip('replaced by Dialog Escape-as-Cancel coverage', async () => {
-    const session = mount();
-    await openAliasCreation();
-    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
-    await screen.findByText('Opened through A');
-    const title = screen.getByRole('textbox', { name: 'Title' });
-    fireEvent.change(title, { target: { value: '   ' } });
-    fireEvent.keyDown(title, { key: 'Enter' });
-    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
-
-    fireEvent.keyDown(title, { key: 'Escape' });
-
-    expect(title).toHaveValue('A');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByTestId('open-card')).toBeVisible();
-    await settled(session);
-  });
-
   it('keeps a title the author entered instead of the Target’s', async () => {
     const session = mount();
     await openAliasCreation();
@@ -684,8 +553,8 @@ describe('the graph behind the Alias creation pane', () => {
    *
    * Declining rather than clearing `creatingAlias`: the author's unfinished
    * creation state is theirs, and an `Enter` landing behind the pane is not a
-   * request to discard it. Without this the Card opened, the Alias pane hid
-   * itself on `openedCardId`, and closing the Card brought it back.
+   * request to discard it. Without this the Card opened behind the pane, which
+   * hid itself while a Card was open and came back when it closed.
    */
   it('declines to open a Card, leaving the pane exactly as it was', async () => {
     const session = mount();
@@ -694,7 +563,7 @@ describe('the graph behind the Alias creation pane', () => {
 
     fireEvent.keyDown(screen.getByTestId(`rf__node-${CARD_ID}`), { key: 'Enter' });
 
-    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Close Card / })).not.toBeInTheDocument();
     expect(screen.getByTestId('new-alias')).toBeVisible();
     expect(screen.getByTestId('new-alias-title')).toHaveValue('Recap');
     await settled(session);

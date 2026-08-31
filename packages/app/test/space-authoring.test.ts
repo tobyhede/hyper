@@ -1405,7 +1405,7 @@ describe('Space Authoring', () => {
       published += 1;
     });
 
-    navigation.openCard(CARD_A);
+    navigation.selectRenderer(GRID_SPACE_VIEW_ID);
     expect(published).toBe(1);
 
     // The session outlives any Authoring composed over it, so one that never
@@ -1414,7 +1414,7 @@ describe('Space Authoring', () => {
     // accepting the stored Space is an edit to this one, but releasing the
     // subscriptions is still this object's to do.
     authoring.dispose();
-    navigation.openCard(CARD_B);
+    navigation.selectRenderer(GRID_SPACE_VIEW_ID);
     session.submit({
       ...automaticSnapshot,
       document: { ...automaticSnapshot.document, title: 'Renamed' },
@@ -1876,7 +1876,7 @@ describe('Space Authoring', () => {
     // shape indirectly and never trips it.
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     authoring.subscribe(() => Promise.reject(new Error('observer rejected')));
-    navigation.openCard(CARD_A);
+    navigation.selectRenderer(GRID_SPACE_VIEW_ID);
 
     await vi.waitFor(() => expect(reported.map(String)).toEqual(['Error: observer rejected']));
   });
@@ -1900,7 +1900,7 @@ describe('Space Authoring', () => {
       notified.push('behind it');
     });
 
-    expect(() => navigation.openCard(CARD_A)).not.toThrow();
+    expect(() => navigation.selectRenderer(GRID_SPACE_VIEW_ID)).not.toThrow();
 
     expect(notified).toEqual(['throwing', 'behind it']);
     expect(reported).toEqual([observerFailed]);
@@ -2085,7 +2085,6 @@ describe('Space Authoring', () => {
     complete(authoring, { kind: 'settled-card-movement' });
     navigation.selectRenderer(GRID_SPACE_VIEW_ID);
     navigation.present();
-    navigation.openCard(CARD_B);
 
     expect(authoring.acceptStoredSpace()).toBeNull();
     expect(
@@ -2108,7 +2107,6 @@ describe('Space Authoring', () => {
         selectedRenderer: LAYOUT_ID,
         activeGraphId: STORED_GRAPH_ID,
         mode: 'overview',
-        openedCardId: null,
       },
     });
     expect(authoring.authoredPlacement()).toEqual(

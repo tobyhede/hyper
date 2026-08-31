@@ -24,7 +24,6 @@ type TraversalHistory = readonly [CardId, ...CardId[]];
 interface NavigationBase {
   readonly selectedRenderer: CanvasRendererId;
   readonly activeGraphId: GraphId | null;
-  readonly openedCardId: CardId | null;
 }
 
 /**
@@ -84,8 +83,6 @@ export interface Navigation {
     cardId: CardId,
   ) => void;
   readonly activateGraph: (graphId: GraphId) => void;
-  readonly openCard: (cardId: CardId) => void;
-  readonly closeCard: () => void;
   readonly present: () => void;
   readonly exitPresenting: () => void;
   readonly advance: () => void;
@@ -152,8 +149,8 @@ function currentCard(traversalHistory: TraversalHistory): CardId {
  * here to stop, arriving through the back door as an untyped property.
  */
 function baseOf(state: NavigationState): NavigationBase {
-  const { selectedRenderer, activeGraphId, openedCardId } = state;
-  return { selectedRenderer, activeGraphId, openedCardId };
+  const { selectedRenderer, activeGraphId } = state;
+  return { selectedRenderer, activeGraphId };
 }
 
 /**
@@ -169,7 +166,6 @@ function openedState(selection: CanvasRendererId, renderer: ResolvedRenderer): N
     selectedRenderer: selection,
     mode: 'overview',
     activeGraphId: openingGraphId(renderer),
-    openedCardId: null,
   };
 }
 
@@ -204,14 +200,6 @@ export function createNavigation(
         selectedRenderer: selection,
         activeGraphId: openingGraphId(renderer),
         mode: 'overview',
-        // An opened Card closes with the renderer it was opened over. This once
-        // retained it, because opening was reading and Cards moving beneath a
-        // Card being read change nothing about it — but opening is editing
-        // now (ADR 0037), and an Algorithmic View installs no placement until
-        // its strategy resolves. An Edit completed in that window is refused for
-        // having no positions to write, and the pane closed on `Done` either
-        // way, so the author could not tell a refusal from a save.
-        openedCardId: null,
       });
     },
     // Published whole, not merged over what is there: a replacement Space is
@@ -279,7 +267,6 @@ export function createNavigation(
       observable.publish({
         selectedRenderer: selection,
         activeGraphId: graphId,
-        openedCardId: null,
         mode: 'overview',
       });
     },
@@ -298,7 +285,6 @@ export function createNavigation(
       observable.publish({
         selectedRenderer: selection,
         activeGraphId: graphId,
-        openedCardId: null,
         mode: 'presenting',
         traversalHistory: [cardId],
         branchIndex: 0,
@@ -357,8 +343,6 @@ export function createNavigation(
         mode: 'overview',
       });
     },
-    openCard: (cardId) => setState({ openedCardId: cardId }),
-    closeCard: () => setState({ openedCardId: null }),
     // Two refusals, and **both are reachable**. Each is a state with no Card to
     // begin at, and `GraphSelector` disables its control on exactly the union of
     // them, so the two agree — which is what stops either from being a click the
@@ -391,7 +375,6 @@ export function createNavigation(
         mode: 'presenting',
         traversalHistory: [start],
         branchIndex: 0,
-        openedCardId: null,
       });
     },
     exitPresenting: () =>

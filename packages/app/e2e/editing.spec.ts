@@ -203,7 +203,7 @@ test(
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
     await card.getByRole('button', { name: 'Edit Title A' }).click();
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-    await expect(page.getByTestId('open-card')).toHaveCount(0);
+    await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
     const title = page.getByRole('textbox', { name: 'Card title' });
     await title.fill('Renamed A');
     await title.press('Enter');
@@ -223,7 +223,7 @@ test(
     await keyboardTitle.fill('');
     await nodeByTitle(page, 'B').first().click();
     await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.getByTestId('open-card')).toHaveCount(0);
+    await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
     await quiescent(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
     await keyboardTitle.focus();
@@ -262,7 +262,7 @@ test("a short Title control's hit-area hugs its text, not the whole Card body", 
   };
   await page.mouse.click(blankSpace.x, blankSpace.y);
   await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveCount(0);
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
 });
 
 test('a click selects a Card, and no pointer gesture on its body opens it', async ({ page }) => {
@@ -274,12 +274,12 @@ test('a click selects a Card, and no pointer gesture on its body opens it', asyn
 
   await card.click();
   await expect(card).toHaveClass(/selected/);
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
 
   // Off the Title, which has its own control. React Flow zooms on a double click
   // by default and its filter exempts only `.nopan`, which a Card is not.
   await card.dblclick({ position: { x: 24, y: 12 } });
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
   expect(await viewportTransform(page)).toEqual(transform);
 });
 
@@ -1714,7 +1714,7 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
     'opacity',
     '1',
   );
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
 });
 
 test('an authored Edge is immediately available when presenting the Graph', async ({ page }) => {
@@ -1967,7 +1967,7 @@ test('clicking a Card authoring handle neither opens the Card nor draws an Edge'
   const handleBox = (await authoringHandle(card, 'source', 'right').boundingBox())!;
   await page.mouse.click(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
 
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });

@@ -617,7 +617,11 @@ describe('the Card affordance on the graph', () => {
     fireEvent.click(card);
     fireEvent.doubleClick(card);
 
-    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
+    // The authored Open state itself, and the control an Open Card offers. The
+    // Card the gesture lands on is the evidence: a pane that is no longer built
+    // cannot be absent from the document for a reason this test is about.
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-expanded', 'false');
+    expect(screen.queryByRole('button', { name: 'Close Card A' })).not.toBeInTheDocument();
     await settled(session);
   });
 });
