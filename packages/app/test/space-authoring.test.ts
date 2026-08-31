@@ -518,15 +518,9 @@ describe('Space Authoring', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  /**
-   * Retargeting is an ordinary Edit of the Alias, made through the same Card
-   * editor as its title (ADR 0009, the Alias prototype's Frame 4) — the Card
-   * editor is the one canonical place a Target changes, so it is the completion
-   * that carries it. The Alias keeps its id, its own title and its position; the
-   * old Target keeps everything.
-   */
-  it("replaces an Alias's Target while preserving its identity and title", () => {
+  it("refuses changing an existing Alias's immutable Target", () => {
     const { authoring, session } = openRefusalFixture();
+    const before = session.getState().working;
 
     expect(
       complete(authoring, {
@@ -534,39 +528,7 @@ describe('Space Authoring', () => {
         cardId: CARD_B,
         document: { title: 'A again', kind: 'alias', target: CARD_C },
       }),
-    ).toEqual({ kind: 'completed' });
-
-    expect(session.getState().working.cards).toEqual([
-      { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-      { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_C } },
-      { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
-    ]);
-    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 40, open: false },
-      [CARD_C]: { x: 600, y: 40, open: false },
-    });
-    expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
-  });
-
-  it('refuses an Alias Target that does not own its content', () => {
-    const { authoring, session } = openRefusalFixture();
-    const before = session.getState().working;
-
-    // `CARD_B` is itself the Alias, so this asks for a chain. Intake rejects one
-    // too, but by then the Edit has already been derived — refusing here is what
-    // keeps a reachable authoring mistake an author-facing sentence rather than
-    // the throw a broken invariant gets.
-    expect(
-      complete(authoring, {
-        kind: 'edited-card',
-        cardId: CARD_B,
-        document: { title: 'A again', kind: 'alias', target: CARD_B },
-      }),
-    ).toEqual({
-      kind: 'refused',
-      refusal: { code: 'alias-target-must-own-content', targetId: CARD_B },
-    });
+    ).toEqual({ kind: 'refused', refusal: { code: 'alias-target-immutable' } });
     expect(session.getState().working).toBe(before);
   });
 

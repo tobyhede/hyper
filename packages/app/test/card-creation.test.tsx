@@ -49,7 +49,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-/** The same Space with an Alias of A already in it, for the retargeting tests. */
+/** The same Space with an Alias of A already in it, for existing-Alias tests. */
 const aliased: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
@@ -635,73 +635,6 @@ describe('an Alias on the graph', () => {
     expect(alias).toContainElement(screen.getByRole('img', { name: 'Alias' }));
     // The Target's title, read-only, under the Alias's own.
     expect(screen.getByTestId('alias-marker')).toHaveTextContent('A');
-    await settled(session);
-  });
-});
-
-describe('retargeting an Alias', () => {
-  it('moves the Target while keeping the Alias’s identity, title and position', async () => {
-    const session = mount(aliased);
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A again' }));
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target' }), { key: 'ArrowDown' });
-    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-
-    expect(cardsOf(session)).toContainEqual({
-      id: ALIAS_ID,
-      document: { title: 'A again', kind: 'alias', target: OTHER_CARD_ID },
-    });
-    expect(layoutsOf(session)[0]?.positions[ALIAS_ID]).toEqual({ x: 600, y: 20, open: false });
-    await settled(session);
-  });
-
-  /**
-   * The Target field is the Alias's, and the fields under it author the Card
-   * that owns the content — two Cards, one pane, which is the pairing ADR
-   * 0039 warns about. The check is that the pane's *own* editor still writes
-   * where it always did.
-   */
-  it.skip('replaced by ADR 0049: an Alias pane never authors Target content', async () => {
-    const session = mount(aliased);
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A again' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
-      target: { value: 'Written through the Alias' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-
-    expect(cardsOf(session)).toContainEqual({
-      id: CARD_ID,
-      document: { title: 'A', kind: 'markdown', body: 'Written through the Alias' },
-    });
-    await settled(session);
-  });
-
-  /**
-   * Opening an Alias opens on its Target picker, not its title.
-   *
-   * The title stays editable from the Card's own front, so it is the Target
-   * that needs the pane to open it — the same reason the creation state opens
-   * on Target too.
-   */
-  it('opens on the Alias’s Target, since the title stays editable from the Card front', async () => {
-    const session = mount(aliased);
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A again' }));
-
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Target' })).toHaveFocus());
-    expect(screen.getByRole('textbox', { name: 'Title' })).not.toHaveFocus();
-    await settled(session);
-  });
-
-  /** A Card that owns its content has no Target, so the field is not drawn. */
-  it('is not offered on a Card opened on its own content', async () => {
-    const session = mount();
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A' }));
-
-    expect(screen.queryByRole('combobox', { name: 'Target' })).not.toBeInTheDocument();
     await settled(session);
   });
 });

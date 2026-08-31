@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
-  presentAliasCardRefusal,
   presentEdgeDeletionRefusal,
   presentEdgeEndpointRefusal,
-  presentNewAliasRefusal,
 } from '../src/authoring-refusal';
 import type { AuthoringRefusal } from '../src/space-authoring';
 
@@ -18,6 +16,7 @@ const EVERY_REFUSAL = {
   'layout-required': { code: 'layout-required', operation: 'added-card-to-layout' },
   'card-not-found': { code: 'card-not-found' },
   'card-kind-immutable': { code: 'card-kind-immutable' },
+  'alias-target-immutable': { code: 'alias-target-immutable' },
   'card-title-required': { code: 'card-title-required' },
   'layout-title-required': { code: 'layout-title-required' },
   'alias-target-not-found': { code: 'alias-target-not-found', targetId: TARGET_ID },
@@ -34,12 +33,6 @@ const EVERY_REFUSAL = {
   'edge-already-exists': { code: 'edge-already-exists' },
   'layout-active-graph-required': { code: 'layout-active-graph-required' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;
-
-describe('Alias Card editing and New Alias creation place every refusal identically', () => {
-  it.each(Object.values(EVERY_REFUSAL))('for $code', (refusal) => {
-    expect(presentAliasCardRefusal(refusal)).toEqual(presentNewAliasRefusal(refusal));
-  });
-});
 
 /**
  * The three Edge surfaces, and the one rule that separates their channels.

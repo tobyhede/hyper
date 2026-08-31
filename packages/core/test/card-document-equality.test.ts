@@ -13,23 +13,12 @@ import { markdownCardDocumentSchema, markdownCardSchema } from '../src/index';
  * does not, and from then on the two agree on nothing but their author's
  * intention.
  *
- * What that costs is a long way from here. The opened-Card pane authors a
- * delegated Card's *content*: it draws no title field, so it passes the stored
- * title straight through and validates the result with `markdownCardSchema` —
- * and it has nowhere to report a title refusal, because there is no title field
- * and no node beside one. A stored title the document schema accepts and the
- * card schema refuses therefore surfaces as a `Done` button that does nothing
- * and says nothing. `OpenCard` carries a generic fallback message for exactly
- * that, and the fallback is the second line of defence; this is the first.
- *
  * Test-only on purpose. The equality is a property of two declarations, not a
  * rule either could carry, and a runtime assertion inside `core` would be
  * checking its own source at import time.
  *
- * Only the markdown pair is guarded, because only that one is passed through an
- * authoring surface that cannot report its own refusal. The alias pair is built
- * the same way and earns the same guard the day an Alias document takes the
- * same shape.
+ * Only the markdown pair is guarded because Markdown is the authorable content
+ * document. An Open Alias reuses its Target's renderer read-only.
  */
 describe('a stored markdown document is the card less its id', () => {
   const CARD_ID = '00000000-0000-4000-8000-000000000002';
@@ -59,10 +48,9 @@ describe('a stored markdown document is the card less its id', () => {
    * `.strict()`, a catchall — sits on the schema rather than in its `.shape`,
    * so a derived schema that appended one passes this and the table below
    * alike, neither of which offers an unknown key. That is a bound, not a hole:
-   * the pane builds the object it validates key by key (`OpenCard.tsx`), so no
-   * unknown key can reach `markdownCardSchema` along the path this file exists
-   * to guard, and a mode the two disagree about cannot produce the silent
-   * `Done`. `omit` carries the mode across anyway — both are `strip` — so a
+   * authoring builds the document key by key, so no unknown key can reach
+   * `markdownCardSchema` along the path this file exists to guard. `omit`
+   * carries the mode across anyway — both are `strip` — so a
    * divergence there needs the same standalone re-declaration that (2) already
    * refuses.
    */

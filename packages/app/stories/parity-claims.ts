@@ -139,12 +139,6 @@ export const parityClaims: readonly ParityClaim[] = [
       "The canvas Card's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
   },
   {
-    id: 'alias-pane-authors-metadata',
-    storyFile: 'components/card-and-alias-panes.stories.tsx',
-    storyExport: 'Alias',
-    claim: 'An Alias opens its own title and Target editor without exposing Target content.',
-  },
-  {
     id: 'new-alias-completes-on-the-target-chosen',
     storyFile: 'components/card-and-alias-panes.stories.tsx',
     storyExport: 'NewAliasPane',
@@ -154,6 +148,13 @@ export const parityClaims: readonly ParityClaim[] = [
     // title would have one proof rather than the two ADR 0052 requires.
     claim:
       'Adding an Alias offers Title and Target with no create action, and completes on the Target chosen rather than on a second confirmation.',
+  },
+  {
+    id: 'open-alias-shows-target-markdown-read-only',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'OpenAlias',
+    claim:
+      'An Open Alias keeps its own Title, renders its Target Markdown read-only, and offers Close without Target or source-edit controls.',
   },
   {
     id: 'persistence-indicator-shows-save-lifecycle',

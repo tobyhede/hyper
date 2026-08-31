@@ -400,50 +400,45 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
   expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
 });
 
-/**
- * Opening an Alias opens an editor for the Alias, and only for the Alias.
- *
- * This used to open the delegated content editor over the Card the Alias points
- * at — `Opened through A′`, `Editing content on A`, and A's own Markdown source
- * in the pane. ADR 0049 withdrew that: a pane has one edit subject, and to
- * author A's content the author opens A.
- */
 test(
-  'an alias node names the card it redraws and opens its own metadata',
-  { tag: '@parity:alias-pane-authors-metadata' },
+  'an Alias Opens on its Target Markdown read-only with click, Enter and Space',
+  { tag: '@parity:open-alias-shows-target-markdown-read-only' },
   async ({ page }) => {
     await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
 
-    // A′ is an alias of A. It is drawn as its own node, carrying its own title, with
-    // a muted marker naming the card it shows, so a redraw reads as a deliberate
-    // return (ADR 0009).
     const recap = nodeByTitle(page, 'A′');
     await expect(recap).toBeVisible();
     await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
+    await openCard(recap, 'A′');
+    await expect(recap.getByText('entry point')).toBeVisible();
+    await expect(recap.getByRole('heading', { name: 'A′', exact: true })).toBeVisible();
+    await expect(recap.getByRole('textbox')).toHaveCount(0);
+    await expect(recap.getByRole('button', { name: /Edit Card/ })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
+    await recap.getByRole('button', { name: 'Close Card A′' }).click();
+
     await recap.focus();
     await page.keyboard.press('Enter');
-    // Two fields, both the Alias's own, and nothing belonging to A.
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-    const target = page.getByRole('combobox', { name: 'Target' });
-    await expect(target).toBeVisible();
-    await target.press('ArrowDown');
-    await expect(page.getByRole('option', { name: 'Markdown Card A' }).locator('svg')).toHaveCount(
-      2,
-    );
-    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-    await target.press('Escape');
-    await expect(page.getByTestId('open-card')).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(recap.getByRole('button', { name: 'Close Card A′' })).toBeVisible();
+    await recap.getByRole('button', { name: 'Close Card A′' }).click();
 
-    // Pointer and keyboard activation are separate production paths. Keep both:
-    // this affordance is the Alias front's explicit Open operation.
-    await openCard(recap, 'A′');
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await recap.focus();
+    await page.keyboard.press('Space');
+    await expect(recap.getByText('entry point')).toBeVisible();
+    await expect(recap.locator('.react-flow__resize-control')).toHaveCount(1);
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
-    // Its own title is still authored, inline on the graph.
-    await recap.getByRole('button', { name: 'Edit Title A′', exact: true }).click();
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    const persisted = nodeByTitle(page, 'A′');
+    await expect(persisted.getByText('entry point')).toBeVisible();
+    await expect(persisted.getByRole('button', { name: 'Close Card A′' })).toBeVisible();
+    await expect(persisted.getByRole('textbox')).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
+
+    await persisted.getByRole('button', { name: 'Edit Title A′', exact: true }).click();
     await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('A′');
   },
 );

@@ -342,7 +342,9 @@ export function projectCardNodes(
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
     const showContent = active && showActiveCardContent;
-    const open = options.openCardIds?.has(card.id) === true && card.kind === 'markdown';
+    const open =
+      options.openCardIds?.has(card.id) === true &&
+      (card.kind === 'markdown' || card.kind === 'alias');
     // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
     const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).

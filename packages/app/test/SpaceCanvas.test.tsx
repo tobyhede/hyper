@@ -75,7 +75,6 @@ const cardNode = (title: string, id: typeof CARD_ID = CARD_ID, selected = false)
 interface Harness {
   readonly view: RenderResult;
   readonly openCard: ReturnType<typeof vi.fn>;
-  readonly openAlias: ReturnType<typeof vi.fn>;
   readonly addCard: ReturnType<typeof vi.fn>;
   /** Re-render with Card authoring on or off, everything else unchanged. */
   readonly setTitleEditing: (enabled: boolean) => void;
@@ -133,7 +132,6 @@ function mountGraph(
   },
 ): Harness {
   const openCard = vi.fn();
-  const openAlias = vi.fn();
   const addCard = vi.fn();
   const titleEditingChanged = vi.fn();
   const nodesChanged = vi.fn();
@@ -142,7 +140,7 @@ function mountGraph(
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(new MemorySpaceBackend([stored]), stored);
-  const { authoring, navigation } = composeApp({ spaceSession });
+  const { authoring } = composeApp({ spaceSession });
   const testedAuthoring = {
     ...authoring,
     complete: (completion: Parameters<typeof authoring.complete>[0]) => {
@@ -173,10 +171,6 @@ function mountGraph(
         nameOnCreation={null}
         authoring={testedAuthoring}
         spaceSession={spaceSession}
-        onOpenAlias={(cardId) => {
-          openAlias(cardId);
-          navigation.openCard(cardId);
-        }}
         onBodyEditingChange={() => undefined}
         onTitleEditingChange={titleEditingChanged}
         cardResize={cardResize}
@@ -191,7 +185,6 @@ function mountGraph(
   return {
     view,
     openCard,
-    openAlias,
     addCard,
     titleEditingChanged,
     nodesChanged,
@@ -370,13 +363,13 @@ it.each(['Enter', ' '])('opens a focused Alias with %s', (key) => {
   const alias = cardNode('A again', ALIAS_ID);
   alias.data.kind = 'alias';
   alias.data.aliasOf = 'A';
-  const { openAlias } = mountGraph([alias]);
+  const { openCard } = mountGraph([alias]);
 
   const focusedAlias = nodeOf(ALIAS_ID);
   focusedAlias.focus();
   fireEvent.keyDown(focusedAlias, { key });
 
-  expect(openAlias).toHaveBeenCalledWith(ALIAS_ID);
+  expect(openCard).toHaveBeenCalledWith(ALIAS_ID);
 });
 
 describe('the Card affordance', () => {

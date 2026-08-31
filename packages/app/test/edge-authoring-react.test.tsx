@@ -327,13 +327,12 @@ function CanvasHarness({
   edgeAuthoring,
   currentSpace,
   authoring,
-  navigation,
   session,
   covered,
   presenting,
 }: Pick<
   ReturnType<typeof compose>,
-  'adapter' | 'edgeAuthoring' | 'currentSpace' | 'authoring' | 'navigation' | 'session'
+  'adapter' | 'edgeAuthoring' | 'currentSpace' | 'authoring' | 'session'
 > & {
   /** A modal pane is open over the graph — what `App` reports as no title editing. */
   readonly covered: boolean;
@@ -363,7 +362,6 @@ function CanvasHarness({
       nameOnCreation={null}
       authoring={authoring}
       spaceSession={session}
-      onOpenAlias={navigation.openCard}
       cardResize={{
         beginResize: () => undefined,
         previewResize: () => undefined,

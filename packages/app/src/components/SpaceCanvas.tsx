@@ -167,7 +167,6 @@ export interface SpaceCanvasProps {
   nameOnCreation: string | null;
   authoring: SpaceAuthoring;
   spaceSession: SpaceSession;
-  onOpenAlias: (cardId: CardId) => void;
   /**
    * Whether a content edit is running, for the one control outside this canvas
    * that has to know: Present.
@@ -208,7 +207,6 @@ export function SpaceCanvas({
   nameOnCreation,
   authoring,
   spaceSession,
-  onOpenAlias,
   onBodyEditingChange,
   onTitleEditingChange,
   cardResize,
@@ -256,7 +254,6 @@ export function SpaceCanvas({
     authoring,
     spaceSession,
     cardResize,
-    onOpenAlias,
     onSelectCard,
     onBodyEditingChange,
     onTitleEditingChange,

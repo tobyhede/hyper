@@ -715,15 +715,27 @@ describe('CardNode Expanded Card front', () => {
     );
   });
 
-  it('leaves an Alias collapsed, because the Alias kind has no Expanded front yet', () => {
-    render(<CardNode {...props({ kind: 'alias', aliasOf: 'Strategies', expanded: true })} />);
+  it("draws an Open Alias's resolved Markdown read-only under the Alias Title", () => {
+    render(
+      <CardNode
+        {...props({
+          kind: 'alias',
+          title: 'Return',
+          aliasOf: 'Strategies',
+          expanded: true,
+          body: SOURCE,
+          cardEditingEnabled: true,
+          onEditCard: vi.fn(),
+        })}
+      />,
+    );
 
-    // ADR 0064 leaves this open. Drawing a Markdown writing surface on a Card
-    // that owns no Markdown would be answering it by accident.
-    expect(
-      screen.queryByRole('button', { name: 'Edit Markdown source of Strategies' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByTestId('card')).toHaveAttribute('data-expanded', 'false');
+    expect(screen.getByRole('heading', { name: 'Return' })).toBeVisible();
+    expect(screen.getByText('No strategy is privileged.')).toBeVisible();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close Card Return' })).toBeVisible();
+    expect(screen.getByTestId('card')).toHaveAttribute('data-expanded', 'true');
     expect(screen.getByTestId('alias-marker')).toHaveTextContent('Strategies');
   });
 

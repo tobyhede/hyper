@@ -150,10 +150,9 @@ export const uncataloguedComponents = [
  * its leading attribute or id, or failing both by its leading element name, so those
  * cannot slip past by having no class to record.
  *
- * `card-editor` was product appearance until Issue 16 moved it to
- * `src/components/card-editor.css` beside `OpenCard`, taking
- * the Card-choice popup's theme with it to `packages/ui/src/card-search-combobox.css`
- * beside `CardSearchCombobox`, which is the component it actually styles.
+ * The Card-choice popup's theme lives in
+ * `packages/ui/src/card-search-combobox.css` beside `CardSearchCombobox`, the
+ * component it actually styles.
  */
 export const handRolledStyles = [
   {

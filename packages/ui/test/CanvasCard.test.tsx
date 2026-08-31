@@ -55,7 +55,7 @@ describe('CanvasCard kind and interaction state', () => {
   it('presents an Alias front with the Target title it must receive', () => {
     render(
       <CanvasCard
-        front={{ kind: 'alias', aliasOf: 'Opening' }}
+        front={{ kind: 'alias', aliasOf: 'Opening', source: '', open: false }}
         state="selected"
         title="Opening, again"
         graphColor="#35d6c3"
@@ -69,11 +69,11 @@ describe('CanvasCard kind and interaction state', () => {
     expect(screen.getByTestId('alias-marker')).toHaveTextContent('Opening');
   });
 
-  it('offers an Alias its metadata Open operation without Markdown state', () => {
-    const onOpen = vi.fn();
+  it('offers an Alias the shared Open operation', () => {
+    const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasCard
-        front={{ kind: 'alias', aliasOf: 'Opening', onOpen }}
+        front={{ kind: 'alias', aliasOf: 'Opening', source: 'Markdown', open: false, onOpenChange }}
         state="selected"
         title="Return"
         graphColor="#ffc53d"
@@ -81,7 +81,7 @@ describe('CanvasCard kind and interaction state', () => {
     );
 
     screen.getByRole('button', { name: 'Open Card Return' }).click();
-    expect(onOpen).toHaveBeenCalledOnce();
+    expect(onOpenChange).toHaveBeenCalledWith(true);
     expect(screen.queryByRole('button', { name: 'Close Card Return' })).not.toBeInTheDocument();
   });
 
@@ -677,7 +677,7 @@ describe('CanvasCard open Markdown front', () => {
   it('keeps the Alias front limited to the Target it owns', () => {
     render(
       <CanvasCard
-        front={{ kind: 'alias', aliasOf: 'Strategies' }}
+        front={{ kind: 'alias', aliasOf: 'Strategies', source: '', open: false }}
         state="rest"
         title="Strategy overview"
         graphColor="#35d6c3"

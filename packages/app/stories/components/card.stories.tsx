@@ -5,7 +5,7 @@ import { cardSizeVars, snapCardSizeToClose } from '#src/card';
 import { CanvasCardSpecimen } from '../support/CanvasCardSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
 import { CanvasCardNodeSpecimen } from '../support/ReactFlowCanvas';
-import { GRAPH_PALETTE } from '../support/fixture';
+import { cardIds, GRAPH_PALETTE } from '../support/fixture';
 import '../support/inventory.css';
 
 export default { title: 'Components/Card' };
@@ -185,7 +185,7 @@ function Instance({
       ? open
         ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: changeOpen }
         : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen }
-      : { kind: 'alias', aliasOf };
+      : { kind: 'alias', aliasOf, source: '', open: false };
   const state: Exclude<CanvasCardState, 'editing'> = dragging
     ? 'dragging'
     : selected
@@ -284,3 +284,26 @@ export const OpenAndClose: Story = () => {
   );
 };
 OpenAndClose.meta = { iframed: true };
+
+export const OpenAlias: Story = () => {
+  const [open, setOpen] = useState(true);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
+  return (
+    <div className="p-8">
+      <CanvasCardNodeSpecimen
+        cardId={cardIds.openingAlias}
+        expanded={open}
+        onOpenChange={changeOpen}
+        cardEditingEnabled
+        body="## Strategies\n\nNo strategy is privileged."
+        nodeSize={open ? openFrame : closedFrame}
+        stageClassName="inv-card-node-stage--large"
+      />
+    </div>
+  );
+};
+OpenAlias.storyName = 'Open Alias';
+OpenAlias.meta = { iframed: true };

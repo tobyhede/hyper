@@ -56,8 +56,11 @@ export type CanvasCardFront =
   | {
       readonly kind: 'alias';
       readonly aliasOf: string;
-      /** Open this Alias's metadata editor; Alias Cards do not expand. */
-      readonly onOpen?: () => void;
+      /** The resolved Target Markdown this Alias displays read-only. */
+      readonly source: string;
+      /** Authored Layout state; an Alias Opens through the shared Card operation. */
+      readonly open: boolean;
+      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
     }
   | {
       /** Interim closed treatment; embedding the selected Space View belongs to issue 01. */
@@ -185,15 +188,15 @@ const opacityTransitionMs = (element: HTMLElement): number => {
 export function CanvasCard(props: CanvasCardProps) {
   const { front, title, graphColor, onBeginTitleEdit, entityActions, state } = props;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
-  const open = front.kind === 'markdown' && front.open;
+  const contentFront = front.kind === 'markdown' || front.kind === 'alias' ? front : undefined;
+  const open = contentFront?.open === true;
   const contentControl = useRef<HTMLDivElement>(null);
   const contentExitDuration = useCallback(
     () => (contentControl.current === null ? 0 : opacityTransitionMs(contentControl.current)),
     [],
   );
   const contentPresence = usePresence(open, contentExitDuration);
-  const onOpenChange = front.kind === 'markdown' ? front.onOpenChange : undefined;
-  const onOpenAlias = front.kind === 'alias' ? front.onOpen : undefined;
+  const onOpenChange = contentFront?.onOpenChange;
   const onBeginContentEdit = front.kind === 'markdown' ? front.onBeginEdit : undefined;
   /**
    * The edit running inside the Markdown front this Card owns.
@@ -212,7 +215,6 @@ export function CanvasCard(props: CanvasCardProps) {
     state !== 'editing' &&
     (contentEdit !== null ||
       onOpenChange !== undefined ||
-      onOpenAlias !== undefined ||
       actionableEntityActions ||
       beginContentEdit !== undefined);
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
@@ -291,14 +293,6 @@ export function CanvasCard(props: CanvasCardProps) {
                 )
               ) : (
                 <ContentEditActions title={title} edit={contentEdit} />
-              )}
-              {/* An Alias does not expand, so its Open is its own kind's
-                  command — it opens the Alias's metadata editor rather than
-                  the Card. It is not the shared Open below. */}
-              {onOpenAlias !== undefined && (
-                <CardRailAction aria-label={`Open Card ${title}`} onClick={onOpenAlias}>
-                  <OpenCardIcon data-icon="inline-start" />
-                </CardRailAction>
               )}
             </CardRailKindActions>
             <CardRailSharedActions>
@@ -398,7 +392,7 @@ export function CanvasCard(props: CanvasCardProps) {
           inset so a Title sits off the Card's border; a writing surface brings
           its own gutter and padding and has to reach the paper's edges, and
           nesting it would draw one inset inside another. */}
-      {front.kind === 'markdown' && contentPresence.mounted && (
+      {contentFront !== undefined && contentPresence.mounted && (
         <div
           ref={contentControl}
           className="canvas-card__content"
@@ -406,7 +400,7 @@ export function CanvasCard(props: CanvasCardProps) {
         >
           <CardContentEditProvider value={setContentEdit}>
             <MarkdownCardBody
-              source={front.source}
+              source={contentFront.source}
               ariaLabel={`Markdown source of ${title}`}
               {...markdownBodyProps}
             />

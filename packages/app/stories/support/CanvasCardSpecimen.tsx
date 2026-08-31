@@ -17,6 +17,8 @@ export function CanvasCardSpecimen({
   graphColor = '#ffc53d',
 }: CanvasCardSpecimenProps) {
   const front: CanvasCardFront =
-    kind === 'alias' ? { kind: 'alias', aliasOf } : { kind: 'markdown', source: '', open: false };
+    kind === 'alias'
+      ? { kind: 'alias', aliasOf, source: '', open: false }
+      : { kind: 'markdown', source: '', open: false };
   return <CanvasCard front={front} title={title} state={state} graphColor={graphColor} />;
 }

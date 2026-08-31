@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { spaceSnapshotSchema, uuidSchema } from '@project/core';
+import { spaceSnapshotSchema, uuidSchema, type CardId } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CARD_SIZE } from '../src/card';
@@ -12,6 +12,7 @@ const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const snapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
@@ -23,13 +24,19 @@ const snapshot = spaceSnapshotSchema.parse({
         id: LAYOUT_ID,
         title: 'Layout',
         kind: 'positioned',
-        positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+        positions: {
+          [CARD_ID]: { x: 0, y: 0, open: false },
+          [ALIAS_ID]: { x: 300, y: 0, open: false },
+        },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
     defaultRenderer: LAYOUT_ID,
   },
-  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } }],
+  cards: [
+    { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
+    { id: ALIAS_ID, document: { title: 'Return', kind: 'alias', target: CARD_ID } },
+  ],
 });
 
 const snapshotWithoutCard = spaceSnapshotSchema.parse({
@@ -83,7 +90,7 @@ interface HookProps {
   readonly enabled: boolean;
   readonly presenting: boolean;
   readonly nameOnCreation: string | null;
-  readonly cardId: typeof CARD_ID;
+  readonly cardId: CardId;
 }
 
 const mountAuthoring = (
@@ -111,7 +118,6 @@ const mountAuthoring = (
         authoring,
         spaceSession,
         cardResize: adapter.getState().cardResize,
-        onOpenAlias: () => undefined,
         onSelectCard: () => undefined,
         onBodyEditingChange,
       }),
@@ -152,6 +158,22 @@ describe('canvas Card authoring', () => {
       cardId: CARD_ID,
     });
     expect(result.current.nodes[0]?.data.bodyEditor).toBeDefined();
+  });
+
+  it('authors Open for an Alias through the same Card operation', () => {
+    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'alias');
+    rerender({
+      expanded: false,
+      enabled: true,
+      presenting: false,
+      nameOnCreation: null,
+      cardId: ALIAS_ID,
+    });
+
+    act(() => expect(result.current.openCard(ALIAS_ID)).toBe('completed'));
+    expect(spaceSession.getState().working.document.layouts?.[0]?.positions[ALIAS_ID]?.open).toBe(
+      true,
+    );
   });
 
   it('forgets a title caret when canvas authoring is withdrawn', () => {

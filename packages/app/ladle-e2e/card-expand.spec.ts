@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const openCloseStory = '/?story=components--card--open-and-close&mode=preview';
 const markdownStory = '/?story=components--card--editing--markdown&mode=preview';
 const resizeControlStory = '/?story=components--card--resize-control&mode=preview';
+const openAliasStory = '/?story=components--card--open-alias&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {
   await page.goto(story);
@@ -10,6 +11,20 @@ const open = async (page: Page, story: string): Promise<void> => {
     timeout: 20_000,
   });
 };
+
+test(
+  'Open Alias story renders Target Markdown read-only under the Alias Title',
+  { tag: '@parity:open-alias-shows-target-markdown-read-only' },
+  async ({ page }) => {
+    await page.goto(openAliasStory);
+    const alias = page.getByRole('article', { name: 'Strategy overview' });
+    await expect(alias.getByRole('heading', { name: 'Strategy overview' })).toBeVisible();
+    await expect(alias.getByText('No strategy is privileged.')).toBeVisible();
+    await expect(alias.getByRole('textbox')).toHaveCount(0);
+    await expect(alias.getByRole('button', { name: /Edit Card/ })).toHaveCount(0);
+    await expect(alias.getByRole('button', { name: 'Close Card Strategy overview' })).toBeVisible();
+  },
+);
 
 test(
   'Open and Close retain one Card and Title treatment',

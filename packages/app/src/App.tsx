@@ -8,7 +8,7 @@ import {
   AppShell,
   DRAWER_WIDTH,
 } from '@project/ui';
-import { type Card, type CardId, type GraphId, type LayoutPosition } from '@project/core';
+import { type CardId, type GraphId, type LayoutPosition } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import { graphCardIds } from '@project/graph';
 import type { OpenedSpace } from './space';
@@ -25,7 +25,6 @@ import { canRetreat } from './navigation';
 import { copyLink } from './clipboard';
 import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
-import { activeGraphColor } from './colors';
 import type { CanvasRendererId } from './renderer';
 import type { DestinationOpening } from './destination-opening';
 import { adoptedRendererDestination, destinationRestoration } from './destination-coordination';
@@ -34,7 +33,6 @@ import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CardDestinationFocus } from './components/CardDestinationFocus';
 import { CardsDrawer } from './components/CardsDrawer';
 import { NewAlias } from './components/NewAlias';
-import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -153,7 +151,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       [rendererSpace, renderer],
     );
 
-    const { activeGraphId, openedCardId } = navigationState;
+    const { activeGraphId } = navigationState;
     const previousRenderer = useRef(selectedRenderer);
     useEffect(() => {
       if (previousRenderer.current === selectedRenderer) return;
@@ -167,13 +165,10 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       );
       if (destination !== null) syncDestination('push', destination);
     }, [selectedRenderer, syncDestination]);
-    const editorGraphColor = activeGraphColor(projection.colors, activeGraphId);
-    const openCard = navigation.openCard;
-    const closeCard = navigation.closeCard;
     const presenting = navigationState.mode === 'presenting';
     useEffect(() => {
       cardsDrag.current = null;
-    }, [selectedRenderer, presenting, openedCardId, authoringState.replacementEpoch]);
+    }, [selectedRenderer, presenting, authoringState.replacementEpoch]);
     // There is a Card to go back to only once a traversal has left its first, and only
     // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
@@ -231,8 +226,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     // The one condition the toggle's `disabled` and the drawer's own open state
     // both read, so neither can drift from the other into an enabled control
     // over a drawer that will not open.
-    const cardsDrawerAvailable =
-      renderer.kind === 'layout' && !presenting && openedCardId === null && !creatingAlias;
+    const cardsDrawerAvailable = renderer.kind === 'layout' && !presenting && !creatingAlias;
     // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
     // `cardsDrawerOpen`. Presenting, opening a Card and creating an Alias all pass
     // through here, and a drawer that reopened itself on the way back would take
@@ -338,12 +332,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       readonly returnFocus: () => void;
     } | null>(null);
     const chromeEditingDisabled =
-      !editable ||
-      presenting ||
-      openedCardId !== null ||
-      creatingAlias ||
-      editingCardBody ||
-      editingCardTitle;
+      !editable || presenting || creatingAlias || editingCardBody || editingCardTitle;
 
     useEffect(() => {
       if (chromeEditingDisabled) setSpaceChromeEdit(null);
@@ -688,45 +677,40 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      * event callback — a blank canvas — for the one case it was written to catch,
      * and the pane places every refusal it is given.
      */
-    const createAlias = useCallback(
-      (target: CardId, title: string) => {
-        const created = authoring.complete({
-          kind: 'created-alias',
-          target,
-          // Exactly as typed, empty string included: an empty title is how
-          // Authoring is told to take the Target's own.
-          title,
-          anchor: centreAnchor(),
-        });
-        if (created.kind === 'refused') {
-          setAliasRefusal(created.refusal);
-          return;
-        }
-        // The surface comes down only where the continuations below will run,
-        // which is why the narrowing precedes it rather than following it.
-        // `queued` is an Edit that lands later from the drain, and it cannot
-        // honour "the editor stays open on the Alias that now exists" — so it
-        // must not take the creation pane with it either, or an empty title
-        // leaves the author holding two identically titled Cards and no
-        // surface to rename either from. `unchanged` this operation cannot
-        // answer: it mints, or it refuses.
-        //
-        // Neither is reachable from here today. `queued` needs a completion
-        // raised from inside an install window, and this one is a cmdk
-        // selection at the top of its own stack. Named rather than trusted to
-        // stay that way, as Add Card names its own.
-        if (created.kind === 'queued') return;
-        if (created.kind === 'unchanged') return;
-        if (created.createdCardId === undefined) return;
-        setCreatingAlias(false);
-        setAliasRefusal(null);
-        useRenderAdapter.getState().selectCard(created.createdCardId);
-        // The editor stays open on the Alias that now exists, which is where the
-        // author already was.
-        openCard(created.createdCardId);
-      },
-      [openCard],
-    );
+    const createAlias = useCallback((target: CardId, title: string) => {
+      const created = authoring.complete({
+        kind: 'created-alias',
+        target,
+        // Exactly as typed, empty string included: an empty title is how
+        // Authoring is told to take the Target's own.
+        title,
+        anchor: centreAnchor(),
+      });
+      if (created.kind === 'refused') {
+        setAliasRefusal(created.refusal);
+        return;
+      }
+      // The surface comes down only where the continuations below will run,
+      // which is why the narrowing precedes it rather than following it.
+      // `queued` is an Edit that lands later from the drain, and it cannot
+      // honour "the editor stays open on the Alias that now exists" — so it
+      // must not take the creation pane with it either, or an empty title
+      // leaves the author holding two identically titled Cards and no
+      // surface to rename either from. `unchanged` this operation cannot
+      // answer: it mints, or it refuses.
+      //
+      // Neither is reachable from here today. `queued` needs a completion
+      // raised from inside an install window, and this one is a cmdk
+      // selection at the top of its own stack. Named rather than trusted to
+      // stay that way, as Add Card names its own.
+      if (created.kind === 'queued') return;
+      if (created.kind === 'unchanged') return;
+      if (created.createdCardId === undefined) return;
+      setCreatingAlias(false);
+      setAliasRefusal(null);
+      useRenderAdapter.getState().selectCard(created.createdCardId);
+      setCreatedCardId(created.createdCardId);
+    }, []);
 
     /**
      * Leaving the Alias creation state, having created nothing.
@@ -776,8 +760,6 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       setAliasRefusal(null);
     }, [presenting]);
 
-    const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
-
     /**
      * Every Card an Alias may name.
      *
@@ -796,33 +778,6 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     // a completed Edit.
     const newCardTitle = useMemo(() => nextCardTitle(sessionState.working), [sessionState.working]);
     /**
-     * Authoring the Alias itself — one ordinary Card Edit, on whichever of its
-     * two fields the author touched, and the operation package 3 already built
-     * for both. Everything the change does not name rides through in the stored
-     * document: the Alias keeps its id, its positions and its incident Edges.
-     *
-     * One helper rather than two, because a rename and a retarget differ only in
-     * which key the change carries. Their *subjects* are what has to stay apart,
-     * and that separation is the pane's: these fields write to the Alias, the
-     * ones under them write to the Card that owns its content.
-     */
-    const editAlias = useCallback(
-      (
-        alias: Extract<Card, { kind: 'alias' }>,
-        change: { readonly title: string; readonly target: CardId },
-      ) => {
-        const { id, ...document } = alias;
-        const result = authoring.complete({
-          kind: 'edited-card',
-          cardId: id,
-          document: { ...document, ...change },
-        });
-        return result.kind === 'refused' ? result.refusal : null;
-      },
-      [],
-    );
-
-    /**
      * Closing an opened Card returns focus to that Card.
      *
      * The pane cannot do this itself. The obvious target is the control that
@@ -836,19 +791,9 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      * excluded because it closes the opened Card on its way in and takes the
      * nodes out of the tab order behind it.
      */
-    const lastOpenedCardId = useRef<string | null>(null);
-    useEffect(() => {
-      const closed = lastOpenedCardId.current;
-      lastOpenedCardId.current = openedCardId;
-      if (closed === null || openedCardId !== null || presenting) return;
-      document
-        .querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(closed)}"]`)
-        ?.focus();
-    }, [openedCardId, presenting]);
-
     // An opened Card covers the graph and owns its own keys, so the global
     // Traversal commands are bound only while a traversal is the thing on screen.
-    usePresentingKeys(presenting && openedCardId === null, {
+    usePresentingKeys(presenting, {
       advance,
       retreat,
       selectBranch,
@@ -895,12 +840,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
           // (ADR 0064) — so a live toolbar created a Card and then swallowed the
           // naming it exists to begin.
           disabled:
-            !editable ||
-            presenting ||
-            openedCardId !== null ||
-            creatingAlias ||
-            editingCardBody ||
-            spaceChromeEdit !== null,
+            !editable || presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
         }}
@@ -1054,9 +994,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
                 // The toolbar's Add Card already reads the pair; this read only
                 // the opened Card, so `C` and the inline title editor stayed
                 // live behind an open Alias creation pane.
-                titleEditingEnabled={
-                  openedCardId === null && !creatingAlias && spaceChromeEdit === null
-                }
+                titleEditingEnabled={!creatingAlias && spaceChromeEdit === null}
                 onNodesChange={changeNodes}
                 onEdgesChange={changeEdges}
                 edgeAuthoring={edgeAuthoring}
@@ -1070,7 +1008,6 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
                 nameOnCreation={createdCardId}
                 authoring={authoring}
                 spaceSession={spaceSession}
-                onOpenAlias={openCard}
                 onBodyEditingChange={setEditingCardBody}
                 onTitleEditingChange={setEditingCardTitle}
                 cardResize={cardResize}
@@ -1105,22 +1042,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
             />
           )}
 
-          {/* An Alias authors only its own metadata. Its Target must be opened
-              explicitly to author shared content (ADR 0049). */}
-          {openedCard?.kind === 'alias' && (
-            <OpenCard
-              through={openedCard}
-              graphColor={editorGraphColor}
-              occurrence={{
-                targets: aliasTargets,
-                onEdit: (change: { title: string; target: CardId }) =>
-                  editAlias(openedCard, change),
-              }}
-              onCancel={closeCard}
-            />
-          )}
-
-          {creatingAlias && openedCardId === null && (
+          {creatingAlias && (
             <NewAlias
               targets={aliasTargets}
               refusal={aliasRefusal}

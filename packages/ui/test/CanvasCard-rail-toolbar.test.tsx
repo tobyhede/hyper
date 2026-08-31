@@ -212,22 +212,24 @@ describe('the rail says whose command each one is', () => {
     expect(sharedGroup()).toContainElement(screen.getByRole('button', { name: 'Close Card A' }));
   });
 
-  it('draws no shared group for a Card that has no shared command', () => {
+  it('draws Alias Open in the shared Card command group', () => {
     render(
       <CanvasCard
-        front={{ kind: 'alias', aliasOf: 'B', onOpen: vi.fn() }}
+        front={{
+          kind: 'alias',
+          aliasOf: 'B',
+          source: '',
+          open: false,
+          onOpenChange: () => 'completed',
+        }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
       />,
     );
 
-    // ADR 0070 makes Alias Open the shared Layout-owned operation: it expands
-    // the Card and renders its immutable Target's content read-only. Until that
-    // contract is built, this fixture exercises the superseded Alias front,
-    // whose lone command belongs to its kind group.
     const groups = within(railActions()).getAllByRole('group');
-    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(['Alias commands']);
+    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(['Card commands']);
     expect(groups[0]).toContainElement(screen.getByRole('button', { name: 'Open Card A' }));
   });
 

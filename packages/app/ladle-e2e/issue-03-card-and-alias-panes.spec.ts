@@ -1,26 +1,6 @@
 import { expect, test } from '@playwright/test';
 
 test(
-  'Alias Card story is present in the production catalogue',
-  { tag: '@parity:alias-pane-authors-metadata' },
-  async ({ page }) => {
-    await page.goto('/?story=components--alias-panes--alias&mode=preview');
-
-    const dialog = page.getByRole('dialog', { name: 'Placement recap' });
-    await expect(dialog.getByRole('textbox', { name: 'Title' })).toHaveValue('Placement recap');
-    await expect(dialog.getByRole('combobox', { name: 'Target' })).toHaveValue(
-      'Architecture notes',
-    );
-    await expect(dialog.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-
-    await dialog.getByRole('textbox', { name: 'Title' }).fill('Revised placement recap');
-    await dialog.getByRole('button', { name: 'Done' }).click();
-
-    await expect(page.getByText('Completed Revised placement recap.')).toBeVisible();
-  },
-);
-
-test(
   'adding an Alias completes on the Target chosen, with no create action beside Cancel',
   { tag: '@parity:new-alias-completes-on-the-target-chosen' },
   async ({ page }) => {
@@ -72,35 +52,11 @@ test('the Card-choice popup draws its paper theme from the component that owns i
   );
 });
 
-test('review Alias empty state explains that no Target is eligible', async ({ page }) => {
-  await page.goto('/?story=review--alias-pane-unreachable-states--empty&mode=preview');
-
-  const dialog = page.getByRole('dialog', { name: 'Placement recap' });
-  const target = dialog.getByRole('combobox', { name: 'Target' });
-  await expect(target).toHaveAccessibleDescription(
-    'This Space holds no other Card that owns its content.',
-  );
-  await target.press('ArrowDown');
-  await expect(page.getByRole('option')).toHaveCount(0);
-});
-
-test('review stale Alias Target refusal stays field-local', async ({ page }) => {
-  await page.goto('/?story=review--alias-pane-unreachable-states--target-refused&mode=preview');
-
-  const dialog = page.getByRole('dialog', { name: 'Placement recap' });
-  const target = dialog.getByRole('combobox', { name: 'Target' });
-  await dialog.getByRole('button', { name: 'Done' }).click();
-
-  await expect(dialog.getByRole('alert')).toHaveText('That Target is no longer part of the Space.');
-  await expect(target).toHaveAttribute('aria-invalid', 'true');
-  await expect(dialog).toBeVisible();
-});
-
 test('Alias pane stories are isolated from the Ladle catalogue', async ({ page }) => {
-  await page.goto('/?story=components--alias-panes--alias');
+  await page.goto('/?story=components--alias-panes--new-alias-pane');
 
   const storyFrame = page.frameLocator('iframe');
-  await expect(storyFrame.getByRole('dialog', { name: 'Placement recap' })).toBeVisible();
+  await expect(storyFrame.getByRole('dialog', { name: 'New Alias' })).toBeVisible();
 
   const storySearch = page.getByLabel('Search stories');
   await storySearch.fill('Persistence Indicator');
