@@ -79,10 +79,10 @@ that has not been decided.
 | --- | --- | --- |
 | `settled-card-movement` | converts | none → completed |
 
-## The 19 codes
+## The 21 codes
 
 3 universal (`placement-pending`, `layout-not-found`, `layout-required`) plus
-the 16 action-specific codes tabulated above — none is produced anywhere else.
+the 18 action-specific codes tabulated above — none is produced anywhere else.
 Count the codes, not the cells: several serve more than one action —
 `card-not-found`, `card-not-in-layout`, `graph-not-owned`,
 `edge-card-outside-layout` and the two `alias-target-*` each appear in more than

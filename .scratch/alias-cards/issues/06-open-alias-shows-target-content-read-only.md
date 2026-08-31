@@ -47,4 +47,4 @@ Aliases now Open and Close through the ordinary Layout-owned Card operation. The
 
 Space Authoring refuses an existing Alias Target change with `alias-target-immutable`. The superseded existing-Alias metadata editor, retarget state, refusal presentation, styles, stories and tests were removed together; Alias creation keeps the one-time Target picker and continues directly into inline Title editing. Stable story/application parity evidence covers read-only Target Markdown, keyboard and pointer Opening, reload persistence and Resize.
 
-Verification: `pnpm verify` (1,929 passed, 7 skipped), `pnpm e2e` (149 passed), and `pnpm e2e:ladle` (65 passed).
+Verification: `pnpm verify` (1,949 passed, 2 skipped), `pnpm e2e` (149 passed), and `pnpm e2e:ladle` (65 passed).

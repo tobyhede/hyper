@@ -2,7 +2,7 @@
 
 `SpaceBackend`/`SpaceSession`, Space Authoring's completed-edit lifecycle, and the Layout/Graph/View aggregate model. Read before touching `packages/persistence`, `packages/graph`, `space-authoring.ts` in `packages/app`, `migrations/**`, or `src/prisma/**`.
 
-**ADR 0070 refinement:** an existing Alias Target is immutable. `edited-card` may rename an Alias but refuses a changed Target with `alias-target-immutable`; the existing-Alias metadata pane and its retargeting route are removed. References below to Alias retargeting describe the superseded surface.
+**ADR 0070 refinement:** an existing Alias Target is immutable. `edited-card` may rename an Alias but refuses a changed Target with `alias-target-immutable`; the existing-Alias metadata pane and its retargeting surface are removed. References below to Alias retargeting describe the superseded surface.
 
 ## PostgreSQL & the document contract
 
