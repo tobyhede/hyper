@@ -105,6 +105,20 @@ describe('issue tags', () => {
 
     expect(issues.map((issue) => issue.tags)).toEqual([['release/v1', 'design-system'], []]);
   });
+
+  it('renders tags in the text and HTML roadmap displays', () => {
+    const root = scratch();
+    write(
+      root,
+      'effort/issues/01-improvement.md',
+      '# 01 — Improvement\n\nStatus: ready-for-agent\nTags: Improvement\n',
+    );
+
+    const roadmap = buildRoadmap(root);
+
+    expect(renderRoadmap(roadmap)).toContain('Improvement  [Improvement]');
+    expect(renderRoadmapHtml(roadmap)).toContain('<span class="tag">Improvement</span>');
+  });
 });
 
 describe('feature phase', () => {
@@ -207,11 +221,13 @@ describe('release scope', () => {
     expect(text).toContain('Definition: v1-release/definition-of-done.md');
     expect(text).not.toMatch(/effort\/01\s+done/u);
     expect(text).toMatch(/effort\/02\s+ready-for-agent/u);
+    expect(text).toContain('Open  [release/v1, another-tag]');
     expect(text.indexOf('V1 RELEASE')).toBeLessThan(text.indexOf('IN FLIGHT'));
     expect(html).toContain('<h2>V1 Release<span class="tally">1/2 settled</span></h2>');
     expect(html).toContain('href="v1-release/definition-of-done.md"');
     expect(html).not.toContain('href="effort/issues/01-done.md"');
     expect(html.match(/href="effort\/issues\/02-open\.md"/gu)).toHaveLength(3);
+    expect(html).toContain('<span class="tag">another-tag</span>');
     const releaseHtml = html.slice(
       html.indexOf('class="release-scope"'),
       html.indexOf('</section>'),
@@ -434,6 +450,9 @@ describe('release scope', () => {
     if (destination === null) throw new Error('Expected a generated Space.');
 
     expect(readdirSync(join(destination, 'cards'))).toHaveLength(3);
+    expect(readFileSync(join(destination, 'cards/parallel-01.md'), 'utf8')).toContain(
+      '- **Tags:** `release/v1`',
+    );
     const written: unknown = JSON.parse(readFileSync(join(destination, 'space.json'), 'utf8'));
     const file = spaceFileSchema.parse(written);
     expect(file.layouts?.[0]?.graphs.map(({ edges }) => edges)).toEqual([
