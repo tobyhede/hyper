@@ -836,7 +836,12 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
                 unavailableReason:
                   placement.kind === 'ready'
                     ? null
-                    : describeAuthoringRefusal({ code: 'placement-pending' }),
+                    : placement.kind === 'failed'
+                      ? describeAuthoringRefusal({
+                          code: 'placement-failed',
+                          error: placement.error,
+                        })
+                      : describeAuthoringRefusal({ code: 'placement-pending' }),
                 refusal: createLayoutRefusal,
                 onCreate: () => {
                   const result = authoring.complete({ kind: 'created-layout' });

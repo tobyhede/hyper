@@ -71,6 +71,17 @@ describe('New Alias creation places every refusal on the field that owns it', ()
   });
 });
 
+describe('describeAuthoringRefusal', () => {
+  it('preserves the placement strategy failure that prevented authoring', () => {
+    expect(
+      describeAuthoringRefusal({
+        code: 'placement-failed',
+        error: new Error('No position for Card A'),
+      }),
+    ).toBe('This view could not place its Cards: No position for Card A');
+  });
+});
+
 /**
  * The three Edge surfaces, and the one rule that separates their channels.
  *

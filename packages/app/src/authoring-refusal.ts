@@ -1,8 +1,13 @@
 import type { AuthoringRefusal, EdgeEndpoint } from './space-authoring';
 
+type PresentedAuthoringRefusal =
+  AuthoringRefusal | { readonly code: 'placement-failed'; readonly error: Error };
+
 /** Application-owned copy for a stable Authoring refusal identity. */
-export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
+export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
   switch (refusal.code) {
+    case 'placement-failed':
+      return `This view could not place its Cards: ${refusal.error.message}`;
     case 'placement-pending':
       return 'This view has not finished placing its Cards, so there is nowhere to write yet.';
     case 'computed-view-read-only':
