@@ -26,6 +26,27 @@ async function openMobileSidebar(page: Page): Promise<void> {
   await expect(sheet(page)).toBeVisible();
 }
 
+test(
+  'Create Layout from the mobile sidebar selects the new authored Layout',
+  { tag: '@parity:mobile-space-sidebar-creates-layout-from-computed-view' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+
+    await openMobileSidebar(page);
+    await page.getByRole('button', { name: 'Create Layout' }).click();
+
+    await expect(sheet(page)).toHaveCount(0);
+    await expect(selectedCanvas(page)).toContainText('Layout 1');
+    await openMobileSidebar(page);
+    await expect(sheet(page).getByTestId('persistence-status')).toHaveAttribute(
+      'data-revision',
+      '1',
+    );
+  },
+);
+
 test('Add Card from the mobile sidebar names the new Card on the canvas', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();

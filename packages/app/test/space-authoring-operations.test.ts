@@ -143,6 +143,61 @@ const openAutomatic = (newId: () => UUID = mintingIds(MINTED)) => {
   return opened;
 };
 
+describe('Create Layout', () => {
+  it('captures the selected Computed View without changing existing Layouts', () => {
+    const { authoring, navigation, session } = open(
+      positionedSnapshot,
+      FLOW_SPACE_VIEW_ID,
+      mintingIds(MINTED),
+    );
+    place(authoring, {
+      [CARD_A]: [80, 120],
+      [CARD_B]: [440, 260],
+    });
+
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
+
+    expect(session.getState().working.document.layouts).toEqual([
+      positionedSnapshot.document.layouts![0],
+      {
+        id: MINTED,
+        title: 'Layout 2',
+        kind: 'positioned',
+        positions: {
+          [CARD_A]: { x: 80, y: 120, open: false },
+          [CARD_B]: { x: 440, y: 260, open: false },
+        },
+        graphs: [
+          {
+            id: MINTED_GRAPH,
+            title: 'Graph 1',
+            color: GRAPH_PALETTE[0],
+            edges: [],
+          },
+        ],
+        activeGraph: MINTED_GRAPH,
+      },
+    ]);
+    expect(session.getState().working.document.defaultRenderer).toBe(MINTED);
+    expect(navigation.getState().selectedRenderer).toBe(MINTED);
+  });
+
+  it('refuses while the selected Computed View placement is unresolved', () => {
+    const { authoring, navigation, session } = open(
+      positionedSnapshot,
+      FLOW_SPACE_VIEW_ID,
+      mintingIds(MINTED),
+    );
+
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'placement-pending' },
+    });
+    expect(session.getState().working).toEqual(positionedSnapshot);
+    expect(navigation.getState().selectedRenderer).toBe(FLOW_SPACE_VIEW_ID);
+  });
+});
+
 describe('Add Card', () => {
   it('creates one neutrally titled detached Card at the anchor it was given', () => {
     const { authoring, session } = openPositioned();

@@ -617,6 +617,32 @@ test(
   },
 );
 
+test(
+  'Create Layout captures the selected Computed View without moving Cards',
+  { tag: '@parity:space-sidebar-creates-layout-from-computed-view' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+    const before = await allPositions(page);
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveAttribute('data-revision', '0');
+
+    const create = sidebar(page).getByRole('button', { name: 'Create Layout' });
+    await expect(create).toBeEnabled();
+    await create.click();
+
+    await expect(selectedCanvas(page)).toContainText('Layout 1');
+    await expect(create).toHaveCount(0);
+    await expect(persistence).toHaveAttribute('data-revision', '1');
+    expect(await allPositions(page)).toEqual(before);
+
+    await page.reload();
+    await expect(selectedCanvas(page)).toContainText('Layout 1');
+    expect(await allPositions(page)).toEqual(before);
+  },
+);
+
 test('opening from Flow is refused without converting or moving Cards', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();

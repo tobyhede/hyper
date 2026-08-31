@@ -57,6 +57,7 @@ export interface SpaceSidebarFixtureProps {
   readonly showGraphLinks?: boolean;
   /** The per-entity actions menu the real Sidebar draws on its rows. */
   readonly entityActions?: SpaceSidebarProps['entityActions'];
+  readonly createLayout?: SpaceSidebarProps['createLayout'];
 }
 
 /**
@@ -81,6 +82,7 @@ export function SpaceSidebarFixture({
   showCardLinks = true,
   showGraphLinks = true,
   entityActions,
+  createLayout,
 }: SpaceSidebarFixtureProps) {
   const [titleEdit, setTitleEdit] = useState<{
     readonly subject: SpaceChromeTitleSubject;
@@ -209,6 +211,7 @@ export function SpaceSidebarFixture({
             keyShortcut: 'C',
             menuTriggerRef: addCardMenu,
           }}
+          createLayout={createLayout}
           persistence={{
             control: (
               <PersistenceControl

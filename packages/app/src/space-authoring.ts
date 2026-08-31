@@ -87,6 +87,7 @@ const ELIGIBLE = { kind: 'eligible' } as const;
  * already installed.
  */
 export type AuthoringCompletion =
+  | { readonly kind: 'created-layout' }
   | {
       readonly kind: 'settled-card-movement';
       readonly rendered: Placement;

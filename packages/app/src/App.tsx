@@ -106,6 +106,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const [editingCardBody, setEditingCardBody] = useState(false);
     const [editingCardTitle, setEditingCardTitle] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
+    const [createLayoutRefusal, setCreateLayoutRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const [destinationNotFound, setDestinationNotFound] = useState(false);
     const syncDestination = useCallback(
@@ -324,6 +325,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const hasCardsOnCanvas = liveProjection !== null;
     const canvas = canvasContent(placement, hasCardsOnCanvas);
     const editable = hasCardsOnCanvas;
+    useEffect(() => setCreateLayoutRefusal(null), [selectedRenderer]);
     const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
       readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;
       readonly draft: string;
@@ -828,6 +830,22 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
         }}
+        createLayout={
+          current.kind === 'computed'
+            ? {
+                disabled: placement.kind !== 'ready',
+                unavailableReason:
+                  placement.kind === 'ready'
+                    ? null
+                    : describeAuthoringRefusal({ code: 'placement-pending' }),
+                refusal: createLayoutRefusal,
+                onCreate: () => {
+                  const result = authoring.complete({ kind: 'created-layout' });
+                  setCreateLayoutRefusal(result.kind === 'refused' ? result.refusal : null);
+                },
+              }
+            : undefined
+        }
         persistence={{
           control: (
             <PersistenceControl

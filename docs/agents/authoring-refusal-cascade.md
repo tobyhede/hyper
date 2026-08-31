@@ -73,6 +73,12 @@ that has not been decided.
 | `recolored-graph` | **layout-required** | `graph-not-owned` → (same color ⇒ `unchanged`) → completed |
 | `deleted-graph` | **layout-required** | `graph-not-owned` → `layout-must-keep-graph` → completed |
 
+### Layout creation
+
+| Action | On a View | Its own checks, in order |
+| --- | --- | --- |
+| `created-layout` | converts | none → completed |
+
 ### Movement
 
 | Action | On a View | Its own checks, in order |
