@@ -1,6 +1,6 @@
 # Chart the V1 source release
 
-Status: ready-for-human
+Status: resolved
 Tags: wayfinder:map, release/v1
 
 ## Destination
@@ -67,6 +67,10 @@ the detail. -->
   requires a commit-specific proof matrix, fresh final rehearsal, classified
   defect register and binary human go/no-go before the approved commit receives
   annotated tag `v1.0.0`.
+- [15 — Complete the V1 release implementation handoff](issues/15-complete-the-v1-release-handoff.md)
+  joins the resolved contracts into one executable dependency graph, acceptance
+  ownership matrix, documentation handoff and final tag checklist, with no known
+  release decision left open.
 
 ## Not yet specified
 

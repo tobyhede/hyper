@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01, 02, 03, 08, 16, 17, 18; `alias-cards/06`; `entity-url-addressability/08`; `space-cards/10`; `architecture-review/14`; plus the pending Layout-only reconciliation when its tracker lands
+Blocked by: 01, 02, 03, 08, 16, 17, 18; `alias-cards/06`; `entity-url-addressability/08`; `space-cards/10`; `architecture-review/13`; `architecture-review/14`; plus the pending Layout-only reconciliation when its tracker lands
 
 **What to build:** Complete the untagged End-to-end checkpoint with one recorded
 technical-author rehearsal from a clean clone and a compact manifest linking

@@ -24,6 +24,8 @@ End-to-end checkpoint.
       register.
 - [ ] A fresh clean-clone canonical journey succeeds on the final candidate SHA
       after every accepted blocker or correction is complete.
+- [ ] Final observed usability evidence covers both the complete desktop journey
+      and the narrow-screen command surface after V1/06 is complete.
 - [ ] The human directing V1 records a binary go/no-go decision; only a go may
       create annotated tag `v1.0.0`, whose peeled commit is verified against the
       approved SHA.
