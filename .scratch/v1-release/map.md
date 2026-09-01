@@ -53,7 +53,7 @@ the detail. -->
   decisions ticket 11 needs before it can define the checkpoint.
 - [11 — Define the End-to-end checkpoint](issues/11-define-the-end-to-end-checkpoint.md)
   makes the complete clean-clone authoring and destructive-recovery rehearsal
-  the untagged checkpoint, with a compact evidence manifest and explicit
+  the untagged checkpoint, with a compact proof matrix and explicit
   post-checkpoint scope.
 - [12 — Decide the V1 execution sequence and critical path](issues/12-decide-the-v1-critical-path.md)
   treats PR 134 as delivered foundation work, rewrites overlapping ownership,

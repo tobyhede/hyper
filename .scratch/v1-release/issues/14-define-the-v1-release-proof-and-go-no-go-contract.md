@@ -94,7 +94,7 @@ earlier End-to-end checkpoint result. One supported manual environment is
 sufficient; V1 does not require a complete OS/browser matrix.
 
 The observed record contains the date, operator, supported OS, Chromium
-version, candidate SHA, result and links to the compact manifest and artifacts.
+version, candidate SHA, result and links to the compact proof matrix and artifacts.
 It contains no credentials or repository secrets. UI and usability claims may
 combine this observation with automated behaviour and accessibility evidence.
 

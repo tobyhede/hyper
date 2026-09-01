@@ -1,7 +1,7 @@
 # Concentrate aggregate commit semantics
 
 Status: ready-for-agent
-Tags: release/v1, Improvement
+Tags: Improvement
 Blocked by: none — PR 134 delivered both adapter decision trees to compare
 
 Surfaced by: the 31 August 2026 Space Cards architecture review, candidate

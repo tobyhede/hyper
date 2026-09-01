@@ -70,6 +70,7 @@ under `superseded/`.
 | [0054](0054-the-unreleased-prototype-rolls-forward.md) | The prototype is unreleased, so a format change rolls forward and adds no migration. |
 | [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. |
 | [0077](0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md) | The Meta Space starts from one deterministic, editable aggregate that CLI hard reset restores. |
+| [0078](0078-the-server-side-repository-owns-meta-lifecycle.md) | The server-side repository owns Meta lifecycle; its browser seam does not expose lifecycle administration. |
 
 ## HTTP
 

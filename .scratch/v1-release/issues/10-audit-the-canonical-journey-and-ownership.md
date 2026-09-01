@@ -8,7 +8,7 @@ Assignee: unassigned
 
 ## Question
 
-Walk the reconciled canonical journey against the current code, accepted ADRs,
+Audit the reconciled canonical journey against the current code, accepted ADRs,
 V1 Definition of Done and all open release-tagged feature tickets. For each
 journey capability, record what is built, what is partially built, what is
 unbuilt, which named ticket owns it and where ownership is missing or

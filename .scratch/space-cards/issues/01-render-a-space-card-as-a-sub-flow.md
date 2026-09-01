@@ -16,8 +16,8 @@ Tags: release/v1
       content shown through the open Card authors the target Space.
 - [ ] Interaction, focus and camera behavior remain coherent while the target is
       open and while returning to the containing Space.
-- [ ] Application, Ladle and adapter evidence covers the selected Layout,
-      resizing the Card, and persistence after editing the target.
+- [ ] Application, Ladle and adapter evidence covers the selected Layout and
+      Graph, resizing the Card, and persistence after editing the target.
 
 ## UX iteration
 

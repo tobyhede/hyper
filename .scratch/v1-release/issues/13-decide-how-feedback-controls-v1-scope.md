@@ -65,7 +65,7 @@ the final classification, confirm every scope expansion and resolve any
 disagreement. An agent may assemble evidence and recommend a disposition but
 cannot finalize one. Ambiguous feedback defaults to post-V1 until stronger
 evidence exists; silence never counts as acceptance or as disposal of a known
-defect. The final decision and rationale are recorded in the evidence manifest.
+defect. The final decision and rationale are recorded in the proof matrix.
 
 Before implementation begins, accepted blocker or correction work must:
 
