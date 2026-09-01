@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0035
-Refined by: 0057
+Refined by: 0057, 0076
 Related: 0028, 0030, 0039, 0040, 0041
 
 An unfinished authoring interaction owns an **Interaction draft** local to the

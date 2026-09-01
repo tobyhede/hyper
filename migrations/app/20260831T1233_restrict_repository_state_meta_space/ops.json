@@ -1,0 +1,82 @@
+[
+  {
+    "id": "index.repository_state.repository_state_meta_space_id_idx",
+    "label": "Create index \"repository_state_meta_space_id_idx\" on \"repository_state\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "repository_state_meta_space_id_idx",
+        "table": "repository_state"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"repository_state_meta_space_id_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"repository_state_meta_space_id_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"repository_state_meta_space_id_idx\"",
+        "sql": "CREATE INDEX \"repository_state_meta_space_id_idx\" ON \"public\".\"repository_state\" (\"meta_space_id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"repository_state_meta_space_id_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"repository_state_meta_space_id_idx\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.repository_state.repository_state_meta_space_id_fkey",
+    "label": "Add foreign key \"repository_state_meta_space_id_fkey\" on \"repository_state\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "repository_state_meta_space_id_fkey",
+        "table": "repository_state"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"repository_state_meta_space_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "repository_state_meta_space_id_fkey",
+          "public",
+          "\"public\".\"repository_state\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"repository_state_meta_space_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"repository_state\"\nADD CONSTRAINT \"repository_state_meta_space_id_fkey\"\nFOREIGN KEY (\"meta_space_id\")\nREFERENCES \"public\".\"spaces\" (\"id\")\nON DELETE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"repository_state_meta_space_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "repository_state_meta_space_id_fkey",
+          "public",
+          "\"public\".\"repository_state\""
+        ]
+      }
+    ]
+  }
+]

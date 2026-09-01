@@ -48,7 +48,7 @@ describe('waitForSettled', () => {
 
     current = withPersistence({
       kind: 'rejected',
-      failure: { kind: 'permanent-failure', code: 'invalid-snapshot', message: 'Invalid' },
+      failure: { kind: 'permanent-failure', code: 'invalid-commit', message: 'Invalid' },
     });
     notify?.();
 

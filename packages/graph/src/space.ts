@@ -189,11 +189,7 @@ export type LoadSpaceSnapshotResult =
  * else. This is one more argument, not one more capability: it does no I/O and
  * stays synchronous. Reading the bytes belongs to the caller, as it always did.
  */
-export function loadSpace(
-  input: unknown,
-  cardFiles: readonly CardFile[],
-  ancestorSpaceIds: readonly UUID[] = [],
-): LoadSpaceResult {
+export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadSpaceResult {
   const refusal = documentRefusal(input);
   if (refusal !== null) return { ok: false, errors: [refusal] };
 
@@ -239,15 +235,11 @@ export function loadSpace(
     cards,
     layouts: file.layouts,
     defaultRenderer: file.defaultRenderer,
-    ancestorSpaceIds,
   });
 }
 
 /** Validate and index a fully identified persistence aggregate. */
-export function loadSpaceSnapshot(
-  input: unknown,
-  ancestorSpaceIds: readonly UUID[] = [],
-): LoadSpaceSnapshotResult {
+export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
   // SAFETY: the `typeof`/`null` check just narrowed `input` to a non-null
   // object, and every object may or may not carry a `document` key — reading
   // it through this optional-property shape stays `unknown` either way, ahead
@@ -285,7 +277,6 @@ export function loadSpaceSnapshot(
     cards,
     layouts: document.layouts,
     defaultRenderer: document.defaultRenderer,
-    ancestorSpaceIds,
   });
   return loaded.ok ? { ...loaded, snapshot: parsed.data } : loaded;
 }
@@ -296,7 +287,6 @@ function buildSpace(input: {
   cards: Card[];
   layouts: Layout[] | undefined;
   defaultRenderer: UUID | undefined;
-  ancestorSpaceIds: readonly UUID[];
 }): LoadSpaceResult {
   // Array order is read only by automatic strategies, so title order is the one
   // default stable across filesystem scans and unordered relational reads. Ties

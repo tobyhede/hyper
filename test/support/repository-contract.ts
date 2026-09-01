@@ -38,19 +38,34 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  *    one-statement aggregate read are PostgreSQL behaviour a `Map` cannot have,
  *    and they stay in the integration suite.
  */
+/** The contract's Meta Space, and the first Space every case imports. */
 const SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000002');
 const MISSING_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000003');
 const CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000010');
 const SECOND_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
 const OTHER_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
-const MISSING_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
+const LINK_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
+const MISSING_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
+const THIRD_SPACE_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000014');
+const FOURTH_SPACE_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000015');
 const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
 const LAYOUT_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
+const SECOND_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000022');
+const SECOND_LAYOUT_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000023');
 
 const card = (id: UUID, title: string) => ({
   id,
   document: { title, kind: 'markdown' as const, body: title },
+});
+
+const spaceCard = (
+  id: UUID,
+  target: UUID,
+  selection: { readonly spaceView?: UUID; readonly graph?: UUID } = {},
+) => ({
+  id,
+  document: { title: `Open ${target}`, kind: 'space' as const, spaceId: target, ...selection },
 });
 
 /**
@@ -109,6 +124,18 @@ export interface RepositoryHarness {
   close(): Promise<void>;
 }
 
+const commitUpdate = (repository: SpaceRepository, snapshot: SpaceSnapshot, revision: bigint) =>
+  repository.commit({
+    changes: [
+      {
+        kind: 'update',
+        spaceId: snapshot.id,
+        snapshot,
+        expectedRevision: revision,
+      },
+    ],
+  });
+
 /**
  * Seeding runs through `importSpaces` rather than through a constructor
  * argument, unlike the `SpaceBackend` contract. A repository backed by
@@ -134,6 +161,29 @@ export const spaceRepositoryContract = (
     return result.spaces;
   };
 
+  /*
+   * The migration that adds the singleton Meta row deliberately leaves it empty
+   * — a migration has no Space to name — so whatever first puts a Space in the
+   * repository has to establish it. Without that, `loadAggregate` and every
+   * `commit` fail on a repository that has only ever been migrated.
+   */
+  it(`${name} becomes committable from an empty store`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      await seed(repository, first);
+
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        metaSpaceId: SPACE_ID,
+        spaces: [stored(first, 0n, null)],
+      });
+      await expect(commitUpdate(repository, retitled(first, 'Changed'), 0n)).resolves.toEqual({
+        kind: 'committed',
+        revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+        deletedSpaceIds: [],
+      });
+    });
+  });
+
   it(`${name} imports a Space, then lists, loads and commits it`, async () => {
     await withHarness(async (repository) => {
       const first = space(SPACE_ID, 'One', [CARD_ID]);
@@ -149,11 +199,312 @@ export const spaceRepositoryContract = (
       await expect(repository.loadSpace(MISSING_SPACE_ID)).resolves.toBeUndefined();
 
       const changed = retitled(first, 'Changed');
-      await expect(repository.commitSpace(changed, 0n)).resolves.toEqual({
+      await expect(commitUpdate(repository, changed, 0n)).resolves.toEqual({
         kind: 'committed',
-        revision: 1n,
+        revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+        deletedSpaceIds: [],
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, null));
+    });
+  });
+
+  it(`${name} returns aggregate Spaces in ascending id order`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'First', [CARD_ID]);
+      const second = space(OTHER_SPACE_ID, 'Second', [OTHER_CARD_ID]);
+      await seed(repository, second, first);
+
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        metaSpaceId: OTHER_SPACE_ID,
+        spaces: [stored(first, 0n, null), stored(second, 0n, null)],
+      });
+    });
+  });
+
+  it(`${name} commits an unrelated edit while another imported Space is not reachable from Meta`, async () => {
+    await withHarness(async (repository) => {
+      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      const importedRoot = space(OTHER_SPACE_ID, 'Imported root', [OTHER_CARD_ID]);
+      await seed(repository, meta, importedRoot);
+
+      const changed = retitled(meta, 'Changed');
+      await expect(commitUpdate(repository, changed, 0n)).resolves.toEqual({
+        kind: 'committed',
+        revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+        deletedSpaceIds: [],
+      });
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(
+        stored(importedRoot, 0n, null),
+      );
+    });
+  });
+
+  it(`${name} refuses to create a new unreachable Space by removing its last reference alone`, async () => {
+    await withHarness(async (repository) => {
+      const target = space(OTHER_SPACE_ID, 'Target', [OTHER_CARD_ID]);
+      const linkedMeta: SpaceSnapshot = {
+        ...space(SPACE_ID, 'Meta', [CARD_ID]),
+        cards: [card(CARD_ID, 'Meta card'), spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID)],
+      };
+      await seed(repository, linkedMeta, target);
+
+      const unlinked = { ...linkedMeta, cards: [card(CARD_ID, 'Meta card')] };
+      await expect(commitUpdate(repository, unlinked, 0n)).resolves.toEqual({
+        kind: 'aggregate-refused',
+        errors: [{ kind: 'ordinary-space-unreferenced', spaceId: OTHER_SPACE_ID }],
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(linkedMeta, 0n, null));
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(target, 0n, null));
+    });
+  });
+
+  it(`${name} atomically creates, links, reads, converges on, and deletes a Space`, async () => {
+    await withHarness(async (repository) => {
+      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      await seed(repository, meta);
+      const child = space(OTHER_SPACE_ID, 'Child', [OTHER_CARD_ID]);
+      const linked = {
+        ...meta,
+        cards: [
+          ...meta.cards,
+          spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID),
+          spaceCard(LINK_CARD_ID, OTHER_SPACE_ID),
+        ],
+      };
+
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: linked,
+              expectedRevision: 0n,
+            },
+            { kind: 'create', spaceId: OTHER_SPACE_ID, snapshot: child },
+          ],
+        }),
+      ).resolves.toEqual({
+        kind: 'committed',
+        revisions: [
+          { spaceId: SPACE_ID, revision: 1n },
+          { spaceId: OTHER_SPACE_ID, revision: 0n },
+        ],
+        deletedSpaceIds: [],
+      });
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        metaSpaceId: SPACE_ID,
+        spaces: [stored(linked, 1n, null), stored(child, 0n, null)],
+      });
+
+      await expect(
+        repository.commit({
+          changes: [{ kind: 'delete', spaceId: OTHER_SPACE_ID, expectedRevision: 0n }],
+        }),
+      ).resolves.toEqual({
+        kind: 'conflict',
+        conflicts: [{ spaceId: OTHER_SPACE_ID, current: stored(child, 0n, null) }],
+      });
+
+      /*
+       * A reference the caller is itself submitting is not authoritative state,
+       * so an incomplete deletion it can see in its own change set is a refusal
+       * rather than a conflict. Answering `conflict` here would be unbreakable:
+       * reloading returns the target at the same revision it already holds, and
+       * the identical change set conflicts again.
+       */
+      const halfUnlinked = {
+        ...meta,
+        cards: [...meta.cards, spaceCard(LINK_CARD_ID, OTHER_SPACE_ID)],
+      };
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: halfUnlinked,
+              expectedRevision: 1n,
+            },
+            { kind: 'delete', spaceId: OTHER_SPACE_ID, expectedRevision: 0n },
+          ],
+        }),
+      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(child, 0n, null));
+
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: meta,
+              expectedRevision: 1n,
+            },
+            { kind: 'delete', spaceId: OTHER_SPACE_ID, expectedRevision: 0n },
+          ],
+        }),
+      ).resolves.toEqual({
+        kind: 'committed',
+        revisions: [{ spaceId: SPACE_ID, revision: 2n }],
+        deletedSpaceIds: [OTHER_SPACE_ID],
+      });
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
+    });
+  });
+
+  it(`${name} round trips every optional Space Card selection combination across a later default change`, async () => {
+    await withHarness(async (repository) => {
+      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      await seed(repository, meta);
+      const target: SpaceSnapshot = {
+        ...space(OTHER_SPACE_ID, 'Target', [OTHER_CARD_ID]),
+        document: {
+          version: 1,
+          title: 'Target',
+          defaultRenderer: LAYOUT_ID,
+          layouts: [
+            {
+              id: LAYOUT_ID,
+              title: 'First view',
+              kind: 'positioned',
+              positions: { [OTHER_CARD_ID]: { x: 0, y: 0, open: false } },
+              graphs: [{ id: GRAPH_ID, title: 'First graph', edges: [] }],
+            },
+            {
+              id: SECOND_LAYOUT_ID,
+              title: 'Second view',
+              kind: 'positioned',
+              positions: { [OTHER_CARD_ID]: { x: 100, y: 100, open: false } },
+              graphs: [{ id: SECOND_GRAPH_ID, title: 'Second graph', edges: [] }],
+            },
+          ],
+        },
+      };
+      const unselected = spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID);
+      const selectedView = spaceCard(LINK_CARD_ID, OTHER_SPACE_ID, {
+        spaceView: SECOND_LAYOUT_ID,
+      });
+      const selectedGraphWithDefaultView = spaceCard(THIRD_SPACE_CARD_ID, OTHER_SPACE_ID, {
+        graph: GRAPH_ID,
+      });
+      const selectedViewAndGraph = spaceCard(FOURTH_SPACE_CARD_ID, OTHER_SPACE_ID, {
+        spaceView: SECOND_LAYOUT_ID,
+        graph: SECOND_GRAPH_ID,
+      });
+      const linked = {
+        ...meta,
+        cards: [
+          ...meta.cards,
+          unselected,
+          selectedView,
+          selectedGraphWithDefaultView,
+          selectedViewAndGraph,
+        ],
+      };
+
+      await expect(
+        repository.commit({
+          changes: [
+            { kind: 'update', spaceId: SPACE_ID, snapshot: linked, expectedRevision: 0n },
+            { kind: 'create', spaceId: OTHER_SPACE_ID, snapshot: target },
+          ],
+        }),
+      ).resolves.toMatchObject({ kind: 'committed' });
+
+      const retargetedDefault: SpaceSnapshot = {
+        ...target,
+        document: { ...target.document, defaultRenderer: SECOND_LAYOUT_ID },
+      };
+      await expect(commitUpdate(repository, retargetedDefault, 0n)).resolves.toMatchObject({
+        kind: 'aggregate-refused',
+      });
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(target, 0n, null));
+
+      const linkedToLaterDefault: SpaceSnapshot = {
+        ...linked,
+        cards: [
+          ...meta.cards,
+          unselected,
+          selectedView,
+          spaceCard(THIRD_SPACE_CARD_ID, OTHER_SPACE_ID, { graph: SECOND_GRAPH_ID }),
+          selectedViewAndGraph,
+        ],
+      };
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: linkedToLaterDefault,
+              expectedRevision: 1n,
+            },
+            {
+              kind: 'update',
+              spaceId: OTHER_SPACE_ID,
+              snapshot: retargetedDefault,
+              expectedRevision: 0n,
+            },
+          ],
+        }),
+      ).resolves.toEqual({
+        kind: 'committed',
+        revisions: [
+          { spaceId: SPACE_ID, revision: 2n },
+          { spaceId: OTHER_SPACE_ID, revision: 1n },
+        ],
+        deletedSpaceIds: [],
+      });
+      const aggregate = await repository.loadAggregate();
+      expect(aggregate).toEqual({
+        metaSpaceId: SPACE_ID,
+        spaces: [stored(linkedToLaterDefault, 2n, null), stored(retargetedDefault, 1n, null)],
+      });
+      const storedSpaceCard = aggregate.spaces[0]?.snapshot.cards.find(
+        ({ id }) => id === SECOND_CARD_ID,
+      );
+      expect(storedSpaceCard?.document).toStrictEqual({
+        title: `Open ${OTHER_SPACE_ID}`,
+        kind: 'space',
+        spaceId: OTHER_SPACE_ID,
+      });
+    });
+  });
+
+  it(`${name} reports every conflict and rolls back every refused aggregate`, async () => {
+    await withHarness(async (repository) => {
+      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      await seed(repository, meta);
+      const orphan = space(OTHER_SPACE_ID, 'Orphan', [OTHER_CARD_ID]);
+
+      await expect(
+        repository.commit({
+          changes: [{ kind: 'create', spaceId: OTHER_SPACE_ID, snapshot: orphan }],
+        }),
+      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
+
+      await expect(
+        repository.commit({
+          changes: [
+            { kind: 'create', spaceId: SPACE_ID, snapshot: meta },
+            {
+              kind: 'update',
+              spaceId: MISSING_SPACE_ID,
+              snapshot: space(MISSING_SPACE_ID, 'Missing', []),
+              expectedRevision: 0n,
+            },
+          ],
+        }),
+      ).resolves.toEqual({
+        kind: 'conflict',
+        conflicts: [
+          { spaceId: SPACE_ID, current: stored(meta, 0n, null) },
+          { spaceId: MISSING_SPACE_ID, current: undefined },
+        ],
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(meta, 0n, null));
     });
   });
 
@@ -162,11 +513,11 @@ export const spaceRepositoryContract = (
       const first = space(SPACE_ID, 'One', [CARD_ID]);
       await seed(repository, first);
       const committed = retitled(first, 'Committed');
-      await repository.commitSpace(committed, 0n);
+      await commitUpdate(repository, committed, 0n);
 
-      await expect(repository.commitSpace(retitled(first, 'Stale'), 0n)).resolves.toEqual({
+      await expect(commitUpdate(repository, retitled(first, 'Stale'), 0n)).resolves.toEqual({
         kind: 'conflict',
-        current: stored(committed, 1n, null),
+        conflicts: [{ spaceId: SPACE_ID, current: stored(committed, 1n, null) }],
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(committed, 1n, null));
     });
@@ -178,9 +529,8 @@ export const spaceRepositoryContract = (
       await seed(repository, first);
       const dangling = spaceWithDanglingEdge(SPACE_ID, 'One', CARD_ID);
 
-      await expect(repository.commitSpace(dangling, 0n)).resolves.toMatchObject({
-        kind: 'rejected',
-        code: 'invalid-snapshot',
+      await expect(commitUpdate(repository, dangling, 0n)).resolves.toMatchObject({
+        kind: 'aggregate-refused',
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
     });
@@ -190,12 +540,59 @@ export const spaceRepositoryContract = (
     await withHarness(async (repository) => {
       const absent = space(MISSING_SPACE_ID, 'Absent', []);
 
-      await expect(repository.commitSpace(absent, 0n)).resolves.toEqual({
-        kind: 'rejected',
-        code: 'not-found',
-        message: `Space ${MISSING_SPACE_ID} does not exist`,
+      await expect(commitUpdate(repository, absent, 0n)).resolves.toEqual({
+        kind: 'conflict',
+        conflicts: [{ spaceId: MISSING_SPACE_ID, current: undefined }],
       });
       await expect(repository.loadSpace(MISSING_SPACE_ID)).resolves.toBeUndefined();
+    });
+  });
+
+  it(`${name} refuses a commit whose Space id differs from its snapshot id`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      await seed(repository, first);
+
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: OTHER_SPACE_ID,
+              snapshot: first,
+              expectedRevision: 0n,
+            },
+          ],
+        }),
+      ).resolves.toMatchObject({ kind: 'rejected', code: 'invalid-commit' });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+    });
+  });
+
+  it(`${name} refuses a commit that names one Space more than once`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      await seed(repository, first);
+
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: retitled(first, 'First update'),
+              expectedRevision: 0n,
+            },
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: retitled(first, 'Second update'),
+              expectedRevision: 0n,
+            },
+          ],
+        }),
+      ).resolves.toMatchObject({ kind: 'rejected', code: 'invalid-commit' });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
     });
   });
 
@@ -209,9 +606,8 @@ export const spaceRepositoryContract = (
         cards: [...other.cards, card(CARD_ID, 'Claimed')],
       };
 
-      await expect(repository.commitSpace(claiming, 0n)).resolves.toMatchObject({
-        kind: 'rejected',
-        code: 'invalid-snapshot',
+      await expect(commitUpdate(repository, claiming, 0n)).resolves.toMatchObject({
+        kind: 'aggregate-refused',
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
       await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(other, 0n, null));
@@ -224,10 +620,23 @@ export const spaceRepositoryContract = (
       await seed(repository, first);
       const narrowed: SpaceSnapshot = { ...first, cards: [card(CARD_ID, 'Kept')] };
 
-      await expect(repository.commitSpace(narrowed, 0n)).resolves.toMatchObject({
+      await expect(commitUpdate(repository, narrowed, 0n)).resolves.toMatchObject({
         kind: 'committed',
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(narrowed, 1n, null));
+    });
+  });
+
+  it(`${name} drops every Card when a commit omits them all`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'One', [CARD_ID, SECOND_CARD_ID]);
+      await seed(repository, first);
+      const empty: SpaceSnapshot = { ...first, cards: [] };
+
+      await expect(commitUpdate(repository, empty, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(empty, 1n, null));
     });
   });
 
@@ -251,7 +660,7 @@ export const spaceRepositoryContract = (
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(ascending, 0n, null));
 
-      await expect(repository.commitSpace(descending, 0n)).resolves.toMatchObject({
+      await expect(commitUpdate(repository, descending, 0n)).resolves.toMatchObject({
         kind: 'committed',
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(ascending, 1n, null));
@@ -265,7 +674,7 @@ export const spaceRepositoryContract = (
 
       await repository.markExported(SPACE_ID, 0n);
       const changed = retitled(first, 'Edited after export');
-      await expect(repository.commitSpace(changed, 0n)).resolves.toMatchObject({
+      await expect(commitUpdate(repository, changed, 0n)).resolves.toMatchObject({
         kind: 'committed',
       });
 

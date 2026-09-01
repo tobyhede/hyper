@@ -152,20 +152,30 @@ describe('MemorySpaceRepository', () => {
     const before = await repository.loadSpace(OTHER_SPACE_ID);
     if (before === undefined) throw new Error('Expected the second Space to be stored');
 
-    const result = await repository.commitSpace(
-      {
-        ...before.snapshot,
-        cards: [
-          {
-            id: CARD_ID,
-            document: { title: 'Claimed card', kind: 'markdown', body: '' },
-          },
-        ],
-      },
-      before.revision,
-    );
+    const claimed = {
+      ...before.snapshot,
+      cards: [
+        {
+          id: CARD_ID,
+          document: { title: 'Claimed card', kind: 'markdown' as const, body: '' },
+        },
+      ],
+    };
+    const result = await repository.commit({
+      changes: [
+        {
+          kind: 'update',
+          spaceId: OTHER_SPACE_ID,
+          snapshot: claimed,
+          expectedRevision: before.revision,
+        },
+      ],
+    });
 
-    expect(result).toMatchObject({ kind: 'rejected', code: 'invalid-snapshot' });
+    expect(result).toMatchObject({
+      kind: 'aggregate-refused',
+      errors: [{ kind: 'duplicate-card-id' }],
+    });
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(before);
   });
 });

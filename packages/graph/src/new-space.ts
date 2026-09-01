@@ -1,4 +1,4 @@
-import { newUuid, SPACE_FILE_VERSION, type Card, type SpaceFile } from '@project/core';
+import { newUuid, SPACE_FILE_VERSION, type Card, type SpaceFile, type UUID } from '@project/core';
 import { serializeCardFile, type CardFile } from './card-file';
 
 /**
@@ -21,6 +21,37 @@ export interface NewSpace {
 
 /** The first neutral Card title; later creation continues the same sequence. */
 const FIRST_CARD_TITLE = 'Card 1';
+
+/** Inputs to the one normal-Space initializer used by every provisioning path. */
+export interface InitializeSpaceOptions {
+  /** Seeds both the Space and its first Card; later edits make them independent. */
+  readonly title: string;
+  /** The composition-owned identity source for the Space and first Card. */
+  readonly newId: () => UUID;
+}
+
+/**
+ * Initialize a normal authored Space through the same on-disk intake as every
+ * other Space.
+ *
+ * A normal Space begins with one Markdown Card and no authored Layout. Meta
+ * bootstrap, ordinary startup and Space Card creation share this shape; the
+ * application supplies a Computed View until an Edit authors a Layout.
+ */
+export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSpace {
+  const spaceId = newId();
+  const cardId = newId();
+  const card: Card = { id: cardId, title, kind: 'markdown', body: '' };
+
+  return {
+    file: {
+      version: SPACE_FILE_VERSION,
+      id: spaceId,
+      title,
+    },
+    cardFiles: [{ path: `cards/${card.id}.md`, text: serializeCardFile(card) }],
+  };
+}
 
 export function newSpace(): NewSpace {
   const spaceId = newUuid();

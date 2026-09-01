@@ -1,6 +1,10 @@
 import { uuidSchema } from '@project/core';
 import {
   decodeCommitRequest,
+  encodeCommitConflict,
+  encodeCommitRefusal,
+  encodeCommitResponse,
+  encodeLoadedAggregate,
   encodeProblemDetails,
   encodeLoadedSpace,
   problemCatalogue,
@@ -38,6 +42,7 @@ export const MAX_COMMIT_BODY_BYTES = 1_048_576;
 // cannot drift apart; the validator needs the literal to stay in the schema.
 const SPACE_RESOURCE_PATH = '/api/spaces/:id';
 const SPACE_COLLECTION_PATH = '/api/spaces';
+const SPACE_AGGREGATE_PATH = '/api/aggregate';
 // The resource path again as a matcher, for a request no route served. Hono has
 // finished routing by then, so its own pattern is no longer available to ask,
 // and this must keep matching what `SPACE_RESOURCE_PATH` registers.
@@ -230,7 +235,7 @@ const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
  */
 const decodeCommitBody = (
   value: CommitRequestJson,
-  context: Context<Env, typeof SPACE_RESOURCE_PATH>,
+  context: Context<Env, typeof SPACE_COLLECTION_PATH>,
 ) => {
   try {
     return decodeCommitRequest(value);
@@ -248,10 +253,10 @@ const decodeCommitBody = (
 
 const validateCommitBody = validator<
   CommitRequestJson,
-  typeof SPACE_RESOURCE_PATH,
-  'put',
+  typeof SPACE_COLLECTION_PATH,
+  'post',
   'json',
-  typeof SPACE_RESOURCE_PATH,
+  typeof SPACE_COLLECTION_PATH,
   typeof decodeCommitBody
 >('json', decodeCommitBody);
 
@@ -270,7 +275,7 @@ const validateSpaceId = validator('param', (value, context) => {
  * GET handler and drops the body — a 200 that silently carries nothing.
  *
  * A non-UUID segment is a 400 here exactly as `validateSpaceId` makes it for
- * GET and PUT. Advertising `Allow` for it instead would name methods for a
+ * GET. Advertising `Allow` for it instead would name methods for a
  * resource no request can address, and disagree with GET on the same URL.
  *
  * `undefined` means the path is not on the contract at all; only `notFound`
@@ -278,8 +283,12 @@ const validateSpaceId = validator('param', (value, context) => {
  */
 const unservedContractPath = (context: Context): Response | undefined => {
   if (context.req.path === SPACE_COLLECTION_PATH) {
+    context.header('Allow', 'GET, POST');
+    return problem(context, 'method-not-allowed', 'Use GET or POST for the Space collection.');
+  }
+  if (context.req.path === SPACE_AGGREGATE_PATH) {
     context.header('Allow', 'GET');
-    return problem(context, 'method-not-allowed', 'Use GET for the Space collection.');
+    return problem(context, 'method-not-allowed', 'Use GET for the aggregate resource.');
   }
   const resource = SPACE_RESOURCE_PATTERN.exec(context.req.path);
   if (resource === null) {
@@ -288,8 +297,8 @@ const unservedContractPath = (context: Context): Response | undefined => {
   if (!uuidSchema.safeParse(resource[1]).success) {
     return problem(context, 'invalid-space-id', 'Use a UUID for the Space id.');
   }
-  context.header('Allow', 'GET, PUT');
-  return problem(context, 'method-not-allowed', 'Use GET or PUT for a Space resource.');
+  context.header('Allow', 'GET');
+  return problem(context, 'method-not-allowed', 'Use GET for a Space resource.');
 };
 
 /**
@@ -344,6 +353,41 @@ export const createSpaceHttpApp = (
         return problem(context, 'persistence-unavailable', 'Try the request again later.');
       }
     })
+    .post(
+      SPACE_COLLECTION_PATH,
+      requireSupportedRequestMedia,
+      requireBoundedCommitBody,
+      validateCommitBody,
+      async (context) => {
+        const commit = context.req.valid('json');
+        try {
+          const result = await repository.commit(commit);
+          if (result.kind === 'committed') {
+            return context.json(encodeCommitResponse(result), 200);
+          }
+          if (result.kind === 'conflict') {
+            return context.json(encodeCommitConflict(result), 409);
+          }
+          if (result.kind === 'aggregate-refused') {
+            return context.json(encodeCommitRefusal(result), 422);
+          }
+          return problem(context, 'invalid-request', result.message, [
+            { code: 'invalid-value', pointer: '' },
+          ]);
+        } catch (error) {
+          invokeLogError(logError, 'Failed to commit spaces', error);
+          return problem(context, 'persistence-unavailable', 'Try the request again later.');
+        }
+      },
+    )
+    .get(SPACE_AGGREGATE_PATH, async (context) => {
+      try {
+        return context.json(encodeLoadedAggregate(await repository.loadAggregate()), 200);
+      } catch (error) {
+        invokeLogError(logError, 'Failed to load the Space aggregate', error);
+        return problem(context, 'persistence-unavailable', 'Try the request again later.');
+      }
+    })
     .get(SPACE_RESOURCE_PATH, validateSpaceId, async (context) => {
       const { id } = context.req.valid('param');
       try {
@@ -356,45 +400,7 @@ export const createSpaceHttpApp = (
         invokeLogError(logError, `Failed to load space ${id}`, error);
         return problem(context, 'persistence-unavailable', 'Try the request again later.');
       }
-    })
-    .put(
-      SPACE_RESOURCE_PATH,
-      validateSpaceId,
-      requireSupportedRequestMedia,
-      requireBoundedCommitBody,
-      validateCommitBody,
-      async (context) => {
-        const { id } = context.req.valid('param');
-        const commit = context.req.valid('json');
-        if (commit.snapshot.id !== id) {
-          return problem(context, 'invalid-request', 'Use the path Space id as the snapshot id.', [
-            { code: 'invalid-value', pointer: '/snapshot/id' },
-          ]);
-        }
-        try {
-          const result = await repository.commitSpace(commit.snapshot, commit.expectedRevision);
-          if (result.kind === 'committed') {
-            return context.json({ revision: result.revision.toString() }, 200);
-          }
-          if (result.kind === 'conflict') {
-            return context.json(encodeLoadedSpace(result.current), 409);
-          }
-          return problem(
-            context,
-            result.code === 'not-found' ? 'not-found' : 'invalid-snapshot',
-            result.code === 'not-found'
-              ? `Choose a Space that exists; ${result.message}`
-              : `Correct the snapshot: ${result.message}`,
-            result.code === 'invalid-snapshot'
-              ? [{ code: 'invalid-value', pointer: '/snapshot' }]
-              : undefined,
-          );
-        } catch (error) {
-          invokeLogError(logError, `Failed to commit space ${id}`, error);
-          return problem(context, 'persistence-unavailable', 'Try the request again later.');
-        }
-      },
-    );
+    });
   app.notFound(
     (context) =>
       unservedContractPath(context) ??

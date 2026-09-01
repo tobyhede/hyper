@@ -116,8 +116,9 @@ describe('hyper CLI', () => {
   };
 
   afterEach(async () => {
+    await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
     for (const spaceId of createdSpaceIds) {
-      await db.orm.public.Card.where({ spaceId }).delete();
+      await db.orm.public.Card.where({ spaceId }).deleteAll();
       await db.orm.public.Space.where({ id: spaceId }).delete();
     }
     createdSpaceIds.clear();

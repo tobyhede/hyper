@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import contractJson from '../../src/prisma/contract.json' with { type: 'json' };
+import repositoryStateOps from '../../migrations/app/20260831T0159_add_repository_state/ops.json' with { type: 'json' };
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -65,6 +66,32 @@ describe('Prisma Next foundation', () => {
     const { db } = await import('../../src/prisma/db');
 
     expect(db.contract.domain.namespaces.public.models).toHaveProperty('Space');
+  });
+
+  it('bootstraps singleton repository state from the legacy Entry Space', () => {
+    const repositoryState = emittedContract.execution?.mutations.defaults.filter(
+      (entry) => entry.ref.table === 'repository_state',
+    );
+
+    expect(repositoryState).toEqual([]);
+    expect(contractJson.domain.namespaces.public.models).toHaveProperty('RepositoryState');
+    expect(repositoryStateOps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'table.repository_state' }),
+        expect.objectContaining({
+          id: 'checkConstraint.repository_state.repository_state_singleton_id_check',
+        }),
+      ]),
+    );
+    const migrationSql = repositoryStateOps
+      .flatMap(({ execute }) => execute.map(({ sql }) => sql))
+      .join('\n');
+    expect(migrationSql).toContain(
+      'INSERT INTO "public"."repository_state" ("meta_space_id", "singleton_id")',
+    );
+    expect(migrationSql).toContain(
+      'SELECT "id", 1 FROM "public"."spaces" WHERE "entry" = TRUE LIMIT 1',
+    );
   });
 
   it('reaches the emitted contract from the existing migration head', () => {

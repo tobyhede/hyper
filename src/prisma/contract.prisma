@@ -12,9 +12,18 @@ model Space {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        temporal.updatedAt() @map("updated_at")
   cards            Card[]
+  repositoryStates RepositoryState[]
   entry             Boolean? @unique
 
   @@map("spaces")
+}
+
+model RepositoryState {
+  singletonId Int  @id @default(1) @map("singleton_id")
+  metaSpaceId Uuid @map("meta_space_id")
+  metaSpace   Space @relation(fields: [metaSpaceId], references: [id], onDelete: Restrict)
+
+  @@map("repository_state")
 }
 
 model Card {

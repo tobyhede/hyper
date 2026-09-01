@@ -21,6 +21,7 @@ expectTypeOf<Parameters<SpaceRepository['importSpaces']>[1]>().toEqualTypeOf<Imp
  * off, so one integration file at a time owns the single `DATABASE_URL`.
  */
 const clearHyperContent = async (): Promise<void> => {
+  await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
   for (const space of await db.orm.public.Space.all()) {
     await db.orm.public.Card.where({ spaceId: space.id }).deleteAll();
     await db.orm.public.Space.where({ id: space.id }).delete();
@@ -34,9 +35,23 @@ const clearHyperContent = async (): Promise<void> => {
  * what a rejected batch leaves behind, and a per-id cleanup list would be
  * written from the same assumption the test is checking.
  */
+// Deliberately unseeded: a repository has to reach a committable state from an
+// empty store on its own, and every case here begins by importing the contract's
+// Meta Space. Seeding it by hand hid that the PostgreSQL adapter could not.
 spaceRepositoryContract('PostgresSpaceRepository', async () => {
   await clearHyperContent();
-  return { repository: new PostgresSpaceRepository(db), close: clearHyperContent };
+  const repository = new PostgresSpaceRepository(db);
+  const harness: SpaceRepository = {
+    entrySpaceId: () => repository.entrySpaceId(),
+    setEntrySpace: (id) => repository.setEntrySpace(id),
+    listSpaces: () => repository.listSpaces(),
+    loadSpace: (id) => repository.loadSpace(id),
+    loadAggregate: () => repository.loadAggregate(),
+    commit: (request) => repository.commit(request),
+    markExported: (id, revision) => repository.markExported(id, revision),
+    importSpaces: (input, mode) => repository.importSpaces(input, mode),
+  };
+  return { repository: harness, close: clearHyperContent };
 });
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -177,6 +192,10 @@ const idlessImport = (cardId: UUID): ImportSpace => ({
 describe('PostgresSpaceRepository', () => {
   const repository = new PostgresSpaceRepository(db);
   const createdSpaceIds = new Set<UUID>();
+  const commitSpace = (next: SpaceSnapshot, expectedRevision: bigint) =>
+    repository.commit({
+      changes: [{ kind: 'update', spaceId: next.id, snapshot: next, expectedRevision }],
+    });
 
   const trackImported = (result: RepositoryImportResult): void => {
     if (result.kind !== 'imported') return;
@@ -184,13 +203,14 @@ describe('PostgresSpaceRepository', () => {
   };
 
   afterEach(async () => {
+    await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
     for (const id of createdSpaceIds) {
-      await db.orm.public.Card.where({ spaceId: id }).delete();
+      await db.orm.public.Card.where({ spaceId: id }).deleteAll();
       await db.orm.public.Space.where({ id }).delete();
     }
     createdSpaceIds.clear();
-    await db.orm.public.Card.where({ spaceId: SPACE_ID }).delete();
-    await db.orm.public.Card.where({ spaceId: OTHER_SPACE_ID }).delete();
+    await db.orm.public.Card.where({ spaceId: SPACE_ID }).deleteAll();
+    await db.orm.public.Card.where({ spaceId: OTHER_SPACE_ID }).deleteAll();
     await db.orm.public.Space.where({ id: SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: OTHER_SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: CONCURRENT_SPACE_ID }).delete();
@@ -216,6 +236,201 @@ describe('PostgresSpaceRepository', () => {
     ]);
   });
 
+  it('prevents direct deletion of the Meta Space while repository state names it', async () => {
+    const imported = await repository.importSpaces([snapshot]);
+    trackImported(imported);
+
+    await expect(db.orm.public.Space.where({ id: SPACE_ID }).delete()).rejects.toThrow(
+      'repository_state_meta_space_id_fkey',
+    );
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot,
+      revision: 0n,
+      exportedRevision: null,
+    });
+  });
+
+  it('commits a topology-preserving edit without waiting for the repository singleton lock', async () => {
+    const imported = await repository.importSpaces([snapshot]);
+    trackImported(imported);
+    const lockAcquired = Promise.withResolvers<undefined>();
+    const releaseLock = Promise.withResolvers<undefined>();
+    const blocker = db.transaction(async ({ orm }) => {
+      const state = await orm.public.RepositoryState.where({ singletonId: 1 }).first();
+      if (state === null) throw new Error('Repository state was not seeded');
+      await orm.public.RepositoryState.where({ singletonId: 1 }).update({
+        metaSpaceId: state.metaSpaceId,
+      });
+      lockAcquired.resolve(undefined);
+      await releaseLock.promise;
+    });
+    await lockAcquired.promise;
+
+    try {
+      const changed = {
+        ...snapshot,
+        document: { ...snapshot.document, title: 'Changed without aggregate lock' },
+      };
+      const timeout = new Promise<'timed-out'>((resolve) =>
+        setTimeout(() => resolve('timed-out'), 500),
+      );
+      await expect(Promise.race([commitSpace(changed, 0n), timeout])).resolves.toEqual({
+        kind: 'committed',
+        revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+        deletedSpaceIds: [],
+      });
+    } finally {
+      releaseLock.resolve(undefined);
+      await blocker;
+    }
+  });
+
+  it('refuses an unlocked single-Space write whose row moved after it read the revision', async () => {
+    const imported = await repository.importSpaces([snapshot]);
+    trackImported(imported);
+
+    /*
+     * The same lost update as the multi-Space case below, on the path that has
+     * no singleton lock to lose: two ordinary single-Space edits at one
+     * revision. This is the plain two-writers case, and it needs no coordinated
+     * edit to reach.
+     */
+    const updateApplied = Promise.withResolvers<undefined>();
+    const releaseBlocker = Promise.withResolvers<undefined>();
+    const blocker = db.transaction(async ({ orm }) => {
+      await orm.public.Space.where({ id: SPACE_ID }).update({
+        document: { version: 1, title: 'Moved by the other writer' },
+        // Prisma Next declares `int8` inputs as `number`, so the literal needs
+        // no relabelling here — unlike the adapter, which holds the same value
+        // as the domain's `bigint`.
+        revision: 1,
+      });
+      updateApplied.resolve(undefined);
+      await releaseBlocker.promise;
+    });
+    await updateApplied.promise;
+
+    const committing = commitSpace(
+      { ...snapshot, document: { ...snapshot.document, title: 'Written against the stale read' } },
+      0n,
+    );
+    let settled = false;
+    void committing.then(() => (settled = true));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(settled).toBe(false);
+
+    releaseBlocker.resolve(undefined);
+    await blocker;
+
+    expect(await committing).toMatchObject({ kind: 'conflict' });
+    // The writer that did commit is the one still standing.
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      revision: 1n,
+      snapshot: { document: { title: 'Moved by the other writer' } },
+    });
+  });
+
+  it('refuses a multi-Space write whose row moved after the conflict check read it', async () => {
+    const linked: SpaceSnapshot = {
+      ...snapshot,
+      cards: [
+        ...snapshot.cards,
+        {
+          id: MISSING_CARD_ID,
+          document: { title: 'Link', kind: 'space', spaceId: OTHER_SPACE_ID },
+        },
+      ],
+    };
+    const imported = await repository.importSpaces([linked, otherSnapshot]);
+    trackImported(imported);
+
+    /*
+     * The lost update this closes is only reachable from the *other* writer:
+     * `commitTopologyPreservingUpdate` runs before `lockRepositoryState`, so a
+     * single-Space edit commits without ever taking the singleton lock the
+     * multi-Space path serializes on. That leaves this window — the multi-Space
+     * path's `loadEverySpace` read is lock-free, so a row can move under it
+     * between the conflict check and the write.
+     *
+     * The barrier makes the window deterministic rather than merely likely. The
+     * blocker's UPDATE lands *before* the commit starts, so the commit's own
+     * read is guaranteed to run while that UPDATE is still uncommitted and, at
+     * read committed, is guaranteed to see the pre-blocker revision. The
+     * conflict check therefore always passes, and the stale revision can only
+     * be caught at the write. Whether the commit reaches its write before or
+     * after the blocker commits changes nothing, so there is no race to lose.
+     */
+    const updateApplied = Promise.withResolvers<undefined>();
+    const releaseBlocker = Promise.withResolvers<undefined>();
+    const blocker = db.transaction(async ({ orm }) => {
+      await orm.public.Space.where({ id: OTHER_SPACE_ID }).update({
+        document: { version: 1, title: 'Moved by the unlocked writer' },
+        // Prisma Next declares `int8` inputs as `number`, so the literal needs
+        // no relabelling here — unlike the adapter, which holds the same value
+        // as the domain's `bigint`.
+        revision: 1,
+      });
+      updateApplied.resolve(undefined);
+      await releaseBlocker.promise;
+    });
+    await updateApplied.promise;
+
+    const committing = repository.commit({
+      changes: [
+        {
+          kind: 'update',
+          spaceId: SPACE_ID,
+          snapshot: { ...linked, document: { ...linked.document, title: 'Coordinated meta' } },
+          expectedRevision: 0n,
+        },
+        {
+          kind: 'update',
+          spaceId: OTHER_SPACE_ID,
+          snapshot: {
+            ...otherSnapshot,
+            document: { ...otherSnapshot.document, title: 'Coordinated other' },
+          },
+          expectedRevision: 0n,
+        },
+      ],
+    });
+
+    let settled = false;
+    void committing.then(() => (settled = true));
+    // Long enough for the commit to take the singleton lock, read the aggregate
+    // at the pre-blocker revision, and reach the write that blocks on the
+    // blocker's row lock. The assertion below is what proves it: a commit that
+    // had already answered by now would have answered from its read, and the
+    // write this case is about would never have run.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(settled).toBe(false);
+
+    releaseBlocker.resolve(undefined);
+    await blocker;
+    const result = await committing;
+
+    expect(result).toEqual({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: OTHER_SPACE_ID,
+          current: {
+            snapshot: {
+              id: OTHER_SPACE_ID,
+              document: { version: 1, title: 'Moved by the unlocked writer' },
+              cards: otherSnapshot.cards,
+            },
+            revision: 1n,
+            exportedRevision: null,
+          },
+        },
+      ],
+    });
+    // The whole commit rolls back, so the Space the loop had already written is
+    // left at the revision the losing commit never advanced past.
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({ revision: 0n });
+  });
+
   it('commits an authoritative complete snapshot and advances its revision', async () => {
     await repository.importSpaces([snapshot]);
     const changed: SpaceSnapshot = {
@@ -233,9 +448,10 @@ describe('PostgresSpaceRepository', () => {
       ],
     };
 
-    expect(await repository.commitSpace(changed, 0n)).toEqual({
+    expect(await commitSpace(changed, 0n)).toEqual({
       kind: 'committed',
-      revision: 1n,
+      revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+      deletedSpaceIds: [],
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot: changed,
@@ -254,9 +470,10 @@ describe('PostgresSpaceRepository', () => {
       document: { ...snapshot.document, title: 'Edited during export' },
     };
 
-    await expect(repository.commitSpace(changed, exported.revision)).resolves.toEqual({
+    await expect(commitSpace(changed, exported.revision)).resolves.toEqual({
       kind: 'committed',
-      revision: 1n,
+      revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+      deletedSpaceIds: [],
     });
     await repository.markExported(SPACE_ID, exported.revision);
 
@@ -277,15 +494,16 @@ describe('PostgresSpaceRepository', () => {
       ...snapshot,
       document: { ...snapshot.document, title: 'Stale overwrite' },
     };
-    await repository.commitSpace(current, 0n);
+    await commitSpace(current, 0n);
 
-    expect(await repository.commitSpace(stale, 0n)).toEqual({
+    expect(await commitSpace(stale, 0n)).toEqual({
       kind: 'conflict',
-      current: {
-        snapshot: current,
-        revision: 1n,
-        exportedRevision: null,
-      },
+      conflicts: [
+        {
+          spaceId: SPACE_ID,
+          current: { snapshot: current, revision: 1n, exportedRevision: null },
+        },
+      ],
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot: current,
@@ -310,8 +528,11 @@ describe('PostgresSpaceRepository', () => {
     const writeRevisions = async () => {
       for (let revision = 1; revision <= 50; revision += 1) {
         await expect(
-          repository.commitSpace(atRevision(revision), BigInt(revision - 1)),
-        ).resolves.toMatchObject({ kind: 'committed', revision: BigInt(revision) });
+          commitSpace(atRevision(revision), BigInt(revision - 1)),
+        ).resolves.toMatchObject({
+          kind: 'committed',
+          revisions: [{ spaceId: SPACE_ID, revision: BigInt(revision) }],
+        });
       }
     };
     const readRevisions = async () => {
@@ -376,10 +597,9 @@ describe('PostgresSpaceRepository', () => {
       cards: [],
     };
 
-    expect(await repository.commitSpace(missing, 0n)).toEqual({
-      kind: 'rejected',
-      code: 'not-found',
-      message: `Space ${MISSING_SPACE_ID} does not exist`,
+    expect(await commitSpace(missing, 0n)).toEqual({
+      kind: 'conflict',
+      conflicts: [{ spaceId: MISSING_SPACE_ID, current: undefined }],
     });
     await expect(repository.loadSpace(MISSING_SPACE_ID)).resolves.toBeUndefined();
   });
@@ -408,9 +628,8 @@ describe('PostgresSpaceRepository', () => {
       },
     };
 
-    await expect(repository.commitSpace(invalid, 0n)).resolves.toMatchObject({
-      kind: 'rejected',
-      code: 'invalid-snapshot',
+    await expect(commitSpace(invalid, 0n)).resolves.toMatchObject({
+      kind: 'aggregate-refused',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot,
@@ -427,9 +646,8 @@ describe('PostgresSpaceRepository', () => {
       cards: [...snapshot.cards, otherSnapshot.cards[0]!],
     };
 
-    await expect(repository.commitSpace(claimed, 0n)).resolves.toMatchObject({
-      kind: 'rejected',
-      code: 'invalid-snapshot',
+    await expect(commitSpace(claimed, 0n)).resolves.toMatchObject({
+      kind: 'aggregate-refused',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot,
@@ -441,6 +659,103 @@ describe('PostgresSpaceRepository', () => {
       revision: 0n,
       exportedRevision: null,
     });
+  });
+
+  it('serializes concurrent topology commits so the loser observes the complete winner', async () => {
+    await repository.importSpaces([snapshot]);
+    const firstRepository = new PostgresSpaceRepository(db);
+    const secondRepository = new PostgresSpaceRepository(db);
+    const firstTarget: SpaceSnapshot = {
+      id: OTHER_SPACE_ID,
+      document: { version: 1, title: 'First target' },
+      cards: [],
+    };
+    const secondTarget: SpaceSnapshot = {
+      id: CONCURRENT_SPACE_ID,
+      document: { version: 1, title: 'Second target' },
+      cards: [],
+    };
+    const firstLinked: SpaceSnapshot = {
+      ...snapshot,
+      cards: [
+        ...snapshot.cards,
+        {
+          id: MISSING_CARD_ID,
+          document: {
+            title: 'First link',
+            kind: 'space',
+            spaceId: OTHER_SPACE_ID,
+          },
+        },
+      ],
+    };
+    const secondLinked: SpaceSnapshot = {
+      ...snapshot,
+      cards: [
+        ...snapshot.cards,
+        {
+          id: UNRESOLVED_CARD_ID,
+          document: {
+            title: 'Second link',
+            kind: 'space',
+            spaceId: CONCURRENT_SPACE_ID,
+          },
+        },
+      ],
+    };
+
+    const results = await Promise.all([
+      firstRepository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: firstLinked,
+            expectedRevision: 0n,
+          },
+          { kind: 'create', spaceId: OTHER_SPACE_ID, snapshot: firstTarget },
+        ],
+      }),
+      secondRepository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: secondLinked,
+            expectedRevision: 0n,
+          },
+          { kind: 'create', spaceId: CONCURRENT_SPACE_ID, snapshot: secondTarget },
+        ],
+      }),
+    ]);
+
+    expect(results.filter((result) => result.kind === 'committed')).toHaveLength(1);
+    expect(results.filter((result) => result.kind === 'conflict')).toHaveLength(1);
+    const firstWon = results[0].kind === 'committed';
+    const winningMeta = firstWon ? firstLinked : secondLinked;
+    const winningTarget = firstWon ? firstTarget : secondTarget;
+    const losingTargetId = firstWon ? CONCURRENT_SPACE_ID : OTHER_SPACE_ID;
+    expect(results).toContainEqual({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: SPACE_ID,
+          current: {
+            snapshot: winningMeta,
+            revision: 1n,
+            exportedRevision: null,
+          },
+        },
+      ],
+    });
+    await expect(repository.loadAggregate()).resolves.toEqual({
+      metaSpaceId: SPACE_ID,
+      spaces: [
+        { snapshot: winningMeta, revision: 1n, exportedRevision: null },
+        { snapshot: winningTarget, revision: 0n, exportedRevision: null },
+      ],
+    });
+    await expect(repository.loadSpace(losingTargetId)).resolves.toBeUndefined();
   });
 
   it('rejects an existing space identity without changing stored content', async () => {
@@ -725,13 +1040,14 @@ describe('PostgresSpaceRepository', () => {
     await repository.importSpaces([snapshot]);
     const unsafeRevision = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
 
-    await expect(repository.commitSpace(snapshot, unsafeRevision)).resolves.toEqual({
+    await expect(commitSpace(snapshot, unsafeRevision)).resolves.toEqual({
       kind: 'conflict',
-      current: {
-        snapshot,
-        revision: 0n,
-        exportedRevision: null,
-      },
+      conflicts: [
+        {
+          spaceId: SPACE_ID,
+          current: { snapshot, revision: 0n, exportedRevision: null },
+        },
+      ],
     });
   });
 

@@ -1,8 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
-import type { LoadedSpace, SpaceSession, SpaceSessionState } from '../src/index';
+import type { LoadedSpace, SpaceBackend, SpaceSession, SpaceSessionState } from '../src/index';
 import { MemorySpaceBackend, openSpaceSession } from '../src/index';
+import { openManagedSpaceSession } from '../src/session';
 import { MemorySpaceBackendTestControl } from '../src/memory';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -41,6 +42,15 @@ const changedTitle = (title: string) => {
   snapshot.document.title = title;
   return snapshot;
 };
+
+const commitSnapshot = (
+  backend: SpaceBackend,
+  snapshot: LoadedSpace['snapshot'],
+  expectedRevision: bigint,
+) =>
+  backend.commit({
+    changes: [{ kind: 'update', spaceId: snapshot.id, snapshot, expectedRevision }],
+  });
 
 /** Every persistence state a session can be in other than `conflicted`. */
 type UnconflictedKind = Exclude<SpaceSessionState['persistence']['kind'], 'conflicted'>;
@@ -96,7 +106,7 @@ const openSessionIn = async (kind: UnconflictedKind): Promise<DrivenSession> => 
       control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'No access' });
       break;
   }
-  const session = openSpaceSession(new MemorySpaceBackend([loaded], control), loaded);
+  const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded], control), loaded);
 
   session.submit(changedTitle(`Drove into ${kind}`));
   const driven = await waitFor(
@@ -114,7 +124,7 @@ const openSessionIn = async (kind: UnconflictedKind): Promise<DrivenSession> => 
    * post-commit one never, without failing.
    *
    * Neither of the two weaker guards catches that. The attempt count cannot:
-   * `MemorySpaceBackend.commitSpace` records the attempt before its first
+   * `MemorySpaceBackend.commit` records the attempt before its first
    * `await`, so `attempts` proves a commit *started*, never that one finished.
    * Nor can state identity: `submit`'s optimistic publication already installs
    * a fresh object in `settled` before any commit begins. Only the revision
@@ -132,6 +142,31 @@ const openSessionIn = async (kind: UnconflictedKind): Promise<DrivenSession> => 
 };
 
 describe('openSpaceSession', () => {
+  it('submits a singleton update through the unified commit interface', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded], control), loaded);
+
+    session.submit(changedTitle('Unified commit'));
+
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+    expect(control.requests).toEqual([
+      {
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: changedTitle('Unified commit'),
+            expectedRevision: 3n,
+          },
+        ],
+      },
+    ]);
+  });
+
   /*
    * The state a session is in the instant it opens, asserted whole. Every other
    * test in this file reads `getState()` only after a `submit`, by which point
@@ -144,7 +179,7 @@ describe('openSpaceSession', () => {
    * `EVERY_UNCONFLICTED_KIND` above is what catches that instead.
    */
   it('opens settled on the loaded snapshot before anything is submitted', () => {
-    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded]), loaded);
 
     expect(session.getState()).toEqual({
       working: loaded.snapshot,
@@ -155,7 +190,7 @@ describe('openSpaceSession', () => {
   });
 
   it('persists an optimistic Edit and notifies later observers when one observer fails', async () => {
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const reported: unknown[] = [];
     const session = openSpaceSession(backend, loaded, {
       reportObserverError: (error) => reported.push(error),
@@ -191,7 +226,7 @@ describe('openSpaceSession', () => {
    */
   it('reports an observer failure to the console when no reporter is supplied', async () => {
     const reportedToConsole = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const session = openSpaceSession(backend, loaded);
     const observerError = new Error('observer failed');
     session.subscribe(() => {
@@ -213,7 +248,7 @@ describe('openSpaceSession', () => {
   });
 
   it('continues session work when reporting an observer failure also fails', async () => {
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const session = openSpaceSession(backend, loaded, {
       reportObserverError: () => {
         throw new Error('diagnostic failed');
@@ -252,7 +287,7 @@ describe('openSpaceSession', () => {
    */
   it('coalesces a submit made from an observer into one commit of the newest snapshot', async () => {
     const control = new MemorySpaceBackendTestControl();
-    const backend = new MemorySpaceBackend([loaded], control);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
     const session = openSpaceSession(backend, loaded);
     let reentered = false;
     session.subscribe(() => {
@@ -289,7 +324,7 @@ describe('openSpaceSession', () => {
   it('queues an Edit submitted from a pending notification raised inside an optimistic one', async () => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({ kind: 'retryable-failure', code: 'unavailable', message: 'Try later' });
-    const backend = new MemorySpaceBackend([loaded], control);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
     const session = openSpaceSession(backend, loaded);
 
     session.submit(changedTitle('Failed payload'));
@@ -341,8 +376,8 @@ describe('openSpaceSession', () => {
    */
   it('queues an Edit submitted from a pending notification raised inside a conflicted one', async () => {
     const control = new MemorySpaceBackendTestControl();
-    const backend = new MemorySpaceBackend([loaded], control);
-    await backend.commitSpace(changedTitle('Remote'), 3n);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
+    await commitSnapshot(backend, changedTitle('Remote'), 3n);
     const session = openSpaceSession(backend, loaded);
 
     session.submit(changedTitle('Conflicting payload'));
@@ -387,7 +422,7 @@ describe('openSpaceSession', () => {
   });
 
   it('updates optimistically, persists a complete snapshot, and acknowledges success', async () => {
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const session = openSpaceSession(backend, loaded);
     const changed = structuredClone(loaded.snapshot);
     changed.document.title = 'Changed';
@@ -420,7 +455,7 @@ describe('openSpaceSession', () => {
   it('coalesces edits behind one in-flight commit to the latest complete snapshot', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
-    const backend = new MemorySpaceBackend([loaded], control);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
     const session = openSpaceSession(backend, loaded);
 
     session.submit(changedTitle('First'));
@@ -455,7 +490,7 @@ describe('openSpaceSession', () => {
   it('carries the acknowledged revision into the coalesced commit it starts', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
-    const backend = new MemorySpaceBackend([loaded], control);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
     const session = openSpaceSession(backend, loaded);
     const pendingRevisions: bigint[] = [];
     session.subscribe(() => {
@@ -486,7 +521,7 @@ describe('openSpaceSession', () => {
       code: 'unavailable',
       message: 'Try later',
     });
-    const backend = new MemorySpaceBackend([loaded], control);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
     const session = openSpaceSession(backend, loaded);
 
     session.submit(changedTitle('Failed payload'));
@@ -519,7 +554,7 @@ describe('openSpaceSession', () => {
       code: 'forbidden',
       message: 'No access',
     });
-    const backend = new MemorySpaceBackend([loaded], control);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
     const session = openSpaceSession(backend, loaded);
 
     session.submit(changedTitle('Rejected'));
@@ -543,10 +578,10 @@ describe('openSpaceSession', () => {
   });
 
   it('retains local work on conflict until accepting the returned remote snapshot', async () => {
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const session = openSpaceSession(backend, loaded);
     const remote = changedTitle('Remote');
-    await backend.commitSpace(remote, 3n);
+    await commitSnapshot(backend, remote, 3n);
 
     session.submit(changedTitle('Local'));
     const conflicted = await waitFor(
@@ -568,9 +603,9 @@ describe('openSpaceSession', () => {
   });
 
   it('commits an explicitly reconciled conflict against the returned current revision', async () => {
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const session = openSpaceSession(backend, loaded);
-    await backend.commitSpace(changedTitle('Remote'), 3n);
+    await commitSnapshot(backend, changedTitle('Remote'), 3n);
 
     session.submit(changedTitle('Local'));
     await waitFor(
@@ -591,6 +626,39 @@ describe('openSpaceSession', () => {
     });
   });
 
+  it('recreates a remotely deleted Space when explicitly keeping local work', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [{ spaceId: SPACE_ID, current: undefined }],
+    });
+    control.queueResult({
+      kind: 'committed',
+      revisions: [{ spaceId: SPACE_ID, revision: 0n }],
+      deletedSpaceIds: [],
+    });
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
+    const session = openSpaceSession(backend, loaded);
+
+    session.submit(changedTitle('Local'));
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'conflicted',
+    );
+    session.resolveConflict(changedTitle('Recreated'));
+
+    await vi.waitFor(() => expect(control.requests).toHaveLength(2));
+    expect(control.requests[1]?.changes).toEqual([
+      { kind: 'create', spaceId: SPACE_ID, snapshot: changedTitle('Recreated') },
+    ]);
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+  });
+
   /*
    * The same threading on the reconciling path, where it is load-bearing rather
    * than merely earlier: the reconciled snapshot exists nowhere but the state
@@ -599,9 +667,9 @@ describe('openSpaceSession', () => {
    * conflict rejected and commit under the wrong one.
    */
   it('carries the reconciled working snapshot into the commit it starts', async () => {
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const session = openSpaceSession(backend, loaded);
-    await backend.commitSpace(changedTitle('Remote'), 3n);
+    await commitSnapshot(backend, changedTitle('Remote'), 3n);
 
     session.submit(changedTitle('Local'));
     const conflicted = await waitFor(
@@ -638,8 +706,11 @@ describe('openSpaceSession', () => {
       exportedRevision: 7n,
     };
     const control = new MemorySpaceBackendTestControl();
-    control.queueResult({ kind: 'conflict', current: remote });
-    const session = openSpaceSession(new MemorySpaceBackend([loaded], control), loaded);
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [{ spaceId: SPACE_ID, current: remote }],
+    });
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded], control), loaded);
 
     session.submit(changedTitle('Local'));
 
@@ -662,7 +733,10 @@ describe('openSpaceSession', () => {
     const atExport = { ...loaded, exportedRevision: 3n };
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
-    const session = openSpaceSession(new MemorySpaceBackend([atExport], control), atExport);
+    const session = openSpaceSession(
+      new MemorySpaceBackend(SPACE_ID, [atExport], control),
+      atExport,
+    );
     expect(session.getState().changedSinceExport).toBe(false);
 
     session.submit(changedTitle('Pending'));
@@ -677,14 +751,14 @@ describe('openSpaceSession', () => {
     expect(settled.changedSinceExport).toBe(true);
 
     const neverExported = openSpaceSession(
-      new MemorySpaceBackend([{ ...loaded, exportedRevision: null }]),
+      new MemorySpaceBackend(SPACE_ID, [{ ...loaded, exportedRevision: null }]),
       { ...loaded, exportedRevision: null },
     );
     expect(neverExported.getState().changedSinceExport).toBe(true);
   });
 
   it('contains a rejected asynchronous observer and still notifies the rest', async () => {
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const reported: unknown[] = [];
     const session = openSpaceSession(backend, loaded, {
       reportObserverError: (error) => reported.push(error),
@@ -777,7 +851,7 @@ describe('openSpaceSession', () => {
             expect(control.attempts).toHaveLength(attemptsBefore);
           } finally {
             // In `finally` because a failed assertion above would otherwise
-            // strand the gate: `commitSpace` would never settle, and fast-check
+            // strand the gate: `commit` would never settle, and fast-check
             // leaves one unsettled promise behind per shrink attempt.
             release();
             await waitFor(
@@ -789,5 +863,126 @@ describe('openSpaceSession', () => {
         },
       ),
     );
+  });
+
+  /*
+   * The seam's contract is a `CommitResult`, and every shipped backend answers
+   * transport failure with one — but a throw is still reachable, and the session
+   * has to survive it. Left uncaught, `inFlight` never clears: the Space sits
+   * `pending` with `retry` and `resolveConflict` both early-returning, and
+   * `waitForIdle()` never resolves. `SpaceSessionRegistry`'s lifecycle barrier
+   * waits on *every* session, so one stuck this way blocks every coordinated
+   * Space Card commit in the registry, with each session already paused.
+   */
+  it('reports a throwing commit as a failure and returns to idle', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
+    const session = openSpaceSession(backend, loaded);
+    control.throwNext(new Error('backend exploded'));
+
+    session.submit(changedTitle('Typed'));
+    const state = await waitFor(
+      session.getState,
+      session.subscribe,
+      ({ persistence }) => persistence.kind !== 'pending',
+    );
+
+    expect(state.persistence).toEqual({
+      kind: 'failed',
+      failure: {
+        kind: 'retryable-failure',
+        code: 'unavailable',
+        message: 'backend exploded',
+      },
+    });
+
+    // The whole point: the session is idle again, so the registry's barrier and
+    // an ordinary retry both get past it.
+    control.queueResult({
+      kind: 'committed',
+      revisions: [{ spaceId: SPACE_ID, revision: 4n }],
+      deletedSpaceIds: [],
+    });
+    session.retry();
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      ({ persistence }) => persistence.kind === 'settled',
+    );
+    expect(session.getState().acknowledgedRevision).toBe(4n);
+  });
+
+  it.each([
+    {
+      result: { kind: 'committed' as const, revisions: [], deletedSpaceIds: [] },
+      message: `Commit result omitted the revision for Space ${SPACE_ID}`,
+    },
+    {
+      result: {
+        kind: 'committed' as const,
+        revisions: [{ spaceId: SPACE_ID, revision: 4n }],
+        deletedSpaceIds: [SPACE_ID],
+      },
+      message: 'Commit result unexpectedly deleted Spaces',
+    },
+  ])('describes the $message protocol fault precisely', async ({ result, message }) => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult(result);
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded], control), loaded);
+
+    session.submit(changedTitle('Protocol fault'));
+    const state = await waitFor(
+      session.getState,
+      session.subscribe,
+      ({ persistence }) => persistence.kind === 'rejected',
+    );
+
+    expect(state.persistence).toEqual({
+      kind: 'rejected',
+      failure: { kind: 'permanent-failure', code: 'protocol', message },
+    });
+  });
+
+  it('does not queue an unchanged coordinated working snapshot', () => {
+    const control = new MemorySpaceBackendTestControl();
+    const managed = openManagedSpaceSession(
+      new MemorySpaceBackend(SPACE_ID, [loaded], control),
+      loaded,
+    );
+
+    managed.prepareCoordinatedCommit(changedTitle('Coordinated'));
+    managed.publishCoordinatedCommit();
+    managed.session.submit(managed.session.getState().working);
+    managed.acknowledgeCoordinatedCommit(4n);
+
+    expect(control.requests).toEqual([]);
+    expect(managed.isIdle()).toBe(true);
+  });
+
+  it('preserves coordinated aggregate refusal identities in rejected session state', () => {
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
+    const managed = openManagedSpaceSession(backend, loaded);
+
+    managed.prepareCoordinatedCommit(changedTitle('Coordinated'));
+    managed.publishCoordinatedCommit();
+    managed.failCoordinatedCommit({
+      kind: 'aggregate-refused',
+      errors: [
+        { kind: 'ordinary-space-unreferenced', spaceId: SPACE_ID },
+        { kind: 'meta-space-missing', metaSpaceId: SPACE_ID },
+      ],
+    });
+
+    expect(managed.session.getState().persistence).toEqual({
+      kind: 'rejected',
+      failure: {
+        kind: 'aggregate-refused',
+        errors: [
+          { kind: 'ordinary-space-unreferenced', spaceId: SPACE_ID },
+          { kind: 'meta-space-missing', metaSpaceId: SPACE_ID },
+        ],
+      },
+    });
+    expect(managed.isIdle()).toBe(true);
   });
 });

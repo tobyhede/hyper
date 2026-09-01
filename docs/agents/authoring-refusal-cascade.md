@@ -37,7 +37,7 @@ that action.
 
 | Action | On a View | Its own checks, in order |
 | --- | --- | --- |
-| `edited-card` | `computed-view-read-only` | `card-not-found` → `card-kind-immutable` → `alias-target-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
+| `edited-card` | `computed-view-read-only` | `card-not-found` → `card-kind-immutable` → `alias-target-immutable` → `space-card-target-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
 | `created-card` | `computed-view-read-only` | none → completed |
 | `created-alias` | `computed-view-read-only` | `alias-target-not-found` → `alias-target-must-own-content` → completed |
 | `opened-card` | `computed-view-read-only` | `card-not-in-layout` → (already Open ⇒ `unchanged`) → completed |
@@ -45,7 +45,7 @@ that action.
 | `resized-card` | `computed-view-read-only` | `card-not-in-layout` → `card-not-expanded` → (same size ⇒ `unchanged`) → completed |
 | `added-card-to-layout` | `computed-view-read-only` | `card-not-found` → `card-already-in-layout` → completed |
 | `removed-card-from-layout` | `computed-view-read-only` | `card-not-in-layout` → completed |
-| `deleted-card` | `computed-view-read-only` | `card-not-found` → `card-has-aliases` → completed |
+| `deleted-card` | `computed-view-read-only` | `card-not-found` → `space-card-deletion-unsupported` → `card-has-aliases` → completed |
 
 `card-not-expanded` is the code `resized-card` raises for a Card that is
 **Closed**. The prose in this file speaks `CONTEXT.md`'s Open/Closed vocabulary;
@@ -73,6 +73,16 @@ that has not been decided.
 | `recolored-graph` | `computed-view-read-only` | `graph-not-owned` → (same color ⇒ `unchanged`) → completed |
 | `deleted-graph` | `computed-view-read-only` | `graph-not-owned` → `layout-must-keep-graph` → completed |
 
+### Layout edits
+
+| Action | On a View | Its own checks, in order |
+| --- | --- | --- |
+| `renamed-layout` | `computed-view-read-only` | `layout-not-found` → `layout-title-required` → (same title ⇒ `unchanged`) → completed |
+
+`layout-not-found` here is not the universal gate 2 check: it is `renamed-layout`
+naming a Layout other than the one the Edit resolved, which is an author's stale
+gesture rather than a broken invariant.
+
 ### Layout creation
 
 | Action | On a View | Its own checks, in order |
@@ -85,10 +95,10 @@ that has not been decided.
 | --- | --- | --- |
 | `settled-card-movement` | `computed-view-read-only` | none → completed |
 
-## The 22 codes
+## The 24 codes
 
 4 contextual (`placement-pending`, `layout-not-found`, `layout-required`, `computed-view-read-only`) plus
-the 18 action-specific codes tabulated above — none is produced anywhere else.
+the 20 action-specific codes tabulated above — none is produced anywhere else.
 Count the codes, not the cells: several serve more than one action —
 `card-not-found`, `card-not-in-layout`, `graph-not-owned`,
 `edge-card-outside-layout` and the two `alias-target-*` each appear in more than

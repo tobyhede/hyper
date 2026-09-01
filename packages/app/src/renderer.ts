@@ -9,6 +9,7 @@ import {
   type UUID,
 } from '@project/core';
 import {
+  computedViewSubject,
   gridStrategy,
   Placement,
   positionedStrategy,
@@ -302,10 +303,13 @@ interface ComputedViewDefinition {
  * every Edge endpoint of every Graph is a Card of some Layout and therefore a
  * Card of the Space.
  */
-const spaceSubject = (space: Space): RendererSubject => ({
-  cards: space.cards,
-  graphs: space.graphs,
-});
+const selectComputedSubject =
+  (spaceViewId: UUID) =>
+  (space: Space): RendererSubject => {
+    const subject = computedViewSubject(space, spaceViewId);
+    if (subject === undefined) throw new Error(`Unknown computed Space View ${spaceViewId}`);
+    return subject;
+  };
 
 /**
  * Carry every Graph the Computed View draws into the new Layout, with identity
@@ -347,14 +351,14 @@ const COMPUTED_VIEWS: PerComputedView<ComputedViewDefinition> = [
   {
     id: FLOW_SPACE_VIEW_ID,
     title: 'Flow',
-    selectSubject: spaceSubject,
+    selectSubject: selectComputedSubject(FLOW_SPACE_VIEW_ID),
     createStrategy: elkStrategy,
     graphPolicy: preserveSubjectGraphs,
   },
   {
     id: GRID_SPACE_VIEW_ID,
     title: 'Grid',
-    selectSubject: spaceSubject,
+    selectSubject: selectComputedSubject(GRID_SPACE_VIEW_ID),
     createStrategy: gridStrategy,
     graphPolicy: preserveSubjectGraphs,
   },

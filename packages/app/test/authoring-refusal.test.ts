@@ -19,6 +19,7 @@ const EVERY_REFUSAL = {
   'card-not-found': { code: 'card-not-found' },
   'card-kind-immutable': { code: 'card-kind-immutable' },
   'alias-target-immutable': { code: 'alias-target-immutable' },
+  'space-card-target-immutable': { code: 'space-card-target-immutable' },
   'card-title-required': { code: 'card-title-required' },
   'layout-title-required': { code: 'layout-title-required' },
   'alias-target-not-found': { code: 'alias-target-not-found', targetId: TARGET_ID },
@@ -34,6 +35,7 @@ const EVERY_REFUSAL = {
   'edge-card-outside-layout': { code: 'edge-card-outside-layout' },
   'edge-already-exists': { code: 'edge-already-exists' },
   'layout-active-graph-required': { code: 'layout-active-graph-required' },
+  'space-card-deletion-unsupported': { code: 'space-card-deletion-unsupported' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;
 
 /**

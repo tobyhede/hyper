@@ -50,6 +50,10 @@ const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 /** A third Card that owns its content, so an Alias may legally target it. */
 const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
+const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000042');
+const TARGET_SPACE_VIEW_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000043');
+const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000044');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const STORED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -528,6 +532,64 @@ describe('Space Authoring', () => {
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'alias-target-immutable' } });
     expect(session.getState().working).toBe(before);
+  });
+
+  it('edits a Space Card selection but refuses changing its target Space', () => {
+    const spaceCardSnapshot: SpaceSnapshot = {
+      ...positionedSnapshot,
+      cards: [
+        {
+          id: CARD_A,
+          document: { title: 'Nested Space', kind: 'space', spaceId: TARGET_SPACE_ID },
+        },
+        positionedSnapshot.cards[1]!,
+      ],
+    };
+    const { authoring, session } = openAuthoring(spaceCardSnapshot, LAYOUT_ID);
+    replacePlacementForTest(
+      authoring,
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
+      ]),
+    );
+
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: {
+          title: 'Selected Nested Space',
+          kind: 'space',
+          spaceId: TARGET_SPACE_ID,
+          spaceView: TARGET_SPACE_VIEW_ID,
+          graph: TARGET_GRAPH_ID,
+        },
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(session.getState().working.cards[0]?.document).toEqual({
+      title: 'Selected Nested Space',
+      kind: 'space',
+      spaceId: TARGET_SPACE_ID,
+      spaceView: TARGET_SPACE_VIEW_ID,
+      graph: TARGET_GRAPH_ID,
+    });
+
+    const beforeRetarget = session.getState().working;
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: {
+          title: 'Retargeted Space',
+          kind: 'space',
+          spaceId: OTHER_SPACE_ID,
+          spaceView: TARGET_SPACE_VIEW_ID,
+          graph: TARGET_GRAPH_ID,
+        },
+      }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'space-card-target-immutable' } });
+    expect(session.getState().working).toBe(beforeRetarget);
   });
 
   /**

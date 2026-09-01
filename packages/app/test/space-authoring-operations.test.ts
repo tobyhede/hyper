@@ -1402,6 +1402,33 @@ describe('Delete Card from Space', () => {
     expect(session.getState().working).toBe(before);
   });
 
+  /*
+   * A Space Card owns the Space it names (ADR 0058), so deleting it deletes
+   * that Space and the closure below it — one coordinated multi-Space Edit,
+   * which is the session registry's and not a single-Space update this seam can
+   * make. Completing it here stores a Space whose target is unreachable, and
+   * aggregate intake refuses that commit permanently with the Card already gone
+   * from the working state, leaving the author nothing to correct.
+   */
+  it('refuses deleting a Space Card rather than orphaning the Space it owns', () => {
+    const linked: SpaceSnapshot = {
+      ...positionedSnapshot,
+      cards: [
+        positionedSnapshot.cards[0]!,
+        { id: CARD_B, document: { title: 'Nested Space', kind: 'space', spaceId: UNKNOWN_CARD } },
+      ],
+    };
+    const { authoring, session } = open(linked);
+    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_B })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'space-card-deletion-unsupported' },
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
   it('deletes an Alias and leaves its Target untouched', () => {
     const aliased: SpaceSnapshot = {
       ...positionedSnapshot,

@@ -14,7 +14,13 @@ const loaded: LoadedSpace = { snapshot, revision: 4n, exportedRevision: 3n };
 const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceResourceRepository => ({
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve(undefined),
-  commitSpace: () => Promise.resolve({ kind: 'committed', revision: 1n }),
+  loadAggregate: () => Promise.resolve({ metaSpaceId: SPACE_ID, spaces: [] }),
+  commit: () =>
+    Promise.resolve({
+      kind: 'committed',
+      revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+      deletedSpaceIds: [],
+    }),
   ...overrides,
 });
 
@@ -41,15 +47,22 @@ spaceBackendContract('Hono HttpSpaceBackend', (initial) => {
   const app = createSpaceHttpApp({
     listSpaces: () => memory.listSpaces(),
     loadSpace: (id) => memory.loadSpace(id),
-    commitSpace: async (nextSnapshot, expectedRevision) => {
-      const result = await memory.commitSpace(nextSnapshot, expectedRevision);
-      if (result.kind === 'committed' || result.kind === 'conflict') return result;
-      // `SpaceResourceRepository` declares two rejection codes; `CommitResult`
-      // carries eight. Collapsing the rest into `invalid-snapshot` would let a
+    loadAggregate: () => memory.loadAggregate(),
+    commit: async (request) => {
+      const result = await memory.commit(request);
+      if (
+        result.kind === 'committed' ||
+        result.kind === 'conflict' ||
+        result.kind === 'aggregate-refused'
+      ) {
+        return result;
+      }
+      // `SpaceResourceRepository` declares one rejection code; `CommitResult`
+      // also carries transport failures. Collapsing those into `invalid-commit` would let a
       // transport or authorization failure reach the contract disguised as a
       // domain rejection, and the assertions downstream would still pass.
-      if (result.code !== 'not-found' && result.code !== 'invalid-snapshot') {
-        throw new Error(`Unmapped commitSpace failure in contract harness: ${result.code}`);
+      if (result.kind !== 'permanent-failure' || result.code !== 'invalid-commit') {
+        throw new Error(`Unmapped commit failure in contract harness: ${result.code}`);
       }
       return { kind: 'rejected', code: result.code, message: result.message };
     },
@@ -82,30 +95,63 @@ describe('HttpSpaceBackend', () => {
   // that is its choice to change, not a guarantee this harness may rely on.
   it('preserves a Request input through the application boundary', async () => {
     const app = createSpaceHttpApp(
-      repository({ commitSpace: () => Promise.resolve({ kind: 'committed', revision: 7n }) }),
+      repository({
+        commit: () =>
+          Promise.resolve({
+            kind: 'committed',
+            revisions: [{ spaceId: SPACE_ID, revision: 7n }],
+            deletedSpaceIds: [],
+          }),
+      }),
     );
 
     const response = await appFetch(app)(
-      new Request(`http://hyper.test/api/spaces/${SPACE_ID}`, {
-        method: 'PUT',
+      new Request('http://hyper.test/api/spaces', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(encodeCommitRequest(snapshot, 4n)),
+        body: JSON.stringify(
+          encodeCommitRequest({
+            changes: [
+              {
+                kind: 'update',
+                spaceId: SPACE_ID,
+                snapshot,
+                expectedRevision: 4n,
+              },
+            ],
+          }),
+        ),
       }),
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ revision: '7' });
+    await expect(response.json()).resolves.toEqual({
+      revisions: [{ spaceId: SPACE_ID, revision: '7' }],
+      deletedSpaceIds: [],
+    });
   });
 
   it('commits through the typed Hono application contract', async () => {
     const app = createSpaceHttpApp(
-      repository({ commitSpace: () => Promise.resolve({ kind: 'committed', revision: 5n }) }),
+      repository({
+        commit: () =>
+          Promise.resolve({
+            kind: 'committed',
+            revisions: [{ spaceId: SPACE_ID, revision: 5n }],
+            deletedSpaceIds: [],
+          }),
+      }),
     );
     const backend = new HttpSpaceBackend('http://hyper.test', { fetch: appFetch(app) });
 
-    await expect(backend.commitSpace(snapshot, 4n)).resolves.toEqual({
+    await expect(
+      backend.commit({
+        changes: [{ kind: 'update', spaceId: SPACE_ID, snapshot, expectedRevision: 4n }],
+      }),
+    ).resolves.toEqual({
       kind: 'committed',
-      revision: 5n,
+      revisions: [{ spaceId: SPACE_ID, revision: 5n }],
+      deletedSpaceIds: [],
     });
   });
 });

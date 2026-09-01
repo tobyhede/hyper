@@ -31,6 +31,11 @@ const snapshot: SpaceSnapshot = {
   document: { version: 1, title: 'One' },
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
+const updateCommit = {
+  changes: [
+    { kind: 'update' as const, spaceId: SPACE_ID, snapshot, expectedRevision: 2n },
+  ] as const,
+};
 
 type Middleware = (
   request: IncomingMessage,
@@ -48,7 +53,8 @@ const hosts: RunningHost[] = [];
 const repository = (): SpaceResourceRepository => ({
   listSpaces: () => Promise.resolve([]),
   loadSpace: () => Promise.resolve(undefined),
-  commitSpace: () => Promise.resolve({ kind: 'rejected', code: 'not-found', message: 'missing' }),
+  loadAggregate: () => Promise.resolve({ metaSpaceId: SPACE_ID, spaces: [] }),
+  commit: () => Promise.resolve({ kind: 'rejected', code: 'invalid-commit', message: 'missing' }),
 });
 
 const startHost = async (
@@ -123,7 +129,7 @@ const startHost = async (
 const abortChunkedRequest = (baseUrl: string, path: string): Promise<void> =>
   new Promise((resolve) => {
     const request = httpRequest(new URL(path, baseUrl), {
-      method: 'PUT',
+      method: 'POST',
       headers: { 'content-type': 'application/json', 'transfer-encoding': 'chunked' },
     });
     request.on('error', () => resolve());
@@ -428,19 +434,30 @@ describe('Vite Hono host', () => {
    * leaving all the rejection paths above green.
    */
   it('commits through a rewritten media type over a real socket', async () => {
-    const commitSpace = vi.fn(() => Promise.resolve({ kind: 'committed' as const, revision: 3n }));
-    const { host } = await startHost(createSpaceHttpApp({ ...repository(), commitSpace }));
+    const commit = vi.fn(() =>
+      Promise.resolve({
+        kind: 'committed' as const,
+        revisions: [{ spaceId: SPACE_ID, revision: 3n }],
+        deletedSpaceIds: [],
+      }),
+    );
+    const { host } = await startHost(createSpaceHttpApp({ ...repository(), commit }));
 
     const response = await send(
       host.url,
-      `/api/spaces/${SPACE_ID}`,
-      JSON.stringify(encodeCommitRequest(snapshot, 2n)),
+      '/api/spaces',
+      JSON.stringify(encodeCommitRequest(updateCommit)),
       { 'content-type': 'application/json ; charset=utf-8' },
+      undefined,
+      'POST',
     );
 
     expect(response.status).toBe(200);
-    expect(JSON.parse(response.body)).toEqual({ revision: '3' });
-    expect(commitSpace).toHaveBeenCalledWith(snapshot, 2n);
+    expect(JSON.parse(response.body)).toEqual({
+      revisions: [{ spaceId: SPACE_ID, revision: '3' }],
+      deletedSpaceIds: [],
+    });
+    expect(commit).toHaveBeenCalledWith(updateCommit);
   });
 
   it('drains an oversized chunked body and reuses the connection', async () => {
@@ -449,10 +466,11 @@ describe('Vite Hono host', () => {
     try {
       const rejected = await send(
         host.url,
-        '/api/spaces/00000000-0000-4000-8000-000000000001',
+        '/api/spaces',
         `{"padding":"${'x'.repeat(MAX_COMMIT_BODY_BYTES)}"}`,
         { 'content-type': 'application/json', 'transfer-encoding': 'chunked' },
         agent,
+        'POST',
       );
       expect(rejected.status).toBe(413);
 
@@ -479,10 +497,11 @@ describe('Vite Hono host', () => {
       try {
         const rejected = await send(
           host.url,
-          '/api/spaces/00000000-0000-4000-8000-000000000001',
+          '/api/spaces',
           `{"padding":"${'x'.repeat(MAX_COMMIT_BODY_BYTES * 4)}"}`,
           headers,
           agent,
+          'POST',
         );
         expect(rejected.status).toBe(413);
 
@@ -504,9 +523,9 @@ describe('Vite Hono host', () => {
       {
         name: 'invalid path identity',
         path: '/api/spaces/not-a-uuid',
-        body: '{}',
-        headers: { 'content-type': 'application/json' },
-        method: 'PUT',
+        body: '',
+        headers: {},
+        method: 'GET',
         status: 400,
       },
       {
@@ -519,26 +538,26 @@ describe('Vite Hono host', () => {
       },
       {
         name: 'unsupported media type',
-        path: resource,
+        path: '/api/spaces',
         body: '{}',
         headers: { 'content-type': 'text/plain' },
-        method: 'PUT',
+        method: 'POST',
         status: 415,
       },
       {
         name: 'unsupported charset',
-        path: resource,
+        path: '/api/spaces',
         body: '{}',
         headers: { 'content-type': 'application/json; charset=utf-16' },
-        method: 'PUT',
+        method: 'POST',
         status: 415,
       },
       {
         name: 'unsupported content encoding',
-        path: resource,
+        path: '/api/spaces',
         body: '{}',
         headers: { 'content-type': 'application/json', 'content-encoding': 'gzip' },
-        method: 'PUT',
+        method: 'POST',
         status: 415,
       },
     ] as const;
@@ -586,11 +605,11 @@ describe('Vite Hono host', () => {
       createSpaceHttpApp(
         {
           ...repository(),
-          commitSpace: () => {
+          commit: () => {
             commitAttempts += 1;
             return Promise.resolve({
               kind: 'rejected' as const,
-              code: 'not-found' as const,
+              code: 'invalid-commit' as const,
               message: 'missing',
             });
           },
@@ -599,7 +618,7 @@ describe('Vite Hono host', () => {
       ),
     );
 
-    await abortChunkedRequest(host.url, '/api/spaces/00000000-0000-4000-8000-000000000001');
+    await abortChunkedRequest(host.url, '/api/spaces');
 
     // The next request completing is the ordering barrier: the host answered it
     // on the same server the abort was handed to, so that handling has run.

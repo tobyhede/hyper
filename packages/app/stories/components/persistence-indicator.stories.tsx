@@ -4,8 +4,10 @@ import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   openSpaceSession,
   type CommitResult,
+  type LoadedAggregate,
   type LoadedSpace,
   type SpaceBackend,
+  type SpaceCommit,
 } from '@project/persistence';
 import { PersistenceControl } from '#components/PersistenceControl';
 
@@ -26,9 +28,28 @@ class DelayedCommitBackend implements SpaceBackend {
     return Promise.resolve(undefined);
   }
 
-  async commitSpace(_snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<CommitResult> {
+  loadAggregate(): Promise<LoadedAggregate> {
+    return Promise.resolve({ metaSpaceId: snapshot.id, spaces: [] });
+  }
+
+  async commit(request: SpaceCommit): Promise<CommitResult> {
     await new Promise<void>((resolve) => window.setTimeout(resolve, 1_000));
-    return { kind: 'committed', revision: expectedRevision + 1n };
+    return {
+      kind: 'committed',
+      revisions: request.changes.flatMap((change) =>
+        change.kind === 'delete'
+          ? []
+          : [
+              {
+                spaceId: change.spaceId,
+                revision: change.kind === 'create' ? 0n : change.expectedRevision + 1n,
+              },
+            ],
+      ),
+      deletedSpaceIds: request.changes.flatMap((change) =>
+        change.kind === 'delete' ? [change.spaceId] : [],
+      ),
+    };
   }
 }
 

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { spaceFileSchema } from '@project/core';
-import { loadSpace, newSpace } from '../src/index';
+import { spaceFileSchema, uuidSchema } from '@project/core';
+import { initializeSpace, loadSpace, newSpace } from '../src/index';
+
+const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 describe('newSpace', () => {
   it('is a real space file, not something that only nearly parses', () => {
@@ -54,5 +57,33 @@ describe('newSpace', () => {
   it('is a fresh value each time, so one space cannot mutate another', () => {
     expect(newSpace()).not.toBe(newSpace());
     expect(newSpace().cardFiles).not.toBe(newSpace().cardFiles);
+  });
+});
+
+describe('initializeSpace', () => {
+  it('creates the same unauthored one-Card shape as newSpace from one identity source', () => {
+    const ids = [SPACE_ID, CARD_ID];
+    const initialized = initializeSpace({
+      title: 'Architecture',
+      newId: () => {
+        const id = ids.shift();
+        if (id === undefined) throw new Error('initializer minted too many ids');
+        return id;
+      },
+    });
+
+    const result = loadSpace(initialized.file, initialized.cardFiles);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('\n'));
+
+    expect(ids).toEqual([]);
+    expect(result.space).toMatchObject({
+      id: SPACE_ID,
+      title: 'Architecture',
+      cards: [{ id: CARD_ID, title: 'Architecture', kind: 'markdown', body: '' }],
+      layouts: [],
+      graphs: [],
+    });
+    expect(result.space.defaultRenderer).toBeUndefined();
   });
 });

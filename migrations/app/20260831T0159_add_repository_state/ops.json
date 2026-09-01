@@ -1,0 +1,110 @@
+[
+  {
+    "id": "table.repository_state",
+    "label": "Create table \"repository_state\"",
+    "summary": "Creates table \"repository_state\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "repository_state"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"repository_state\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"repository_state\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"repository_state\"",
+        "sql": "CREATE TABLE \"public\".\"repository_state\" (\n  \"meta_space_id\" \"uuid\" NOT NULL,\n  \"singleton_id\" int4 DEFAULT 1 NOT NULL,\n  PRIMARY KEY (\"singleton_id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"repository_state\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"repository_state\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.repository_state.repository_state_singleton_id_check",
+    "label": "Add check constraint \"repository_state_singleton_id_check\" on \"repository_state\".\"singleton_id\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "repository_state_singleton_id_check",
+        "table": "repository_state"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"repository_state_singleton_id_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "repository_state_singleton_id_check",
+          "public",
+          "\"public\".\"repository_state\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"repository_state_singleton_id_check\"",
+        "sql": "ALTER TABLE \"public\".\"repository_state\" ADD CONSTRAINT \"repository_state_singleton_id_check\" CHECK (\"singleton_id\" IN ('1'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"repository_state_singleton_id_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "repository_state_singleton_id_check",
+          "public",
+          "\"public\".\"repository_state\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data_migration.bootstrap_repository_state",
+    "label": "Bootstrap repository state from the legacy Entry Space",
+    "operationClass": "data",
+    "target": { "id": "postgres" },
+    "precheck": [
+      {
+        "description": "check repository state needs bootstrapping",
+        "sql": "SELECT NOT EXISTS (SELECT 1 FROM \"public\".\"repository_state\") AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "bootstrap repository state from the legacy Entry Space",
+        "sql": "INSERT INTO \"public\".\"repository_state\" (\"meta_space_id\", \"singleton_id\") SELECT \"id\", 1 FROM \"public\".\"spaces\" WHERE \"entry\" = TRUE LIMIT 1",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify every non-empty repository has singleton state",
+        "sql": "SELECT (NOT EXISTS (SELECT 1 FROM \"public\".\"spaces\") OR EXISTS (SELECT 1 FROM \"public\".\"repository_state\" WHERE \"singleton_id\" = 1)) AS \"result\"",
+        "params": []
+      }
+    ]
+  }
+]

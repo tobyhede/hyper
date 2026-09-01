@@ -46,13 +46,13 @@ interface Document {
   readonly cards: readonly Card[];
 }
 
-type Loader = (document: Document, ancestorSpaceIds?: readonly string[]) => LoadSpaceResult;
+type Loader = (document: Document) => LoadSpaceResult;
 
 /**
  * The file loader: cards arrive as the markdown files an author wrote, so the
  * document under test is turned back into frontmatter on the way in.
  */
-const viaFiles: Loader = ({ cards, ...structure }, ancestorSpaceIds = []) =>
+const viaFiles: Loader = ({ cards, ...structure }) =>
   loadSpace(
     { version: 1, id: SPACE, title: 'Test space', ...structure },
     cards.map((card) =>
@@ -65,19 +65,15 @@ const viaFiles: Loader = ({ cards, ...structure }, ancestorSpaceIds = []) =>
             }
           : cardFile(card.id, card.title, card.body),
     ),
-    ancestorSpaceIds.map(uuid),
   );
 
 /** The persistence loader: the same aggregate, fully identified. */
-const viaSnapshot: Loader = ({ cards, ...structure }, ancestorSpaceIds = []) => {
-  const result = loadSpaceSnapshot(
-    {
-      id: SPACE,
-      document: { version: 1, title: 'Test space', ...structure },
-      cards: cards.map(({ id, ...document }) => ({ id, document })),
-    },
-    ancestorSpaceIds.map(uuid),
-  );
+const viaSnapshot: Loader = ({ cards, ...structure }) => {
+  const result = loadSpaceSnapshot({
+    id: SPACE,
+    document: { version: 1, title: 'Test space', ...structure },
+    cards: cards.map(({ id, ...document }) => ({ id, document })),
+  });
   return result.ok ? { ok: true, space: result.space } : result;
 };
 
@@ -614,14 +610,6 @@ describe.each([
 
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'space-card-reference-cycle', ref: SPACE }),
-      );
-    });
-
-    it('refuses a Space Card that targets an open ancestor Space', () => {
-      const errors = refused(load({ cards: [spaceCard(A, B)], layouts: [] }, [C, B]));
-
-      expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'space-card-reference-cycle', ref: B }),
       );
     });
 

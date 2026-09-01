@@ -4,6 +4,8 @@ export interface ObservableState<State> {
   readonly getState: () => State;
   readonly subscribe: (listener: () => void) => () => void;
   readonly publish: (state: State) => void;
+  readonly install: (state: State) => void;
+  readonly notify: () => void;
   readonly clearSubscribers: () => void;
 }
 
@@ -46,6 +48,16 @@ export function createObservableState<State>(
   const listeners = new Set<() => unknown>();
   const safelyReportObserverError = createNonThrowingReporter(reportObserverError);
 
+  const notify = (): void => {
+    for (const listener of [...listeners]) {
+      try {
+        const settled = listener();
+        if (isThenable(settled)) void settled.then(undefined, safelyReportObserverError);
+      } catch (error) {
+        safelyReportObserverError(error);
+      }
+    }
+  };
   return {
     getState: () => state,
     subscribe: (listener) => {
@@ -54,15 +66,12 @@ export function createObservableState<State>(
     },
     publish: (nextState) => {
       state = nextState;
-      for (const listener of [...listeners]) {
-        try {
-          const settled = listener();
-          if (isThenable(settled)) void settled.then(undefined, safelyReportObserverError);
-        } catch (error) {
-          safelyReportObserverError(error);
-        }
-      }
+      notify();
     },
+    install: (nextState) => {
+      state = nextState;
+    },
+    notify,
     clearSubscribers: () => listeners.clear(),
   };
 }

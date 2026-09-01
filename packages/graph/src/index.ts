@@ -37,6 +37,9 @@ export type {
   ParseImportCardFileResult,
 } from './card-file';
 
+export { computedViewSubject } from './computed-view';
+export type { ComputedViewSubject } from './computed-view';
+
 // The rule for "the same Edge twice in one Graph" (ADR 0032), offered because
 // the app's ADR 0045 conversion boundary refuses one before it can reach a
 // document, and intake's own refusal must be the same answer.
@@ -61,8 +64,8 @@ export type {
 export { resolveContentCard } from './lookup';
 export type { OwnedGraph, ResolvedContentCard, ResolvedLayout, SpaceLookup } from './lookup';
 
-export { newSpace } from './new-space';
-export type { NewSpace } from './new-space';
+export { initializeSpace, newSpace } from './new-space';
+export type { InitializeSpaceOptions, NewSpace } from './new-space';
 
 // One name carrying both the branded map type and the module that builds it.
 // Unpacking it would put `fromLayout`, `equals` and `next` in this surface.
@@ -94,5 +97,14 @@ export type { CardHandleSet, GraphRenderEdge, GraphRenderHandleRef } from './gra
 // docblock is where that argument lives.
 export { documentRefusal, loadSpace, loadSpaceSnapshot } from './space';
 export type { LoadSpaceResult, LoadSpaceSnapshotResult, Space, SpaceError } from './space';
+
+export { loadSpaceAggregate } from './space-aggregate';
+export type {
+  LoadSpaceAggregateInput,
+  LoadSpaceAggregateResult,
+  SpaceAggregate,
+  SpaceAggregateError,
+  SpaceAggregateLookup,
+} from './space-aggregate';
 
 export { outgoingEdges, graphStartCard } from './traversal';
