@@ -63,6 +63,10 @@ the detail. -->
   admits feedback through an evidence-backed blocker/correction/post-V1 rule,
   assigns classification and scope authority, and requires explicit ownership,
   proof and critical-path updates before accepted work begins.
+- [14 — Define the V1 release proof and go/no-go contract](issues/14-define-the-v1-release-proof-and-go-no-go-contract.md)
+  requires a commit-specific proof matrix, fresh final rehearsal, classified
+  defect register and binary human go/no-go before the approved commit receives
+  annotated tag `v1.0.0`.
 
 ## Not yet specified
 
