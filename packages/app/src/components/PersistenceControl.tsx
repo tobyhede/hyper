@@ -43,7 +43,8 @@ export function PersistenceControl({
   if (persistence.kind === 'conflicted') {
     return (
       <ConflictControl
-        key={persistence.current.revision.toString()}
+        key={persistence.current?.revision.toString() ?? 'coordinated'}
+        hasRemote={persistence.current !== undefined}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={onKeepLocal}
       />
@@ -99,9 +100,11 @@ export function PersistenceNotice({ persistence, onRetry }: PersistenceNoticePro
 }
 
 function ConflictControl({
+  hasRemote,
   onAcceptRemote,
   onKeepLocal,
 }: {
+  readonly hasRemote: boolean;
   readonly onAcceptRemote: () => string | null;
   readonly onKeepLocal: () => void;
 }) {
@@ -118,8 +121,9 @@ function ConflictControl({
         <AlertDialogHeader>
           <AlertDialogTitle>Changes conflict</AlertDialogTitle>
           <AlertDialogDescription>
-            A newer version of this space is available. Reload discards your local changes; keeping
-            your local version tries to save it again.
+            {hasRemote
+              ? 'A newer version of this space is available. Reload discards your local changes; keeping your local version tries to save it again.'
+              : 'A related space changed while this coordinated edit was saving. Keep your local version to continue from the current space.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {remoteRefusal === null ? null : (
@@ -133,6 +137,7 @@ function ConflictControl({
             variant="secondary"
             data-testid="persistence-accept-remote"
             onClick={() => setRemoteRefusal(onAcceptRemote())}
+            disabled={!hasRemote}
           >
             Reload
           </Button>

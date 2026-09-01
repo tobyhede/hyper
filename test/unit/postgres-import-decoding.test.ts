@@ -40,7 +40,9 @@ describe('PostgresSpaceRepository import decoding', () => {
   /** The same failure as the wire sees it, through the commit-request codec. */
   const wireMessage = (snapshot: unknown): string => {
     try {
-      decodeCommitRequest({ snapshot, expectedRevision: '0' });
+      decodeCommitRequest({
+        changes: [{ kind: 'create', spaceId: SPACE_ID, snapshot }],
+      });
     } catch (error) {
       return error instanceof Error ? error.message : '';
     }

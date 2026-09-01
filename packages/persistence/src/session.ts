@@ -14,7 +14,7 @@ export interface SpaceSessionState {
     | { kind: 'pending' }
     | { kind: 'failed'; failure: RetryableFailure }
     | { kind: 'rejected'; failure: PermanentFailure }
-    | { kind: 'conflicted'; current: LoadedSpace };
+    | { kind: 'conflicted'; current: LoadedSpace | undefined };
 }
 
 export interface SpaceSession {
@@ -30,6 +30,20 @@ export interface SpaceSessionOptions {
   readonly reportObserverError?: ObserverErrorReporter;
 }
 
+/** Package-private coordination surface consumed by the session registry. */
+export interface ManagedSpaceSession {
+  readonly session: SpaceSession;
+  readonly isIdle: () => boolean;
+  readonly waitForIdle: () => Promise<void>;
+  readonly beginCoordinatedCommit: (snapshot?: SpaceSnapshot) => void;
+  readonly acknowledgeCoordinatedCommit: (revision: bigint) => void;
+  readonly completeCoordinatedDeletion: () => void;
+  readonly conflictCoordinatedCommit: (current: LoadedSpace | undefined) => void;
+  readonly failCoordinatedCommit: (
+    result: Exclude<CommitResult, { kind: 'committed' } | { kind: 'conflict' }>,
+  ) => void;
+}
+
 const clone = <T>(value: T): T => structuredClone(value);
 
 const hasChangedSinceExport = (
@@ -41,11 +55,11 @@ const reportToConsole = (error: unknown): void => {
   console.error('SpaceSession observer failed', error);
 };
 
-export const openSpaceSession = (
+export const openManagedSpaceSession = (
   backend: SpaceBackend,
   loaded: LoadedSpace,
   options: SpaceSessionOptions = {},
-): SpaceSession => {
+): ManagedSpaceSession => {
   let exportedRevision = loaded.exportedRevision;
   const initialState: SpaceSessionState = {
     working: clone(loaded.snapshot),
@@ -54,11 +68,19 @@ export const openSpaceSession = (
     persistence: { kind: 'settled' },
   };
   let inFlight = false;
+  let coordinating = false;
   let waiting: SpaceSnapshot | undefined;
   /** The snapshot `startCommit` handed the backend. Read only while `inFlight`. */
   let committing: SpaceSnapshot | undefined;
   const reportObserverError = options.reportObserverError ?? reportToConsole;
   const observable = createObservableState(initialState, reportObserverError);
+  const idleWaiters = new Set<() => void>();
+
+  const publishIdle = (): void => {
+    if (inFlight || coordinating) return;
+    for (const resolve of idleWaiters) resolve();
+    idleWaiters.clear();
+  };
 
   const publishPersistence = (persistence: SpaceSessionState['persistence']): void => {
     observable.publish({ ...observable.getState(), persistence });
@@ -83,46 +105,112 @@ export const openSpaceSession = (
     inFlight = true;
     committing = snapshot;
     observable.publish({ ...unpublishedState, persistence: { kind: 'pending' } });
-    void backend.commitSpace(clone(snapshot), expectedRevision).then((result) => {
-      inFlight = false;
-      switch (result.kind) {
-        case 'committed': {
-          const nextWaiting = waiting;
-          waiting = undefined;
-          const committedState: SpaceSessionState = {
-            ...observable.getState(),
-            acknowledgedRevision: result.revision,
-            changedSinceExport: hasChangedSinceExport(result.revision, exportedRevision),
-          };
-          if (nextWaiting === undefined) {
-            observable.publish({ ...committedState, persistence: { kind: 'settled' } });
-          } else {
-            startCommit(nextWaiting, result.revision, committedState);
+    void backend
+      .commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: snapshot.id,
+            snapshot: clone(snapshot),
+            expectedRevision,
+          },
+        ],
+      })
+      .then((result) => {
+        inFlight = false;
+        switch (result.kind) {
+          case 'committed': {
+            const revision = result.revisions.find(
+              ({ spaceId }) => spaceId === snapshot.id,
+            )?.revision;
+            if (revision === undefined || result.deletedSpaceIds.length > 0) {
+              waiting = undefined;
+              publishPersistence({
+                kind: 'rejected',
+                failure: {
+                  kind: 'permanent-failure',
+                  code: 'protocol',
+                  message: `Commit result omitted the revision for Space ${snapshot.id}`,
+                },
+              });
+              publishIdle();
+              return;
+            }
+            const nextWaiting = waiting;
+            waiting = undefined;
+            const committedState: SpaceSessionState = {
+              ...observable.getState(),
+              acknowledgedRevision: revision,
+              changedSinceExport: hasChangedSinceExport(revision, exportedRevision),
+            };
+            if (nextWaiting === undefined) {
+              observable.publish({ ...committedState, persistence: { kind: 'settled' } });
+              publishIdle();
+            } else {
+              startCommit(nextWaiting, revision, committedState);
+            }
+            return;
           }
-          return;
+          case 'retryable-failure':
+            waiting = undefined;
+            publishPersistence({ kind: 'failed', failure: result });
+            publishIdle();
+            return;
+          case 'permanent-failure':
+            waiting = undefined;
+            publishPersistence({ kind: 'rejected', failure: result });
+            publishIdle();
+            return;
+          case 'aggregate-refused':
+            waiting = undefined;
+            publishPersistence({
+              kind: 'rejected',
+              failure: {
+                kind: 'permanent-failure',
+                code: 'invalid-commit',
+                message: result.errors.map((error) => error.kind).join(', '),
+              },
+            });
+            publishIdle();
+            return;
+          case 'conflict': {
+            waiting = undefined;
+            const conflict = result.conflicts.find(({ spaceId }) => spaceId === snapshot.id);
+            if (conflict === undefined) {
+              publishPersistence({
+                kind: 'rejected',
+                failure: {
+                  kind: 'permanent-failure',
+                  code: 'protocol',
+                  message: `Conflict result omitted the current Space ${snapshot.id}`,
+                },
+              });
+              publishIdle();
+              return;
+            }
+            const { current } = conflict;
+            if (current === undefined) {
+              observable.publish({
+                ...observable.getState(),
+                persistence: { kind: 'conflicted', current: undefined },
+              });
+              publishIdle();
+              return;
+            }
+            exportedRevision = current.exportedRevision;
+            observable.publish({
+              ...observable.getState(),
+              acknowledgedRevision: current.revision,
+              changedSinceExport: hasChangedSinceExport(current.revision, exportedRevision),
+              persistence: { kind: 'conflicted', current: clone(current) },
+            });
+            publishIdle();
+          }
         }
-        case 'retryable-failure':
-          waiting = undefined;
-          publishPersistence({ kind: 'failed', failure: result });
-          return;
-        case 'permanent-failure':
-          waiting = undefined;
-          publishPersistence({ kind: 'rejected', failure: result });
-          return;
-        case 'conflict':
-          waiting = undefined;
-          exportedRevision = result.current.exportedRevision;
-          observable.publish({
-            ...observable.getState(),
-            acknowledgedRevision: result.current.revision,
-            changedSinceExport: hasChangedSinceExport(result.current.revision, exportedRevision),
-            persistence: { kind: 'conflicted', current: clone(result.current) },
-          });
-      }
-    });
+      });
   };
 
-  return {
+  const session: SpaceSession = {
     getState: observable.getState,
     subscribe: observable.subscribe,
     /*
@@ -149,7 +237,7 @@ export const openSpaceSession = (
       observable.publish({ ...observable.getState(), working });
       if (previous.kind === 'conflicted' || previous.kind === 'failed') return;
       const newest = observable.getState().working;
-      if (inFlight) {
+      if (inFlight || coordinating) {
         if (newest !== committing) waiting = newest;
         return;
       }
@@ -157,13 +245,14 @@ export const openSpaceSession = (
     },
     retry: () => {
       const state = observable.getState();
-      if (state.persistence.kind !== 'failed' || inFlight) return;
+      if (state.persistence.kind !== 'failed' || inFlight || coordinating) return;
       startCommit(state.working, state.acknowledgedRevision);
     },
     acceptRemote: () => {
       const state = observable.getState();
       if (state.persistence.kind !== 'conflicted') return;
       const { current } = state.persistence;
+      if (current === undefined) return;
       exportedRevision = current.exportedRevision;
       observable.publish({
         working: clone(current.snapshot),
@@ -172,19 +261,120 @@ export const openSpaceSession = (
         persistence: { kind: 'settled' },
       });
     },
+    /*
+     * A coordinated conflict can name a Space other than this one, and this
+     * session is then conflicted with no remote snapshot to reload. Its own
+     * acknowledged revision is still the newest it knows, so keeping local work
+     * re-commits against that. Returning here instead would leave the only two
+     * exits from `conflicted` both refusing, and `PersistenceControl`'s dialog
+     * has no dismissal by design — the Space would never save again.
+     */
     resolveConflict: (snapshot) => {
       const state = observable.getState();
-      if (state.persistence.kind !== 'conflicted' || inFlight) return;
+      if (state.persistence.kind !== 'conflicted' || inFlight || coordinating) return;
       const { current } = state.persistence;
-      exportedRevision = current.exportedRevision;
+      const revision = current?.revision ?? state.acknowledgedRevision;
+      if (current !== undefined) exportedRevision = current.exportedRevision;
       const working = clone(snapshot);
       const resolvedState: SpaceSessionState = {
         working,
-        acknowledgedRevision: current.revision,
-        changedSinceExport: hasChangedSinceExport(current.revision, exportedRevision),
+        acknowledgedRevision: revision,
+        changedSinceExport: hasChangedSinceExport(revision, exportedRevision),
         persistence: { kind: 'conflicted', current },
       };
-      startCommit(working, current.revision, resolvedState);
+      startCommit(working, revision, resolvedState);
     },
   };
+
+  const failCoordinatedCommit: ManagedSpaceSession['failCoordinatedCommit'] = (result) => {
+    coordinating = false;
+    waiting = undefined;
+    if (result.kind === 'retryable-failure') {
+      publishPersistence({ kind: 'failed', failure: result });
+    } else if (result.kind === 'permanent-failure') {
+      publishPersistence({ kind: 'rejected', failure: result });
+    } else {
+      publishPersistence({
+        kind: 'rejected',
+        failure: {
+          kind: 'permanent-failure',
+          code: 'invalid-commit',
+          message: result.errors.map((error) => error.kind).join(', '),
+        },
+      });
+    }
+    publishIdle();
+  };
+
+  return {
+    session,
+    isIdle: () => !inFlight && !coordinating,
+    waitForIdle: () => {
+      if (!inFlight && !coordinating) return Promise.resolve();
+      return new Promise((resolve) => idleWaiters.add(resolve));
+    },
+    beginCoordinatedCommit: (snapshot) => {
+      if (inFlight || coordinating) throw new Error('Space session is already committing');
+      coordinating = true;
+      committing = snapshot;
+      const state = observable.getState();
+      const pendingState: SpaceSessionState = {
+        ...state,
+        persistence: { kind: 'pending' },
+      };
+      if (snapshot !== undefined) pendingState.working = clone(snapshot);
+      observable.publish(pendingState);
+    },
+    acknowledgeCoordinatedCommit: (revision) => {
+      coordinating = false;
+      const nextWaiting = waiting;
+      waiting = undefined;
+      const state = observable.getState();
+      const committedState: SpaceSessionState = {
+        ...state,
+        acknowledgedRevision: revision,
+        changedSinceExport: hasChangedSinceExport(revision, exportedRevision),
+        persistence: { kind: 'settled' },
+      };
+      observable.publish(committedState);
+      if (nextWaiting === undefined) publishIdle();
+      else startCommit(nextWaiting, revision, committedState);
+    },
+    completeCoordinatedDeletion: () => {
+      coordinating = false;
+      waiting = undefined;
+      committing = undefined;
+      publishPersistence({ kind: 'settled' });
+      publishIdle();
+    },
+    conflictCoordinatedCommit: (current) => {
+      coordinating = false;
+      waiting = undefined;
+      if (current !== undefined) exportedRevision = current.exportedRevision;
+      const state = observable.getState();
+      const conflictedState: SpaceSessionState = {
+        ...state,
+        persistence: {
+          kind: 'conflicted',
+          current: current === undefined ? undefined : clone(current),
+        },
+      };
+      if (current !== undefined) {
+        conflictedState.acknowledgedRevision = current.revision;
+        conflictedState.changedSinceExport = hasChangedSinceExport(
+          current.revision,
+          exportedRevision,
+        );
+      }
+      observable.publish(conflictedState);
+      publishIdle();
+    },
+    failCoordinatedCommit,
+  };
 };
+
+export const openSpaceSession = (
+  backend: SpaceBackend,
+  loaded: LoadedSpace,
+  options: SpaceSessionOptions = {},
+): SpaceSession => openManagedSpaceSession(backend, loaded, options).session;

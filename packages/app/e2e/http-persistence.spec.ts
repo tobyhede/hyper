@@ -11,7 +11,7 @@ import {
 } from './graph';
 
 const isCommit = (method: string, url: string): boolean =>
-  method === 'PUT' && /\/api\/spaces\/[0-9a-f-]+$/.test(new URL(url).pathname);
+  method === 'POST' && new URL(url).pathname === '/api/spaces';
 
 const navigationIsProtected = (page: Page) =>
   page.evaluate(() => {
@@ -50,14 +50,20 @@ test(
     });
     const expectedRevisions: string[] = [];
 
-    await page.route('**/api/spaces/*', async (route) => {
+    await page.route('**/api/spaces', async (route) => {
       const request = route.request();
       if (!isCommit(request.method(), request.url())) return route.continue();
       // SAFETY: Playwright's `postDataJSON()` returns `any`; this narrows to
       // the one field read below, from a commit request this same app's own
       // client code just sent — not third-party input.
-      const body = request.postDataJSON() as { expectedRevision: string };
-      expectedRevisions.push(body.expectedRevision);
+      const body = request.postDataJSON() as {
+        changes: readonly { kind: string; expectedRevision?: string }[];
+      };
+      const update = body.changes.find((change) => change.kind === 'update');
+      if (update?.expectedRevision === undefined) {
+        throw new Error('The intercepted commit must contain an update change.');
+      }
+      expectedRevisions.push(update.expectedRevision);
       if (expectedRevisions.length === 1) {
         observeFirst();
         await firstGate;
@@ -114,7 +120,7 @@ test(
       attempts += 1;
       await route.abort('failed');
     };
-    await page.route('**/api/spaces/*', failFirstCommit);
+    await page.route('**/api/spaces', failFirstCommit);
 
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
@@ -132,7 +138,7 @@ test(
     expect(attempts).toBe(1);
     await expect.poll(() => navigationIsProtected(page)).toBe(true);
 
-    await page.unroute('**/api/spaces/*', failFirstCommit);
+    await page.unroute('**/api/spaces', failFirstCommit);
     await retry.click();
 
     await expect(failure).toBeHidden();
@@ -146,7 +152,7 @@ test(
   'a permanent rejection explains the reason and leaves the Space available',
   { tag: '@parity:space-sidebar-reports-permanent-rejection' },
   async ({ page }) => {
-    await page.route('**/api/spaces/*', async (route) => {
+    await page.route('**/api/spaces', async (route) => {
       const request = route.request();
       if (!isCommit(request.method(), request.url())) return route.continue();
       await route.fulfill({
@@ -202,7 +208,7 @@ test(
       const staleCommitObserved = new Promise<void>((resolve) => {
         observeStaleCommit = resolve;
       });
-      await stalePage.route('**/api/spaces/*', async (route) => {
+      await stalePage.route('**/api/spaces', async (route) => {
         const request = route.request();
         if (isCommit(request.method(), request.url())) {
           staleCommits += 1;
@@ -224,10 +230,11 @@ test(
       const mountedGraphArea = await stalePage.locator('.graph-area').elementHandle();
       expect(mountedGraphArea).not.toBeNull();
 
-      // The conflict AlertDialog is modal, so prepare the race while the stale PUT
-      // is parked: leave the local space in unrelated navigation and start an
-      // automatic placement, then let the conflict arrive. Any placement result
-      // still arriving after Reload belongs to the Space that is being replaced.
+      // The conflict AlertDialog is modal, so prepare the race while the stale
+      // aggregate commit is parked: leave the local space in unrelated navigation
+      // and start an automatic placement, then let the conflict arrive. Any
+      // placement result still arriving after Reload belongs to the Space that
+      // is being replaced.
       try {
         await selectCanvas(stalePage, 'Flow');
         await activateGraph(stalePage, 'Echo');
@@ -279,7 +286,7 @@ test(
 
 test('graph activation and presenting do not write or protect navigation', async ({ page }) => {
   let commits = 0;
-  await page.route('**/api/spaces/*', async (route) => {
+  await page.route('**/api/spaces', async (route) => {
     const request = route.request();
     if (isCommit(request.method(), request.url())) commits += 1;
     await route.continue();

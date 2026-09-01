@@ -1,5 +1,11 @@
-import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
-import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
+import { uuidSchema, type ImportSpace, type UUID } from '@project/core';
+import type {
+  LoadedAggregate,
+  LoadedSpace,
+  RepositoryCommitResult,
+  SpaceCommit,
+  SpaceSummary,
+} from '@project/persistence';
 import { describe, expect, it } from 'vitest';
 import type {
   ImportMode,
@@ -29,8 +35,12 @@ class PersistenceOwnedSpaceIdRepository implements SpaceRepository {
     return this.#memory.loadSpace(id);
   }
 
-  commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<RepositoryCommitResult> {
-    return this.#memory.commitSpace(snapshot, expectedRevision);
+  loadAggregate(): Promise<LoadedAggregate> {
+    return this.#memory.loadAggregate();
+  }
+
+  commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    return this.#memory.commit(request);
   }
 
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {

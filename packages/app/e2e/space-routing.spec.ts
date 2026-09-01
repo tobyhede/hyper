@@ -454,8 +454,17 @@ test('a self-Edge presentation move adds a same-URL browser entry', async ({ pag
       ],
     },
   };
-  const commit = await page.request.put(`/api/spaces/${seeded.snapshot.id}`, {
-    data: { snapshot, expectedRevision: seeded.revision },
+  const commit = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId: seeded.snapshot.id,
+          snapshot,
+          expectedRevision: seeded.revision,
+        },
+      ],
+    },
   });
   expect(commit.ok()).toBe(true);
   const graph = `/spaces/${encodeCompactUuid(seeded.snapshot.id)}/views/${encodeCompactUuid(SEEDED_LAYOUT_ID)}/graphs/${encodeCompactUuid(SEEDED_GRAPH_ID)}`;

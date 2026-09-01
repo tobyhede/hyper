@@ -1,13 +1,17 @@
-import type { SpaceSnapshot, UUID } from '@project/core';
+import type { UUID } from '@project/core';
 import {
   CANONICAL_DECIMAL,
-  decodeCommittedRevision,
+  decodeCommitConflict,
+  decodeCommitRefusal,
+  decodeCommitResponse,
+  decodeLoadedAggregate,
   decodeProblemDetails,
   decodeSpaceSummaries,
   decodeLoadedSpace,
   encodeCommitRequest,
   problemCodeForType,
   type CommitResult,
+  type LoadedAggregate,
   type LoadedSpace,
   type ProblemDetails,
   type SpaceBackend,
@@ -91,24 +95,33 @@ export class HttpSpaceBackend implements SpaceBackend {
     );
   }
 
-  async commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<CommitResult> {
+  loadAggregate(): Promise<LoadedAggregate> {
+    return this.#timedRequest(
+      (client) => client.api.aggregate.$get(),
+      async (response) => {
+        if (!response.ok) throw new Error(`Unable to load aggregate: HTTP ${response.status}`);
+        return decodeLoadedAggregate(await response.json());
+      },
+    );
+  }
+
+  async commit(request: Parameters<SpaceBackend['commit']>[0]): Promise<CommitResult> {
     try {
       return await this.#timedRequest(
         (client) =>
-          client.api.spaces[':id'].$put({
-            param: { id: snapshot.id },
-            json: encodeCommitRequest(snapshot, expectedRevision),
+          client.api.spaces.$post({
+            json: encodeCommitRequest(request),
           }),
         async (response, signal): Promise<CommitResult> => {
           try {
             if (response.status === 200) {
-              return {
-                kind: 'committed',
-                revision: decodeCommittedRevision(await response.json()),
-              };
+              return decodeCommitResponse(await response.json());
             }
             if (response.status === 409) {
-              return { kind: 'conflict', current: decodeLoadedSpace(await response.json()) };
+              return decodeCommitConflict(await response.json());
+            }
+            if (response.status === 422) {
+              return decodeCommitRefusal(await response.json());
             }
             if (!hasProblemDetailsMediaType(response)) {
               return protocolFailure('Error response must use application/problem+json');
@@ -180,11 +193,10 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
     case 'unauthorized':
     case 'forbidden':
       return { kind: 'permanent-failure', code: 'forbidden', message: problem.detail };
-    case 'not-found':
-      return { kind: 'permanent-failure', code: 'not-found', message: problem.detail };
-    case 'invalid-snapshot':
-      return { kind: 'permanent-failure', code: 'invalid-snapshot', message: problem.detail };
     case 'invalid-request':
+    case 'invalid-snapshot':
+      return { kind: 'permanent-failure', code: 'invalid-commit', message: problem.detail };
+    case 'not-found':
     case 'invalid-space-id':
     case 'unsupported-media-type':
     case 'payload-too-large':

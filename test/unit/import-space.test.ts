@@ -2,7 +2,13 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
-import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
+import type {
+  LoadedAggregate,
+  LoadedSpace,
+  RepositoryCommitResult,
+  SpaceCommit,
+  SpaceSummary,
+} from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   SpaceImportError,
@@ -78,11 +84,12 @@ class RecordingRepository implements SpaceRepository {
     throw new Error('Unexpected markExported call');
   }
 
-  commitSpace(
-    _snapshot: SpaceSnapshot,
-    _expectedRevision: bigint,
-  ): Promise<RepositoryCommitResult> {
-    throw new Error('Unexpected commitSpace call');
+  loadAggregate(): Promise<LoadedAggregate> {
+    throw new Error('Unexpected loadAggregate call');
+  }
+
+  commit(_request: SpaceCommit): Promise<RepositoryCommitResult> {
+    throw new Error('Unexpected commit call');
   }
 
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {

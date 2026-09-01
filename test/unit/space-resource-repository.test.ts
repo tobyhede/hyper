@@ -23,7 +23,10 @@ it('declares the server repository as a strict superset of the HTTP seam', () =>
   expectTypeOf<Awaited<ReturnType<SpaceRepository['loadSpace']>>>().toEqualTypeOf<
     LoadedSpace | undefined
   >();
-  expectTypeOf<ReturnType<SpaceRepository['commitSpace']>>().toEqualTypeOf<
-    ReturnType<SpaceResourceRepository['commitSpace']>
+  expectTypeOf<ReturnType<SpaceRepository['commit']>>().toEqualTypeOf<
+    ReturnType<SpaceResourceRepository['commit']>
+  >();
+  expectTypeOf<ReturnType<SpaceRepository['loadAggregate']>>().toEqualTypeOf<
+    ReturnType<SpaceResourceRepository['loadAggregate']>
   >();
 });

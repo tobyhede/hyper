@@ -6,23 +6,35 @@ export * from './backend';
 export {
   CANONICAL_DECIMAL,
   decodeCommitRequest,
+  decodeCommitConflict,
+  decodeCommitRefusal,
+  decodeCommitResponse,
   decodeCommittedRevision,
   decodeProblemDetails,
   decodeLoadedSpace,
+  decodeLoadedAggregate,
   decodeSpaceSummaries,
   encodeCommitRequest,
+  encodeCommitConflict,
+  encodeCommitRefusal,
+  encodeCommitResponse,
   encodeLoadedSpace,
+  encodeLoadedAggregate,
   encodeProblemDetails,
   problemCodeForType,
   problemCatalogue,
 } from './http-protocol';
 export type {
   CommitRequestJson,
+  CommitConflictBody,
+  CommitRefusalBody,
+  CommitResponseBody,
   DecodedCommitRequest,
   HyperProblemCode,
   HyperProblemStatus,
   HyperProblemType,
   LoadedSpaceJson,
+  LoadedAggregateJson,
   ProblemDetails,
   ProblemError,
 } from './http-protocol';
@@ -37,4 +49,6 @@ export * from './observable-state';
 /* The stored side of the seam, declared once for both consumers: the Fetch
  * application in `@project/http` and the PostgreSQL adapter under `src/`. */
 export * from './repository';
-export * from './session';
+export { openSpaceSession } from './session';
+export type { SpaceSession, SpaceSessionOptions, SpaceSessionState } from './session';
+export * from './session-registry';

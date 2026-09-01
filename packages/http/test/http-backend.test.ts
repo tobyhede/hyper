@@ -1,8 +1,12 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import {
-  encodeLoadedSpace,
+  encodeCommitConflict,
+  encodeCommitRefusal,
+  encodeCommitResponse,
+  encodeLoadedAggregate,
   encodeProblemDetails,
   type HyperProblemCode,
+  type SpaceCommit,
 } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
@@ -14,10 +18,26 @@ const snapshot: SpaceSnapshot = {
   document: { version: 1, title: 'One' },
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
+const loaded = { snapshot, revision: 4n, exportedRevision: 2n };
+const commit: SpaceCommit = {
+  changes: [{ kind: 'update', spaceId: SPACE_ID, snapshot, expectedRevision: 3n }],
+};
 
 const backendAnswering = (response: Response): HttpSpaceBackend =>
-  new HttpSpaceBackend('http://example.test', {
-    fetch: () => Promise.resolve(response),
+  new HttpSpaceBackend('http://example.test', { fetch: () => Promise.resolve(response) });
+
+type JsonResponseBody =
+  | ReturnType<typeof encodeLoadedAggregate>
+  | ReturnType<typeof encodeCommitResponse>
+  | ReturnType<typeof encodeCommitConflict>
+  | ReturnType<typeof encodeCommitRefusal>
+  | { readonly message: string }
+  | readonly never[];
+
+const jsonResponse = (body: JsonResponseBody, status = 200): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });
 
 const problemResponse = (
@@ -28,13 +48,61 @@ const problemResponse = (
   const body = encodeProblemDetails(code, detail);
   const responseHeaders = new Headers(headers);
   responseHeaders.set('Content-Type', 'application/problem+json');
-  return new Response(JSON.stringify(body), {
-    status: body.status,
-    headers: responseHeaders,
-  });
+  return new Response(JSON.stringify(body), { status: body.status, headers: responseHeaders });
 };
 
-describe('HTTP Space backend Problem Details decoding', () => {
+describe('HTTP Space backend aggregate protocol', () => {
+  it('loads the complete aggregate through its codec', async () => {
+    const aggregate = { metaSpaceId: SPACE_ID, spaces: [loaded] };
+
+    await expect(
+      backendAnswering(jsonResponse(encodeLoadedAggregate(aggregate))).loadAggregate(),
+    ).resolves.toEqual(aggregate);
+  });
+
+  it('decodes committed revisions and deleted Space ids', async () => {
+    const committed = {
+      kind: 'committed' as const,
+      revisions: [{ spaceId: SPACE_ID, revision: 5n }],
+      deletedSpaceIds: [SPACE_ID],
+    };
+
+    await expect(
+      backendAnswering(jsonResponse(encodeCommitResponse(committed))).commit(commit),
+    ).resolves.toEqual(committed);
+  });
+
+  it('decodes every conflicting current value', async () => {
+    const conflict = {
+      kind: 'conflict' as const,
+      conflicts: [{ spaceId: SPACE_ID, current: loaded }],
+    };
+
+    await expect(
+      backendAnswering(jsonResponse(encodeCommitConflict(conflict), 409)).commit(commit),
+    ).resolves.toEqual(conflict);
+  });
+
+  it('decodes aggregate refusal identities and locations', async () => {
+    const refusal = {
+      kind: 'aggregate-refused' as const,
+      errors: [
+        {
+          kind: 'space-card-target-missing' as const,
+          spaceId: SPACE_ID,
+          cardId: CARD_ID,
+          targetSpaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
+        },
+      ],
+    };
+
+    await expect(
+      backendAnswering(jsonResponse(encodeCommitRefusal(refusal), 422)).commit(commit),
+    ).resolves.toEqual(refusal);
+  });
+});
+
+describe('HTTP Space backend failure mapping', () => {
   it.each([
     ['request-timeout', 'timeout'],
     ['rate-limited', 'rate-limited'],
@@ -43,27 +111,22 @@ describe('HTTP Space backend Problem Details decoding', () => {
   ] as const)('maps %s to retryable %s', async (problemCode, resultCode) => {
     const result = await backendAnswering(
       problemResponse(problemCode, 'Try later', { 'Retry-After': '3' }),
-    ).commitSpace(snapshot, 0n);
+    ).commit(commit);
 
     expect(result).toMatchObject({
       kind: 'retryable-failure',
       code: resultCode,
       message: 'Try later',
     });
-    if (problemCode !== 'request-timeout') expect(result).toHaveProperty('retryAfterMs', 3000);
   });
 
   it.each([
     ['unauthorized', 'forbidden'],
     ['forbidden', 'forbidden'],
-    ['not-found', 'not-found'],
-    ['invalid-snapshot', 'invalid-snapshot'],
+    ['invalid-request', 'invalid-commit'],
   ] as const)('maps %s to permanent %s', async (problemCode, resultCode) => {
     await expect(
-      backendAnswering(problemResponse(problemCode, 'Correct the request.')).commitSpace(
-        snapshot,
-        0n,
-      ),
+      backendAnswering(problemResponse(problemCode, 'Correct the request.')).commit(commit),
     ).resolves.toEqual({
       kind: 'permanent-failure',
       code: resultCode,
@@ -71,116 +134,52 @@ describe('HTTP Space backend Problem Details decoding', () => {
     });
   });
 
-  it('has no compatibility path for the retired message envelope', async () => {
-    const response = new Response(JSON.stringify({ message: 'old shape' }), { status: 422 });
-
-    await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toMatchObject({
-      kind: 'permanent-failure',
-      code: 'protocol',
-    });
+  it('requires Problem Details for an ordinary error response', async () => {
+    await expect(
+      backendAnswering(jsonResponse({ message: 'old shape' }, 400)).commit(commit),
+    ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
   });
 
-  it('rejects disagreement between the HTTP status and body status', async () => {
-    const body = encodeProblemDetails('not-found', 'Missing.');
+  it('rejects Problem Details whose status disagrees with the response', async () => {
+    const body = encodeProblemDetails('invalid-request', 'Correct the request.');
     const response = new Response(JSON.stringify(body), {
-      status: 400,
+      status: 503,
       headers: { 'Content-Type': 'application/problem+json' },
     });
 
-    await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toEqual({
+    await expect(backendAnswering(response).commit(commit)).resolves.toEqual({
       kind: 'permanent-failure',
       code: 'protocol',
       message: 'Problem status does not match the HTTP status',
     });
   });
 
-  it('requires the Problem Details media type', async () => {
-    const body = encodeProblemDetails('invalid-snapshot', 'Correct the snapshot.');
-    const response = new Response(JSON.stringify(body), {
-      status: 422,
-      headers: { 'Content-Type': 'application/json' },
+  it('contains a non-Error response decoding failure', async () => {
+    const response = new Response(null, {
+      status: 400,
+      headers: { 'Content-Type': 'application/problem+json' },
+    });
+    Object.defineProperty(response, 'json', {
+      // A host Response implementation can reject with an arbitrary value.
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+      value: () => Promise.reject(null),
     });
 
-    await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toEqual({
-      kind: 'permanent-failure',
-      code: 'protocol',
-      message: 'Error response must use application/problem+json',
-    });
-  });
-
-  it('accepts a Problem Details response whose Content-Type carries parameters', async () => {
-    const body = encodeProblemDetails('persistence-unavailable', 'Down for maintenance');
-    const response = new Response(JSON.stringify(body), {
-      status: body.status,
-      headers: { 'Content-Type': 'application/problem+json; charset=utf-8' },
-    });
-
-    await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toMatchObject({
-      kind: 'retryable-failure',
-      code: 'unavailable',
-      message: 'Down for maintenance',
-    });
-  });
-
-  it('rejects a Problem Details response whose Content-Type is not a valid media type', async () => {
-    const body = encodeProblemDetails('persistence-unavailable', 'Down for maintenance');
-    const response = new Response(JSON.stringify(body), {
-      status: body.status,
-      headers: { 'Content-Type': 'application/problem+json; charset=' },
-    });
-
-    await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toEqual({
-      kind: 'permanent-failure',
-      code: 'protocol',
-      message: 'Error response must use application/problem+json',
-    });
-  });
-
-  it('keeps the 409 recovery representation as LoadedSpace', async () => {
-    const current = { snapshot, revision: 4n, exportedRevision: 2n };
-    const response = new Response(JSON.stringify(encodeLoadedSpace(current)), { status: 409 });
-
-    await expect(backendAnswering(response).commitSpace(snapshot, 3n)).resolves.toEqual({
-      kind: 'conflict',
-      current,
-    });
-  });
-
-  it('omits Retry-After when a rate-limited response does not send one', async () => {
-    await expect(
-      backendAnswering(problemResponse('rate-limited', 'Slow down')).commitSpace(snapshot, 0n),
-    ).resolves.toEqual({
-      kind: 'retryable-failure',
-      code: 'rate-limited',
-      message: 'Slow down',
-    });
-  });
-
-  it('treats a non-Error throw while decoding the body as a malformed response', async () => {
-    const response = Object.assign(
-      new Response(null, { status: 500, headers: { 'Content-Type': 'application/problem+json' } }),
-      {
-        // A caller's Response-like stand-in can reject with anything; that is the regression case.
-        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
-        json: () => Promise.reject('boom'),
-      },
-    );
-
-    await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toEqual({
+    await expect(backendAnswering(response).commit(commit)).resolves.toEqual({
       kind: 'permanent-failure',
       code: 'protocol',
       message: 'Malformed response',
     });
   });
 
-  it('treats a non-Error network rejection with a generic message', async () => {
+  it('treats a non-Error network rejection as a network failure', async () => {
     const backend = new HttpSpaceBackend('http://example.test', {
       // A caller-injected fetch can reject with anything; that is the regression case.
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
       fetch: () => Promise.reject('offline'),
     });
 
-    await expect(backend.commitSpace(snapshot, 0n)).resolves.toEqual({
+    await expect(backend.commit(commit)).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'network',
       message: 'Network request failed',
@@ -189,25 +188,25 @@ describe('HTTP Space backend Problem Details decoding', () => {
 });
 
 describe('HTTP Space backend transport', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  afterEach(() => vi.unstubAllGlobals());
 
-  it('falls back to the global fetch when none is injected', async () => {
-    const globalFetch = vi.fn(() =>
-      Promise.resolve(new Response(JSON.stringify([]), { status: 200 })),
-    );
+  it('falls back to global fetch', async () => {
+    const globalFetch = vi.fn(() => Promise.resolve(jsonResponse([])));
     vi.stubGlobal('fetch', globalFetch);
 
-    const backend = new HttpSpaceBackend('http://example.test');
-
-    await expect(backend.listSpaces()).resolves.toEqual([]);
+    await expect(new HttpSpaceBackend('http://example.test').listSpaces()).resolves.toEqual([]);
     expect(globalFetch).toHaveBeenCalledOnce();
   });
 
-  it('rejects an unsuccessful load by status rather than decoding it', async () => {
+  it('rejects an unsuccessful lazy load by status', async () => {
     await expect(
       backendAnswering(new Response('gateway', { status: 502 })).loadSpace(SPACE_ID),
     ).rejects.toThrow('Unable to load space: HTTP 502');
+  });
+
+  it('rejects an unsuccessful aggregate load by status', async () => {
+    await expect(
+      backendAnswering(new Response('gateway', { status: 502 })).loadAggregate(),
+    ).rejects.toThrow('Unable to load aggregate: HTTP 502');
   });
 });

@@ -1,5 +1,13 @@
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
-import type { LoadedSpace, SpaceSummary } from './backend';
+import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import type { SpaceAggregateError, SpaceError } from '@project/graph';
+import type {
+  CommitResult,
+  LoadedAggregate,
+  LoadedSpace,
+  SpaceChange,
+  SpaceCommit,
+  SpaceSummary,
+} from './backend';
 
 /**
  * A non-negative decimal with no leading zeros, bounded at 19 digits — the width
@@ -263,30 +271,365 @@ export const decodeLoadedSpace = (value: unknown): LoadedSpace => {
   };
 };
 
-export interface CommitRequestJson {
-  snapshot: SpaceSnapshot;
-  expectedRevision: string;
-}
+export type CommitRequestJson = {
+  changes: readonly (
+    | { kind: 'create'; spaceId: string; snapshot: SpaceSnapshot }
+    | { kind: 'update'; spaceId: string; snapshot: SpaceSnapshot; expectedRevision: string }
+    | { kind: 'delete'; spaceId: string; expectedRevision: string }
+  )[];
+};
 
-export const encodeCommitRequest = (
-  snapshot: SpaceSnapshot,
-  expectedRevision: bigint,
-): CommitRequestJson => ({
-  snapshot,
-  expectedRevision: expectedRevision.toString(),
+export const encodeCommitRequest = (request: SpaceCommit): CommitRequestJson => ({
+  changes: request.changes.map((change) =>
+    change.kind === 'create'
+      ? change
+      : { ...change, expectedRevision: change.expectedRevision.toString() },
+  ),
 });
 
-export interface DecodedCommitRequest {
-  snapshot: SpaceSnapshot;
-  expectedRevision: bigint;
-}
+export type DecodedCommitRequest = SpaceCommit;
 
 export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
-  const record = exactRecord(value, ['snapshot', 'expectedRevision'], 'commit request');
+  const request = exactRecord(value, ['changes'], 'commit request');
+  if (!Array.isArray(request['changes'])) throw new Error('commit changes must be an array');
+  const changes = request['changes'].map((value: unknown): SpaceChange => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw new Error('commit change must be an object');
+    }
+    // The discriminant only, so the arm below can name the exact keys its shape
+    // allows. `exactRecord` cannot do it here — the allowed set is not known
+    // until `kind` is read, and passing the value's own keys would make the
+    // exactness check hold for every input.
+    const kind: unknown = Object.hasOwn(value, 'kind')
+      ? Object.getOwnPropertyDescriptor(value, 'kind')?.value
+      : undefined;
+    if (kind === 'create') {
+      const change = exactRecord(value, ['kind', 'spaceId', 'snapshot'], 'create change');
+      return {
+        kind,
+        spaceId: uuidSchema.parse(change['spaceId']),
+        snapshot: decodeSnapshot(change['snapshot'], 'create change'),
+      };
+    }
+    if (kind === 'update') {
+      const change = exactRecord(
+        value,
+        ['kind', 'spaceId', 'snapshot', 'expectedRevision'],
+        'update change',
+      );
+      return {
+        kind,
+        spaceId: uuidSchema.parse(change['spaceId']),
+        snapshot: decodeSnapshot(change['snapshot'], 'update change'),
+        expectedRevision: decodeRevision(change['expectedRevision'], 'expectedRevision'),
+      };
+    }
+    if (kind === 'delete') {
+      const change = exactRecord(value, ['kind', 'spaceId', 'expectedRevision'], 'delete change');
+      return {
+        kind,
+        spaceId: uuidSchema.parse(change['spaceId']),
+        expectedRevision: decodeRevision(change['expectedRevision'], 'expectedRevision'),
+      };
+    }
+    throw new Error('commit change has an unknown kind');
+  });
+  const [first, ...rest] = changes;
+  if (first === undefined) throw new Error('commit changes must be non-empty');
+  const named = new Set<UUID>();
+  for (const change of changes) {
+    if (named.has(change.spaceId))
+      throw new Error(`Space ${change.spaceId} is named more than once`);
+    named.add(change.spaceId);
+    if (change.kind !== 'delete' && change.snapshot.id !== change.spaceId) {
+      throw new Error(`Change Space id ${change.spaceId} does not match its snapshot`);
+    }
+  }
+  return { changes: [first, ...rest] };
+};
+
+export interface LoadedAggregateJson {
+  metaSpaceId: string;
+  spaces: readonly LoadedSpaceJson[];
+}
+
+export const encodeLoadedAggregate = (aggregate: LoadedAggregate): LoadedAggregateJson => ({
+  metaSpaceId: aggregate.metaSpaceId,
+  spaces: aggregate.spaces.map(encodeLoadedSpace),
+});
+
+export const decodeLoadedAggregate = (value: unknown): LoadedAggregate => {
+  const record = exactRecord(value, ['metaSpaceId', 'spaces'], 'loaded aggregate');
+  if (!Array.isArray(record['spaces'])) throw new Error('loaded aggregate spaces must be an array');
   return {
-    snapshot: decodeSnapshot(record['snapshot'], 'commit request'),
-    expectedRevision: decodeRevision(record['expectedRevision'], 'expectedRevision'),
+    metaSpaceId: uuidSchema.parse(record['metaSpaceId']),
+    spaces: record['spaces'].map(decodeLoadedSpace),
   };
+};
+
+type Committed = Extract<CommitResult, { kind: 'committed' }>;
+type Conflict = Extract<CommitResult, { kind: 'conflict' }>;
+type AggregateRefused = Extract<CommitResult, { kind: 'aggregate-refused' }>;
+
+type JsonWire<T> = T extends UUID
+  ? string
+  : T extends readonly (infer Item)[]
+    ? readonly JsonWire<Item>[]
+    : T extends object
+      ? { readonly [Key in keyof T]: JsonWire<T[Key]> }
+      : T;
+
+export interface CommitResponseBody {
+  readonly revisions: readonly { readonly spaceId: string; readonly revision: string }[];
+  readonly deletedSpaceIds: readonly string[];
+}
+
+export const encodeCommitResponse = (result: Committed): CommitResponseBody => ({
+  revisions: result.revisions.map(({ spaceId, revision }) => ({
+    spaceId,
+    revision: revision.toString(),
+  })),
+  deletedSpaceIds: result.deletedSpaceIds,
+});
+
+export const decodeCommitResponse = (value: unknown): Committed => {
+  const record = exactRecord(value, ['revisions', 'deletedSpaceIds'], 'commit response');
+  if (!Array.isArray(record['revisions'])) throw new Error('commit revisions must be an array');
+  if (!Array.isArray(record['deletedSpaceIds'])) {
+    throw new Error('deleted Space ids must be an array');
+  }
+  return {
+    kind: 'committed',
+    revisions: record['revisions'].map((entry) => {
+      const revision = exactRecord(entry, ['spaceId', 'revision'], 'committed Space revision');
+      return {
+        spaceId: uuidSchema.parse(revision['spaceId']),
+        revision: decodeRevision(revision['revision'], 'revision'),
+      };
+    }),
+    deletedSpaceIds: record['deletedSpaceIds'].map((id) => uuidSchema.parse(id)),
+  };
+};
+
+export interface CommitConflictBody {
+  readonly conflicts: readonly {
+    readonly spaceId: string;
+    readonly current: JsonWire<LoadedSpaceJson> | null;
+  }[];
+}
+
+export const encodeCommitConflict = (result: Conflict): CommitConflictBody => ({
+  conflicts: result.conflicts.map(({ spaceId, current }) => ({
+    spaceId,
+    current: current === undefined ? null : encodeLoadedSpace(current),
+  })),
+});
+
+export const decodeCommitConflict = (value: unknown): Conflict => {
+  const record = exactRecord(value, ['conflicts'], 'commit conflict');
+  if (!Array.isArray(record['conflicts']) || record['conflicts'].length === 0) {
+    throw new Error('commit conflicts must be a non-empty array');
+  }
+  return {
+    kind: 'conflict',
+    conflicts: record['conflicts'].map((entry) => {
+      const conflict = exactRecord(entry, ['spaceId', 'current'], 'Space conflict');
+      return {
+        spaceId: uuidSchema.parse(conflict['spaceId']),
+        current: conflict['current'] === null ? undefined : decodeLoadedSpace(conflict['current']),
+      };
+    }),
+  };
+};
+
+export interface CommitRefusalBody {
+  readonly errors: readonly JsonWire<SpaceAggregateError>[];
+}
+
+export const encodeCommitRefusal = (result: AggregateRefused): CommitRefusalBody => ({
+  errors: result.errors,
+});
+
+const requiredString = (value: unknown, label: string): string => {
+  if (typeof value !== 'string') throw new Error(`${label} must be a string`);
+  return value;
+};
+
+const requiredIndex = (value: unknown, label: string): number => {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative safe integer`);
+  }
+  return value;
+};
+
+const discriminant = (value: unknown, label: string): string => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value) || !('kind' in value)) {
+    throw new Error(`${label} must be an object with a kind`);
+  }
+  return requiredString(value.kind, `${label} kind`);
+};
+
+const decodeSpaceError = (value: unknown): SpaceError => {
+  const kind = discriminant(value, 'Space intake error');
+  switch (kind) {
+    case 'invalid-shape':
+    case 'unsupported-version':
+    case 'retired-space-graphs': {
+      const error = exactRecord(value, ['kind', 'message'], 'Space intake error');
+      return { kind, message: requiredString(error['message'], 'Space intake message') };
+    }
+    case 'missing-frontmatter':
+    case 'unterminated-frontmatter':
+    case 'invalid-yaml':
+    case 'invalid-frontmatter': {
+      const error = exactRecord(value, ['kind', 'path', 'message'], 'Card file error');
+      return {
+        kind,
+        path: requiredString(error['path'], 'Card file path'),
+        message: requiredString(error['message'], 'Card file message'),
+      };
+    }
+    case 'duplicate-card-id':
+    case 'duplicate-graph-id':
+    case 'duplicate-layout-id':
+    case 'space-view-id-collision':
+    case 'layout-member-missing-card':
+    case 'layout-active-graph-missing':
+    case 'layout-active-graph-outside-layout':
+    case 'graph-edge-missing-card':
+    case 'graph-edge-card-outside-layout':
+    case 'unresolved-default-renderer':
+    case 'duplicate-graph-edge':
+    case 'unresolved-alias-target':
+    case 'alias-self-reference':
+    case 'alias-targets-alias':
+    case 'alias-target-must-own-content':
+    case 'space-card-reference-cycle': {
+      const error = exactRecord(value, ['kind', 'ref', 'message'], 'Space reference error');
+      return {
+        kind,
+        ref: requiredString(error['ref'], 'Space reference'),
+        message: requiredString(error['message'], 'Space reference message'),
+      };
+    }
+    default:
+      throw new Error('Space intake error has an unknown kind');
+  }
+};
+
+const decodeSpaceCardLocation = (record: Record<string, unknown>) => ({
+  spaceId: uuidSchema.parse(record['spaceId']),
+  cardId: uuidSchema.parse(record['cardId']),
+  targetSpaceId: uuidSchema.parse(record['targetSpaceId']),
+});
+
+const decodeAggregateError = (value: unknown): SpaceAggregateError => {
+  const kind = discriminant(value, 'aggregate refusal');
+  switch (kind) {
+    case 'invalid-space-snapshot': {
+      const error = exactRecord(
+        value,
+        ['kind', 'snapshotIndex', 'errors'],
+        'invalid Space snapshot refusal',
+      );
+      if (!Array.isArray(error['errors'])) throw new Error('Space intake errors must be an array');
+      return {
+        kind,
+        snapshotIndex: requiredIndex(error['snapshotIndex'], 'snapshot index'),
+        errors: error['errors'].map(decodeSpaceError),
+      };
+    }
+    case 'duplicate-space-id': {
+      const error = exactRecord(
+        value,
+        ['kind', 'spaceId', 'snapshotIndexes'],
+        'duplicate Space refusal',
+      );
+      if (!Array.isArray(error['snapshotIndexes'])) {
+        throw new Error('snapshot indexes must be an array');
+      }
+      return {
+        kind,
+        spaceId: uuidSchema.parse(error['spaceId']),
+        snapshotIndexes: error['snapshotIndexes'].map((index) =>
+          requiredIndex(index, 'snapshot index'),
+        ),
+      };
+    }
+    case 'duplicate-card-id': {
+      const error = exactRecord(value, ['kind', 'cardId', 'spaceIds'], 'duplicate Card refusal');
+      if (!Array.isArray(error['spaceIds'])) throw new Error('Space ids must be an array');
+      return {
+        kind,
+        cardId: uuidSchema.parse(error['cardId']),
+        spaceIds: error['spaceIds'].map((id) => uuidSchema.parse(id)),
+      };
+    }
+    case 'meta-space-missing': {
+      const error = exactRecord(value, ['kind', 'metaSpaceId'], 'missing Meta Space refusal');
+      return { kind, metaSpaceId: uuidSchema.parse(error['metaSpaceId']) };
+    }
+    case 'space-card-target-missing':
+    case 'space-card-reference-cycle': {
+      const error = exactRecord(
+        value,
+        ['kind', 'spaceId', 'cardId', 'targetSpaceId'],
+        'Space Card refusal',
+      );
+      return { kind, ...decodeSpaceCardLocation(error) };
+    }
+    case 'ordinary-space-unreferenced': {
+      const error = exactRecord(value, ['kind', 'spaceId'], 'unreferenced Space refusal');
+      return { kind, spaceId: uuidSchema.parse(error['spaceId']) };
+    }
+    case 'space-card-space-view-missing': {
+      const error = exactRecord(
+        value,
+        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'spaceViewId'],
+        'Space Card Space View refusal',
+      );
+      return {
+        kind,
+        ...decodeSpaceCardLocation(error),
+        spaceViewId: uuidSchema.parse(error['spaceViewId']),
+      };
+    }
+    case 'space-card-graph-missing': {
+      const error = exactRecord(
+        value,
+        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'graphId'],
+        'Space Card Graph refusal',
+      );
+      return {
+        kind,
+        ...decodeSpaceCardLocation(error),
+        graphId: uuidSchema.parse(error['graphId']),
+      };
+    }
+    case 'space-card-graph-outside-space-view': {
+      const error = exactRecord(
+        value,
+        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'spaceViewId', 'graphId'],
+        'Space Card Graph membership refusal',
+      );
+      return {
+        kind,
+        ...decodeSpaceCardLocation(error),
+        spaceViewId: uuidSchema.parse(error['spaceViewId']),
+        graphId: uuidSchema.parse(error['graphId']),
+      };
+    }
+    default:
+      throw new Error('aggregate refusal has an unknown kind');
+  }
+};
+
+export const decodeCommitRefusal = (value: unknown): AggregateRefused => {
+  const record = exactRecord(value, ['errors'], 'commit refusal');
+  if (!Array.isArray(record['errors']) || record['errors'].length === 0) {
+    throw new Error('aggregate refusal errors must be a non-empty array');
+  }
+  return { kind: 'aggregate-refused', errors: record['errors'].map(decodeAggregateError) };
 };
 
 export const decodeSpaceSummaries = (value: unknown): readonly SpaceSummary[] => {

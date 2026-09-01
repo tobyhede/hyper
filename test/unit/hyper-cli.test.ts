@@ -2,7 +2,13 @@ import { access, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
-import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
+import type {
+  LoadedAggregate,
+  LoadedSpace,
+  RepositoryCommitResult,
+  SpaceCommit,
+  SpaceSummary,
+} from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCliMain } from '../../src/cli/main';
 import { runHyper, type CliIo } from '../../src/cli/run';
@@ -81,11 +87,12 @@ class ImportRepository implements SpaceRepository {
     throw new Error('Unexpected markExported call');
   }
 
-  commitSpace(
-    _snapshot: SpaceSnapshot,
-    _expectedRevision: bigint,
-  ): Promise<RepositoryCommitResult> {
-    throw new Error('Unexpected commitSpace call');
+  loadAggregate(): Promise<LoadedAggregate> {
+    throw new Error('Unexpected loadAggregate call');
+  }
+
+  commit(_request: SpaceCommit): Promise<RepositoryCommitResult> {
+    throw new Error('Unexpected commit call');
   }
 
   importSpaces(_input: readonly ImportSpace[], _mode: ImportMode): Promise<RepositoryImportResult> {
@@ -346,9 +353,21 @@ describe('runHyper', () => {
         ...storedSpace.snapshot,
         document: { ...storedSpace.snapshot.document, title: 'Edited during export' },
       };
-      await expect(repository.commitSpace(changed, 0n)).resolves.toEqual({
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: changed.id,
+              snapshot: changed,
+              expectedRevision: 0n,
+            },
+          ],
+        }),
+      ).resolves.toEqual({
         kind: 'committed',
-        revision: 1n,
+        revisions: [{ spaceId: changed.id, revision: 1n }],
+        deletedSpaceIds: [],
       });
       await markExported(id, revision);
     };

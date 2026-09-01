@@ -27,9 +27,21 @@ describe('e2e HTTP runtime', () => {
       ...loaded.snapshot,
       document: { ...loaded.snapshot.document, title: 'Changed only in first runtime' },
     };
-    await expect(first.commitSpace(changed, 0n)).resolves.toEqual({
+    await expect(
+      first.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: FIXTURE_ID,
+            snapshot: changed,
+            expectedRevision: 0n,
+          },
+        ],
+      }),
+    ).resolves.toEqual({
       kind: 'committed',
-      revision: 1n,
+      revisions: [{ spaceId: FIXTURE_ID, revision: 1n }],
+      deletedSpaceIds: [],
     });
 
     await expect(second.loadSpace(FIXTURE_ID)).resolves.toMatchObject({

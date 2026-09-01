@@ -1,6 +1,6 @@
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
-import { afterAll, afterEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import type {
   ImportMode,
@@ -21,10 +21,17 @@ expectTypeOf<Parameters<SpaceRepository['importSpaces']>[1]>().toEqualTypeOf<Imp
  * off, so one integration file at a time owns the single `DATABASE_URL`.
  */
 const clearHyperContent = async (): Promise<void> => {
+  await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
   for (const space of await db.orm.public.Space.all()) {
     await db.orm.public.Card.where({ spaceId: space.id }).deleteAll();
     await db.orm.public.Space.where({ id: space.id }).delete();
   }
+};
+
+const seedRepositoryState = async (metaSpaceId: UUID): Promise<void> => {
+  const current = await db.orm.public.RepositoryState.where({ singletonId: 1 }).first();
+  if (current !== null) return;
+  await db.orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId });
 };
 
 /*
@@ -34,9 +41,23 @@ const clearHyperContent = async (): Promise<void> => {
  * what a rejected batch leaves behind, and a per-id cleanup list would be
  * written from the same assumption the test is checking.
  */
+// Deliberately unseeded: a repository has to reach a committable state from an
+// empty store on its own, and every case here begins by importing the contract's
+// Meta Space. Seeding it by hand hid that the PostgreSQL adapter could not.
 spaceRepositoryContract('PostgresSpaceRepository', async () => {
   await clearHyperContent();
-  return { repository: new PostgresSpaceRepository(db), close: clearHyperContent };
+  const repository = new PostgresSpaceRepository(db);
+  const harness: SpaceRepository = {
+    entrySpaceId: () => repository.entrySpaceId(),
+    setEntrySpace: (id) => repository.setEntrySpace(id),
+    listSpaces: () => repository.listSpaces(),
+    loadSpace: (id) => repository.loadSpace(id),
+    loadAggregate: () => repository.loadAggregate(),
+    commit: (request) => repository.commit(request),
+    markExported: (id, revision) => repository.markExported(id, revision),
+    importSpaces: (input, mode) => repository.importSpaces(input, mode),
+  };
+  return { repository: harness, close: clearHyperContent };
 });
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -177,13 +198,20 @@ const idlessImport = (cardId: UUID): ImportSpace => ({
 describe('PostgresSpaceRepository', () => {
   const repository = new PostgresSpaceRepository(db);
   const createdSpaceIds = new Set<UUID>();
+  const commitSpace = (next: SpaceSnapshot, expectedRevision: bigint) =>
+    repository.commit({
+      changes: [{ kind: 'update', spaceId: next.id, snapshot: next, expectedRevision }],
+    });
 
   const trackImported = (result: RepositoryImportResult): void => {
     if (result.kind !== 'imported') return;
     for (const stored of result.spaces) createdSpaceIds.add(stored.snapshot.id);
   };
 
+  beforeEach(async () => seedRepositoryState(SPACE_ID));
+
   afterEach(async () => {
+    await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
     for (const id of createdSpaceIds) {
       await db.orm.public.Card.where({ spaceId: id }).delete();
       await db.orm.public.Space.where({ id }).delete();
@@ -233,9 +261,10 @@ describe('PostgresSpaceRepository', () => {
       ],
     };
 
-    expect(await repository.commitSpace(changed, 0n)).toEqual({
+    expect(await commitSpace(changed, 0n)).toEqual({
       kind: 'committed',
-      revision: 1n,
+      revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+      deletedSpaceIds: [],
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot: changed,
@@ -254,9 +283,10 @@ describe('PostgresSpaceRepository', () => {
       document: { ...snapshot.document, title: 'Edited during export' },
     };
 
-    await expect(repository.commitSpace(changed, exported.revision)).resolves.toEqual({
+    await expect(commitSpace(changed, exported.revision)).resolves.toEqual({
       kind: 'committed',
-      revision: 1n,
+      revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+      deletedSpaceIds: [],
     });
     await repository.markExported(SPACE_ID, exported.revision);
 
@@ -277,15 +307,16 @@ describe('PostgresSpaceRepository', () => {
       ...snapshot,
       document: { ...snapshot.document, title: 'Stale overwrite' },
     };
-    await repository.commitSpace(current, 0n);
+    await commitSpace(current, 0n);
 
-    expect(await repository.commitSpace(stale, 0n)).toEqual({
+    expect(await commitSpace(stale, 0n)).toEqual({
       kind: 'conflict',
-      current: {
-        snapshot: current,
-        revision: 1n,
-        exportedRevision: null,
-      },
+      conflicts: [
+        {
+          spaceId: SPACE_ID,
+          current: { snapshot: current, revision: 1n, exportedRevision: null },
+        },
+      ],
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot: current,
@@ -310,8 +341,11 @@ describe('PostgresSpaceRepository', () => {
     const writeRevisions = async () => {
       for (let revision = 1; revision <= 50; revision += 1) {
         await expect(
-          repository.commitSpace(atRevision(revision), BigInt(revision - 1)),
-        ).resolves.toMatchObject({ kind: 'committed', revision: BigInt(revision) });
+          commitSpace(atRevision(revision), BigInt(revision - 1)),
+        ).resolves.toMatchObject({
+          kind: 'committed',
+          revisions: [{ spaceId: SPACE_ID, revision: BigInt(revision) }],
+        });
       }
     };
     const readRevisions = async () => {
@@ -376,10 +410,9 @@ describe('PostgresSpaceRepository', () => {
       cards: [],
     };
 
-    expect(await repository.commitSpace(missing, 0n)).toEqual({
-      kind: 'rejected',
-      code: 'not-found',
-      message: `Space ${MISSING_SPACE_ID} does not exist`,
+    expect(await commitSpace(missing, 0n)).toEqual({
+      kind: 'conflict',
+      conflicts: [{ spaceId: MISSING_SPACE_ID, current: undefined }],
     });
     await expect(repository.loadSpace(MISSING_SPACE_ID)).resolves.toBeUndefined();
   });
@@ -408,9 +441,8 @@ describe('PostgresSpaceRepository', () => {
       },
     };
 
-    await expect(repository.commitSpace(invalid, 0n)).resolves.toMatchObject({
-      kind: 'rejected',
-      code: 'invalid-snapshot',
+    await expect(commitSpace(invalid, 0n)).resolves.toMatchObject({
+      kind: 'aggregate-refused',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot,
@@ -427,9 +459,8 @@ describe('PostgresSpaceRepository', () => {
       cards: [...snapshot.cards, otherSnapshot.cards[0]!],
     };
 
-    await expect(repository.commitSpace(claimed, 0n)).resolves.toMatchObject({
-      kind: 'rejected',
-      code: 'invalid-snapshot',
+    await expect(commitSpace(claimed, 0n)).resolves.toMatchObject({
+      kind: 'aggregate-refused',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot,
@@ -441,6 +472,103 @@ describe('PostgresSpaceRepository', () => {
       revision: 0n,
       exportedRevision: null,
     });
+  });
+
+  it('serializes concurrent topology commits so the loser observes the complete winner', async () => {
+    await repository.importSpaces([snapshot]);
+    const firstRepository = new PostgresSpaceRepository(db);
+    const secondRepository = new PostgresSpaceRepository(db);
+    const firstTarget: SpaceSnapshot = {
+      id: OTHER_SPACE_ID,
+      document: { version: 1, title: 'First target' },
+      cards: [],
+    };
+    const secondTarget: SpaceSnapshot = {
+      id: CONCURRENT_SPACE_ID,
+      document: { version: 1, title: 'Second target' },
+      cards: [],
+    };
+    const firstLinked: SpaceSnapshot = {
+      ...snapshot,
+      cards: [
+        ...snapshot.cards,
+        {
+          id: MISSING_CARD_ID,
+          document: {
+            title: 'First link',
+            kind: 'space',
+            spaceId: OTHER_SPACE_ID,
+          },
+        },
+      ],
+    };
+    const secondLinked: SpaceSnapshot = {
+      ...snapshot,
+      cards: [
+        ...snapshot.cards,
+        {
+          id: UNRESOLVED_CARD_ID,
+          document: {
+            title: 'Second link',
+            kind: 'space',
+            spaceId: CONCURRENT_SPACE_ID,
+          },
+        },
+      ],
+    };
+
+    const results = await Promise.all([
+      firstRepository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: firstLinked,
+            expectedRevision: 0n,
+          },
+          { kind: 'create', spaceId: OTHER_SPACE_ID, snapshot: firstTarget },
+        ],
+      }),
+      secondRepository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: secondLinked,
+            expectedRevision: 0n,
+          },
+          { kind: 'create', spaceId: CONCURRENT_SPACE_ID, snapshot: secondTarget },
+        ],
+      }),
+    ]);
+
+    expect(results.filter((result) => result.kind === 'committed')).toHaveLength(1);
+    expect(results.filter((result) => result.kind === 'conflict')).toHaveLength(1);
+    const firstWon = results[0].kind === 'committed';
+    const winningMeta = firstWon ? firstLinked : secondLinked;
+    const winningTarget = firstWon ? firstTarget : secondTarget;
+    const losingTargetId = firstWon ? CONCURRENT_SPACE_ID : OTHER_SPACE_ID;
+    expect(results).toContainEqual({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: SPACE_ID,
+          current: {
+            snapshot: winningMeta,
+            revision: 1n,
+            exportedRevision: null,
+          },
+        },
+      ],
+    });
+    await expect(repository.loadAggregate()).resolves.toEqual({
+      metaSpaceId: SPACE_ID,
+      spaces: [
+        { snapshot: winningMeta, revision: 1n, exportedRevision: null },
+        { snapshot: winningTarget, revision: 0n, exportedRevision: null },
+      ],
+    });
+    await expect(repository.loadSpace(losingTargetId)).resolves.toBeUndefined();
   });
 
   it('rejects an existing space identity without changing stored content', async () => {
@@ -725,13 +853,14 @@ describe('PostgresSpaceRepository', () => {
     await repository.importSpaces([snapshot]);
     const unsafeRevision = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
 
-    await expect(repository.commitSpace(snapshot, unsafeRevision)).resolves.toEqual({
+    await expect(commitSpace(snapshot, unsafeRevision)).resolves.toEqual({
       kind: 'conflict',
-      current: {
-        snapshot,
-        revision: 0n,
-        exportedRevision: null,
-      },
+      conflicts: [
+        {
+          spaceId: SPACE_ID,
+          current: { snapshot, revision: 0n, exportedRevision: null },
+        },
+      ],
     });
   });
 

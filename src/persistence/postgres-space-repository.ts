@@ -10,8 +10,15 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot } from '@project/graph';
-import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
+import { loadSpaceAggregate as validateSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
+import type {
+  LoadedAggregate,
+  LoadedSpace,
+  RepositoryCommitResult,
+  SpaceCommit,
+  SpaceConflict,
+  SpaceSummary,
+} from '@project/persistence';
 import { db } from '../prisma/db';
 import type { ImportMode, RepositoryImportResult, SpaceRepository } from './space-repository';
 
@@ -221,13 +228,6 @@ const validateImportIdentities = (spaces: readonly ImportSpace[]): void => {
   }
 };
 
-const validateSnapshotIdentities = (snapshot: SpaceSnapshot): void => {
-  const duplicate = duplicateIdentity([snapshot]);
-  if (duplicate !== undefined) {
-    throw new SnapshotValidationError(`Duplicate ${duplicate.kind} identity "${duplicate.id}"`);
-  }
-};
-
 /**
  * Fill in every id the import input left out, producing the fully identified
  * aggregate that domain intake and the writes below both require.
@@ -292,6 +292,82 @@ const loadSpaceAggregate = async (orm: Orm, id: UUID): Promise<LoadedSpace | und
   };
 };
 
+const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
+  const stored = await orm.public.Space.orderBy((space) => space.id.asc())
+    .include('cards', (cards) => cards.select('id', 'document').orderBy((card) => card.id.asc()))
+    .all();
+
+  return stored.map((space) => ({
+    snapshot: parseSnapshot({
+      id: space.id,
+      document: space.document,
+      cards: space.cards.map((card) => ({ id: card.id, document: card.document })),
+    }),
+    revision: toRevision(space.revision),
+    exportedRevision: toOptionalRevision(space.exportedRevision),
+  }));
+};
+
+/**
+ * Take the singleton row's write lock, and answer `undefined` when there is no
+ * row to take.
+ *
+ * A repository that has only been migrated has no Meta Space, and there is then
+ * nothing to serialize integrity-affecting transactions on and no aggregate to
+ * validate. That is not a reason to fail a commit outright: identity and
+ * revision conflicts are answerable without Meta, and `MemorySpaceRepository`
+ * answers them first. Requiring Meta here instead made a commit against an
+ * unbootstrapped database throw, which the HTTP host reports as a retryable
+ * 503.
+ */
+const lockRepositoryState = async (orm: Orm): Promise<UUID | undefined> => {
+  const state = await orm.public.RepositoryState.where({ singletonId: 1 }).first();
+  if (state === null) return undefined;
+  const metaSpaceId = uuidSchema.parse(state.metaSpaceId);
+  const locked = await orm.public.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId });
+  if (locked === null) throw new Error('Repository state disappeared while locking it');
+  return metaSpaceId;
+};
+
+const replaceStoredSpace = async (
+  orm: Orm,
+  snapshot: SpaceSnapshot,
+  revision: bigint,
+): Promise<void> => {
+  const updated = await orm.public.Space.where({ id: snapshot.id }).update({
+    document: toJsonValue(snapshot.document),
+    revision: toDatabaseRevision(revision),
+  });
+  if (updated === null) throw new Error(`Space ${snapshot.id} disappeared during commit`);
+  await upsertCards(orm, snapshot);
+  const ownedCards = orm.public.Card.where({ spaceId: snapshot.id });
+  if (snapshot.cards.length === 0) await ownedCards.delete();
+  else {
+    await ownedCards.where((card) => card.id.notIn(snapshot.cards.map(({ id }) => id))).delete();
+  }
+};
+
+const createStoredSpace = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
+  await orm.public.Space.create({
+    id: snapshot.id,
+    document: toJsonValue(snapshot.document),
+    revision: 0,
+  });
+  await importCards(orm, snapshot);
+};
+
+const commitIdentityRefusal = (request: SpaceCommit): string | undefined => {
+  const ids = new Set<UUID>();
+  for (const change of request.changes) {
+    if (ids.has(change.spaceId)) return `Space ${change.spaceId} is named more than once`;
+    ids.add(change.spaceId);
+    if (change.kind !== 'delete' && change.snapshot.id !== change.spaceId) {
+      return `Change Space id ${change.spaceId} does not match its snapshot`;
+    }
+  }
+  return undefined;
+};
+
 const upsertCards = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
   for (const card of snapshot.cards) {
     const stored = await orm.public.Card.upsert({
@@ -335,6 +411,28 @@ const truncateHyperContent = async (orm: Orm): Promise<void> => {
     await orm.public.Card.where({ spaceId: space.id }).deleteAll();
     await orm.public.Space.where({ id: space.id }).delete();
   }
+  // Meta state names a Space, so it cannot outlive the Spaces. Leaving the row
+  // behind makes every later commit fail complete intake with
+  // `meta-space-missing`, naming a Space nothing can restore.
+  await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
+};
+
+/**
+ * Establish Meta state when the repository has none, and leave it alone
+ * otherwise.
+ *
+ * The singleton row is what `commit` and `loadAggregate` lock and read, and the
+ * migration deliberately creates the table empty — a migration has no Space to
+ * name. So the paths that first put a Space in the repository are what
+ * establish it: bootstrap and administrative import both go through these, the
+ * way `MemorySpaceRepository` does. Choosing the Meta Space properly, and
+ * retiring the Entry flag it stands in for here, is `v1-release/01`.
+ */
+const establishMetaSpace = async (orm: Orm, candidate: UUID | undefined): Promise<void> => {
+  if (candidate === undefined) return;
+  const existing = await orm.public.RepositoryState.where({ singletonId: 1 }).first();
+  if (existing !== null) return;
+  await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: candidate });
 };
 
 export class PostgresSpaceRepository implements SpaceRepository {
@@ -361,6 +459,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
       }
       const updated = await orm.public.Space.where({ id }).update({ entry: true });
       if (updated === null) throw new Error(`Space ${id} disappeared while becoming Entry Space`);
+      await establishMetaSpace(orm, id);
     });
   }
 
@@ -377,6 +476,18 @@ export class PostgresSpaceRepository implements SpaceRepository {
     return loadSpaceAggregate(this.#database.orm, id);
   }
 
+  loadAggregate(): Promise<LoadedAggregate> {
+    return this.#database.transaction(async ({ orm }) => {
+      const metaSpaceId = await lockRepositoryState(orm);
+      // A complete read has no answer without Meta, unlike a commit, which can
+      // still name a conflict. Nothing establishes it but the paths that put a
+      // Space in the repository, so reaching here without one is a broken
+      // invariant rather than a request the caller got wrong.
+      if (metaSpaceId === undefined) throw new Error('Repository state has not been bootstrapped');
+      return { metaSpaceId, spaces: await loadEverySpace(orm) };
+    });
+  }
+
   async markExported(id: UUID, revision: bigint): Promise<void> {
     const updated = await this.#database.orm.public.Space.where({ id }).update({
       exportedRevision: toDatabaseRevision(revision),
@@ -384,74 +495,119 @@ export class PostgresSpaceRepository implements SpaceRepository {
     if (updated === null) throw new Error(`Space ${id} does not exist`);
   }
 
-  async commitSpace(
-    snapshot: SpaceSnapshot,
-    expectedRevision: bigint,
-  ): Promise<RepositoryCommitResult> {
-    let accepted: SpaceSnapshot;
+  async commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    const refusal = commitIdentityRefusal(request);
+    if (refusal !== undefined)
+      return { kind: 'rejected', code: 'invalid-commit', message: refusal };
+
     try {
-      accepted = parseSnapshot(snapshot);
-      validateSnapshotIdentities(accepted);
+      return await this.#commitInTransaction(request);
     } catch (error) {
-      if (error instanceof SnapshotValidationError) {
-        return rejectInvalidSnapshot(error);
+      // A Card the commit writes is still owned by a Space the same commit did
+      // not release. Complete intake cannot see it — the candidate aggregate is
+      // consistent and the collision only exists in the stored rows the write
+      // loop meets in request order. It is permanent, so it has to leave here
+      // as a rejection: escaping instead becomes 503 `persistence-unavailable`,
+      // which the client retries forever. `importSpaces` answers the same
+      // error the same way.
+      if (error instanceof CardOwnershipError) {
+        return { kind: 'rejected', code: 'invalid-commit', message: error.message };
       }
       throw error;
     }
-    const databaseExpectedRevision = toDatabaseRevision(expectedRevision);
-    const revision = expectedRevision + 1n;
-    const databaseRevision = toDatabaseRevision(revision);
+  }
 
-    let outcome: { kind: 'committed'; revision: bigint } | { kind: 'stale' };
-    try {
-      outcome = await this.#database.transaction(async ({ orm }) => {
-        const updated = await orm.public.Space.where({ id: accepted.id })
-          .where({ revision: databaseExpectedRevision })
-          .update({
-            document: toJsonValue(accepted.document),
-            revision: databaseRevision,
+  #commitInTransaction(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    return this.#database.transaction(async ({ orm }) => {
+      const metaSpaceId = await lockRepositoryState(orm);
+      const stored = await loadEverySpace(orm);
+      const byId = new Map(stored.map((space) => [space.snapshot.id, space]));
+      const conflicts: SpaceConflict[] = [];
+      for (const change of request.changes) {
+        const current = byId.get(change.spaceId);
+        const stale =
+          change.kind === 'create'
+            ? current !== undefined
+            : current?.revision !== change.expectedRevision;
+        if (stale) conflicts.push({ spaceId: change.spaceId, current });
+      }
+      if (conflicts.length > 0) return { kind: 'conflict', conflicts };
+
+      const candidate = new Map(byId);
+      for (const change of request.changes) {
+        if (change.kind === 'delete') candidate.delete(change.spaceId);
+        else {
+          candidate.set(change.spaceId, {
+            snapshot: structuredClone(change.snapshot),
+            revision: change.kind === 'create' ? 0n : change.expectedRevision + 1n,
+            exportedRevision: byId.get(change.spaceId)?.exportedRevision ?? null,
           });
-        // A stale write is reported, not resolved here. The conflict response
-        // needs the current aggregate, and reading it below rather than inside
-        // this callback both closes the write transaction first and answers
-        // from committed state.
-        if (updated === null) return { kind: 'stale' };
-
-        await upsertCards(orm, accepted);
-
-        const ownedCards = orm.public.Card.where({ spaceId: accepted.id });
-        if (accepted.cards.length === 0) {
-          await ownedCards.delete();
-        } else {
-          await ownedCards
-            .where((card) => card.id.notIn(accepted.cards.map(({ id }) => id)))
-            .delete();
         }
-
-        return { kind: 'committed', revision };
-      });
-    } catch (error) {
-      if (error instanceof CardOwnershipError) {
+      }
+      // Answered after the conflicts, exactly as `MemorySpaceRepository` does:
+      // a change set naming a Space the store does not hold is a conflict
+      // whether or not Meta has been established, and only what follows needs a
+      // complete aggregate to check.
+      if (metaSpaceId === undefined) {
         return {
           kind: 'rejected',
-          code: 'invalid-snapshot',
-          message: error.message,
+          code: 'invalid-commit',
+          message: 'The repository has no Meta Space',
         };
       }
-      throw error;
-    }
+      /*
+       * Only a reference the caller did not submit is authoritative state, and
+       * only that makes an incomplete deletion a conflict it can resolve by
+       * reloading. A reference the caller kept in its own change set is its own
+       * proposal, and answering `conflict` for it cannot be recovered from: the
+       * reload returns the target at the revision the caller already holds, so
+       * the identical change set conflicts again, forever. That falls through
+       * to complete intake below and is refused. `memory.ts` draws the same
+       * line, and `repository-contract.ts` holds both to it.
+       */
+      const changedIds = new Set(request.changes.map((change) => change.spaceId));
+      const incompleteDeletes = request.changes.flatMap((change) => {
+        if (change.kind !== 'delete') return [];
+        const stillReferenced = [...candidate.values()].some(
+          ({ snapshot }) =>
+            !changedIds.has(snapshot.id) &&
+            snapshot.cards.some(
+              (card) => card.document.kind === 'space' && card.document.spaceId === change.spaceId,
+            ),
+        );
+        return stillReferenced
+          ? [{ spaceId: change.spaceId, current: byId.get(change.spaceId) }]
+          : [];
+      });
+      if (incompleteDeletes.length > 0) {
+        return { kind: 'conflict', conflicts: incompleteDeletes };
+      }
+      const aggregate = validateSpaceAggregate({
+        metaSpaceId,
+        snapshots: [...candidate.values()].map(({ snapshot }) => snapshot),
+      });
+      if (!aggregate.ok) return { kind: 'aggregate-refused', errors: aggregate.errors };
 
-    if (outcome.kind === 'committed') return outcome;
-
-    const current = await loadSpaceAggregate(this.#database.orm, accepted.id);
-    if (current === undefined) {
-      return {
-        kind: 'rejected',
-        code: 'not-found',
-        message: `Space ${accepted.id} does not exist`,
-      };
-    }
-    return { kind: 'conflict', current };
+      const revisions: { spaceId: UUID; revision: bigint }[] = [];
+      const deletedSpaceIds: UUID[] = [];
+      for (const change of request.changes) {
+        if (change.kind === 'delete') {
+          await orm.public.Card.where({ spaceId: change.spaceId }).deleteAll();
+          const deleted = await orm.public.Space.where({ id: change.spaceId }).delete();
+          if (deleted === null)
+            throw new Error(`Space ${change.spaceId} disappeared during commit`);
+          deletedSpaceIds.push(change.spaceId);
+        } else if (change.kind === 'create') {
+          await createStoredSpace(orm, change.snapshot);
+          revisions.push({ spaceId: change.spaceId, revision: 0n });
+        } else {
+          const revision = change.expectedRevision + 1n;
+          await replaceStoredSpace(orm, change.snapshot, revision);
+          revisions.push({ spaceId: change.spaceId, revision });
+        }
+      }
+      return { kind: 'committed', revisions, deletedSpaceIds };
+    });
   }
 
   async importSpaces(
@@ -546,6 +702,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
           imported.push(stored);
         }
 
+        await establishMetaSpace(orm, imported[0]?.snapshot.id);
         return { kind: 'imported', spaces: imported };
       });
     } catch (error) {

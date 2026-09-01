@@ -35,12 +35,28 @@ export const spaceBackendContract = (
       );
       await expect(harness.backend.loadSpace(SPACE_ID)).resolves.toEqual(contractLoaded);
       await expect(harness.backend.loadSpace(MISSING_ID)).resolves.toBeUndefined();
+      await expect(harness.backend.loadAggregate()).resolves.toEqual({
+        metaSpaceId: SPACE_ID,
+        spaces: [contractLoaded],
+      });
 
       const changed = structuredClone(contractLoaded.snapshot);
       changed.document.title = 'Changed';
-      await expect(harness.backend.commitSpace(changed, 9_007_199_254_740_993n)).resolves.toEqual({
+      await expect(
+        harness.backend.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: changed,
+              expectedRevision: 9_007_199_254_740_993n,
+            },
+          ],
+        }),
+      ).resolves.toEqual({
         kind: 'committed',
-        revision: 9_007_199_254_740_994n,
+        revisions: [{ spaceId: SPACE_ID, revision: 9_007_199_254_740_994n }],
+        deletedSpaceIds: [],
       });
       await expect(harness.backend.loadSpace(SPACE_ID)).resolves.toEqual({
         snapshot: changed,
@@ -48,14 +64,28 @@ export const spaceBackendContract = (
         exportedRevision: 9_007_199_254_740_992n,
       });
       await expect(
-        harness.backend.commitSpace(contractLoaded.snapshot, 9_007_199_254_740_993n),
+        harness.backend.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: contractLoaded.snapshot,
+              expectedRevision: 9_007_199_254_740_993n,
+            },
+          ],
+        }),
       ).resolves.toEqual({
         kind: 'conflict',
-        current: {
-          snapshot: changed,
-          revision: 9_007_199_254_740_994n,
-          exportedRevision: 9_007_199_254_740_992n,
-        },
+        conflicts: [
+          {
+            spaceId: SPACE_ID,
+            current: {
+              snapshot: changed,
+              revision: 9_007_199_254_740_994n,
+              exportedRevision: 9_007_199_254_740_992n,
+            },
+          },
+        ],
       });
     } finally {
       await harness.close();
@@ -79,8 +109,17 @@ export const spaceBackendContract = (
         },
       ];
       await expect(
-        harness.backend.commitSpace(invalid, 9_007_199_254_740_993n),
-      ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'invalid-snapshot' });
+        harness.backend.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: invalid,
+              expectedRevision: 9_007_199_254_740_993n,
+            },
+          ],
+        }),
+      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
     } finally {
       await harness.close();
     }

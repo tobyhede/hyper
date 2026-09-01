@@ -25,8 +25,8 @@ export type ImportMode = 'insert' | 'truncate';
  * The server-side seam: everything the HTTP application consumes, plus the two
  * members only the CLI reaches for.
  *
- * Extension, not a second declaration. `listSpaces`, `loadSpace` and
- * `commitSpace` are `SpaceResourceRepository`'s, so a change to any of them
+ * Extension, not a second declaration. `listSpaces`, `loadSpace`,
+ * `loadAggregate` and `commit` are `SpaceResourceRepository`'s, so a change to any of them
  * cannot leave the two sides disagreeing — and the browser still cannot name
  * import or export, because the seam the Fetch application takes does not
  * declare them.

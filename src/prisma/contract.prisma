@@ -17,6 +17,13 @@ model Space {
   @@map("spaces")
 }
 
+model RepositoryState {
+  singletonId Int  @id @default(1) @map("singleton_id")
+  metaSpaceId Uuid @map("meta_space_id")
+
+  @@map("repository_state")
+}
+
 model Card {
   id        Uuid     @id @default(dbgenerated("gen_random_uuid()"))
   spaceId   Uuid     @map("space_id")

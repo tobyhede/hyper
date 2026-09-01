@@ -1,13 +1,23 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { LoadedSpace } from '../src/backend';
 import {
+  decodeCommitConflict,
+  decodeCommitRefusal,
+  decodeCommitResponse,
   decodeCommitRequest,
   decodeProblemDetails,
   decodeCommittedRevision,
+  decodeLoadedAggregate,
   decodeLoadedSpace,
   decodeSpaceSummaries,
+  encodeCommitConflict,
+  encodeCommitRefusal,
+  encodeCommitResponse,
+  encodeCommitRequest,
+  encodeLoadedAggregate,
   encodeProblemDetails,
   encodeLoadedSpace,
   problemCatalogue,
@@ -31,6 +41,218 @@ const overTheWire = (loaded: LoadedSpace): LoadedSpace =>
   decodeLoadedSpace(JSON.parse(JSON.stringify(encodeLoadedSpace(loaded))) as unknown);
 
 const BIGINT_MAX = 9_223_372_036_854_775_807n;
+
+describe('aggregate wire protocol', () => {
+  const loaded: LoadedSpace = { snapshot, revision: BIGINT_MAX, exportedRevision: null };
+  const secondId = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+  const second: LoadedSpace = {
+    ...loaded,
+    snapshot: { ...snapshot, id: secondId },
+  };
+
+  it('round-trips complete reads, authored commits, successes, and complete conflicts', () => {
+    const aggregate = { metaSpaceId: SPACE_ID, spaces: [loaded, second] };
+    expect(decodeLoadedAggregate(encodeLoadedAggregate(aggregate))).toEqual(aggregate);
+
+    const request = {
+      changes: [
+        {
+          kind: 'update' as const,
+          spaceId: SPACE_ID,
+          snapshot,
+          expectedRevision: BIGINT_MAX,
+        },
+        { kind: 'delete' as const, spaceId: secondId, expectedRevision: 7n },
+      ] as const,
+    };
+    expect(decodeCommitRequest(encodeCommitRequest(request))).toEqual(request);
+
+    const committed = {
+      kind: 'committed' as const,
+      revisions: [{ spaceId: SPACE_ID, revision: BIGINT_MAX }],
+      deletedSpaceIds: [secondId],
+    };
+    expect(decodeCommitResponse(encodeCommitResponse(committed))).toEqual(committed);
+
+    const conflict = {
+      kind: 'conflict' as const,
+      conflicts: [
+        { spaceId: SPACE_ID, current: loaded },
+        { spaceId: secondId, current: undefined },
+      ],
+    };
+    expect(decodeCommitConflict(encodeCommitConflict(conflict))).toEqual(conflict);
+  });
+
+  it('strictly rejects empty, duplicate, mismatched, and extra-field changes', () => {
+    expect(() => decodeCommitRequest({ changes: [] })).toThrow('non-empty');
+    expect(() =>
+      decodeCommitRequest({
+        changes: [
+          { kind: 'delete', spaceId: SPACE_ID, expectedRevision: '1' },
+          { kind: 'delete', spaceId: SPACE_ID, expectedRevision: '1' },
+        ],
+      }),
+    ).toThrow('more than once');
+    expect(() =>
+      decodeCommitRequest({
+        changes: [{ kind: 'update', spaceId: secondId, snapshot, expectedRevision: '1' }],
+      }),
+    ).toThrow('does not match');
+    expect(() =>
+      decodeCommitRequest({
+        changes: [{ kind: 'delete', spaceId: SPACE_ID, expectedRevision: '1', extra: 1 }],
+      }),
+    ).toThrow('unexpected fields');
+  });
+
+  it('round-trips stable aggregate refusal identities and locations', () => {
+    const refusal = {
+      kind: 'aggregate-refused' as const,
+      errors: [
+        {
+          kind: 'space-card-target-missing' as const,
+          spaceId: SPACE_ID,
+          cardId: CARD_ID,
+          targetSpaceId: secondId,
+        },
+      ],
+    };
+
+    expect(decodeCommitRefusal(encodeCommitRefusal(refusal))).toEqual(refusal);
+  });
+
+  it('round-trips every aggregate and nested Space intake refusal identity', () => {
+    const described = { ref: 'ref', message: 'message' };
+    const intakeErrors: SpaceError[] = [
+      { kind: 'invalid-shape', message: 'message' },
+      { kind: 'unsupported-version', message: 'message' },
+      { kind: 'retired-space-graphs', message: 'message' },
+      { kind: 'missing-frontmatter', path: 'card.md', message: 'message' },
+      { kind: 'unterminated-frontmatter', path: 'card.md', message: 'message' },
+      { kind: 'invalid-yaml', path: 'card.md', message: 'message' },
+      { kind: 'invalid-frontmatter', path: 'card.md', message: 'message' },
+      { kind: 'duplicate-card-id', ...described },
+      { kind: 'duplicate-graph-id', ...described },
+      { kind: 'duplicate-layout-id', ...described },
+      { kind: 'space-view-id-collision', ...described },
+      { kind: 'layout-member-missing-card', ...described },
+      { kind: 'layout-active-graph-missing', ...described },
+      { kind: 'layout-active-graph-outside-layout', ...described },
+      { kind: 'graph-edge-missing-card', ...described },
+      { kind: 'graph-edge-card-outside-layout', ...described },
+      { kind: 'unresolved-default-renderer', ...described },
+      { kind: 'duplicate-graph-edge', ...described },
+      { kind: 'unresolved-alias-target', ...described },
+      { kind: 'alias-self-reference', ...described },
+      { kind: 'alias-targets-alias', ...described },
+      { kind: 'alias-target-must-own-content', ...described },
+      { kind: 'space-card-reference-cycle', ...described },
+    ];
+    const location = { spaceId: SPACE_ID, cardId: CARD_ID, targetSpaceId: secondId };
+    const errors: SpaceAggregateError[] = [
+      { kind: 'invalid-space-snapshot', snapshotIndex: 0, errors: intakeErrors },
+      { kind: 'duplicate-space-id', spaceId: SPACE_ID, snapshotIndexes: [0, 2] },
+      { kind: 'duplicate-card-id', cardId: CARD_ID, spaceIds: [SPACE_ID, secondId] },
+      { kind: 'meta-space-missing', metaSpaceId: SPACE_ID },
+      { kind: 'space-card-target-missing', ...location },
+      { kind: 'space-card-reference-cycle', ...location },
+      { kind: 'ordinary-space-unreferenced', spaceId: secondId },
+      { kind: 'space-card-space-view-missing', ...location, spaceViewId: secondId },
+      { kind: 'space-card-graph-missing', ...location, graphId: secondId },
+      {
+        kind: 'space-card-graph-outside-space-view',
+        ...location,
+        spaceViewId: SPACE_ID,
+        graphId: secondId,
+      },
+    ];
+    const refusal = { kind: 'aggregate-refused' as const, errors };
+
+    expect(decodeCommitRefusal(encodeCommitRefusal(refusal))).toEqual(refusal);
+  });
+
+  it('rejects unknown aggregate refusal identities and fields', () => {
+    expect(() => decodeCommitRefusal({ errors: [{ kind: 'invented' }] })).toThrow('unknown kind');
+    expect(() =>
+      decodeCommitRefusal({
+        errors: [
+          {
+            kind: 'ordinary-space-unreferenced',
+            spaceId: SPACE_ID,
+            extra: true,
+          },
+        ],
+      }),
+    ).toThrow('unexpected fields');
+  });
+
+  it('strictly rejects malformed aggregate refusal containers and nested values', () => {
+    const malformed = [
+      { errors: [] },
+      { errors: 'nope' },
+      { errors: [null] },
+      { errors: [{ kind: 7 }] },
+      { errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: -1, errors: [] }] },
+      { errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0, errors: 'nope' }] },
+      {
+        errors: [
+          {
+            kind: 'invalid-space-snapshot',
+            snapshotIndex: 0,
+            errors: [{ kind: 'invalid-shape', message: 7 }],
+          },
+        ],
+      },
+      {
+        errors: [
+          {
+            kind: 'invalid-space-snapshot',
+            snapshotIndex: 0,
+            errors: [{ kind: 'invalid-yaml', path: 7, message: 'message' }],
+          },
+        ],
+      },
+      {
+        errors: [
+          {
+            kind: 'invalid-space-snapshot',
+            snapshotIndex: 0,
+            errors: [{ kind: 'duplicate-card-id', ref: 7, message: 'message' }],
+          },
+        ],
+      },
+      {
+        errors: [
+          {
+            kind: 'invalid-space-snapshot',
+            snapshotIndex: 0,
+            errors: [{ kind: 'invented' }],
+          },
+        ],
+      },
+      { errors: [{ kind: 'duplicate-space-id', spaceId: SPACE_ID, snapshotIndexes: 'nope' }] },
+      { errors: [{ kind: 'duplicate-space-id', spaceId: SPACE_ID, snapshotIndexes: [1.5] }] },
+      { errors: [{ kind: 'duplicate-card-id', cardId: CARD_ID, spaceIds: 'nope' }] },
+    ];
+
+    for (const value of malformed) expect(() => decodeCommitRefusal(value)).toThrow();
+  });
+
+  it('strictly rejects malformed aggregate, success, and conflict arrays', () => {
+    expect(() => decodeLoadedAggregate({ metaSpaceId: SPACE_ID, spaces: 'nope' })).toThrow(
+      'must be an array',
+    );
+    expect(() => decodeCommitResponse({ revisions: 'nope', deletedSpaceIds: [] })).toThrow(
+      'must be an array',
+    );
+    expect(() => decodeCommitResponse({ revisions: [], deletedSpaceIds: 'nope' })).toThrow(
+      'must be an array',
+    );
+    expect(() => decodeCommitConflict({ conflicts: [] })).toThrow('non-empty array');
+    expect(() => decodeSpaceSummaries('nope')).toThrow('must be an array');
+  });
+});
 
 describe('revision decoding', () => {
   it('rejects a revision longer than a PostgreSQL bigint can be', () => {
@@ -208,9 +430,11 @@ describe('Problem Details', () => {
   });
 
   it('falls back to "snapshot" when a schema failure has no field path', () => {
-    expect(() => decodeCommitRequest({ snapshot: null, expectedRevision: '0' })).toThrow(
-      /snapshot is invalid: snapshot /,
-    );
+    expect(() =>
+      decodeCommitRequest({
+        changes: [{ kind: 'create', spaceId: SPACE_ID, snapshot: null }],
+      }),
+    ).toThrow(/snapshot is invalid: snapshot /);
   });
 });
 

@@ -32,6 +32,10 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'A Card keeps the kind it was created with.';
     case 'alias-target-immutable':
       return 'An Alias keeps the Target it was created with.';
+    case 'space-card-target-immutable':
+      return 'A Space Card keeps the target Space it was created with.';
+    case 'space-card-deletion-unsupported':
+      return 'Deleting a Space Card also deletes the Space it owns, which this control cannot do.';
     case 'card-title-required':
       return 'A Card title is required.';
     case 'layout-title-required':
@@ -95,6 +99,8 @@ const titleAndTargetPlacements = {
   'card-not-found': form,
   'card-kind-immutable': form,
   'alias-target-immutable': form,
+  'space-card-target-immutable': form,
+  'space-card-deletion-unsupported': form,
   'card-title-required': 'title',
   'layout-title-required': form,
   'alias-target-not-found': 'target',
@@ -139,6 +145,8 @@ const correctableByCardChoice = {
   'card-not-found': false,
   'card-kind-immutable': false,
   'alias-target-immutable': false,
+  'space-card-target-immutable': false,
+  'space-card-deletion-unsupported': false,
   'card-title-required': false,
   'layout-title-required': false,
   'alias-target-not-found': false,
@@ -194,8 +202,8 @@ export const presentEdgeEndpointRefusal = (
  * Error placement for a refused Delete, which stays on the controls that asked.
  *
  * Total by construction rather than by an exhaustive record: a surface with no
- * field has nowhere else for a code to go, so a second nineteen-line table
- * saying `form` nineteen times would be a thing to keep in step and never a
+ * field has nowhere else for a code to go, so a second twenty-two-line table
+ * saying `form` twenty-two times would be a thing to keep in step and never a
  * thing to decide.
  */
 export const presentEdgeDeletionRefusal = (

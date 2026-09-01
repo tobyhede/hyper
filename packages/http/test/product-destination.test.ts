@@ -276,6 +276,18 @@ describe('product destinations', () => {
     ).resolves.toEqual({ kind: 'unresolved' });
   });
 
+  it('classifies a malformed contextual Card id without loading the Space', async () => {
+    const backend = loader();
+
+    await expect(
+      resolveProductDestination(
+        backend,
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/cards/not-a-compact-uuid`,
+      ),
+    ).resolves.toEqual({ kind: 'malformed' });
+    expect(backend.loadSpace).not.toHaveBeenCalled();
+  });
+
   it('resolves a browser-history destination against an already loaded snapshot', () => {
     expect(
       resolveProductDestinationInSnapshot(

@@ -202,6 +202,8 @@ export type AuthoringRefusal =
   | { readonly code: 'card-not-found' }
   | { readonly code: 'card-kind-immutable' }
   | { readonly code: 'alias-target-immutable' }
+  | { readonly code: 'space-card-target-immutable' }
+  | { readonly code: 'space-card-deletion-unsupported' }
   | { readonly code: 'card-title-required' }
   | { readonly code: 'layout-title-required' }
   | { readonly code: 'alias-target-not-found'; readonly targetId: CardId }
@@ -902,6 +904,13 @@ export function createSpaceAuthoring({
       ) {
         return refuse({ code: 'alias-target-immutable' });
       }
+      if (
+        card.document.kind === 'space' &&
+        completion.document.kind === 'space' &&
+        card.document.spaceId !== completion.document.spaceId
+      ) {
+        return refuse({ code: 'space-card-target-immutable' });
+      }
       // Trimmed and refused *here* rather than only at the surface that typed
       // it. A blank title is the empty case wearing different bytes, and intake
       // answers an empty one by failing — which this derivation reports by
@@ -997,8 +1006,18 @@ export function createSpaceAuthoring({
       unplacedCardId = completion.cardId;
       completedPlacement = Placement.remove(completedPlacement, completion.cardId);
     } else if (completion.kind === 'deleted-card') {
-      if (space.lookup.card(completion.cardId) === undefined) {
+      const deleted = space.lookup.card(completion.cardId);
+      if (deleted === undefined) {
         return refuse({ code: 'card-not-found' });
+      }
+      // A Space Card owns the Space it names (ADR 0058), so deleting it deletes
+      // that Space and everything below it — one coordinated multi-Space Edit,
+      // which is `createSpaceCardLifecycle` through the session registry and not
+      // a single-Space update this seam can make. Completing it here would store
+      // a Space whose target is unreachable, and aggregate intake refuses that
+      // commit permanently with the Card already gone from the working state.
+      if (deleted.kind === 'space') {
+        return refuse({ code: 'space-card-deletion-unsupported' });
       }
       // An Alias whose Target vanished is not a Card intake accepts, so the Space
       // cannot lose one out from under its Aliases. Removing that Card from a
@@ -1407,6 +1426,9 @@ export function createSpaceAuthoring({
   const acceptStoredSpace = (): string | null => {
     const { persistence } = session.getState();
     if (persistence.kind !== 'conflicted') return null;
+    if (persistence.current === undefined) {
+      return 'The coordinated conflict did not include a remote snapshot for this Space.';
+    }
     const accepted = loadSpaceSnapshot(persistence.current.snapshot);
     if (!accepted.ok) {
       return `The remote space is invalid and was not accepted:\n${accepted.errors

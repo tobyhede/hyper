@@ -70,8 +70,17 @@ export async function seedPositionedLayout(
       defaultRenderer: SEEDED_LAYOUT_ID,
     },
   };
-  const commitResponse = await page.request.put(`/api/spaces/${spaceId}`, {
-    data: { snapshot, expectedRevision: loaded.revision },
+  const commitResponse = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId,
+          snapshot,
+          expectedRevision: loaded.revision,
+        },
+      ],
+    },
   });
   expect(commitResponse.ok()).toBe(true);
 

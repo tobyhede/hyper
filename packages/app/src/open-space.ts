@@ -2,9 +2,10 @@ import type { UUID } from '@project/core';
 import type { CardFile, Space } from '@project/graph';
 import { loadSpace, loadSpaceSnapshot } from '@project/graph';
 import {
+  createSpaceSessionRegistry,
   MemorySpaceBackend,
-  openSpaceSession,
   type SpaceBackend,
+  type SpaceSessionRegistry,
   type SpaceSession,
   type LoadedSpace,
 } from '@project/persistence';
@@ -16,7 +17,11 @@ export interface OpenedSpace {
 }
 
 /** Compose one exact Space value already loaded by the configured backend. */
-export const openLoadedSpace = (spaceBackend: SpaceBackend, loaded: LoadedSpace): OpenedSpace => {
+export const openLoadedSpace = (
+  spaceBackend: SpaceBackend,
+  loaded: LoadedSpace,
+  registry: SpaceSessionRegistry = createSpaceSessionRegistry(spaceBackend),
+): OpenedSpace => {
   const runtime = loadSpaceSnapshot(loaded.snapshot);
   if (!runtime.ok) {
     throw new Error(
@@ -25,7 +30,7 @@ export const openLoadedSpace = (spaceBackend: SpaceBackend, loaded: LoadedSpace)
   }
   return {
     space: runtime.space,
-    spaceSession: openSpaceSession(spaceBackend, loaded),
+    spaceSession: registry.open(loaded),
   };
 };
 

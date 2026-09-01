@@ -89,6 +89,22 @@ describe('HTTP space startup composition', () => {
     expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
   });
 
+  it('reuses the live Space session when the runtime reopens the same Space', async () => {
+    const loaded = { snapshot: snapshot(), revision: 0n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const loadSpace = vi.spyOn(backend, 'loadSpace');
+    const startup = createSpaceStartup(backend);
+    const destination = productDestinationPath({ kind: 'space', spaceId: SPACE_ID });
+
+    const first = await startup.resolve(destination);
+    const reopened = await startup.resolve(destination);
+
+    expect(reopened.opened.spaceSession).toBe(first.opened.spaceSession);
+    expect(loadSpace).toHaveBeenCalledTimes(2);
+    expect(loadSpace).toHaveBeenNthCalledWith(1, SPACE_ID);
+    expect(loadSpace).toHaveBeenNthCalledWith(2, SPACE_ID);
+  });
+
   /**
    * A stored Layout carrying a Computed View's id. Intake rejects it, so the
    * only way here is a document that reached storage some other way — and the

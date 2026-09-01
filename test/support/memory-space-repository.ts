@@ -1,6 +1,12 @@
 import { newUuid, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
-import { loadSpaceSnapshot } from '@project/graph';
-import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
+import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
+import type {
+  LoadedAggregate,
+  LoadedSpace,
+  RepositoryCommitResult,
+  SpaceCommit,
+  SpaceSummary,
+} from '@project/persistence';
 import type {
   ImportMode,
   RepositoryImportResult,
@@ -64,10 +70,12 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
 export class MemorySpaceRepository implements SpaceRepository {
   readonly #spaces = new Map<UUID, LoadedSpace>();
   #entrySpaceId: UUID | undefined;
+  #metaSpaceId: UUID | undefined;
 
-  constructor(spaces: readonly LoadedSpace[] = [], entrySpaceId?: UUID) {
+  constructor(spaces: readonly LoadedSpace[] = [], entrySpaceId?: UUID, metaSpaceId?: UUID) {
     for (const space of spaces) this.#spaces.set(space.snapshot.id, clone(space));
     this.#entrySpaceId = entrySpaceId;
+    this.#metaSpaceId = metaSpaceId ?? entrySpaceId ?? spaces[0]?.snapshot.id;
   }
 
   entrySpaceId(): Promise<UUID | undefined> {
@@ -77,6 +85,7 @@ export class MemorySpaceRepository implements SpaceRepository {
   setEntrySpace(id: UUID): Promise<void> {
     if (!this.#spaces.has(id)) return Promise.reject(new Error(`Space ${id} does not exist`));
     this.#entrySpaceId = id;
+    this.#metaSpaceId ??= id;
     return Promise.resolve();
   }
 
@@ -93,6 +102,16 @@ export class MemorySpaceRepository implements SpaceRepository {
     return Promise.resolve(stored === undefined ? undefined : read(stored));
   }
 
+  loadAggregate(): Promise<LoadedAggregate> {
+    if (this.#metaSpaceId === undefined) {
+      return Promise.reject(new Error('The repository has no Meta Space'));
+    }
+    return Promise.resolve({
+      metaSpaceId: this.#metaSpaceId,
+      spaces: [...this.#spaces.values()].map(read),
+    });
+  }
+
   markExported(id: UUID, revision: bigint): Promise<void> {
     const stored = this.#spaces.get(id);
     if (stored === undefined) return Promise.reject(new Error(`Space ${id} does not exist`));
@@ -100,49 +119,106 @@ export class MemorySpaceRepository implements SpaceRepository {
     return Promise.resolve();
   }
 
-  commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<RepositoryCommitResult> {
-    const intake = loadSpaceSnapshot(snapshot);
-    if (!intake.ok) {
-      return Promise.resolve({
-        kind: 'rejected',
-        code: 'invalid-snapshot',
-        message: intake.errors.map(({ message }) => message).join('\n'),
-      });
+  commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    if (request.changes.length === 0) {
+      return Promise.resolve({ kind: 'rejected', code: 'invalid-commit', message: 'Empty commit' });
     }
-
-    const current = this.#spaces.get(intake.snapshot.id);
-    if (current === undefined) {
-      return Promise.resolve({
-        kind: 'rejected',
-        code: 'not-found',
-        message: `Space ${intake.snapshot.id} does not exist`,
-      });
-    }
-    if (current.revision !== expectedRevision) {
-      return Promise.resolve({ kind: 'conflict', current: read(current) });
-    }
-    for (const card of intake.snapshot.cards) {
-      const owner = [...this.#spaces.values()].find(
-        ({ snapshot }) =>
-          snapshot.id !== intake.snapshot.id &&
-          snapshot.cards.some((storedCard) => storedCard.id === card.id),
-      );
-      if (owner !== undefined) {
+    const named = new Set<UUID>();
+    for (const change of request.changes) {
+      if (named.has(change.spaceId)) {
         return Promise.resolve({
           kind: 'rejected',
-          code: 'invalid-snapshot',
-          message: `Card ${card.id} belongs to space ${owner.snapshot.id}`,
+          code: 'invalid-commit',
+          message: `Space ${change.spaceId} is named more than once`,
+        });
+      }
+      named.add(change.spaceId);
+      if (change.kind !== 'delete' && change.snapshot.id !== change.spaceId) {
+        return Promise.resolve({
+          kind: 'rejected',
+          code: 'invalid-commit',
+          message: `Change Space id ${change.spaceId} does not match its snapshot`,
         });
       }
     }
 
-    const revision = current.revision + 1n;
-    this.#spaces.set(intake.snapshot.id, {
-      snapshot: clone(intake.snapshot),
-      revision,
-      exportedRevision: current.exportedRevision,
+    const conflicts = request.changes.flatMap((change) => {
+      const current = this.#spaces.get(change.spaceId);
+      const conflict =
+        change.kind === 'create'
+          ? current !== undefined
+          : current?.revision !== change.expectedRevision;
+      return conflict
+        ? [{ spaceId: change.spaceId, current: current === undefined ? undefined : read(current) }]
+        : [];
     });
-    return Promise.resolve({ kind: 'committed', revision });
+    if (conflicts.length > 0) return Promise.resolve({ kind: 'conflict', conflicts });
+
+    const candidate = new Map(this.#spaces);
+    for (const change of request.changes) {
+      if (change.kind === 'delete') {
+        candidate.delete(change.spaceId);
+        continue;
+      }
+      const current = candidate.get(change.spaceId);
+      candidate.set(change.spaceId, {
+        snapshot: clone(change.snapshot),
+        revision: current === undefined ? 0n : current.revision + 1n,
+        exportedRevision: current?.exportedRevision ?? null,
+      });
+    }
+    if (this.#metaSpaceId === undefined) {
+      return Promise.resolve({
+        kind: 'rejected',
+        code: 'invalid-commit',
+        message: 'The repository has no Meta Space',
+      });
+    }
+    const intake = loadSpaceAggregate({
+      metaSpaceId: this.#metaSpaceId,
+      snapshots: [...candidate.values()].map(({ snapshot }) => snapshot),
+    });
+    if (!intake.ok) {
+      const deleted = new Set(
+        request.changes.flatMap((change) => (change.kind === 'delete' ? [change.spaceId] : [])),
+      );
+      const changed = new Set(request.changes.map(({ spaceId }) => spaceId));
+      const incompleteDeletionIds = new Set(
+        intake.errors.flatMap((error) =>
+          error.kind === 'space-card-target-missing' &&
+          deleted.has(error.targetSpaceId) &&
+          !changed.has(error.spaceId)
+            ? [error.targetSpaceId]
+            : [],
+        ),
+      );
+      if (incompleteDeletionIds.size > 0) {
+        return Promise.resolve({
+          kind: 'conflict',
+          conflicts: [...incompleteDeletionIds].map((spaceId) => {
+            const current = this.#spaces.get(spaceId);
+            if (current === undefined) throw new Error('Deleted Space disappeared during commit');
+            return { spaceId, current: read(current) };
+          }),
+        });
+      }
+      return Promise.resolve({ kind: 'aggregate-refused', errors: intake.errors });
+    }
+
+    this.#spaces.clear();
+    for (const [id, loaded] of candidate) this.#spaces.set(id, loaded);
+    return Promise.resolve({
+      kind: 'committed',
+      revisions: request.changes.flatMap((change) => {
+        if (change.kind === 'delete') return [];
+        const loaded = candidate.get(change.spaceId);
+        if (loaded === undefined) throw new Error('Candidate omitted a changed Space');
+        return [{ spaceId: change.spaceId, revision: loaded.revision }];
+      }),
+      deletedSpaceIds: request.changes.flatMap((change) =>
+        change.kind === 'delete' ? [change.spaceId] : [],
+      ),
+    });
   }
 
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {
@@ -236,6 +312,7 @@ export class MemorySpaceRepository implements SpaceRepository {
     if (mode === 'truncate') {
       this.#spaces.clear();
       this.#entrySpaceId = undefined;
+      this.#metaSpaceId = undefined;
     }
     const stored = snapshots.map((snapshot): LoadedSpace => ({
       snapshot: clone(snapshot),
@@ -243,6 +320,7 @@ export class MemorySpaceRepository implements SpaceRepository {
       exportedRevision: null,
     }));
     for (const space of stored) this.#spaces.set(space.snapshot.id, clone(space));
+    this.#metaSpaceId ??= stored[0]?.snapshot.id;
     return Promise.resolve({ kind: 'imported', spaces: stored.map(read) });
   }
 }

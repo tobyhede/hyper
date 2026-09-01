@@ -107,7 +107,7 @@ describe('Space app conflict recovery', () => {
   it('replaces the visible runtime and editor placement when remote state is accepted', async () => {
     const local = snapshot('Local space', 'Local card', 10, 20);
     const remote = snapshot('Remote space', 'Remote card', 900, 700);
-    const backend = new MemorySpaceBackend([
+    const backend = new MemorySpaceBackend(SPACE_ID, [
       { snapshot: remote, revision: 4n, exportedRevision: null },
     ]);
     const session = openSpaceSession(backend, {
@@ -160,9 +160,14 @@ describe('Space app conflict recovery', () => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
       kind: 'conflict',
-      current: { snapshot: dangling, revision: 4n, exportedRevision: null },
+      conflicts: [
+        {
+          spaceId: SPACE_ID,
+          current: { snapshot: dangling, revision: 4n, exportedRevision: null },
+        },
+      ],
     });
-    const session = openSpaceSession(new MemorySpaceBackend([], control), {
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [], control), {
       snapshot: local,
       revision: 3n,
       exportedRevision: null,
@@ -220,13 +225,23 @@ describe('Space app conflict recovery', () => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
       kind: 'conflict',
-      current: { snapshot: dangling, revision: 4n, exportedRevision: null },
+      conflicts: [
+        {
+          spaceId: SPACE_ID,
+          current: { snapshot: dangling, revision: 4n, exportedRevision: null },
+        },
+      ],
     });
     control.queueResult({
       kind: 'conflict',
-      current: { snapshot: loadable, revision: 5n, exportedRevision: null },
+      conflicts: [
+        {
+          spaceId: SPACE_ID,
+          current: { snapshot: loadable, revision: 5n, exportedRevision: null },
+        },
+      ],
     });
-    const session = openSpaceSession(new MemorySpaceBackend([], control), {
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [], control), {
       snapshot: local,
       revision: 3n,
       exportedRevision: null,
@@ -252,7 +267,7 @@ describe('Space app conflict recovery', () => {
     });
     await waitFor(() => {
       const { persistence } = session.getState();
-      expect(persistence.kind === 'conflicted' ? persistence.current.revision : null).toBe(5n);
+      expect(persistence.kind === 'conflicted' ? persistence.current?.revision : null).toBe(5n);
     });
 
     await waitFor(() =>
@@ -286,10 +301,10 @@ describe('Space app permanent save refusal', () => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
       kind: 'permanent-failure',
-      code: 'invalid-snapshot',
+      code: 'invalid-commit',
       message: 'Graph names an absent card',
     });
-    const session = openSpaceSession(new MemorySpaceBackend([], control), {
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [], control), {
       snapshot: local,
       revision: 3n,
       exportedRevision: null,
@@ -331,7 +346,7 @@ describe('Space app failure reporting', () => {
         })),
       },
     };
-    const session = openSpaceSession(new MemorySpaceBackend(), {
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
       snapshot: addressed,
       revision: 0n,
       exportedRevision: null,
@@ -357,7 +372,7 @@ describe('Space app failure reporting', () => {
     'reports a rejected clipboard write from %s without unmounting the Space',
     async (copyAction) => {
       const valid = snapshot('Space', 'Card', 10, 20);
-      const session = openSpaceSession(new MemorySpaceBackend(), {
+      const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
         snapshot: valid,
         revision: 0n,
         exportedRevision: null,
@@ -401,7 +416,7 @@ describe('Space app failure reporting', () => {
   it('names a working snapshot that stopped loading instead of blanking the page', () => {
     const valid = snapshot('Space', 'Card', 10, 20);
     const dangling = withDanglingGraph(valid, valid.document.title);
-    const session = openSpaceSession(new MemorySpaceBackend(), {
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
       snapshot: dangling,
       revision: 0n,
       exportedRevision: null,
@@ -432,7 +447,7 @@ describe('Space app failure reporting', () => {
    */
   it('names a working snapshot that stops loading under a mounted Space app', () => {
     const valid = snapshot('Space', 'Card', 10, 20);
-    const session = openSpaceSession(new MemorySpaceBackend(), {
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
       snapshot: valid,
       revision: 0n,
       exportedRevision: null,
@@ -465,7 +480,7 @@ describe('Space app Cards drawer', () => {
       ],
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
     mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app), {
       selection: LAYOUT_ID,
@@ -518,7 +533,7 @@ describe('Space app Cards drawer', () => {
       },
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
     mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app), {
       selection: LAYOUT_ID,

@@ -17,7 +17,6 @@ export interface Referenceable {
   readonly cards: readonly Card[];
   readonly layouts?: readonly Layout[] | undefined;
   readonly defaultRenderer?: UUID | undefined;
-  readonly ancestorSpaceIds: readonly UUID[];
 }
 
 /**
@@ -287,13 +286,12 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     }
   }
 
-  const cycleTargets = new Set<UUID>([space.id, ...space.ancestorSpaceIds]);
   for (const card of space.cards) {
-    if (card.kind !== 'space' || !cycleTargets.has(card.spaceId)) continue;
+    if (card.kind !== 'space' || card.spaceId !== space.id) continue;
     errors.push({
       kind: 'space-card-reference-cycle',
       ref: card.spaceId,
-      message: `Space Card "${card.id}" targets Space "${card.spaceId}", which is the current Space or one of its open ancestors`,
+      message: `Space Card "${card.id}" targets its own Space "${card.spaceId}"`,
     });
   }
 
