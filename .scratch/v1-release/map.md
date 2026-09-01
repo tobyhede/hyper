@@ -45,14 +45,22 @@ presentation without editing source files or understanding the stored format.
 <!-- Resolved decision tickets are indexed here; their resolution comments own
 the detail. -->
 
+- [09 — Reconcile the confirmed V1 release contract](issues/09-reconcile-the-confirmed-v1-release-contract.md)
+  assigns Default Content/reset to ticket 16 and keeps End-to-end distinct from
+  the `v1.0.0` gate.
+- [10 — Audit the canonical journey and its issue ownership](issues/10-audit-the-canonical-journey-and-ownership.md)
+  records the built/partial/unbuilt matrix, overlapping ownership and the six
+  decisions ticket 11 needs before it can define the checkpoint.
+
 ## Not yet specified
 
-- The exact work packages and proof boundary that constitute End-to-end cannot
-  be fixed until the confirmed release contract is reconciled with the existing
-  artifacts and the built product is audited against the canonical journey.
+- The exact work packages and proof boundary that constitute End-to-end depend
+  on resolving the ownership, Layout-only, destructive-recovery, clean-launch,
+  fixture-placement and cut-line decisions surfaced by the completed
+  canonical-journey audit.
 - The critical path from End-to-end to `v1.0.0`, including which existing
   release and feature tickets must be split, reordered or retired, depends on
-  that audit.
+  the resulting End-to-end checkpoint decision.
 - Feedback may expose canonical-journey blockers whose decision shape is not yet
   visible. Non-blocking requests remain beyond V1.
 - Exact Default Content copy and final visual treatment remain deliberately
