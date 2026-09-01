@@ -4,6 +4,11 @@
 
 **Status:** interaction direction chosen; production wiring remains open
 
+**ADR 0079 reconciliation:** the `space-view` `SpaceEntity` kind below is retired.
+When this wiring is built, the entity kinds are Space, Layout, Card and Graph, and
+the canvas header names the selected Layout. ADR 0072, cited below, is superseded
+by ADR 0079; `layout-only-v1/03` owns the removal.
+
 ## Prototype
 
 The menu is now a real component drawn by real surfaces, rather than a story-local replica. The Sidebar and Card prototypes both demonstrate the icon and right-click trigger paths; production still supplies neither surface with actions.

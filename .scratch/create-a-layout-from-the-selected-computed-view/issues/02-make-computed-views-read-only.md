@@ -6,8 +6,10 @@ authoring workflow remains available after a Layout has been created or selected
 
 **Blocked by:** 01 — Create a Layout from the selected Computed View.
 
-**Status:** ready-for-agent
+**Status:** superseded by ADR 0079 and `layout-only-v1/03`
 **Tags:** release/v1
+
+ADR 0079 removed Computed Views from V1 outright rather than making them read-only, so there is nothing left to hold read-only and `computed-view-read-only` goes with them. [`layout-only-v1/03`](../../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md) owns that removal, including the live guidance this ticket asked to describe the read-only contract. The criteria below are kept as the record of what was planned.
 
 - [ ] No Card, Alias, placement, Open state, Graph or Edge operation implicitly
       creates a Layout while a Computed View is selected.

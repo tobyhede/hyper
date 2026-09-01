@@ -5,8 +5,16 @@ select the Layout and Graph it shows, and see that selection rendered in the
 Card. The target remains independently editable while its lifetime is owned by
 its references.
 
-**Blocked by:** the pending Layout-only reconciliation in critical-path Wave 0;
-PR 134 delivered the Space Card aggregate and atomic lifetime foundation.
+**Blocked by:** `v1-release/20`; `layout-only-v1/03`; PR 134 delivered the Space
+Card aggregate and atomic lifetime foundation.
+
+ADR 0079 settled the selection this Card stores: a Space Card selects a Layout
+and a Graph, and there is no Space View or Computed View alternative.
+`layout-only-v1/03` retires the Space View selection this ticket must not author.
+`layout-only-v1/04` owns the Space Card's content shape and the initialization a
+layoutless target needs, and it waits on `space-cards/01`, which waits on this
+ticket — so 04 is downstream of this ticket, not a blocker of it. This ticket
+owns creation, title seeding, the cycle rule and the deletion cascade.
 
 **Status:** ready-for-agent
 Tags: release/v1

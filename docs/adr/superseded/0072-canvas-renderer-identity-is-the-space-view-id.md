@@ -1,6 +1,7 @@
 # Canvas renderer identity is the Space View Id
 
-Status: accepted
+Status: superseded
+Superseded by: 0079
 Refines: 0031, 0068
 
 A canvas renderer is identified by the durable UUID of the Space View it

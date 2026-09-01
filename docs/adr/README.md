@@ -36,7 +36,7 @@ under `superseded/`.
 | [0039](0039-an-alias-delegates-content-authoring-to-its-target.md) | An Alias gives content authoring to its Target. |
 | [0046](0046-an-occurrence-authors-its-own-title-and-target.md) | An occurrence authors its own Title and Target in the pane that opens it. |
 | [0070](0070-an-open-alias-shows-immutable-target-content-read-only.md) | An Alias keeps its Target for life and shows that content read-only. |
-| [0068](0068-a-space-card-shows-a-space-view.md) | A Space Card shows one selected Space View of another Space. |
+| [0068](0068-a-space-card-shows-a-space-view.md) | A Space Card shows another Space through the selection it carries; ADR 0079 makes that selection a Layout. |
 | [0074](0074-space-card-references-own-the-target-space.md) | The Space Cards referencing a Space own its lifetime. Deleting the last one deletes the Space. |
 | [0076](0076-multi-space-edits-coordinate-per-space-sessions-behind-space-card-lifecycle.md) | Multi-Space edits coordinate per-Space sessions behind the Space Card lifecycle. |
 
@@ -47,15 +47,12 @@ under `superseded/`.
 | [0002](0002-layout-view-separation.md) | A Layout and a View are different entities. |
 | [0005](0005-layout-is-a-strategy.md) | A strategy arranges Cards and returns no separate arranged-result type. |
 | [0014](0014-layout-is-the-authored-data-strategy-is-the-behaviour.md) | A Layout is authored data. A LayoutStrategy is behaviour. |
-| [0031](0031-views-and-layouts-are-selected-and-conversion-keeps-no-provenance.md) | The reader selects a View or a Layout. A conversion keeps no provenance. |
 | [0040](0040-layouts-own-card-membership-and-routes.md) | A Layout owns its Card membership and its Graphs. |
-| [0045](0045-a-view-takes-cards-and-graphs-and-returns-a-layout.md) | A View takes Cards and Graphs and returns a Layout. |
+| [0079](0079-v1-exposes-only-layouts-and-first-open-initializes-one.md) | An authored Layout is the only selectable and addressable canvas context, and first working load initializes one. |
 | [0015](0015-a-space-may-have-no-routes.md) | A Space may hold no Graph. It then cannot present. |
 | [0003](0003-routes-may-conflict.md) | Graphs are independent, and their orders may disagree. |
 | [0032](0032-routes-may-contain-cycles.md) | A Graph may contain a cycle. |
 | [0041](0041-graph-is-the-first-public-name-for-route.md) | Graph is the first-public name for Route. |
-| [0072](0072-canvas-renderer-identity-is-the-space-view-id.md) | A canvas renderer is identified by the UUID of its Space View. |
-| [0075](0075-computed-views-are-read-only-and-create-layout-converts.md) | Computed Views are read-only; Create Layout is their sole transition to authored state. |
 
 ## Editing and persistence
 

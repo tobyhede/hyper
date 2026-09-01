@@ -2,6 +2,8 @@
 
 `SpaceBackend`/`SpaceSession`, Space Authoring's completed-edit lifecycle, and the Layout/Graph/View aggregate model. Read before touching `packages/persistence`, `packages/graph`, `space-authoring.ts` in `packages/app`, `migrations/**`, or `src/prisma/**`.
 
+**ADR 0079 — decided, not built:** Computed Views, the union term Space View and the persisted `defaultRenderer` selection leave V1. An authored Layout becomes the only selectable and addressable canvas context, Add Layout creates an *empty* Layout rather than capturing a placement, and first working load initializes a layoutless Space. **Nothing below has changed yet** — the descriptions here are the code as it stands, and they are what `.scratch/layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md` removes. Do not build new work onto the Computed View contract.
+
 **ADR 0070 refinement:** an existing Alias Target is immutable. `edited-card` may rename an Alias but refuses a changed Target with `alias-target-immutable`; the existing-Alias metadata pane and its retargeting surface are removed. References below to Alias retargeting describe the superseded surface.
 
 ## PostgreSQL & the document contract

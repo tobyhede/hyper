@@ -1,6 +1,7 @@
 # Computed Views are read-only and Create Layout converts
 
-Status: accepted
+Status: superseded
+Superseded by: 0079
 Supersedes: 0025
 Refines: 0031
 Related: 0033, 0035, 0040, 0045, 0053, 0064

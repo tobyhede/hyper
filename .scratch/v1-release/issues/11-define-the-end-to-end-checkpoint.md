@@ -80,10 +80,10 @@ authoring the journey is understandable.
 
 ### Prerequisites before checkpoint implementation proceeds in parallel
 
-- Commit or reject the pending Layout-only decision and tracker, then reconcile
-  the Definition of Done and affected Layout, Space Card and URL tickets. The
-  checkpoint must exercise the settled V1 product rather than an already
-  superseded conversion path.
+- Met by `v1-release/20`: ADR 0079 is accepted, `layout-only-v1/01–04` are
+  tracked, and the Definition of Done and the affected Layout, Space Card and URL
+  tickets are reconciled. The checkpoint exercises Add Layout and first-load
+  initialization rather than the superseded conversion path.
 - Resolve architecture issues 12, 13 and 14 before their dependent feature work
   begins. Each must either own the shared Meta lifecycle, aggregate-commit or
   Open Spaces seam and become an explicit blocker, or close as advice. Parallel

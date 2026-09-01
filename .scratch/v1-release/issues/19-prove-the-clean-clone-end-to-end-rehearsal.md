@@ -8,6 +8,12 @@ Blocked by: 01, 02, 03, 08, 16, 17, 18, 20; `alias-cards/06`; `entity-url-addres
 technical-author rehearsal from a clean clone and a compact proof matrix linking
 every checkpoint claim to its executable or observed proof.
 
+[V1/20](20-land-and-reconcile-layout-only-v1.md) is the one durable Layout-only
+prerequisite this ticket names; the `layout-only-v1` implementation tickets reach
+it through [V1/08](08-round-trip-multi-space-import-and-export.md). The rehearsal
+exercises Add Layout and first-load initialization, never a Computed View, and
+includes presenting from the Active Graph of an initialized Space.
+
 - [ ] Document the supported Node/pnpm, Docker PostgreSQL and desktop Chromium
       setup path for macOS or Linux without assuming an existing checkout state.
 - [ ] Automated toolchain, migration, startup, unit, integration, Chromium and

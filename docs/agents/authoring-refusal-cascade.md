@@ -5,6 +5,8 @@ this before adding a completion action, adding or reordering a check inside
 one, or adding a refusal code — it is the one place the full cascade is drawn
 out end to end instead of scattered across a 1300-line function.
 
+**ADR 0079 — decided, not built:** Computed Views, the union term Space View and the persisted `defaultRenderer` selection leave V1. An authored Layout becomes the only selectable and addressable canvas context, Add Layout creates an *empty* Layout rather than capturing a placement, and first working load initializes a layoutless Space. **Nothing below has changed yet** — the descriptions here are the code as it stands, and they are what `.scratch/layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md` removes. Do not build new work onto the Computed View contract.
+
 Every `complete(completion)` call answers exactly one **completion outcome** —
 `completed`, `unchanged` or `refused` (`CONTEXT.md`, ADR 0042/0057;
 architecture and rationale live in `docs/agents/editing-and-persistence.md`'s

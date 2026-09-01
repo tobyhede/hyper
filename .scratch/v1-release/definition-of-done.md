@@ -15,6 +15,10 @@ technical presentation without editing source files or losing authored work.
       Content, including after the author empties or heavily edits the Meta Space.
 - [ ] An ordinary Space is created only by creating its first Space Card and can
       be opened independently at its canonical URL.
+- [ ] The first request for a stored or imported layoutless Space's complete
+      working state durably creates and selects its empty default Layout and
+      initial empty Active Graph before returning it; listing, import completion,
+      export and reference checks never initialize a Space.
 - [ ] Every successful Edit is saved through the unified authored commit path
       over HTTP/PostgreSQL and survives reload.
 - [ ] Save failure and revision conflict are visible and recoverable without
@@ -53,8 +57,8 @@ technical presentation without editing source files or losing authored work.
 ## Space Cards
 
 - [ ] Creation can reference an existing Space or atomically create a new Space.
-- [ ] The target Space reference is immutable; the selected Space View and Graph
-      are editable on the Space Card.
+- [ ] The target Space reference is immutable; the selected Layout and Graph are
+      editable on the Space Card.
 - [ ] Opening renders the selected target context in place without changing the
       target Space's own selections.
 - [ ] Entering adopts the target Space's complete working surface; the author can
@@ -70,8 +74,12 @@ technical presentation without editing source files or losing authored work.
 ## Layouts
 
 - [ ] Layouts can be explicitly created, renamed, selected and deleted.
-- [ ] Editing a Computed View creates a Layout without moving the Cards currently
-      on screen.
+- [ ] Add Layout creates and selects an empty Layout with one empty Active Graph
+      in a single Edit; existing Cards stay in the Cards View until added.
+- [ ] An authored Layout is the only selectable and addressable canvas context; a
+      selected Layout draws only its own Cards and the Graphs it owns.
+- [ ] A working Space always has a durable default Layout, so deleting its last
+      Layout is refused.
 - [ ] Each Layout independently owns Card membership, positions, Open/Closed
       state, Open Size, Graphs and Active Graph.
 - [ ] Deleting a Layout does not delete its Cards from the Space.
@@ -96,8 +104,8 @@ technical presentation without editing source files or losing authored work.
 
 ## URL addressing
 
-- [ ] Every Space, Space View, Card and Graph has a durable canonical URL.
-- [ ] Contextual Card and Graph URLs preserve their Space View context.
+- [ ] Every Space, Layout, Card and Graph has a durable canonical URL.
+- [ ] Contextual Card and Graph URLs preserve their Layout context.
 - [ ] Presentation URLs address the exact current presentation point within one
       Space.
 - [ ] Direct navigation, reload, Back and Forward restore the addressed state
@@ -137,8 +145,11 @@ technical presentation without editing source files or losing authored work.
 
 - [x] Space deletion is part of V1 and occurs when the last referencing Space
       Card is deleted; the Meta Space is permanent.
-- [x] Layouts have an explicit Create Layout command in addition to conversion
-      from a Computed View.
+- [x] An authored Layout is the only selectable and addressable canvas context in
+      V1. Computed Views, the union term Space View and the persisted
+      `defaultRenderer` selection are retired rather than hidden, Add Layout
+      creates an empty Layout, and first working load initializes a layoutless
+      Space — [ADR 0079](../../docs/adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md).
 
 ## Deferred beyond V1
 
@@ -150,6 +161,10 @@ technical presentation without editing source files or losing authored work.
 - Browser-facing reset and merge-style seeding; V1 has only complete CLI hard
   reset and first-run initialization.
 - Migration or compatibility for pre-V1 repository state and generated artifacts.
+- Computed Views, and any automatic Layout strategy as a selectable or
+  addressable canvas context. Automatic strategies remain non-addressable
+  capabilities for explicit operations or later work.
+- A canvas that flattens Graphs across Layouts.
 - Cross-Space Edge authoring and reconnection.
 - Presentation traversal across Space boundaries.
 - Cross-Space presentation-point URLs.
