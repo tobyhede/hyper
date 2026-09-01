@@ -30,6 +30,41 @@ export const parityClaims: readonly ParityClaim[] = [
       'The Cards drawer opens from its own trigger as a dialog named Cards, dismisses on Escape with focus returning to that trigger, and leaves the surface behind it both live and undismissing — which is what dropping a Card onto the canvas is.',
   },
   {
+    id: 'cards-drawer-distinguishes-an-empty-layout',
+    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    storyExport: 'Empty',
+    claim: 'A Layout containing every Space Card names that empty Cards View explicitly.',
+  },
+  {
+    id: 'cards-drawer-scrolls-a-long-list-on-a-narrow-screen',
+    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    storyExport: 'LongList',
+    claim:
+      'A long Cards list remains searchable and independently scrollable inside the viewport on a narrow screen.',
+  },
+  {
+    id: 'cards-drawer-withdraws-while-authoring-is-unavailable',
+    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    storyExport: 'Disabled',
+    claim:
+      'The Cards trigger is disabled while the Space View cannot accept membership edits — presenting, an open Card, or Alias creation.',
+  },
+  {
+    id: 'cards-drawer-keeps-an-add-refusal-on-its-surface',
+    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    storyExport: 'Refused',
+    claim: 'A refused Add remains visible in the open Cards drawer that asked for it.',
+    applicationEvidence:
+      'No browser gesture reaches a repeated Add. Completing the first one removes the Card from `cardsOutsideSelectedLayout`, so the row unmounts before a second click can land on it, and only two events dispatched inside one task reach the refusal at all. The story is driven to the state instead, through the production Authoring composition, so the sentence it draws is the one `describeAuthoringRefusal` gives the application.',
+  },
+  {
+    id: 'cards-drawer-coexists-with-persistence-failure',
+    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    storyExport: 'PersistenceFailure',
+    claim:
+      'A failed membership save leaves the Cards drawer available beside the standing retryable persistence notice.',
+  },
+  {
     id: 'canvas-card-fills-authored-node-rect',
     storyFile: 'components/card.stories.tsx',
     storyExport: 'ResizeControl',

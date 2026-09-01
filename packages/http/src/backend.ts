@@ -22,6 +22,15 @@ import { hc } from 'hono/client';
 import type { SpaceHttpApp } from './index';
 import { hasValidUniqueMediaTypeParameters } from './media-type';
 
+/**
+ * What a network failure says when the thrown value carries no message.
+ *
+ * Named rather than inline so a story can draw this state without transcribing
+ * a sentence the application would have to keep matching by hand — ADR 0052
+ * parity is derived, not promised in a comment.
+ */
+export const NETWORK_FAILURE_MESSAGE = 'Network request failed';
+
 type SpaceHttpClient = ReturnType<typeof hc<SpaceHttpApp>>;
 
 const protocolFailure = (message: string): CommitResult => ({
@@ -144,7 +153,7 @@ export class HttpSpaceBackend implements SpaceBackend {
       return {
         kind: 'retryable-failure',
         code: 'network',
-        message: error instanceof Error ? error.message : 'Network request failed',
+        message: error instanceof Error ? error.message : NETWORK_FAILURE_MESSAGE,
       };
     }
   }

@@ -1,4 +1,4 @@
-import { useId, type ReactNode, type Ref } from 'react';
+import { useId, useState, type ReactNode, type Ref } from 'react';
 import {
   FLOW_SPACE_VIEW_ID,
   GRID_SPACE_VIEW_ID,
@@ -13,6 +13,15 @@ import {
   Alert,
   AlertDescription,
   AlertIcon,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
   AlertTitle,
   Button,
   buttonVariants,
@@ -140,6 +149,8 @@ export interface SpaceSidebarProps {
          * destination it would copy does not exist.
          */
         readonly onCopyContextual?: (() => void) | undefined;
+        /** Delete this Card from the whole Space, returning a refusal to show in place. */
+        readonly onDelete?: (() => string | null) | undefined;
       }
     | undefined;
   /**
@@ -154,6 +165,59 @@ export interface SpaceSidebarProps {
    */
   readonly entityActions?: (entity: SpaceEntity) => readonly EntityActionGroup[];
   readonly titleEdit?: SpaceChromeTitleEdit;
+}
+
+function DeleteCardControl({
+  title,
+  onDelete,
+}: {
+  readonly title: string;
+  readonly onDelete: () => string | null;
+}) {
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  return (
+    <AlertDialog onOpenChange={(open) => !open && setRefusal(null)}>
+      <AlertDialogTrigger
+        render={<Button variant="destructive" size="compact" className="w-full" />}
+      >
+        Delete Card {title}
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Card {title}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the Card from the Space, every Layout that contains it, and every Edge
+            connected to it.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {refusal === null ? null : (
+          <Alert variant="destructive">
+            <AlertTitle>Card not deleted</AlertTitle>
+            <AlertDescription>{refusal}</AlertDescription>
+          </Alert>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={(event) => {
+              const nextRefusal = onDelete();
+              setRefusal(nextRefusal);
+              // `preventBaseUIHandler`, not `preventDefault`: Base UI's
+              // `mergeProps` runs the primitive's own close handler unless the
+              // consumer sets `baseUIHandlerPrevented`, and it never reads
+              // `defaultPrevented`. A refusal has nowhere to be read but this
+              // dialog, so the dialog has to stay.
+              if (nextRefusal !== null) event.preventBaseUIHandler();
+            }}
+          >
+            Delete Card
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }
 
 /**
@@ -712,6 +776,21 @@ export function SpaceSidebar({
               >
                 Copy link in this Space View
               </Button>
+            )}
+            {cardLinks.onDelete !== undefined && (
+              <DeleteCardControl
+                title={cardLinks.title}
+                /* `onCanvas` by hand rather than by the helper: only a
+                   *completed* Delete has a canvas result to dismiss the sheet
+                   for. A refusal keeps the dialog open (`DeleteCardControl`
+                   below), and dismissing the sheet under it would take the
+                   surface the sentence is on with it. */
+                onDelete={() => {
+                  const refusal = cardLinks.onDelete?.() ?? null;
+                  if (refusal === null && isMobile) setOpenMobile(false);
+                  return refusal;
+                }}
+              />
             )}
           </div>
         )}

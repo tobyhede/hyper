@@ -111,7 +111,12 @@ test(
 
 test(
   'a network failure stays visible until the user retries',
-  { tag: '@parity:space-sidebar-recovers-retryable-failure' },
+  {
+    tag: [
+      '@parity:space-sidebar-recovers-retryable-failure',
+      '@parity:cards-drawer-coexists-with-persistence-failure',
+    ],
+  },
   async ({ page }) => {
     let attempts = 0;
     const failFirstCommit = async (route: Route) => {
@@ -124,9 +129,9 @@ test(
 
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
-    await dragBy(page, card, 0, 180);
+    await settled(page);
+    await page.getByRole('button', { name: 'Cards' }).click();
+    await page.getByRole('button', { name: 'Add E to Layout' }).click();
 
     // The toolbar reports the failure as a red dot and keeps every control where
     // it was; the reason and the action are in the notice pinned beneath it.
@@ -135,6 +140,7 @@ test(
     await expect(failure).toBeVisible();
     const retry = failure.getByRole('button', { name: 'Retry' });
     await expect(retry).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
     expect(attempts).toBe(1);
     await expect.poll(() => navigationIsProtected(page)).toBe(true);
 

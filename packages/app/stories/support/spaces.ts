@@ -64,6 +64,7 @@ const chain = (links: number): GraphEdge[] =>
 
 /** Named once, because the Space both declares this Layout and opens on it. */
 const COLLECTION_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
+const COLLECTION_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 /**
  * A Space with two authored Layouts and the four Graphs they own.
@@ -117,7 +118,7 @@ export const authoredSnapshot: SpaceSnapshot = {
         ],
       },
       {
-        id: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
+        id: COLLECTION_TWO,
         title: 'Collection 2',
         kind: 'positioned',
         positions: positions(2),
@@ -135,6 +136,21 @@ export const authoredSnapshot: SpaceSnapshot = {
     id,
     document: { title: `Card ${index + 1}`, kind: 'markdown', body: '' },
   })),
+};
+
+/**
+ * The same Space opened on Collection 2, which holds two of the five Cards.
+ *
+ * The Cards drawer's stories need a Layout some Cards are *absent* from, and
+ * this **declares where it opens** like every other fixture here rather than
+ * leaving a story to index into `layouts` — array order is not a declaration,
+ * and a Layout inserted before it would move the story somewhere else in
+ * silence. `story-spaces.test.ts` holds both halves: where it opens, and that
+ * Cards remain outside it.
+ */
+export const sparseAuthoredSnapshot: SpaceSnapshot = {
+  ...authoredSnapshot,
+  document: { ...authoredSnapshot.document, defaultRenderer: COLLECTION_TWO },
 };
 
 export const authoredSpace: Space = loaded(loadSpaceSnapshot(authoredSnapshot));

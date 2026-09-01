@@ -1,5 +1,5 @@
 import { createRef, useState, type ReactElement } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID, uuidSchema } from '@project/core';
 import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
@@ -356,6 +356,39 @@ describe('SpaceSidebar', () => {
   });
 
   /**
+   * A refused whole-Space Delete stays on the confirmation that asked for it.
+   *
+   * The dialog is the only surface with the question on it, so a refusal that
+   * dismisses it has nowhere left to be read. Base UI closes on the action's
+   * click unless the handler says otherwise, and `preventDefault` is not how it
+   * is said — `mergeProps` reads `baseUIHandlerPrevented`, never
+   * `defaultPrevented`.
+   */
+  it('keeps a refused Delete on the confirmation that asked for it', async () => {
+    const props: SpaceSidebarProps = {
+      ...settledProps(),
+      cardLinks: {
+        title: 'Start here',
+        onCopyCanonical: vi.fn(),
+        onCopyContextual: vi.fn(),
+        onDelete: () => 'Retarget or delete the Aliases of this Card first: Alias 1.',
+      },
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Card Start here' }));
+    const confirmation = await screen.findByRole('alertdialog', {
+      name: 'Delete Card Start here?',
+    });
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete Card' }));
+
+    expect(await within(confirmation).findByRole('alert')).toHaveTextContent(
+      'Retarget or delete the Aliases of this Card first: Alias 1.',
+    );
+    expect(confirmation).toBeVisible();
+  });
+
+  /**
    * The whole of ADR 0053's first claim, asserted as one state: every computed
    * View and every authored Layout is a row of one list, exactly one is pressed,
    * and no row anywhere says `None`.
@@ -609,6 +642,55 @@ describe('SpaceSidebar', () => {
 
       expect(props.canvas.onSelect).toHaveBeenCalledOnce();
       await dismissed();
+    });
+
+    it('dismisses itself when a Card is deleted from the Space', async () => {
+      const onDelete = vi.fn(() => null);
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        cardLinks: {
+          title: 'Start here',
+          onCopyCanonical: vi.fn(),
+          onCopyContextual: vi.fn(),
+          onDelete,
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Card Start here' }));
+      const confirmation = await screen.findByRole('alertdialog', {
+        name: 'Delete Card Start here?',
+      });
+      fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete Card' }));
+
+      expect(onDelete).toHaveBeenCalledOnce();
+      await dismissed();
+    });
+
+    /** The other half of the rule above: a refusal has nowhere to be read but
+        the dialog, and dismissing the sheet under it takes that away. */
+    it('stays open when a Delete is refused', async () => {
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        cardLinks: {
+          title: 'Start here',
+          onCopyCanonical: vi.fn(),
+          onCopyContextual: vi.fn(),
+          onDelete: () => 'This Card is no longer part of the Space.',
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Card Start here' }));
+      const confirmation = await screen.findByRole('alertdialog', {
+        name: 'Delete Card Start here?',
+      });
+      fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete Card' }));
+
+      expect(await within(confirmation).findByRole('alert')).toHaveTextContent(
+        'This Card is no longer part of the Space.',
+      );
+      expect(screen.getByTestId('space-title')).toBeVisible();
     });
 
     it('dismisses itself when a Graph is activated', async () => {
