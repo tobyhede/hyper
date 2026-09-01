@@ -6,6 +6,7 @@ import { defaultRenderer } from '../src/renderer';
 import {
   authoredSnapshot,
   authoredSpace,
+  sparseAuthoredSnapshot,
   deepDiveSpace,
   editedSnapshot,
   MINTED_GRAPH_ID_BASE,
@@ -34,6 +35,24 @@ describe('the story Spaces', () => {
 
     expect(opens).toBe(authoredSpace.defaultRenderer);
     expect(currentRenderer(canvasRenderers(authoredSpace), opens).title).toBe('Collection 1');
+  });
+
+  /**
+   * The Cards drawer's Refused story needs a Layout that is *missing* Cards, and
+   * it must not find one by indexing into `layouts` — that follows array order,
+   * so inserting a Layout would silently move the story to a different one.
+   */
+  it('opens the sparse authored Space on a Layout some Cards are absent from', () => {
+    const space = loadSpaceSnapshot(sparseAuthoredSnapshot);
+    if (!space.ok) throw new Error('sparse story Space did not load');
+    const opens = defaultRenderer(space.space);
+
+    expect(opens).toBe(space.space.defaultRenderer);
+    const layout = space.space.lookup.layout(opens)?.layout;
+    expect(currentRenderer(canvasRenderers(space.space), opens).title).toBe('Collection 2');
+    expect(
+      space.space.cards.filter((card) => layout?.positions[card.id] === undefined),
+    ).not.toHaveLength(0);
   });
 
   /** A new Space names no view, so production's own fallback answers (ADR 0018, ADR 0025). */

@@ -29,7 +29,7 @@ export {
   type ProductResponse,
 } from './product-destination';
 
-export { HttpSpaceBackend } from './backend';
+export { HttpSpaceBackend, NETWORK_FAILURE_MESSAGE } from './backend';
 export type { HttpSpaceBackendOptions } from './backend';
 
 export const MAX_COMMIT_BODY_BYTES = 1_048_576;

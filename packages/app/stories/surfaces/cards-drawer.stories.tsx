@@ -1,12 +1,13 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
-import { uuidSchema, type Card, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type Card } from '@project/core';
+import { NETWORK_FAILURE_MESSAGE } from '@project/http';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { CardsDrawer } from '#components/CardsDrawer';
 import { PersistenceNotice } from '#components/PersistenceControl';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { composeApp } from '#src/compose-app';
-import { authoredSnapshot } from '../support/spaces';
+import { sparseAuthoredSnapshot } from '../support/spaces';
 
 export default { title: 'Surfaces/Cards Drawer' };
 
@@ -75,20 +76,10 @@ function CardsDrawerFixture({
   );
 }
 
-const sparseSnapshot = (): SpaceSnapshot => {
-  const sparseLayout = authoredSnapshot.document.layouts?.[1];
-  if (sparseLayout === undefined) throw new Error('Cards drawer story needs its sparse Layout');
-  return {
-    ...authoredSnapshot,
-    document: { ...authoredSnapshot.document, defaultRenderer: sparseLayout.id },
-  };
-};
-
 /** The production Authoring composition behind the browser-reachable repeated-activation refusal. */
 function RefusedAdd() {
   const session = useMemo(() => {
-    const snapshot = sparseSnapshot();
-    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    const stored = { snapshot: sparseAuthoredSnapshot, revision: 0n, exportedRevision: null };
     return openSpaceSession(new MemorySpaceBackend([stored]), stored);
   }, []);
   const composed = useMemo(() => composeApp({ spaceSession: session }), [session]);
@@ -155,7 +146,10 @@ export const PersistenceFailure: Story = () => (
           failure: {
             kind: 'retryable-failure',
             code: 'network',
-            message: 'The Card is local but has not been saved.',
+            // The message production emits, imported rather than transcribed:
+            // `PersistenceNotice` renders `failure.message` verbatim, so a
+            // sentence invented here would prove nothing about the app.
+            message: NETWORK_FAILURE_MESSAGE,
           },
         }}
         onRetry={() => undefined}

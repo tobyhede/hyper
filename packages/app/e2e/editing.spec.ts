@@ -1425,24 +1425,6 @@ test(
 );
 
 test(
-  'a repeated activation reports the stale Add in the Cards drawer',
-  { tag: '@parity:cards-drawer-keeps-an-add-refusal-on-its-surface' },
-  async ({ page }) => {
-    await page.goto('/');
-    await selectCanvas(page, 'Collection 1');
-    await settled(page);
-
-    await page.getByRole('button', { name: 'Cards' }).click();
-    await page.getByRole('button', { name: 'Add E to Layout' }).evaluate((button) => {
-      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    await expect(page.getByRole('alert')).toContainText('already in this Layout');
-  },
-);
-
-test(
   'the Cards drawer dismisses on Escape and survives working on the canvas behind it',
   { tag: '@parity:cards-drawer-opens-and-dismisses-without-locking-the-canvas' },
   async ({ page }) => {
@@ -1564,6 +1546,41 @@ test('Delete Card confirms before removing the Card from the whole Space', async
   await page.getByRole('button', { name: 'Cards' }).click();
   await expect(page.getByRole('button', { name: 'Add B to Layout' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
+
+test('Delete Card is withdrawn while presenting', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  await nodeByTitle(page, 'B').click();
+  await expect(page.getByRole('button', { name: 'Delete Card B' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Present' }).click();
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+
+  await expect(page.getByRole('button', { name: 'Delete Card B' })).toHaveCount(0);
+});
+
+/**
+ * Creating an Alias both selects and opens it, so it is the one gesture that
+ * leaves an Open Card as the selected Card. Deleting it there would strand
+ * `openedCardId` on a Card the Space no longer holds, and every authoring
+ * affordance that reads it — the Cards drawer, Title editing, chrome editing —
+ * would stay withdrawn with no pane left to close.
+ */
+test('Delete Card is withdrawn on the Card that Alias creation left open', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await page.getByRole('combobox', { name: 'Target' }).fill('B');
+  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+  await expect(page.getByTestId('open-card')).toBeVisible();
+
+  await expect(page.getByRole('button', { name: 'Delete Card B' })).toHaveCount(0);
 });
 
 test('dragging from the Cards drawer uses transformed canvas coordinates then ordinary Card dragging', async ({

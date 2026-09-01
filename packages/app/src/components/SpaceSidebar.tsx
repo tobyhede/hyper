@@ -204,7 +204,12 @@ function DeleteCardControl({
             onClick={(event) => {
               const nextRefusal = onDelete();
               setRefusal(nextRefusal);
-              if (nextRefusal !== null) event.preventDefault();
+              // `preventBaseUIHandler`, not `preventDefault`: Base UI's
+              // `mergeProps` runs the primitive's own close handler unless the
+              // consumer sets `baseUIHandlerPrevented`, and it never reads
+              // `defaultPrevented`. A refusal has nowhere to be read but this
+              // dialog, so the dialog has to stay.
+              if (nextRefusal !== null) event.preventBaseUIHandler();
             }}
           >
             Delete Card
@@ -773,7 +778,19 @@ export function SpaceSidebar({
               </Button>
             )}
             {cardLinks.onDelete !== undefined && (
-              <DeleteCardControl title={cardLinks.title} onDelete={cardLinks.onDelete} />
+              <DeleteCardControl
+                title={cardLinks.title}
+                /* `onCanvas` by hand rather than by the helper: only a
+                   *completed* Delete has a canvas result to dismiss the sheet
+                   for. A refusal keeps the dialog open (`DeleteCardControl`
+                   below), and dismissing the sheet under it would take the
+                   surface the sentence is on with it. */
+                onDelete={() => {
+                  const refusal = cardLinks.onDelete?.() ?? null;
+                  if (refusal === null && isMobile) setOpenMobile(false);
+                  return refusal;
+                }}
+              />
             )}
           </div>
         )}

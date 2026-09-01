@@ -58,5 +58,7 @@ immediately and re-adding it does not restore those Edges.
 The selected-Card Sidebar controls now offer a separately named whole-Space
 Delete Card action behind an `AlertDialog` confirmation. Stable Ladle stories
 and paired application evidence cover empty, long, narrow, disabled, refused
-and retryable persistence-failure states. `positionedStrategy` projects only
-authored Layout membership; its former fallback band is gone.
+and retryable persistence-failure states. The last checklist line was already
+true before this work started: `positionedStrategy` projects only authored
+Layout membership, its fallback band having been removed earlier, and nothing
+under `packages/graph` changed here.

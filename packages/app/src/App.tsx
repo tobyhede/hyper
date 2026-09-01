@@ -335,6 +335,27 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const chromeEditingDisabled =
       !editable || presenting || creatingAlias || editingCardBody || editingCardTitle;
 
+    /**
+     * Delete Card is withdrawn wherever Add Card is, and for one reason more.
+     *
+     * It is a whole-Space authoring action on the *selected* Card, so it reads
+     * the conditions `addCard.disabled` reads and adds `editingCardTitle`: that
+     * one names the selected Card, and destroying the subject of a live rename
+     * is the edit answering itself. Withdrawing it while a Card is open is what
+     * keeps `openedCardId` from outliving the Card it names — nothing clears it
+     * on a Delete, and Alias creation is the one gesture that leaves an Open
+     * Card selected, so every affordance reading `openedCardId` would stay
+     * withdrawn with no pane left to close.
+     */
+    const deleteCardAvailable =
+      editable &&
+      !presenting &&
+      openedCardId === null &&
+      !creatingAlias &&
+      !editingCardBody &&
+      !editingCardTitle &&
+      spaceChromeEdit === null;
+
     useEffect(() => {
       if (chromeEditingDisabled) setSpaceChromeEdit(null);
     }, [chromeEditingDisabled]);
@@ -593,11 +614,17 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const centreAnchor = (): LayoutPosition => visibleCentre.current?.() ?? { x: 0, y: 0 };
 
     /**
-     * A silent refusal, deliberately: both `added-card-to-layout` outcomes it
-     * can produce (`card-already-in-layout`, `card-not-found`) mean this row's
-     * own Card just left `cardsOutsideSelectedLayout` — the drawer that called
-     * this has already removed the row the reader activated. There is nothing
-     * on screen left to attach a refusal sentence to.
+     * The refusal goes back to the caller, and only the caller can place it.
+     *
+     * Both `added-card-to-layout` outcomes this can produce
+     * (`card-already-in-layout`, `card-not-found`) mean the Card just left
+     * `cardsOutsideSelectedLayout`, so the row the reader activated is already
+     * gone. The drawer is still on screen though, and it is the surface that
+     * asked — so it keeps the sentence, in the `Alert` above its list.
+     *
+     * `dropExistingCard` below discards the same string on purpose: a drop
+     * ends on the canvas, and by then the drawer that named the Card may be
+     * dismissed, leaving nowhere the sentence belongs.
      */
     const addExistingCard = useCallback(
       (cardId: CardId, anchor: LayoutPosition, focus: boolean): string | null => {
@@ -892,15 +919,17 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
                         cardId: selectedCard.id,
                       })
                   : undefined,
-                onDelete: () => {
-                  const result = authoring.complete({
-                    kind: 'deleted-card',
-                    cardId: selectedCard.id,
-                  });
-                  return result.kind === 'refused'
-                    ? describeAuthoringRefusal(result.refusal)
-                    : null;
-                },
+                onDelete: deleteCardAvailable
+                  ? () => {
+                      const result = authoring.complete({
+                        kind: 'deleted-card',
+                        cardId: selectedCard.id,
+                      });
+                      return result.kind === 'refused'
+                        ? describeAuthoringRefusal(result.refusal)
+                        : null;
+                    }
+                  : undefined,
               }
         }
         titleEdit={titleEdit}

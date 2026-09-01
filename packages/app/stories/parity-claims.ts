@@ -47,13 +47,15 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/cards-drawer.stories.tsx',
     storyExport: 'Disabled',
     claim:
-      'The Cards trigger is disabled while the selected Layout cannot accept membership edits.',
+      'The Cards trigger is disabled while the Space View cannot accept membership edits — presenting, an open Card, or Alias creation.',
   },
   {
     id: 'cards-drawer-keeps-an-add-refusal-on-its-surface',
     storyFile: 'surfaces/cards-drawer.stories.tsx',
     storyExport: 'Refused',
     claim: 'A refused Add remains visible in the open Cards drawer that asked for it.',
+    applicationEvidence:
+      'No browser gesture reaches a repeated Add. Completing the first one removes the Card from `cardsOutsideSelectedLayout`, so the row unmounts before a second click can land on it, and only two events dispatched inside one task reach the refusal at all. The story is driven to the state instead, through the production Authoring composition, so the sentence it draws is the one `describeAuthoringRefusal` gives the application.',
   },
   {
     id: 'cards-drawer-coexists-with-persistence-failure',

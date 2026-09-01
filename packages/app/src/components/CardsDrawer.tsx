@@ -175,7 +175,12 @@ export function CardsDrawer({
               other portalled surface in the tree does. */}
           <DrawerPopup className="nokey">
             <DrawerHeader>
-              <DrawerTitle hidden>Cards</DrawerTitle>
+              {/* `sr-only`, not `hidden`: the spec asks for no *visible*
+                  heading, and `hidden` would take the title out of the
+                  accessibility tree while still naming the dialog through
+                  `aria-labelledby` — leaving a reader navigating by heading
+                  nothing at all. */}
+              <DrawerTitle className="sr-only">Cards</DrawerTitle>
             </DrawerHeader>
             <DrawerContent>
               {refusal === null ? null : (

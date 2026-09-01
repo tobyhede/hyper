@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { NETWORK_FAILURE_MESSAGE } from '@project/http';
 
 const STORY = '/?story=surfaces--cards-drawer--available-cards&mode=preview';
 const story = (name: string) => `/?story=surfaces--cards-drawer--${name}&mode=preview`;
@@ -80,9 +81,7 @@ test(
   { tag: '@parity:cards-drawer-coexists-with-persistence-failure' },
   async ({ page }) => {
     await page.goto(story('persistence-failure'));
-    await expect(page.getByTestId('persistence-failure')).toContainText(
-      'The Card is local but has not been saved.',
-    );
+    await expect(page.getByTestId('persistence-failure')).toContainText(NETWORK_FAILURE_MESSAGE);
     await page.getByRole('button', { name: 'Cards' }).click();
     await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
   },
