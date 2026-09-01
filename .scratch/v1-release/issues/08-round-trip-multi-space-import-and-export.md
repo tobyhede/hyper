@@ -2,10 +2,14 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01; `space-cards/03`
+Blocked by: 01; `architecture-review/12`
 
 **What to build:** Make the public CLI import and export exactly one complete
 Meta-rooted aggregate.
+
+Complete import replacement is not the Default Content hard reset: this ticket
+owns round-tripping a supplied aggregate, while ticket 16 owns regenerating the
+canonical initial aggregate without an import source.
 
 - [ ] The canonical directory contains a versioned `hyper.json` with
       `metaSpaceId`, plus one immediate `<space-uuid>/` child per Space. Each
@@ -38,5 +42,9 @@ Meta-rooted aggregate.
       `hyper <aggregate-path> --dangerous-truncate`. Retire Space-scoped public
       export and `hyper entry`.
 - [ ] Export followed by import produces the same V1 authored aggregate through
-      normal intake, including converging Space Cards and all selected Space Views
+      normal intake, including converging Space Cards and all selected Layouts
       and Graphs.
+- [ ] Fold `layout-only-v1/05` into this ticket when the Layout-only tracker
+      lands: export/import preserve `defaultLayout`, initialized and layoutless
+      source states, Layout/Graph identities and explicit post-initialization
+      Export without retaining fields retired by the Layout-only contract.

@@ -366,11 +366,14 @@ const byPhase = (roadmap: Roadmap, phase: FeaturePhase): readonly FeatureRoadmap
 const openIssues = (feature: FeatureRoadmap): readonly ScratchIssue[] =>
   feature.issues.filter((issue) => !isSettled(issue.state));
 
+const issueTagSuffix = (issue: ScratchIssue): string =>
+  issue.tags.length === 0 ? '' : `  [${issue.tags.join(', ')}]`;
+
 const issueLine = (issue: ScratchIssue): string => {
   const number = issue.number ?? '--';
   const blocked =
     issue.unmetBlockers.length > 0 ? `  blocked by ${issue.unmetBlockers.join(', ')}` : '';
-  return `    ${number}  ${issue.state.padEnd(15)} ${issue.title}${blocked}`;
+  return `    ${number}  ${issue.state.padEnd(15)} ${issue.title}${issueTagSuffix(issue)}${blocked}`;
 };
 
 const featureBlock = (feature: FeatureRoadmap): readonly string[] => [
@@ -517,7 +520,7 @@ const releaseIssueLine = ({ feature, issue }: TaggedIssue): string => {
   const reference = `${feature}/${issue.number ?? '--'}`;
   const blocked =
     issue.unmetBlockers.length > 0 ? `  blocked by ${issue.unmetBlockers.join(', ')}` : '';
-  return `  ${reference.padEnd(44)} ${issue.state.padEnd(15)} ${issue.title}${blocked}`;
+  return `  ${reference.padEnd(44)} ${issue.state.padEnd(15)} ${issue.title}${issueTagSuffix(issue)}${blocked}`;
 };
 
 export const renderRoadmap = (roadmap: Roadmap, release: ReleaseScope | null = null): string => {
@@ -530,7 +533,10 @@ export const renderRoadmap = (roadmap: Roadmap, release: ReleaseScope | null = n
   const grabbable = roadmap.features.flatMap((feature) =>
     openIssues(feature)
       .filter((issue) => issue.unmetBlockers.length === 0 && issue.state !== 'claimed')
-      .map((issue) => `  ${feature.slug}/${issue.number ?? '--'}  ${issue.title}`),
+      .map(
+        (issue) =>
+          `  ${feature.slug}/${issue.number ?? '--'}  ${issue.title}${issueTagSuffix(issue)}`,
+      ),
   );
   const deferred = roadmap.features.flatMap((feature) =>
     feature.issues
@@ -634,6 +640,7 @@ const markdownCard = (
     '',
     `- **Reference:** \`${planned.reference}\``,
     `- **Status:** \`${planned.issue.state}\``,
+    `- **Tags:** ${planned.issue.tags.map((tag) => `\`${tag}\``).join(', ')}`,
     `- **Blocked by:** ${blockers}`,
     '',
     `[Open issue](${issuePath})`,
@@ -756,6 +763,9 @@ const escapeHtml = (text: string): string =>
 const inlineMarkup = (text: string): string =>
   escapeHtml(text).replace(/`([^`]+)`/gu, '<code>$1</code>');
 
+const htmlTags = (issue: ScratchIssue): string =>
+  issue.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
+
 const htmlIssue = (issue: ScratchIssue): string => {
   const blocked =
     issue.unmetBlockers.length > 0
@@ -765,6 +775,7 @@ const htmlIssue = (issue: ScratchIssue): string => {
     '<li class="issue">',
     `<span class="num">${escapeHtml(issue.number ?? '--')}</span>`,
     `<span class="badge ${issue.state}">${issue.state}</span>`,
+    htmlTags(issue),
     `<a class="title" href="${escapeHtml(issue.path)}">${inlineMarkup(issue.title)}</a>`,
     blocked,
     '</li>',
@@ -808,6 +819,7 @@ const htmlReleaseIssue = ({ feature, issue }: TaggedIssue): string => {
     '<li class="issue">',
     `<span class="ref">${escapeHtml(feature)}/${escapeHtml(issue.number ?? '--')}</span>`,
     `<span class="badge ${issue.state}">${issue.state}</span>`,
+    htmlTags(issue),
     `<a class="title" href="${escapeHtml(issue.path)}">${inlineMarkup(issue.title)}</a>`,
     blocked,
     '</li>',
@@ -901,6 +913,10 @@ h2 {
 .badge.needs-triage, .badge.needs-info { color: var(--cool); }
 .badge.claimed { color: var(--claim); }
 .badge.unrecognised { color: var(--stop); }
+.tag {
+  color: var(--muted); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 999px; padding: .08rem .38rem; font-size: .68rem; white-space: nowrap;
+}
 .title { flex: 1; min-width: 14rem; color: inherit; text-decoration: none; }
 .title:hover, .pick a:hover { text-decoration: underline; }
 .blocked { font-size: .76rem; color: var(--stop); }
@@ -912,6 +928,7 @@ code {
 .pick li { padding: .35rem 0; border-bottom: 1px solid var(--line); }
 .pick a { color: inherit; text-decoration: none; }
 .pick .ref { font-family: ui-monospace, monospace; color: var(--muted); margin-right: .6rem; }
+.pick .tag { margin-left: .5rem; }
 details { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: .7rem 1.1rem; }
 summary { cursor: pointer; color: var(--muted); font-size: .85rem; }
 details ul { list-style: none; padding: 0; margin: .8rem 0 0; }
@@ -949,7 +966,7 @@ export const renderRoadmapHtml = (
       .filter((issue) => issue.unmetBlockers.length === 0 && issue.state !== 'claimed')
       .map(
         (issue) =>
-          `<li><a href="${escapeHtml(issue.path)}"><span class="ref">${escapeHtml(feature.slug)}/${escapeHtml(issue.number ?? '--')}</span>${inlineMarkup(issue.title)}</a></li>`,
+          `<li><a href="${escapeHtml(issue.path)}"><span class="ref">${escapeHtml(feature.slug)}/${escapeHtml(issue.number ?? '--')}</span>${inlineMarkup(issue.title)}</a>${htmlTags(issue)}</li>`,
       ),
   );
   const deferred = roadmap.features.flatMap((feature) =>
