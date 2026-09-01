@@ -59,6 +59,10 @@ the detail. -->
   treats PR 134 as delivered foundation work, rewrites overlapping ownership,
   adds checkpoint tickets 17–19 and fixes the parallel lanes that rejoin at the
   clean-clone rehearsal.
+- [13 — Decide how End-to-end feedback controls V1 scope](issues/13-decide-how-feedback-controls-v1-scope.md)
+  admits feedback through an evidence-backed blocker/correction/post-V1 rule,
+  assigns classification and scope authority, and requires explicit ownership,
+  proof and critical-path updates before accepted work begins.
 
 ## Not yet specified
 
