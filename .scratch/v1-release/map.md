@@ -51,13 +51,13 @@ the detail. -->
 - [10 — Audit the canonical journey and its issue ownership](issues/10-audit-the-canonical-journey-and-ownership.md)
   records the built/partial/unbuilt matrix, overlapping ownership and the six
   decisions ticket 11 needs before it can define the checkpoint.
+- [11 — Define the End-to-end checkpoint](issues/11-define-the-end-to-end-checkpoint.md)
+  makes the complete clean-clone authoring and destructive-recovery rehearsal
+  the untagged checkpoint, with a compact evidence manifest and explicit
+  post-checkpoint scope.
 
 ## Not yet specified
 
-- The exact work packages and proof boundary that constitute End-to-end depend
-  on resolving the ownership, Layout-only, destructive-recovery, clean-launch,
-  fixture-placement and cut-line decisions surfaced by the completed
-  canonical-journey audit.
 - The critical path from End-to-end to `v1.0.0`, including which existing
   release and feature tickets must be split, reordered or retired, depends on
   the resulting End-to-end checkpoint decision.
