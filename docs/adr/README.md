@@ -69,6 +69,7 @@ under `superseded/`.
 | [0018](0018-a-new-space-is-a-single-centered-card.md) | A new Space is one centred Card. |
 | [0054](0054-the-unreleased-prototype-rolls-forward.md) | The prototype is unreleased, so a format change rolls forward and adds no migration. |
 | [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. |
+| [0077](0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md) | The Meta Space starts from one deterministic, editable aggregate that CLI hard reset restores. |
 
 ## HTTP
 

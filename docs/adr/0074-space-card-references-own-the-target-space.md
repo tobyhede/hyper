@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0068
-Refined by: 0076
+Refined by: 0076, 0077
 Related: 0001, 0018, 0058, 0060, 0069
 
 The Space Cards that reference a Space own its lifetime, and they own it

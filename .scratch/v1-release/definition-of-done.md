@@ -7,6 +7,12 @@ technical presentation without editing source files or losing authored work.
 
 - [ ] The application has one permanent Meta Space that opens when no other Space
       is named.
+- [ ] First repository initialization creates that Meta Space with deterministic,
+      editable Default Content: a Closed Markdown Card, an Open Markdown Card, an
+      Open Space Card and an Alias, with the Space Card targeting a three-Card
+      example Space with a small Graph.
+- [ ] Loading an initialized repository never adds, repairs or replaces Default
+      Content, including after the author empties or heavily edits the Meta Space.
 - [ ] An ordinary Space is created only by creating its first Space Card and can
       be opened independently at its canonical URL.
 - [ ] Every successful Edit is saved through the unified authored commit path
@@ -15,6 +21,10 @@ technical presentation without editing source files or losing authored work.
       discarding the working Space.
 - [ ] Canonical CLI import and export preserve the complete Meta-rooted aggregate,
       every V1 entity and every authored selection.
+- [ ] A confirmed or forced CLI hard reset atomically destroys the complete
+      repository and regenerates the same canonical Meta Space and Default
+      Content used by first initialization; cancellation and failure preserve the
+      previous aggregate.
 
 ## Cards
 
@@ -112,8 +122,10 @@ technical presentation without editing source files or losing authored work.
 
 ## Release gate
 
-- [ ] No known defect blocks creating, editing, saving, reopening or presenting
-      the V1 authored aggregate.
+- [ ] The untagged End-to-end checkpoint has supplied observed canonical-journey
+      feedback; reaching it is not the `v1.0.0` release.
+- [ ] No known defect blocks creating, editing, saving, reopening, importing,
+      exporting or presenting the V1 authored aggregate.
 - [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass on the required Node
       version.
 - [ ] PostgreSQL integration proves an Edit survives a fresh application host.
@@ -135,6 +147,9 @@ technical presentation without editing source files or losing authored work.
 - Special visual treatment distinguishing first and repeat visits in cycles.
 - Undo and redo.
 - Browser-facing export and backup; CLI export is sufficient for V1.
+- Browser-facing reset and merge-style seeding; V1 has only complete CLI hard
+  reset and first-run initialization.
+- Migration or compatibility for pre-V1 repository state and generated artifacts.
 - Cross-Space Edge authoring and reconnection.
 - Presentation traversal across Space boundaries.
 - Cross-Space presentation-point URLs.

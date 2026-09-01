@@ -7,6 +7,10 @@ Blocked by: 01; `space-cards/03`
 **What to build:** Make the public CLI import and export exactly one complete
 Meta-rooted aggregate.
 
+Complete import replacement is not the Default Content hard reset: this ticket
+owns round-tripping a supplied aggregate, while ticket 16 owns regenerating the
+canonical initial aggregate without an import source.
+
 - [ ] The canonical directory contains a versioned `hyper.json` with
       `metaSpaceId`, plus one immediate `<space-uuid>/` child per Space. Each
       child keeps the existing `space.json` and `cards/<card-uuid>.md` shape.

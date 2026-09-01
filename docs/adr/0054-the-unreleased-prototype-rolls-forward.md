@@ -1,7 +1,7 @@
 # The unreleased prototype rolls forward
 
 Status: accepted
-Refined by: 0056
+Refined by: 0056, 0077
 
 Hyper has no old documents to preserve. Its only data are fixtures kept with the
 prototype, so authored document changes roll forward with those fixtures rather
@@ -25,4 +25,3 @@ unreleased prototype. It does not remove relational schema management:
 `migrations/app/` and the Prisma-next contract remain how the PostgreSQL schema
 is defined and applied. It is not licence to delete them or to skip a migration
 when the relational schema changes.
-
