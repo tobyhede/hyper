@@ -334,6 +334,9 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     } | null>(null);
     const chromeEditingDisabled =
       !editable || presenting || creatingAlias || editingCardBody || editingCardTitle;
+    const cardIsOpen =
+      renderer.kind === 'layout' &&
+      Object.values(renderer.resolvedLayout.layout.positions).some((at) => at?.open === true);
 
     /**
      * Delete Card is withdrawn wherever Add Card is, and for one reason more.
@@ -342,15 +345,15 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      * the conditions `addCard.disabled` reads and adds `editingCardTitle`: that
      * one names the selected Card, and destroying the subject of a live rename
      * is the edit answering itself. Withdrawing it while a Card is open is what
-     * keeps `openedCardId` from outliving the Card it names — nothing clears it
-     * on a Delete, and Alias creation is the one gesture that leaves an Open
-     * Card selected, so every affordance reading `openedCardId` would stay
+     * keeps the Layout's Open state from outliving the Card it names — nothing
+     * clears it on a Delete, and Alias creation is the one gesture that leaves
+     * an Open Card selected, so every affordance reading that state would stay
      * withdrawn with no pane left to close.
      */
     const deleteCardAvailable =
       editable &&
       !presenting &&
-      openedCardId === null &&
+      !cardIsOpen &&
       !creatingAlias &&
       !editingCardBody &&
       !editingCardTitle &&
