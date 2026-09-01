@@ -12,7 +12,7 @@ import {
   uuidSchema,
   type SpaceSnapshot,
 } from '@project/core';
-import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
+import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import {
   decodeProblemDetails,
   encodeCommitRequest,
@@ -448,7 +448,6 @@ describe('Vite Hono host', () => {
       '/api/spaces',
       JSON.stringify(encodeCommitRequest(updateCommit)),
       { 'content-type': 'application/json ; charset=utf-8' },
-      undefined,
       'POST',
     );
 
@@ -469,12 +468,12 @@ describe('Vite Hono host', () => {
         '/api/spaces',
         `{"padding":"${'x'.repeat(MAX_COMMIT_BODY_BYTES)}"}`,
         { 'content-type': 'application/json', 'transfer-encoding': 'chunked' },
-        agent,
         'POST',
+        agent,
       );
       expect(rejected.status).toBe(413);
 
-      const accepted = await send(host.url, '/api/spaces', '', {}, agent, 'GET');
+      const accepted = await send(host.url, '/api/spaces', '', {}, 'GET', agent);
       expect(accepted.status).toBe(200);
       expect(connections).toHaveLength(2);
       expect(connections[1]).toBe(connections[0]);
@@ -500,12 +499,12 @@ describe('Vite Hono host', () => {
           '/api/spaces',
           `{"padding":"${'x'.repeat(MAX_COMMIT_BODY_BYTES * 4)}"}`,
           headers,
-          agent,
           'POST',
+          agent,
         );
         expect(rejected.status).toBe(413);
 
-        const accepted = await send(host.url, '/api/spaces', '', {}, agent, 'GET');
+        const accepted = await send(host.url, '/api/spaces', '', {}, 'GET', agent);
         expect(accepted.status).toBe(200);
         expect(connections).toHaveLength(2);
         expect(connections[1]).toBe(connections[0]);
@@ -515,17 +514,68 @@ describe('Vite Hono host', () => {
     },
   );
 
+  // The other half of the drain policy. Below the allowance an oversized body is
+  // read to its end and the connection survives its own 413, as above; past the
+  // allowance the drain stops, the body is left unconsumed and the socket cannot
+  // be reused — a client that never stops sending loses its connection rather
+  // than costing us the drain. Only the reuse half was pinned before.
+  it('drops the connection when a body outruns the drain allowance', async () => {
+    const { host, connections } = await startHost(createSpaceHttpApp(repository()));
+    const agent = new Agent({ keepAlive: true, maxSockets: 1 });
+    try {
+      // The host answers 413 and stops reading, so the client's write may finish
+      // or be reset part-way through — the reset is the policy working, not a
+      // failure. But a swallowed rejection would also swallow a 500 or a crash,
+      // leaving the connection assertions below true for the wrong reason, so
+      // whichever outcome the client saw is checked: a response that arrived at
+      // all has to be the 413.
+      const overflow = await send(
+        host.url,
+        '/api/spaces',
+        `{"padding":"${'x'.repeat(MAX_DRAINED_BODY_BYTES * 2)}"}`,
+        { 'content-type': 'application/json' },
+        'POST',
+        agent,
+      ).then(
+        (response) => response,
+        () => undefined,
+      );
+      if (overflow !== undefined) expect(overflow.status).toBe(413);
+
+      // Waited for rather than assumed. A keep-alive agent holding one socket
+      // will re-dispatch onto a connection the host has decided to drop but not
+      // yet closed, and the follow-up then fails for a reason that is not the
+      // policy under test — the CI-only flake this test would otherwise carry.
+      const doomed = connections[0];
+      await vi.waitFor(() => expect(doomed?.destroyed).toBe(true));
+
+      const accepted = await send(host.url, '/api/spaces', '', {}, 'GET', agent);
+      expect(accepted.status).toBe(200);
+      expect(connections).toHaveLength(2);
+      expect(connections[1]).not.toBe(connections[0]);
+    } finally {
+      agent.destroy();
+    }
+  });
+
   it('reuses the connection after every early request rejection', async () => {
     const { host, connections } = await startHost(createSpaceHttpApp(repository()));
     const agent = new Agent({ keepAlive: true, maxSockets: 1 });
     const resource = '/api/spaces/00000000-0000-4000-8000-000000000001';
     const rejectedRequests = [
       {
+        // Body-carrying, as it was before the aggregate endpoint replaced the
+        // Space resource. It does not drain — no route matches, so `notFound`
+        // answers it before `requireBoundedCommitBody` is reached — and at two
+        // bytes there is nothing to drain anyway. What it holds is the graph:
+        // the not-found answer must leave the connection as reusable as the
+        // middleware rejections beside it, which a bodyless GET would show
+        // whether or not the request carried a body at all.
         name: 'invalid path identity',
         path: '/api/spaces/not-a-uuid',
-        body: '',
-        headers: {},
-        method: 'GET',
+        body: '{}',
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
         status: 400,
       },
       {
@@ -569,12 +619,12 @@ describe('Vite Hono host', () => {
           rejectedRequest.path,
           rejectedRequest.body,
           rejectedRequest.headers,
-          agent,
           rejectedRequest.method,
+          agent,
         );
         expect(rejected.status, rejectedRequest.name).toBe(rejectedRequest.status);
 
-        const accepted = await send(host.url, '/api/spaces', '', {}, agent, 'GET');
+        const accepted = await send(host.url, '/api/spaces', '', {}, 'GET', agent);
         expect(accepted.status, `${rejectedRequest.name} follow-up`).toBe(200);
         expect(connections[before + 1], `${rejectedRequest.name} socket`).toBe(connections[before]);
       }
