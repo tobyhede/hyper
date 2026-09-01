@@ -45,7 +45,8 @@ const MISSING_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000003'
 const CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000010');
 const SECOND_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
 const OTHER_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
-const MISSING_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
+const LINK_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
+const MISSING_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
 const THIRD_SPACE_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000014');
 const FOURTH_SPACE_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000015');
 const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
@@ -207,6 +208,56 @@ export const spaceRepositoryContract = (
     });
   });
 
+  it(`${name} returns aggregate Spaces in ascending id order`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'First', [CARD_ID]);
+      const second = space(OTHER_SPACE_ID, 'Second', [OTHER_CARD_ID]);
+      await seed(repository, second, first);
+
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        metaSpaceId: OTHER_SPACE_ID,
+        spaces: [stored(first, 0n, null), stored(second, 0n, null)],
+      });
+    });
+  });
+
+  it(`${name} commits an unrelated edit while another imported Space is not reachable from Meta`, async () => {
+    await withHarness(async (repository) => {
+      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      const importedRoot = space(OTHER_SPACE_ID, 'Imported root', [OTHER_CARD_ID]);
+      await seed(repository, meta, importedRoot);
+
+      const changed = retitled(meta, 'Changed');
+      await expect(commitUpdate(repository, changed, 0n)).resolves.toEqual({
+        kind: 'committed',
+        revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+        deletedSpaceIds: [],
+      });
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(
+        stored(importedRoot, 0n, null),
+      );
+    });
+  });
+
+  it(`${name} refuses to create a new unreachable Space by removing its last reference alone`, async () => {
+    await withHarness(async (repository) => {
+      const target = space(OTHER_SPACE_ID, 'Target', [OTHER_CARD_ID]);
+      const linkedMeta: SpaceSnapshot = {
+        ...space(SPACE_ID, 'Meta', [CARD_ID]),
+        cards: [card(CARD_ID, 'Meta card'), spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID)],
+      };
+      await seed(repository, linkedMeta, target);
+
+      const unlinked = { ...linkedMeta, cards: [card(CARD_ID, 'Meta card')] };
+      await expect(commitUpdate(repository, unlinked, 0n)).resolves.toEqual({
+        kind: 'aggregate-refused',
+        errors: [{ kind: 'ordinary-space-unreferenced', spaceId: OTHER_SPACE_ID }],
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(linkedMeta, 0n, null));
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(target, 0n, null));
+    });
+  });
+
   it(`${name} atomically creates, links, reads, converges on, and deletes a Space`, async () => {
     await withHarness(async (repository) => {
       const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
@@ -217,7 +268,7 @@ export const spaceRepositoryContract = (
         cards: [
           ...meta.cards,
           spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID),
-          spaceCard(MISSING_CARD_ID, OTHER_SPACE_ID),
+          spaceCard(LINK_CARD_ID, OTHER_SPACE_ID),
         ],
       };
 
@@ -264,7 +315,7 @@ export const spaceRepositoryContract = (
        */
       const halfUnlinked = {
         ...meta,
-        cards: [...meta.cards, spaceCard(MISSING_CARD_ID, OTHER_SPACE_ID)],
+        cards: [...meta.cards, spaceCard(LINK_CARD_ID, OTHER_SPACE_ID)],
       };
       await expect(
         repository.commit({
@@ -331,7 +382,7 @@ export const spaceRepositoryContract = (
         },
       };
       const unselected = spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID);
-      const selectedView = spaceCard(MISSING_CARD_ID, OTHER_SPACE_ID, {
+      const selectedView = spaceCard(LINK_CARD_ID, OTHER_SPACE_ID, {
         spaceView: SECOND_LAYOUT_ID,
       });
       const selectedGraphWithDefaultView = spaceCard(THIRD_SPACE_CARD_ID, OTHER_SPACE_ID, {
@@ -497,6 +548,54 @@ export const spaceRepositoryContract = (
     });
   });
 
+  it(`${name} refuses a commit whose Space id differs from its snapshot id`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      await seed(repository, first);
+
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: OTHER_SPACE_ID,
+              snapshot: first,
+              expectedRevision: 0n,
+            },
+          ],
+        }),
+      ).resolves.toMatchObject({ kind: 'rejected', code: 'invalid-commit' });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+    });
+  });
+
+  it(`${name} refuses a commit that names one Space more than once`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      await seed(repository, first);
+
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: retitled(first, 'First update'),
+              expectedRevision: 0n,
+            },
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: retitled(first, 'Second update'),
+              expectedRevision: 0n,
+            },
+          ],
+        }),
+      ).resolves.toMatchObject({ kind: 'rejected', code: 'invalid-commit' });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+    });
+  });
+
   it(`${name} refuses a commit claiming a Card another Space owns`, async () => {
     await withHarness(async (repository) => {
       const first = space(SPACE_ID, 'One', [CARD_ID]);
@@ -525,6 +624,19 @@ export const spaceRepositoryContract = (
         kind: 'committed',
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(narrowed, 1n, null));
+    });
+  });
+
+  it(`${name} drops every Card when a commit omits them all`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'One', [CARD_ID, SECOND_CARD_ID]);
+      await seed(repository, first);
+      const empty: SpaceSnapshot = { ...first, cards: [] };
+
+      await expect(commitUpdate(repository, empty, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(empty, 1n, null));
     });
   });
 

@@ -26,7 +26,7 @@ const FIRST_CARD_TITLE = 'Card 1';
 export interface InitializeSpaceOptions {
   /** Seeds both the Space and its first Card; later edits make them independent. */
   readonly title: string;
-  /** The composition-owned identity source for the Space, Card, Layout and Graph. */
+  /** The composition-owned identity source for the Space and first Card. */
   readonly newId: () => UUID;
 }
 
@@ -34,16 +34,13 @@ export interface InitializeSpaceOptions {
  * Initialize a normal authored Space through the same on-disk intake as every
  * other Space.
  *
- * A normal Space begins with one Markdown Card in one authored Layout whose
- * first empty Graph is both active and selected by default. Meta bootstrap and
- * ordinary Space Card creation share this shape; neither gets a privileged
- * variant of the domain value.
+ * A normal Space begins with one Markdown Card and no authored Layout. Meta
+ * bootstrap, ordinary startup and Space Card creation share this shape; the
+ * application supplies a Computed View until an Edit authors a Layout.
  */
 export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSpace {
   const spaceId = newId();
   const cardId = newId();
-  const layoutId = newId();
-  const graphId = newId();
   const card: Card = { id: cardId, title, kind: 'markdown', body: '' };
 
   return {
@@ -51,17 +48,6 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
       version: SPACE_FILE_VERSION,
       id: spaceId,
       title,
-      defaultRenderer: layoutId,
-      layouts: [
-        {
-          id: layoutId,
-          title: 'Layout 1',
-          kind: 'positioned',
-          positions: { [cardId]: { x: 0, y: 0, open: false } },
-          graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
-          activeGraph: graphId,
-        },
-      ],
     },
     cardFiles: [{ path: `cards/${card.id}.md`, text: serializeCardFile(card) }],
   };

@@ -152,6 +152,29 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     });
   });
 
+  it('commits beside an existing imported root Space', async () => {
+    const other = loaded(OTHER_ID, 0n);
+    const backend = new MemorySpaceBackend(META_ID, [loaded(), other]);
+
+    await expect(
+      backend.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: META_ID,
+            snapshot: snapshot(META_ID, 'Changed'),
+            expectedRevision: 3n,
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      kind: 'committed',
+      revisions: [{ spaceId: META_ID, revision: 4n }],
+      deletedSpaceIds: [],
+    });
+    await expect(backend.loadSpace(OTHER_ID)).resolves.toEqual(other);
+  });
+
   it('conflicts an incomplete deletion when authoritative state still references the Space', async () => {
     const linkedMeta: SpaceSnapshot = {
       ...snapshot(),

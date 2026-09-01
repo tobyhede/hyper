@@ -110,9 +110,9 @@ test('Delete on a mobile Sidebar control leaves the selected Card on the canvas'
   await renderer.focus();
   await page.keyboard.press('Delete');
 
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
   await page.getByRole('button', { name: 'Close' }).click();
   await expect(card).toBeVisible();
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
 test('Card and Graph copy commands close the mobile sidebar', async ({ page }) => {

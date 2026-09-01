@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import type { LoadedSpace, SpaceBackend, SpaceSession, SpaceSessionState } from '../src/index';
 import { MemorySpaceBackend, openSpaceSession } from '../src/index';
+import { openManagedSpaceSession } from '../src/session';
 import { MemorySpaceBackendTestControl } from '../src/memory';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -829,5 +830,126 @@ describe('openSpaceSession', () => {
         },
       ),
     );
+  });
+
+  /*
+   * The seam's contract is a `CommitResult`, and every shipped backend answers
+   * transport failure with one — but a throw is still reachable, and the session
+   * has to survive it. Left uncaught, `inFlight` never clears: the Space sits
+   * `pending` with `retry` and `resolveConflict` both early-returning, and
+   * `waitForIdle()` never resolves. `SpaceSessionRegistry`'s lifecycle barrier
+   * waits on *every* session, so one stuck this way blocks every coordinated
+   * Space Card commit in the registry, with each session already paused.
+   */
+  it('reports a throwing commit as a failure and returns to idle', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
+    const session = openSpaceSession(backend, loaded);
+    control.throwNext(new Error('backend exploded'));
+
+    session.submit(changedTitle('Typed'));
+    const state = await waitFor(
+      session.getState,
+      session.subscribe,
+      ({ persistence }) => persistence.kind !== 'pending',
+    );
+
+    expect(state.persistence).toEqual({
+      kind: 'failed',
+      failure: {
+        kind: 'retryable-failure',
+        code: 'unavailable',
+        message: 'backend exploded',
+      },
+    });
+
+    // The whole point: the session is idle again, so the registry's barrier and
+    // an ordinary retry both get past it.
+    control.queueResult({
+      kind: 'committed',
+      revisions: [{ spaceId: SPACE_ID, revision: 4n }],
+      deletedSpaceIds: [],
+    });
+    session.retry();
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      ({ persistence }) => persistence.kind === 'settled',
+    );
+    expect(session.getState().acknowledgedRevision).toBe(4n);
+  });
+
+  it.each([
+    {
+      result: { kind: 'committed' as const, revisions: [], deletedSpaceIds: [] },
+      message: `Commit result omitted the revision for Space ${SPACE_ID}`,
+    },
+    {
+      result: {
+        kind: 'committed' as const,
+        revisions: [{ spaceId: SPACE_ID, revision: 4n }],
+        deletedSpaceIds: [SPACE_ID],
+      },
+      message: 'Commit result unexpectedly deleted Spaces',
+    },
+  ])('describes the $message protocol fault precisely', async ({ result, message }) => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult(result);
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded], control), loaded);
+
+    session.submit(changedTitle('Protocol fault'));
+    const state = await waitFor(
+      session.getState,
+      session.subscribe,
+      ({ persistence }) => persistence.kind === 'rejected',
+    );
+
+    expect(state.persistence).toEqual({
+      kind: 'rejected',
+      failure: { kind: 'permanent-failure', code: 'protocol', message },
+    });
+  });
+
+  it('does not queue an unchanged coordinated working snapshot', () => {
+    const control = new MemorySpaceBackendTestControl();
+    const managed = openManagedSpaceSession(
+      new MemorySpaceBackend(SPACE_ID, [loaded], control),
+      loaded,
+    );
+
+    managed.prepareCoordinatedCommit(changedTitle('Coordinated'));
+    managed.publishCoordinatedCommit();
+    managed.session.submit(managed.session.getState().working);
+    managed.acknowledgeCoordinatedCommit(4n);
+
+    expect(control.requests).toEqual([]);
+    expect(managed.isIdle()).toBe(true);
+  });
+
+  it('preserves coordinated aggregate refusal identities in rejected session state', () => {
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
+    const managed = openManagedSpaceSession(backend, loaded);
+
+    managed.prepareCoordinatedCommit(changedTitle('Coordinated'));
+    managed.publishCoordinatedCommit();
+    managed.failCoordinatedCommit({
+      kind: 'aggregate-refused',
+      errors: [
+        { kind: 'ordinary-space-unreferenced', spaceId: SPACE_ID },
+        { kind: 'meta-space-missing', metaSpaceId: SPACE_ID },
+      ],
+    });
+
+    expect(managed.session.getState().persistence).toEqual({
+      kind: 'rejected',
+      failure: {
+        kind: 'aggregate-refused',
+        errors: [
+          { kind: 'ordinary-space-unreferenced', spaceId: SPACE_ID },
+          { kind: 'meta-space-missing', metaSpaceId: SPACE_ID },
+        ],
+      },
+    });
+    expect(managed.isIdle()).toBe(true);
   });
 });

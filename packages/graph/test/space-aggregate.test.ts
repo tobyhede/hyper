@@ -97,6 +97,18 @@ const errorsOf = (result: ReturnType<typeof loadSpaceAggregate>) => {
 };
 
 describe('loadSpaceAggregate', () => {
+  it('locates an invalid snapshot at its aggregate position', () => {
+    const errors = errorsOf(
+      loadSpaceAggregate({
+        metaSpaceId: META,
+        snapshots: [snapshot(META, []), { id: CHILD, document: { version: 1 }, cards: [] }],
+      }),
+    );
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ kind: 'invalid-space-snapshot', snapshotIndex: 1 });
+  });
+
   it('loads and indexes a complete Meta-rooted aggregate with convergence and scoped ids', () => {
     const result = loadSpaceAggregate({
       metaSpaceId: META,

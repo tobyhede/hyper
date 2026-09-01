@@ -4,8 +4,6 @@ import { initializeSpace, loadSpace, newSpace } from '../src/index';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 describe('newSpace', () => {
   it('is a real space file, not something that only nearly parses', () => {
@@ -63,8 +61,8 @@ describe('newSpace', () => {
 });
 
 describe('initializeSpace', () => {
-  it('creates the shared normal Space shape from one title and one identity source', () => {
-    const ids = [SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID];
+  it('creates the same unauthored one-Card shape as newSpace from one identity source', () => {
+    const ids = [SPACE_ID, CARD_ID];
     const initialized = initializeSpace({
       title: 'Architecture',
       newId: () => {
@@ -82,18 +80,10 @@ describe('initializeSpace', () => {
     expect(result.space).toMatchObject({
       id: SPACE_ID,
       title: 'Architecture',
-      defaultRenderer: LAYOUT_ID,
       cards: [{ id: CARD_ID, title: 'Architecture', kind: 'markdown', body: '' }],
-      layouts: [
-        {
-          id: LAYOUT_ID,
-          title: 'Layout 1',
-          kind: 'positioned',
-          activeGraph: GRAPH_ID,
-          positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
-          graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
-        },
-      ],
+      layouts: [],
+      graphs: [],
     });
+    expect(result.space.defaultRenderer).toBeUndefined();
   });
 });

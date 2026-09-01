@@ -40,6 +40,7 @@ describe('computedViewSubject', () => {
   );
 
   it('does not claim an authored or unknown Space View', () => {
+    expect(computedViewSubject(loaded.space, uuidSchema.parse(LAYOUT))).toBeUndefined();
     expect(computedViewSubject(loaded.space, UNKNOWN_VIEW)).toBeUndefined();
   });
 });

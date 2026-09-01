@@ -35,7 +35,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
     case 'space-card-target-immutable':
       return 'A Space Card keeps the target Space it was created with.';
     case 'space-card-deletion-unsupported':
-      return 'Deleting a Space Card also deletes the Space it owns, which this control cannot do.';
+      return 'Deleting this Space Card requires a coordinated multi-Space Edit, which this control cannot perform.';
     case 'card-title-required':
       return 'A Card title is required.';
     case 'layout-title-required':

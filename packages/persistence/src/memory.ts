@@ -25,10 +25,15 @@ export class MemorySpaceBackendTestControl {
   readonly attempts: MemoryCommitAttempt[] = [];
   readonly requests: SpaceCommit[] = [];
   readonly #results: CommitResult[] = [];
+  readonly #errors: Error[] = [];
   readonly #gates: Promise<void>[] = [];
 
   queueResult(result: CommitResult): void {
     this.#results.push(clone(result));
+  }
+
+  throwNext(error: Error): void {
+    this.#errors.push(error);
   }
 
   deferNextCommit(): () => void {
@@ -54,6 +59,10 @@ export class MemorySpaceBackendTestControl {
 
   nextResult(): CommitResult | undefined {
     return this.#results.shift();
+  }
+
+  nextError(): Error | undefined {
+    return this.#errors.shift();
   }
 
   async waitForCommit(): Promise<void> {
@@ -133,6 +142,8 @@ export class MemorySpaceBackend implements SpaceBackend {
 
     this.#testControl?.record(request);
     await this.#testControl?.waitForCommit();
+    const testError = this.#testControl?.nextError();
+    if (testError !== undefined) throw testError;
     const injected = this.#testControl?.nextResult();
     if (injected !== undefined) return clone(injected);
 
@@ -148,6 +159,17 @@ export class MemorySpaceBackend implements SpaceBackend {
     });
     if (conflicts.length > 0) return { kind: 'conflict', conflicts };
 
+    const baseline = loadSpaceAggregate({
+      metaSpaceId: this.#metaSpaceId,
+      snapshots: [...this.#spaces.values()].map(({ snapshot }) => snapshot),
+    });
+    const baselineUnreferenced = new Set(
+      baseline.ok
+        ? []
+        : baseline.errors.flatMap((error) =>
+            error.kind === 'ordinary-space-unreferenced' ? [error.spaceId] : [],
+          ),
+    );
     const candidate = new Map(this.#spaces);
     for (const change of request.changes) {
       if (change.kind === 'delete') {
@@ -189,7 +211,11 @@ export class MemorySpaceBackend implements SpaceBackend {
           })),
         };
       }
-      return { kind: 'aggregate-refused', errors: clone(intake.errors) };
+      const errors = intake.errors.filter(
+        (error) =>
+          error.kind !== 'ordinary-space-unreferenced' || !baselineUnreferenced.has(error.spaceId),
+      );
+      if (errors.length > 0) return { kind: 'aggregate-refused', errors: clone(errors) };
     }
 
     const revisions = request.changes.flatMap((change) => {

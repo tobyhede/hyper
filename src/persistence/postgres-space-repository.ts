@@ -33,6 +33,25 @@ class DuplicateIdentityError extends Error {}
 
 class CardOwnershipError extends Error {}
 
+/**
+ * A Space row moved between this transaction's conflict check and its write.
+ *
+ * Thrown rather than returned because the write loop has already replaced
+ * earlier Spaces in the change set by the time it can be detected. Returning a
+ * conflict from inside the transaction callback would commit those writes
+ * beside it, publishing half a coordinated edit; escaping the callback is what
+ * rolls the whole change set back. `CardOwnershipError` above escapes for the
+ * same reason.
+ */
+class StaleSpaceRevisionError extends Error {
+  readonly spaceId: UUID;
+
+  constructor(spaceId: UUID) {
+    super(`Space ${spaceId} changed during commit`);
+    this.spaceId = spaceId;
+  }
+}
+
 interface SqlPrimaryKeyConflictFields {
   readonly kind?: unknown;
   readonly sqlState?: unknown;
@@ -329,22 +348,131 @@ const lockRepositoryState = async (orm: Orm): Promise<UUID | undefined> => {
   return metaSpaceId;
 };
 
+/**
+ * Write one Space's document under the row's write lock, and answer the
+ * revision the row actually carried when that lock was granted. `undefined`
+ * means there is no such row.
+ *
+ * This exists because a revision predicate on the ORM's own `update` does not
+ * do it. `where({ id, revision }).update(...)` compiles to a SELECT that tests
+ * the predicate followed by an `UPDATE ... WHERE id = $1` keyed on the primary
+ * key alone, so the revision is checked against a snapshot the write never
+ * rechecks. Two commits that read the same revision both matched and both
+ * wrote, the later silently replacing the earlier, and both callers were told
+ * they had committed — the check read as atomic and was not.
+ *
+ * Writing the document first is what closes that window. The UPDATE takes the
+ * row's write lock, and because it leaves `revision` alone, the row it returns
+ * carries the authoritative committed revision as of the moment the lock was
+ * granted — a concurrent writer has either finished before it, and is visible
+ * here, or is still waiting for the lock this now holds to the end of the
+ * transaction. So the caller's comparison against it cannot go stale, and the
+ * revision it then writes cannot land on a row that moved.
+ *
+ * The document write on the losing path is rolled back with the rest of the
+ * transaction, which is why every caller answers a mismatch by throwing rather
+ * than returning.
+ */
+const writeSpaceDocumentUnderLock = async (
+  orm: Orm,
+  snapshot: SpaceSnapshot,
+): Promise<bigint | undefined> => {
+  const locked = await orm.public.Space.where({ id: snapshot.id }).update({
+    document: toJsonValue(snapshot.document),
+  });
+  return locked === null ? undefined : toRevision(locked.revision);
+};
+
+/**
+ * Replace one Space's stored rows, at the revision the conflict check read.
+ *
+ * The check above this is not enough on its own: it reads through
+ * `loadEverySpace`, which takes no row locks, and the topology-preserving path
+ * commits *without* ever taking the singleton lock this path holds — so a
+ * single-Space edit can move a row in the window between the two.
+ *
+ * A row that is no longer there is the same answer as one that moved. Both mean
+ * the change set was written against state that is no longer current, and both
+ * are resolved by reloading — so neither is the `disappeared during commit`
+ * invariant failure this used to raise.
+ */
 const replaceStoredSpace = async (
   orm: Orm,
   snapshot: SpaceSnapshot,
+  expectedRevision: bigint,
   revision: bigint,
 ): Promise<void> => {
-  const updated = await orm.public.Space.where({ id: snapshot.id }).update({
-    document: toJsonValue(snapshot.document),
+  const locked = await writeSpaceDocumentUnderLock(orm, snapshot);
+  if (locked !== expectedRevision) throw new StaleSpaceRevisionError(snapshot.id);
+  await orm.public.Space.where({ id: snapshot.id }).update({
     revision: toDatabaseRevision(revision),
   });
-  if (updated === null) throw new Error(`Space ${snapshot.id} disappeared during commit`);
   await upsertCards(orm, snapshot);
   const ownedCards = orm.public.Card.where({ spaceId: snapshot.id });
-  if (snapshot.cards.length === 0) await ownedCards.delete();
+  if (snapshot.cards.length === 0) await ownedCards.deleteAll();
   else {
-    await ownedCards.where((card) => card.id.notIn(snapshot.cards.map(({ id }) => id))).delete();
+    await ownedCards.where((card) => card.id.notIn(snapshot.cards.map(({ id }) => id))).deleteAll();
   }
+};
+
+const preservesAggregateBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
+  if (current.document.defaultRenderer !== next.document.defaultRenderer) return false;
+  if (
+    JSON.stringify(current.document.layouts ?? []) !== JSON.stringify(next.document.layouts ?? [])
+  ) {
+    return false;
+  }
+  if (current.cards.length !== next.cards.length) return false;
+  const currentById = new Map(current.cards.map((card) => [card.id, card]));
+  return next.cards.every((card) => {
+    const previous = currentById.get(card.id);
+    if (previous?.document.kind !== card.document.kind) return false;
+    if (card.document.kind !== 'space' || previous.document.kind !== 'space') return true;
+    return (
+      previous.document.spaceId === card.document.spaceId &&
+      previous.document.spaceView === card.document.spaceView &&
+      previous.document.graph === card.document.graph
+    );
+  });
+};
+
+const commitTopologyPreservingUpdate = async (
+  orm: Orm,
+  request: SpaceCommit,
+): Promise<RepositoryCommitResult | undefined> => {
+  const [change] = request.changes;
+  if (request.changes.length !== 1 || change.kind !== 'update') return undefined;
+  const current = await loadSpaceAggregate(orm, change.spaceId);
+  if (current?.revision !== change.expectedRevision) {
+    return { kind: 'conflict', conflicts: [{ spaceId: change.spaceId, current }] };
+  }
+  const intake = loadSpaceSnapshot(change.snapshot);
+  if (!intake.ok) {
+    return {
+      kind: 'aggregate-refused',
+      errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0, errors: intake.errors }],
+    };
+  }
+  if (!preservesAggregateBoundary(current.snapshot, change.snapshot)) return undefined;
+
+  // Past this point the aggregate boundary is settled and this path commits, so
+  // the write below is the first one and every earlier return has written
+  // nothing. The revision is re-established under the row lock rather than
+  // trusted from the read above, because this path deliberately holds no
+  // singleton lock: another commit — fast or slow — can move the row in
+  // between, and the conflict it then raises rolls this transaction back.
+  const revision = change.expectedRevision + 1n;
+  const locked = await writeSpaceDocumentUnderLock(orm, change.snapshot);
+  if (locked !== change.expectedRevision) throw new StaleSpaceRevisionError(change.spaceId);
+  await orm.public.Space.where({ id: change.spaceId }).update({
+    revision: toDatabaseRevision(revision),
+  });
+  await upsertCards(orm, change.snapshot);
+  return {
+    kind: 'committed',
+    revisions: [{ spaceId: change.spaceId, revision }],
+    deletedSpaceIds: [],
+  };
 };
 
 const createStoredSpace = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
@@ -406,15 +534,14 @@ const importCards = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => 
 };
 
 const truncateHyperContent = async (orm: Orm): Promise<void> => {
+  // Repository state restricts deletion of its Meta Space, so clear the
+  // aggregate root before deleting any Space rows.
+  await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
   const spaces = await orm.public.Space.all();
   for (const space of spaces) {
     await orm.public.Card.where({ spaceId: space.id }).deleteAll();
     await orm.public.Space.where({ id: space.id }).delete();
   }
-  // Meta state names a Space, so it cannot outlive the Spaces. Leaving the row
-  // behind makes every later commit fail complete intake with
-  // `meta-space-missing`, naming a Space nothing can restore.
-  await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
 };
 
 /**
@@ -513,15 +640,45 @@ export class PostgresSpaceRepository implements SpaceRepository {
       if (error instanceof CardOwnershipError) {
         return { kind: 'rejected', code: 'invalid-commit', message: error.message };
       }
+      // The transaction has rolled back, so the current state is read fresh
+      // outside it — reading it inside the aborted one would answer with rows
+      // the caller can never observe.
+      if (error instanceof StaleSpaceRevisionError) {
+        return {
+          kind: 'conflict',
+          conflicts: [
+            {
+              spaceId: error.spaceId,
+              current: await loadSpaceAggregate(this.#database.orm, error.spaceId),
+            },
+          ],
+        };
+      }
       throw error;
     }
   }
 
   #commitInTransaction(request: SpaceCommit): Promise<RepositoryCommitResult> {
     return this.#database.transaction(async ({ orm }) => {
+      const topologyPreserving = await commitTopologyPreservingUpdate(orm, request);
+      if (topologyPreserving !== undefined) return topologyPreserving;
       const metaSpaceId = await lockRepositoryState(orm);
       const stored = await loadEverySpace(orm);
       const byId = new Map(stored.map((space) => [space.snapshot.id, space]));
+      const baseline =
+        metaSpaceId === undefined
+          ? undefined
+          : validateSpaceAggregate({
+              metaSpaceId,
+              snapshots: stored.map(({ snapshot }) => snapshot),
+            });
+      const baselineUnreferenced = new Set(
+        baseline?.ok === false
+          ? baseline.errors.flatMap((error) =>
+              error.kind === 'ordinary-space-unreferenced' ? [error.spaceId] : [],
+            )
+          : [],
+      );
       const conflicts: SpaceConflict[] = [];
       for (const change of request.changes) {
         const current = byId.get(change.spaceId);
@@ -565,28 +722,40 @@ export class PostgresSpaceRepository implements SpaceRepository {
        * to complete intake below and is refused. `memory.ts` draws the same
        * line, and `repository-contract.ts` holds both to it.
        */
-      const changedIds = new Set(request.changes.map((change) => change.spaceId));
-      const incompleteDeletes = request.changes.flatMap((change) => {
-        if (change.kind !== 'delete') return [];
-        const stillReferenced = [...candidate.values()].some(
-          ({ snapshot }) =>
-            !changedIds.has(snapshot.id) &&
-            snapshot.cards.some(
-              (card) => card.document.kind === 'space' && card.document.spaceId === change.spaceId,
-            ),
-        );
-        return stillReferenced
-          ? [{ spaceId: change.spaceId, current: byId.get(change.spaceId) }]
-          : [];
-      });
-      if (incompleteDeletes.length > 0) {
-        return { kind: 'conflict', conflicts: incompleteDeletes };
-      }
       const aggregate = validateSpaceAggregate({
         metaSpaceId,
         snapshots: [...candidate.values()].map(({ snapshot }) => snapshot),
       });
-      if (!aggregate.ok) return { kind: 'aggregate-refused', errors: aggregate.errors };
+      const deletedIds = new Set(
+        request.changes.flatMap((change) => (change.kind === 'delete' ? [change.spaceId] : [])),
+      );
+      const changedIds = new Set(request.changes.map((change) => change.spaceId));
+      const incompleteDeleteIds = new Set(
+        aggregate.ok
+          ? []
+          : aggregate.errors.flatMap((error) =>
+              error.kind === 'space-card-target-missing' &&
+              deletedIds.has(error.targetSpaceId) &&
+              !changedIds.has(error.spaceId)
+                ? [error.targetSpaceId]
+                : [],
+            ),
+      );
+      const incompleteDeletes = [...incompleteDeleteIds].map((spaceId) => ({
+        spaceId,
+        current: byId.get(spaceId),
+      }));
+      if (incompleteDeletes.length > 0) {
+        return { kind: 'conflict', conflicts: incompleteDeletes };
+      }
+      if (!aggregate.ok) {
+        const errors = aggregate.errors.filter(
+          (error) =>
+            error.kind !== 'ordinary-space-unreferenced' ||
+            !baselineUnreferenced.has(error.spaceId),
+        );
+        if (errors.length > 0) return { kind: 'aggregate-refused', errors };
+      }
 
       const revisions: { spaceId: UUID; revision: bigint }[] = [];
       const deletedSpaceIds: UUID[] = [];
@@ -602,7 +771,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
           revisions.push({ spaceId: change.spaceId, revision: 0n });
         } else {
           const revision = change.expectedRevision + 1n;
-          await replaceStoredSpace(orm, change.snapshot, revision);
+          await replaceStoredSpace(orm, change.snapshot, change.expectedRevision, revision);
           revisions.push({ spaceId: change.spaceId, revision });
         }
       }

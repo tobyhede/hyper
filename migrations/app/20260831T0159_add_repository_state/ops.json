@@ -79,5 +79,32 @@
         ]
       }
     ]
+  },
+  {
+    "id": "data_migration.bootstrap_repository_state",
+    "label": "Bootstrap repository state from the legacy Entry Space",
+    "operationClass": "data",
+    "target": { "id": "postgres" },
+    "precheck": [
+      {
+        "description": "check repository state needs bootstrapping",
+        "sql": "SELECT NOT EXISTS (SELECT 1 FROM \"public\".\"repository_state\") AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "bootstrap repository state from the legacy Entry Space",
+        "sql": "INSERT INTO \"public\".\"repository_state\" (\"meta_space_id\", \"singleton_id\") SELECT \"id\", 1 FROM \"public\".\"spaces\" WHERE \"entry\" = TRUE LIMIT 1",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify every non-empty repository has singleton state",
+        "sql": "SELECT (NOT EXISTS (SELECT 1 FROM \"public\".\"spaces\") OR EXISTS (SELECT 1 FROM \"public\".\"repository_state\" WHERE \"singleton_id\" = 1)) AS \"result\"",
+        "params": []
+      }
+    ]
   }
 ]

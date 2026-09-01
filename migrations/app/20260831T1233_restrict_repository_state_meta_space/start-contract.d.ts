@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:8bd4ae05bc57e60ecf2f92ff1a179bf972ff06e13466439449fc5dd41fe62a5f'>;
+  StorageHashBase<'sha256:d37fa0a38782869fa17be8d7b6e3e58f932b2445f56f9f13155793e22084e74e'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:f9be1da4ef42827ebd2b1d6e35e7e84be1f6d78783f54d1796a2b34881777b70'>;
 export type ProfileHash =
@@ -229,26 +229,8 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['singleton_id'] };
               uniques: readonly [];
-              indexes: readonly [
-                {
-                  readonly columns: readonly ['meta_space_id'];
-                  readonly name: 'repository_state_meta_space_id_idx';
-                },
-              ];
-              foreignKeys: readonly [
-                {
-                  readonly source: {
-                    readonly namespaceId: 'public' & NamespaceId;
-                    readonly tableName: 'repository_state';
-                    readonly columns: readonly ['meta_space_id'];
-                  };
-                  readonly target: {
-                    readonly namespaceId: 'public' & NamespaceId;
-                    readonly tableName: 'spaces';
-                    readonly columns: readonly ['id'];
-                  };
-                },
-              ];
+              indexes: readonly [];
+              foreignKeys: readonly [];
             };
             readonly spaces: {
               columns: {
@@ -392,19 +374,7 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
             };
-            readonly relations: {
-              readonly metaSpace: {
-                readonly to: {
-                  readonly namespace: 'public' & NamespaceId;
-                  readonly model: 'Space';
-                };
-                readonly cardinality: 'N:1';
-                readonly on: {
-                  readonly localFields: readonly ['metaSpaceId'];
-                  readonly targetFields: readonly ['id'];
-                };
-              };
-            };
+            readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'repository_state';
               readonly namespaceId: 'public';
@@ -452,17 +422,6 @@ type ContractBase = Omit<
                 readonly on: {
                   readonly localFields: readonly ['id'];
                   readonly targetFields: readonly ['spaceId'];
-                };
-              };
-              readonly repositoryStates: {
-                readonly to: {
-                  readonly namespace: 'public' & NamespaceId;
-                  readonly model: 'RepositoryState';
-                };
-                readonly cardinality: '1:N';
-                readonly on: {
-                  readonly localFields: readonly ['id'];
-                  readonly targetFields: readonly ['metaSpaceId'];
                 };
               };
             };

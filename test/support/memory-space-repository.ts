@@ -108,7 +108,9 @@ export class MemorySpaceRepository implements SpaceRepository {
     }
     return Promise.resolve({
       metaSpaceId: this.#metaSpaceId,
-      spaces: [...this.#spaces.values()].map(read),
+      spaces: [...this.#spaces.values()]
+        .map(read)
+        .sort((left, right) => left.snapshot.id.localeCompare(right.snapshot.id)),
     });
   }
 
@@ -154,6 +156,20 @@ export class MemorySpaceRepository implements SpaceRepository {
     });
     if (conflicts.length > 0) return Promise.resolve({ kind: 'conflict', conflicts });
 
+    const baseline =
+      this.#metaSpaceId === undefined
+        ? undefined
+        : loadSpaceAggregate({
+            metaSpaceId: this.#metaSpaceId,
+            snapshots: [...this.#spaces.values()].map(({ snapshot }) => snapshot),
+          });
+    const baselineUnreferenced = new Set(
+      baseline?.ok === false
+        ? baseline.errors.flatMap((error) =>
+            error.kind === 'ordinary-space-unreferenced' ? [error.spaceId] : [],
+          )
+        : [],
+    );
     const candidate = new Map(this.#spaces);
     for (const change of request.changes) {
       if (change.kind === 'delete') {
@@ -202,7 +218,13 @@ export class MemorySpaceRepository implements SpaceRepository {
           }),
         });
       }
-      return Promise.resolve({ kind: 'aggregate-refused', errors: intake.errors });
+      const errors = intake.errors.filter(
+        (error) =>
+          error.kind !== 'ordinary-space-unreferenced' || !baselineUnreferenced.has(error.spaceId),
+      );
+      if (errors.length > 0) {
+        return Promise.resolve({ kind: 'aggregate-refused', errors });
+      }
     }
 
     this.#spaces.clear();

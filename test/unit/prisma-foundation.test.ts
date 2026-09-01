@@ -68,7 +68,7 @@ describe('Prisma Next foundation', () => {
     expect(db.contract.domain.namespaces.public.models).toHaveProperty('Space');
   });
 
-  it('emits singleton repository state without bootstrapping a row', () => {
+  it('bootstraps singleton repository state from the legacy Entry Space', () => {
     const repositoryState = emittedContract.execution?.mutations.defaults.filter(
       (entry) => entry.ref.table === 'repository_state',
     );
@@ -83,7 +83,15 @@ describe('Prisma Next foundation', () => {
         }),
       ]),
     );
-    expect(JSON.stringify(repositoryStateOps)).not.toContain('INSERT');
+    const migrationSql = repositoryStateOps
+      .flatMap(({ execute }) => execute.map(({ sql }) => sql))
+      .join('\n');
+    expect(migrationSql).toContain(
+      'INSERT INTO "public"."repository_state" ("meta_space_id", "singleton_id")',
+    );
+    expect(migrationSql).toContain(
+      'SELECT "id", 1 FROM "public"."spaces" WHERE "entry" = TRUE LIMIT 1',
+    );
   });
 
   it('reaches the emitted contract from the existing migration head', () => {

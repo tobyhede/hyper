@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { SpaceAggregateError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   Alert,
@@ -27,6 +28,49 @@ type Persistence = SpaceSessionState['persistence'];
 type Rejection = Extract<Persistence, { kind: 'rejected' }>;
 
 /**
+ * What each refusal means, in the author's terms rather than the repository's.
+ *
+ * A refusal code is a stable domain identity (ADR 0057), which is exactly why
+ * it is the wrong thing to show: `space-card-target-missing` names the fact for
+ * a caller matching on it, and says nothing to the person who has just been
+ * told their work would not save. The identity stays on the wire; only this
+ * translation is user-facing.
+ *
+ * Deliberately without ids. Every one of these carries at least a Space id and
+ * some carry three, and a dialog reciting UUIDs is less legible than one
+ * sentence about what is wrong — the author is about to be returned to the
+ * canvas where the offending Card is the one they were editing.
+ */
+const AGGREGATE_REFUSAL_REASONS = {
+  'invalid-space-snapshot': 'A space in this edit is not valid.',
+  'duplicate-space-id': 'Two spaces in this edit share one identity.',
+  'duplicate-card-id': 'Two spaces in this edit claim the same card.',
+  'meta-space-missing': 'The repository’s Meta Space is missing.',
+  'space-card-target-missing': 'A space card points at a space that no longer exists.',
+  'space-card-reference-cycle': 'A space card would make a space contain itself.',
+  'ordinary-space-unreferenced': 'A space would be left with nothing pointing at it.',
+  'space-card-space-view-missing': 'A space card points at a space view that no longer exists.',
+  'space-card-graph-missing': 'A space card points at a graph that no longer exists.',
+  'space-card-graph-outside-space-view':
+    'A space card names a graph that its space view does not own.',
+  // `satisfies` rather than an annotation: it still fails the moment a refusal
+  // kind is added without a sentence, and it keeps each value's literal type
+  // instead of widening the map to an open dictionary.
+} satisfies Record<SpaceAggregateError['kind'], string>;
+
+const rejectionDescription = ({ failure }: Rejection): string =>
+  failure.kind === 'aggregate-refused'
+    ? // One refusal commonly repeats across several Spaces, and the same
+      // sentence three times reads as three problems rather than one.
+      [...new Set(failure.errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ')
+    : failure.message;
+
+const rejectionIdentity = ({ failure }: Rejection): string =>
+  failure.kind === 'aggregate-refused'
+    ? JSON.stringify(failure.errors)
+    : `${failure.code}:${failure.message}`;
+
+/**
  * Production persistence feedback and recovery at the application boundary.
  *
  * A retryable failure is deliberately absent here: it reports as a red dot
@@ -52,8 +96,7 @@ export function PersistenceControl({
   }
 
   if (persistence.kind === 'rejected') {
-    const rejectionKey = `${persistence.failure.code}:${persistence.failure.message}`;
-    return <RejectionControl key={rejectionKey} persistence={persistence} />;
+    return <RejectionControl key={rejectionIdentity(persistence)} persistence={persistence} />;
   }
 
   return <PersistenceIndicator state={persistence.kind} />;
@@ -166,7 +209,7 @@ function RejectionControl({ persistence }: { readonly persistence: Rejection }) 
         </AlertDialogHeader>
         <Alert variant="destructive">
           <AlertTitle>Reason</AlertTitle>
-          <AlertDescription>{persistence.failure.message}</AlertDescription>
+          <AlertDescription>{rejectionDescription(persistence)}</AlertDescription>
         </Alert>
         <AlertDialogFooter>
           <AlertDialogAction data-testid="persistence-rejection-continue">

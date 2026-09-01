@@ -172,7 +172,10 @@ describe('MemorySpaceRepository', () => {
       ],
     });
 
-    expect(result).toMatchObject({ kind: 'aggregate-refused' });
+    expect(result).toMatchObject({
+      kind: 'aggregate-refused',
+      errors: [{ kind: 'duplicate-card-id' }],
+    });
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(before);
   });
 });

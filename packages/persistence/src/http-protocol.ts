@@ -307,7 +307,7 @@ export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
       const change = exactRecord(value, ['kind', 'spaceId', 'snapshot'], 'create change');
       return {
         kind,
-        spaceId: uuidSchema.parse(change['spaceId']),
+        spaceId: requiredUuid(change['spaceId'], 'change Space id'),
         snapshot: decodeSnapshot(change['snapshot'], 'create change'),
       };
     }
@@ -319,7 +319,7 @@ export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
       );
       return {
         kind,
-        spaceId: uuidSchema.parse(change['spaceId']),
+        spaceId: requiredUuid(change['spaceId'], 'change Space id'),
         snapshot: decodeSnapshot(change['snapshot'], 'update change'),
         expectedRevision: decodeRevision(change['expectedRevision'], 'expectedRevision'),
       };
@@ -328,7 +328,7 @@ export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
       const change = exactRecord(value, ['kind', 'spaceId', 'expectedRevision'], 'delete change');
       return {
         kind,
-        spaceId: uuidSchema.parse(change['spaceId']),
+        spaceId: requiredUuid(change['spaceId'], 'change Space id'),
         expectedRevision: decodeRevision(change['expectedRevision'], 'expectedRevision'),
       };
     }
@@ -362,7 +362,7 @@ export const decodeLoadedAggregate = (value: unknown): LoadedAggregate => {
   const record = exactRecord(value, ['metaSpaceId', 'spaces'], 'loaded aggregate');
   if (!Array.isArray(record['spaces'])) throw new Error('loaded aggregate spaces must be an array');
   return {
-    metaSpaceId: uuidSchema.parse(record['metaSpaceId']),
+    metaSpaceId: requiredUuid(record['metaSpaceId'], 'loaded aggregate Meta Space id'),
     spaces: record['spaces'].map(decodeLoadedSpace),
   };
 };
@@ -370,14 +370,6 @@ export const decodeLoadedAggregate = (value: unknown): LoadedAggregate => {
 type Committed = Extract<CommitResult, { kind: 'committed' }>;
 type Conflict = Extract<CommitResult, { kind: 'conflict' }>;
 type AggregateRefused = Extract<CommitResult, { kind: 'aggregate-refused' }>;
-
-type JsonWire<T> = T extends UUID
-  ? string
-  : T extends readonly (infer Item)[]
-    ? readonly JsonWire<Item>[]
-    : T extends object
-      ? { readonly [Key in keyof T]: JsonWire<T[Key]> }
-      : T;
 
 export interface CommitResponseBody {
   readonly revisions: readonly { readonly spaceId: string; readonly revision: string }[];
@@ -403,18 +395,18 @@ export const decodeCommitResponse = (value: unknown): Committed => {
     revisions: record['revisions'].map((entry) => {
       const revision = exactRecord(entry, ['spaceId', 'revision'], 'committed Space revision');
       return {
-        spaceId: uuidSchema.parse(revision['spaceId']),
+        spaceId: requiredUuid(revision['spaceId'], 'committed Space id'),
         revision: decodeRevision(revision['revision'], 'revision'),
       };
     }),
-    deletedSpaceIds: record['deletedSpaceIds'].map((id) => uuidSchema.parse(id)),
+    deletedSpaceIds: record['deletedSpaceIds'].map((id) => requiredUuid(id, 'deleted Space id')),
   };
 };
 
 export interface CommitConflictBody {
   readonly conflicts: readonly {
     readonly spaceId: string;
-    readonly current: JsonWire<LoadedSpaceJson> | null;
+    readonly current: LoadedSpaceJson | null;
   }[];
 }
 
@@ -435,7 +427,7 @@ export const decodeCommitConflict = (value: unknown): Conflict => {
     conflicts: record['conflicts'].map((entry) => {
       const conflict = exactRecord(entry, ['spaceId', 'current'], 'Space conflict');
       return {
-        spaceId: uuidSchema.parse(conflict['spaceId']),
+        spaceId: requiredUuid(conflict['spaceId'], 'conflicted Space id'),
         current: conflict['current'] === null ? undefined : decodeLoadedSpace(conflict['current']),
       };
     }),
@@ -443,7 +435,55 @@ export const decodeCommitConflict = (value: unknown): Conflict => {
 };
 
 export interface CommitRefusalBody {
-  readonly errors: readonly JsonWire<SpaceAggregateError>[];
+  readonly errors: readonly (
+    | Extract<SpaceAggregateError, { readonly kind: 'invalid-space-snapshot' }>
+    | {
+        readonly kind: 'duplicate-space-id';
+        readonly spaceId: string;
+        readonly snapshotIndexes: readonly number[];
+      }
+    | {
+        readonly kind: 'duplicate-card-id';
+        readonly cardId: string;
+        readonly spaceIds: readonly string[];
+      }
+    | { readonly kind: 'meta-space-missing'; readonly metaSpaceId: string }
+    | {
+        readonly kind: 'space-card-target-missing';
+        readonly spaceId: string;
+        readonly cardId: string;
+        readonly targetSpaceId: string;
+      }
+    | {
+        readonly kind: 'space-card-reference-cycle';
+        readonly spaceId: string;
+        readonly cardId: string;
+        readonly targetSpaceId: string;
+      }
+    | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: string }
+    | {
+        readonly kind: 'space-card-space-view-missing';
+        readonly spaceId: string;
+        readonly cardId: string;
+        readonly targetSpaceId: string;
+        readonly spaceViewId: string;
+      }
+    | {
+        readonly kind: 'space-card-graph-missing';
+        readonly spaceId: string;
+        readonly cardId: string;
+        readonly targetSpaceId: string;
+        readonly graphId: string;
+      }
+    | {
+        readonly kind: 'space-card-graph-outside-space-view';
+        readonly spaceId: string;
+        readonly cardId: string;
+        readonly targetSpaceId: string;
+        readonly spaceViewId: string;
+        readonly graphId: string;
+      }
+  )[];
 }
 
 export const encodeCommitRefusal = (result: AggregateRefused): CommitRefusalBody => ({
@@ -453,6 +493,12 @@ export const encodeCommitRefusal = (result: AggregateRefused): CommitRefusalBody
 const requiredString = (value: unknown, label: string): string => {
   if (typeof value !== 'string') throw new Error(`${label} must be a string`);
   return value;
+};
+
+const requiredUuid = (value: unknown, label: string): UUID => {
+  const parsed = uuidSchema.safeParse(value);
+  if (!parsed.success) throw new Error(`${label} must be a UUID`);
+  return parsed.data;
 };
 
 const requiredIndex = (value: unknown, label: string): number => {
@@ -518,9 +564,9 @@ const decodeSpaceError = (value: unknown): SpaceError => {
 };
 
 const decodeSpaceCardLocation = (record: Record<string, unknown>) => ({
-  spaceId: uuidSchema.parse(record['spaceId']),
-  cardId: uuidSchema.parse(record['cardId']),
-  targetSpaceId: uuidSchema.parse(record['targetSpaceId']),
+  spaceId: requiredUuid(record['spaceId'], 'Space Card Space id'),
+  cardId: requiredUuid(record['cardId'], 'Space Card id'),
+  targetSpaceId: requiredUuid(record['targetSpaceId'], 'Space Card target Space id'),
 });
 
 const decodeAggregateError = (value: unknown): SpaceAggregateError => {
@@ -532,7 +578,9 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
         ['kind', 'snapshotIndex', 'errors'],
         'invalid Space snapshot refusal',
       );
-      if (!Array.isArray(error['errors'])) throw new Error('Space intake errors must be an array');
+      if (!Array.isArray(error['errors']) || error['errors'].length === 0) {
+        throw new Error('Space intake errors must be a non-empty array');
+      }
       return {
         kind,
         snapshotIndex: requiredIndex(error['snapshotIndex'], 'snapshot index'),
@@ -550,7 +598,7 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       }
       return {
         kind,
-        spaceId: uuidSchema.parse(error['spaceId']),
+        spaceId: requiredUuid(error['spaceId'], 'duplicate Space id'),
         snapshotIndexes: error['snapshotIndexes'].map((index) =>
           requiredIndex(index, 'snapshot index'),
         ),
@@ -561,13 +609,13 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       if (!Array.isArray(error['spaceIds'])) throw new Error('Space ids must be an array');
       return {
         kind,
-        cardId: uuidSchema.parse(error['cardId']),
-        spaceIds: error['spaceIds'].map((id) => uuidSchema.parse(id)),
+        cardId: requiredUuid(error['cardId'], 'duplicate Card id'),
+        spaceIds: error['spaceIds'].map((id) => requiredUuid(id, 'duplicate Card Space id')),
       };
     }
     case 'meta-space-missing': {
       const error = exactRecord(value, ['kind', 'metaSpaceId'], 'missing Meta Space refusal');
-      return { kind, metaSpaceId: uuidSchema.parse(error['metaSpaceId']) };
+      return { kind, metaSpaceId: requiredUuid(error['metaSpaceId'], 'Meta Space id') };
     }
     case 'space-card-target-missing':
     case 'space-card-reference-cycle': {
@@ -580,7 +628,7 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
     }
     case 'ordinary-space-unreferenced': {
       const error = exactRecord(value, ['kind', 'spaceId'], 'unreferenced Space refusal');
-      return { kind, spaceId: uuidSchema.parse(error['spaceId']) };
+      return { kind, spaceId: requiredUuid(error['spaceId'], 'unreferenced Space id') };
     }
     case 'space-card-space-view-missing': {
       const error = exactRecord(
@@ -591,7 +639,7 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       return {
         kind,
         ...decodeSpaceCardLocation(error),
-        spaceViewId: uuidSchema.parse(error['spaceViewId']),
+        spaceViewId: requiredUuid(error['spaceViewId'], 'Space Card Space View id'),
       };
     }
     case 'space-card-graph-missing': {
@@ -603,7 +651,7 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       return {
         kind,
         ...decodeSpaceCardLocation(error),
-        graphId: uuidSchema.parse(error['graphId']),
+        graphId: requiredUuid(error['graphId'], 'Space Card Graph id'),
       };
     }
     case 'space-card-graph-outside-space-view': {
@@ -615,8 +663,8 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       return {
         kind,
         ...decodeSpaceCardLocation(error),
-        spaceViewId: uuidSchema.parse(error['spaceViewId']),
-        graphId: uuidSchema.parse(error['graphId']),
+        spaceViewId: requiredUuid(error['spaceViewId'], 'Space Card Space View id'),
+        graphId: requiredUuid(error['graphId'], 'Space Card Graph id'),
       };
     }
     default:
@@ -639,7 +687,7 @@ export const decodeSpaceSummaries = (value: unknown): readonly SpaceSummary[] =>
     if (typeof record['title'] !== 'string' || record['title'].length === 0) {
       throw new Error('space summary title must be non-empty');
     }
-    return { id: uuidSchema.parse(record['id']), title: record['title'] };
+    return { id: requiredUuid(record['id'], 'space summary id'), title: record['title'] };
   });
 };
 

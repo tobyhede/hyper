@@ -115,23 +115,7 @@
                 }
               }
             },
-            "relations": {
-              "metaSpace": {
-                "cardinality": "N:1",
-                "on": {
-                  "localFields": [
-                    "metaSpaceId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
-                },
-                "to": {
-                  "model": "Space",
-                  "namespace": "public"
-                }
-              }
-            },
+            "relations": {},
             "storage": {
               "fields": {
                 "metaSpaceId": {
@@ -210,21 +194,6 @@
                 },
                 "to": {
                   "model": "Card",
-                  "namespace": "public"
-                }
-              },
-              "repositoryStates": {
-                "cardinality": "1:N",
-                "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "metaSpaceId"
-                  ]
-                },
-                "to": {
-                  "model": "RepositoryState",
                   "namespace": "public"
                 }
               }
@@ -355,33 +324,8 @@
                   "nullable": false
                 }
               },
-              "foreignKeys": [
-                {
-                  "onDelete": "restrict",
-                  "source": {
-                    "columns": [
-                      "meta_space_id"
-                    ],
-                    "namespaceId": "public",
-                    "tableName": "repository_state"
-                  },
-                  "target": {
-                    "columns": [
-                      "id"
-                    ],
-                    "namespaceId": "public",
-                    "tableName": "spaces"
-                  }
-                }
-              ],
-              "indexes": [
-                {
-                  "columns": [
-                    "meta_space_id"
-                  ],
-                  "name": "repository_state_meta_space_id_idx"
-                }
-              ],
+              "foreignKeys": [],
+              "indexes": [],
               "primaryKey": {
                 "columns": [
                   "singleton_id"
@@ -461,7 +405,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:8bd4ae05bc57e60ecf2f92ff1a179bf972ff06e13466439449fc5dd41fe62a5f",
+    "storageHash": "sha256:d37fa0a38782869fa17be8d7b6e3e58f932b2445f56f9f13155793e22084e74e",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",

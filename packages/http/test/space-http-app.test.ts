@@ -53,6 +53,171 @@ const postCommit = (app: ReturnType<typeof createSpaceHttpApp>, commit = updateC
     body: JSON.stringify(encodeCommitRequest(commit)),
   });
 
+const oversizedSnapshot: SpaceSnapshot = {
+  ...snapshot,
+  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) } }],
+};
+
+describe('commit wire policy', () => {
+  it.each([
+    ['missing media type', undefined, 'Send the request as application/json.'],
+    ['non-JSON media type', 'text/plain; charset=utf-8', 'Send the request as application/json.'],
+    ['non-UTF-8 charset', 'application/json; charset=utf-16', 'Encode the JSON request as UTF-8.'],
+    [
+      'duplicate charset',
+      'application/json; charset=utf-8; charset=utf-16',
+      'Send the request as application/json.',
+    ],
+    [
+      'malformed charset',
+      'application/json; charset="utf-8',
+      'Send the request as application/json.',
+    ],
+  ])('rejects %s', async (_name, contentType, detail) => {
+    const body = JSON.stringify(encodeCommitRequest(updateCommit()));
+    const request: RequestInit =
+      contentType === undefined
+        ? { method: 'POST', body }
+        : { method: 'POST', headers: { 'Content-Type': contentType }, body };
+    const response = await createSpaceHttpApp(repository()).request('/api/spaces', request);
+
+    await expectProblem(response, 'unsupported-media-type', detail);
+  });
+
+  it('rejects compressed request bodies', async () => {
+    const response = await createSpaceHttpApp(repository()).request('/api/spaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' },
+      body: JSON.stringify(encodeCommitRequest(updateCommit())),
+    });
+
+    await expectProblem(
+      response,
+      'unsupported-media-type',
+      'Send the request without content encoding.',
+    );
+  });
+
+  it.each([
+    ['honest', String(MAX_COMMIT_BODY_BYTES + 500)],
+    ['understated', '1'],
+  ])('rejects a body over 1 MiB with an %s declared length', async (_name, contentLength) => {
+    const response = await createSpaceHttpApp(repository()).request('/api/spaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': contentLength },
+      body: JSON.stringify(encodeCommitRequest(updateCommit(oversizedSnapshot))),
+    });
+
+    await expectProblem(response, 'payload-too-large');
+  });
+
+  it('measures the body rather than trusting an over-declared length', async () => {
+    const response = await createSpaceHttpApp(repository()).request('/api/spaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': '1048577' },
+      body: '{}',
+    });
+
+    await expectProblem(response, 'invalid-request');
+  });
+
+  it('rejects a streamed body over 1 MiB without a declared length', async () => {
+    const response = await createSpaceHttpApp(repository()).request('/api/spaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: `{"padding":"${'x'.repeat(1_048_576)}"}`,
+    });
+
+    await expectProblem(response, 'payload-too-large');
+  });
+
+  it('stops draining a body that keeps arriving past the drain allowance', async () => {
+    const chunk = 64 * 1024;
+    let pulled = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += chunk;
+        controller.enqueue(new Uint8Array(chunk));
+      },
+    });
+    const streamingRequest: RequestInit & { duplex: 'half' } = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: endless,
+      duplex: 'half',
+    };
+    const response = await createSpaceHttpApp(repository()).request(
+      '/api/spaces',
+      streamingRequest,
+    );
+
+    expect(response.status).toBe(413);
+    expect(pulled).toBeLessThanOrEqual(MAX_COMMIT_BODY_BYTES * 16);
+  });
+
+  it('still answers 413 when the client vanishes mid-drain', async () => {
+    let reads = 0;
+    const flaky = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        reads += 1;
+        if (reads > 20) {
+          controller.error(new Error('client disconnected'));
+          return;
+        }
+        controller.enqueue(new Uint8Array(64 * 1024));
+      },
+    });
+    const streamingRequest: RequestInit & { duplex: 'half' } = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: flaky,
+      duplex: 'half',
+    };
+    const response = await createSpaceHttpApp(repository()).request(
+      '/api/spaces',
+      streamingRequest,
+    );
+
+    expect(response.status).toBe(413);
+  });
+
+  it('accepts a body of exactly the 1 MiB limit', async () => {
+    const padded = (length: number): SpaceSnapshot => ({
+      ...snapshot,
+      cards: [
+        { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(length) } },
+      ],
+    });
+    const overhead = JSON.stringify(encodeCommitRequest(updateCommit(padded(0)))).length;
+    const body = JSON.stringify(
+      encodeCommitRequest(updateCommit(padded(MAX_COMMIT_BODY_BYTES - overhead))),
+    );
+    expect(new TextEncoder().encode(body).byteLength).toBe(MAX_COMMIT_BODY_BYTES);
+
+    const response = await createSpaceHttpApp(repository()).request('/api/spaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it.each([
+    'Application/JSON; charset="UTF-8"',
+    'application/json ; charset=utf-8',
+    'application/json; charset = utf-8',
+  ])('normalizes and accepts legal JSON media type %s', async (contentType) => {
+    const response = await createSpaceHttpApp(repository()).request('/api/spaces', {
+      method: 'POST',
+      headers: { 'Content-Type': contentType },
+      body: JSON.stringify(encodeCommitRequest(updateCommit())),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
+  });
+});
+
 describe('Space HTTP reads', () => {
   it('retains collection listing and lazy resource loading', async () => {
     const app = createSpaceHttpApp(repository());

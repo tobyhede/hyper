@@ -195,6 +195,8 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
       return { kind: 'permanent-failure', code: 'forbidden', message: problem.detail };
     case 'invalid-request':
     case 'invalid-snapshot':
+      // A 422 carrying `invalid-snapshot` cannot reach this exhaustive mapping:
+      // commit/decodeCommitRefusal rejects a problem whose code mismatches its status.
       return { kind: 'permanent-failure', code: 'invalid-commit', message: problem.detail };
     case 'not-found':
     case 'invalid-space-id':
