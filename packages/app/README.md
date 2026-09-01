@@ -1,5 +1,7 @@
 # The app's two spaces
 
+**ADR 0079 — decided, not built:** Computed Views, the union term Space View and the persisted `defaultRenderer` selection leave V1. An authored Layout becomes the only selectable and addressable canvas context, Add Layout creates an *empty* Layout rather than capturing a placement, and first working load initializes a layoutless Space. **Nothing below has changed yet** — the descriptions here are the code as it stands, and they are what `.scratch/layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md` removes. Do not build new work onto the Computed View contract.
+
 `fixture/` is the abstract space `pnpm dev:fixture` loads, and the one Playwright drives.
 It is a **test bed**, not the product demo — the narrative demo lives in
 `example/` and is kept for when real space-loading exists. Tests assert

@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0007
-Refined by: 0018, 0040, 0041
+Refined by: 0018, 0040, 0041, 0079
 
 `routes` may be empty. A space with no routes loads, indexes and renders its cards like any other; what it cannot do is present, because presenting walks a route's steps and there is none to walk. The Present control is disabled rather than merely unselected, which is already how the store behaves — `selectedRouteId` starts `null` when there are no routes and `enterPresentation` refuses to act without one.
 
