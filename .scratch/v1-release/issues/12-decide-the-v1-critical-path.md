@@ -31,7 +31,7 @@ merge and must not split or reschedule its umbrella ticket.
 | 2 — Complete aggregate-facing capabilities | Build Meta initialization/startup in V1/01, complete aggregate import/export in V1/08, and Space Card creation/reference/lifetime authoring in entity URL 07. | These three lanes consume the settled seams and may run together once their individual blockers clear. |
 | 3 — Join Spaces into the application | Build in-place Space Card Opening (`space-cards/01`), the tracked multi-Space fixture (`space-cards/10`), then Enter/independent opening and History through Open Spaces (`entity-url-addressability/08`). | In-place Opening and fixture work may overlap after their dependencies; Enter integration waits for both plus issue 14. |
 | 4 — Compose the checkpoint product | Rewrite V1/03 as the unified Card-kind command surface and integrate Default Content/reset in V1/16. | The command surface can compose completed feature operations while Default Content integrates the completed Markdown, Alias and Space renderers. |
-| 5 — Complete End-to-end | Close required desktop accessibility/evidence gaps and run ticket 19's clean-clone rehearsal with its compact manifest. | Only proof repair and qualifying checkpoint-defect fixes remain; the successful rehearsal completes the untagged checkpoint. |
+| 5 — Complete End-to-end | Close required desktop accessibility/evidence gaps and run ticket 19's clean-clone rehearsal with its compact proof matrix. | Only proof repair and qualifying checkpoint-defect fixes remain; the successful rehearsal completes the untagged checkpoint. |
 
 The critical spine is Layout-only → shared seams → Meta/aggregate/lifetime →
 Opening/Open Spaces/fixture → Default Content and unified controls → rehearsal.
@@ -56,7 +56,9 @@ lanes that must rejoin before checkpoint integration.
   one canonical aggregate-format and destructive-replacement owner.
 - Pending Layout-only ticket 06 supersedes the stale V1/04 conversion contract.
 - Tickets 17 and 18 close PR 134's unowned correctness/evidence gaps. Ticket 19
-  owns clean-clone setup, the compact manifest and checkpoint completion.
+  owns clean-clone setup, the compact proof matrix and checkpoint completion.
+- Ticket 20 owns landing and reconciling the Layout-only prerequisite before
+  downstream implementation proceeds.
 
 ### PR 134 follow-up disposition
 

@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01, 02, 03, 05, 06, 08, 16, 17, 18, 19; `alias-cards/06`; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`; `architecture-review/14`; plus the pending Layout-only reconciliation when its tracker lands
+Blocked by: 01, 02, 03, 05, 06, 08, 16, 17, 18, 19, 20; `alias-cards/06`; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`; `architecture-review/14`
 
 **What to build:** Close every V1 Definition of Done line with executable evidence
 or an explicit deferred-scope link and apply ticket 14's complete, commit-specific

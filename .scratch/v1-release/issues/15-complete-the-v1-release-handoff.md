@@ -20,7 +20,7 @@ decision remain between the current repository and the `v1.0.0` destination?
 This is the implementation handoff. The governing decisions are:
 
 - [ticket 11](11-define-the-end-to-end-checkpoint.md) for the untagged
-  End-to-end boundary and compact evidence manifest;
+  End-to-end boundary and compact proof matrix;
 - [ticket 12](12-decide-the-v1-critical-path.md) for ordering, parallel work,
   rewritten ownership and PR 134 follow-ups;
 - [ticket 13](13-decide-how-feedback-controls-v1-scope.md) for feedback
@@ -33,11 +33,12 @@ does not restate their internal designs.
 
 ### Entry condition
 
-Land the pending Layout-only decision and its surviving implementation tickets
-01–04 first. Fold its aggregate criteria into [V1/08](08-round-trip-multi-space-import-and-export.md),
-use its reconciliation ticket to update the Definition of Done and affected
-guidance/trackers, and retire its superseded entries as required by ticket 12.
-No downstream work may implement the retired Computed View/Space View contract.
+Complete [V1/20](20-land-and-reconcile-layout-only-v1.md) first. It owns landing
+the pending Layout-only decision and surviving implementation tickets 01–04,
+folding their aggregate criteria into [V1/08](08-round-trip-multi-space-import-and-export.md),
+reconciling the Definition of Done and affected guidance/trackers, and retiring
+superseded entries as required by ticket 12. No downstream work may implement
+the retired Computed View/Space View contract.
 
 This entry condition is a pending implementation/reconciliation dependency, not
 an unresolved V1 product decision: the Layout-only direction and its critical-
@@ -129,7 +130,8 @@ Before go/no-go, the candidate README and setup guidance must describe:
 - the Markdown, Alias and Space Card workflow;
 - Layout, Graph, presentation and durable URL behavior;
 - save/reload and complete CLI export, confirmed/forced hard reset and
-  `--dangerous-truncate` recovery;
+  subsequent `hyper <aggregate-path> --dangerous-truncate` recovery in that
+  order, with no merge-style import;
 - the supported Chromium scope and deliberate V1 exclusions; and
 - the distinction between the untagged End-to-end checkpoint and `v1.0.0`.
 

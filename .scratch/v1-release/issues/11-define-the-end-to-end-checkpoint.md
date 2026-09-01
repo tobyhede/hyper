@@ -20,7 +20,7 @@ cannot be used truthfully without them.
 
 End-to-end is complete when one technical author successfully performs the
 complete canonical journey from a clean clone on the supported local stack and
-the compact evidence manifest below is green. That recorded rehearsal is the
+the compact proof matrix below is green. That recorded rehearsal is the
 checkpoint completion event. Broader observed use begins immediately afterward;
 End-to-end remains untagged and is not the `v1.0.0` release.
 
@@ -55,10 +55,10 @@ This is the minimum truthful journey. A checkpoint that stops after presentation
 would not observe the release's sharpest data-integrity boundary and could not
 validate the promised recovery path.
 
-### Evidence manifest
+### Proof matrix
 
 Every line below must link to the named executable or observed evidence before
-the rehearsal begins. Ticket 07 later expands this compact manifest into the
+the rehearsal begins. Ticket 07 later expands this compact proof matrix into the
 complete V1 Definition-of-Done proof matrix.
 
 | Claim | Required evidence at End-to-end |
