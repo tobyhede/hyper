@@ -502,7 +502,12 @@ export function createSpaceSessionRegistry(
         conflictCurrents = conflicts;
         for (const [id, managed] of participants) {
           managed.setCoordinatedRecovery(recovery);
-          managed.conflictCoordinatedCommit(conflicts.get(id));
+          // A participant the conflict did not name reverts to its baseline,
+          // which is exactly the branch `recovery.acceptRemote` takes for it.
+          managed.conflictCoordinatedCommit({
+            current: conflicts.get(id),
+            baseline: conflicts.has(id) ? undefined : baselines.get(id)?.snapshot,
+          });
         }
         for (const managed of participants.values()) managed.notifyCoordinatedCommit();
         return result;

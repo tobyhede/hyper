@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { PersistenceControl } from '../src/components/PersistenceControl';
@@ -60,16 +60,49 @@ describe('PersistenceControl', () => {
     expect(screen.getAllByText(/nothing pointing at it/i)).toHaveLength(1);
   });
 
-  it('does not offer an unavailable remote snapshot for a coordinated conflict', () => {
+  it('can accept the stored side when no stored Space remains', () => {
+    const onAcceptRemote = vi.fn(() => null);
     render(
       <PersistenceControl
-        persistence={{ kind: 'conflicted', current: undefined }}
-        onAcceptRemote={vi.fn(() => null)}
+        persistence={{ kind: 'conflicted', current: undefined, baseline: undefined }}
+        onAcceptRemote={onAcceptRemote}
         onKeepLocal={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Reload' })).toBeDisabled();
-    expect(screen.getByText(/related space changed/i)).toBeVisible();
+    const reload = screen.getByRole('button', { name: 'Reload' });
+    expect(reload).toBeEnabled();
+    expect(screen.getByText(/there is no stored version of this space/i)).toBeVisible();
+
+    fireEvent.click(reload);
+    expect(onAcceptRemote).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers a revert to the baseline for a Space the conflict never named', () => {
+    const onAcceptRemote = vi.fn(() => null);
+    render(
+      <PersistenceControl
+        persistence={{
+          kind: 'conflicted',
+          current: undefined,
+          baseline: {
+            id: SPACE_ID,
+            document: { version: 1, title: 'Before the coordinated edit' },
+            cards: [],
+          },
+        }}
+        onAcceptRemote={onAcceptRemote}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    // The coordinated edit never committed, so the baseline is what is stored
+    // and reloading it is an ordinary discard rather than a dead end.
+    const reload = screen.getByRole('button', { name: 'Reload' });
+    expect(reload).toBeEnabled();
+    expect(screen.getByText(/returns this space to how it was before the edit/i)).toBeVisible();
+
+    fireEvent.click(reload);
+    expect(onAcceptRemote).toHaveBeenCalledTimes(1);
   });
 });

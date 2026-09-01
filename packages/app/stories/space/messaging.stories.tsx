@@ -33,6 +33,7 @@ export const SaveConflict: Story = () => (
         revision: 5n,
         exportedRevision: null,
       },
+      baseline: undefined,
     }}
     remoteRefusal="The remote space is invalid and was not accepted."
   />

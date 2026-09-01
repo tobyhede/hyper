@@ -626,6 +626,39 @@ describe('openSpaceSession', () => {
     });
   });
 
+  it('recreates a remotely deleted Space when explicitly keeping local work', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [{ spaceId: SPACE_ID, current: undefined }],
+    });
+    control.queueResult({
+      kind: 'committed',
+      revisions: [{ spaceId: SPACE_ID, revision: 0n }],
+      deletedSpaceIds: [],
+    });
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
+    const session = openSpaceSession(backend, loaded);
+
+    session.submit(changedTitle('Local'));
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'conflicted',
+    );
+    session.resolveConflict(changedTitle('Recreated'));
+
+    await vi.waitFor(() => expect(control.requests).toHaveLength(2));
+    expect(control.requests[1]?.changes).toEqual([
+      { kind: 'create', spaceId: SPACE_ID, snapshot: changedTitle('Recreated') },
+    ]);
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+  });
+
   /*
    * The same threading on the reconciling path, where it is load-bearing rather
    * than merely earlier: the reconciled snapshot exists nowhere but the state

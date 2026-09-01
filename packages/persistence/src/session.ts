@@ -15,7 +15,30 @@ export interface SpaceSessionState {
     | { kind: 'pending' }
     | { kind: 'failed'; failure: RetryableFailure }
     | { kind: 'rejected'; failure: PermanentFailure | AggregateRefusal }
-    | { kind: 'conflicted'; current: LoadedSpace | undefined };
+    | {
+        kind: 'conflicted';
+        /** The newer stored Space to reload, when the conflict named this one. */
+        current: LoadedSpace | undefined;
+        /**
+         * The snapshot this Space held before a coordinated edit began.
+         *
+         * A coordinated commit puts *every* participant into `conflicted`, so a
+         * Space the repository never complained about arrives here too, with no
+         * remote snapshot of its own. `current: undefined` alone cannot tell
+         * that apart from a Space the conflict named and reported gone, and the
+         * two have opposite recoveries. Carrying the baseline says which:
+         * present, accepting the stored side reverts this Space to it, because
+         * the coordinated edit never committed and the baseline *is* what is
+         * stored; absent alongside `current`, there is nothing stored to accept
+         * and keeping local work is what restores the Space, re-committing it
+         * as a create.
+         *
+         * The three shapes are the branches `CoordinatedRecovery.acceptRemote`
+         * already takes, so the state names what the recovery would do rather
+         * than leaving the surface to infer it.
+         */
+        baseline: SpaceSnapshot | undefined;
+      };
 }
 
 export interface SpaceSession {
@@ -43,12 +66,24 @@ export interface ManagedSpaceSession {
   readonly notifyCoordinatedCommit: () => void;
   readonly acknowledgeCoordinatedCommit: (revision: bigint) => void;
   readonly completeCoordinatedDeletion: () => void;
-  readonly conflictCoordinatedCommit: (current: LoadedSpace | undefined) => void;
+  readonly conflictCoordinatedCommit: (conflict: CoordinatedConflict) => void;
   readonly failCoordinatedCommit: (
     result: Exclude<CommitResult, { kind: 'committed' } | { kind: 'conflict' }>,
   ) => void;
   readonly setCoordinatedRecovery: (recovery: CoordinatedRecovery | undefined) => void;
   readonly restoreCoordinatedCommit: (snapshot: SpaceSnapshot, revision: bigint) => void;
+}
+
+/**
+ * One participant's share of a coordinated conflict: the remote snapshot the
+ * repository answered with, if the conflict named this Space, and otherwise the
+ * baseline it reverts to. A participant the conflict did not name still becomes
+ * `conflicted` — the commit was one edit — but its recovery is the baseline.
+ * Neither means there is nothing stored to accept.
+ */
+export interface CoordinatedConflict {
+  readonly current: LoadedSpace | undefined;
+  readonly baseline: SpaceSnapshot | undefined;
 }
 
 export interface CoordinatedRecovery {
@@ -116,6 +151,7 @@ export const openManagedSpaceSession = (
     snapshot: SpaceSnapshot,
     expectedRevision: bigint,
     unpublishedState: SpaceSessionState = observable.getState(),
+    kind: 'create' | 'update' = 'update',
   ): void => {
     inFlight = true;
     committing = snapshot;
@@ -123,12 +159,14 @@ export const openManagedSpaceSession = (
     void backend
       .commit({
         changes: [
-          {
-            kind: 'update',
-            spaceId: snapshot.id,
-            snapshot: clone(snapshot),
-            expectedRevision,
-          },
+          kind === 'create'
+            ? { kind, spaceId: snapshot.id, snapshot: clone(snapshot) }
+            : {
+                kind,
+                spaceId: snapshot.id,
+                snapshot: clone(snapshot),
+                expectedRevision,
+              },
         ],
       })
       .then((result) => {
@@ -205,7 +243,7 @@ export const openManagedSpaceSession = (
             if (current === undefined) {
               observable.publish({
                 ...observable.getState(),
-                persistence: { kind: 'conflicted', current: undefined },
+                persistence: { kind: 'conflicted', current: undefined, baseline: undefined },
               });
               publishIdle();
               return;
@@ -215,7 +253,7 @@ export const openManagedSpaceSession = (
               ...observable.getState(),
               acknowledgedRevision: current.revision,
               changedSinceExport: hasChangedSinceExport(current.revision, exportedRevision),
-              persistence: { kind: 'conflicted', current: clone(current) },
+              persistence: { kind: 'conflicted', current: clone(current), baseline: undefined },
             });
             publishIdle();
           }
@@ -329,7 +367,7 @@ export const openManagedSpaceSession = (
       }
       if (state.persistence.kind !== 'conflicted' || inFlight || coordinating || persistencePaused)
         return;
-      const { current } = state.persistence;
+      const { current, baseline } = state.persistence;
       const revision = current?.revision ?? state.acknowledgedRevision;
       if (current !== undefined) exportedRevision = current.exportedRevision;
       const working = clone(snapshot);
@@ -337,9 +375,14 @@ export const openManagedSpaceSession = (
         working,
         acknowledgedRevision: revision,
         changedSinceExport: hasChangedSinceExport(revision, exportedRevision),
-        persistence: { kind: 'conflicted', current },
+        persistence: { kind: 'conflicted', current, baseline },
       };
-      startCommit(working, revision, resolvedState);
+      startCommit(
+        working,
+        revision,
+        resolvedState,
+        current === undefined && baseline === undefined ? 'create' : 'update',
+      );
     },
   };
 
@@ -417,7 +460,7 @@ export const openManagedSpaceSession = (
       observable.install({ ...observable.getState(), persistence: { kind: 'settled' } });
       publishIdle();
     },
-    conflictCoordinatedCommit: (current) => {
+    conflictCoordinatedCommit: ({ current, baseline }) => {
       coordinating = false;
       waiting = undefined;
       if (current !== undefined) exportedRevision = current.exportedRevision;
@@ -427,6 +470,7 @@ export const openManagedSpaceSession = (
         persistence: {
           kind: 'conflicted',
           current: current === undefined ? undefined : clone(current),
+          baseline: baseline === undefined ? undefined : clone(baseline),
         },
       };
       if (current !== undefined) {

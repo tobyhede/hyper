@@ -7,6 +7,7 @@ import {
   type LoadedAggregate,
 } from '@project/persistence';
 import { createSpaceCardLifecycle } from '../src/space-card-lifecycle';
+import { composeApp } from '../src/compose-app';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -426,6 +427,159 @@ describe('Space Card lifecycle', () => {
       expect(control.requests).toHaveLength(1);
     },
   );
+
+  it('gives a participant the conflict never named the baseline it reverts to', async () => {
+    const linkedMeta: SpaceSnapshot = {
+      ...metaSnapshot,
+      cards: [
+        ...metaSnapshot.cards,
+        { id: SPACE_CARD_ID, document: { title: 'Target', kind: 'space', spaceId: TARGET_ID } },
+      ],
+      document: {
+        ...metaSnapshot.document,
+        layouts: metaSnapshot.document.layouts?.map((layout) => ({
+          ...layout,
+          positions: {
+            ...layout.positions,
+            [SPACE_CARD_ID]: { x: 240, y: 80, open: false },
+          },
+        })),
+      },
+    };
+    const control = new MemorySpaceBackendTestControl();
+    // The conflict names the cascade's target only. Meta is a participant
+    // because the same edit removes its Space Card, but the repository never
+    // complained about it, so it has no remote snapshot of its own.
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: TARGET_ID,
+          current: { snapshot: targetSnapshot, revision: 9n, exportedRevision: null },
+        },
+      ],
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: linkedMeta, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: linkedMeta, revision: 3n, exportedRevision: null });
+    registry.open({ snapshot: targetSnapshot, revision: 7n, exportedRevision: null });
+    const lifecycle = createSpaceCardLifecycle({ backend, registry, newId: idSource([]) });
+
+    await lifecycle.delete({ containingSpaceId: META_ID, cardId: SPACE_CARD_ID });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
+
+    // Meta carries the snapshot it held before the cascade, which is what
+    // accepting the stored side reverts it to — the edit never committed, so
+    // the baseline *is* what is stored. Without it the surface cannot tell this
+    // apart from a Space reported gone, whose recovery is the opposite one.
+    expect(meta.getState().persistence).toEqual({
+      kind: 'conflicted',
+      current: undefined,
+      baseline: linkedMeta,
+    });
+    // The Space the conflict did name keeps its remote snapshot to reload.
+    expect(registry.session(TARGET_ID)?.getState().persistence).toMatchObject({
+      kind: 'conflicted',
+      current: { revision: 9n },
+      baseline: undefined,
+    });
+  });
+
+  it('accepts the baseline for a participant the conflict never named', async () => {
+    const linkedMeta: SpaceSnapshot = {
+      ...metaSnapshot,
+      cards: [
+        ...metaSnapshot.cards,
+        { id: SPACE_CARD_ID, document: { title: 'Target', kind: 'space', spaceId: TARGET_ID } },
+      ],
+      document: {
+        ...metaSnapshot.document,
+        layouts: metaSnapshot.document.layouts?.map((layout) => ({
+          ...layout,
+          positions: {
+            ...layout.positions,
+            [SPACE_CARD_ID]: { x: 240, y: 80, open: false },
+          },
+        })),
+      },
+    };
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: TARGET_ID,
+          current: { snapshot: targetSnapshot, revision: 9n, exportedRevision: null },
+        },
+      ],
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: linkedMeta, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: linkedMeta, revision: 3n, exportedRevision: null });
+    registry.open({ snapshot: targetSnapshot, revision: 7n, exportedRevision: null });
+    // The Space the author is looking at is Meta, composed exactly as the
+    // application composes it, so this exercises the control's own handler
+    // rather than the session underneath it.
+    const { authoring } = composeApp({ spaceSession: meta, selection: META_LAYOUT_ID });
+    const lifecycle = createSpaceCardLifecycle({ backend, registry, newId: idSource([]) });
+
+    await lifecycle.delete({ containingSpaceId: META_ID, cardId: SPACE_CARD_ID });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
+    const before = authoring.getState().replacementEpoch;
+
+    // Reload is reachable here precisely because the baseline is what is
+    // stored: the cascade never committed, so accepting it puts the Space Card
+    // the edit removed back.
+    expect(authoring.acceptStoredSpace()).toBeNull();
+
+    expect(meta.getState()).toMatchObject({
+      working: linkedMeta,
+      acknowledgedRevision: 3n,
+      persistence: { kind: 'settled' },
+    });
+    expect(authoring.getState().replacementEpoch).toBe(before + 1);
+  });
+
+  it('has no stored side to accept for a Space the conflict reported gone', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [{ spaceId: META_ID, current: undefined }],
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const { authoring } = composeApp({ spaceSession: meta, selection: META_LAYOUT_ID });
+    meta.submit(meta.getState().working);
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
+    const before = authoring.getState();
+
+    // Keeping local work is this one's recovery — it re-commits as a create —
+    // so accepting answers with the reason and changes nothing.
+    expect(authoring.acceptStoredSpace()).toBe(
+      'This Space was deleted while the coordinated edit was saving. Keep your local version to restore it.',
+    );
+    expect(authoring.getState().replacementEpoch).toBe(before.replacementEpoch);
+    expect(meta.getState().persistence.kind).toBe('conflicted');
+  });
 
   it('refuses a deletion cascade when its target Space needs recovery', async () => {
     const linkedMeta: SpaceSnapshot = {

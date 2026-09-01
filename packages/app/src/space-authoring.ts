@@ -1426,10 +1426,16 @@ export function createSpaceAuthoring({
   const acceptStoredSpace = (): string | null => {
     const { persistence } = session.getState();
     if (persistence.kind !== 'conflicted') return null;
-    if (persistence.current === undefined) {
-      return 'The coordinated conflict did not include a remote snapshot for this Space.';
+    // The stored side is the newer Space when the conflict named this one, and
+    // otherwise the baseline it reverts to — a coordinated edit that did not
+    // commit leaves the baseline as what is stored. Only a Space the conflict
+    // named and reported gone has neither, and keeping local work is its
+    // recovery rather than this one.
+    const stored = persistence.current?.snapshot ?? persistence.baseline;
+    if (stored === undefined) {
+      return 'This Space was deleted while the coordinated edit was saving. Keep your local version to restore it.';
     }
-    const accepted = loadSpaceSnapshot(persistence.current.snapshot);
+    const accepted = loadSpaceSnapshot(stored);
     if (!accepted.ok) {
       return `The remote space is invalid and was not accepted:\n${accepted.errors
         .map((error) => `  - ${error.message}`)
