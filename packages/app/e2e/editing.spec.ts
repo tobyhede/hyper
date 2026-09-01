@@ -1562,23 +1562,15 @@ test('Delete Card is withdrawn while presenting', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Delete Card B' })).toHaveCount(0);
 });
 
-/**
- * Creating an Alias both selects and opens it, so it is the one gesture that
- * leaves an Open Card as the selected Card. Deleting it there would strand
- * `openedCardId` on a Card the Space no longer holds, and every authoring
- * affordance that reads it — the Cards drawer, Title editing, chrome editing —
- * would stay withdrawn with no pane left to close.
- */
-test('Delete Card is withdrawn on the Card that Alias creation left open', async ({ page }) => {
+test('Delete Card is withdrawn while the selected Card is Open', async ({ page }) => {
   await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
-  await page.getByRole('combobox', { name: 'Target' }).fill('B');
-  await page.getByRole('option', { name: 'Markdown Card B' }).click();
-  await expect(page.getByTestId('open-card')).toBeVisible();
+  await nodeByTitle(page, 'B').click();
+  await expect(page.getByRole('button', { name: 'Delete Card B' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open Card B' }).click();
+  await expect(nodeByTitle(page, 'B').getByRole('button', { name: 'Close Card B' })).toBeVisible();
 
   await expect(page.getByRole('button', { name: 'Delete Card B' })).toHaveCount(0);
 });

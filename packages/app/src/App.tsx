@@ -346,8 +346,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      * one names the selected Card, and destroying the subject of a live rename
      * is the edit answering itself. Withdrawing it while a Card is open is what
      * keeps the Layout's Open state from outliving the Card it names — nothing
-     * clears it on a Delete, and Alias creation is the one gesture that leaves
-     * an Open Card selected, so every affordance reading that state would stay
+     * clears it on a Delete, so every affordance reading that state would stay
      * withdrawn with no pane left to close.
      */
     const deleteCardAvailable =
