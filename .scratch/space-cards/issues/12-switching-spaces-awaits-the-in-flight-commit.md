@@ -6,8 +6,12 @@ author switches or closes one of several live Space contexts.
 **Blocked by:** `entity-url-addressability/08` — Open, enter and independently
 address a Space Card.
 
-**Status:** ready-for-agent
+**Status:** superseded by `architecture-review/14`
 Tags: release/v1
+
+The Open Spaces module now contains this ticket's complete persistence-safety
+acceptance. The criteria below are historical only; do not build or verify a
+second switching/closing coordinator here.
 
 - [ ] Switching Spaces awaits an in-flight commit on the Space being left.
 - [ ] An inactive Space whose session has failed or conflicted remains

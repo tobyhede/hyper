@@ -1,8 +1,8 @@
 # Concentrate aggregate commit semantics
 
-Status: needs-triage
-Tags: Improvement
-Blocked by: `space-cards/03` — Build the Space Card lifecycle and aggregate persistence
+Status: ready-for-agent
+Tags: release/v1, Improvement
+Blocked by: none — PR 134 delivered both adapter decision trees to compare
 
 Surfaced by: the 31 August 2026 Space Cards architecture review, candidate
 “Concentrate aggregate commit semantics”. Validated against the in-flight
@@ -61,6 +61,14 @@ Potentially shared by `space-cards/03`, `v1-release/01` and
 `v1-release/08`, but it is not yet a release blocker. Promote it to
 `Tags: release/v1` only if the differential test proves an observable drift or
 the Meta lifecycle design needs the shared decision module.
+
+## V1 disposition
+
+The differential property test is a checkpoint prerequisite. If it proves a
+semantic disagreement, this ticket owns the shared pure aggregate-commit module
+and blocks dependent persistence work until both adapters consume it. If the
+adapters agree, record that evidence, resolve this ticket and defer the locality
+refactor beyond V1. Duplication alone does not authorize the refactor.
 
 ## Acceptance for triage
 

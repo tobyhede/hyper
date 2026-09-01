@@ -88,8 +88,8 @@ authoring the journey is understandable.
   begins. Each must either own the shared Meta lifecycle, aggregate-commit or
   Open Spaces seam and become an explicit blocker, or close as advice. Parallel
   tickets must not build competing seams.
-- Assign the clean-clone rehearsal work package. A documentation/proof ticket
-  alone is not an owner for defects found while following the supported setup.
+- Ticket 19 owns the clean-clone setup and rehearsal work package, including
+  defects found while following the supported setup.
 - Make `space-cards/10` an explicit checkpoint dependency.
 
 Ticket 12 owns the resulting dependency graph, sequencing, parallel work and

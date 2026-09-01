@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01, 02, 03, 04, 05, 06, 08, 16; `alias-cards/06`; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`; `space-cards/12`
+Blocked by: 01, 02, 03, 05, 06, 08, 16, 17, 18, 19; `alias-cards/06`; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`; `architecture-review/14`; plus the pending Layout-only reconciliation when its tracker lands
 
 **What to build:** Close every V1 Definition of Done line with executable evidence
 or an explicit deferred-scope link and apply the complete `v1.0.0` release gate.

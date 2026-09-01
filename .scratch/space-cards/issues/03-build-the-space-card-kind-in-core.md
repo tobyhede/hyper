@@ -5,8 +5,13 @@ authored commit interface and atomic Space creation/deletion.
 
 **Blocked by:** none.
 
-**Status:** resolved
+**Status:** resolved — merged by PR 134 (`67ec0371`)
 Tags: release/v1
+
+The merged foundation supplies complete aggregate intake, `loadAggregate()`,
+the unified `commit({ changes })` contract, repository Meta state, coordinated
+sessions and one live session per Space Id. Its recorded follow-ups are owned by
+the V1 critical path; do not split or reschedule this delivered umbrella.
 
 - [x] Add `spaceCardSchema`: `kind: 'space'`, an immutable target `spaceId`, and
       optional Space View and Graph selections. Space Card files and single-Space
@@ -96,3 +101,11 @@ private coordination acquires one browser-wide barrier, derives every
 participant from the latest working sessions, validates and installs them
 atomically, and resolves success, retry, conflict, rejection and recovery for
 the complete Edit together. Tickets 15–17 contain the focused delivery record.
+
+## Follow-ups recorded by PR 134
+
+The merge review deliberately left Meta initializer convergence to V1/01,
+Space Card deletion integration and uncommitted-sibling policy to entity URL 07,
+structured refusal transport to V1/17, restored HTTP wire-policy proof to V1/18,
+and ordinary-commit/read locking optimization beyond V1 unless measured as a
+checkpoint blocker.

@@ -4,7 +4,10 @@
 the complete working surface, move safely among open Spaces, close an ordinary
 context, or open the target independently at its canonical URL.
 
-**Blocked by:** `v1-release/01` — Establish the Meta Space lifecycle; 04 — Address Cards canonically and in a Space View; 07 — Author a Space Card reference; `space-cards/01` — Open and edit a Space Card in place; `space-cards/10` — Extend the fixture to linked Spaces.
+**Blocked by:** `v1-release/01` — Establish the Meta Space lifecycle; 07 — Author
+a Space Card reference; `space-cards/01` — Open and edit a Space Card in place;
+`space-cards/10` — Extend the fixture to linked Spaces;
+`architecture-review/14` — Build Open Spaces composition.
 
 **Status:** ready-for-agent
 Tags: release/v1
@@ -16,7 +19,7 @@ Tags: release/v1
 - [ ] Enter loads the target from repository state already accepted by complete
       aggregate intake. Navigation performs no second cycle check and does not
       carry an ancestor chain as an integrity mechanism.
-- [ ] Enter starts from the Space Card's Space View and Graph selections.
+- [ ] Enter starts from the Space Card's Layout and Graph selections.
       Navigation while entered authors neither the Card nor target Space.
 - [ ] Entering an already-open Space reuses its live context. An author can move
       among open Spaces without losing work, close an ordinary context
@@ -25,8 +28,9 @@ Tags: release/v1
       carries no containing navigation or presentation state.
 - [ ] Browser Back, Forward and reload reproduce addressable transitions without
       producing an Edit.
-- [ ] Persistence waiting, refusal and warning behavior is proven by
-      `space-cards/12`; its presentation and control placement remain UX work.
+- [ ] Persistence waiting, refusal and warning behavior is supplied and proven
+      by `architecture-review/14`; its presentation and control placement remain
+      UX work.
 - [ ] Application and Ladle evidence prove the chosen current UX without making
       that treatment an architectural constraint.
 

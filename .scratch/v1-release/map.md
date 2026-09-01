@@ -55,12 +55,13 @@ the detail. -->
   makes the complete clean-clone authoring and destructive-recovery rehearsal
   the untagged checkpoint, with a compact evidence manifest and explicit
   post-checkpoint scope.
+- [12 — Decide the V1 execution sequence and critical path](issues/12-decide-the-v1-critical-path.md)
+  treats PR 134 as delivered foundation work, rewrites overlapping ownership,
+  adds checkpoint tickets 17–19 and fixes the parallel lanes that rejoin at the
+  clean-clone rehearsal.
 
 ## Not yet specified
 
-- The critical path from End-to-end to `v1.0.0`, including which existing
-  release and feature tickets must be split, reordered or retired, depends on
-  the resulting End-to-end checkpoint decision.
 - Feedback may expose canonical-journey blockers whose decision shape is not yet
   visible. Non-blocking requests remain beyond V1.
 - Exact Default Content copy and final visual treatment remain deliberately

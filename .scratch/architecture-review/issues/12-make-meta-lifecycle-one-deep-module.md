@@ -1,8 +1,8 @@
 # Make repository Meta lifecycle one deep module
 
-Status: needs-triage
+Status: ready-for-agent
 Tags: release/v1, Improvement
-Blocked by: `space-cards/03` — Build the Space Card lifecycle and aggregate persistence
+Blocked by: none — PR 134 delivered the aggregate foundation
 
 Surfaced by: the 31 August 2026 Space Cards architecture review, candidate
 “Make Meta lifecycle one deep module”. Validated against the in-flight
@@ -60,9 +60,17 @@ This should be designed with `v1-release/01`, then reused by
 `v1-release/08`. Building either release ticket first would harden the current
 distributed invariant into more startup and CLI callers.
 
-## Acceptance for triage
+## V1 disposition
 
-- [ ] Name the module and its external interface without exposing SQL locking or
+This is the binding Meta lifecycle implementation prerequisite. It owns the one
+deep establishment/read/replacement seam and its shared memory/PostgreSQL
+contract. `v1-release/01` consumes it for initialization and startup;
+`v1-release/08` consumes it for complete administrative replacement. Neither
+release ticket may recreate its policy.
+
+## Implementation acceptance
+
+- [ ] Define the module and its external interface without exposing SQL locking or
       singleton-row vocabulary.
 - [ ] Show how both memory and PostgreSQL satisfy the seam without duplicating
       Meta policy.

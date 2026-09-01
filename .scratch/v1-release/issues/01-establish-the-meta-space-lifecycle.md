@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: `space-cards/03`
+Blocked by: `architecture-review/12`
 
 **What to build:** Give each repository one permanent Meta Space whose identity
 is repository state and whose reachability closure is the complete authored
