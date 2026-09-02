@@ -4,7 +4,6 @@ import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   openSpaceSession,
   type CommitResult,
-  type LoadedAggregate,
   type LoadedSpace,
   type SpaceBackend,
   type SpaceCommit,
@@ -28,8 +27,11 @@ class DelayedCommitBackend implements SpaceBackend {
     return Promise.resolve(undefined);
   }
 
-  loadAggregate(): Promise<LoadedAggregate> {
-    return Promise.resolve({ metaSpaceId: snapshot.id, spaces: [] });
+  loadAggregate(): ReturnType<SpaceBackend['loadAggregate']> {
+    return Promise.resolve({
+      kind: 'loaded',
+      aggregate: { metaSpaceId: snapshot.id, spaces: [] },
+    });
   }
 
   async commit(request: SpaceCommit): Promise<CommitResult> {

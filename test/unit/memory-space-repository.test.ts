@@ -11,6 +11,7 @@ const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_CARD_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+const LINK_CARD_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 
 const importSpace = (id: UUID, cardId: UUID, title: string): ImportSpace => ({
   id,
@@ -142,9 +143,23 @@ describe('MemorySpaceRepository', () => {
 
   it('rejects a commit that claims a Card owned by another Space', async () => {
     const repository = new MemorySpaceRepository();
+    const meta = importSpace(SPACE_ID, CARD_ID, 'First');
     await repository.importSpaces(
       [
-        importSpace(SPACE_ID, CARD_ID, 'First'),
+        {
+          ...meta,
+          cards: [
+            ...meta.cards,
+            {
+              id: LINK_CARD_ID,
+              document: {
+                title: 'Second',
+                kind: 'space',
+                spaceId: OTHER_SPACE_ID,
+              },
+            },
+          ],
+        },
         importSpace(OTHER_SPACE_ID, OTHER_CARD_ID, 'Second'),
       ],
       'insert',

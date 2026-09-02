@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import type {
-  LoadedAggregate,
   LoadedSpace,
   RepositoryCommitResult,
   SpaceCommit,
@@ -84,8 +83,20 @@ class RecordingRepository implements SpaceRepository {
     throw new Error('Unexpected markExported call');
   }
 
-  loadAggregate(): Promise<LoadedAggregate> {
+  loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
     throw new Error('Unexpected loadAggregate call');
+  }
+
+  initializeAggregate(
+    ..._args: Parameters<SpaceRepository['initializeAggregate']>
+  ): ReturnType<SpaceRepository['initializeAggregate']> {
+    throw new Error('Unexpected initializeAggregate call');
+  }
+
+  replaceAggregate(
+    ..._args: Parameters<SpaceRepository['replaceAggregate']>
+  ): ReturnType<SpaceRepository['replaceAggregate']> {
+    throw new Error('Unexpected replaceAggregate call');
   }
 
   commit(_request: SpaceCommit): Promise<RepositoryCommitResult> {

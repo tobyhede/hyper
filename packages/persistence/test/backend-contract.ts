@@ -36,8 +36,8 @@ export const spaceBackendContract = (
       await expect(harness.backend.loadSpace(SPACE_ID)).resolves.toEqual(contractLoaded);
       await expect(harness.backend.loadSpace(MISSING_ID)).resolves.toBeUndefined();
       await expect(harness.backend.loadAggregate()).resolves.toEqual({
-        metaSpaceId: SPACE_ID,
-        spaces: [contractLoaded],
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [contractLoaded] },
       });
 
       const changed = structuredClone(contractLoaded.snapshot);

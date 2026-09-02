@@ -11,7 +11,6 @@ import {
   encodeCommitRequest,
   problemCodeForType,
   type CommitResult,
-  type LoadedAggregate,
   type LoadedSpace,
   type ProblemDetails,
   type SpaceBackend,
@@ -104,7 +103,7 @@ export class HttpSpaceBackend implements SpaceBackend {
     );
   }
 
-  loadAggregate(): Promise<LoadedAggregate> {
+  loadAggregate(): ReturnType<SpaceBackend['loadAggregate']> {
     return this.#timedRequest(
       (client) => client.api.aggregate.$get(),
       async (response) => {

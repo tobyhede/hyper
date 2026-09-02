@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import type {
-  LoadedAggregate,
   LoadedSpace,
   RepositoryCommitResult,
   SpaceCommit,
@@ -87,8 +86,20 @@ class ImportRepository implements SpaceRepository {
     throw new Error('Unexpected markExported call');
   }
 
-  loadAggregate(): Promise<LoadedAggregate> {
+  loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
     throw new Error('Unexpected loadAggregate call');
+  }
+
+  initializeAggregate(
+    ..._args: Parameters<SpaceRepository['initializeAggregate']>
+  ): ReturnType<SpaceRepository['initializeAggregate']> {
+    throw new Error('Unexpected initializeAggregate call');
+  }
+
+  replaceAggregate(
+    ..._args: Parameters<SpaceRepository['replaceAggregate']>
+  ): ReturnType<SpaceRepository['replaceAggregate']> {
+    throw new Error('Unexpected replaceAggregate call');
   }
 
   commit(_request: SpaceCommit): Promise<RepositoryCommitResult> {
@@ -839,7 +850,7 @@ describe('runHyper', () => {
     ]);
   });
 
-  it('does not list the catalog after a successful batch import', async () => {
+  it('refuses a batch that is not one Meta-rooted aggregate', async () => {
     const collection = await makeTemporaryDirectory();
     const first = join(collection, 'first');
     const second = join(collection, 'second');
@@ -859,18 +870,10 @@ describe('runHyper', () => {
 
     const exitCode = await runHyper([collection], { repository, io: output.io });
 
-    expect(exitCode).toBe(0);
-    expect(output.stdout).toEqual([
-      `Imported space ${SPACE_ID} at revision 0\n`,
-      `Imported space ${OTHER_SPACE_ID} at revision 0\n`,
-    ]);
-    expect(output.stderr).toEqual([]);
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
-      snapshot: { id: SPACE_ID },
-    });
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toMatchObject({
-      snapshot: { id: OTHER_SPACE_ID },
-    });
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual(['Domain validation failed: ordinary-space-unreferenced\n']);
+    await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });
 
   it('classifies a no-path repository failure as database startup without a stack', async () => {

@@ -1,6 +1,7 @@
 import { newUuid, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import type {
+  AggregateLoadResult,
   LoadedAggregate,
   LoadedSpace,
   RepositoryCommitResult,
@@ -8,10 +9,14 @@ import type {
   SpaceSummary,
 } from '@project/persistence';
 import type {
+  AggregateInput,
   ImportMode,
+  InitializeAggregateResult,
+  ReplaceAggregateResult,
   RepositoryImportResult,
   SpaceRepository,
 } from '../../src/persistence/space-repository';
+import { classifyInitializedAggregate } from '../../src/persistence/aggregate-lifecycle';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -39,6 +44,11 @@ const read = (loaded: LoadedSpace): LoadedSpace =>
     ...loaded,
     snapshot: { ...loaded.snapshot, cards: [...loaded.snapshot.cards].sort(ascendingById) },
   });
+
+const loadedAggregate = (metaSpaceId: UUID, spaces: Iterable<LoadedSpace>): LoadedAggregate => ({
+  metaSpaceId,
+  spaces: [...spaces].map(read).sort((left, right) => ascendingById(left.snapshot, right.snapshot)),
+});
 
 /**
  * A layout's own id and the ids of the graphs it owns are minted in one pass,
@@ -102,15 +112,63 @@ export class MemorySpaceRepository implements SpaceRepository {
     return Promise.resolve(stored === undefined ? undefined : read(stored));
   }
 
-  loadAggregate(): Promise<LoadedAggregate> {
+  loadAggregate(): Promise<AggregateLoadResult> {
     if (this.#metaSpaceId === undefined) {
-      return Promise.reject(new Error('The repository has no Meta Space'));
+      if (this.#spaces.size === 0) return Promise.resolve({ kind: 'uninitialized' });
+      return Promise.reject(new Error('Stored Spaces exist without a Meta Space'));
     }
-    return Promise.resolve({
-      metaSpaceId: this.#metaSpaceId,
-      spaces: [...this.#spaces.values()]
-        .map(read)
-        .sort((left, right) => left.snapshot.id.localeCompare(right.snapshot.id)),
+    const aggregate = loadedAggregate(this.#metaSpaceId, this.#spaces.values());
+    const intake = loadSpaceAggregate({
+      metaSpaceId: aggregate.metaSpaceId,
+      snapshots: aggregate.spaces.map(({ snapshot }) => snapshot),
+    });
+    if (!intake.ok) return Promise.reject(new Error('Stored aggregate violates Meta invariants'));
+    return Promise.resolve({ kind: 'loaded', aggregate });
+  }
+
+  initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult> {
+    const intake = loadSpaceAggregate({ metaSpaceId: input.metaSpaceId, snapshots: input.spaces });
+    if (!intake.ok) return Promise.resolve({ kind: 'aggregate-refused', errors: intake.errors });
+    if (this.#metaSpaceId !== undefined || this.#spaces.size > 0) {
+      if (this.#metaSpaceId === undefined) {
+        return Promise.reject(new Error('Stored Spaces exist without a Meta Space'));
+      }
+      const existing = loadedAggregate(this.#metaSpaceId, this.#spaces.values());
+      return Promise.resolve(classifyInitializedAggregate(input, existing));
+    }
+    const aggregate = loadedAggregate(
+      input.metaSpaceId,
+      input.spaces.map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+    );
+    this.#spaces.clear();
+    for (const space of aggregate.spaces) this.#spaces.set(space.snapshot.id, clone(space));
+    this.#metaSpaceId = input.metaSpaceId;
+    return Promise.resolve({ kind: 'initialized', aggregate });
+  }
+
+  replaceAggregate(
+    input: AggregateInput,
+    expectedMetaSpaceId: UUID,
+  ): Promise<ReplaceAggregateResult> {
+    const intake = loadSpaceAggregate({ metaSpaceId: input.metaSpaceId, snapshots: input.spaces });
+    if (!intake.ok) return Promise.resolve({ kind: 'aggregate-refused', errors: intake.errors });
+    if (this.#metaSpaceId === undefined) {
+      if (this.#spaces.size > 0)
+        return Promise.reject(new Error('Stored Spaces exist without Meta'));
+      return Promise.resolve({ kind: 'uninitialized' });
+    }
+    if (this.#metaSpaceId !== expectedMetaSpaceId) {
+      return Promise.resolve({ kind: 'conflict', currentMetaSpaceId: this.#metaSpaceId });
+    }
+    const aggregate = loadedAggregate(
+      input.metaSpaceId,
+      input.spaces.map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+    );
+    return Promise.resolve().then(() => {
+      this.#spaces.clear();
+      for (const space of aggregate.spaces) this.#spaces.set(space.snapshot.id, clone(space));
+      this.#metaSpaceId = input.metaSpaceId;
+      return { kind: 'replaced', aggregate };
     });
   }
 
@@ -331,18 +389,34 @@ export class MemorySpaceRepository implements SpaceRepository {
       snapshots.push(intake.snapshot);
     }
 
-    if (mode === 'truncate') {
-      this.#spaces.clear();
-      this.#entrySpaceId = undefined;
-      this.#metaSpaceId = undefined;
-    }
     const stored = snapshots.map((snapshot): LoadedSpace => ({
       snapshot: clone(snapshot),
       revision: 0n,
       exportedRevision: null,
     }));
+    const candidateMetaSpaceId = stored[0]?.snapshot.id;
+    if (candidateMetaSpaceId !== undefined && (mode === 'truncate' || this.#spaces.size === 0)) {
+      const input = { metaSpaceId: candidateMetaSpaceId, spaces: snapshots };
+      const lifecycle =
+        this.#metaSpaceId === undefined
+          ? this.initializeAggregate(input)
+          : this.replaceAggregate(input, this.#metaSpaceId);
+      return lifecycle.then((result) => {
+        if (result.kind === 'initialized' || result.kind === 'replaced') {
+          if (mode === 'truncate') this.#entrySpaceId = undefined;
+          return { kind: 'imported', spaces: stored.map(read) };
+        }
+        if (result.kind === 'aggregate-refused') {
+          return {
+            kind: 'rejected',
+            code: 'invalid-snapshot',
+            message: result.errors.map((error) => error.kind).join('\n'),
+          };
+        }
+        throw new Error(`Compatibility import reached unexpected lifecycle result ${result.kind}`);
+      });
+    }
     for (const space of stored) this.#spaces.set(space.snapshot.id, clone(space));
-    this.#metaSpaceId ??= stored[0]?.snapshot.id;
     return Promise.resolve({ kind: 'imported', spaces: stored.map(read) });
   }
 }

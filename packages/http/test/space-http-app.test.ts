@@ -28,7 +28,8 @@ const updateCommit = (next = snapshot): SpaceCommit => ({
 const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceResourceRepository => ({
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve(loaded),
-  loadAggregate: () => Promise.resolve({ metaSpaceId: SPACE_ID, spaces: [loaded] }),
+  loadAggregate: () =>
+    Promise.resolve({ kind: 'loaded', aggregate: { metaSpaceId: SPACE_ID, spaces: [loaded] } }),
   commit: () =>
     Promise.resolve({
       kind: 'committed' as const,
@@ -386,8 +387,11 @@ describe('Space HTTP reads', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      metaSpaceId: SPACE_ID,
-      spaces: [{ snapshot, revision: '0', exportedRevision: null }],
+      kind: 'loaded',
+      aggregate: {
+        metaSpaceId: SPACE_ID,
+        spaces: [{ snapshot, revision: '0', exportedRevision: null }],
+      },
     });
   });
 
