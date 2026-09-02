@@ -51,7 +51,6 @@ const initializedSnapshot = (
             activeGraph: graphId,
           },
         ],
-        // Ticket 03 renames this transitional persisted selection to defaultLayout.
         defaultLayout: layoutId,
       },
     },

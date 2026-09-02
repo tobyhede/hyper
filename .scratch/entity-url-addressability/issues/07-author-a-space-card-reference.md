@@ -21,10 +21,10 @@ Tags: release/v1
 
 - [ ] Creating a Space Card can create a new ordinary Space or reference an existing one through the same Card shape.
 - [ ] One supplied creation title seeds the Space Card and new Space, after which
-      their titles are independent. A newly created target begins complete, never
-      as a blank canvas: Markdown Card `Card 1` centred in an authored Layout that
-      owns one empty Active Graph, with that Layout persisted as its
-      `defaultLayout`.
+      their titles are independent. A new target Space is created complete through
+      the one Space initializer — Markdown Card `Card 1` placed in its authored
+      default Layout, one empty Active Graph, and that Layout persisted as
+      `defaultLayout` — so creation never produces a blank canvas.
 - [ ] The immutable Space reference and editable Layout and Graph selections
       survive persistence and reload.
 - [ ] Many Space Cards may reference the same Space and cycles are refused. Deleting one reference preserves the target while another remains; deleting the last reference to an **ordinary** Space atomically deletes it and every newly-unreferenced descendant. The Meta Space is permanent and no deletion reaches it — the cycle rule already refuses any Space Card that would reference it (ADR 0074).

@@ -96,12 +96,6 @@ const noCards: SpaceSnapshot = spaceSnapshotSchema.parse({
   cards: [],
 });
 
-/** A stored Space with no Layout, before working-state initialization. */
-const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
-  ...snapshot,
-  document: { version: 1, title: 'Space' },
-});
-
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);
   if (!loaded.ok) throw new Error(loaded.errors.map((error) => error.message).join('\n'));
@@ -263,21 +257,20 @@ describe('Add Card', () => {
     await settled(session);
   });
 
-  it('requires explicit Layout creation before Card creation', async () => {
-    const session = mount(noLayouts);
-    expect(layoutsOf(session)).toEqual([]);
-    expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
-
-    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
-    await waitFor(() => expect(createLayout).toBeEnabled());
-    fireEvent.click(createLayout);
-    await waitFor(() => expect(layoutsOf(session)).toHaveLength(1));
+  /**
+   * An empty Layout is the state Add Layout leaves behind, and the one a
+   * layoutless Space is initialized into (ADR 0079). A Space with no Layout at
+   * all no longer reaches this surface — `SpaceApp.test.tsx` owns Add Layout
+   * itself, and working-state initialization owns the Layout being there.
+   */
+  it('creates the first Card of an empty Layout as its only member', async () => {
+    const session = mount(noCards);
 
     fireEvent.click(await readyToAuthor());
 
     const layout = layoutsOf(session)[0]!;
+    expect(cardTitles(session)).toEqual(['Card 1']);
     expect(layout.graphs).toEqual([expect.objectContaining({ edges: [] })]);
-    // The new Layout starts empty; only the Card created in it becomes a member.
     expect(Object.keys(layout.positions)).toHaveLength(1);
     await settled(session);
   });

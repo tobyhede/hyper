@@ -1,13 +1,14 @@
 # 01 — Choose the link action pattern
 
-**What to build:** Replace the Sidebar's persistent "Copy link to X" / "Copy link in this Space View" buttons with one entity-actions menu — Rename, Copy link, Copy permanent link, Open in new tab — reachable two ways: a trailing icon on the entity's own row or rail, and a right click anywhere on it. For Cards, Graphs, Space Views and Spaces alike. This ticket does not change addressing, routing, or the product-destination table (ADR 0069, ADR 0072) — only where and how a person reaches the two link forms those ADRs already define, plus one existing capability (rename) it now also surfaces.
+**What to build:** Replace the Sidebar's persistent "Copy link to X" / "Copy link in this Layout" buttons with one entity-actions menu — Rename, Copy link, Copy permanent link, Open in new tab — reachable two ways: a trailing icon on the entity's own row or rail, and a right click anywhere on it. For Cards, Graphs, Layouts and Spaces alike. This ticket does not change addressing, routing, or the product-destination table (ADR 0069, ADR 0072) — only where and how a person reaches the two link forms those ADRs already define, plus one existing capability (rename) it now also surfaces.
 
 **Status:** interaction direction chosen; production wiring remains open
 
-**ADR 0079 reconciliation:** the `space-view` `SpaceEntity` kind below is retired.
-When this wiring is built, the entity kinds are Space, Layout, Card and Graph, and
-the canvas header names the selected Layout. ADR 0072, cited below, is superseded
-by ADR 0079; `layout-only-v1/03` owns the removal.
+**ADR 0079 reconciliation:** the retired `space-view` `SpaceEntity` kind is gone —
+`layout-only-v1/03` removed it, and `SpaceSidebar` now asks one entity at a time as
+`space` / `layout` / `graph`. The entity kinds are Space, Layout, Card and Graph, and
+the canvas header names the selected Layout. ADR 0072, cited below, is superseded by
+ADR 0079, and this ticket has been rewritten in the Layout vocabulary the code uses.
 
 ## Prototype
 
@@ -16,7 +17,7 @@ The menu is now a real component drawn by real surfaces, rather than a story-loc
 - **`packages/ui/src/EntityActionsMenu.tsx`** — `EntityActions` (the right-click surface) and `EntityActionsTrigger` (the icon), sharing one internal item list so the two paths cannot drift. Commands arrive as `readonly EntityActionGroup[]`; an empty group draws neither items nor its separator, which is how a withheld command stays withheld rather than shown-and-refused. An item carrying a `confirmation` holds the menu open through the press, swaps its own label, and announces the same word through a polite live region mounted outside the popup.
 - **`packages/ui/src/icons.tsx`** — `LinkActionsIcon`, a link glyph. Not the conventional kebab: every other Card rail control names its command, so a generic "more" glyph would be the one control on the rail saying nothing.
 - **`packages/ui/src/CanvasCard.tsx`** — an optional `entityActions` prop puts the icon on the real rail, in the shared command group **ahead of Open/Close**, so the rail reads `[link][open-or-close]` and Close keeps the position it has always had.
-- **`packages/app/src/components/SpaceSidebar.tsx`** — an optional `entityActions` prop, asked one `SpaceEntity` at a time (`space` / `space-view` / `graph`). Each Space View row, each Graph row and the Space's own title answers a right click and carries a `SidebarMenuAction` trailing icon, hover- and focus-revealed by the registry Sidebar's own `showOnHover`. Withheld while that row's title is being renamed.
+- **`packages/app/src/components/SpaceSidebar.tsx`** — an optional `entityActions` prop, asked one `SpaceEntity` at a time (`space` / `layout` / `graph`). Each Layout row, each Graph row and the Space's own title answers a right click and carries a `SidebarMenuAction` trailing icon, hover- and focus-revealed by the registry Sidebar's own `showOnHover`. Withheld while that row's title is being renamed.
 
 Both props are optional and nothing in the application supplies them yet, so no production state changed and no ADR 0052 parity claim attaches. `packages/app/stories/review/link-actions-prototype.stories.tsx` supplies them: `Sidebar` mounts the real Sidebar and canvas, `CardRail` mounts real `CanvasCard`s. Addresses come from `@project/http`'s own `productDestinationPath` over the fixture Space's real ids; copying, navigating and renaming are replaced by a line in an on-screen log.
 
@@ -33,7 +34,7 @@ This trades away the earlier "one click copies the useful default outright" spee
 
 ### Cards specifically: rail, right click, or both
 
-The interaction decision is **both**, asymmetrically with Graph/Space View/Space. A Card already has a persistent rail once selected or hovered (`CardRailActions`: Open/Close/Edit, ADR 0073) that Graphs and Space Views don't have. `CanvasCard` adds one more `CardRailAction` to that rail (the same link glyph, opening the same menu) rather than inventing a second control, and wraps the Card in the matching right-click surface. For Graph, Space View and Space — which have no existing rail — the trailing icon on the Sidebar row *is* the primary actions surface, with right click as its accelerator.
+The interaction decision is **both**, asymmetrically with Graph/Layout/Space. A Card already has a persistent rail once selected or hovered (`CardRailActions`: Open/Close/Edit, ADR 0073) that Graphs and Layouts don't have. `CanvasCard` adds one more `CardRailAction` to that rail (the same link glyph, opening the same menu) rather than inventing a second control, and wraps the Card in the matching right-click surface. For Graph, Layout and Space — which have no existing rail — the trailing icon on the Sidebar row *is* the primary actions surface, with right click as its accelerator.
 
 ### The icon
 
@@ -43,13 +44,13 @@ A link glyph (lucide `Link`), not the conventional kebab. The rail decided it: `
 
 Never "canonical" or "contextual" in user-facing copy:
 
-- **"Copy link"** — the address that reproduces what's currently on screen (a Card or Graph within the active Space View when that address exists, the entity's own address otherwise).
+- **"Copy link"** — the address that reproduces what's currently on screen (a Card or Graph within the active Layout when that address exists, the entity's own address otherwise).
 - **"Copy permanent link"**, offered only when it differs from the above — "permanent" already means what it needs to a general audience (cf. "permalink"), without naming a domain concept.
 - Every menu item carries a one-sentence destination description ("Opens Constraints inside Layout 1, selected the way it is now" / "Always opens Constraints on its own, wherever it's placed") so the difference is legible without the reader knowing the domain model.
 
 ### Placement
 
-On the entity itself, never standing Sidebar chrome: a Card's rail plus a right click on the Card, a Graph's row in the Sidebar's Graphs list, the canvas header for the current Space View, the Space's own title area in the Sidebar — the trailing icon always revealed by hover or keyboard focus, never permanently visible (`showOnHover`-equivalent styling already resolves to always-visible below the `md` breakpoint and hover/focus-revealed above it, so narrow screens need no separate treatment for the icon). Right click has no touch equivalent; Base UI's `ContextMenu` answers long-press instead on coarse pointers, which is worth confirming feels right on a touch canvas before this ships, since a Card's whole body is also a drag/pan/selection target there.
+On the entity itself, never standing Sidebar chrome: a Card's rail plus a right click on the Card, a Graph's row in the Sidebar's Graphs list, the canvas header for the current Layout, the Space's own title area in the Sidebar — the trailing icon always revealed by hover or keyboard focus, never permanently visible (`showOnHover`-equivalent styling already resolves to always-visible below the `md` breakpoint and hover/focus-revealed above it, so narrow screens need no separate treatment for the icon). Right click has no touch equivalent; Base UI's `ContextMenu` answers long-press instead on coarse pointers, which is worth confirming feels right on a touch canvas before this ships, since a Card's whole body is also a drag/pan/selection target there.
 
 ### No secondary address, or no rename
 
@@ -66,7 +67,7 @@ Standard Base UI trigger/menu behavior throughout, left untouched: Tab reaches t
 ## Open follow-ups
 
 - Wire the menu's Copy link / Copy permanent link to the real `copyProductDestination` path in `App.tsx`, and Rename to the same `authoring.complete({ kind: 'renamed-card' | 'renamed-graph' | 'renamed-layout', ... })` path `chromeTitleEdit`/`InlineTitleEditor` already use. That is what makes any of this production-reachable; `SpaceSidebar`'s `graph.links` and `cardLinks` footer buttons are deliberately still there and still wired, and come out in the same change rather than ahead of it.
-- The canvas header (`SelectedCanvasRenderer`) is the one Sidebar-adjacent surface still without the menu — it names the drawing Space View outside the Sidebar and survives the Sidebar closing, so it wants the same treatment its row already has.
+- The canvas header (`SelectedCanvasRenderer`) is the one Sidebar-adjacent surface still without the menu — it names the drawing Layout outside the Sidebar and survives the Sidebar closing, so it wants the same treatment its row already has.
 - The rail control and `CanvasCard` right-click surface are built; their interaction with React Flow's pointer handling (pan, drag, multi-select, connection dragging) still needs production evidence when `CardNode` supplies the actions.
 - `CardNode` does not pass `entityActions` through, so the rail menu is reachable from `CanvasCard` directly but not yet from a Card on the canvas. That hop is the adapter's and belongs with whichever surface lands first.
 - Decide whether Card title rename stays reachable both ways (click-to-rename and the menu) or the menu becomes the one path — same question for Graph/Layout.

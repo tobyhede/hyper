@@ -39,7 +39,11 @@ implementation tickets `layout-only-v1/01–04`, folded their aggregate criteria
 into [V1/08](08-round-trip-multi-space-import-and-export.md), reconciled the
 Definition of Done and the affected guidance/trackers, and retired the superseded
 entries ticket 12 named. No downstream work may implement the retired Computed
-View/Space View contract.
+View/Space View contract. `layout-only-v1/01`, `02` and `03` have since landed,
+so Layout management, layoutless initialization and the Layout-only canvas
+selection are in the tree ahead of the End-to-end checkpoint;
+`layout-only-v1/04` is the one implementation ticket of that set still open, and
+it belongs to the Space Card work below.
 
 ### Executable dependency graph
 
@@ -64,6 +68,7 @@ View/Space View contract.
    [Space Card reference/lifetime authoring](../../entity-url-addressability/issues/07-author-a-space-card-reference.md)
    in parallel.
 3. **Join Spaces into the application.** Build
+   [Space Card Layout selection](../../layout-only-v1/issues/04-make-space-cards-select-initialized-layouts.md),
    [in-place Space Card Opening](../../space-cards/issues/01-render-a-space-card-as-a-sub-flow.md)
    and the [tracked multi-Space fixture](../../space-cards/issues/10-extend-the-dev-fixture-to-linked-spaces.md),
    then build
@@ -83,7 +88,9 @@ View/Space View contract.
    correction work returns to its real owner, updates the Definition of Done and
    critical path where required, and reruns affected proof. Non-blocking work is
    recorded beyond V1.
-7. **Finish the V1 product.** Complete [Graph management](05-add-graph-management.md),
+7. **Finish the V1 product.** Layout management landed with
+   [`layout-only-v1/01`](../../layout-only-v1/issues/01-add-empty-layouts.md)
+   before the checkpoint. Complete [Graph management](05-add-graph-management.md),
    [replacement-discard acknowledgement](../../interaction-draft-invalidation/issues/04-acknowledge-markdown-prose-discarded-by-replacement.md)
    and [V1 product design](06-finalise-v1-product-design.md), including
    responsive surfaces and Ladle/application parity.
@@ -93,9 +100,9 @@ View/Space View contract.
    desktop checkpoint evidence.
 
 The critical spine remains Layout-only → shared seams → Meta/aggregate/Space
-Card lifetime → Opening/Open Spaces/fixture → Default Content and unified
-controls → End-to-end rehearsal → classified corrections → full Layout/Graph
-management and product finish → final proof and tag.
+Card lifetime → Space Card Layout selection/Opening/Open Spaces/fixture →
+Default Content and unified controls → End-to-end rehearsal → classified
+corrections → Graph management and product finish → final proof and tag.
 
 ### Acceptance and proof ownership
 
@@ -110,7 +117,7 @@ attach several typed evidence entries to a row.
 | Cards drawer and selected-Layout membership | [V1/02](02-complete-the-cards-view.md) | V1/07; V1/19 covers the canonical path |
 | Move, Open, Close, Resize and Markdown source editing | [`canvas-card-authoring`](../../../packages/app/src/canvas-card-authoring.ts) and [`space-authoring`](../../../packages/app/src/space-authoring.ts); proof-discovered UI correction is assigned through V1/06 | V1/07; V1/19 covers successful use |
 | Alias creation, read-only Opening and own-state editing | [Alias Opening](../../alias-cards/issues/06-open-alias-shows-target-content-read-only.md) and [V1/03](03-complete-card-lifecycle-controls.md) | V1/07; V1/19 covers successful use |
-| Space Cards and multi-Space lifetime/navigation | [entity URL 07](../../entity-url-addressability/issues/07-author-a-space-card-reference.md), [entity URL 08](../../entity-url-addressability/issues/08-enter-and-independently-open-a-space-card.md), [Space Cards 01](../../space-cards/issues/01-render-a-space-card-as-a-sub-flow.md), [Space Cards 10](../../space-cards/issues/10-extend-the-dev-fixture-to-linked-spaces.md) [architecture 14](../../architecture-review/issues/14-deepen-open-spaces-composition.md) and [`layout-only-v1/04`](../../layout-only-v1/issues/04-make-space-cards-select-initialized-layouts.md) for the initialised-Layout selection | V1/07; V1/19 covers Enter, return and recovery |
+| Space Cards and multi-Space lifetime/navigation | [`layout-only-v1/04`](../../layout-only-v1/issues/04-make-space-cards-select-initialized-layouts.md) for the initialised-Layout selection contract, [entity URL 07](../../entity-url-addressability/issues/07-author-a-space-card-reference.md), [entity URL 08](../../entity-url-addressability/issues/08-enter-and-independently-open-a-space-card.md), [Space Cards 01](../../space-cards/issues/01-render-a-space-card-as-a-sub-flow.md), [Space Cards 10](../../space-cards/issues/10-extend-the-dev-fixture-to-linked-spaces.md) and [architecture 14](../../architecture-review/issues/14-deepen-open-spaces-composition.md) | V1/07; V1/19 covers Enter, return and recovery |
 | Layouts, Graphs and Edges | [`layout-only-v1/01`](../../layout-only-v1/issues/01-add-empty-layouts.md), [`layout-only-v1/02`](../../layout-only-v1/issues/02-initialize-layoutless-space-on-first-working-load.md) and [`layout-only-v1/03`](../../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md) for Layouts, [V1/05](05-add-graph-management.md) for Graphs and Edges; [V1/04](04-add-layout-management.md) is superseded | V1/07 |
 | Presentation controls and traversal | [V1/06](06-finalise-v1-product-design.md) owns surface gaps; [`navigation`](../../../packages/app/src/navigation.ts) owns traversal state | V1/07; V1/19 covers the canonical recovered presentation |
 | Durable Space, Layout, Card, Graph and presentation URLs | [entity URL 02](../../entity-url-addressability/issues/02-open-the-entry-space-at-its-canonical-url.md), [03](../../entity-url-addressability/issues/03-address-every-space-view.md), [04](../../entity-url-addressability/issues/04-address-cards-canonically-and-in-a-space-view.md), [05](../../entity-url-addressability/issues/05-address-graphs-canonically-and-in-a-space-view.md), [06](../../entity-url-addressability/issues/06-deep-link-ordinary-presentation-points.md) and [08](../../entity-url-addressability/issues/08-enter-and-independently-open-a-space-card.md); [`layout-only-v1/03`](../../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md) retires the Space View URL shape before proof | V1/07; V1/19 covers canonical reload/recovery navigation |
@@ -162,8 +169,9 @@ executable or observed proof of product behavior.
 ### Remaining decisions
 
 No known release-contract or product-scope decision remains between the
-repository and `v1.0.0`. The Layout-only baseline is landed and reconciled, so
-`layout-only-v1/01` and `02` are built and `03` and `04` remain; architecture
+repository and `v1.0.0`. The Layout-only baseline is landed and reconciled, and
+`layout-only-v1/01–03` are built, so what remains of it is `layout-only-v1/04`
+with the Space Card work; architecture
 13 may conditionally promote a refactor when its diagnostic runs, and End-to-end
 feedback may create corrections through ticket 13. These are decided
 contingencies and implementation work, not open design questions.

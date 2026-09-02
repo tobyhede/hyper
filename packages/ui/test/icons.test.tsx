@@ -72,8 +72,6 @@ describe('the public icon facade', () => {
     );
 
     const expectedLucideName = {
-      flow: 'workflow',
-      grid: 'grid-2x2',
       layout: 'panels-top-left',
       graph: 'network',
       present: 'play',
