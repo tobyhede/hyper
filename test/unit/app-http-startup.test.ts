@@ -95,6 +95,33 @@ describe('HTTP space startup composition', () => {
     expect(result.opened.app.currentSpace().id).toBe(OTHER_SPACE_ID);
   });
 
+  it('retries a startup whose first aggregate load failed', async () => {
+    class FlakyAggregateBackend extends MemorySpaceBackend {
+      failNextLoad = true;
+
+      override loadAggregate(): ReturnType<MemorySpaceBackend['loadAggregate']> {
+        if (this.failNextLoad) {
+          this.failNextLoad = false;
+          return Promise.reject(new Error('aggregate transport exploded'));
+        }
+        return super.loadAggregate();
+      }
+    }
+
+    const backend = new FlakyAggregateBackend(SPACE_ID, [
+      { snapshot: snapshot(), revision: 0n, exportedRevision: null },
+    ]);
+    const startup = createSpaceStartup(backend);
+    const destination = productDestinationPath({ kind: 'space', spaceId: SPACE_ID });
+
+    await expect(startup.resolve(destination)).rejects.toThrow('aggregate transport exploded');
+
+    // A transport failure is not a permanent verdict on the repository. Keeping
+    // the rejected attempt would answer every later startup with a stale error.
+    const result = await startup.resolve(destination);
+    expect(result.kind).toBe('opened');
+  });
+
   it('rejects a malformed compact product-route id', async () => {
     const startup = startupFor(snapshot());
 

@@ -45,15 +45,13 @@ class SpaceAppFailure extends Component<{ children: ReactNode }, SpaceAppFailure
 /**
  * Mount one application for the lifetime of the opened Space.
  *
- * Composition is guarded as well as rendering, because it reads the same
- * snapshot: `createApp` builds Navigation, which resolves the renderer the
- * Space opens in against the session's working Space (`compose-app.ts`), so a
- * snapshot that fails domain intake throws here — before there is a tree for
- * the boundary to catch it in. Both paths report the same sentence, for the
- * same reason: an uncaught throw leaves a blank page, which says nothing.
- *
- * Open Spaces validates the snapshot and composes the collaborators once. This
- * guard is therefore a backstop rather than another composition path.
+ * Open Spaces validates the snapshot and composes the collaborators once, so
+ * `createApp` no longer performs domain intake. What it still does before there
+ * is a tree is apply the addressed opening against the session's working Space,
+ * and that throws on a Space that has since stopped loading — with no boundary
+ * mounted yet to catch it. Both paths report the same sentence, for the same
+ * reason: an uncaught throw leaves a blank page, which says nothing. This guard
+ * is a backstop for a broken invariant, not a second composition path.
  */
 export function mountSpaceApp(
   opened: OpenSpace,

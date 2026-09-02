@@ -427,6 +427,46 @@ describe('Space app failure reporting', () => {
   );
 
   /**
+   * Composition happens in Open Spaces now, so `createApp` no longer performs
+   * domain intake. What it still does before there is a tree is read the
+   * session's working Space to open an addressed Graph, and that throws on a
+   * snapshot that has since stopped loading. What is pinned is that
+   * `mountSpaceApp` reports it rather than throwing at its caller and leaving a
+   * blank page — and that it logs, because unlike the boundary below, which
+   * React traces for us, nothing else would say what threw.
+   */
+  it('names a working snapshot that stopped loading instead of blanking the page', () => {
+    const valid = snapshot('Space', 'Card', 10, 20);
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
+      snapshot: valid,
+      revision: 0n,
+      exportedRevision: null,
+    });
+    const app = composeApp({ spaceSession: session });
+    // Written straight onto the session, past the validation every authoring
+    // path performs first: reaching this state means an invariant has already
+    // broken, which is what the guard is a backstop for.
+    session.submit(withDanglingGraph(valid, valid.document.title));
+    // React reports a boundary-caught error to `console.error` as well as to the
+    // boundary. The report is the point; the duplicate is noise this test owns.
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(() =>
+      mountSpaceApp(
+        { id: runtime(valid).id, session, app },
+        (view) => {
+          render(view);
+        },
+        { selection: LAYOUT_ID, cardId: null, graphId: GRAPH_ID, presentationCardId: null },
+      ),
+    ).not.toThrow();
+
+    expect(screen.getByTestId('space-app-failure')).toHaveTextContent(MISSING_CARD_ID);
+    expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
+    expect(reported).toHaveBeenCalledWith('Composing the Space app failed', expect.any(Error));
+  });
+
+  /**
    * The other path to the same sentence, and the one the error boundary itself
    * is for: a Space app that composed and mounted, whose snapshot then stops
    * passing intake under it. `App` re-derives the whole aggregate on every

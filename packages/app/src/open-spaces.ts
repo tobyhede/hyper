@@ -70,21 +70,6 @@ export interface OpenSpacesOptions {
   readonly reportObserverError?: ObserverErrorReporter;
 }
 
-const waitUntilNotPending = (session: SpaceSession): Promise<void> => {
-  if (session.getState().persistence.kind !== 'pending') return Promise.resolve();
-  return new Promise((resolve) => {
-    const unsubscribe = session.subscribe(() => {
-      if (session.getState().persistence.kind === 'pending') return;
-      unsubscribe();
-      resolve();
-    });
-    if (session.getState().persistence.kind !== 'pending') {
-      unsubscribe();
-      resolve();
-    }
-  });
-};
-
 interface ValidatedLoadedSpace {
   readonly loaded: LoadedSpace;
   readonly space: Space;
@@ -119,12 +104,24 @@ export function createOpenSpaces({
   );
   const compositions = new Map<UUID, Promise<OpenSpace>>();
 
-  const activate = (entry: OpenSpace): void => {
+  /**
+   * Every activation request in the order it was made.
+   *
+   * Waiting for the Space being left to settle takes arbitrarily long, and the
+   * author keeps choosing while it does. A request that returns to find a later
+   * one recorded has been superseded: the Space it opened stays open, but
+   * reinstating it on the canvas would undo the newer choice.
+   */
+  let activationRequest = 0;
+
+  const include = (entry: OpenSpace, activeSpaceId: UUID): void => {
     const state = observable.getState();
-    const entries = state.entries.some(({ id }) => id === entry.id)
-      ? state.entries
-      : [...state.entries, entry];
-    observable.publish({ activeSpaceId: entry.id, entries });
+    if (state.entries.some(({ id }) => id === entry.id)) {
+      if (state.activeSpaceId === activeSpaceId) return;
+      observable.publish({ activeSpaceId, entries: state.entries });
+      return;
+    }
+    observable.publish({ activeSpaceId, entries: [...state.entries, entry] });
   };
 
   const buildLoaded = (
@@ -133,7 +130,15 @@ export function createOpenSpaces({
   ): OpenSpace => {
     const spaceId = loaded.snapshot.id;
     const session = registry.open(loaded);
-    const opened = { id: spaceId, session, app: composeApp({ spaceSession: session, selection }) };
+    // Every identity and every observer failure in a composed Space comes from
+    // the seams Open Spaces was given (ADR 0016). Leaving either off here lets
+    // `composeApp` fall back to the ambient generator and to `console.error`,
+    // which is the second, invisible source the one owner exists to prevent.
+    const opened = {
+      id: spaceId,
+      session,
+      app: composeApp({ spaceSession: session, selection, newId, reportObserverError: report }),
+    };
     if (loaded.initialization !== 'created-layout') return opened;
     return { ...opened, initialization: 'created-layout' };
   };
@@ -164,21 +169,32 @@ export function createOpenSpaces({
     return opening;
   };
 
-  const activateAfterLeavingSettles = async (target: OpenSpace): Promise<OpenSpace> => {
+  const activateAfterLeavingSettles = async (
+    target: OpenSpace,
+    request: number,
+  ): Promise<OpenSpace> => {
     const active = observable.getState().activeSpaceId;
     if (active !== null && active !== target.id) {
-      const leaving = observable.getState().entries.find(({ id }) => id === active);
-      if (leaving !== undefined) await waitUntilNotPending(leaving.session);
+      await registry.waitUntilRetirable(active);
     }
-    activate(target);
+    if (request !== activationRequest) {
+      include(target, observable.getState().activeSpaceId ?? target.id);
+      return target;
+    }
+    include(target, target.id);
     return target;
   };
 
   const open = async (spaceId: UUID, selection?: CanvasRendererId): Promise<OpenSpace> => {
-    return activateAfterLeavingSettles(await compose(spaceId, selection));
+    // Numbered before the Space is loaded, not after: composition is itself a
+    // wait, and a request made first must not be superseded by one made second
+    // merely because the second Space was already in hand.
+    const request = ++activationRequest;
+    return activateAfterLeavingSettles(await compose(spaceId, selection), request);
   };
 
   const openPath: OpenSpaces['openPath'] = async (pathname) => {
+    const request = ++activationRequest;
     // Resolving an address is a working load, so it initializes a stored
     // layoutless Space before the destination is read off it (ADR 0079).
     const resolution = await resolveProductDestination({ loadSpace: loadWorkingSpace }, pathname);
@@ -187,17 +203,26 @@ export function createOpenSpaces({
     if (resolution.kind === 'unresolved') throw new Error('The product URL does not resolve.');
     if (resolution.kind === 'collision') throw new Error('The product URL names two Space Views.');
     const validated = validateLoadedSpace(resolution.loaded);
-    const opening = destinationOpening(validated.space, resolution.destination);
+    const destination = destinationOpening(validated.space, resolution.destination);
     const opened = await activateAfterLeavingSettles(
-      await composeValidated(validated, opening.selection),
+      await composeValidated(validated, destination.selection),
+      request,
     );
+    // A Space already open keeps the selection it is being worked in, so the
+    // URL's is only a proposal. Report the one that holds: a caller opening the
+    // named Graph does so against the selected Space View, and the two
+    // disagreeing is how a Graph lands on a Space View nobody named.
+    const selection = opened.app.navigation.getState().selectedRenderer;
+    const opening: DestinationOpening =
+      selection === destination.selection ? destination : { ...destination, selection };
     return { opened, opening };
   };
 
   const switchTo = async (spaceId: UUID): Promise<OpenSpace> => {
+    const request = ++activationRequest;
     const target = observable.getState().entries.find(({ id }) => id === spaceId);
     if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
-    return activateAfterLeavingSettles(target);
+    return activateAfterLeavingSettles(target, request);
   };
 
   const close = async (
@@ -209,7 +234,7 @@ export function createOpenSpaces({
     }
     const target = observable.getState().entries.find(({ id }) => id === spaceId);
     if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
-    await waitUntilNotPending(target.session);
+    await registry.waitUntilRetirable(spaceId);
     const persistence = target.session.getState().persistence;
     if (persistence.kind === 'failed') {
       return {
@@ -230,6 +255,10 @@ export function createOpenSpaces({
     const entries = state.entries.filter(({ id }) => id !== spaceId);
     const activeSpaceId =
       state.activeSpaceId === spaceId ? (entries[0]?.id ?? null) : state.activeSpaceId;
+    // The registry stops owning this session here, so anything still driving it
+    // would be a writer outside the one owner. The composition goes with it.
+    target.app.edgeAuthoring.dispose();
+    target.app.authoring.dispose();
     registry.release(spaceId);
     compositions.delete(spaceId);
     observable.publish({ activeSpaceId, entries });

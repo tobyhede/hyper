@@ -55,6 +55,14 @@ export type SpaceSessionRegistryEntry =
 
 export interface SpaceSessionRegistry {
   readonly open: (loaded: LoadedSpace) => SpaceSession;
+  /**
+   * Resolve once this Space holds no work the registry still owes the backend:
+   * no commit in flight, no coordination it participates in, and nothing queued
+   * behind a paused turn. An owner waits on this before leaving or retiring a
+   * Space, because each of those three states hides authored work that
+   * `persistence.kind` alone reports as `settled`.
+   */
+  readonly waitUntilRetirable: (spaceId: UUID) => Promise<void>;
   /** Retire one idle live session after its owner has completed safe closing. */
   readonly release: (spaceId: UUID) => void;
   readonly session: (spaceId: UUID) => SpaceSession | undefined;
@@ -744,12 +752,35 @@ export function createSpaceSessionRegistry(
     };
   };
 
+  const waitUntilRetirable = async (spaceId: UUID): Promise<void> => {
+    for (;;) {
+      const managed = sessions.get(spaceId);
+      if (managed === undefined) return;
+      // A coordination has paused every session, so queued work cannot drain
+      // and the participant set must not change under it. Wait the turn out:
+      // its `finally` lowers the barrier and resumes, which is what lets the
+      // queued snapshot become an in-flight commit this loop can then await.
+      if (persistenceBarrier) {
+        await lifecycleTail;
+        continue;
+      }
+      if (managed.isIdle() && !managed.hasQueuedWork()) return;
+      await managed.waitForIdle();
+    }
+  };
+
   const registry: SpaceSessionRegistry = {
     open,
+    waitUntilRetirable,
     release: (spaceId) => {
       const managed = sessions.get(spaceId);
       if (managed === undefined) return;
-      if (!managed.isIdle()) throw new Error(`Space ${spaceId} is still committing`);
+      if (persistenceBarrier) {
+        throw new Error(`Space ${spaceId} is in a coordinated commit`);
+      }
+      if (!managed.isIdle() || managed.hasQueuedWork()) {
+        throw new Error(`Space ${spaceId} is still committing`);
+      }
       managed.setCoordinatedRecovery(undefined);
       sessions.delete(spaceId);
       uncommittedCreates.delete(spaceId);

@@ -17,12 +17,20 @@ export const createSpaceStartup = (
 ): SpaceStartup => {
   let owner: Promise<OpenSpaces> | undefined;
   const openSpaces = (): Promise<OpenSpaces> => {
-    owner ??= backend.loadAggregate().then((result) => {
+    if (owner !== undefined) return owner;
+    const opening = backend.loadAggregate().then((result) => {
       if (result.kind === 'uninitialized')
         throw new Error('The Space repository is uninitialized.');
       return createOpenSpaces({ backend, metaSpaceId: result.aggregate.metaSpaceId, newId });
     });
-    return owner;
+    owner = opening;
+    // A failed attempt is not the owner. Retaining the rejected promise would
+    // answer every later startup with the first transport error, so the memo
+    // holds only an owner that exists.
+    void opening.catch(() => {
+      if (owner === opening) owner = undefined;
+    });
+    return opening;
   };
   return {
     resolve: async (pathname) => {

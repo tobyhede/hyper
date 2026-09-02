@@ -58,6 +58,13 @@ export interface SpaceSessionOptions {
 export interface ManagedSpaceSession {
   readonly session: SpaceSession;
   readonly isIdle: () => boolean;
+  /**
+   * Whether a submitted snapshot is parked awaiting a commit turn. Idleness
+   * alone does not answer this: a submit arriving while persistence is paused
+   * is queued without announcing `pending`, so a session can be idle and still
+   * be holding authored work that has never reached the backend.
+   */
+  readonly hasQueuedWork: () => boolean;
   readonly waitForIdle: () => Promise<void>;
   readonly pausePersistence: () => void;
   readonly resumePersistence: () => void;
@@ -405,6 +412,7 @@ export const openManagedSpaceSession = (
   return {
     session,
     isIdle: () => !inFlight && !coordinating,
+    hasQueuedWork: () => waiting !== undefined,
     waitForIdle: () => {
       if (!inFlight && !coordinating) return Promise.resolve();
       return new Promise((resolve) => idleWaiters.add(resolve));

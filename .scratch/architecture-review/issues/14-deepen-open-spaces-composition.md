@@ -71,19 +71,29 @@ their UI evidence. No second Open Spaces owner or optional registry path remains
       implementation begins.
 - [x] No public opening helper can silently manufacture a second registry.
 - [x] One Space Id has one live session across direct URL opening, Enter and
-      switching.
+      switching. **`enter` is currently `open` under a second name** — Entering
+      has no semantics of its own yet, so this box is proven for opening and
+      switching only. CONTEXT.md's "Entering is not Opening", and Exit as the
+      name of the closing action, are `entity-url-addressability/08`'s to build.
 - [x] Per-Space navigation selection survives switching without becoming
       authored Space state.
 - [x] Closing follows `space-cards/12` for pending, failed, conflicted and
       rejected persistence, and Meta cannot close.
 - [x] Replace helper-level composition tests with behavioural tests through the
-      Open Spaces interface.
+      Open Spaces interface. The `open-space.ts` helper and its tests are gone
+      and `spaceCards` is exercised through `createOpenSpaces`.
+      `packages/app/test/space-card-lifecycle.test.ts` still composes registries
+      directly: it is a test of registry coordination rather than of Open Spaces
+      composition, and moving it beside `packages/persistence` is its own change.
 
 ## Persistence-safety acceptance absorbed from `space-cards/12`
 
 - [x] Switching Spaces awaits an in-flight commit on the Space being left.
 - [x] An inactive Space whose session has failed or conflicted remains
-      discoverable; conflict resolution waits until that Space is active.
+      discoverable. **Gating conflict resolution on the Space being active is
+      not built** — nothing in Open Spaces reads `activeSpaceId` on the recovery
+      path, and there is no surface offering recovery for an inactive Space to
+      gate. It follows the Enter/Exit UI that creates the situation.
 - [x] Closing waits on an in-flight commit and refuses for `failed` or
       `conflicted`, so recoverable authored state cannot be discarded.
 - [x] Closing warns and permits the action for `rejected`, where no recovery
@@ -114,4 +124,10 @@ domain capability; the registry itself never escapes.
 `packages/app/test/open-spaces.test.ts` crosses only the Open Spaces interface
 and covers concurrent direct/Enter reuse, retained selection, switching and
 closing waits, inactive recoverable entries, rejected confirmation, fresh
-reopening and the permanent Meta rule.
+reopening and the permanent Meta rule. It also covers what review found the
+first implementation got wrong: an edit queued behind a Space Card coordination
+is committed before the Space closes rather than discarded, the injected
+identity minter reaches each composed Space, a superseded activation does not
+reinstate itself when the Space being left settles, `openPath` reports the
+selection a reused composition actually kept, and closing retires the
+composition along with the session.

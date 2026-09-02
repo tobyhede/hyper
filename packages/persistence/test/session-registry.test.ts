@@ -48,6 +48,7 @@ describe('Space session registry', () => {
       'release',
       'session',
       'spaceCards',
+      'waitUntilRetirable',
     ]);
   });
 });
