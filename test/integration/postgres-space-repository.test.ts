@@ -725,18 +725,28 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('rejects a card owned by another space and rolls back the whole commit', async () => {
-    await repository.importSpaces([snapshot, otherSnapshot]);
-    const claimed: SpaceSnapshot = {
+    const linked: SpaceSnapshot = {
       ...snapshot,
-      document: { ...snapshot.document, title: 'Must roll back' },
-      cards: [...snapshot.cards, otherSnapshot.cards[0]!],
+      cards: [
+        ...snapshot.cards,
+        {
+          id: MISSING_CARD_ID,
+          document: { title: 'Other Space', kind: 'space', spaceId: OTHER_SPACE_ID },
+        },
+      ],
+    };
+    await repository.importSpaces([linked, otherSnapshot]);
+    const claimed: SpaceSnapshot = {
+      ...linked,
+      document: { ...linked.document, title: 'Must roll back' },
+      cards: [...linked.cards, otherSnapshot.cards[0]!],
     };
 
     await expect(commitSpace(claimed, 0n)).resolves.toMatchObject({
       kind: 'aggregate-refused',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot,
+      snapshot: linked,
       revision: 0n,
       exportedRevision: null,
     });
@@ -835,17 +845,21 @@ describe('PostgresSpaceRepository', () => {
       ],
     });
     await expect(repository.loadAggregate()).resolves.toEqual({
-      metaSpaceId: SPACE_ID,
-      spaces: [
-        { snapshot: winningMeta, revision: 1n, exportedRevision: null },
-        { snapshot: winningTarget, revision: 0n, exportedRevision: null },
-      ],
+      kind: 'loaded',
+      aggregate: {
+        metaSpaceId: SPACE_ID,
+        spaces: [
+          { snapshot: winningMeta, revision: 1n, exportedRevision: null },
+          { snapshot: winningTarget, revision: 0n, exportedRevision: null },
+        ],
+      },
     });
     await expect(repository.loadSpace(losingTargetId)).resolves.toBeUndefined();
   });
 
   it('rejects an existing space identity without changing stored content', async () => {
-    await repository.importSpaces([snapshot, otherSnapshot]);
+    await repository.importSpaces([snapshot]);
+    await repository.importSpaces([otherSnapshot]);
     const suppliedCard = {
       ...snapshot.cards[0]!,
       document: {
@@ -881,7 +895,8 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('replaces every stored space and card in truncate mode', async () => {
-    await repository.importSpaces([snapshot, otherSnapshot]);
+    await repository.importSpaces([snapshot]);
+    await repository.importSpaces([otherSnapshot]);
     const replacement: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Only remaining space' },
@@ -904,7 +919,8 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('rolls back truncation and every earlier batch write when later validation fails', async () => {
-    await repository.importSpaces([snapshot, otherSnapshot]);
+    await repository.importSpaces([snapshot]);
+    await repository.importSpaces([otherSnapshot]);
     const replacement: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Must roll back' },
@@ -1096,7 +1112,8 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('rejects a cross-space card in an import and rolls back the whole batch', async () => {
-    await repository.importSpaces([snapshot, otherSnapshot]);
+    await repository.importSpaces([snapshot]);
+    await repository.importSpaces([otherSnapshot]);
     const changedFirst: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Must not persist' },

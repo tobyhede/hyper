@@ -926,15 +926,15 @@ export class PostgresSpaceRepository implements SpaceRepository {
         };
       }
     }
-    const current = await this.loadAggregate();
-    if (mode === 'truncate' || current.kind === 'uninitialized') {
+    const currentMetaSpaceId = await this.#database.transaction(({ orm }) => lockMetaIdentity(orm));
+    if (mode === 'truncate' || currentMetaSpaceId === undefined) {
       const metaSpaceId = resolved[0]?.id;
       if (metaSpaceId === undefined) return { kind: 'imported', spaces: [] };
       const aggregate = { metaSpaceId, spaces: resolved };
       const lifecycle =
-        current.kind === 'uninitialized'
+        currentMetaSpaceId === undefined
           ? await this.initializeAggregate(aggregate)
-          : await this.replaceAggregate(aggregate, current.aggregate.metaSpaceId);
+          : await this.replaceAggregate(aggregate, currentMetaSpaceId);
       if (lifecycle.kind === 'initialized' || lifecycle.kind === 'replaced') {
         return { kind: 'imported', spaces: lifecycle.aggregate.spaces };
       }
