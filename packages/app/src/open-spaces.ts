@@ -1,5 +1,5 @@
 import type { UUID } from '@project/core';
-import { loadSpaceSnapshot } from '@project/graph';
+import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { resolveProductDestination } from '@project/http';
 import {
   createObservableState,
@@ -85,6 +85,21 @@ const waitUntilNotPending = (session: SpaceSession): Promise<void> => {
   });
 };
 
+interface ValidatedLoadedSpace {
+  readonly loaded: LoadedSpace;
+  readonly space: Space;
+}
+
+const validateLoadedSpace = (loaded: LoadedSpace): ValidatedLoadedSpace => {
+  const runtime = loadSpaceSnapshot(loaded.snapshot);
+  if (!runtime.ok) {
+    throw new Error(
+      `The backend returned an invalid space:\n${runtime.errors.map((error) => `  - ${error.message}`).join('\n')}`,
+    );
+  }
+  return { loaded, space: runtime.space };
+};
+
 /** Own every live Space composition and the one registry they all share. */
 export function createOpenSpaces({
   backend,
@@ -112,25 +127,26 @@ export function createOpenSpaces({
     observable.publish({ activeSpaceId: entry.id, entries });
   };
 
-  const buildLoaded = (loaded: LoadedSpace, selection?: CanvasRendererId): OpenSpace => {
+  const buildLoaded = (
+    { loaded }: ValidatedLoadedSpace,
+    selection?: CanvasRendererId,
+  ): OpenSpace => {
     const spaceId = loaded.snapshot.id;
-    const runtime = loadSpaceSnapshot(loaded.snapshot);
-    if (!runtime.ok) {
-      throw new Error(
-        `The backend returned an invalid space:\n${runtime.errors.map((error) => `  - ${error.message}`).join('\n')}`,
-      );
-    }
     const session = registry.open(loaded);
     const opened = { id: spaceId, session, app: composeApp({ spaceSession: session, selection }) };
     if (loaded.initialization !== 'created-layout') return opened;
     return { ...opened, initialization: 'created-layout' };
   };
 
-  const composeLoaded = (loaded: LoadedSpace, selection?: CanvasRendererId): Promise<OpenSpace> => {
+  const composeValidated = (
+    validated: ValidatedLoadedSpace,
+    selection?: CanvasRendererId,
+  ): Promise<OpenSpace> => {
+    const { loaded } = validated;
     const spaceId = loaded.snapshot.id;
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
-    const opening = Promise.resolve().then(() => buildLoaded(loaded, selection));
+    const opening = Promise.resolve().then(() => buildLoaded(validated, selection));
     compositions.set(spaceId, opening);
     void opening.catch(() => compositions.delete(spaceId));
     return opening;
@@ -141,7 +157,7 @@ export function createOpenSpaces({
     if (existing !== undefined) return existing;
     const opening = loadWorkingSpace(spaceId).then((loaded) => {
       if (loaded === undefined) throw new Error(`The backend could not load space ${spaceId}`);
-      return buildLoaded(loaded, selection);
+      return buildLoaded(validateLoadedSpace(loaded), selection);
     });
     compositions.set(spaceId, opening);
     void opening.catch(() => compositions.delete(spaceId));
@@ -170,15 +186,10 @@ export function createOpenSpaces({
     if (resolution.kind === 'malformed') throw new Error('The product URL is malformed.');
     if (resolution.kind === 'unresolved') throw new Error('The product URL does not resolve.');
     if (resolution.kind === 'collision') throw new Error('The product URL names two Space Views.');
-    const runtime = loadSpaceSnapshot(resolution.loaded.snapshot);
-    if (!runtime.ok) {
-      throw new Error(
-        `The backend returned an invalid space:\n${runtime.errors.map((error) => `  - ${error.message}`).join('\n')}`,
-      );
-    }
-    const opening = destinationOpening(runtime.space, resolution.destination);
+    const validated = validateLoadedSpace(resolution.loaded);
+    const opening = destinationOpening(validated.space, resolution.destination);
     const opened = await activateAfterLeavingSettles(
-      await composeLoaded(resolution.loaded, opening.selection),
+      await composeValidated(validated, opening.selection),
     );
     return { opened, opening };
   };
