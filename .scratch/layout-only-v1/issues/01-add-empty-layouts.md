@@ -27,5 +27,7 @@ reveals that next step once without becoming authored state.
       Ladle and Ladle-E2E evidence for desktop and narrow screens.
 
 This ticket owns the Add Layout operation and the complete Layout management
-surface for V1; [V1/04](../../v1-release/issues/04-add-layout-management.md)
+surface for V1; it does not own the initial Layout created as part of a new
+Space, which [Layout-only V1/02](02-initialize-layoutless-space-on-first-working-load.md)
+owns beside first-working-load repair. [V1/04](../../v1-release/issues/04-add-layout-management.md)
 defers its Layout lifecycle criteria here.
