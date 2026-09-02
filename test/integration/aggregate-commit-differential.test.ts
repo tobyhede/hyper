@@ -5,11 +5,13 @@ import {
   type CommitResult,
   type LoadedAggregate,
   type RepositoryCommitResult,
+  type SpaceChange,
   type SpaceCommit,
 } from '@project/persistence';
 import { afterAll, describe, expect, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
+import { clearHyperContent } from '../support/clear-hyper-content';
 
 const scenarios = [
   'topology-preserving-update',
@@ -26,9 +28,29 @@ const scenarios = [
 
 type Scenario = (typeof scenarios)[number];
 
+interface GeneratedCase {
+  readonly seed: number;
+  readonly scenario: Scenario;
+  readonly parentCount: number;
+  readonly referencesPerParent: number;
+  readonly extraSpaceCount: number;
+  readonly staleRevision: number;
+  readonly reverseChanges: boolean;
+}
+
+const generatedCase = fc.record({
+  seed: fc.integer({ min: 1, max: 1_000_000 }),
+  scenario: fc.constantFrom(...scenarios),
+  parentCount: fc.integer({ min: 2, max: 4 }),
+  referencesPerParent: fc.integer({ min: 1, max: 3 }),
+  extraSpaceCount: fc.integer({ min: 0, max: 3 }),
+  staleRevision: fc.integer({ min: 1, max: 20 }),
+  reverseChanges: fc.boolean(),
+});
+
 const idAt = (seed: number, offset: number): UUID =>
   uuidSchema.parse(
-    `00000000-0000-4000-8000-${(seed * 32 + offset).toString(16).padStart(12, '0')}`,
+    `00000000-0000-4000-8000-${(seed * 256 + offset).toString(16).padStart(12, '0')}`,
   );
 
 const spaceCard = (id: UUID, title: string, spaceId: UUID) => ({
@@ -42,42 +64,73 @@ interface Fixture {
   readonly commit: SpaceCommit;
 }
 
-const fixtureFor = (seed: number, scenario: Scenario): Fixture => {
+const orderedChanges = (
+  first: SpaceChange,
+  rest: readonly SpaceChange[],
+  reverse: boolean,
+): SpaceCommit['changes'] => {
+  if (!reverse) return [first, ...rest];
+  const [last, ...preceding] = [...rest].reverse();
+  return last === undefined ? [first] : [last, ...preceding, first];
+};
+
+const fixtureFor = ({
+  seed,
+  scenario,
+  parentCount,
+  referencesPerParent,
+  extraSpaceCount,
+  staleRevision,
+  reverseChanges,
+}: GeneratedCase): Fixture => {
   const metaSpaceId = idAt(seed, 0);
-  const leftSpaceId = idAt(seed, 1);
-  const rightSpaceId = idAt(seed, 2);
-  const sharedSpaceId = idAt(seed, 3);
-  const newSpaceId = idAt(seed, 4);
-  const metaLeftCardId = idAt(seed, 5);
-  const metaRightCardId = idAt(seed, 6);
-  const leftSharedCardId = idAt(seed, 7);
-  const rightSharedCardId = idAt(seed, 8);
-  const newSpaceCardId = idAt(seed, 9);
+  const parentSpaceIds = Array.from({ length: parentCount }, (_, index) => idAt(seed, 1 + index));
+  const sharedSpaceId = idAt(seed, 10);
+  const extraSpaceIds = Array.from({ length: extraSpaceCount }, (_, index) =>
+    idAt(seed, 11 + index),
+  );
+  const newSpaceId = idAt(seed, 15);
+  const newSpaceCardId = idAt(seed, 240);
 
   const meta: SpaceSnapshot = {
     id: metaSpaceId,
     document: { version: 1, title: `Meta ${seed}` },
     cards: [
-      spaceCard(metaLeftCardId, 'Left', leftSpaceId),
-      spaceCard(metaRightCardId, 'Right', rightSpaceId),
+      ...parentSpaceIds.map((spaceId, index) =>
+        spaceCard(idAt(seed, 20 + index), `Parent ${index}`, spaceId),
+      ),
+      ...extraSpaceIds.map((spaceId, index) =>
+        spaceCard(idAt(seed, 30 + index), `Extra ${index}`, spaceId),
+      ),
     ],
   };
-  const left: SpaceSnapshot = {
-    id: leftSpaceId,
-    document: { version: 1, title: `Left ${seed}` },
-    cards: [spaceCard(leftSharedCardId, 'Shared from left', sharedSpaceId)],
-  };
-  const right: SpaceSnapshot = {
-    id: rightSpaceId,
-    document: { version: 1, title: `Right ${seed}` },
-    cards: [spaceCard(rightSharedCardId, 'Shared from right', sharedSpaceId)],
-  };
+  const parents: SpaceSnapshot[] = parentSpaceIds.map((id, parentIndex) => ({
+    id,
+    document: { version: 1, title: `Parent ${parentIndex} seed ${seed}` },
+    cards: Array.from({ length: referencesPerParent }, (_, referenceIndex) =>
+      spaceCard(
+        idAt(seed, 40 + parentIndex * 10 + referenceIndex),
+        `Shared ${referenceIndex}`,
+        sharedSpaceId,
+      ),
+    ),
+  }));
+  const firstParent = parents[0];
+  const selectedParent = parents[seed % parents.length];
+  if (firstParent === undefined || selectedParent === undefined) {
+    throw new Error('Generated aggregate requires at least two parent Spaces');
+  }
   const shared: SpaceSnapshot = {
     id: sharedSpaceId,
     document: { version: 1, title: `Shared ${seed}` },
     cards: [],
   };
-  const snapshots = [meta, left, right, shared] as const;
+  const extras: SpaceSnapshot[] = extraSpaceIds.map((id, index) => ({
+    id,
+    document: { version: 1, title: `Extra ${index} seed ${seed}` },
+    cards: [],
+  }));
+  const snapshots = [meta, ...parents, shared, ...extras];
   const update = (snapshot: SpaceSnapshot) => ({
     kind: 'update' as const,
     spaceId: snapshot.id,
@@ -89,7 +142,15 @@ const fixtureFor = (seed: number, scenario: Scenario): Fixture => {
   switch (scenario) {
     case 'topology-preserving-update':
       commit = {
-        changes: [update({ ...meta, document: { ...meta.document, title: `Renamed ${seed}` } })],
+        changes: [
+          update({
+            ...selectedParent,
+            document: {
+              ...selectedParent.document,
+              title: `Renamed ${seed}`,
+            },
+          }),
+        ],
       };
       break;
     case 'create-ordinary-space': {
@@ -99,13 +160,14 @@ const fixtureFor = (seed: number, scenario: Scenario): Fixture => {
         cards: [],
       };
       commit = {
-        changes: [
+        changes: orderedChanges(
           update({
             ...meta,
             cards: [...meta.cards, spaceCard(newSpaceCardId, 'Created', newSpaceId)],
           }),
-          { kind: 'create', spaceId: newSpaceId, snapshot: created },
-        ],
+          [{ kind: 'create', spaceId: newSpaceId, snapshot: created }],
+          reverseChanges,
+        ),
       };
       break;
     }
@@ -114,12 +176,14 @@ const fixtureFor = (seed: number, scenario: Scenario): Fixture => {
       break;
     case 'update-conflict':
       commit = {
-        changes: [{ ...update(meta), expectedRevision: 1n }],
+        changes: [{ ...update(meta), expectedRevision: BigInt(staleRevision) }],
       };
       break;
     case 'delete-conflict':
       commit = {
-        changes: [{ kind: 'delete', spaceId: sharedSpaceId, expectedRevision: 1n }],
+        changes: [
+          { kind: 'delete', spaceId: sharedSpaceId, expectedRevision: BigInt(staleRevision) },
+        ],
       };
       break;
     case 'partial-deletion':
@@ -129,20 +193,29 @@ const fixtureFor = (seed: number, scenario: Scenario): Fixture => {
       break;
     case 'complete-deletion':
       commit = {
-        changes: [
-          update({ ...left, cards: [] }),
-          update({ ...right, cards: [] }),
-          { kind: 'delete', spaceId: sharedSpaceId, expectedRevision: 0n },
-        ],
+        changes: orderedChanges(
+          update({ ...firstParent, cards: [] }),
+          [
+            ...parents.slice(1).map((parent) => update({ ...parent, cards: [] })),
+            { kind: 'delete', spaceId: sharedSpaceId, expectedRevision: 0n },
+          ],
+          reverseChanges,
+        ),
       };
       break;
     case 'incomplete-deletion-proposal':
       commit = {
-        changes: [
-          update({ ...left, cards: [] }),
-          update({ ...right, document: { ...right.document, title: `Still linked ${seed}` } }),
-          { kind: 'delete', spaceId: sharedSpaceId, expectedRevision: 0n },
-        ],
+        changes: orderedChanges(
+          update({
+            ...firstParent,
+            document: { ...firstParent.document, title: `Still linked ${seed}` },
+          }),
+          [
+            ...parents.slice(1).map((parent) => update({ ...parent, cards: [] })),
+            { kind: 'delete', spaceId: sharedSpaceId, expectedRevision: 0n },
+          ],
+          reverseChanges,
+        ),
       };
       break;
     case 'duplicate-space-change':
@@ -152,19 +225,13 @@ const fixtureFor = (seed: number, scenario: Scenario): Fixture => {
       break;
     case 'mismatched-snapshot':
       commit = {
-        changes: [{ kind: 'update', spaceId: metaSpaceId, snapshot: left, expectedRevision: 0n }],
+        changes: [
+          { kind: 'update', spaceId: metaSpaceId, snapshot: firstParent, expectedRevision: 0n },
+        ],
       };
       break;
   }
   return { metaSpaceId, snapshots, commit };
-};
-
-const clearHyperContent = async (): Promise<void> => {
-  await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
-  for (const space of await db.orm.public.Space.all()) {
-    await db.orm.public.Card.where({ spaceId: space.id }).deleteAll();
-    await db.orm.public.Space.where({ id: space.id }).delete();
-  }
 };
 
 const comparableResult = (
@@ -182,37 +249,43 @@ const comparableAggregate = ({ metaSpaceId, spaces }: LoadedAggregate): LoadedAg
 describe('aggregate commit adapter differential', () => {
   it('gives memory and PostgreSQL the same public outcome over generated aggregate changes', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.integer({ min: 1, max: 1_000_000 }),
-        fc.constantFrom(...scenarios),
-        async (seed, scenario) => {
-          const fixture = fixtureFor(seed, scenario);
-          const initial = fixture.snapshots.map((snapshot) => ({
-            snapshot,
-            revision: 0n,
-            exportedRevision: null,
-          }));
-          const memory = new MemorySpaceBackend(fixture.metaSpaceId, initial);
-          const postgres = new PostgresSpaceRepository(db);
+      fc.asyncProperty(generatedCase, async (generated) => {
+        const fixture = fixtureFor(generated);
+        const initial = fixture.snapshots.map((snapshot) => ({
+          snapshot,
+          revision: 0n,
+          exportedRevision: null,
+        }));
+        const memory = new MemorySpaceBackend(fixture.metaSpaceId, initial);
+        const postgres = new PostgresSpaceRepository(db);
 
-          await clearHyperContent();
-          const imported = await postgres.importSpaces(fixture.snapshots, 'insert');
-          expect(imported.kind).toBe('imported');
+        await clearHyperContent();
+        const imported = await postgres.importSpaces(fixture.snapshots, 'insert');
+        expect(imported.kind).toBe('imported');
 
-          const [memoryResult, postgresResult] = await Promise.all([
-            memory.commit(fixture.commit),
-            postgres.commit(fixture.commit),
-          ]);
+        const [memoryResult, postgresResult] = await Promise.all([
+          memory.commit(fixture.commit),
+          postgres.commit(fixture.commit),
+        ]);
 
-          expect(comparableResult(postgresResult)).toEqual(comparableResult(memoryResult));
-          await expect(postgres.loadAggregate()).resolves.toEqual(
-            comparableAggregate(await memory.loadAggregate()),
-          );
-        },
-      ),
+        expect(comparableResult(postgresResult)).toEqual(comparableResult(memoryResult));
+        await expect(postgres.loadAggregate()).resolves.toEqual(
+          comparableAggregate(await memory.loadAggregate()),
+        );
+      }),
       {
-        numRuns: 30,
-        examples: scenarios.map((scenario, index) => [index + 1, scenario]),
+        numRuns: 50,
+        examples: scenarios.map((scenario, index) => [
+          {
+            seed: index + 1,
+            scenario,
+            parentCount: 2 + (index % 3),
+            referencesPerParent: 1 + (index % 3),
+            extraSpaceCount: index % 4,
+            staleRevision: index + 1,
+            reverseChanges: index % 2 === 0,
+          },
+        ]),
       },
     );
   });

@@ -88,8 +88,9 @@ decision tree moved, and the existing adapter-policy tests remain. They stay unc
 claiming a refactor landed.
 
 `test/integration/aggregate-commit-differential.test.ts` compares the public commit result and the
-resulting loaded aggregate from `MemorySpaceBackend` and `PostgresSpaceRepository`. Its generated
-valid aggregate contains two Space Cards converging on one ordinary Space. Mandatory examples plus
+resulting loaded aggregate from `MemorySpaceBackend` and `PostgresSpaceRepository`. The generator
+varies the number of parent and unrelated ordinary Spaces, the number of Space Cards converging on
+one target, stale revision values, change order, identities and titles. Mandatory examples plus
 generated runs cover topology-preserving updates, newly created ordinary Spaces, create/update/delete
 revision conflicts, partial and complete deletion proposals, a proposal whose changed Spaces retain
 the deleted reference, duplicate Space changes, and mismatched snapshot identity. The two adapters
