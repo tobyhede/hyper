@@ -353,12 +353,18 @@ const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
  * unbootstrapped database throw, which the HTTP host reports as a retryable
  * 503.
  */
-const lockMetaIdentity = async (orm: Orm): Promise<UUID | undefined> => {
+const lockMetaIdentity = async (
+  orm: Orm,
+  retryAfterReplacement = true,
+): Promise<UUID | undefined> => {
   const state = await orm.public.RepositoryState.where({ singletonId: 1 }).first();
   if (state === null) return undefined;
   const metaSpaceId = uuidSchema.parse(state.metaSpaceId);
   const locked = await orm.public.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId });
-  if (locked === null) throw new Error('Repository state disappeared while locking it');
+  if (locked === null) {
+    if (retryAfterReplacement) return lockMetaIdentity(orm, false);
+    throw new Error('Repository state disappeared while locking it');
+  }
   return metaSpaceId;
 };
 
@@ -568,9 +574,16 @@ const authoritativeAggregate = async (orm: Orm, metaSpaceId: UUID): Promise<Load
   return { metaSpaceId, spaces };
 };
 
+const ascendingSnapshotId = (left: SpaceSnapshot, right: SpaceSnapshot): number => {
+  if (left.id === right.id) return 0;
+  return left.id < right.id ? -1 : 1;
+};
+
 const replaceAllSpaces = async (orm: Orm, input: AggregateInput): Promise<LoadedAggregate> => {
   await truncateHyperContent(orm);
-  for (const snapshot of input.spaces) await createStoredSpace(orm, snapshot);
+  for (const snapshot of [...input.spaces].sort(ascendingSnapshotId)) {
+    await createStoredSpace(orm, snapshot);
+  }
   await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: input.metaSpaceId });
   return authoritativeAggregate(orm, input.metaSpaceId);
 };
