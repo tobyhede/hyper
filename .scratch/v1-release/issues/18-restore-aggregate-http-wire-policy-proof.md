@@ -95,7 +95,7 @@ but it named a method the contract retired.
 
 ### Evidence
 
-Nine targeted mutations of `packages/http/src/index.ts`, each reverted, to prove
+Eleven targeted mutations of `packages/http/src/index.ts`, each reverted, to prove
 the restored tests bite rather than merely pass:
 
 | Mutation | Failures |
@@ -112,7 +112,7 @@ the restored tests bite rather than merely pass:
 | drain reads four allowances | 2 (incl. the new socket case) |
 | HEAD always refuses instead of falling through | 3 (incl. the new fall-through case) |
 
-`pnpm verify` passes: 171 files, 2095 tests, 2 skipped. `packages/http/src/**`
+`pnpm verify` passes: 171 files, 2096 tests, 2 skipped. `packages/http/src/**`
 coverage is 99.29 statements / 94.96 branches / 97.5 functions against the pinned
 98 / 94 / 96 — higher than before on every axis. `pnpm e2e` passes.
 

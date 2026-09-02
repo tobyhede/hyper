@@ -546,8 +546,11 @@ describe('Vite Hono host', () => {
       // will re-dispatch onto a connection the host has decided to drop but not
       // yet closed, and the follow-up then fails for a reason that is not the
       // policy under test — the CI-only flake this test would otherwise carry.
+      // The allowance the client overruns is 8 MiB, so the write and its reset
+      // are a real amount of work; vi.waitFor's 1s default is the flake this
+      // wait exists to remove, and the ceiling only ever delays a real failure.
       const doomed = connections[0];
-      await vi.waitFor(() => expect(doomed?.destroyed).toBe(true));
+      await vi.waitFor(() => expect(doomed?.destroyed).toBe(true), { timeout: 5000 });
 
       const accepted = await send(host.url, '/api/spaces', '', {}, 'GET', agent);
       expect(accepted.status).toBe(200);
