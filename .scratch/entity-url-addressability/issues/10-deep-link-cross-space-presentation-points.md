@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] The URL starts at the root Space View and Graph and canonically encodes the ordered Space Card, target Space View and target Graph crossing stack.
+- [ ] The URL starts at the root Layout and Graph and canonically encodes the ordered Space Card, target Layout and target Graph crossing stack (ADR 0079).
 - [ ] Immutable Space Card references derive every intervening Space, and the final Card resolves in the last derived Space.
 - [ ] Explicit URL selections win for navigation without editing Space or Space Card selections.
 - [ ] Missing, incompatible or changed crossing context returns an actual HTTP 404 rather than dropping context or choosing fallbacks.

@@ -1,8 +1,9 @@
-import type { UUID } from '@project/core';
+import { newUuid, type UUID } from '@project/core';
 import type { CardFile, Space } from '@project/graph';
 import { loadSpace, loadSpaceSnapshot } from '@project/graph';
 import {
   createSpaceSessionRegistry,
+  createWorkingSpaceLoader,
   MemorySpaceBackend,
   type SpaceBackend,
   type SpaceSessionRegistry,
@@ -14,6 +15,7 @@ import { snapshotFromSpace } from './snapshot';
 export interface OpenedSpace {
   space: Space;
   spaceSession: SpaceSession;
+  initialization?: 'created-layout';
 }
 
 /** Compose one exact Space value already loaded by the configured backend. */
@@ -28,20 +30,22 @@ export const openLoadedSpace = (
       `The backend returned an invalid space:\n${runtime.errors.map((error) => `  - ${error.message}`).join('\n')}`,
     );
   }
-  return {
+  const opened = {
     space: runtime.space,
     spaceSession: registry.open(loaded),
   };
+  if (loaded.initialization !== 'created-layout') return opened;
+  return { ...opened, initialization: 'created-layout' };
 };
 
 /** Open one exact Space already stored by the configured backend. */
-export const openStoredSpace = async (
-  spaceBackend: SpaceBackend,
-  id: UUID,
-): Promise<OpenedSpace> => {
-  const loaded = await spaceBackend.loadSpace(id);
-  if (loaded === undefined) throw new Error(`The backend could not load space ${id}`);
-  return openLoadedSpace(spaceBackend, loaded);
+export const createStoredSpaceOpener = (spaceBackend: SpaceBackend, newId: () => UUID) => {
+  const loadWorkingSpace = createWorkingSpaceLoader(spaceBackend, newId);
+  return async (id: UUID): Promise<OpenedSpace> => {
+    const loaded = await loadWorkingSpace(id);
+    if (loaded === undefined) throw new Error(`The backend could not load space ${id}`);
+    return openLoadedSpace(spaceBackend, loaded);
+  };
 };
 
 /** Import files into the configured backend, then open its first Space. */
@@ -63,5 +67,5 @@ export const openImportedSpace = async (
     },
   ]);
 
-  return openStoredSpace(spaceBackend, imported.space.id);
+  return createStoredSpaceOpener(spaceBackend, newUuid)(imported.space.id);
 };

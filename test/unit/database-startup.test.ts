@@ -157,11 +157,32 @@ describe('resolveDatabaseStartup', () => {
     expect(result.kind).toBe('opened');
     expect(uuidSchema.safeParse(result.space.snapshot.id).success).toBe(true);
     const cardId = result.space.snapshot.cards[0]?.id;
+    const layoutId = result.space.snapshot.document.layouts?.[0]?.id;
+    const graphId = result.space.snapshot.document.layouts?.[0]?.graphs[0]?.id;
     expect(uuidSchema.safeParse(cardId).success).toBe(true);
+    expect(uuidSchema.safeParse(layoutId).success).toBe(true);
+    expect(uuidSchema.safeParse(graphId).success).toBe(true);
+    if (cardId === undefined || layoutId === undefined || graphId === undefined) {
+      throw new Error('New Space did not create its complete working state');
+    }
     expect(result.space).toEqual({
       snapshot: {
         id: result.space.snapshot.id,
-        document: { version: 1, title: 'New space' },
+        document: {
+          version: 1,
+          title: 'New space',
+          defaultRenderer: layoutId,
+          layouts: [
+            {
+              id: layoutId,
+              title: 'Layout 1',
+              kind: 'positioned',
+              positions: { [cardId]: { x: 0, y: 0, open: false } },
+              graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
+              activeGraph: graphId,
+            },
+          ],
+        },
         cards: [
           {
             id: cardId,

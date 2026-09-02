@@ -76,6 +76,17 @@ export type EdgeEligibility =
 
 const ELIGIBLE = { kind: 'eligible' } as const;
 
+const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
+  const loaded = loadSpaceSnapshot(snapshot);
+  if (!loaded.ok) {
+    throw new Error(
+      `Authoring produced an invalid Space: ${loaded.errors
+        .map((error) => error.message)
+        .join('; ')}`,
+    );
+  }
+};
+
 /**
  * One completed authored fact, as the interaction that finished knows it.
  *
@@ -140,6 +151,7 @@ export type AuthoringCompletion =
   /** Delete Card from Space: the same removal, cascaded through every Layout. */
   | { readonly kind: 'deleted-card'; readonly cardId: CardId }
   | { readonly kind: 'renamed-layout'; readonly layoutId: UUID; readonly title: string }
+  | { readonly kind: 'deleted-layout'; readonly layoutId: UUID }
   | { readonly kind: 'added-graph' }
   | { readonly kind: 'renamed-graph'; readonly graphId: GraphId; readonly title: string }
   | { readonly kind: 'recolored-graph'; readonly graphId: GraphId; readonly color: string }
@@ -206,6 +218,7 @@ export type AuthoringRefusal =
   | { readonly code: 'space-card-deletion-unsupported' }
   | { readonly code: 'card-title-required' }
   | { readonly code: 'layout-title-required' }
+  | { readonly code: 'space-must-keep-layout' }
   | { readonly code: 'alias-target-not-found'; readonly targetId: CardId }
   | { readonly code: 'alias-target-must-own-content'; readonly targetId: CardId }
   | { readonly code: 'card-already-in-layout' }
@@ -833,7 +846,74 @@ export function createSpaceAuthoring({
     placement: reportedPlacement,
   }: ReportedCompletion): DerivedCompletion => {
     const selection = navigation.getState().selectedRenderer;
-    if (isComputedViewId(selection) && completion.kind !== 'created-layout') {
+    if (completion.kind === 'created-layout') {
+      const snapshot = session.getState().working;
+      const layoutId = newId();
+      const graphId = newId();
+      const emptyPlacement = Placement.fromEntries([]);
+      const next = updatePositionedLayout(snapshot, {
+        layoutId,
+        title: nextLayoutTitle(snapshot),
+        positions: emptyPlacement,
+        graphs: [
+          {
+            id: graphId,
+            title: 'Graph 1',
+            color: nextGraphColor(0),
+            edges: [],
+          },
+        ],
+        activeGraphId: graphId,
+      });
+      assertValidAuthoredSnapshot(next);
+      return {
+        kind: 'completed',
+        edit: {
+          snapshot: next,
+          placement: emptyPlacement,
+          nextActiveGraphId: graphId,
+          nextRenderer: layoutId,
+        },
+      };
+    }
+    if (completion.kind === 'deleted-layout') {
+      const snapshot = session.getState().working;
+      const layouts = snapshot.document.layouts ?? [];
+      const target = layouts.find((layout) => layout.id === completion.layoutId);
+      if (target === undefined) return refuse({ code: 'layout-not-found' });
+      if (layouts.length === 1) return refuse({ code: 'space-must-keep-layout' });
+      const survivors = layouts.filter((layout) => layout.id !== completion.layoutId);
+      const selectedSurvives =
+        !isComputedViewId(selection) && survivors.some((layout) => layout.id === selection);
+      const nextLayout = selectedSurvives
+        ? survivors.find((layout) => layout.id === selection)
+        : survivors[0];
+      if (nextLayout === undefined) {
+        throw new Error('Deleting a Layout left no survivor after the last Layout was refused.');
+      }
+      const next = {
+        ...snapshot,
+        document: {
+          ...snapshot.document,
+          layouts: survivors,
+          defaultRenderer:
+            snapshot.document.defaultRenderer === completion.layoutId
+              ? nextLayout.id
+              : snapshot.document.defaultRenderer,
+        },
+      };
+      assertValidAuthoredSnapshot(next);
+      return {
+        kind: 'completed',
+        edit: {
+          snapshot: next,
+          placement: Placement.fromLayout(nextLayout),
+          nextActiveGraphId: nextLayout.activeGraph ?? nextLayout.graphs[0]?.id ?? null,
+          nextRenderer: nextLayout.id,
+        },
+      };
+    }
+    if (isComputedViewId(selection)) {
       return refuse({ code: 'computed-view-read-only' });
     }
     if (reportedPlacement === null) {
@@ -1219,14 +1299,7 @@ export function createSpaceAuthoring({
       },
     );
     if (sameSnapshot(previousSnapshot, next)) return UNCHANGED;
-    const loaded = loadSpaceSnapshot(next);
-    if (!loaded.ok) {
-      throw new Error(
-        `Authoring produced an invalid Space: ${loaded.errors
-          .map((error) => error.message)
-          .join('; ')}`,
-      );
-    }
+    assertValidAuthoredSnapshot(next);
     const created: { createdCardId?: CardId; createdGraphId?: GraphId } = {};
     if (createdCard !== null) created.createdCardId = createdCard.id;
     if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;

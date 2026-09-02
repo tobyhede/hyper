@@ -7,6 +7,7 @@ import {
   AlertTitle,
   AppShell,
   DRAWER_WIDTH,
+  type EntityActionGroup,
 } from '@project/ui';
 import { type CardId, type GraphId, type LayoutPosition } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
@@ -41,9 +42,13 @@ import {
   SelectedCanvasRenderer,
   SpaceSidebar,
   type SpaceChromeTitleEdit,
+  type SpaceEntity,
 } from './components/SpaceSidebar';
 
-export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOpening) => {
+export const createApp = (
+  { spaceSession, initialization }: OpenedSpace,
+  opening?: DestinationOpening,
+) => {
   // What an opened Space is composed of, stated once (`compose-app.ts`): one
   // working-space reader every collaborator shares, one renderer resolver, and
   // the order the six of them have to be built in.
@@ -107,6 +112,9 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const [editingCardTitle, setEditingCardTitle] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
     const [createLayoutRefusal, setCreateLayoutRefusal] = useState<AuthoringRefusal | null>(null);
+    const [layoutManagementRefusal, setLayoutManagementRefusal] = useState<AuthoringRefusal | null>(
+      null,
+    );
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const [destinationNotFound, setDestinationNotFound] = useState(false);
     const syncDestination = useCallback(
@@ -125,7 +133,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     }, []);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
-    const [cardsDrawerOpen, setCardsDrawerOpen] = useState(false);
+    const [cardsDrawerOpen, setCardsDrawerOpen] = useState(initialization === 'created-layout');
     const [addedCardToFocus, setAddedCardToFocus] = useState<CardId | null>(null);
     const cardsDrag = useRef<{
       readonly cardId: CardId;
@@ -324,7 +332,14 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const hasCardsOnCanvas = liveProjection !== null;
     const canvas = canvasContent(placement, hasCardsOnCanvas);
     const editable = hasCardsOnCanvas && current.kind === 'authored';
-    useEffect(() => setCreateLayoutRefusal(null), [selectedRenderer]);
+    // Both refusals are drawn under Add Layout and both are about the canvas
+    // that was selected when they were refused — the Edit Add Layout would have
+    // made, and the Rename or Delete on that row. Neither says anything about
+    // the canvas the reader has moved to, so the move clears them together.
+    useEffect(() => {
+      setCreateLayoutRefusal(null);
+      setLayoutManagementRefusal(null);
+    }, [selectedRenderer]);
     const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
       readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;
       readonly draft: string;
@@ -402,6 +417,51 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       onComplete: completeSpaceChromeTitle,
       onCancel: () => setSpaceChromeEdit(null),
       onReturnFocus: () => spaceChromeEdit?.returnFocus(),
+    };
+
+    /**
+     * Rename Layout begins the very chrome title edit `chromeEditingDisabled`
+     * withdraws while a Card title editor owns the caret — and the effect below
+     * discards a draft begun against that condition on the same render. So the
+     * gate reads `editingCardTitle` too, and Delete Layout goes with it rather
+     * than standing alone in a menu whose other item cannot run.
+     */
+    const layoutActions = (entity: SpaceEntity): readonly EntityActionGroup[] => {
+      if (
+        entity.kind !== 'space-view' ||
+        entity.renderer.kind !== 'authored' ||
+        presenting ||
+        creatingAlias ||
+        editingCardBody ||
+        editingCardTitle ||
+        spaceChromeEdit !== null
+      )
+        return [];
+      const { selection: layoutId, title } = entity.renderer;
+      return [
+        [
+          {
+            id: 'rename-layout',
+            label: 'Rename',
+            onSelect: () => {
+              setLayoutManagementRefusal(null);
+              titleEdit.onBegin({ kind: 'layout', id: layoutId }, title, 'sidebar', () => {
+                document.querySelector<HTMLElement>(`[data-renderer="${layoutId}"]`)?.focus();
+              });
+            },
+          },
+        ],
+        [
+          {
+            id: 'delete-layout',
+            label: 'Delete Layout',
+            onSelect: () => {
+              const result = authoring.complete({ kind: 'deleted-layout', layoutId });
+              setLayoutManagementRefusal(result.kind === 'refused' ? result.refusal : null);
+            },
+          },
+        ],
+      ];
     };
 
     // One decision resolved from one Space, applied in an order that cannot
@@ -663,15 +723,10 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      * one activation, from a toolbar button and a keystroke, and leaves nothing
      * standing that a sentence could correct.
      *
-     * Both refusals it can produce also turn on state the control is already
-     * withdrawn in. `disabled` on `AddCardControl` and `canAuthorCards` in
-     * `SpaceCanvas` are both gated on `editable`, which requires an authored Layout with Cards on the canvas —
-     * and no Cards on the canvas is the first refusal ("nowhere to write yet"). The
-     * second is a Layout that has left the Space, which would have taken the
-     * canvas drawing it, and `editable` with it. Neither is reachable from
-     * either path, so a surface built for them could not be exercised, and an
-     * untestable surface for an unreachable state is worth less than this
-     * paragraph.
+     * The toolbar remains available for an empty authored Layout: it is the
+     * zero-Card Space's way to create the first Card. Canvas-local authoring is
+     * still gated on `editable`, because there is no projected node surface to
+     * receive its shortcut until that first Card exists.
      *
      * What that argument does *not* license is a catch-all, so each outcome is
      * named below. If Add Card ever grows an input — a kind, a title, a
@@ -856,31 +911,25 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
           // (ADR 0064) — so a live toolbar created a Card and then swallowed the
           // naming it exists to begin.
           disabled:
-            !editable || presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
+            current.kind !== 'authored' ||
+            presenting ||
+            creatingAlias ||
+            editingCardBody ||
+            spaceChromeEdit !== null,
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
+          hidden: current.kind === 'computed',
         }}
-        createLayout={
-          current.kind === 'computed'
-            ? {
-                disabled: placement.kind !== 'ready',
-                unavailableReason:
-                  placement.kind === 'ready'
-                    ? null
-                    : placement.kind === 'failed'
-                      ? describeAuthoringRefusal({
-                          code: 'placement-failed',
-                          error: placement.error,
-                        })
-                      : describeAuthoringRefusal({ code: 'placement-pending' }),
-                refusal: createLayoutRefusal,
-                onCreate: () => {
-                  const result = authoring.complete({ kind: 'created-layout' });
-                  setCreateLayoutRefusal(result.kind === 'refused' ? result.refusal : null);
-                },
-              }
-            : undefined
-        }
+        createLayout={{
+          disabled: presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
+          refusal: createLayoutRefusal ?? layoutManagementRefusal,
+          onCreate: () => {
+            const result = authoring.complete({ kind: 'created-layout' });
+            setCreateLayoutRefusal(result.kind === 'refused' ? result.refusal : null);
+            setLayoutManagementRefusal(null);
+            if (result.kind === 'completed') setCardsDrawerOpen(true);
+          },
+        }}
         persistence={{
           control: (
             <PersistenceControl
@@ -935,6 +984,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
               }
         }
         titleEdit={titleEdit}
+        entityActions={layoutActions}
       />
     );
 

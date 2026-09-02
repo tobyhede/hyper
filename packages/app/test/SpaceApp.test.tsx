@@ -470,6 +470,118 @@ describe('Space app failure reporting', () => {
 });
 
 describe('Space app Cards drawer', () => {
+  it('opens once for the client whose working load created the empty Layout', () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 1n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp(
+      { space: runtime(base), spaceSession: session, initialization: 'created-layout' },
+      (app) => render(app),
+    );
+
+    expect(screen.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
+    expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
+  });
+
+  it('opens an accessible empty drawer for an initialized zero-Card Space', () => {
+    const seeded = snapshot('Space', 'Card', 10, 20);
+    const empty: SpaceSnapshot = {
+      ...seeded,
+      cards: [],
+      document: {
+        ...seeded.document,
+        layouts: seeded.document.layouts?.map((layout) => ({ ...layout, positions: {} })),
+      },
+    };
+    const stored = { snapshot: empty, revision: 1n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp(
+      { space: runtime(empty), spaceSession: session, initialization: 'created-layout' },
+      (app) => render(app),
+    );
+
+    expect(screen.getByRole('dialog', { name: 'Cards' })).toHaveTextContent(
+      'This Space has no Cards.',
+    );
+    const addCard = screen.getByRole('button', { name: 'Add Card' });
+    expect(addCard).toBeEnabled();
+    fireEvent.click(addCard);
+    expect(session.getState().working.cards).toHaveLength(1);
+  });
+
+  it('adds an empty selected Layout and reveals its existing Cards once', () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp({ space: runtime(base), spaceSession: session }, (app) => render(app));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Layout' }));
+
+    expect(session.getState().working.document.layouts).toHaveLength(2);
+    expect(session.getState().working.document.layouts?.[1]?.positions).toEqual({});
+    expect(session.getState().working.document.layouts?.[1]?.graphs).toHaveLength(1);
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout 1');
+    expect(screen.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
+    expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+    expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
+  });
+
+  it('offers Layout rename and delete actions and explains why the last cannot be deleted', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp({ space: runtime(base), spaceSession: session }, (app) => render(app));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Layout' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('A Space keeps at least one Layout.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Layout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Layout 1' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    const editor = await screen.findByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(editor, { target: { value: 'Workshop' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Workshop');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Workshop' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+    expect(session.getState().working.document.layouts).toHaveLength(1);
+    expect(session.getState().working.cards).toEqual(base.cards);
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout');
+  });
+
+  /**
+   * The refusal is drawn under Add Layout, which every canvas selection shows.
+   * A Delete Layout refusal that outlived its own renderer therefore reappeared
+   * as the next one's, explaining a Layout the reader had just left.
+   */
+  it('clears a Layout management refusal when the canvas selection changes', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp({ space: runtime(base), spaceSession: session }, (app) => render(app));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Layout' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('A Space keeps at least one Layout.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('keeps the Cards drawer closed after the reader closes it, even once the Space gains another Card', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const local: SpaceSnapshot = {
@@ -561,7 +673,7 @@ describe('Space app Cards drawer', () => {
 });
 
 describe('explicit Layout creation', () => {
-  it('withholds Create Layout while a changed Computed View is replacing its placement', async () => {
+  it('keeps Add Layout available while a Computed View is replacing its placement', async () => {
     const local = spaceSnapshotSchema.parse({
       id: SPACE_ID,
       document: {
@@ -582,13 +694,8 @@ describe('explicit Layout creation', () => {
 
     mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app));
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Create Layout' })).toBeEnabled(),
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add Layout' })).toBeEnabled());
     expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
-      'Computed Views are read-only. Create a Layout to edit.',
-    );
 
     act(() => {
       session.submit({
@@ -603,10 +710,6 @@ describe('explicit Layout creation', () => {
       });
     });
 
-    const pendingCreateLayout = screen.getByRole('button', { name: 'Create Layout' });
-    expect(pendingCreateLayout).toBeDisabled();
-    expect(pendingCreateLayout).toHaveAccessibleDescription(
-      'Computed Views are read-only. Create a Layout to edit. This view has not finished placing its Cards, so there is nowhere to write yet.',
-    );
+    expect(screen.getByRole('button', { name: 'Add Layout' })).toBeEnabled();
   });
 });

@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode, type Ref } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import {
   FLOW_SPACE_VIEW_ID,
   GRID_SPACE_VIEW_ID,
@@ -124,15 +124,13 @@ export interface SpaceSidebarProps {
     readonly disabled?: boolean;
     readonly keyShortcut?: string;
     readonly menuTriggerRef?: Ref<HTMLButtonElement>;
+    readonly hidden?: boolean;
   };
-  readonly createLayout?:
-    | {
-        readonly disabled: boolean;
-        readonly unavailableReason: string | null;
-        readonly refusal: AuthoringRefusal | null;
-        readonly onCreate: () => void;
-      }
-    | undefined;
+  readonly createLayout: {
+    readonly disabled?: boolean;
+    readonly refusal: AuthoringRefusal | null;
+    readonly onCreate: () => void;
+  };
   readonly persistence: {
     readonly control: ReactNode;
     readonly state: SpaceSessionState['persistence']['kind'];
@@ -508,14 +506,23 @@ export function SpaceSidebar({
   // instead of the result. Above the breakpoint the sidebar is beside the canvas
   // and there is nothing to dismiss.
   const { isMobile, setOpenMobile } = useSidebar();
-  const createLayoutReasonId = useId();
-  const computedViewReadOnlyId = useId();
   const onCanvas =
     <Args extends readonly unknown[]>(command: (...args: Args) => void) =>
     (...args: Args): void => {
       if (isMobile) setOpenMobile(false);
       command(...args);
     };
+  const canvasAwareEntityActions: SpaceSidebarProps['entityActions'] =
+    entityActions === undefined
+      ? undefined
+      : (entity) =>
+          entityActions(entity).map((group) =>
+            group.map((action) =>
+              action.id === 'delete-layout'
+                ? { ...action, onSelect: onCanvas(action.onSelect) }
+                : action,
+            ),
+          );
 
   const activeGraph = graph.graphs.find((candidate) => candidate.id === graph.activeGraphId);
   const activeGraphColor =
@@ -542,7 +549,7 @@ export function SpaceSidebar({
         <div className="group/menu-item relative flex min-w-0 items-center gap-2 px-2">
           <EntityActionsRow
             entity={{ kind: 'space' }}
-            entityActions={entityActions}
+            entityActions={canvasAwareEntityActions}
             label={`Actions for Space ${spaceTitle}`}
             editing={false}
           >
@@ -568,7 +575,7 @@ export function SpaceSidebar({
           the mobile Sheet portals these regions somewhere a class on the root
           would not be an ancestor at all. */}
       <SidebarContent className="nokey">
-        {createLayout === undefined ? (
+        {addCard.hidden === true ? null : (
           <SidebarGroup>
             <SidebarGroupContent>
               <AddCardControl
@@ -578,7 +585,7 @@ export function SpaceSidebar({
               />
             </SidebarGroupContent>
           </SidebarGroup>
-        ) : null}
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Space View</SidebarGroupLabel>
@@ -588,7 +595,7 @@ export function SpaceSidebar({
               selected={canvas.current}
               onSelect={onCanvas(canvas.onSelect)}
               titleEdit={titleEdit}
-              entityActions={entityActions}
+              entityActions={canvasAwareEntityActions}
             />
             {canvas.renderers.authored.length === 0 ? (
               <NothingYet testId="no-authored-layouts">
@@ -600,45 +607,30 @@ export function SpaceSidebar({
                 selected={canvas.current}
                 onSelect={onCanvas(canvas.onSelect)}
                 titleEdit={titleEdit}
-                entityActions={entityActions}
+                entityActions={canvasAwareEntityActions}
               />
             )}
-            {createLayout === undefined ? null : (
-              <div className="mt-2 space-y-2">
-                <Button
-                  variant="default"
-                  size="compact"
-                  className="w-full justify-start gap-2"
-                  disabled={createLayout.disabled}
-                  aria-describedby={`${computedViewReadOnlyId}${
-                    createLayout.disabled && createLayout.unavailableReason !== null
-                      ? ` ${createLayoutReasonId}`
-                      : ''
-                  }`}
-                  onClick={onCanvas(createLayout.onCreate)}
-                >
-                  <LayoutIcon />
-                  Create Layout
-                </Button>
-                <p id={computedViewReadOnlyId} className="text-xs text-muted-foreground">
-                  Computed Views are read-only. Create a Layout to edit.
-                </p>
-                {createLayout.disabled && createLayout.unavailableReason !== null ? (
-                  <p id={createLayoutReasonId} className="text-xs text-muted-foreground">
-                    {createLayout.unavailableReason}
-                  </p>
-                ) : null}
-                {createLayout.refusal === null ? null : (
-                  <Alert variant="destructive">
-                    <AlertIcon />
-                    <AlertTitle>Layout not created</AlertTitle>
-                    <AlertDescription>
-                      {describeAuthoringRefusal(createLayout.refusal)}
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            )}
+            <div className="mt-2 space-y-2">
+              <Button
+                variant="default"
+                size="compact"
+                className="w-full justify-start gap-2"
+                disabled={createLayout.disabled}
+                onClick={onCanvas(createLayout.onCreate)}
+              >
+                <LayoutIcon />
+                Add Layout
+              </Button>
+              {createLayout.refusal === null ? null : (
+                <Alert variant="destructive">
+                  <AlertIcon />
+                  <AlertTitle>Layout unchanged</AlertTitle>
+                  <AlertDescription>
+                    {describeAuthoringRefusal(createLayout.refusal)}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
           </SidebarGroupContent>
         </SidebarGroup>
 
@@ -673,7 +665,7 @@ export function SpaceSidebar({
                     <SidebarMenuItem key={candidate.id} tabIndex={-1}>
                       <EntityActionsRow
                         entity={{ kind: 'graph', graph: candidate, renderer: canvas.current }}
-                        entityActions={entityActions}
+                        entityActions={canvasAwareEntityActions}
                         label={`Actions for Graph ${candidate.title}`}
                         editing={isEditing}
                       >

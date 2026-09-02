@@ -6,8 +6,10 @@ existing creation contract or any Layout the Space already owns.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** superseded by ADR 0079 and `layout-only-v1/01`
 **Tags:** release/v1
+
+ADR 0079 removed Computed Views from V1, so there is no selected Computed View to capture and Add Layout creates an *empty* Layout instead. [`layout-only-v1/01`](../../layout-only-v1/issues/01-add-empty-layouts.md) owns Add Layout and the rest of the Layout management surface. The criteria below describe the retired conversion contract and are kept as the record of what was planned.
 
 - [ ] The active Computed View offers one `Create Layout` command in the Sidebar;
       inactive Computed Views and authored Layouts do not.

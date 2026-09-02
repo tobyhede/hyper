@@ -40,6 +40,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'A Card title is required.';
     case 'layout-title-required':
       return 'A Layout title is required.';
+    case 'space-must-keep-layout':
+      return 'A Space keeps at least one Layout.';
     case 'alias-target-not-found':
       return 'That Target is no longer part of the Space.';
     case 'alias-target-must-own-content':
@@ -103,6 +105,7 @@ const titleAndTargetPlacements = {
   'space-card-deletion-unsupported': form,
   'card-title-required': 'title',
   'layout-title-required': form,
+  'space-must-keep-layout': form,
   'alias-target-not-found': 'target',
   'alias-target-must-own-content': 'target',
   'card-already-in-layout': form,
@@ -149,6 +152,7 @@ const correctableByCardChoice = {
   'space-card-deletion-unsupported': false,
   'card-title-required': false,
   'layout-title-required': false,
+  'space-must-keep-layout': false,
   'alias-target-not-found': false,
   'alias-target-must-own-content': false,
   'card-already-in-layout': false,

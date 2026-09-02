@@ -1,6 +1,7 @@
 # Views and Layouts are selected; conversion keeps no strategy provenance
 
-Status: accepted
+Status: superseded
+Superseded by: 0079
 Refines: 0025
 Refined by: 0040, 0041, 0053, 0072, 0075
 Related: 0014, 0028, 0030

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { FLOW_SPACE_VIEW_ID } from '@project/core';
 import { graphStartCard, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import { defaultRenderer } from '../src/renderer';
@@ -11,7 +10,7 @@ import {
   editedSnapshot,
   MINTED_GRAPH_ID_BASE,
   storyGraphIds,
-  unauthoredSpace,
+  newSpaceFixture,
   traversalSpace,
 } from '../stories/support/spaces';
 
@@ -55,14 +54,14 @@ describe('the story Spaces', () => {
     ).not.toHaveLength(0);
   });
 
-  /** A new Space names no view, so production's own fallback answers (ADR 0018, ADR 0025). */
-  it('opens the unauthored Space on Flow, owning no Layout to open on', () => {
-    const opens = defaultRenderer(unauthoredSpace);
+  /** ADR 0080 makes a newly created Space complete before it is first opened. */
+  it('opens the newly created Space on its authored Layout', () => {
+    const opens = defaultRenderer(newSpaceFixture);
 
-    expect(opens).toEqual(FLOW_SPACE_VIEW_ID);
-    expect(unauthoredSpace.layouts).toEqual([]);
-    expect(unauthoredSpace.graphs).toEqual([]);
-    expect(currentRenderer(canvasRenderers(unauthoredSpace), opens).title).toBe('Flow');
+    expect(opens).toEqual(newSpaceFixture.layouts[0]?.id);
+    expect(newSpaceFixture.layouts).toHaveLength(1);
+    expect(newSpaceFixture.graphs).toHaveLength(1);
+    expect(currentRenderer(canvasRenderers(newSpaceFixture), opens).title).toBe('Layout 1');
   });
 
   /**
@@ -106,7 +105,7 @@ describe('the story Spaces', () => {
    * to be asked for: `0x40` is the highest id declared, and a counter that
    * began anywhere below it would be caught inside this many draws.
    *
-   * `unauthoredSpace` is deliberately not in the set. `newSpace()` mints a real
+   * `newSpaceFixture` is deliberately not in the set. `newSpace()` mints a real
    * v4 uuid on every load, so its ids are not tracked literals this could be
    * held against, and asserting over them would make the test a coin toss
    * rather than a claim about the block.

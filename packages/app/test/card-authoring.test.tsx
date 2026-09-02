@@ -231,17 +231,12 @@ describe('presenting after explicit Layout creation', () => {
     // has no Graphs at all, so there is no Active Graph.
     expect(await screen.findByTestId('present-button')).toBeDisabled();
 
-    const createLayout = await screen.findByRole('button', { name: 'Create Layout' });
+    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
     await waitFor(() => expect(createLayout).toBeEnabled());
     fireEvent.click(createLayout);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
-    const input = screen.getByRole('textbox', { name: 'Card title' });
-    fireEvent.change(input, { target: { value: 'Renamed A' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-
-    // Explicit creation made a Layout active on its fresh empty Graph; the
-    // later title Edit changed only the Card.
+    // Explicit creation made a Layout active on its fresh empty Graph and left
+    // existing Cards outside it for the Cards View.
     await waitFor(() =>
       expect(session.getState().working.document.layouts?.[0]?.graphs).toEqual([
         expect.objectContaining({ edges: [] }),
@@ -480,6 +475,29 @@ describe('authoring an opened Card', () => {
     fireEvent.click(addCard);
 
     expect(session.getState().working.cards).toHaveLength(2);
+    await settled(session);
+  });
+
+  /**
+   * Rename Layout begins a Space chrome title edit, and chrome title editing is
+   * already withdrawn while a Card title editor owns the caret — so the menu
+   * offered a Rename that began an edit the same render discarded, with a
+   * Delete Layout beside it.
+   */
+  it('withdraws the Layout actions while a Card title editor is open', async () => {
+    const session = mount();
+    await settled(session);
+
+    expect(
+      screen.getByRole('button', { name: 'Actions for Space View Layout' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+    expect(await screen.findByRole('textbox', { name: 'Card title' })).toBeVisible();
+
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Space View Layout' }),
+    ).not.toBeInTheDocument();
     await settled(session);
   });
 

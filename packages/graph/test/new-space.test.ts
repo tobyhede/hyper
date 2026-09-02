@@ -4,6 +4,8 @@ import { initializeSpace, loadSpace, newSpace } from '../src/index';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 describe('newSpace', () => {
   it('is a real space file, not something that only nearly parses', () => {
@@ -17,7 +19,8 @@ describe('newSpace', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
     expect(result.space.cards).toHaveLength(1);
-    expect(result.space.graphs).toEqual([]);
+    expect(result.space.layouts).toHaveLength(1);
+    expect(result.space.graphs).toHaveLength(1);
   });
 
   it('begins neutral Card numbering at Card 1 with an empty body (ADR 0018, ADR 0020)', () => {
@@ -31,12 +34,17 @@ describe('newSpace', () => {
     expect(card.kind === 'markdown' && card.body).toBe('');
   });
 
-  it("authors no position — centering is the view's job, not content", () => {
-    // A position nobody wrote is authored content nobody wrote. `fitView` frames
-    // whatever is on screen, so a new space declares no layout and no view.
-    const { file } = newSpace();
-    expect(file.layouts).toBeUndefined();
-    expect(file.defaultRenderer).toBeUndefined();
+  it('starts complete with its first Card at the canonical centred position', () => {
+    const { file, cardFiles } = newSpace();
+    const result = loadSpace(file, cardFiles);
+    if (!result.ok) throw new Error('should load');
+
+    const layout = result.space.layouts[0]!;
+    const card = result.space.cards[0]!;
+    expect(layout).toMatchObject({ title: 'Layout 1', activeGraph: layout.graphs[0]?.id });
+    expect(layout.graphs).toMatchObject([{ title: 'Graph 1', edges: [] }]);
+    expect(layout.positions[card.id]).toEqual({ x: 0, y: 0, open: false });
+    expect(result.space.defaultRenderer).toBe(layout.id);
   });
 
   it('mints fresh UUID identity for each new space and its first card', () => {
@@ -61,8 +69,8 @@ describe('newSpace', () => {
 });
 
 describe('initializeSpace', () => {
-  it('creates the same unauthored one-Card shape as newSpace from one identity source', () => {
-    const ids = [SPACE_ID, CARD_ID];
+  it('creates the same complete one-Card shape as newSpace from one identity source', () => {
+    const ids = [SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID];
     const initialized = initializeSpace({
       title: 'Architecture',
       newId: () => {
@@ -81,9 +89,17 @@ describe('initializeSpace', () => {
       id: SPACE_ID,
       title: 'Architecture',
       cards: [{ id: CARD_ID, title: 'Architecture', kind: 'markdown', body: '' }],
-      layouts: [],
-      graphs: [],
     });
-    expect(result.space.defaultRenderer).toBeUndefined();
+    expect(result.space.layouts).toEqual([
+      {
+        id: LAYOUT_ID,
+        title: 'Layout 1',
+        kind: 'positioned',
+        positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+        graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+        activeGraph: GRAPH_ID,
+      },
+    ]);
+    expect(result.space.defaultRenderer).toBe(LAYOUT_ID);
   });
 });

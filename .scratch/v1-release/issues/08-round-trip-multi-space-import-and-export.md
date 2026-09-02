@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01; `architecture-review/12`
+Blocked by: 01; `architecture-review/12`; `layout-only-v1/03`; `layout-only-v1/04`
 
 **What to build:** Make the public CLI import and export exactly one complete
 Meta-rooted aggregate.
@@ -45,9 +45,25 @@ canonical initial aggregate without an import source.
       `hyper <aggregate-path> --dangerous-truncate`. Retire Space-scoped public
       export and `hyper entry`.
 - [ ] Export followed by import produces the same V1 authored aggregate through
-      normal intake, including converging Space Cards and all selected Layouts
-      and Graphs.
-- [ ] Fold `layout-only-v1/05` into this ticket when the Layout-only tracker
-      lands: export/import preserve `defaultLayout`, initialized and layoutless
-      source states, Layout/Graph identities and explicit post-initialization
-      Export without retaining fields retired by the Layout-only contract.
+      normal intake, including converging Space Cards, a formerly layoutless
+      Space and all selected Layouts and Graphs.
+- [ ] Canonical export writes each initialized Space's `defaultLayout` — a Space
+      still awaiting initialization has none and none is invented — together with
+      its Layouts and Layout-owned Graphs, and every Space Card's selected Layout
+      and Graph.
+      Canonical import validates those identities and references across the
+      complete aggregate and preserves them exactly.
+- [ ] A layoutless imported Space stays layoutless in its source and stored
+      aggregate until its first complete working-state request initializes it;
+      import itself never rewrites the source Markdown, so an export taken before
+      that request round-trips the layoutless state unchanged. Explicit Export after
+      initialization writes the new Layout and Graph.
+- [ ] Removed Computed View Ids, Space View selections and `defaultRenderer` are
+      absent from canonical fixtures and rejected by the current schema rather
+      than migrated or invented as compatibility fields.
+- [ ] PostgreSQL integration proves the initialized aggregate survives a fresh
+      application host and exports at the committed revision.
+
+This ticket absorbs the aggregate criteria formerly proposed as
+`layout-only-v1/05`, so it remains the one canonical aggregate-format and
+destructive-replacement owner. ADR 0079 is the contract those criteria encode.

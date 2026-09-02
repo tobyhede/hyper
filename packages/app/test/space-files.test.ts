@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FLOW_SPACE_VIEW_ID } from '@project/core';
 import { loadSpace, type CardFile } from '@project/graph';
 import fixtureJson from '../fixture/space.json';
 import exampleJson from '../example/space.json';
@@ -13,9 +14,9 @@ import exampleJson from '../example/space.json';
  * unquoted title in a card's frontmatter fails here.
  *
  * Both declare Layouts, because both hold Graphs and a Layout is what owns one
- * (ADR 0040). Neither names a `defaultRenderer`, so both still open in Flow — which
- * is what makes the fixture's Space-subject flatten, across two Layouts, the
- * thing the app and the e2e suite actually exercise. The fixture is separately
+ * (ADR 0040). The fixture explicitly opens in Flow; the example still relies on
+ * the transitional fallback. That makes the fixture's Space-subject flatten,
+ * across two Layouts, the thing the app and the e2e suite actually exercise. The fixture is separately
  * proven by the app booting; `example/` is dormant and nothing else would notice
  * it breaking.
  */
@@ -37,8 +38,12 @@ describe.each([
   // The fixture is two disconnected collections sharing no cards, so it splits
   // into two Layouts; the example is one connected collection, so its three
   // Graphs are owned by one.
-  ['fixture', fixtureJson, { cards: 10, layouts: 2, graphs: 4 }],
-  ['example', exampleJson, { cards: 7, layouts: 1, graphs: 3 }],
+  [
+    'fixture',
+    fixtureJson,
+    { cards: 10, layouts: 2, graphs: 4, defaultRenderer: FLOW_SPACE_VIEW_ID },
+  ],
+  ['example', exampleJson, { cards: 7, layouts: 1, graphs: 3, defaultRenderer: undefined }],
 ])('%s/', (name, json, expected) => {
   it('loads as a version 1 Space whose Layouts own every Graph, and opens in Flow', () => {
     const result = loadSpace(json, cardFiles(name));
@@ -48,9 +53,7 @@ describe.each([
     // `space.graphs` is the flatten across those Layouts, never a stored
     // collection beside them (ADR 0045).
     expect(result.space.graphs).toHaveLength(expected.graphs);
-    // Absent, so neither space opens in an authored Layout — the Algorithmic
-    // View draws the flatten instead.
-    expect(result.space.defaultRenderer).toBeUndefined();
+    expect(result.space.defaultRenderer).toBe(expected.defaultRenderer);
   });
 
   it("each Layout's position keys are exactly the Cards its own Graphs connect", () => {

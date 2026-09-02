@@ -4,6 +4,7 @@ import {
   encodeCommitRefusal,
   encodeCommitResponse,
   encodeLoadedAggregate,
+  encodeLoadedSpace,
   encodeProblemDetails,
   type HyperProblemCode,
   type SpaceCommit,
@@ -28,6 +29,7 @@ const backendAnswering = (response: Response): HttpSpaceBackend =>
 
 type JsonResponseBody =
   | ReturnType<typeof encodeLoadedAggregate>
+  | ReturnType<typeof encodeLoadedSpace>
   | ReturnType<typeof encodeCommitResponse>
   | ReturnType<typeof encodeCommitConflict>
   | ReturnType<typeof encodeCommitRefusal>
@@ -52,6 +54,16 @@ const problemResponse = (
 };
 
 describe('HTTP Space backend aggregate protocol', () => {
+  it('reports when this working load created the stored Space Layout', async () => {
+    const response = jsonResponse(encodeLoadedSpace(loaded));
+    response.headers.set('X-Hyper-Space-Initialization', 'created-layout');
+
+    await expect(backendAnswering(response).loadSpace(SPACE_ID)).resolves.toEqual({
+      ...loaded,
+      initialization: 'created-layout',
+    });
+  });
+
   it('loads the complete aggregate through its codec', async () => {
     const aggregate = {
       kind: 'loaded' as const,

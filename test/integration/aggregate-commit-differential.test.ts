@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   MemorySpaceBackend,
+  type AggregateLoadResult,
   type CommitResult,
   type LoadedAggregate,
   type RepositoryCommitResult,
@@ -246,6 +247,11 @@ const comparableAggregate = ({ metaSpaceId, spaces }: LoadedAggregate): LoadedAg
   spaces: [...spaces].sort((left, right) => left.snapshot.id.localeCompare(right.snapshot.id)),
 });
 
+const comparableAggregateResult = (result: AggregateLoadResult): AggregateLoadResult =>
+  result.kind === 'loaded'
+    ? { kind: 'loaded', aggregate: comparableAggregate(result.aggregate) }
+    : result;
+
 describe('aggregate commit adapter differential', () => {
   it('gives memory and PostgreSQL the same public outcome over generated aggregate changes', async () => {
     await fc.assert(
@@ -269,8 +275,8 @@ describe('aggregate commit adapter differential', () => {
         ]);
 
         expect(comparableResult(postgresResult)).toEqual(comparableResult(memoryResult));
-        await expect(postgres.loadAggregate()).resolves.toEqual(
-          comparableAggregate(await memory.loadAggregate()),
+        await expect(postgres.loadAggregate().then(comparableAggregateResult)).resolves.toEqual(
+          comparableAggregateResult(await memory.loadAggregate()),
         );
       }),
       {

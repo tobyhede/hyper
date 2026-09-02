@@ -225,40 +225,21 @@ export const parityClaims: readonly ParityClaim[] = [
   {
     id: 'space-sidebar-names-unauthored-state',
     storyFile: 'space/space.stories.tsx',
-    storyExport: 'Unauthored',
-    claim: 'An unauthored Space names its empty Layout and Graph groups and cannot present.',
+    storyExport: 'NewSpace',
+    claim: 'A new Space names its initial Layout and empty Active Graph and cannot present.',
   },
   {
-    id: 'space-sidebar-creates-layout-from-computed-view',
+    id: 'space-sidebar-adds-empty-layout',
     storyFile: 'space/space.stories.tsx',
-    storyExport: 'ComputedViewReady',
+    storyExport: 'AddLayoutReady',
     claim:
-      'The selected Computed View offers one enabled Create Layout command that dispatches its production callback.',
+      'Add Layout is an ordinary enabled command and dispatches its production callback without implicitly placing Cards.',
   },
   {
-    id: 'mobile-space-sidebar-creates-layout-from-computed-view',
+    id: 'mobile-space-sidebar-adds-empty-layout',
     storyFile: 'space/space.stories.tsx',
-    storyExport: 'ComputedViewReady',
-    claim:
-      'The narrow Sidebar offers Create Layout and dismisses after selecting the new authored Layout.',
-  },
-  {
-    id: 'space-sidebar-withholds-layout-creation-until-placement-is-ready',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'ComputedViewPending',
-    claim:
-      'Create Layout is disabled while the selected Computed View placement is pending and the reason is announced.',
-    applicationEvidence:
-      'The production placement-pending state is already covered by operational-feedback-placement-pending; SpaceSidebar.test.tsx proves this command-specific disabled state and announcement through the production component.',
-  },
-  {
-    id: 'space-sidebar-explains-refused-layout-creation',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'ComputedViewRefused',
-    claim:
-      'A refused Create Layout leaves the Computed View selected and explains the refusal beside the command.',
-    applicationEvidence:
-      'space-authoring-operations.test.ts proves the refusal changes no authored state; SpaceSidebar.test.tsx proves operational feedback through the production component.',
+    storyExport: 'AddLayoutReady',
+    claim: 'The narrow Sidebar offers Add Layout and dismisses after the command runs.',
   },
   {
     id: 'space-sidebar-shows-pending-persistence',
@@ -335,7 +316,7 @@ export const parityClaims: readonly ParityClaim[] = [
       "The Space app's error boundary reports a mounted app's render throw instead of leaving a blank page.",
     // Every production write path that could hand `App` a bad working
     // snapshot validates first and refuses inline rather than installing it:
-    // `openStoredSpace` (initial load), Space Authoring's edit completion,
+    // `createStoredSpaceOpener` (initial load), Space Authoring's edit completion,
     // and the conflict accept/reload flow (`acceptStoredSpace` in
     // space-authoring.ts, guarding exactly this). Reaching this boundary means
     // an invariant already broke — see `SpaceApp.tsx`'s own doc comment — and
@@ -345,7 +326,7 @@ export const parityClaims: readonly ParityClaim[] = [
     // is no legitimate user- or network-observable flow left to drive it
     // through the real app, so this claim is Ladle-only.
     applicationEvidence:
-      'Unreachable through any current legitimate browser-driven flow — every production path that could install a bad working snapshot validates first (openStoredSpace, Space Authoring edit completion, conflict accept/reload). Covered instead by packages/app/test/SpaceApp.test.tsx, which reaches the boundary only via the internal openSpaceSession API.',
+      'Unreachable through any current legitimate browser-driven flow — every production path that could install a bad working snapshot validates first (createStoredSpaceOpener, Space Authoring edit completion, conflict accept/reload). Covered instead by packages/app/test/SpaceApp.test.tsx, which reaches the boundary only via the internal openSpaceSession API.',
   },
   {
     id: 'operational-feedback-placement-failure',

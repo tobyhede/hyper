@@ -1,6 +1,7 @@
 # A View takes Cards and Graphs and returns a Layout
 
-Status: accepted
+Status: superseded
+Superseded by: 0079
 Refines: 0040, 0041
 Related: 0024, 0025, 0027, 0031
 

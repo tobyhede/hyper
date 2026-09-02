@@ -21,9 +21,9 @@ proof matrix with exactly one row for every checkbox in the reconciled
 Definition of Done. No checkbox closes without a direct evidence link, a named
 owner and an explanation of what the evidence proves.
 
-The pending Layout-only reconciliation must complete before the matrix is
-populated. A retired Computed View or Space View claim is corrected in the
-Definition of Done; it is never proved, waived or silently deferred.
+The Layout-only reconciliation is complete (`v1-release/20`, ADR 0079), so the
+matrix may be populated. A retired Computed View or Space View claim is corrected
+in the Definition of Done; it is never proved, waived or silently deferred.
 
 ### Proof matrix contract
 

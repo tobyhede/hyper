@@ -2,6 +2,8 @@
 
 Graph-native technical content. Cards of content live in spatial Layouts; authors connect them into curated directed Graphs and offer different Space Views onto them. This glossary is the shared language for that domain — it holds no implementation detail (file formats, storage, and rendering libraries are out of scope here), with one exception noted at the end.
 
+**ADR 0079 — decided, not built:** Computed Views, the union term Space View and the persisted `defaultRenderer` selection leave V1. An authored Layout becomes the only selectable and addressable canvas context, Add Layout creates an *empty* Layout rather than capturing a placement, and first working load initializes a layoutless Space. **Nothing below has changed yet** — the terms here are the vocabulary the code still uses, and they are what `.scratch/layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md` retires. Do not build new work onto the Computed View contract.
+
 ## The space
 
 **Space**:

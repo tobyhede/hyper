@@ -33,16 +33,13 @@ does not restate their internal designs.
 
 ### Entry condition
 
-Complete [V1/20](20-land-and-reconcile-layout-only-v1.md) first. It owns landing
-the pending Layout-only decision and surviving implementation tickets 01–04,
-folding their aggregate criteria into [V1/08](08-round-trip-multi-space-import-and-export.md),
-reconciling the Definition of Done and affected guidance/trackers, and retiring
-superseded entries as required by ticket 12. No downstream work may implement
-the retired Computed View/Space View contract.
-
-This entry condition is a pending implementation/reconciliation dependency, not
-an unresolved V1 product decision: the Layout-only direction and its critical-
-path treatment are already decided.
+[V1/20](20-land-and-reconcile-layout-only-v1.md) is complete, so this entry
+condition is met. It landed the Layout-only decision as ADR 0079, tracked
+implementation tickets `layout-only-v1/01–04`, folded their aggregate criteria
+into [V1/08](08-round-trip-multi-space-import-and-export.md), reconciled the
+Definition of Done and the affected guidance/trackers, and retired the superseded
+entries ticket 12 named. No downstream work may implement the retired Computed
+View/Space View contract.
 
 ### Executable dependency graph
 
@@ -52,7 +49,12 @@ path treatment are already decided.
    [architecture 14](../../architecture-review/issues/14-deepen-open-spaces-composition.md).
    Run [architecture 13](../../architecture-review/issues/13-concentrate-aggregate-commit-semantics.md)
    as the mandatory diagnostic: refactor only if its differential test exposes
-   drift. In parallel, complete
+   drift. Complete
+   [`layout-only-v1/03`](../../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md)
+   here — `layout-only-v1/01` and `02` are built, and both
+   [V1/08](08-round-trip-multi-space-import-and-export.md) and
+   [Space Card reference authoring](../../entity-url-addressability/issues/07-author-a-space-card-reference.md)
+   are blocked on it. In parallel, complete
    [Alias Opening](../../alias-cards/issues/06-open-alias-shows-target-content-read-only.md),
    [V1/02](02-complete-the-cards-view.md), [V1/17](17-preserve-structured-aggregate-refusals.md)
    and [V1/18](18-restore-aggregate-http-wire-policy-proof.md).
@@ -66,7 +68,9 @@ path treatment are already decided.
    and the [tracked multi-Space fixture](../../space-cards/issues/10-extend-the-dev-fixture-to-linked-spaces.md),
    then build
    [Enter and independent Opening](../../entity-url-addressability/issues/08-enter-and-independently-open-a-space-card.md)
-   through architecture 14's Open Spaces owner.
+   through architecture 14's Open Spaces owner, with
+   [`layout-only-v1/04`](../../layout-only-v1/issues/04-make-space-cards-select-initialized-layouts.md)
+   settling the initialised-Layout selection a Space Card stores.
 4. **Compose the checkpoint product.** Complete the unified Card-kind surface in
    [V1/03](03-complete-card-lifecycle-controls.md) and canonical Default Content
    and reset in [V1/16](16-seed-and-restore-the-meta-space-default-content.md).
@@ -79,8 +83,7 @@ path treatment are already decided.
    correction work returns to its real owner, updates the Definition of Done and
    critical path where required, and reruns affected proof. Non-blocking work is
    recorded beyond V1.
-7. **Finish the V1 product.** Complete [Layout management](04-add-layout-management.md),
-   [Graph management](05-add-graph-management.md),
+7. **Finish the V1 product.** Complete [Graph management](05-add-graph-management.md),
    [replacement-discard acknowledgement](../../interaction-draft-invalidation/issues/04-acknowledge-markdown-prose-discarded-by-replacement.md)
    and [V1 product design](06-finalise-v1-product-design.md), including
    responsive surfaces and Ladle/application parity.
@@ -107,10 +110,10 @@ attach several typed evidence entries to a row.
 | Cards drawer and selected-Layout membership | [V1/02](02-complete-the-cards-view.md) | V1/07; V1/19 covers the canonical path |
 | Move, Open, Close, Resize and Markdown source editing | [`canvas-card-authoring`](../../../packages/app/src/canvas-card-authoring.ts) and [`space-authoring`](../../../packages/app/src/space-authoring.ts); proof-discovered UI correction is assigned through V1/06 | V1/07; V1/19 covers successful use |
 | Alias creation, read-only Opening and own-state editing | [Alias Opening](../../alias-cards/issues/06-open-alias-shows-target-content-read-only.md) and [V1/03](03-complete-card-lifecycle-controls.md) | V1/07; V1/19 covers successful use |
-| Space Cards and multi-Space lifetime/navigation | [entity URL 07](../../entity-url-addressability/issues/07-author-a-space-card-reference.md), [entity URL 08](../../entity-url-addressability/issues/08-enter-and-independently-open-a-space-card.md), [Space Cards 01](../../space-cards/issues/01-render-a-space-card-as-a-sub-flow.md), [Space Cards 10](../../space-cards/issues/10-extend-the-dev-fixture-to-linked-spaces.md) and [architecture 14](../../architecture-review/issues/14-deepen-open-spaces-composition.md) | V1/07; V1/19 covers Enter, return and recovery |
-| Layouts, Graphs and Edges | [V1/04](04-add-layout-management.md), [V1/05](05-add-graph-management.md) and settled Layout-only tickets | V1/07 |
+| Space Cards and multi-Space lifetime/navigation | [entity URL 07](../../entity-url-addressability/issues/07-author-a-space-card-reference.md), [entity URL 08](../../entity-url-addressability/issues/08-enter-and-independently-open-a-space-card.md), [Space Cards 01](../../space-cards/issues/01-render-a-space-card-as-a-sub-flow.md), [Space Cards 10](../../space-cards/issues/10-extend-the-dev-fixture-to-linked-spaces.md) [architecture 14](../../architecture-review/issues/14-deepen-open-spaces-composition.md) and [`layout-only-v1/04`](../../layout-only-v1/issues/04-make-space-cards-select-initialized-layouts.md) for the initialised-Layout selection | V1/07; V1/19 covers Enter, return and recovery |
+| Layouts, Graphs and Edges | [`layout-only-v1/01`](../../layout-only-v1/issues/01-add-empty-layouts.md), [`layout-only-v1/02`](../../layout-only-v1/issues/02-initialize-layoutless-space-on-first-working-load.md) and [`layout-only-v1/03`](../../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md) for Layouts, [V1/05](05-add-graph-management.md) for Graphs and Edges; [V1/04](04-add-layout-management.md) is superseded | V1/07 |
 | Presentation controls and traversal | [V1/06](06-finalise-v1-product-design.md) owns surface gaps; [`navigation`](../../../packages/app/src/navigation.ts) owns traversal state | V1/07; V1/19 covers the canonical recovered presentation |
-| Durable Space, Layout, Card, Graph and presentation URLs | [entity URL 02](../../entity-url-addressability/issues/02-open-the-entry-space-at-its-canonical-url.md), [03](../../entity-url-addressability/issues/03-address-every-space-view.md), [04](../../entity-url-addressability/issues/04-address-cards-canonically-and-in-a-space-view.md), [05](../../entity-url-addressability/issues/05-address-graphs-canonically-and-in-a-space-view.md), [06](../../entity-url-addressability/issues/06-deep-link-ordinary-presentation-points.md) and [08](../../entity-url-addressability/issues/08-enter-and-independently-open-a-space-card.md), reconciled to Layout-only before proof | V1/07; V1/19 covers canonical reload/recovery navigation |
+| Durable Space, Layout, Card, Graph and presentation URLs | [entity URL 02](../../entity-url-addressability/issues/02-open-the-entry-space-at-its-canonical-url.md), [03](../../entity-url-addressability/issues/03-address-every-space-view.md), [04](../../entity-url-addressability/issues/04-address-cards-canonically-and-in-a-space-view.md), [05](../../entity-url-addressability/issues/05-address-graphs-canonically-and-in-a-space-view.md), [06](../../entity-url-addressability/issues/06-deep-link-ordinary-presentation-points.md) and [08](../../entity-url-addressability/issues/08-enter-and-independently-open-a-space-card.md); [`layout-only-v1/03`](../../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md) retires the Space View URL shape before proof | V1/07; V1/19 covers canonical reload/recovery navigation |
 | Product design and accessibility | [V1/06](06-finalise-v1-product-design.md) and [interaction-draft-invalidation/04](../../interaction-draft-invalidation/issues/04-acknowledge-markdown-prose-discarded-by-replacement.md) | V1/07 owns final desktop and narrow-screen observation; V1/19 supplies earlier desktop checkpoint evidence |
 | Feedback, release decision and tag | [Ticket 13](13-decide-how-feedback-controls-v1-scope.md) and [ticket 14](14-define-the-v1-release-proof-and-go-no-go-contract.md), implemented by [V1/07](07-prove-the-v1-release.md) | Human directing V1 authorizes go/no-go |
 | Included scope decisions and deferred work | The linked accepted decision in the Definition-of-Done row; a new capability must reopen that decision | V1/07 audits the direct decision link |
@@ -140,7 +143,7 @@ executable or observed proof of product behavior.
 
 ### Final tag checklist
 
-- [ ] The Layout-only Definition-of-Done reconciliation is committed.
+- [x] The Layout-only Definition-of-Done reconciliation is committed (V1/20, ADR 0079).
 - [ ] Every V1/07 proof-matrix row is closed with typed, commit-valid evidence.
 - [ ] `pnpm verify`, `pnpm e2e`, `pnpm e2e:ladle` and PostgreSQL integration are
       green on the final candidate SHA without a pass-on-retry being hidden.
@@ -159,11 +162,11 @@ executable or observed proof of product behavior.
 ### Remaining decisions
 
 No known release-contract or product-scope decision remains between the
-repository and `v1.0.0`. The Layout-only work must still land and reconcile the
-tracked baseline, architecture 13 may conditionally promote a refactor when its
-diagnostic runs, and End-to-end feedback may create corrections through ticket
-13; these are decided contingencies and implementation work, not open design
-questions.
+repository and `v1.0.0`. The Layout-only baseline is landed and reconciled, so
+`layout-only-v1/01` and `02` are built and `03` and `04` remain; architecture
+13 may conditionally promote a refactor when its diagnostic runs, and End-to-end
+feedback may create corrections through ticket 13. These are decided
+contingencies and implementation work, not open design questions.
 
 Exact Default Content prose and final visual treatment remain bounded
 implementation choices under their existing acceptance criteria. A genuinely

@@ -9,7 +9,7 @@ Acceptance and implementation of ADR 0068's Space Card kind, renderer and author
 
 ## Decision already made
 
-ADR 0070's capability rule applies when Space Cards exist: an Alias may render the content its Target Space Card owns, but cannot change that Card's Space View, Graph or other content configuration. The Alias remains ordinarily authorable through its own Title and the containing Layout and Graphs.
+ADR 0070's capability rule applies when Space Cards exist: an Alias may render the content its Target Space Card owns, but cannot change that Card's Layout, Graph or other content configuration (ADR 0079). The Alias remains ordinarily authorable through its own Title and the containing Layout and Graphs.
 
 ## Scope after ADR 0068 is built
 

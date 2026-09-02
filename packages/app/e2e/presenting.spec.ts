@@ -149,6 +149,10 @@ test(
   async ({ page }) => {
     await present(page);
     await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Add Layout' })).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: /^Actions for Space View Collection 1$/ }),
+    ).toHaveCount(0);
     await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
 
     // A line gives a one-member choice at each card — the degenerate fork, not a

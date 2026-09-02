@@ -2,14 +2,15 @@
 
 **What to build:** The cut-over. Entering a Space Card from the canvas replaces the canvas with that Space and adds an entry to Open Spaces; the Space Sidebar survives the crossing, so the entered Space takes the canvas area rather than the viewport. Exit is an explicit command.
 
-**Blocked by:** 09 — Build Open Spaces and the Space Sidebars, in Ladle; 01 — Draw an open Space Card as a compound-canvas sub flow; 10 — Extend the dev fixture to a tree of linked Spaces.
+**Blocked by:** 09 — Build Open Spaces and the Space Sidebars, in Ladle; 01 — Draw an open Space Card as a compound-canvas sub flow; 10 — Extend the dev fixture to a tree of linked Spaces; `layout-only-v1/04` — Make Space Cards select initialized Layouts.
 
 **Status:** ready-for-agent
 
 - [ ] A Space Card on the canvas offers Enter. It is a Card command and belongs on the Card's rail as a kind command (ADR 0073), not in the canvas header — ADR 0053 closes that surface, and an earlier prototype pass was right to be rejected for putting it there.
 - [ ] Entering adds the target Space to Open Spaces and shows it. The entered Space has its own React Flow instance and camera and is edited exactly as a Space opened normally is — **Enter is exempt from the compound canvas**, which scopes to the embedded open-Card case (ADR 0068).
 - [ ] The loader that follows a Space Card carries the complete chain of containing Space ids into target intake. Root intake starts with an empty chain; each Enter appends the Space being left before loading the target, so `space-card-reference-cycle` catches every ancestor cycle rather than only direct self-reference. Do not make ancestry optional at this recursive seam or infer it from whichever entries happen to remain in Open Spaces.
-- [ ] Entering seeds the new entry's Space View and Graph from the **Space Card's** selection. Changing either while inside is navigation, not an Edit: it writes neither the Card nor the Space. Leave the Space and come back and the selection is the one you left; reload and it is the Card's again (ADR 0068).
+- [ ] Entering seeds the new entry's Layout and Graph from the **Space Card's** selection. Changing either while inside is navigation, not an Edit: it writes neither the Card nor the Space. Leave the Space and come back and the selection is the one you left; reload and it is the Card's again (ADR 0068, ADR 0079).
+- [ ] Entering requires an initialized target: a layoutless target crosses `layout-only-v1/02`'s initialization boundary before the entry receives working state, and Enter fails rather than showing an uninitialized Space (ADR 0079).
 - [ ] **Entering a Space that is already open focuses its existing entry** rather than adding a second. Two views of one Space at once is what a second browser tab on its address is for (ADR 0069).
 - [ ] Entries are persistent. Selecting one switches and closes nothing; more than one Space is open at once; Exit is the only thing that closes one. The root Space is never closable.
 - [ ] An entry names a Space and remembers nothing about how it was reached, so closing one Space never closes another. **Back is the browser's history**, not a pop, and **Escape does not exit** — it keeps the meaning ADR 0048 gives it. ADR 0068 withdrew "Back or Escape returns to the containing Space".

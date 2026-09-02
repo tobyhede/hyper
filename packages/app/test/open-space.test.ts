@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
-import { openImportedSpace, openLoadedSpace, openStoredSpace } from '../src/open-space';
+import { createStoredSpaceOpener, openImportedSpace, openLoadedSpace } from '../src/open-space';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const CARD_ID = '00000000-0000-4000-8000-000000000002';
-const OTHER_SPACE_ID = '00000000-0000-4000-8000-000000000003';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000004';
 const MISSING_CARD_A = '00000000-0000-4000-8000-000000000005';
 const MISSING_CARD_B = '00000000-0000-4000-8000-000000000006';
@@ -34,7 +33,7 @@ kind: markdown
   },
 ];
 
-describe('openStoredSpace', () => {
+describe('createStoredSpaceOpener', () => {
   it('composes an already-loaded Space without looking it up again', () => {
     const loaded = {
       snapshot: storedSnapshot,
@@ -54,31 +53,23 @@ describe('openStoredSpace', () => {
   it('opens the requested stored space with its acknowledged revision', async () => {
     const revision = BigInt(Number.MAX_SAFE_INTEGER) + 17n;
     const backend = new MemorySpaceBackend([
-      {
-        snapshot: {
-          ...storedSnapshot,
-          id: uuidSchema.parse(OTHER_SPACE_ID),
-          document: { ...storedSnapshot.document, title: 'Other space' },
-        },
-        revision: 1n,
-        exportedRevision: null,
-      },
       { snapshot: storedSnapshot, revision, exportedRevision: revision },
     ]);
 
-    const opened = await openStoredSpace(backend, uuidSchema.parse(SPACE_ID));
+    const opened = await createStoredSpaceOpener(backend, newUuid)(uuidSchema.parse(SPACE_ID));
 
     expect(opened.space.title).toBe('Stored space');
     expect(opened.space.lookup.card(uuidSchema.parse(CARD_ID))?.title).toBe('Start here');
-    expect(opened.spaceSession.getState().acknowledgedRevision).toBe(revision);
+    expect(opened.spaceSession.getState().acknowledgedRevision).toBe(revision + 1n);
+    expect(opened.initialization).toBe('created-layout');
   });
 
   it('reports the exact requested id when the stored space is missing', async () => {
     const backend = new MemorySpaceBackend();
 
-    await expect(openStoredSpace(backend, uuidSchema.parse(SPACE_ID))).rejects.toThrow(
-      `The backend could not load space ${SPACE_ID}`,
-    );
+    await expect(
+      createStoredSpaceOpener(backend, newUuid)(uuidSchema.parse(SPACE_ID)),
+    ).rejects.toThrow(`The backend could not load space ${SPACE_ID}`);
   });
 
   it('reports every normal intake diagnostic for an invalid stored aggregate', async () => {
@@ -120,7 +111,9 @@ describe('openStoredSpace', () => {
       },
     ]);
 
-    await expect(openStoredSpace(backend, uuidSchema.parse(SPACE_ID))).rejects.toThrow(
+    await expect(
+      createStoredSpaceOpener(backend, newUuid)(uuidSchema.parse(SPACE_ID)),
+    ).rejects.toThrow(
       `The backend returned an invalid space:\n` +
         `  - Graph "${GRAPH_ID}" edge 0 names "${MISSING_CARD_A}" as its from, which the space does not hold\n` +
         `  - Graph "${GRAPH_ID}" edge 0 names "${MISSING_CARD_B}" as its to, which the space does not hold`,

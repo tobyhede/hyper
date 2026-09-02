@@ -553,7 +553,7 @@ describe('render adapter', () => {
     expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([CARD_A, CARD_B]);
   });
 
-  it('captures every projected Card when a Layout is explicitly created', () => {
+  it('creates an empty Layout without capturing projected Cards', () => {
     // No Layout, so no Graph either: a Graph is a nested owned value and a Space
     // with nothing to own one holds none (ADR 0040). Explicit creation gives
     // this Space both.
@@ -588,10 +588,7 @@ describe('render adapter', () => {
       kind: 'completed',
     });
 
-    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 20, open: false },
-    });
+    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({});
   });
 
   /*

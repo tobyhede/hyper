@@ -163,7 +163,7 @@ describe('where a composition mints identities', () => {
     const { authoring, navigation } = composeApp({
       spaceSession,
       selection: FLOW_SPACE_VIEW_ID,
-      newId: mintingIds(MINTED_LAYOUT_ID),
+      newId: mintingIds(MINTED_LAYOUT_ID, MINTED_GRAPH_ID),
       newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
       initialPlacement: rendered,
     });

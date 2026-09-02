@@ -268,7 +268,7 @@ describe('Add Card', () => {
     expect(layoutsOf(session)).toEqual([]);
     expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
 
-    const createLayout = await screen.findByRole('button', { name: 'Create Layout' });
+    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
     await waitFor(() => expect(createLayout).toBeEnabled());
     fireEvent.click(createLayout);
     await waitFor(() => expect(layoutsOf(session)).toHaveLength(1));
@@ -277,8 +277,8 @@ describe('Add Card', () => {
 
     const layout = layoutsOf(session)[0]!;
     expect(layout.graphs).toEqual([expect.objectContaining({ edges: [] })]);
-    // Every Card the View captured, plus the later explicit creation.
-    expect(Object.keys(layout.positions)).toHaveLength(3);
+    // The new Layout starts empty; only the Card created in it becomes a member.
+    expect(Object.keys(layout.positions)).toHaveLength(1);
     await settled(session);
   });
 });

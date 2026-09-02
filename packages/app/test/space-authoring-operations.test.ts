@@ -144,17 +144,12 @@ const openAutomatic = (newId: () => UUID = mintingIds(MINTED)) => {
 };
 
 describe('Create Layout', () => {
-  it('captures the selected Computed View without changing existing Layouts', () => {
+  it('creates and selects an empty Layout with one empty Active Graph', () => {
     const { authoring, navigation, session } = open(
       positionedSnapshot,
       FLOW_SPACE_VIEW_ID,
-      mintingIds(MINTED),
+      mintingIds(MINTED, MINTED_GRAPH),
     );
-    place(authoring, {
-      [CARD_A]: [80, 120],
-      [CARD_B]: [440, 260],
-    });
-
     expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
 
     expect(session.getState().working.document.layouts).toEqual([
@@ -163,15 +158,13 @@ describe('Create Layout', () => {
         id: MINTED,
         title: 'Layout 2',
         kind: 'positioned',
-        positions: {
-          [CARD_A]: { x: 80, y: 120, open: false },
-          [CARD_B]: { x: 440, y: 260, open: false },
-        },
+        positions: {},
         graphs: [
           {
             id: MINTED_GRAPH,
-            title: 'Main',
-            edges: [{ from: CARD_A, to: CARD_B }],
+            title: 'Graph 1',
+            color: GRAPH_PALETTE[0],
+            edges: [],
           },
         ],
         activeGraph: MINTED_GRAPH,
@@ -181,19 +174,16 @@ describe('Create Layout', () => {
     expect(navigation.getState().selectedRenderer).toBe(MINTED);
   });
 
-  it('refuses while the selected Computed View placement is unresolved', () => {
+  it('does not require the current canvas placement to resolve', () => {
     const { authoring, navigation, session } = open(
       positionedSnapshot,
       FLOW_SPACE_VIEW_ID,
-      mintingIds(MINTED),
+      mintingIds(MINTED, MINTED_GRAPH),
     );
 
-    expect(authoring.complete({ kind: 'created-layout' })).toEqual({
-      kind: 'refused',
-      refusal: { code: 'placement-pending' },
-    });
-    expect(session.getState().working).toEqual(positionedSnapshot);
-    expect(navigation.getState().selectedRenderer).toBe(FLOW_SPACE_VIEW_ID);
+    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
+    expect(session.getState().working.document.layouts).toHaveLength(2);
+    expect(navigation.getState().selectedRenderer).toBe(MINTED);
   });
 });
 
@@ -741,6 +731,62 @@ describe('Rename Layout', () => {
     ).toEqual({
       kind: 'refused',
       refusal: { code: 'layout-not-found' },
+    });
+    expect(session.getState().working).toBe(before);
+  });
+});
+
+describe('Delete Layout', () => {
+  const otherGraph: Graph = { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] };
+  const twoLayouts: SpaceSnapshot = {
+    ...positionedSnapshot,
+    document: {
+      ...positionedSnapshot.document,
+      layouts: [
+        positionedSnapshot.document.layouts![0]!,
+        {
+          id: OTHER_LAYOUT_ID,
+          title: 'Layout 2',
+          kind: 'positioned',
+          positions: {
+            [CARD_B]: {
+              x: 80,
+              y: 90,
+              open: true,
+              openSize: { width: 640, height: 360 },
+            },
+          },
+          graphs: [otherGraph],
+          activeGraph: OTHER_GRAPH_ID,
+        },
+      ],
+    },
+  };
+
+  it('deletes only the selected Layout and continues in the first survivor', () => {
+    const { authoring, navigation, session } = open(twoLayouts, OTHER_LAYOUT_ID);
+    place(authoring, { [CARD_B]: [80, 90] });
+
+    expect(authoring.complete({ kind: 'deleted-layout', layoutId: OTHER_LAYOUT_ID })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(session.getState().working.cards).toEqual(twoLayouts.cards);
+    expect(session.getState().working.document.layouts).toEqual([
+      positionedSnapshot.document.layouts![0]!,
+    ]);
+    expect(navigation.getState().selectedRenderer).toBe(LAYOUT_ID);
+    expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
+    expect(authoring.authoredPlacement()?.get(CARD_A)).toEqual({ x: 10, y: 20, open: false });
+  });
+
+  it('refuses to delete the last Layout with a stable identity', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'deleted-layout', layoutId: LAYOUT_ID })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'space-must-keep-layout' },
     });
     expect(session.getState().working).toBe(before);
   });

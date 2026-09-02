@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 02, 03, 04, 05; `alias-cards/06`; `entity-url-addressability/08`; `interaction-draft-invalidation/04`
+Blocked by: 02, 03, 05; `layout-only-v1/01`; `alias-cards/06`; `entity-url-addressability/08`; `interaction-draft-invalidation/04`
 
 **What to build:** Finish V1 as one coherent responsive design rather than a mix of
 dark, light and feature-owned treatments.

@@ -28,11 +28,11 @@ const seedNewSpaceLayout = (page: Page) =>
     return { [cardId]: { x: 0, y: 0, open: false } };
   });
 
-/** Capture the fresh Space's read-only Flow placement before authoring it. */
+/** A new Space already owns its complete first Layout and centered Card. */
 const createLayout = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Create Layout' }).click();
   await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
   await settled(page);
 };
 
@@ -99,9 +99,7 @@ test('shows one card, and it is the only thing on screen', async ({ page }) => {
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
-test('a graph-less Computed View is read-only until its Layout is explicitly created', async ({
-  page,
-}) => {
+test('starts in a complete authored Layout with its first empty Active Graph', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
@@ -109,14 +107,11 @@ test('a graph-less Computed View is read-only until its Layout is explicitly cre
   await card.hover();
 
   const handles = card.locator('.rf-card-node__authoring-handle--source');
-  await expect(handles).toHaveCount(0);
+  await expect(handles).toHaveCount(4);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
-  await expect(sidebar(page).getByTestId('no-graphs')).toBeVisible();
-  await expect(sidebar(page).getByTestId('no-authored-layouts')).toBeVisible();
-  await expect(selectedCanvas(page)).toContainText('Flow');
-  await expect(page.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
-    'Computed Views are read-only. Create a Layout to edit.',
-  );
+  await expect(activeGraph(page)).toHaveText('Graph 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await expect(page.getByRole('button', { name: 'Add Layout' })).toBeEnabled();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
@@ -149,7 +144,7 @@ test('Alt toggles a transient Card 2 preview during an empty connection drag', a
   await page.mouse.up();
 
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
 test('Alt empty-drop creates, connects and selects Card 2 at the previewed position', async ({
@@ -193,7 +188,7 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
   await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
@@ -203,7 +198,7 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   const continuedSource = authoringHandle(created, 'source', 'left');
   await connectHandles(page, continuedSource, authoringHandle(sourceCard, 'target', 'right'));
   await expect(page.locator('.react-flow__edge')).toHaveCount(2);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
 /**
@@ -288,7 +283,7 @@ test('an Alt-drop released off the canvas creates no Card', async ({ page }) => 
   await expect(nodeByTitle(page, 'Card 2')).toHaveCount(0);
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
 test('the first self-connection authors into the Graph the explicit Layout owns', async ({
@@ -312,7 +307,7 @@ test('the first self-connection authors into the Graph the explicit Layout owns'
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
   await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   // Authoring the Edge must not move the Card captured by Create Layout.
   await settled(page);
@@ -349,22 +344,20 @@ test('the Graph the explicit Layout owns can be self-connected and presented', a
 });
 
 test(
-  'shows an empty disabled graph control and no graph HUD (ADR 0015)',
+  'shows the empty initial Graph and its graph HUD',
   { tag: '@parity:space-sidebar-names-unauthored-state' },
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
 
-    await expect(sidebar(page).getByTestId('no-graphs')).toBeVisible();
-    await expect(sidebar(page).getByTestId('no-authored-layouts')).toBeVisible();
+    await expect(activeGraph(page)).toHaveText('Graph 1');
+    await expect(selectedCanvas(page)).toContainText('Layout 1');
     await expect(page.getByTestId('present-button')).toBeDisabled();
-    await expect(page.getByTestId('graph-legend')).toHaveCount(0);
+    await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
   },
 );
 
-test('its one card is draggable after its automatic placement is captured (ADR 0025)', async ({
-  page,
-}) => {
+test('its one centered authored Card is draggable', async ({ page }) => {
   await page.goto('/');
   await createLayout(page);
 
@@ -419,7 +412,7 @@ test('a completed edit and space identity survive reload', async ({ page }) => {
   expect(firstId).not.toBeNull();
   await settled(page);
   await dragBy(page, first, 0, 220);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   const durablePosition = await positionOf(first);
 
   await page.reload();
@@ -429,11 +422,11 @@ test('a completed edit and space identity survive reload', async ({ page }) => {
   await settled(page);
   expect(await second.getAttribute('data-id')).toBe(firstId);
   expect(await positionOf(second)).toEqual(durablePosition);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
 /**
- * `openStoredSpace` validates the backend's response before opening it
+ * `createStoredSpaceOpener` validates the backend's response before opening it
  * (`open-space.ts`) — a real backend can return a snapshot referencing a
  * card it does not hold (a partial write, a migration gap), and this proves
  * that reaches `StartupFailure` rather than an unhandled rejection. The
@@ -514,9 +507,8 @@ test(
  * first use (`elk-strategy.ts`) — a real network condition (a chunk-load
  * blip, a stale service worker) can fail that fetch, and this proves the
  * rejection reaches `PlacementFailure` through `usePlacementRendering`'s own
- * catch rather than an unhandled rejection or a stuck busy state. A fresh
- * Space has no authored Layout, so it opens on Flow — the one View this
- * failure mode can reach.
+ * catch rather than an unhandled rejection or a stuck busy state. The fresh
+ * Space starts on its authored Layout, so the test explicitly chooses Flow.
  */
 test(
   'a blocked elkjs chunk fails placement with the real strategy diagnostic',
@@ -525,6 +517,7 @@ test(
     await page.route('**/deps/elkjs*', (route) => route.abort('failed'));
 
     await page.goto('/');
+    await sidebar(page).getByRole('button', { name: 'Flow', exact: true }).click();
     const alert = page.getByRole('alert');
     await expect(alert.getByText('Unable to arrange this view')).toBeVisible();
     await expect(alert).toContainText('elkjs');
@@ -533,10 +526,9 @@ test(
 
 /**
  * `usePlacementRendering` starts every strategy pending and only resolves
- * once it settles (`placement-rendering.ts`) — a fresh Space has no authored
- * Layout, so it opens on Flow. The elkjs chunk request is held open rather
- * than timed, so the pending state is asserted deterministically instead of
- * racing real layout latency.
+ * once it settles (`placement-rendering.ts`). The elkjs chunk request is held
+ * open while the test explicitly chooses Flow, so the pending state is
+ * asserted deterministically instead of racing real layout latency.
  */
 test(
   'a fresh Space shows the busy state while elk is still arranging it',
@@ -553,6 +545,7 @@ test(
 
     try {
       await page.goto('/');
+      await sidebar(page).getByRole('button', { name: 'Flow', exact: true }).click();
       await expect(page.getByRole('status')).toHaveText('Arranging…');
     } finally {
       releaseElk();

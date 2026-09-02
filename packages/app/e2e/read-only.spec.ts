@@ -29,13 +29,14 @@ test('database persistence never writes structural edits back to imported author
   await settled(page);
 
   await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
-    'Computed Views are read-only. Create a Layout to edit.',
-  );
+  await expect(page.getByRole('button', { name: 'Add Layout' })).toBeEnabled();
   await card.hover();
   await expect(authoringHandle(card, 'source', 'right')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Create Layout' }).click();
+  await page.getByRole('button', { name: 'Add Layout' }).click();
   await expect(page.getByRole('button', { name: 'Add Card' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Add A to Layout' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
 
   await card.hover();
   await connectToEmptyWithAlt(page, authoringHandle(card, 'source', 'right'));
@@ -48,10 +49,8 @@ test('database persistence never writes structural edits back to imported author
   // was drawn, so a commit that recorded a placement and dropped the Edge fails
   // here rather than passing as "persisted".
   await expect(page.getByLabel(/^Edge from A to Card 1 in /)).toBeVisible();
-  // The explicit command preserved the source Graphs and their thirteen Edges;
-  // the later Alt-drop authors one more.
-  await expect(page.locator('.react-flow__edge')).toHaveCount(14);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   expect(readFixture()).toEqual(before);

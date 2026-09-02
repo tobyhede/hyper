@@ -2,7 +2,7 @@ import { newUuid, SPACE_FILE_VERSION, type Card, type SpaceFile, type UUID } fro
 import { serializeCardFile, type CardFile } from './card-file';
 
 /**
- * A new space: one card, no layouts and so no graphs (ADR 0018).
+ * A new Space: one Card in one complete default Layout (ADRs 0018 and 0080).
  *
  * The default when there is nothing else to open — not the fixture, which is a
  * purpose-shaped test bed, and not an empty canvas, which offers no gesture a
@@ -26,7 +26,10 @@ const FIRST_CARD_TITLE = 'Card 1';
 export interface InitializeSpaceOptions {
   /** Seeds both the Space and its first Card; later edits make them independent. */
   readonly title: string;
-  /** The composition-owned identity source for the Space and first Card. */
+  /**
+   * The composition-owned identity source. A complete new Space needs four:
+   * the Space, its first Card, its default Layout and that Layout's Graph.
+   */
   readonly newId: () => UUID;
 }
 
@@ -34,13 +37,15 @@ export interface InitializeSpaceOptions {
  * Initialize a normal authored Space through the same on-disk intake as every
  * other Space.
  *
- * A normal Space begins with one Markdown Card and no authored Layout. Meta
- * bootstrap, ordinary startup and Space Card creation share this shape; the
- * application supplies a Computed View until an Edit authors a Layout.
+ * A normal Space begins complete: one Markdown Card in its default authored
+ * Layout, with one empty Active Graph. Meta bootstrap, ordinary startup and
+ * Space Card creation share this shape.
  */
 export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSpace {
   const spaceId = newId();
   const cardId = newId();
+  const layoutId = newId();
+  const graphId = newId();
   const card: Card = { id: cardId, title, kind: 'markdown', body: '' };
 
   return {
@@ -48,42 +53,23 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
       version: SPACE_FILE_VERSION,
       id: spaceId,
       title,
+      layouts: [
+        {
+          id: layoutId,
+          title: 'Layout 1',
+          kind: 'positioned',
+          positions: { [cardId]: { x: 0, y: 0, open: false } },
+          graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
+          activeGraph: graphId,
+        },
+      ],
+      defaultRenderer: layoutId,
     },
     cardFiles: [{ path: `cards/${card.id}.md`, text: serializeCardFile(card) }],
   };
 }
 
 export function newSpace(): NewSpace {
-  const spaceId = newUuid();
-  const cardId = newUuid();
-  // Neither `layouts` nor `defaultRenderer`, and they are two statements rather
-  // than one. No Layouts *is* also "no graphs" — a Layout owns at least one (ADR
-  // 0040) and there is nowhere else for a Graph to live — and that is the state a
-  // new space starts in. No `defaultRenderer` says nothing about graphs at all:
-  // the field names a Computed View as readily as an authored
-  // Layout (ADR 0055), so leaving it unset only declines to record which renderer
-  // opens, and the application falls back to its default Computed View.
-  //
-  // A new space's card carries no position either, because centering is the
-  // view's job — `fitView` frames whatever is on screen, and a position nobody
-  // wrote would be authored content nobody wrote. The Layout arrives when the
-  // space is edited (ADR 0025), not here and not on open: a space that is only
-  // read keeps none.
-  const file: SpaceFile = {
-    version: SPACE_FILE_VERSION,
-    id: spaceId,
-    title: 'New space',
-  };
-
-  const card: Card = {
-    id: cardId,
-    title: FIRST_CARD_TITLE,
-    kind: 'markdown',
-    body: '',
-  };
-
-  return {
-    file,
-    cardFiles: [{ path: `cards/${card.id}.md`, text: serializeCardFile(card) }],
-  };
+  const created = initializeSpace({ title: FIRST_CARD_TITLE, newId: newUuid });
+  return { ...created, file: { ...created.file, title: 'New space' } };
 }
