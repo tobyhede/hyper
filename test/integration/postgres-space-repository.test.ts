@@ -8,6 +8,7 @@ import type {
   SpaceRepository,
 } from '../../src/persistence/space-repository';
 import { db } from '../../src/prisma/db';
+import { clearHyperContent } from '../support/clear-hyper-content';
 import { spaceRepositoryContract } from '../support/repository-contract';
 
 expectTypeOf<Parameters<SpaceRepository['importSpaces']>[0]>().toEqualTypeOf<
@@ -20,14 +21,6 @@ expectTypeOf<Parameters<SpaceRepository['importSpaces']>[1]>().toEqualTypeOf<Imp
  * for the same reason the truncate-mode tests below are: `fileParallelism` is
  * off, so one integration file at a time owns the single `DATABASE_URL`.
  */
-const clearHyperContent = async (): Promise<void> => {
-  await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
-  for (const space of await db.orm.public.Space.all()) {
-    await db.orm.public.Card.where({ spaceId: space.id }).deleteAll();
-    await db.orm.public.Space.where({ id: space.id }).delete();
-  }
-};
-
 /*
  * Declared before the suite below so it runs before it, and therefore before the
  * `afterAll` that closes the connection. The harness owns a clean database at
