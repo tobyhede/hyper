@@ -18,6 +18,17 @@ const snapshot = (id = SPACE_ID, cardId = CARD_ID, title = 'Stored space'): Spac
   cards: [{ id: cardId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } }],
 });
 
+const metaReferencingOther = (): SpaceSnapshot => ({
+  id: SPACE_ID,
+  document: { version: 1, title: 'Stored space' },
+  cards: [
+    {
+      id: CARD_ID,
+      document: { title: 'Other space', kind: 'space', spaceId: OTHER_SPACE_ID },
+    },
+  ],
+});
+
 const startupFor = (...snapshots: SpaceSnapshot[]) => {
   const repository = new E2eMemorySpaceRepository(
     snapshots.map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
@@ -47,8 +58,8 @@ describe('HTTP space startup composition', () => {
     );
 
     expect(result.opened.initialization).toBe('created-layout');
-    expect(result.opened.spaceSession.getState().acknowledgedRevision).toBe(1n);
-    expect(result.opened.space.lookup.layout(LAYOUT_ID)?.layout.positions).toEqual({});
+    expect(result.opened.session.getState().acknowledgedRevision).toBe(1n);
+    expect(result.opened.app.currentSpace().lookup.layout(LAYOUT_ID)?.layout.positions).toEqual({});
   });
 
   it('opens the Space named by the compact product-route id through HTTP', async () => {
@@ -59,12 +70,12 @@ describe('HTTP space startup composition', () => {
     );
 
     expect(result.kind).toBe('opened');
-    expect(result.opened.space.id).toBe(SPACE_ID);
-    expect(result.opened.spaceSession.getState().acknowledgedRevision).toBe(1n);
+    expect(result.opened.app.currentSpace().id).toBe(SPACE_ID);
+    expect(result.opened.session.getState().acknowledgedRevision).toBe(1n);
   });
 
   it('fails when the product-route id no longer resolves', async () => {
-    const startup = startupFor();
+    const startup = startupFor(snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'));
 
     await expect(
       startup.resolve(productDestinationPath({ kind: 'space', spaceId: SPACE_ID })),
@@ -72,13 +83,16 @@ describe('HTTP space startup composition', () => {
   });
 
   it('opens the exact named Space when several are stored', async () => {
-    const startup = startupFor(snapshot(), snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'));
+    const startup = startupFor(
+      metaReferencingOther(),
+      snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'),
+    );
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: OTHER_SPACE_ID }),
     );
 
-    expect(result.opened.space.id).toBe(OTHER_SPACE_ID);
+    expect(result.opened.app.currentSpace().id).toBe(OTHER_SPACE_ID);
   });
 
   it('rejects a malformed compact product-route id', async () => {
@@ -104,7 +118,7 @@ describe('HTTP space startup composition', () => {
     );
 
     expect(result.opening?.selection).toBe(FLOW_SPACE_VIEW_ID);
-    expect(result.opened.space.id).toBe(SPACE_ID);
+    expect(result.opened.app.currentSpace().id).toBe(SPACE_ID);
     expect(loadSpace).toHaveBeenCalledOnce();
     expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
   });
@@ -119,7 +133,7 @@ describe('HTTP space startup composition', () => {
     const first = await startup.resolve(destination);
     const reopened = await startup.resolve(destination);
 
-    expect(reopened.opened.spaceSession).toBe(first.opened.spaceSession);
+    expect(reopened.opened.session).toBe(first.opened.session);
     expect(loadSpace).toHaveBeenCalledTimes(2);
     expect(loadSpace).toHaveBeenNthCalledWith(1, SPACE_ID);
     expect(loadSpace).toHaveBeenNthCalledWith(2, SPACE_ID);
@@ -288,9 +302,9 @@ describe('HTTP space startup composition', () => {
 
     expect(result.opening?.selection).toBe(layoutId);
     expect(result.opening?.cardId).toBe(CARD_ID);
-    expect(result.opened.space.lookup.layout(layoutId)?.layout.positions[CARD_ID]?.open).toBe(
-      false,
-    );
+    expect(
+      result.opened.app.currentSpace().lookup.layout(layoutId)?.layout.positions[CARD_ID]?.open,
+    ).toBe(false);
   });
 
   it('reveals a canonical Card omitted by the default Layout in the Cards collection', async () => {
@@ -339,7 +353,7 @@ describe('HTTP space startup composition', () => {
     expect(result.opening?.selection).toBe(layoutId);
     expect(result.opening?.cardId).toBe(omittedId);
     expect(
-      result.opened.space.lookup.layout(layoutId)?.layout.positions[omittedId],
+      result.opened.app.currentSpace().lookup.layout(layoutId)?.layout.positions[omittedId],
     ).toBeUndefined();
   });
 });

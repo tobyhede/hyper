@@ -15,6 +15,7 @@ import {
   type SpaceSession,
 } from '@project/persistence';
 import { mountSpaceApp } from '../src/SpaceApp';
+import { composeApp } from '../src/compose-app';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -128,10 +129,13 @@ describe('Space app conflict recovery', () => {
     });
 
     let view: RenderResult | undefined;
-    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
-      if (view === undefined) view = render(app);
-      else view.rerender(app);
-    });
+    mountSpaceApp(
+      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      (app) => {
+        if (view === undefined) view = render(app);
+        else view.rerender(app);
+      },
+    );
     expect(screen.getByText('Local space')).toBeVisible();
     expect(screen.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
@@ -182,10 +186,13 @@ describe('Space app conflict recovery', () => {
     });
 
     let view: RenderResult | undefined;
-    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
-      if (view === undefined) view = render(app);
-      else view.rerender(app);
-    });
+    mountSpaceApp(
+      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      (app) => {
+        if (view === undefined) view = render(app);
+        else view.rerender(app);
+      },
+    );
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
     return { local, session };
@@ -250,10 +257,13 @@ describe('Space app conflict recovery', () => {
     await waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
 
     let view: RenderResult | undefined;
-    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
-      if (view === undefined) view = render(app);
-      else view.rerender(app);
-    });
+    mountSpaceApp(
+      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      (app) => {
+        if (view === undefined) view = render(app);
+        else view.rerender(app);
+      },
+    );
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
     expect(await screen.findByTestId('persistence-remote-refused')).toBeVisible();
 
@@ -313,10 +323,13 @@ describe('Space app permanent save refusal', () => {
     await waitFor(() => expect(session.getState().persistence.kind).toBe('rejected'));
 
     let view: RenderResult | undefined;
-    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
-      if (view === undefined) view = render(app);
-      else view.rerender(app);
-    });
+    mountSpaceApp(
+      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      (app) => {
+        if (view === undefined) view = render(app);
+        else view.rerender(app);
+      },
+    );
 
     expect(screen.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
     expect(screen.getByText('Graph names an absent card')).toBeVisible();
@@ -352,12 +365,16 @@ describe('Space app failure reporting', () => {
       exportedRevision: null,
     });
 
-    mountSpaceApp({ space: runtime(addressed), spaceSession: session }, (app) => render(app), {
-      selection: LAYOUT_ID,
-      cardId: null,
-      graphId: GRAPH_ID,
-      presentationCardId: null,
-    });
+    mountSpaceApp(
+      { id: runtime(addressed).id, session: session, app: composeApp({ spaceSession: session }) },
+      (app) => render(app),
+      {
+        selection: LAYOUT_ID,
+        cardId: null,
+        graphId: GRAPH_ID,
+        presentationCardId: null,
+      },
+    );
 
     expect(await screen.findByRole('button', { name: 'Present' })).toBeVisible();
     expect(session.getState().working).toEqual(addressed);
@@ -385,12 +402,16 @@ describe('Space app failure reporting', () => {
       });
 
       try {
-        mountSpaceApp({ space: runtime(valid), spaceSession: session }, (app) => render(app), {
-          selection: LAYOUT_ID,
-          cardId: CARD_ID,
-          graphId: null,
-          presentationCardId: null,
-        });
+        mountSpaceApp(
+          { id: runtime(valid).id, session: session, app: composeApp({ spaceSession: session }) },
+          (app) => render(app),
+          {
+            selection: LAYOUT_ID,
+            cardId: CARD_ID,
+            graphId: null,
+            presentationCardId: null,
+          },
+        );
 
         fireEvent.click(await screen.findByRole('button', { name: copyAction }));
 
@@ -406,40 +427,6 @@ describe('Space app failure reporting', () => {
   );
 
   /**
-   * The snapshot is already unloadable when the Space app is composed, so
-   * nothing has rendered yet: `createApp` builds Navigation, which resolves the
-   * renderer the Space opens in against the session's working Space, and that
-   * throws before there is a tree for the error boundary to catch it in. What is
-   * pinned is that `mountSpaceApp` reports it anyway rather than throwing at
-   * its caller and leaving a blank page.
-   */
-  it('names a working snapshot that stopped loading instead of blanking the page', () => {
-    const valid = snapshot('Space', 'Card', 10, 20);
-    const dangling = withDanglingGraph(valid, valid.document.title);
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
-      snapshot: dangling,
-      revision: 0n,
-      exportedRevision: null,
-    });
-    // React reports a boundary-caught error to `console.error` as well as to the
-    // boundary. The report is the point; the duplicate is noise this test owns.
-    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-    expect(() =>
-      mountSpaceApp({ space: runtime(valid), spaceSession: session }, (app) => {
-        render(app);
-      }),
-    ).not.toThrow();
-
-    expect(screen.getByTestId('space-app-failure')).toHaveTextContent(MISSING_CARD_ID);
-    expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
-    // Logged as well as reported: nothing else traces this path. React logs the
-    // boundary's own catch, so only this one would otherwise leave a developer a
-    // sentence and an empty console.
-    expect(reported).toHaveBeenCalledWith('Composing the Space app failed', expect.any(Error));
-  });
-
-  /**
    * The other path to the same sentence, and the one the error boundary itself
    * is for: a Space app that composed and mounted, whose snapshot then stops
    * passing intake under it. `App` re-derives the whole aggregate on every
@@ -453,9 +440,12 @@ describe('Space app failure reporting', () => {
       exportedRevision: null,
     });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    mountSpaceApp({ space: runtime(valid), spaceSession: session }, (app) => {
-      render(app);
-    });
+    mountSpaceApp(
+      { id: runtime(valid).id, session: session, app: composeApp({ spaceSession: session }) },
+      (app) => {
+        render(app);
+      },
+    );
 
     // Written straight onto the session, past the validation every authoring
     // path performs first: reaching this state means an invariant has already
@@ -594,12 +584,20 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app), {
-      selection: LAYOUT_ID,
-      cardId: OUTSIDE_CARD_ID,
-      graphId: null,
-      presentationCardId: null,
-    });
+    mountSpaceApp(
+      {
+        id: runtime(local).id,
+        session,
+        app: composeApp({ spaceSession: session, selection: LAYOUT_ID }),
+      },
+      (app) => render(app),
+      {
+        selection: LAYOUT_ID,
+        cardId: OUTSIDE_CARD_ID,
+        graphId: null,
+        presentationCardId: null,
+      },
+    );
 
     expect(screen.getByRole('button', { name: 'Add Outside card to Layout' })).toBeVisible();
 
@@ -647,12 +645,20 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app), {
-      selection: LAYOUT_ID,
-      cardId: CARD_ID,
-      graphId: null,
-      presentationCardId: null,
-    });
+    mountSpaceApp(
+      {
+        id: runtime(local).id,
+        session,
+        app: composeApp({ spaceSession: session, selection: LAYOUT_ID }),
+      },
+      (app) => render(app),
+      {
+        selection: LAYOUT_ID,
+        cardId: CARD_ID,
+        graphId: null,
+        presentationCardId: null,
+      },
+    );
 
     // Card is a member of the selected Layout, so there is nothing to reveal yet.
     expect(screen.queryByRole('button', { name: 'Add Card to Layout' })).not.toBeInTheDocument();
@@ -692,7 +698,10 @@ describe('explicit Layout creation', () => {
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
 
-    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => render(app));
+    mountSpaceApp(
+      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      (app) => render(app),
+    );
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Add Layout' })).toBeEnabled());
     expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();

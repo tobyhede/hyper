@@ -11,6 +11,7 @@ import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/co
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { mountSpaceApp } from '../src/SpaceApp';
+import { composeApp } from '../src/compose-app';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -128,10 +129,13 @@ async function mountedSpaceApp(): Promise<SpaceSession> {
   });
 
   let view: RenderResult | undefined;
-  mountSpaceApp({ space: runtime(LOCAL), spaceSession: session }, (app) => {
-    if (view === undefined) view = render(app);
-    else view.rerender(app);
-  });
+  mountSpaceApp(
+    { id: runtime(LOCAL).id, session: session, app: composeApp({ spaceSession: session }) },
+    (app) => {
+      if (view === undefined) view = render(app);
+      else view.rerender(app);
+    },
+  );
   // Placement is asynchronous, so the Card arrives after the mount rather than
   // with it. Every draft below starts from a drawn Card.
   await screen.findByRole('heading', { name: 'Local card' });

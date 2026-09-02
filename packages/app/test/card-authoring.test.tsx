@@ -12,6 +12,7 @@ import {
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { mountSpaceApp } from '../src/SpaceApp';
+import { composeApp } from '../src/compose-app';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -122,10 +123,13 @@ function mount(value: SpaceSnapshot = snapshot): SpaceSession {
   const stored = { snapshot: value, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
   let view: RenderResult | undefined;
-  mountSpaceApp({ space: runtime(value), spaceSession: session }, (app) => {
-    if (view === undefined) view = render(app);
-    else view.rerender(app);
-  });
+  mountSpaceApp(
+    { id: runtime(value).id, session: session, app: composeApp({ spaceSession: session }) },
+    (app) => {
+      if (view === undefined) view = render(app);
+      else view.rerender(app);
+    },
+  );
   return session;
 }
 

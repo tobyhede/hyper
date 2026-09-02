@@ -1,5 +1,6 @@
 import type { UUID } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
+import { resolveProductDestination } from '@project/http';
 import {
   createObservableState,
   createSpaceSessionRegistry,
@@ -11,6 +12,7 @@ import {
   type SpaceSession,
 } from '@project/persistence';
 import { composeApp, type ComposedApp } from './compose-app';
+import { destinationOpening, type DestinationOpening } from './destination-opening';
 import type { CanvasRendererId } from './renderer';
 
 export interface OpenSpace {
@@ -47,7 +49,11 @@ export interface OpenSpaces {
   readonly getState: () => OpenSpacesState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;
-  readonly open: (target: UUID | LoadedSpace, selection?: CanvasRendererId) => Promise<OpenSpace>;
+  readonly open: (spaceId: UUID, selection?: CanvasRendererId) => Promise<OpenSpace>;
+  readonly openPath: (pathname: string) => Promise<{
+    readonly opened: OpenSpace;
+    readonly opening?: DestinationOpening;
+  }>;
   readonly enter: (spaceId: UUID, selection?: CanvasRendererId) => Promise<OpenSpace>;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
   readonly close: (
@@ -86,9 +92,8 @@ export function createOpenSpaces({
   newId,
   reportObserverError,
 }: OpenSpacesOptions): OpenSpaces {
-  const report =
-    reportObserverError ??
-    ((error: unknown) => console.error('Open Spaces observer failed', error));
+  const report: ObserverErrorReporter =
+    reportObserverError ?? console.error.bind(console, 'Open Spaces observer failed');
   const registry = createSpaceSessionRegistry(backend, { reportObserverError: report });
   // Opening a Space is a working load, so it initializes a stored layoutless
   // Space before anything composes against it (ADR 0079).
@@ -107,31 +112,37 @@ export function createOpenSpaces({
     observable.publish({ activeSpaceId: entry.id, entries });
   };
 
-  const compose = (
-    target: UUID | LoadedSpace,
-    selection?: CanvasRendererId,
-  ): Promise<OpenSpace> => {
-    const spaceId = typeof target === 'string' ? target : target.snapshot.id;
+  const buildLoaded = (loaded: LoadedSpace, selection?: CanvasRendererId): OpenSpace => {
+    const spaceId = loaded.snapshot.id;
+    const runtime = loadSpaceSnapshot(loaded.snapshot);
+    if (!runtime.ok) {
+      throw new Error(
+        `The backend returned an invalid space:\n${runtime.errors.map((error) => `  - ${error.message}`).join('\n')}`,
+      );
+    }
+    const session = registry.open(loaded);
+    const opened = { id: spaceId, session, app: composeApp({ spaceSession: session, selection }) };
+    if (loaded.initialization !== 'created-layout') return opened;
+    return { ...opened, initialization: 'created-layout' };
+  };
+
+  const composeLoaded = (loaded: LoadedSpace, selection?: CanvasRendererId): Promise<OpenSpace> => {
+    const spaceId = loaded.snapshot.id;
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
-    const opening = (async (): Promise<OpenSpace> => {
-      const loaded = typeof target === 'string' ? await loadWorkingSpace(spaceId) : target;
+    const opening = Promise.resolve().then(() => buildLoaded(loaded, selection));
+    compositions.set(spaceId, opening);
+    void opening.catch(() => compositions.delete(spaceId));
+    return opening;
+  };
+
+  const compose = (spaceId: UUID, selection?: CanvasRendererId): Promise<OpenSpace> => {
+    const existing = compositions.get(spaceId);
+    if (existing !== undefined) return existing;
+    const opening = loadWorkingSpace(spaceId).then((loaded) => {
       if (loaded === undefined) throw new Error(`The backend could not load space ${spaceId}`);
-      const runtime = loadSpaceSnapshot(loaded.snapshot);
-      if (!runtime.ok) {
-        throw new Error(
-          `The backend returned an invalid space:\n${runtime.errors.map((error) => `  - ${error.message}`).join('\n')}`,
-        );
-      }
-      const session = registry.open(loaded);
-      const opened = {
-        id: spaceId,
-        session,
-        app: composeApp({ spaceSession: session, selection }),
-      };
-      if (loaded.initialization !== 'created-layout') return opened;
-      return { ...opened, initialization: 'created-layout' };
-    })();
+      return buildLoaded(loaded, selection);
+    });
     compositions.set(spaceId, opening);
     void opening.catch(() => compositions.delete(spaceId));
     return opening;
@@ -147,11 +158,29 @@ export function createOpenSpaces({
     return target;
   };
 
-  const open = async (
-    target: UUID | LoadedSpace,
-    selection?: CanvasRendererId,
-  ): Promise<OpenSpace> => {
-    return activateAfterLeavingSettles(await compose(target, selection));
+  const open = async (spaceId: UUID, selection?: CanvasRendererId): Promise<OpenSpace> => {
+    return activateAfterLeavingSettles(await compose(spaceId, selection));
+  };
+
+  const openPath: OpenSpaces['openPath'] = async (pathname) => {
+    // Resolving an address is a working load, so it initializes a stored
+    // layoutless Space before the destination is read off it (ADR 0079).
+    const resolution = await resolveProductDestination({ loadSpace: loadWorkingSpace }, pathname);
+    if (resolution.kind === 'outside') throw new Error('The URL is outside product addressing.');
+    if (resolution.kind === 'malformed') throw new Error('The product URL is malformed.');
+    if (resolution.kind === 'unresolved') throw new Error('The product URL does not resolve.');
+    if (resolution.kind === 'collision') throw new Error('The product URL names two Space Views.');
+    const runtime = loadSpaceSnapshot(resolution.loaded.snapshot);
+    if (!runtime.ok) {
+      throw new Error(
+        `The backend returned an invalid space:\n${runtime.errors.map((error) => `  - ${error.message}`).join('\n')}`,
+      );
+    }
+    const opening = destinationOpening(runtime.space, resolution.destination);
+    const opened = await activateAfterLeavingSettles(
+      await composeLoaded(resolution.loaded, opening.selection),
+    );
+    return { opened, opening };
   };
 
   const switchTo = async (spaceId: UUID): Promise<OpenSpace> => {
@@ -190,9 +219,9 @@ export function createOpenSpaces({
     const entries = state.entries.filter(({ id }) => id !== spaceId);
     const activeSpaceId =
       state.activeSpaceId === spaceId ? (entries[0]?.id ?? null) : state.activeSpaceId;
-    observable.publish({ activeSpaceId, entries });
-    compositions.delete(spaceId);
     registry.release(spaceId);
+    compositions.delete(spaceId);
+    observable.publish({ activeSpaceId, entries });
     return { kind: 'closed' };
   };
 
@@ -201,6 +230,7 @@ export function createOpenSpaces({
     subscribe: observable.subscribe,
     entry: (spaceId) => observable.getState().entries.find(({ id }) => id === spaceId),
     open,
+    openPath,
     enter: open,
     switchTo,
     close,
