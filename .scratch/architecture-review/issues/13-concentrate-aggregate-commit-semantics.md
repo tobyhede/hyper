@@ -1,6 +1,6 @@
 # Concentrate aggregate commit semantics
 
-Status: ready-for-agent
+Status: resolved
 Tags: Improvement
 Blocked by: none — PR 134 delivered both adapter decision trees to compare
 
@@ -72,10 +72,28 @@ refactor beyond V1. Duplication alone does not authorize the refactor.
 
 ## Acceptance for triage
 
-- [ ] A differential test establishes whether a real semantic disagreement
+- [x] A differential test establishes whether a real semantic disagreement
       exists before production code is moved.
 - [ ] The proposed interface separates aggregate policy from storage mechanics
       and does not expose an adapter-specific transaction.
 - [ ] The two existing decision trees are replaced, not wrapped.
 - [ ] Tests at the shared interface cover every public commit outcome; adapter
       tests retain only behaviour particular to their storage implementation.
+
+## Answer
+
+The checkpoint found no observable semantic disagreement, so the direction-if-confirmed
+acceptance items above did not activate: no shared interface was introduced, neither adapter
+decision tree moved, and the existing adapter-policy tests remain. They stay unchecked rather than
+claiming a refactor landed.
+
+`test/integration/aggregate-commit-differential.test.ts` compares the public commit result and the
+resulting loaded aggregate from `MemorySpaceBackend` and `PostgresSpaceRepository`. Its generated
+valid aggregate contains two Space Cards converging on one ordinary Space. Mandatory examples plus
+generated runs cover topology-preserving updates, newly created ordinary Spaces, create/update/delete
+revision conflicts, partial and complete deletion proposals, a proposal whose changed Spaces retain
+the deleted reference, duplicate Space changes, and mismatched snapshot identity. The two adapters
+agreed across all cases.
+
+This remains a locality improvement worth reconsidering after V1. Duplication alone does not justify
+moving the production decision trees now, and the ticket is no longer tagged `release/v1`.
