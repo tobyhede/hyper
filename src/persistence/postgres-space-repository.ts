@@ -362,7 +362,10 @@ const lockMetaIdentity = async (
   const metaSpaceId = uuidSchema.parse(state.metaSpaceId);
   const locked = await orm.public.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId });
   if (locked === null) {
-    if (retryAfterReplacement) return lockMetaIdentity(orm, false);
+    if (retryAfterReplacement) {
+      const replacementMetaSpaceId = await lockMetaIdentity(orm, false);
+      if (replacementMetaSpaceId !== undefined) return metaSpaceId;
+    }
     throw new Error('Repository state disappeared while locking it');
   }
   return metaSpaceId;
