@@ -332,7 +332,14 @@ export const createApp = (
     const hasCardsOnCanvas = liveProjection !== null;
     const canvas = canvasContent(placement, hasCardsOnCanvas);
     const editable = hasCardsOnCanvas && current.kind === 'authored';
-    useEffect(() => setCreateLayoutRefusal(null), [selectedRenderer]);
+    // Both refusals are drawn under Add Layout and both are about the canvas
+    // that was selected when they were refused — the Edit Add Layout would have
+    // made, and the Rename or Delete on that row. Neither says anything about
+    // the canvas the reader has moved to, so the move clears them together.
+    useEffect(() => {
+      setCreateLayoutRefusal(null);
+      setLayoutManagementRefusal(null);
+    }, [selectedRenderer]);
     const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
       readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;
       readonly draft: string;

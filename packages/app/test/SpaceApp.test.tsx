@@ -561,6 +561,27 @@ describe('Space app Cards drawer', () => {
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout');
   });
 
+  /**
+   * The refusal is drawn under Add Layout, which every canvas selection shows.
+   * A Delete Layout refusal that outlived its own renderer therefore reappeared
+   * as the next one's, explaining a Layout the reader had just left.
+   */
+  it('clears a Layout management refusal when the canvas selection changes', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp({ space: runtime(base), spaceSession: session }, (app) => render(app));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Layout' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('A Space keeps at least one Layout.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('keeps the Cards drawer closed after the reader closes it, even once the Space gains another Card', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const local: SpaceSnapshot = {

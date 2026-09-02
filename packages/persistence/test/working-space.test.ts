@@ -261,6 +261,44 @@ describe('loadWorkingSpace', () => {
     });
   });
 
+  /**
+   * `current: undefined` on an entry that names this Space is the repository
+   * saying the Space is gone — deleted between the read and the initialization
+   * Edit. That is the same answer as never having been there, and the loader
+   * already spells it `undefined`; throwing turned an ordinary not-found into a
+   * server error.
+   */
+  it('answers undefined when the conflict reports the Space deleted', async () => {
+    const store = {
+      loadSpace: () =>
+        Promise.resolve({ snapshot: layoutless, revision: 7n, exportedRevision: null }),
+      commit: () =>
+        Promise.resolve({
+          kind: 'conflict' as const,
+          conflicts: [{ spaceId: SPACE, current: undefined }],
+        }),
+    };
+
+    await expect(loadWorkingSpace(store, SPACE, () => LAYOUT)).resolves.toBeUndefined();
+  });
+
+  it('throws when the conflict never names the Space it refused', async () => {
+    const other = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+    const store = {
+      loadSpace: () =>
+        Promise.resolve({ snapshot: layoutless, revision: 7n, exportedRevision: null }),
+      commit: () =>
+        Promise.resolve({
+          kind: 'conflict' as const,
+          conflicts: [{ spaceId: other, current: undefined }],
+        }),
+    };
+
+    await expect(loadWorkingSpace(store, SPACE, () => LAYOUT)).rejects.toThrow(
+      'changed without returning its current working state',
+    );
+  });
+
   it.each([
     { kind: 'rejected', code: 'invalid-commit', message: 'No write occurred' },
     { kind: 'retryable-failure', code: 'network', message: 'No write occurred' },

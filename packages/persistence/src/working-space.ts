@@ -84,11 +84,15 @@ async function loadWorkingSpace(
       ],
     });
     if (result.kind === 'conflict') {
-      const current = result.conflicts.find((conflict) => conflict.spaceId === id)?.current;
-      if (current === undefined) {
+      const conflict = result.conflicts.find((candidate) => candidate.spaceId === id);
+      if (conflict === undefined) {
         throw new Error(`Space ${id} changed without returning its current working state`);
       }
-      loaded = current;
+      // A conflict that names this Space and reports no current state is saying
+      // it was deleted between the read and this Edit. That is the answer the
+      // loader already spells `undefined`, not a broken repository.
+      if (conflict.current === undefined) return undefined;
+      loaded = conflict.current;
       continue;
     }
     if (result.kind !== 'committed') {
