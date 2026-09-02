@@ -1309,7 +1309,11 @@ describe('PostgresSpaceRepository', () => {
       ],
     };
 
-    expect((await repository.importSpaces([first, second])).kind).toBe('imported');
+    await expect(repository.importSpaces([first, second])).resolves.toMatchObject({
+      kind: 'rejected',
+      code: 'invalid-snapshot',
+    });
+    await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });
 
   it('imports a Space whose graph id equals one of its card ids', async () => {

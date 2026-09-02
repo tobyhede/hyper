@@ -911,8 +911,6 @@ export class PostgresSpaceRepository implements SpaceRepository {
       }
     }
     const current = await this.loadAggregate();
-    let pending = accepted;
-    let lifecycleImported: readonly LoadedSpace[] = [];
     if (mode === 'truncate' || current.kind === 'uninitialized') {
       const metaSpaceId = resolved[0]?.id;
       if (metaSpaceId === undefined) return { kind: 'imported', spaces: [] };
@@ -925,33 +923,11 @@ export class PostgresSpaceRepository implements SpaceRepository {
         return { kind: 'imported', spaces: lifecycle.aggregate.spaces };
       }
       if (lifecycle.kind === 'aggregate-refused') {
-        // The legacy facade admits a batch of independently valid Spaces. Until
-        // v1-release/08 removes it, let the lifecycle own the inferred first
-        // Meta Space, then preserve the facade's remaining insert behavior.
-        const first = resolved[0];
-        if (first === undefined) return { kind: 'imported', spaces: [] };
-        const firstAggregate = { metaSpaceId: first.id, spaces: [first] };
-        const firstLifecycle =
-          current.kind === 'uninitialized'
-            ? await this.initializeAggregate(firstAggregate)
-            : await this.replaceAggregate(firstAggregate, current.aggregate.metaSpaceId);
-        if (firstLifecycle.kind === 'initialized' || firstLifecycle.kind === 'replaced') {
-          lifecycleImported = firstLifecycle.aggregate.spaces;
-          pending = accepted.slice(1);
-          if (pending.length === 0) {
-            return { kind: 'imported', spaces: lifecycleImported };
-          }
-        } else if (firstLifecycle.kind === 'aggregate-refused') {
-          return {
-            kind: 'rejected',
-            code: 'invalid-snapshot',
-            message: firstLifecycle.errors.map((error) => error.kind).join('\n'),
-          };
-        } else {
-          throw new Error(
-            `Compatibility import reached unexpected lifecycle result ${firstLifecycle.kind}`,
-          );
-        }
+        return {
+          kind: 'rejected',
+          code: 'invalid-snapshot',
+          message: lifecycle.errors.map((error) => error.kind).join('\n'),
+        };
       } else if (lifecycle.kind === 'existing' || lifecycle.kind === 'already-initialized') {
         const duplicate = resolved.find((snapshot) =>
           lifecycle.aggregate.spaces.some(({ snapshot: stored }) => stored.id === snapshot.id),
@@ -971,9 +947,9 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
     try {
       return await this.#database.transaction(async ({ orm }) => {
-        const imported: LoadedSpace[] = [...lifecycleImported];
+        const imported: LoadedSpace[] = [];
 
-        for (const importInput of pending) {
+        for (const importInput of accepted) {
           let space;
           try {
             // A placeholder document, replaced below once the space id it is
