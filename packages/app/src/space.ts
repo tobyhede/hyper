@@ -1,15 +1,12 @@
 import { newUuid, type UUID } from '@project/core';
 import { HttpSpaceBackend, resolveProductDestination } from '@project/http';
-import {
-  createSpaceSessionRegistry,
-  createWorkingSpaceLoader,
-  type SpaceBackend,
-} from '@project/persistence';
-import { openLoadedSpace } from './open-space';
+import { loadSpaceSnapshot } from '@project/graph';
+import { createWorkingSpaceLoader, type SpaceBackend } from '@project/persistence';
 import type { OpenedApplicationStartup } from './startup';
 import { destinationOpening } from './destination-opening';
+import { createOpenSpaces, type OpenSpaces } from './open-spaces';
 
-export type { OpenedSpace } from './open-space';
+export type { OpenSpace } from './open-spaces';
 
 export interface SpaceStartup {
   resolve(pathname: string): Promise<OpenedApplicationStartup>;
@@ -20,8 +17,16 @@ export const createSpaceStartup = (
   backend: SpaceBackend = new HttpSpaceBackend(),
   newId: () => UUID = newUuid,
 ): SpaceStartup => {
-  const registry = createSpaceSessionRegistry(backend);
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
+  let owner: Promise<OpenSpaces> | undefined;
+  const openSpaces = (): Promise<OpenSpaces> => {
+    owner ??= backend.loadAggregate().then((result) => {
+      if (result.kind === 'uninitialized')
+        throw new Error('The Space repository is uninitialized.');
+      return createOpenSpaces({ backend, metaSpaceId: result.aggregate.metaSpaceId, newId });
+    });
+    return owner;
+  };
   return {
     resolve: async (pathname) => {
       const resolution = await resolveProductDestination({ loadSpace: loadWorkingSpace }, pathname);
@@ -36,8 +41,11 @@ export const createSpaceStartup = (
       // invariant rather than an address the author can correct.
       if (resolution.kind === 'collision')
         throw new Error('The product URL names two Space Views.');
-      const opened = openLoadedSpace(backend, resolution.loaded, registry);
-      const opening = destinationOpening(opened.space, resolution.destination);
+      const spaces = await openSpaces();
+      const resolvedSpace = loadSpaceSnapshot(resolution.loaded.snapshot);
+      if (!resolvedSpace.ok) throw new Error('The product URL resolved an invalid Space.');
+      const opening = destinationOpening(resolvedSpace.space, resolution.destination);
+      const opened = await spaces.open(resolution.loaded.snapshot.id, opening.selection);
       return {
         kind: 'opened',
         opened,

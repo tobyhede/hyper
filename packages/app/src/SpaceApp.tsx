@@ -1,7 +1,7 @@
 import { Component, type ReactElement, type ReactNode } from 'react';
 import { createApp } from './App';
 import { SpaceAppFailureView } from './components/SpaceAppFailureView';
-import type { OpenedSpace } from './space';
+import type { OpenSpace } from './open-spaces';
 import type { DestinationOpening } from './destination-opening';
 
 export type SpaceAppRenderer = (app: ReactElement) => void;
@@ -52,15 +52,11 @@ class SpaceAppFailure extends Component<{ children: ReactNode }, SpaceAppFailure
  * the boundary to catch it in. Both paths report the same sentence, for the
  * same reason: an uncaught throw leaves a blank page, which says nothing.
  *
- * `createStoredSpaceOpener` validates the snapshot and the session then clones that
- * same value, so the two halves of an `OpenedSpace` agree on every route this
- * app actually opens by. This guard is therefore a backstop, not a path with a
- * caller: it catches a composition assembled from halves that disagree, and it
- * logs as well as reports because — unlike the boundary below, which React
- * traces for us — nothing else would say what threw.
+ * Open Spaces validates the snapshot and composes the collaborators once. This
+ * guard is therefore a backstop rather than another composition path.
  */
 export function mountSpaceApp(
-  opened: OpenedSpace,
+  opened: OpenSpace,
   render: SpaceAppRenderer,
   opening?: DestinationOpening,
 ): void {

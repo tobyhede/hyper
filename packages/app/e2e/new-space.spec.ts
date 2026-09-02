@@ -426,8 +426,8 @@ test('a completed edit and space identity survive reload', async ({ page }) => {
 });
 
 /**
- * `createStoredSpaceOpener` validates the backend's response before opening it
- * (`open-space.ts`) — a real backend can return a snapshot referencing a
+ * Open Spaces validates the backend's response before opening it
+ * (`open-spaces.ts`) — a real backend can return a snapshot referencing a
  * card it does not hold (a partial write, a migration gap), and this proves
  * that reaches `StartupFailure` rather than an unhandled rejection. The
  * response is wire-valid (it parses as a `SpaceSnapshot`) and only fails

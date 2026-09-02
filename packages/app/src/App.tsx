@@ -12,8 +12,8 @@ import {
 import { type CardId, type GraphId, type LayoutPosition } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import { graphCardIds } from '@project/graph';
-import type { OpenedSpace } from './space';
-import { composeApp, openingPlacement } from './compose-app';
+import type { OpenSpace } from './open-spaces';
+import { openingPlacement } from './compose-app';
 import type { AuthoringRefusal } from './space-authoring';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
@@ -51,12 +51,9 @@ import {
 } from './components/SpaceSidebar';
 
 export const createApp = (
-  { spaceSession, initialization }: OpenedSpace,
+  { app: composition, session: spaceSession, initialization }: OpenSpace,
   opening?: DestinationOpening,
 ) => {
-  // What an opened Space is composed of, stated once (`compose-app.ts`): one
-  // working-space reader every collaborator shares, one renderer resolver, and
-  // the order the six of them have to be built in.
   const {
     readWorkingSpace,
     currentSpace,
@@ -65,7 +62,7 @@ export const createApp = (
     authoring,
     adapter: useRenderAdapter,
     edgeAuthoring,
-  } = composeApp({ spaceSession, selection: opening?.selection });
+  } = composition;
   const openingGraphId = opening?.graphId ?? null;
   const openingPresentationCardId = opening?.presentationCardId ?? null;
   if (openingGraphId !== null && openingPresentationCardId !== null) {
