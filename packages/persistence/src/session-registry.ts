@@ -63,8 +63,17 @@ export interface SpaceSessionRegistry {
    * `persistence.kind` alone reports as `settled`.
    */
   readonly waitUntilRetirable: (spaceId: UUID) => Promise<void>;
-  /** Retire one idle live session after its owner has completed safe closing. */
-  readonly release: (spaceId: UUID) => void;
+  /**
+   * Retire one idle live session after its owner has completed safe closing,
+   * answering whether it was retired.
+   *
+   * The check and the retirement are one synchronous step because they cannot
+   * be two: a coordination can raise the barrier in the microtask between an
+   * owner's {@link waitUntilRetirable} resolving and its call to this, and a
+   * session that has become a coordination participant must not vanish from
+   * under it. `false` says exactly that happened — wait again and retry.
+   */
+  readonly release: (spaceId: UUID) => boolean;
   readonly session: (spaceId: UUID) => SpaceSession | undefined;
   readonly entry: (spaceId: UUID) => SpaceSessionRegistryEntry | undefined;
   readonly spaceCards: (newId: () => UUID) => SpaceCardLifecycle;
@@ -774,16 +783,13 @@ export function createSpaceSessionRegistry(
     waitUntilRetirable,
     release: (spaceId) => {
       const managed = sessions.get(spaceId);
-      if (managed === undefined) return;
-      if (persistenceBarrier) {
-        throw new Error(`Space ${spaceId} is in a coordinated commit`);
-      }
-      if (!managed.isIdle() || managed.hasQueuedWork()) {
-        throw new Error(`Space ${spaceId} is still committing`);
-      }
+      if (managed === undefined) return true;
+      if (persistenceBarrier) return false;
+      if (!managed.isIdle() || managed.hasQueuedWork()) return false;
       managed.setCoordinatedRecovery(undefined);
       sessions.delete(spaceId);
       uncommittedCreates.delete(spaceId);
+      return true;
     },
     session: (spaceId) => sessions.get(spaceId)?.session,
     entry: (spaceId) => {

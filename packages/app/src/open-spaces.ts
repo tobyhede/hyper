@@ -234,32 +234,39 @@ export function createOpenSpaces({
     }
     const target = observable.getState().entries.find(({ id }) => id === spaceId);
     if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
-    await registry.waitUntilRetirable(spaceId);
-    const persistence = target.session.getState().persistence;
-    if (persistence.kind === 'failed') {
-      return {
-        kind: 'refused',
-        refusal: { code: 'persistence-recovery-required', recovery: 'retry' },
-      };
-    }
-    if (persistence.kind === 'conflicted') {
-      return {
-        kind: 'refused',
-        refusal: { code: 'persistence-recovery-required', recovery: 'resolve-conflict' },
-      };
-    }
-    if (persistence.kind === 'rejected' && confirmation?.warning !== 'persistence-rejected') {
-      return { kind: 'warning', warning: 'persistence-rejected' };
+    // Waiting and retiring cannot be one step: a coordination can raise the
+    // barrier in the microtask between them, which makes this Space one of its
+    // participants again. So the wait, the reading it justifies and the
+    // retirement are one attempt, repeated until the retirement holds.
+    for (;;) {
+      await registry.waitUntilRetirable(spaceId);
+      const persistence = target.session.getState().persistence;
+      if (persistence.kind === 'failed') {
+        return {
+          kind: 'refused',
+          refusal: { code: 'persistence-recovery-required', recovery: 'retry' },
+        };
+      }
+      if (persistence.kind === 'conflicted') {
+        return {
+          kind: 'refused',
+          refusal: { code: 'persistence-recovery-required', recovery: 'resolve-conflict' },
+        };
+      }
+      if (persistence.kind === 'rejected' && confirmation?.warning !== 'persistence-rejected') {
+        return { kind: 'warning', warning: 'persistence-rejected' };
+      }
+      // The registry stops owning this session here, so anything still driving
+      // it would be a writer outside the one owner.
+      if (registry.release(spaceId)) break;
     }
     const state = observable.getState();
     const entries = state.entries.filter(({ id }) => id !== spaceId);
     const activeSpaceId =
       state.activeSpaceId === spaceId ? (entries[0]?.id ?? null) : state.activeSpaceId;
-    // The registry stops owning this session here, so anything still driving it
-    // would be a writer outside the one owner. The composition goes with it.
+    // The composition goes with the session the registry has just stopped owning.
     target.app.edgeAuthoring.dispose();
     target.app.authoring.dispose();
-    registry.release(spaceId);
     compositions.delete(spaceId);
     observable.publish({ activeSpaceId, entries });
     return { kind: 'closed' };

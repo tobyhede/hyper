@@ -3,7 +3,7 @@
 Status: resolved
 Tags: release/v1, Improvement
 Blocked by: none — PR 134 delivered the low-level session registry
-Related: `entity-url-addressability/08`; `space-cards/12`; `v1-release/01`
+Related: `entity-url-addressability/08`; `space-cards/12`; `v1-release/01`; `architecture-review/16`
 
 Surfaced by: the 31 August 2026 Space Cards architecture review, candidate
 “Deepen Open Spaces composition”. Validated against the in-flight
@@ -84,7 +84,8 @@ their UI evidence. No second Open Spaces owner or optional registry path remains
       and `spaceCards` is exercised through `createOpenSpaces`.
       `packages/app/test/space-card-lifecycle.test.ts` still composes registries
       directly: it is a test of registry coordination rather than of Open Spaces
-      composition, and moving it beside `packages/persistence` is its own change.
+      composition, and moving it beside `packages/persistence` is
+      `architecture-review/16`'s to build.
 
 ## Persistence-safety acceptance absorbed from `space-cards/12`
 

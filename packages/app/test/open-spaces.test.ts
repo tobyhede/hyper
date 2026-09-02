@@ -274,6 +274,40 @@ describe('Open Spaces', () => {
     });
   });
 
+  it('closes through a coordination that starts while the close is waiting', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const { openSpaces } = setup(control, countingIds());
+    await openSpaces.open(META_ID);
+    await openSpaces.open(OTHER_ID);
+
+    const releaseFirst = control.deferNextCommit();
+    const first = openSpaces.spaceCards.create({
+      containingSpaceId: META_ID,
+      layoutId: META_LAYOUT_ID,
+      title: 'First child',
+      position: { x: 10, y: 10 },
+    });
+    await vi.waitFor(() => expect(control.requests).toHaveLength(1));
+
+    // Closing waits behind the running coordination, and a second coordination
+    // then queues behind the same turn. When the first ends it wakes both: the
+    // wait reports a retirable Space, and the second raises the barrier again
+    // before the close gets to retire it. Retiring has to survive that window.
+    const closing = openSpaces.close(OTHER_ID);
+    const second = openSpaces.spaceCards.create({
+      containingSpaceId: META_ID,
+      layoutId: META_LAYOUT_ID,
+      title: 'Second child',
+      position: { x: 20, y: 20 },
+    });
+
+    releaseFirst();
+    await expect(closing).resolves.toEqual({ kind: 'closed' });
+    await first;
+    await second;
+    expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
+  });
+
   it('mints a composed Space\u2019s Card identities from the minter it was given', async () => {
     const { openSpaces } = setup(undefined, mintingIds(MINTED_CARD_ID));
     const other = await openSpaces.open(OTHER_ID);
