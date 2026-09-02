@@ -11,11 +11,13 @@ authored Layout, as ADR 0079 requires. Rename the persisted opening selection to
 compatibility intake.
 
 - [ ] Computed View identities, registries, renderer variants, conversion paths,
-      selection rows and Create Layout controls no longer exist in V1 code or
-      generated state.
+      selection rows and Computed View conversion controls no longer exist in V1
+      code or generated state. Add Layout and its control remain: they author an
+      empty Layout rather than converting one.
 - [ ] `defaultLayout` replaces `defaultRenderer` across schemas, snapshots, HTTP,
       repositories, authoring, navigation, fixtures, seeds, stories and tests;
-      the retired spelling receives no transitional reader or refusal path.
+      the retired spelling receives no transitional reader, and ordinary schema
+      rejection is what a document still carrying it meets.
 - [ ] Layout URLs remain durable; URLs for removed Computed View identities use
       the ordinary not-found behavior, while malformed destinations retain the
       existing bad-request behavior.

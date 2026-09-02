@@ -2,10 +2,18 @@ import type { SpaceSnapshot, UUID } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import type { LoadedSpace } from './backend';
 import type { CommitResult, SpaceCommit } from './backend';
-import type { RepositoryCommitResult } from './repository';
+import type { RepositoryCommitResult, SpaceResourceRepository } from './repository';
 
-interface WorkingSpaceStore {
-  readonly loadSpace: (id: UUID) => Promise<LoadedSpace | undefined>;
+/**
+ * The two methods initialization needs, taken from the stored seam rather than
+ * declared a second time.
+ *
+ * `commit` is the one half that cannot be: the browser reaches a `SpaceBackend`
+ * whose `CommitResult` carries transport failures the stored
+ * `RepositoryCommitResult` does not, so this loader serves both by accepting
+ * either. Narrowing it to the repository's own result would reject the browser.
+ */
+interface WorkingSpaceStore extends Pick<SpaceResourceRepository, 'loadSpace'> {
   readonly commit: (request: SpaceCommit) => Promise<CommitResult | RepositoryCommitResult>;
 }
 

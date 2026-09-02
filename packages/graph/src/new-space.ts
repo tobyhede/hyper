@@ -26,7 +26,10 @@ const FIRST_CARD_TITLE = 'Card 1';
 export interface InitializeSpaceOptions {
   /** Seeds both the Space and its first Card; later edits make them independent. */
   readonly title: string;
-  /** The composition-owned identity source for the Space and first Card. */
+  /**
+   * The composition-owned identity source. A complete new Space needs four:
+   * the Space, its first Card, its default Layout and that Layout's Graph.
+   */
   readonly newId: () => UUID;
 }
 

@@ -412,6 +412,13 @@ export const createApp = (
       onReturnFocus: () => spaceChromeEdit?.returnFocus(),
     };
 
+    /**
+     * Rename Layout begins the very chrome title edit `chromeEditingDisabled`
+     * withdraws while a Card title editor owns the caret — and the effect below
+     * discards a draft begun against that condition on the same render. So the
+     * gate reads `editingCardTitle` too, and Delete Layout goes with it rather
+     * than standing alone in a menu whose other item cannot run.
+     */
     const layoutActions = (entity: SpaceEntity): readonly EntityActionGroup[] => {
       if (
         entity.kind !== 'space-view' ||
@@ -419,6 +426,7 @@ export const createApp = (
         presenting ||
         creatingAlias ||
         editingCardBody ||
+        editingCardTitle ||
         spaceChromeEdit !== null
       )
         return [];

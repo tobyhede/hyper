@@ -16,9 +16,11 @@ technical presentation without editing source files or losing authored work.
 - [ ] An ordinary Space is created only by creating its first Space Card and can
       be opened independently at its canonical URL.
 - [ ] The first request for a stored or imported layoutless Space's complete
-      working state durably creates and selects its empty default Layout and
-      initial empty Active Graph before returning it; listing, import completion,
-      export and reference checks never initialize a Space.
+      working state durably initializes it in one atomic persisted Edit —
+      creating `Layout 1` and `Graph 1`, selecting `Graph 1` as that Layout's
+      Active Graph and persisting the Layout as `defaultLayout` — before
+      returning the complete working state; listing, import completion, export
+      and reference checks never initialize a Space.
 - [ ] Every successful Edit is saved through the unified authored commit path
       over HTTP/PostgreSQL and survives reload.
 - [ ] Save failure and revision conflict are visible and recoverable without

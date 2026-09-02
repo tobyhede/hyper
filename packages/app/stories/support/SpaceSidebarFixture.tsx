@@ -214,6 +214,7 @@ export function SpaceSidebarFixture({
           }}
           createLayout={
             createLayout ?? {
+              disabled: authoringDisabled,
               refusal: null,
               onCreate: () => {
                 authoring.complete({ kind: 'created-layout' });

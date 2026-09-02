@@ -75,7 +75,7 @@ under `superseded/`.
 | ADR | Binds |
 | --- | --- |
 | [0034](0034-the-http-application-is-fetch-native.md) | The HTTP application is Fetch-native. |
-| [0069](0069-entities-have-durable-web-addresses.md) | Every Space, Card, Graph and Space View has a durable URL built from its Id; ADR 0079 makes the addressable canvas context a Layout. |
+| [0069](0069-entities-have-durable-web-addresses.md) | Every Space, Card, Graph and Layout has a durable URL built from its Id; ADR 0079 replaced the Space View this ADR addresses with the Layout. |
 
 ## Canvas and camera
 

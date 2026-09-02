@@ -478,6 +478,29 @@ describe('authoring an opened Card', () => {
     await settled(session);
   });
 
+  /**
+   * Rename Layout begins a Space chrome title edit, and chrome title editing is
+   * already withdrawn while a Card title editor owns the caret — so the menu
+   * offered a Rename that began an edit the same render discarded, with a
+   * Delete Layout beside it.
+   */
+  it('withdraws the Layout actions while a Card title editor is open', async () => {
+    const session = mount();
+    await settled(session);
+
+    expect(
+      screen.getByRole('button', { name: 'Actions for Space View Layout' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+    expect(await screen.findByRole('textbox', { name: 'Card title' })).toBeVisible();
+
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Space View Layout' }),
+    ).not.toBeInTheDocument();
+    await settled(session);
+  });
+
   it('adds a Card again once the author has settled the edit', async () => {
     const session = mount();
     await openEditor();
