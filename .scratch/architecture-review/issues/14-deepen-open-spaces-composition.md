@@ -105,11 +105,13 @@ owner, and the old public opening helpers and their helper-level tests are gone.
 Switching waits for pending persistence on the Space being left. Closing waits
 for the target, refuses with the applicable recovery for failed or conflicted
 work, returns a warning before permitting rejected work to be discarded, and
-never closes Meta. Closed entries leave the visible collection but retain their
-process-owned composition, so reopening cannot manufacture a second writer.
-The owned registry's Space Card lifecycle is exposed as one domain capability;
-the registry itself never escapes.
+never closes Meta. A completed close retires the idle registry session and its
+composition; a later open loads and composes a fresh entry, while an entry that
+remains open can never acquire a second writer. The owned registry's Space Card
+lifecycle is composed from Open Spaces' identity minter and exposed as one
+domain capability; the registry itself never escapes.
 
 `packages/app/test/open-spaces.test.ts` crosses only the Open Spaces interface
-and covers concurrent direct/Enter reuse, retained selection, switching waits,
-recoverable refusals, rejected confirmation and the permanent Meta rule.
+and covers concurrent direct/Enter reuse, retained selection, switching and
+closing waits, inactive recoverable entries, rejected confirmation, fresh
+reopening and the permanent Meta rule.

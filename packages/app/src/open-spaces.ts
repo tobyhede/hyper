@@ -1,9 +1,10 @@
-import { newUuid, type UUID } from '@project/core';
+import type { UUID } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import {
   createObservableState,
   createSpaceSessionRegistry,
   createWorkingSpaceLoader,
+  type LoadedSpace,
   type ObserverErrorReporter,
   type SpaceBackend,
   type SpaceCardLifecycle,
@@ -38,21 +39,28 @@ export type CloseSpaceResult =
           };
     };
 
+export interface RejectedCloseConfirmation {
+  readonly warning: 'persistence-rejected';
+}
+
 export interface OpenSpaces {
   readonly getState: () => OpenSpacesState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;
-  readonly open: (spaceId: UUID, selection?: CanvasRendererId) => Promise<OpenSpace>;
+  readonly open: (target: UUID | LoadedSpace, selection?: CanvasRendererId) => Promise<OpenSpace>;
   readonly enter: (spaceId: UUID, selection?: CanvasRendererId) => Promise<OpenSpace>;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
-  readonly close: (spaceId: UUID, permitRejected?: boolean) => Promise<CloseSpaceResult>;
-  readonly spaceCards: (newId: () => UUID) => SpaceCardLifecycle;
+  readonly close: (
+    spaceId: UUID,
+    confirmation?: RejectedCloseConfirmation,
+  ) => Promise<CloseSpaceResult>;
+  readonly spaceCards: SpaceCardLifecycle;
 }
 
 export interface OpenSpacesOptions {
   readonly backend: SpaceBackend;
   readonly metaSpaceId: UUID;
-  readonly newId?: () => UUID;
+  readonly newId: () => UUID;
   readonly reportObserverError?: ObserverErrorReporter;
 }
 
@@ -75,7 +83,7 @@ const waitUntilNotPending = (session: SpaceSession): Promise<void> => {
 export function createOpenSpaces({
   backend,
   metaSpaceId,
-  newId = newUuid,
+  newId,
   reportObserverError,
 }: OpenSpacesOptions): OpenSpaces {
   const report =
@@ -99,11 +107,15 @@ export function createOpenSpaces({
     observable.publish({ activeSpaceId: entry.id, entries });
   };
 
-  const compose = (spaceId: UUID, selection?: CanvasRendererId): Promise<OpenSpace> => {
+  const compose = (
+    target: UUID | LoadedSpace,
+    selection?: CanvasRendererId,
+  ): Promise<OpenSpace> => {
+    const spaceId = typeof target === 'string' ? target : target.snapshot.id;
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
     const opening = (async (): Promise<OpenSpace> => {
-      const loaded = await loadWorkingSpace(spaceId);
+      const loaded = typeof target === 'string' ? await loadWorkingSpace(spaceId) : target;
       if (loaded === undefined) throw new Error(`The backend could not load space ${spaceId}`);
       const runtime = loadSpaceSnapshot(loaded.snapshot);
       if (!runtime.ok) {
@@ -125,22 +137,9 @@ export function createOpenSpaces({
     return opening;
   };
 
-  const open = async (spaceId: UUID, selection?: CanvasRendererId): Promise<OpenSpace> => {
-    const opened = await compose(spaceId, selection);
+  const activateAfterLeavingSettles = async (target: OpenSpace): Promise<OpenSpace> => {
     const active = observable.getState().activeSpaceId;
-    if (active !== null && active !== opened.id) {
-      const leaving = observable.getState().entries.find(({ id }) => id === active);
-      if (leaving !== undefined) await waitUntilNotPending(leaving.session);
-    }
-    activate(opened);
-    return opened;
-  };
-
-  const switchTo = async (spaceId: UUID): Promise<OpenSpace> => {
-    const target = observable.getState().entries.find(({ id }) => id === spaceId);
-    if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
-    const active = observable.getState().activeSpaceId;
-    if (active !== null && active !== spaceId) {
+    if (active !== null && active !== target.id) {
       const leaving = observable.getState().entries.find(({ id }) => id === active);
       if (leaving !== undefined) await waitUntilNotPending(leaving.session);
     }
@@ -148,7 +147,23 @@ export function createOpenSpaces({
     return target;
   };
 
-  const close = async (spaceId: UUID, permitRejected = false): Promise<CloseSpaceResult> => {
+  const open = async (
+    target: UUID | LoadedSpace,
+    selection?: CanvasRendererId,
+  ): Promise<OpenSpace> => {
+    return activateAfterLeavingSettles(await compose(target, selection));
+  };
+
+  const switchTo = async (spaceId: UUID): Promise<OpenSpace> => {
+    const target = observable.getState().entries.find(({ id }) => id === spaceId);
+    if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
+    return activateAfterLeavingSettles(target);
+  };
+
+  const close = async (
+    spaceId: UUID,
+    confirmation?: RejectedCloseConfirmation,
+  ): Promise<CloseSpaceResult> => {
     if (spaceId === metaSpaceId) {
       return { kind: 'refused', refusal: { code: 'meta-space-permanent' } };
     }
@@ -168,7 +183,7 @@ export function createOpenSpaces({
         refusal: { code: 'persistence-recovery-required', recovery: 'resolve-conflict' },
       };
     }
-    if (persistence.kind === 'rejected' && !permitRejected) {
+    if (persistence.kind === 'rejected' && confirmation?.warning !== 'persistence-rejected') {
       return { kind: 'warning', warning: 'persistence-rejected' };
     }
     const state = observable.getState();
@@ -176,6 +191,8 @@ export function createOpenSpaces({
     const activeSpaceId =
       state.activeSpaceId === spaceId ? (entries[0]?.id ?? null) : state.activeSpaceId;
     observable.publish({ activeSpaceId, entries });
+    compositions.delete(spaceId);
+    registry.release(spaceId);
     return { kind: 'closed' };
   };
 
@@ -187,6 +204,6 @@ export function createOpenSpaces({
     enter: open,
     switchTo,
     close,
-    spaceCards: (newId) => registry.spaceCards(newId),
+    spaceCards: registry.spaceCards(newId),
   };
 }

@@ -45,7 +45,11 @@ it('mounts an opened startup result without interpreting the browser path again'
   document.body.append(container);
   const root = createRoot(container);
   const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
-  const opened = await createOpenSpaces({ backend, metaSpaceId: SPACE_ID }).open(SPACE_ID);
+  const opened = await createOpenSpaces({
+    backend,
+    metaSpaceId: SPACE_ID,
+    newId: () => CARD_ID,
+  }).open(SPACE_ID);
   window.history.replaceState(null, '', '/already-resolved-by-startup');
 
   try {

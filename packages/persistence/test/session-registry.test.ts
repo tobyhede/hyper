@@ -27,11 +27,27 @@ describe('Space session registry', () => {
     expect(registry.entry(SPACE_ID)).toEqual({ kind: 'session', session: first });
   });
 
+  it('releases an idle session after its owner safely closes it', () => {
+    const registry = createSpaceSessionRegistry(new MemorySpaceBackend(SPACE_ID, [loaded]));
+    const first = registry.open(loaded);
+
+    registry.release(SPACE_ID);
+
+    expect(registry.session(SPACE_ID)).toBeUndefined();
+    expect(registry.open(loaded)).not.toBe(first);
+  });
+
   it('offers Space Card coordination only through the three lifecycle operations', () => {
     const registry = createSpaceSessionRegistry(new MemorySpaceBackend(SPACE_ID, [loaded]));
     const lifecycle = registry.spaceCards(() => CARD_ID);
 
     expect(Object.keys(lifecycle).sort()).toEqual(['create', 'delete', 'link']);
-    expect(Object.keys(registry).sort()).toEqual(['entry', 'open', 'session', 'spaceCards']);
+    expect(Object.keys(registry).sort()).toEqual([
+      'entry',
+      'open',
+      'release',
+      'session',
+      'spaceCards',
+    ]);
   });
 });

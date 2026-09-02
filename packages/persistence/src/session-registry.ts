@@ -55,6 +55,8 @@ export type SpaceSessionRegistryEntry =
 
 export interface SpaceSessionRegistry {
   readonly open: (loaded: LoadedSpace) => SpaceSession;
+  /** Retire one idle live session after its owner has completed safe closing. */
+  readonly release: (spaceId: UUID) => void;
   readonly session: (spaceId: UUID) => SpaceSession | undefined;
   readonly entry: (spaceId: UUID) => SpaceSessionRegistryEntry | undefined;
   readonly spaceCards: (newId: () => UUID) => SpaceCardLifecycle;
@@ -744,6 +746,14 @@ export function createSpaceSessionRegistry(
 
   const registry: SpaceSessionRegistry = {
     open,
+    release: (spaceId) => {
+      const managed = sessions.get(spaceId);
+      if (managed === undefined) return;
+      if (!managed.isIdle()) throw new Error(`Space ${spaceId} is still committing`);
+      managed.setCoordinatedRecovery(undefined);
+      sessions.delete(spaceId);
+      uncommittedCreates.delete(spaceId);
+    },
     session: (spaceId) => sessions.get(spaceId)?.session,
     entry: (spaceId) => {
       const managed = sessions.get(spaceId);

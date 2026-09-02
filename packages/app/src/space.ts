@@ -45,7 +45,7 @@ export const createSpaceStartup = (
       const resolvedSpace = loadSpaceSnapshot(resolution.loaded.snapshot);
       if (!resolvedSpace.ok) throw new Error('The product URL resolved an invalid Space.');
       const opening = destinationOpening(resolvedSpace.space, resolution.destination);
-      const opened = await spaces.open(resolution.loaded.snapshot.id, opening.selection);
+      const opened = await spaces.open(resolution.loaded, opening.selection);
       return {
         kind: 'opened',
         opened,
