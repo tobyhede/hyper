@@ -4,7 +4,6 @@ import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
   createSpaceSessionRegistry,
-  type LoadedAggregate,
 } from '@project/persistence';
 import { createSpaceCardLifecycle } from '../src/space-card-lifecycle';
 import { composeApp } from '../src/compose-app';
@@ -26,7 +25,7 @@ const CHILD_LINK_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000018');
 class ThrowingAggregateBackend extends MemorySpaceBackend {
   throwNextLoad = true;
 
-  override loadAggregate(): Promise<LoadedAggregate> {
+  override loadAggregate(): ReturnType<MemorySpaceBackend['loadAggregate']> {
     if (this.throwNextLoad) {
       this.throwNextLoad = false;
       return Promise.reject(new Error('aggregate transport exploded'));
@@ -1037,7 +1036,9 @@ describe('Space Card lifecycle', () => {
       }),
     ).resolves.toEqual({ kind: 'completed' });
 
-    const aggregate = await backend.loadAggregate();
+    const result = await backend.loadAggregate();
+    if (result.kind === 'uninitialized') throw new Error('Test backend is uninitialized');
+    const aggregate = result.aggregate;
     expect(aggregate.spaces).toHaveLength(2);
     const storedMeta = await backend.loadSpace(META_ID);
     expect(storedMeta?.revision).toBe(4n);

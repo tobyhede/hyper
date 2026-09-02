@@ -47,6 +47,9 @@ spaceRepositoryContract('PostgresSpaceRepository', async () => {
     listSpaces: () => repository.listSpaces(),
     loadSpace: (id) => repository.loadSpace(id),
     loadAggregate: () => repository.loadAggregate(),
+    initializeAggregate: (input) => repository.initializeAggregate(input),
+    replaceAggregate: (input, expectedMetaSpaceId) =>
+      repository.replaceAggregate(input, expectedMetaSpaceId),
     commit: (request) => repository.commit(request),
     markExported: (id, revision) => repository.markExported(id, revision),
     importSpaces: (input, mode) => repository.importSpaces(input, mode),

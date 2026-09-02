@@ -24,8 +24,11 @@ canonical initial aggregate without an import source.
       It never manufactures direct Meta Space Cards for imported Spaces.
 - [ ] Import initialises an empty repository or, only with
       `--dangerous-truncate`, atomically replaces the complete aggregate and its
-      Meta identity. There is no public merge mode. Raw directory batches remain
-      internal to seeds and fixtures.
+      Meta identity through `initializeAggregate` and `replaceAggregate`, using
+      the expected current Meta identity returned by `loadAggregate`. It then
+      deletes `ImportMode` and the compatibility `importSpaces` facade. There is
+      no public merge mode. Raw directory batches remain internal to seeds and
+      fixtures.
 - [ ] Administrative bootstrap/import stays outside the browser's authored
       `commit({ changes })` interface while reusing complete aggregate intake and
       transactional persistence internals.

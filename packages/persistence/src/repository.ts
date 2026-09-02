@@ -1,7 +1,7 @@
 import type { UUID } from '@project/core';
 import type {
   CommittedSpaceRevision,
-  LoadedAggregate,
+  AggregateLoadResult,
   LoadedSpace,
   SpaceCommit,
   SpaceConflict,
@@ -24,6 +24,6 @@ export type RepositoryCommitResult =
 export interface SpaceResourceRepository {
   listSpaces(): Promise<readonly SpaceSummary[]>;
   loadSpace(id: UUID): Promise<LoadedSpace | undefined>;
-  loadAggregate(): Promise<LoadedAggregate>;
+  loadAggregate(): Promise<AggregateLoadResult>;
   commit(request: SpaceCommit): Promise<RepositoryCommitResult>;
 }

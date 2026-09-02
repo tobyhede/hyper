@@ -1,5 +1,23 @@
-import type { ImportSpace, UUID } from '@project/core';
-import type { LoadedSpace, SpaceResourceRepository } from '@project/persistence';
+import type { ImportSpace, SpaceSnapshot, UUID } from '@project/core';
+import type { LoadedAggregate, LoadedSpace, SpaceResourceRepository } from '@project/persistence';
+import type { SpaceAggregateError } from '@project/graph';
+
+export interface AggregateInput {
+  metaSpaceId: UUID;
+  spaces: readonly SpaceSnapshot[];
+}
+
+export type InitializeAggregateResult =
+  | { kind: 'initialized'; aggregate: LoadedAggregate }
+  | { kind: 'existing'; aggregate: LoadedAggregate }
+  | { kind: 'already-initialized'; aggregate: LoadedAggregate }
+  | { kind: 'aggregate-refused'; errors: readonly SpaceAggregateError[] };
+
+export type ReplaceAggregateResult =
+  | { kind: 'replaced'; aggregate: LoadedAggregate }
+  | { kind: 'uninitialized' }
+  | { kind: 'conflict'; currentMetaSpaceId: UUID }
+  | { kind: 'aggregate-refused'; errors: readonly SpaceAggregateError[] };
 
 /**
  * No `conflict` variant, unlike {@link RepositoryCommitResult}.
@@ -32,9 +50,15 @@ export type ImportMode = 'insert' | 'truncate';
  * declare them.
  */
 export interface SpaceRepository extends SpaceResourceRepository {
+  initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult>;
+  replaceAggregate(
+    input: AggregateInput,
+    expectedMetaSpaceId: UUID,
+  ): Promise<ReplaceAggregateResult>;
   /** Application state, separate from every authored Space document. */
   entrySpaceId(): Promise<UUID | undefined>;
   setEntrySpace(id: UUID): Promise<void>;
+  /** Temporary compatibility facade; v1-release/08 removes it after migrating current callers. */
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult>;
   /** Records the revision projected by a completed external export. */
   markExported(id: UUID, revision: bigint): Promise<void>;

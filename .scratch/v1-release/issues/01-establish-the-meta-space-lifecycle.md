@@ -12,11 +12,14 @@ aggregate.
       Meta identity. It is not an authored Space field, inferred from graph shape
       or represented by the mutable nullable `spaces.entry` flag.
 - [ ] First repository initialization establishes the Meta identity through the
-      repository lifecycle seam consumed by ticket 16's canonical Default Content
-      generator. It does not use the ordinary one-Card new-Space initializer or
+      repository's `initializeAggregate` operation, consumed by ticket 16's
+      canonical Default Content generator. It does not use the compatibility
+      `importSpaces` facade, the ordinary one-Card new-Space initializer, or
       silently seed an already initialized repository.
 - [ ] Opening the application without another destination opens the Meta Space's
-      canonical URL. Missing or invalid Meta state fails explicitly.
+      canonical URL. It handles `loadAggregate`'s `uninitialized` outcome by
+      invoking initialization; contradictory or invalid stored Meta state fails
+      explicitly.
 - [ ] Authored commits cannot change or delete `metaSpaceId`, and the Meta Space
       cannot be deleted through Space Card removal. Complete administrative
       import may establish or replace repository Meta state.

@@ -25,8 +25,8 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     const backend = new MemorySpaceBackend(META_ID, [loaded()]);
 
     await expect(backend.loadAggregate()).resolves.toEqual({
-      metaSpaceId: META_ID,
-      spaces: [loaded()],
+      kind: 'loaded',
+      aggregate: { metaSpaceId: META_ID, spaces: [loaded()] },
     });
   });
 
@@ -74,8 +74,8 @@ describe('MemorySpaceBackend aggregate persistence', () => {
       ],
     });
     await expect(backend.loadAggregate()).resolves.toEqual({
-      metaSpaceId: META_ID,
-      spaces: [loaded()],
+      kind: 'loaded',
+      aggregate: { metaSpaceId: META_ID, spaces: [loaded()] },
     });
   });
 

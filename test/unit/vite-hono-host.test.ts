@@ -53,7 +53,8 @@ const hosts: RunningHost[] = [];
 const repository = (): SpaceResourceRepository => ({
   listSpaces: () => Promise.resolve([]),
   loadSpace: () => Promise.resolve(undefined),
-  loadAggregate: () => Promise.resolve({ metaSpaceId: SPACE_ID, spaces: [] }),
+  loadAggregate: () =>
+    Promise.resolve({ kind: 'loaded', aggregate: { metaSpaceId: SPACE_ID, spaces: [] } }),
   commit: () => Promise.resolve({ kind: 'rejected', code: 'invalid-commit', message: 'missing' }),
 });
 

@@ -1,8 +1,8 @@
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type {
+  AggregateLoadResult,
   CommitResult,
-  LoadedAggregate,
   LoadedSpace,
   SpaceChange,
   SpaceCommit,
@@ -348,22 +348,39 @@ export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
   return { changes: [first, ...rest] };
 };
 
-export interface LoadedAggregateJson {
-  metaSpaceId: string;
-  spaces: readonly LoadedSpaceJson[];
-}
+export type LoadedAggregateJson =
+  | { kind: 'uninitialized' }
+  | { kind: 'loaded'; aggregate: { metaSpaceId: string; spaces: readonly LoadedSpaceJson[] } };
 
-export const encodeLoadedAggregate = (aggregate: LoadedAggregate): LoadedAggregateJson => ({
-  metaSpaceId: aggregate.metaSpaceId,
-  spaces: aggregate.spaces.map(encodeLoadedSpace),
-});
+export const encodeLoadedAggregate = (result: AggregateLoadResult): LoadedAggregateJson =>
+  result.kind === 'uninitialized'
+    ? result
+    : {
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: result.aggregate.metaSpaceId,
+          spaces: result.aggregate.spaces.map(encodeLoadedSpace),
+        },
+      };
 
-export const decodeLoadedAggregate = (value: unknown): LoadedAggregate => {
-  const record = exactRecord(value, ['metaSpaceId', 'spaces'], 'loaded aggregate');
-  if (!Array.isArray(record['spaces'])) throw new Error('loaded aggregate spaces must be an array');
+export const decodeLoadedAggregate = (value: unknown): AggregateLoadResult => {
+  try {
+    const uninitialized = exactRecord(value, ['kind'], 'uninitialized aggregate load result');
+    if (uninitialized['kind'] === 'uninitialized') return { kind: 'uninitialized' };
+  } catch {
+    // The loaded shape is decoded below with its own exact-field diagnostic.
+  }
+  const record = exactRecord(value, ['kind', 'aggregate'], 'loaded aggregate load result');
+  if (record['kind'] !== 'loaded') throw new Error('aggregate load result kind is invalid');
+  const aggregate = exactRecord(record['aggregate'], ['metaSpaceId', 'spaces'], 'loaded aggregate');
+  if (!Array.isArray(aggregate['spaces']))
+    throw new Error('loaded aggregate spaces must be an array');
   return {
-    metaSpaceId: requiredUuid(record['metaSpaceId'], 'loaded aggregate Meta Space id'),
-    spaces: record['spaces'].map(decodeLoadedSpace),
+    kind: 'loaded',
+    aggregate: {
+      metaSpaceId: requiredUuid(aggregate['metaSpaceId'], 'loaded aggregate Meta Space id'),
+      spaces: aggregate['spaces'].map(decodeLoadedSpace),
+    },
   };
 };
 

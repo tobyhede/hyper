@@ -161,6 +161,130 @@ export const spaceRepositoryContract = (
     return result.spaces;
   };
 
+  it(`${name} initializes and replaces only through explicit Meta-rooted aggregates`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
+      ).resolves.toEqual({
+        kind: 'initialized',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
+      });
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [structuredClone(first)] }),
+      ).resolves.toMatchObject({ kind: 'existing' });
+
+      const replacement = retitled(first, 'Replacement');
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: SPACE_ID, spaces: [replacement] },
+          OTHER_SPACE_ID,
+        ),
+      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: SPACE_ID });
+      await expect(
+        repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [replacement] }, SPACE_ID),
+      ).resolves.toEqual({
+        kind: 'replaced',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(replacement, 0n, null)] },
+      });
+    });
+  });
+
+  it(`${name} classifies canonical initialization and invalid lifecycle proposals`, async () => {
+    await withHarness(async (repository) => {
+      const child = space(OTHER_SPACE_ID, 'Child', [OTHER_CARD_ID]);
+      const meta = {
+        ...space(SPACE_ID, 'Meta', [CARD_ID]),
+        cards: [card(CARD_ID, 'Meta card'), spaceCard(LINK_CARD_ID, OTHER_SPACE_ID)],
+      };
+      const input = { metaSpaceId: SPACE_ID, spaces: [meta, child] };
+      const [first, second] = await Promise.all([
+        repository.initializeAggregate(input),
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [child, meta] }),
+      ]);
+      expect(new Set([first.kind, second.kind])).toEqual(new Set(['initialized', 'existing']));
+
+      await expect(
+        repository.initializeAggregate({
+          metaSpaceId: SPACE_ID,
+          spaces: [retitled(meta, 'Different'), child],
+        }),
+      ).resolves.toMatchObject({ kind: 'already-initialized' });
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: MISSING_SPACE_ID, spaces: [meta, child] },
+          SPACE_ID,
+        ),
+      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
+    });
+  });
+
+  it(`${name} lets only one different concurrent initialization establish state`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'First', [CARD_ID]);
+      const second = space(OTHER_SPACE_ID, 'Second', [OTHER_CARD_ID]);
+      const results = await Promise.all([
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
+        repository.initializeAggregate({ metaSpaceId: OTHER_SPACE_ID, spaces: [second] }),
+      ]);
+      expect(new Set(results.map(({ kind }) => kind))).toEqual(
+        new Set(['initialized', 'already-initialized']),
+      );
+      const loaded = await repository.loadAggregate();
+      expect(loaded.kind).toBe('loaded');
+    });
+  });
+
+  it(`${name} rolls back a refused replacement`, async () => {
+    await withHarness(async (repository) => {
+      const initial = space(SPACE_ID, 'Initial', [CARD_ID]);
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: MISSING_SPACE_ID, spaces: [retitled(initial, 'Invalid')] },
+          SPACE_ID,
+        ),
+      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(initial, 0n, null)] },
+      });
+    });
+  });
+
+  it(`${name} refuses replacement before initialization`, async () => {
+    await withHarness(async (repository) => {
+      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      await expect(
+        repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [meta] }, SPACE_ID),
+      ).resolves.toEqual({ kind: 'uninitialized' });
+      await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
+    });
+  });
+
+  it(`${name} serializes two replacements authorized against the same Meta identity`, async () => {
+    await withHarness(async (repository) => {
+      const initial = space(SPACE_ID, 'Initial', [CARD_ID]);
+      const first = space(OTHER_SPACE_ID, 'First replacement', [OTHER_CARD_ID]);
+      const second = space(MISSING_SPACE_ID, 'Second replacement', [MISSING_CARD_ID]);
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
+
+      const results = await Promise.all([
+        repository.replaceAggregate({ metaSpaceId: OTHER_SPACE_ID, spaces: [first] }, SPACE_ID),
+        repository.replaceAggregate({ metaSpaceId: MISSING_SPACE_ID, spaces: [second] }, SPACE_ID),
+      ]);
+      expect(results.map(({ kind }) => kind)).toEqual(['replaced', 'replaced']);
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: MISSING_SPACE_ID,
+          spaces: [stored(second, 0n, null)],
+        },
+      });
+    });
+  });
+
   /*
    * The migration that adds the singleton Meta row deliberately leaves it empty
    * — a migration has no Space to name — so whatever first puts a Space in the
@@ -173,8 +297,8 @@ export const spaceRepositoryContract = (
       await seed(repository, first);
 
       await expect(repository.loadAggregate()).resolves.toEqual({
-        metaSpaceId: SPACE_ID,
-        spaces: [stored(first, 0n, null)],
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
       });
       await expect(commitUpdate(repository, retitled(first, 'Changed'), 0n)).resolves.toEqual({
         kind: 'committed',
@@ -205,37 +329,6 @@ export const spaceRepositoryContract = (
         deletedSpaceIds: [],
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, null));
-    });
-  });
-
-  it(`${name} returns aggregate Spaces in ascending id order`, async () => {
-    await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'First', [CARD_ID]);
-      const second = space(OTHER_SPACE_ID, 'Second', [OTHER_CARD_ID]);
-      await seed(repository, second, first);
-
-      await expect(repository.loadAggregate()).resolves.toEqual({
-        metaSpaceId: OTHER_SPACE_ID,
-        spaces: [stored(first, 0n, null), stored(second, 0n, null)],
-      });
-    });
-  });
-
-  it(`${name} commits an unrelated edit while another imported Space is not reachable from Meta`, async () => {
-    await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
-      const importedRoot = space(OTHER_SPACE_ID, 'Imported root', [OTHER_CARD_ID]);
-      await seed(repository, meta, importedRoot);
-
-      const changed = retitled(meta, 'Changed');
-      await expect(commitUpdate(repository, changed, 0n)).resolves.toEqual({
-        kind: 'committed',
-        revisions: [{ spaceId: SPACE_ID, revision: 1n }],
-        deletedSpaceIds: [],
-      });
-      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(
-        stored(importedRoot, 0n, null),
-      );
     });
   });
 
@@ -293,8 +386,11 @@ export const spaceRepositoryContract = (
         deletedSpaceIds: [],
       });
       await expect(repository.loadAggregate()).resolves.toEqual({
-        metaSpaceId: SPACE_ID,
-        spaces: [stored(linked, 1n, null), stored(child, 0n, null)],
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: SPACE_ID,
+          spaces: [stored(linked, 1n, null), stored(child, 0n, null)],
+        },
       });
 
       await expect(
@@ -456,7 +552,9 @@ export const spaceRepositoryContract = (
         ],
         deletedSpaceIds: [],
       });
-      const aggregate = await repository.loadAggregate();
+      const result = await repository.loadAggregate();
+      if (result.kind === 'uninitialized') throw new Error('Seeded repository is uninitialized');
+      const aggregate = result.aggregate;
       expect(aggregate).toEqual({
         metaSpaceId: SPACE_ID,
         spaces: [stored(linkedToLaterDefault, 2n, null), stored(retargetedDefault, 1n, null)],
@@ -600,7 +698,11 @@ export const spaceRepositoryContract = (
     await withHarness(async (repository) => {
       const first = space(SPACE_ID, 'One', [CARD_ID]);
       const other = space(OTHER_SPACE_ID, 'Other', [OTHER_CARD_ID]);
-      await seed(repository, first, other);
+      const linked = {
+        ...first,
+        cards: [...first.cards, spaceCard(LINK_CARD_ID, OTHER_SPACE_ID)],
+      };
+      await seed(repository, linked, other);
       const claiming: SpaceSnapshot = {
         ...retitled(other, 'Must roll back'),
         cards: [...other.cards, card(CARD_ID, 'Claimed')],
@@ -609,7 +711,7 @@ export const spaceRepositoryContract = (
       await expect(commitUpdate(repository, claiming, 0n)).resolves.toMatchObject({
         kind: 'aggregate-refused',
       });
-      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(linked, 0n, null));
       await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(other, 0n, null));
     });
   });

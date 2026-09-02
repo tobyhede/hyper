@@ -1,13 +1,6 @@
 import { uuidSchema, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
-import type {
-  CommitResult,
-  LoadedAggregate,
-  LoadedSpace,
-  SpaceBackend,
-  SpaceCommit,
-  SpaceSummary,
-} from './backend';
+import type { CommitResult, LoadedSpace, SpaceBackend, SpaceCommit, SpaceSummary } from './backend';
 
 const clone = <T>(value: T): T => structuredClone(value);
 const isLoadedSpaceCollection = (
@@ -119,10 +112,13 @@ export class MemorySpaceBackend implements SpaceBackend {
     return Promise.resolve(loaded === undefined ? undefined : clone(loaded));
   }
 
-  loadAggregate(): Promise<LoadedAggregate> {
+  loadAggregate(): ReturnType<SpaceBackend['loadAggregate']> {
     return Promise.resolve({
-      metaSpaceId: this.#metaSpaceId,
-      spaces: [...this.#spaces.values()].map(clone),
+      kind: 'loaded',
+      aggregate: {
+        metaSpaceId: this.#metaSpaceId,
+        spaces: [...this.#spaces.values()].map(clone),
+      },
     });
   }
 

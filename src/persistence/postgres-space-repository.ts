@@ -12,6 +12,7 @@ import {
 } from '@project/core';
 import { loadSpaceAggregate as validateSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import type {
+  AggregateLoadResult,
   LoadedAggregate,
   LoadedSpace,
   RepositoryCommitResult,
@@ -20,7 +21,15 @@ import type {
   SpaceSummary,
 } from '@project/persistence';
 import { db } from '../prisma/db';
-import type { ImportMode, RepositoryImportResult, SpaceRepository } from './space-repository';
+import { classifyInitializedAggregate } from './aggregate-lifecycle';
+import type {
+  AggregateInput,
+  ImportMode,
+  InitializeAggregateResult,
+  ReplaceAggregateResult,
+  RepositoryImportResult,
+  SpaceRepository,
+} from './space-repository';
 
 type Orm = typeof db.orm;
 type JsonValue =
@@ -81,6 +90,11 @@ const isSpacePrimaryKeyConflict = (error: unknown): error is SqlPrimaryKeyConfli
 
 const isCardPrimaryKeyConflict = (error: unknown): error is SqlPrimaryKeyConflictFields =>
   isPrimaryKeyConflict(error, 'cards', 'cards_pkey');
+
+const isRepositoryStatePrimaryKeyConflict = (
+  error: unknown,
+): error is SqlPrimaryKeyConflictFields =>
+  isPrimaryKeyConflict(error, 'repository_state', 'repository_state_pkey');
 
 const toRevision = (value: number | string | bigint): bigint => {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
@@ -339,7 +353,7 @@ const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
  * unbootstrapped database throw, which the HTTP host reports as a retryable
  * 503.
  */
-const lockRepositoryState = async (orm: Orm): Promise<UUID | undefined> => {
+const lockMetaIdentity = async (orm: Orm): Promise<UUID | undefined> => {
   const state = await orm.public.RepositoryState.where({ singletonId: 1 }).first();
   if (state === null) return undefined;
   const metaSpaceId = uuidSchema.parse(state.metaSpaceId);
@@ -544,6 +558,23 @@ const truncateHyperContent = async (orm: Orm): Promise<void> => {
   }
 };
 
+const authoritativeAggregate = async (orm: Orm, metaSpaceId: UUID): Promise<LoadedAggregate> => {
+  const spaces = await loadEverySpace(orm);
+  const intake = validateSpaceAggregate({
+    metaSpaceId,
+    snapshots: spaces.map(({ snapshot }) => snapshot),
+  });
+  if (!intake.ok) throw new Error('Stored aggregate violates Meta invariants');
+  return { metaSpaceId, spaces };
+};
+
+const replaceAllSpaces = async (orm: Orm, input: AggregateInput): Promise<LoadedAggregate> => {
+  await truncateHyperContent(orm);
+  for (const snapshot of input.spaces) await createStoredSpace(orm, snapshot);
+  await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: input.metaSpaceId });
+  return authoritativeAggregate(orm, input.metaSpaceId);
+};
+
 /**
  * Establish Meta state when the repository has none, and leave it alone
  * otherwise.
@@ -555,13 +586,6 @@ const truncateHyperContent = async (orm: Orm): Promise<void> => {
  * way `MemorySpaceRepository` does. Choosing the Meta Space properly, and
  * retiring the Entry flag it stands in for here, is `v1-release/01`.
  */
-const establishMetaSpace = async (orm: Orm, candidate: UUID | undefined): Promise<void> => {
-  if (candidate === undefined) return;
-  const existing = await orm.public.RepositoryState.where({ singletonId: 1 }).first();
-  if (existing !== null) return;
-  await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: candidate });
-};
-
 export class PostgresSpaceRepository implements SpaceRepository {
   readonly #database: typeof db;
 
@@ -586,7 +610,6 @@ export class PostgresSpaceRepository implements SpaceRepository {
       }
       const updated = await orm.public.Space.where({ id }).update({ entry: true });
       if (updated === null) throw new Error(`Space ${id} disappeared while becoming Entry Space`);
-      await establishMetaSpace(orm, id);
     });
   }
 
@@ -603,15 +626,75 @@ export class PostgresSpaceRepository implements SpaceRepository {
     return loadSpaceAggregate(this.#database.orm, id);
   }
 
-  loadAggregate(): Promise<LoadedAggregate> {
+  loadAggregate(): Promise<AggregateLoadResult> {
     return this.#database.transaction(async ({ orm }) => {
-      const metaSpaceId = await lockRepositoryState(orm);
-      // A complete read has no answer without Meta, unlike a commit, which can
-      // still name a conflict. Nothing establishes it but the paths that put a
-      // Space in the repository, so reaching here without one is a broken
-      // invariant rather than a request the caller got wrong.
-      if (metaSpaceId === undefined) throw new Error('Repository state has not been bootstrapped');
-      return { metaSpaceId, spaces: await loadEverySpace(orm) };
+      const metaSpaceId = await lockMetaIdentity(orm);
+      if (metaSpaceId === undefined) {
+        if ((await loadEverySpace(orm)).length === 0) return { kind: 'uninitialized' };
+        throw new Error('Stored Spaces exist without a Meta Space');
+      }
+      return { kind: 'loaded', aggregate: await authoritativeAggregate(orm, metaSpaceId) };
+    });
+  }
+
+  async initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult> {
+    const intake = validateSpaceAggregate({
+      metaSpaceId: input.metaSpaceId,
+      snapshots: input.spaces,
+    });
+    if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
+    try {
+      return await this.#database.transaction(async ({ orm }) => {
+        const metaSpaceId = await lockMetaIdentity(orm);
+        if (metaSpaceId !== undefined) {
+          return classifyInitializedAggregate(
+            input,
+            await authoritativeAggregate(orm, metaSpaceId),
+          );
+        }
+        if ((await loadEverySpace(orm)).length > 0) {
+          throw new Error('Stored Spaces exist without a Meta Space');
+        }
+        return { kind: 'initialized', aggregate: await replaceAllSpaces(orm, input) };
+      });
+    } catch (error) {
+      // Identical and different first proposals race on the first durable Space
+      // identity. The loser reads the winner after its transaction rolls back
+      // and classifies authored meaning, rather than exposing SQL timing.
+      if (!isSpacePrimaryKeyConflict(error) && !isRepositoryStatePrimaryKeyConflict(error)) {
+        throw error;
+      }
+      const result = await this.loadAggregate();
+      if (result.kind === 'uninitialized') throw error;
+      return classifyInitializedAggregate(input, result.aggregate);
+    }
+  }
+
+  async replaceAggregate(
+    input: AggregateInput,
+    expectedMetaSpaceId: UUID,
+  ): Promise<ReplaceAggregateResult> {
+    const intake = validateSpaceAggregate({
+      metaSpaceId: input.metaSpaceId,
+      snapshots: input.spaces,
+    });
+    if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
+    return this.#database.transaction(async ({ orm }) => {
+      const metaSpaceId = await lockMetaIdentity(orm);
+      if (metaSpaceId === undefined) {
+        if ((await loadEverySpace(orm)).length > 0)
+          throw new Error('Stored Spaces exist without Meta');
+        return { kind: 'uninitialized' };
+      }
+      if (metaSpaceId !== expectedMetaSpaceId) {
+        return { kind: 'conflict', currentMetaSpaceId: metaSpaceId };
+      }
+      // Lock every current Space row before replacement so an authored fast-path
+      // commit and this replacement cannot both report success.
+      for (const space of await loadEverySpace(orm)) {
+        await writeSpaceDocumentUnderLock(orm, space.snapshot);
+      }
+      return { kind: 'replaced', aggregate: await replaceAllSpaces(orm, input) };
     });
   }
 
@@ -662,7 +745,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
     return this.#database.transaction(async ({ orm }) => {
       const topologyPreserving = await commitTopologyPreservingUpdate(orm, request);
       if (topologyPreserving !== undefined) return topologyPreserving;
-      const metaSpaceId = await lockRepositoryState(orm);
+      const metaSpaceId = await lockMetaIdentity(orm);
       const stored = await loadEverySpace(orm);
       const byId = new Map(stored.map((space) => [space.snapshot.id, space]));
       const baseline =
@@ -801,11 +884,42 @@ export class PostgresSpaceRepository implements SpaceRepository {
       throw error;
     }
 
+    const resolved = accepted.map((item) => resolveImport(item, item.id ?? newUuid()));
+    for (const snapshot of resolved) {
+      const intake = loadSpaceSnapshot(snapshot);
+      if (!intake.ok) {
+        return {
+          kind: 'rejected',
+          code: 'invalid-snapshot',
+          message: intake.errors.map(({ message }) => message).join('\n'),
+        };
+      }
+    }
+    const current = await this.loadAggregate();
+    if (mode === 'truncate' || current.kind === 'uninitialized') {
+      const metaSpaceId = resolved[0]?.id;
+      if (metaSpaceId === undefined) return { kind: 'imported', spaces: [] };
+      const aggregate = { metaSpaceId, spaces: resolved };
+      const lifecycle =
+        current.kind === 'uninitialized'
+          ? await this.initializeAggregate(aggregate)
+          : await this.replaceAggregate(aggregate, current.aggregate.metaSpaceId);
+      if (lifecycle.kind === 'initialized' || lifecycle.kind === 'replaced') {
+        return { kind: 'imported', spaces: lifecycle.aggregate.spaces };
+      }
+      if (lifecycle.kind === 'aggregate-refused') {
+        return {
+          kind: 'rejected',
+          code: 'invalid-snapshot',
+          message: lifecycle.errors.map((error) => error.kind).join('\n'),
+        };
+      }
+      throw new Error(`Compatibility import reached unexpected lifecycle result ${lifecycle.kind}`);
+    }
+
     try {
       return await this.#database.transaction(async ({ orm }) => {
         const imported: LoadedSpace[] = [];
-
-        if (mode === 'truncate') await truncateHyperContent(orm);
 
         for (const importInput of accepted) {
           let space;
@@ -871,7 +985,6 @@ export class PostgresSpaceRepository implements SpaceRepository {
           imported.push(stored);
         }
 
-        await establishMetaSpace(orm, imported[0]?.snapshot.id);
         return { kind: 'imported', spaces: imported };
       });
     } catch (error) {

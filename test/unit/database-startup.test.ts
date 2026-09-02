@@ -1,6 +1,5 @@
 import { uuidSchema, type ImportSpace, type UUID } from '@project/core';
 import type {
-  LoadedAggregate,
   LoadedSpace,
   RepositoryCommitResult,
   SpaceCommit,
@@ -35,8 +34,20 @@ class PersistenceOwnedSpaceIdRepository implements SpaceRepository {
     return this.#memory.loadSpace(id);
   }
 
-  loadAggregate(): Promise<LoadedAggregate> {
+  loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
     return this.#memory.loadAggregate();
+  }
+
+  initializeAggregate(
+    ...args: Parameters<SpaceRepository['initializeAggregate']>
+  ): ReturnType<SpaceRepository['initializeAggregate']> {
+    return this.#memory.initializeAggregate(...args);
+  }
+
+  replaceAggregate(
+    ...args: Parameters<SpaceRepository['replaceAggregate']>
+  ): ReturnType<SpaceRepository['replaceAggregate']> {
+    return this.#memory.replaceAggregate(...args);
   }
 
   commit(request: SpaceCommit): Promise<RepositoryCommitResult> {

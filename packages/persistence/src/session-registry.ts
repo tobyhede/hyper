@@ -238,7 +238,9 @@ export function createSpaceSessionRegistry(
       };
       let aggregate: LoadedAggregate;
       try {
-        aggregate = await backend.loadAggregate();
+        const result = await backend.loadAggregate();
+        if (result.kind === 'uninitialized') throw new Error('The repository is uninitialized');
+        aggregate = result.aggregate;
       } catch (error) {
         installed({ kind: 'persistence-read-failed' });
         return protocolFailure(
@@ -657,7 +659,9 @@ export function createSpaceSessionRegistry(
           if (refusal !== undefined) return undefined;
           let aggregate: LoadedAggregate;
           try {
-            aggregate = await backend.loadAggregate();
+            const result = await backend.loadAggregate();
+            if (result.kind === 'uninitialized') throw new Error('The repository is uninitialized');
+            aggregate = result.aggregate;
           } catch {
             refusal = { kind: 'refused', refusal: { code: 'persistence-read-failed' } };
             return undefined;

@@ -14,7 +14,8 @@ const loaded: LoadedSpace = { snapshot, revision: 4n, exportedRevision: 3n };
 const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceResourceRepository => ({
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve(undefined),
-  loadAggregate: () => Promise.resolve({ metaSpaceId: SPACE_ID, spaces: [] }),
+  loadAggregate: () =>
+    Promise.resolve({ kind: 'loaded', aggregate: { metaSpaceId: SPACE_ID, spaces: [] } }),
   commit: () =>
     Promise.resolve({
       kind: 'committed',

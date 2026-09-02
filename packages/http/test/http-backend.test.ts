@@ -53,7 +53,10 @@ const problemResponse = (
 
 describe('HTTP Space backend aggregate protocol', () => {
   it('loads the complete aggregate through its codec', async () => {
-    const aggregate = { metaSpaceId: SPACE_ID, spaces: [loaded] };
+    const aggregate = {
+      kind: 'loaded' as const,
+      aggregate: { metaSpaceId: SPACE_ID, spaces: [loaded] },
+    };
 
     await expect(
       backendAnswering(jsonResponse(encodeLoadedAggregate(aggregate))).loadAggregate(),

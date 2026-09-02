@@ -53,7 +53,10 @@ describe('aggregate wire protocol', () => {
   };
 
   it('round-trips complete reads, authored commits, successes, and complete conflicts', () => {
-    const aggregate = { metaSpaceId: SPACE_ID, spaces: [loaded, second] };
+    const aggregate = {
+      kind: 'loaded' as const,
+      aggregate: { metaSpaceId: SPACE_ID, spaces: [loaded, second] },
+    };
     expect(decodeLoadedAggregate(encodeLoadedAggregate(aggregate))).toEqual(aggregate);
 
     const request = {
@@ -96,9 +99,12 @@ describe('aggregate wire protocol', () => {
     // reader could not trace to a key. Every UUID on the response and refusal
     // side now goes through the same `<label> must be a UUID` shape the request
     // decoder already used.
-    expect(() => decodeLoadedAggregate({ metaSpaceId: 'nope', spaces: [] })).toThrow(
-      'loaded aggregate Meta Space id must be a UUID',
-    );
+    expect(() =>
+      decodeLoadedAggregate({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: 'nope', spaces: [] },
+      }),
+    ).toThrow('loaded aggregate Meta Space id must be a UUID');
     expect(() =>
       decodeCommitResponse({
         revisions: [{ spaceId: 'nope', revision: '1' }],
@@ -319,9 +325,12 @@ describe('aggregate wire protocol', () => {
   });
 
   it('strictly rejects malformed aggregate, success, and conflict arrays', () => {
-    expect(() => decodeLoadedAggregate({ metaSpaceId: SPACE_ID, spaces: 'nope' })).toThrow(
-      'must be an array',
-    );
+    expect(() =>
+      decodeLoadedAggregate({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: 'nope' },
+      }),
+    ).toThrow('must be an array');
     expect(() => decodeCommitResponse({ revisions: 'nope', deletedSpaceIds: [] })).toThrow(
       'must be an array',
     );

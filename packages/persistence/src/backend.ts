@@ -17,6 +17,9 @@ export interface LoadedAggregate {
   spaces: readonly LoadedSpace[];
 }
 
+export type AggregateLoadResult =
+  { kind: 'uninitialized' } | { kind: 'loaded'; aggregate: LoadedAggregate };
+
 export type SpaceChange =
   | { kind: 'create'; spaceId: UUID; snapshot: SpaceSnapshot }
   | { kind: 'update'; spaceId: UUID; snapshot: SpaceSnapshot; expectedRevision: bigint }
@@ -60,6 +63,6 @@ export type CommitResult =
 export interface SpaceBackend {
   listSpaces(): Promise<readonly SpaceSummary[]>;
   loadSpace(id: UUID): Promise<LoadedSpace | undefined>;
-  loadAggregate(): Promise<LoadedAggregate>;
+  loadAggregate(): Promise<AggregateLoadResult>;
   commit(request: SpaceCommit): Promise<CommitResult>;
 }
