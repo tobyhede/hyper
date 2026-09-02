@@ -65,6 +65,7 @@ const appChrome = (
         onExitPresenting: () => undefined,
       }}
       addCard={{ onAddCard: () => undefined, onAddAlias: () => undefined }}
+      createLayout={{ refusal: null, onCreate: () => undefined }}
       persistence={{
         control: <PersistenceIndicator state="settled" />,
         state: 'settled',

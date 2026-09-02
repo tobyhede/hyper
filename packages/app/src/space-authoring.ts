@@ -76,6 +76,17 @@ export type EdgeEligibility =
 
 const ELIGIBLE = { kind: 'eligible' } as const;
 
+const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
+  const loaded = loadSpaceSnapshot(snapshot);
+  if (!loaded.ok) {
+    throw new Error(
+      `Authoring produced an invalid Space: ${loaded.errors
+        .map((error) => error.message)
+        .join('; ')}`,
+    );
+  }
+};
+
 /**
  * One completed authored fact, as the interaction that finished knows it.
  *
@@ -854,14 +865,7 @@ export function createSpaceAuthoring({
         ],
         activeGraphId: graphId,
       });
-      const loaded = loadSpaceSnapshot(next);
-      if (!loaded.ok) {
-        throw new Error(
-          `Authoring produced an invalid Space: ${loaded.errors
-            .map((error) => error.message)
-            .join('; ')}`,
-        );
-      }
+      assertValidAuthoredSnapshot(next);
       return {
         kind: 'completed',
         edit: {
@@ -898,14 +902,7 @@ export function createSpaceAuthoring({
               : snapshot.document.defaultRenderer,
         },
       };
-      const loaded = loadSpaceSnapshot(next);
-      if (!loaded.ok) {
-        throw new Error(
-          `Authoring produced an invalid Space: ${loaded.errors
-            .map((error) => error.message)
-            .join('; ')}`,
-        );
-      }
+      assertValidAuthoredSnapshot(next);
       return {
         kind: 'completed',
         edit: {
@@ -1302,14 +1299,7 @@ export function createSpaceAuthoring({
       },
     );
     if (sameSnapshot(previousSnapshot, next)) return UNCHANGED;
-    const loaded = loadSpaceSnapshot(next);
-    if (!loaded.ok) {
-      throw new Error(
-        `Authoring produced an invalid Space: ${loaded.errors
-          .map((error) => error.message)
-          .join('; ')}`,
-      );
-    }
+    assertValidAuthoredSnapshot(next);
     const created: { createdCardId?: CardId; createdGraphId?: GraphId } = {};
     if (createdCard !== null) created.createdCardId = createdCard.id;
     if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
