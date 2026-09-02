@@ -214,6 +214,7 @@ describe('PostgresSpaceRepository', () => {
     createdSpaceIds.clear();
     await db.orm.public.Card.where({ spaceId: SPACE_ID }).deleteAll();
     await db.orm.public.Card.where({ spaceId: OTHER_SPACE_ID }).deleteAll();
+    await db.orm.public.Card.where({ spaceId: CONCURRENT_SPACE_ID }).deleteAll();
     await db.orm.public.Space.where({ id: SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: OTHER_SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: CONCURRENT_SPACE_ID }).delete();
@@ -237,6 +238,88 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Repository space' },
     ]);
+  });
+
+  it('classifies initialization when a concurrent winner takes a shared Card identity', async () => {
+    const winnerReady = Promise.withResolvers<undefined>();
+    const releaseWinner = Promise.withResolvers<undefined>();
+    const winner = db.transaction(async ({ orm }) => {
+      await orm.public.Space.create({
+        id: SPACE_ID,
+        document: { version: 1, title: 'Winner' },
+        revision: 0,
+      });
+      await orm.public.Card.create({
+        id: CARD_ID,
+        spaceId: SPACE_ID,
+        document: { title: 'Shared', kind: 'markdown', body: 'Winner' },
+      });
+      await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
+      winnerReady.resolve(undefined);
+      await releaseWinner.promise;
+    });
+    await winnerReady.promise;
+
+    const proposal: SpaceSnapshot = {
+      id: CONCURRENT_SPACE_ID,
+      document: { version: 1, title: 'Loser' },
+      cards: [
+        {
+          id: CARD_ID,
+          document: { title: 'Shared', kind: 'markdown', body: 'Loser' },
+        },
+      ],
+    };
+    const initializing = repository.initializeAggregate({
+      metaSpaceId: CONCURRENT_SPACE_ID,
+      spaces: [proposal],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    releaseWinner.resolve(undefined);
+    await winner;
+
+    await expect(initializing).resolves.toMatchObject({ kind: 'already-initialized' });
+  });
+
+  it('conflicts when an authored commit wins after replacement reads its baseline', async () => {
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
+    const updateApplied = Promise.withResolvers<undefined>();
+    const releaseCommit = Promise.withResolvers<undefined>();
+    const committing = db.transaction(async ({ orm }) => {
+      await orm.public.Space.where({ id: SPACE_ID }).update({
+        document: { version: 1, title: 'Authored winner' },
+        revision: 1,
+      });
+      updateApplied.resolve(undefined);
+      await releaseCommit.promise;
+    });
+    await updateApplied.promise;
+
+    const replacement = repository.replaceAggregate(
+      {
+        metaSpaceId: SPACE_ID,
+        spaces: [
+          { ...snapshot, document: { ...snapshot.document, title: 'Administrative replacement' } },
+        ],
+      },
+      SPACE_ID,
+    );
+    let settled = false;
+    void replacement.then(() => (settled = true));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(settled).toBe(false);
+
+    releaseCommit.resolve(undefined);
+    await committing;
+
+    await expect(replacement).resolves.toEqual({
+      kind: 'conflict',
+      currentMetaSpaceId: SPACE_ID,
+    });
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      revision: 1n,
+      snapshot: { document: { title: 'Authored winner' } },
+    });
   });
 
   it('prevents direct deletion of the Meta Space while repository state names it', async () => {

@@ -661,7 +661,11 @@ export class PostgresSpaceRepository implements SpaceRepository {
       // Identical and different first proposals race on the first durable Space
       // identity. The loser reads the winner after its transaction rolls back
       // and classifies authored meaning, rather than exposing SQL timing.
-      if (!isSpacePrimaryKeyConflict(error) && !isRepositoryStatePrimaryKeyConflict(error)) {
+      if (
+        !(error instanceof CardOwnershipError) &&
+        !isSpacePrimaryKeyConflict(error) &&
+        !isRepositoryStatePrimaryKeyConflict(error)
+      ) {
         throw error;
       }
       const result = await this.loadAggregate();
@@ -679,23 +683,34 @@ export class PostgresSpaceRepository implements SpaceRepository {
       snapshots: input.spaces,
     });
     if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
-    return this.#database.transaction(async ({ orm }) => {
-      const metaSpaceId = await lockMetaIdentity(orm);
-      if (metaSpaceId === undefined) {
-        if ((await loadEverySpace(orm)).length > 0)
-          throw new Error('Stored Spaces exist without Meta');
-        return { kind: 'uninitialized' };
-      }
-      if (metaSpaceId !== expectedMetaSpaceId) {
-        return { kind: 'conflict', currentMetaSpaceId: metaSpaceId };
-      }
-      // Lock every current Space row before replacement so an authored fast-path
-      // commit and this replacement cannot both report success.
-      for (const space of await loadEverySpace(orm)) {
-        await writeSpaceDocumentUnderLock(orm, space.snapshot);
-      }
-      return { kind: 'replaced', aggregate: await replaceAllSpaces(orm, input) };
-    });
+    try {
+      return await this.#database.transaction(async ({ orm }) => {
+        const metaSpaceId = await lockMetaIdentity(orm);
+        if (metaSpaceId === undefined) {
+          if ((await loadEverySpace(orm)).length > 0)
+            throw new Error('Stored Spaces exist without Meta');
+          return { kind: 'uninitialized' };
+        }
+        if (metaSpaceId !== expectedMetaSpaceId) {
+          return { kind: 'conflict', currentMetaSpaceId: metaSpaceId };
+        }
+        // The baseline read is lock-free so topology-preserving commits retain
+        // their fast path. Compare each revision again after taking its row lock:
+        // a commit that won in between must conflict rather than be overwritten.
+        for (const space of await loadEverySpace(orm)) {
+          const lockedRevision = await writeSpaceDocumentUnderLock(orm, space.snapshot);
+          if (lockedRevision !== space.revision)
+            throw new StaleSpaceRevisionError(space.snapshot.id);
+        }
+        return { kind: 'replaced', aggregate: await replaceAllSpaces(orm, input) };
+      });
+    } catch (error) {
+      if (!(error instanceof StaleSpaceRevisionError)) throw error;
+      const current = await this.loadAggregate();
+      return current.kind === 'uninitialized'
+        ? current
+        : { kind: 'conflict', currentMetaSpaceId: current.aggregate.metaSpaceId };
+    }
   }
 
   async markExported(id: UUID, revision: bigint): Promise<void> {

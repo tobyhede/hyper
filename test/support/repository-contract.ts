@@ -220,6 +220,38 @@ export const spaceRepositoryContract = (
     });
   });
 
+  it(`${name} ignores object-key insertion order when classifying initialization`, async () => {
+    await withHarness(async (repository) => {
+      const first: SpaceSnapshot = {
+        id: SPACE_ID,
+        document: { version: 1, title: 'Meta' },
+        cards: [
+          {
+            id: CARD_ID,
+            document: { title: 'Card', kind: 'markdown', body: 'Body' },
+          },
+        ],
+      };
+      const reordered: SpaceSnapshot = {
+        id: SPACE_ID,
+        document: { title: 'Meta', version: 1 },
+        cards: [
+          {
+            id: CARD_ID,
+            document: { body: 'Body', kind: 'markdown', title: 'Card' },
+          },
+        ],
+      };
+
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
+      ).resolves.toMatchObject({ kind: 'initialized' });
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [reordered] }),
+      ).resolves.toMatchObject({ kind: 'existing' });
+    });
+  });
+
   it(`${name} lets only one different concurrent initialization establish state`, async () => {
     await withHarness(async (repository) => {
       const first = space(SPACE_ID, 'First', [CARD_ID]);
