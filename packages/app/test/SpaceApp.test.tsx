@@ -506,7 +506,12 @@ describe('Space app Cards drawer', () => {
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
     mountSpaceApp(
-      { space: runtime(base), spaceSession: session, initialization: 'created-layout' },
+      {
+        id: runtime(base).id,
+        session,
+        app: composeApp({ spaceSession: session }),
+        initialization: 'created-layout',
+      },
       (app) => render(app),
     );
 
@@ -529,7 +534,12 @@ describe('Space app Cards drawer', () => {
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
     mountSpaceApp(
-      { space: runtime(empty), spaceSession: session, initialization: 'created-layout' },
+      {
+        id: runtime(empty).id,
+        session,
+        app: composeApp({ spaceSession: session }),
+        initialization: 'created-layout',
+      },
       (app) => render(app),
     );
 
@@ -547,7 +557,10 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp({ space: runtime(base), spaceSession: session }, (app) => render(app));
+    mountSpaceApp(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
+      (app) => render(app),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Layout' }));
 
@@ -569,7 +582,10 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp({ space: runtime(base), spaceSession: session }, (app) => render(app));
+    mountSpaceApp(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
+      (app) => render(app),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Layout' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
@@ -601,7 +617,10 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp({ space: runtime(base), spaceSession: session }, (app) => render(app));
+    mountSpaceApp(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
+      (app) => render(app),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Layout' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));

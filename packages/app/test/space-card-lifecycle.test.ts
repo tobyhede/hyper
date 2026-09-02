@@ -127,7 +127,9 @@ describe('Space Card lifecycle', () => {
       const before = structuredClone(meta.getState());
       const lifecycle = registry.spaceCards(
         idSource(
-          operation === 'create' ? [TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID] : [SPACE_CARD_ID],
+          operation === 'create'
+            ? [TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]
+            : [SPACE_CARD_ID],
         ),
       );
 
@@ -649,7 +651,9 @@ describe('Space Card lifecycle', () => {
         );
       }
     });
-    const lifecycle = registry.spaceCards(idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]));
+    const lifecycle = registry.spaceCards(
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+    );
 
     await lifecycle.create({
       containingSpaceId: META_ID,
@@ -673,7 +677,9 @@ describe('Space Card lifecycle', () => {
     );
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
-    const lifecycle = registry.spaceCards(idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]));
+    const lifecycle = registry.spaceCards(
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+    );
 
     await lifecycle.create({
       containingSpaceId: META_ID,
@@ -704,7 +710,9 @@ describe('Space Card lifecycle', () => {
     );
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
-    const lifecycle = registry.spaceCards(idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]));
+    const lifecycle = registry.spaceCards(
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+    );
 
     await lifecycle.create({
       containingSpaceId: META_ID,
@@ -741,7 +749,9 @@ describe('Space Card lifecycle', () => {
     );
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
-    const lifecycle = registry.spaceCards(idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]));
+    const lifecycle = registry.spaceCards(
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+    );
     await lifecycle.create({
       containingSpaceId: META_ID,
       layoutId: META_LAYOUT_ID,
@@ -778,7 +788,9 @@ describe('Space Card lifecycle', () => {
     );
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
-    const lifecycle = registry.spaceCards(idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]));
+    const lifecycle = registry.spaceCards(
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+    );
     await lifecycle.create({
       containingSpaceId: META_ID,
       layoutId: META_LAYOUT_ID,
@@ -886,7 +898,9 @@ describe('Space Card lifecycle', () => {
     );
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
-    const lifecycle = registry.spaceCards(idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]));
+    const lifecycle = registry.spaceCards(
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+    );
 
     await lifecycle.create({
       containingSpaceId: META_ID,
@@ -931,7 +945,9 @@ describe('Space Card lifecycle', () => {
     );
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
-    const lifecycle = registry.spaceCards(idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]));
+    const lifecycle = registry.spaceCards(
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+    );
     await lifecycle.create({
       containingSpaceId: META_ID,
       layoutId: META_LAYOUT_ID,
@@ -966,7 +982,9 @@ describe('Space Card lifecycle', () => {
     ]);
     const registry = createSpaceSessionRegistry(backend);
     registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
-    const lifecycle = registry.spaceCards(idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]));
+    const lifecycle = registry.spaceCards(
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+    );
 
     await expect(
       lifecycle.create({
