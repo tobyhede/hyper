@@ -13,8 +13,6 @@ import {
   connectHandles,
   connectToEmptyWithAlt,
   dragBy,
-  FIXTURE_CARD_COUNT,
-  FIXTURE_EDGE_COUNT,
   nodeByTitle,
   openCard,
   positionOf,
@@ -44,11 +42,11 @@ async function quiescent(page: Page): Promise<void> {
   await page.waitForTimeout(250);
 }
 
-async function createLayoutFromCurrentView(page: Page): Promise<void> {
-  const create = sidebar(page).getByRole('button', { name: 'Create Layout' });
-  await expect(create).toBeEnabled();
-  await create.click();
-  await expect(selectedCanvas(page)).toContainText('Layout');
+async function addExistingCard(page: Page, title: string): Promise<void> {
+  await page.getByRole('button', { name: 'Cards', exact: true }).click();
+  await page.getByRole('button', { name: `Add ${title} to Layout` }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
 }
 
 function sameEdgeGeometry(left: string | null, right: string | null): boolean {
@@ -572,7 +570,7 @@ test('explicit creation addresses the minted Layout and reload does not create a
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await settled(page);
 
-  await createLayoutFromCurrentView(page);
+  await sidebar(page).getByRole('button', { name: 'Add Layout' }).click();
   await expect(selectedCanvas(page)).toContainText('Layout 1');
   const convertedUrl = page.url();
   expect(convertedUrl).toMatch(/\/views\/[A-Za-z0-9_-]{22}$/);
@@ -628,28 +626,48 @@ test(
 );
 
 test(
-  'Create Layout captures the selected Computed View without moving Cards',
-  { tag: '@parity:space-sidebar-creates-layout-from-computed-view' },
+  'Add Layout creates an empty selected Layout and persists it through reload',
+  { tag: '@parity:space-sidebar-adds-empty-layout' },
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
-    const before = await allPositions(page);
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    const create = sidebar(page).getByRole('button', { name: 'Create Layout' });
+    const create = sidebar(page).getByRole('button', { name: 'Add Layout' });
     await expect(create).toBeEnabled();
     await create.click();
 
     await expect(selectedCanvas(page)).toContainText('Layout 1');
-    await expect(create).toHaveCount(0);
+    await expect(create).toBeEnabled();
     await expect(persistence).toHaveAttribute('data-revision', '1');
-    expect(await allPositions(page)).toEqual(before);
+    await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+    expect(await allPositions(page)).toEqual({});
 
     await page.reload();
     await expect(selectedCanvas(page)).toContainText('Layout 1');
-    expect(await allPositions(page)).toEqual(before);
+    expect(await allPositions(page)).toEqual({});
+
+    await sidebar(page).getByRole('button', { name: 'Actions for Space View Layout 1' }).click();
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
+    const title = sidebar(page).getByRole('textbox', { name: 'Layout name' });
+    await title.fill('Workshop');
+    await title.press('Enter');
+    await expect(selectedCanvas(page)).toContainText('Workshop');
+    await expect(persistence).toHaveAttribute('data-revision', '2');
+
+    await page.reload();
+    await expect(selectedCanvas(page)).toContainText('Workshop');
+    await sidebar(page).getByRole('button', { name: 'Actions for Space View Workshop' }).click();
+    await page.getByRole('menuitem', { name: 'Delete Layout' }).click();
+    await expect(selectedCanvas(page)).toContainText('Collection 1');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await expect(persistence).toHaveAttribute('data-revision', '3');
+
+    await page.reload();
+    await expect(selectedCanvas(page)).toContainText('Collection 1');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   },
 );
 
@@ -667,9 +685,7 @@ test('Flow withholds Card authoring and explains how to make it editable', async
   await expect(card.getByRole('button', { name: 'Edit Title A' })).toHaveCount(0);
   await expect(card.locator('.rf-card-node__authoring-handle')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
-  await expect(
-    sidebar(page).getByRole('button', { name: 'Create Layout' }),
-  ).toHaveAccessibleDescription('Computed Views are read-only. Create a Layout to edit.');
+  await expect(sidebar(page).getByRole('button', { name: 'Add Layout' })).toBeEnabled();
 
   await card.click();
   await page.keyboard.press('F2');
@@ -1316,9 +1332,7 @@ test('Flow and Grid expose the same read-only canvas and explicit creation comma
       await expect(source.getByRole('button', { name: 'Edit Title A' })).toHaveCount(0);
       await expect(source.getByRole('button', { name: 'Open Card A' })).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
-      await expect(
-        sidebar(page).getByRole('button', { name: 'Create Layout' }),
-      ).toHaveAccessibleDescription('Computed Views are read-only. Create a Layout to edit.');
+      await expect(sidebar(page).getByRole('button', { name: 'Add Layout' })).toBeEnabled();
 
       const from = await positionOf(source);
       await dragBy(page, source, 0, 200);
@@ -1332,28 +1346,15 @@ test('Flow and Grid expose the same read-only canvas and explicit creation comma
   }
 });
 
-test('creating from a Computed View freezes existing Cards and places Card 1', async ({ page }) => {
+test('creating from a Computed View leaves existing Cards in the Cards View', async ({ page }) => {
   await page.goto('/');
-  await createLayoutFromCurrentView(page);
-  const source = nodeByTitle(page, 'A').first();
-  await expect(source).toBeVisible();
-  await settled(page);
-  const before = await allPositions(page);
-  await source.hover();
+  await sidebar(page).getByRole('button', { name: 'Add Layout' }).click();
 
-  await connectToEmptyWithAlt(page, authoringHandle(source, 'source', 'right'));
-
-  const created = nodeByTitle(page, 'Card 1');
-  await expect(created).toBeVisible();
-  const after = await allPositions(page);
-  for (const [id, position] of Object.entries(before)) {
-    expect(after[id], `card ${id} moved`).toEqual(position);
-  }
-  // Explicit creation preserves every Graph and Edge the Computed View drew;
-  // the new connection is added to that captured collection.
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  await expect(page.locator('.react-flow__node')).toHaveCount(0);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
   await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   // `Persisted` says the commit was acknowledged, not that the conversion is what
@@ -1361,10 +1362,9 @@ test('creating from a Computed View freezes existing Cards and places Card 1', a
   // `defaultRenderer`, still hold the created Card and still carry its Edge — a
   // conversion that only lived in runtime state passes every assertion above.
   await page.reload();
-  await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
-  await settled(page);
+  await expect(page.locator('.react-flow__node')).toHaveCount(0);
   await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
 test(
@@ -1632,24 +1632,26 @@ test(
 
 test('editing an existing Layout updates it instead of creating another one', async ({ page }) => {
   await page.goto('/');
-  await createLayoutFromCurrentView(page);
+  await selectCanvas(page, 'Collection 1');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
   await settled(page);
 
   await dragBy(page, a, 0, 220);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(selectedCanvas(page)).toContainText('Collection 1');
 
   await selectCanvas(page, 'Grid');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await selectCanvas(page, 'Layout 1');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await selectCanvas(page, 'Collection 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await settled(page);
 
   await dragBy(page, a, 0, 160);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
-  await expect(sidebar(page).getByRole('button', { name: 'Layout 1', exact: true })).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(
+    sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
+  ).toHaveCount(1);
 });
 
 test(
@@ -1788,9 +1790,11 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
   page,
 }) => {
   await page.goto('/');
-  await createLayoutFromCurrentView(page);
+  await selectCanvas(page, 'Collection 1');
+  await addExistingCard(page, 'E');
   const source = nodeByTitle(page, 'A').first();
   const target = nodeByTitle(page, 'E').first();
+  const initialEdgeCount = await page.locator('.react-flow__edge').count();
   await expect(source).toBeVisible();
   await expect(target).toBeVisible();
 
@@ -1816,14 +1820,14 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
     // Every Card offers a target on every side while a connection is in flight,
     // so the drop is never blocked by which side the author aimed at.
     await expect(targetHandles.first()).toHaveCSS('opacity', '1');
-    await expect(targetHandles).toHaveCount(FIXTURE_CARD_COUNT * AUTHORING_HANDLE_SIDES);
+    await expect(targetHandles).toHaveCount(6 * AUTHORING_HANDLE_SIDES);
     const preview = page.locator('.react-flow__connection-path');
     await expect(preview).toBeVisible();
     await expect(preview).toHaveCSS('stroke', activeGraphColor);
     await expect(preview).toHaveAttribute('marker-end', /url/);
   });
 
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
   // An Edge names its Cards and its Graph for a screen reader. Matched loosely
   // on the Graph, whose neutral title depends on how many the Space already had.
   await expect(page.getByLabel(/^Edge from A to E in /)).toBeVisible();
@@ -1838,7 +1842,8 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
 
 test('an authored Edge is immediately available when presenting the Graph', async ({ page }) => {
   await page.goto('/');
-  await createLayoutFromCurrentView(page);
+  await selectCanvas(page, 'Collection 1');
+  await addExistingCard(page, 'E');
   const source = nodeByTitle(page, 'E').first();
   const target = nodeByTitle(page, 'A').first();
   await expect(source).toBeVisible();
@@ -1856,7 +1861,7 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
     authoringHandle(target, 'target', 'top'),
   );
 
-  await expect(page.getByLabel(/^Edge from E to A in /)).toBeVisible();
+  await expect(page.getByLabel(/^Edge from E to A in /)).toBeAttached();
   await expect(persistence).toHaveAttribute('data-revision', '2');
   await expect(persistence).toHaveText('Persisted');
 
@@ -1876,7 +1881,8 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
 }) => {
   const A = '00000000-0000-4000-8000-000000000002';
   await page.goto('/');
-  await createLayoutFromCurrentView(page);
+  await selectCanvas(page, 'Collection 1');
+  await addExistingCard(page, 'E');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
 
@@ -1930,13 +1936,16 @@ test('drawing an Edge into an explicitly created Layout then refuses its duplica
   page,
 }) => {
   await page.goto('/');
-  await createLayoutFromCurrentView(page);
+  await selectCanvas(page, 'Collection 1');
+  await addExistingCard(page, 'E');
+  await addExistingCard(page, 'F');
   const source = nodeByTitle(page, 'A').first();
   const target = nodeByTitle(page, 'E').first();
+  const initialEdgeCount = await page.locator('.react-flow__edge').count();
   await settled(page);
   const before = await allPositions(page);
   const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', '1');
+  await expect(persistence).toHaveAttribute('data-revision', '2');
 
   await source.hover();
   await connectHandles(
@@ -1949,11 +1958,11 @@ test('drawing an Edge into an explicitly created Layout then refuses its duplica
   // is a dead-horizontal line with a zero-height box, which Playwright reads as
   // hidden.
   await expect(page.getByLabel(new RegExp(`^Edge from A to E in `))).toBeAttached();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
-  await expect(persistence).toHaveAttribute('data-revision', '2');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
+  await expect(persistence).toHaveAttribute('data-revision', '3');
   await expect(persistence).toHaveText('Persisted');
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
-  // Explicit creation copied what was on screen, and Edge creation moves nothing.
+  await expect(selectedCanvas(page)).toContainText('Collection 1');
+  // Adding an Edge moves nothing.
   expect(await allPositions(page)).toEqual(before);
 
   // Drawn a second time, in the Layout that now owns the Graph holding it, it is
@@ -1966,8 +1975,8 @@ test('drawing an Edge into an explicitly created Layout then refuses its duplica
     authoringHandle(target, 'target', 'left'),
   );
   await quiescent(page);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
-  await expect(persistence).toHaveAttribute('data-revision', '2');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
+  await expect(persistence).toHaveAttribute('data-revision', '3');
   await expect(persistence).toHaveText('Persisted');
 });
 
@@ -1989,13 +1998,20 @@ test('drawing an Edge into an explicitly created Layout then refuses its duplica
  */
 test('a second connection drawn in the same session resolves its handles', async ({ page }) => {
   await page.goto('/');
-  await createLayoutFromCurrentView(page);
+  await selectCanvas(page, 'Collection 1');
+  await addExistingCard(page, 'E');
+  await addExistingCard(page, 'F');
   const a = nodeByTitle(page, 'A').first();
   const e = nodeByTitle(page, 'E').first();
   const f = nodeByTitle(page, 'F').first();
+  const initialEdgeCount = await page.locator('.react-flow__edge').count();
   await expect(a).toBeVisible();
 
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  // Newly added Cards use the same initial placement. Separate F so its target
+  // handle is not covered by E during the chained gesture.
+  await dragBy(page, f, 260, 0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
   await settled(page);
 
   await connectHandles(
@@ -2003,8 +2019,8 @@ test('a second connection drawn in the same session resolves its handles', async
     authoringHandle(a, 'source', 'right'),
     authoringHandle(e, 'target', 'top'),
   );
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '4');
   await settled(page);
 
   await connectHandles(
@@ -2012,8 +2028,8 @@ test('a second connection drawn in the same session resolves its handles', async
     authoringHandle(e, 'source', 'right'),
     authoringHandle(f, 'target', 'top'),
   );
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 2);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 2);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '5');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
 
@@ -2375,9 +2391,7 @@ test(
     await expect(page.getByRole('button', { name: 'Edit this Edge' })).toHaveCount(0);
     await expect(page.locator('.react-flow__edgeupdater')).toHaveCount(0);
     await expect(page.locator('.react-flow__edge[tabindex="0"]')).toHaveCount(0);
-    await expect(
-      sidebar(page).getByRole('button', { name: 'Create Layout' }),
-    ).toHaveAccessibleDescription('Computed Views are read-only. Create a Layout to edit.');
+    await expect(sidebar(page).getByRole('button', { name: 'Add Layout' })).toBeEnabled();
   },
 );
 
@@ -2395,9 +2409,7 @@ test(
     const drawn = await page.locator('.react-flow__edge').count();
 
     await expect(page.getByRole('button', { name: 'Delete this Edge' })).toHaveCount(0);
-    await expect(
-      sidebar(page).getByRole('button', { name: 'Create Layout' }),
-    ).toHaveAccessibleDescription('Computed Views are read-only. Create a Layout to edit.');
+    await expect(sidebar(page).getByRole('button', { name: 'Add Layout' })).toBeEnabled();
     await page.locator('.react-flow__pane').click({ position: { x: 20, y: 20 } });
     await page.keyboard.press('Delete');
     await quiescent(page);
@@ -2698,8 +2710,10 @@ test('an Alt-drop released over a Card body creates no Card', async ({ page }) =
  */
 test('a duplicate Edge is marked invalid while the drag is still live', async ({ page }) => {
   await page.goto('/');
-  await createLayoutFromCurrentView(page);
+  await selectCanvas(page, 'Collection 1');
+  await addExistingCard(page, 'E');
   const source = nodeByTitle(page, 'A').first();
+  const initialEdgeCount = await page.locator('.react-flow__edge').count();
   await expect(source).toBeVisible();
   await settled(page);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
@@ -2723,7 +2737,7 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
   await startDrag();
   await expect(await dragOnto('E')).toHaveClass(/valid/);
   await page.mouse.up();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await settled(page);
 
@@ -2737,12 +2751,12 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
   await expect(overDuplicate).toHaveClass(/connectingto/);
   await expect(overDuplicate).not.toHaveClass(/valid/);
   await page.mouse.up();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
 
   await startDrag();
-  await expect(await dragOnto('F')).toHaveClass(/valid/);
+  await expect(await dragOnto('C')).toHaveClass(/valid/);
   await page.mouse.up();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 2);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 2);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
 });
 
@@ -2760,7 +2774,7 @@ test('Add Card follows explicit Layout creation and names the Card in place', as
   const before = await allPositions(page);
   const addCard = page.getByTestId('add-card');
   await expect(addCard).toHaveCount(0);
-  await createLayoutFromCurrentView(page);
+  await sidebar(page).getByRole('button', { name: 'Add Layout' }).click();
   await expect(addCard).toBeEnabled();
 
   await addCard.click();
@@ -2770,11 +2784,9 @@ test('Add Card follows explicit Layout creation and names the Card in place', as
   await expect(title).toHaveValue('Card 1');
   await expect(selectedCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  // Explicit creation moves nothing: captured Cards keep their computed positions.
+  // Explicit creation leaves existing Cards outside the new Layout.
   const after = await allPositions(page);
-  for (const [id, position] of Object.entries(before)) {
-    expect(after[id], `card ${id} moved`).toEqual(position);
-  }
+  expect(after).not.toEqual(before);
 
   await title.fill('Consequences');
   await title.press('Enter');

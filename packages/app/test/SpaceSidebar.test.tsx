@@ -103,6 +103,7 @@ const settledProps = (): SpaceSidebarProps => ({
     keyShortcut: 'C',
     menuTriggerRef: createRef<HTMLButtonElement>(),
   },
+  createLayout: { refusal: null, onCreate: vi.fn() },
   persistence: {
     control: <PersistenceIndicator state="settled" />,
     state: 'settled',
@@ -213,58 +214,28 @@ describe('SpaceSidebar', () => {
     expect(screen.getByTestId('persistence-status')).toHaveAttribute('data-revision', '4');
   });
 
-  it('offers Create Layout only for the selected Computed View', () => {
+  it('offers Add Layout beside Card creation for every selected canvas', () => {
     const onCreate = vi.fn();
     const computed = settledProps();
     const { unmount } = draw(
-      <SpaceSidebar
-        {...computed}
-        createLayout={{ disabled: false, unavailableReason: null, refusal: null, onCreate }}
-      />,
+      <SpaceSidebar {...computed} createLayout={{ refusal: null, onCreate }} />,
     );
 
-    expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
-      'Computed Views are read-only. Create a Layout to edit.',
-    );
-    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveClass('bg-primary');
-    fireEvent.click(screen.getByRole('button', { name: 'Create Layout' }));
+    expect(screen.getByRole('button', { name: 'Add Card' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Layout' }));
     expect(onCreate).toHaveBeenCalledOnce();
     unmount();
 
     const authored = withLayout(settledProps());
     draw(<SpaceSidebar {...authored} canvas={{ ...authored.canvas, current: LAYOUT }} />);
-    expect(screen.queryByRole('button', { name: 'Create Layout' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Layout' })).toBeVisible();
   });
 
-  it('keeps Create Layout unavailable while placement is pending and describes why', () => {
+  it('keeps a refused Add Layout explanation beside the command', () => {
     draw(
       <SpaceSidebar
         {...settledProps()}
         createLayout={{
-          disabled: true,
-          unavailableReason:
-            'This view has not finished placing its Cards, so there is nowhere to write yet.',
-          refusal: null,
-          onCreate: vi.fn(),
-        }}
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: 'Create Layout' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Create Layout' })).toHaveAccessibleDescription(
-      'Computed Views are read-only. Create a Layout to edit. This view has not finished placing its Cards, so there is nowhere to write yet.',
-    );
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('keeps a refused Create Layout explanation beside the still-selected Computed View', () => {
-    draw(
-      <SpaceSidebar
-        {...settledProps()}
-        createLayout={{
-          disabled: false,
-          unavailableReason: null,
           refusal: { code: 'placement-pending' },
           onCreate: vi.fn(),
         }}
@@ -272,7 +243,7 @@ describe('SpaceSidebar', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Flow', pressed: true })).toBeVisible();
-    expect(screen.getByRole('alert')).toHaveTextContent('Layout not created');
+    expect(screen.getByRole('alert')).toHaveTextContent('Layout unchanged');
     expect(screen.getByRole('alert')).toHaveTextContent(
       'This view has not finished placing its Cards, so there is nowhere to write yet.',
     );

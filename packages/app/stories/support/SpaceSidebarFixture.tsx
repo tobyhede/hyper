@@ -210,8 +210,16 @@ export function SpaceSidebarFixture({
             disabled: authoringDisabled,
             keyShortcut: 'C',
             menuTriggerRef: addCardMenu,
+            hidden: current.kind === 'computed',
           }}
-          createLayout={createLayout}
+          createLayout={
+            createLayout ?? {
+              refusal: null,
+              onCreate: () => {
+                authoring.complete({ kind: 'created-layout' });
+              },
+            }
+          }
           persistence={{
             control: (
               <PersistenceControl

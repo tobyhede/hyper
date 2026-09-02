@@ -37,6 +37,7 @@ function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
       keyShortcut: 'C',
       menuTriggerRef: addCardMenu,
     },
+    createLayout: { refusal: null, onCreate: () => undefined },
     persistence: {
       control: (
         <PersistenceControl

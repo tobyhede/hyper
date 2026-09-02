@@ -27,23 +27,30 @@ async function openMobileSidebar(page: Page): Promise<void> {
 }
 
 test(
-  'Create Layout from the mobile sidebar selects the new authored Layout',
-  { tag: '@parity:mobile-space-sidebar-creates-layout-from-computed-view' },
+  'Add Layout from the mobile sidebar selects an empty authored Layout',
+  { tag: '@parity:mobile-space-sidebar-adds-empty-layout' },
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
 
     await openMobileSidebar(page);
-    await page.getByRole('button', { name: 'Create Layout' }).click();
+    await page.getByRole('button', { name: 'Add Layout' }).click();
 
     await expect(sheet(page)).toHaveCount(0);
     await expect(selectedCanvas(page)).toContainText('Layout 1');
+    await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
     await openMobileSidebar(page);
     await expect(sheet(page).getByTestId('persistence-status')).toHaveAttribute(
       'data-revision',
       '1',
     );
+    await sheet(page).getByRole('button', { name: 'Actions for Space View Layout 1' }).click();
+    await page.getByRole('menuitem', { name: 'Delete Layout' }).click();
+    await expect(sheet(page)).toHaveCount(0);
+    await expect(selectedCanvas(page)).toContainText('Collection 1');
   },
 );
 

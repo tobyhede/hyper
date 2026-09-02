@@ -30,6 +30,7 @@ const EVERY_REFUSAL = {
   'card-has-aliases': { code: 'card-has-aliases', aliasTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },
   'layout-must-keep-graph': { code: 'layout-must-keep-graph' },
+  'space-must-keep-layout': { code: 'space-must-keep-layout' },
   'graph-not-owned': { code: 'graph-not-owned' },
   'edge-not-found': { code: 'edge-not-found' },
   'edge-card-outside-layout': { code: 'edge-card-outside-layout' },

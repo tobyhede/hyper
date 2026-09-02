@@ -47,62 +47,32 @@ test(
 );
 
 test(
-  'Space Sidebar offers explicit Layout creation from a ready Computed View',
-  { tag: '@parity:space-sidebar-creates-layout-from-computed-view' },
+  'Space Sidebar offers Add Layout as an ordinary command',
+  { tag: '@parity:space-sidebar-adds-empty-layout' },
   async ({ page }) => {
     await page.goto('/?story=space--space--computed-view-ready&mode=preview');
 
-    const create = page.getByRole('button', { name: 'Create Layout' });
+    const create = page.getByRole('button', { name: 'Add Layout' });
     await expect(create).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
-    await expect(create).toHaveAccessibleDescription(
-      'Computed Views are read-only. Create a Layout to edit.',
-    );
     await create.click();
     await expect(page.locator('body')).toHaveAttribute('data-create-layout', 'requested');
   },
 );
 
 test(
-  'narrow Space Sidebar offers explicit Layout creation from a ready Computed View',
-  { tag: '@parity:mobile-space-sidebar-creates-layout-from-computed-view' },
+  'narrow Space Sidebar offers Add Layout and dismisses the Sheet',
+  { tag: '@parity:mobile-space-sidebar-adds-empty-layout' },
   async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?story=space--space--computed-view-ready&mode=preview');
     await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
 
-    const create = page.getByRole('button', { name: 'Create Layout' });
+    const create = page.getByRole('button', { name: 'Add Layout' });
     await expect(create).toBeEnabled();
     await create.click();
     await expect(page.locator('body')).toHaveAttribute('data-create-layout', 'requested');
-  },
-);
-
-test(
-  'Space Sidebar explains pending explicit Layout creation',
-  { tag: '@parity:space-sidebar-withholds-layout-creation-until-placement-is-ready' },
-  async ({ page }) => {
-    await page.goto('/?story=space--space--computed-view-pending&mode=preview');
-
-    const create = page.getByRole('button', { name: 'Create Layout' });
-    await expect(create).toBeDisabled();
-    await expect(create).toHaveAccessibleDescription(
-      'Computed Views are read-only. Create a Layout to edit. This view has not finished placing its Cards, so there is nowhere to write yet.',
-    );
-  },
-);
-
-test(
-  'Space Sidebar keeps a refused explicit Layout creation beside its command',
-  { tag: '@parity:space-sidebar-explains-refused-layout-creation' },
-  async ({ page }) => {
-    await page.goto('/?story=space--space--computed-view-refused&mode=preview');
-
-    await expect(page.getByRole('button', { name: 'Flow', pressed: true })).toBeVisible();
-    await expect(page.getByRole('alert')).toContainText('Layout not created');
-    await expect(page.getByRole('alert')).toContainText(
-      'This view has not finished placing its Cards, so there is nowhere to write yet.',
-    );
+    await expect(page.getByTestId('space-sidebar')).toHaveCount(0);
   },
 );
 

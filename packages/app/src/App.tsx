@@ -7,6 +7,7 @@ import {
   AlertTitle,
   AppShell,
   DRAWER_WIDTH,
+  type EntityActionGroup,
 } from '@project/ui';
 import { type CardId, type GraphId, type LayoutPosition } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
@@ -41,6 +42,7 @@ import {
   SelectedCanvasRenderer,
   SpaceSidebar,
   type SpaceChromeTitleEdit,
+  type SpaceEntity,
 } from './components/SpaceSidebar';
 
 export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOpening) => {
@@ -107,6 +109,9 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     const [editingCardTitle, setEditingCardTitle] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
     const [createLayoutRefusal, setCreateLayoutRefusal] = useState<AuthoringRefusal | null>(null);
+    const [layoutManagementRefusal, setLayoutManagementRefusal] = useState<AuthoringRefusal | null>(
+      null,
+    );
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const [destinationNotFound, setDestinationNotFound] = useState(false);
     const syncDestination = useCallback(
@@ -402,6 +407,43 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       onComplete: completeSpaceChromeTitle,
       onCancel: () => setSpaceChromeEdit(null),
       onReturnFocus: () => spaceChromeEdit?.returnFocus(),
+    };
+
+    const layoutActions = (entity: SpaceEntity): readonly EntityActionGroup[] => {
+      if (
+        entity.kind !== 'space-view' ||
+        entity.renderer.kind !== 'authored' ||
+        presenting ||
+        creatingAlias ||
+        editingCardBody ||
+        spaceChromeEdit !== null
+      )
+        return [];
+      const { selection: layoutId, title } = entity.renderer;
+      return [
+        [
+          {
+            id: 'rename-layout',
+            label: 'Rename',
+            onSelect: () => {
+              setLayoutManagementRefusal(null);
+              titleEdit.onBegin({ kind: 'layout', id: layoutId }, title, 'sidebar', () => {
+                document.querySelector<HTMLElement>(`[data-renderer="${layoutId}"]`)?.focus();
+              });
+            },
+          },
+        ],
+        [
+          {
+            id: 'delete-layout',
+            label: 'Delete Layout',
+            onSelect: () => {
+              const result = authoring.complete({ kind: 'deleted-layout', layoutId });
+              setLayoutManagementRefusal(result.kind === 'refused' ? result.refusal : null);
+            },
+          },
+        ],
+      ];
     };
 
     // One decision resolved from one Space, applied in an order that cannot
@@ -859,28 +901,18 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
             !editable || presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
+          hidden: current.kind === 'computed',
         }}
-        createLayout={
-          current.kind === 'computed'
-            ? {
-                disabled: placement.kind !== 'ready',
-                unavailableReason:
-                  placement.kind === 'ready'
-                    ? null
-                    : placement.kind === 'failed'
-                      ? describeAuthoringRefusal({
-                          code: 'placement-failed',
-                          error: placement.error,
-                        })
-                      : describeAuthoringRefusal({ code: 'placement-pending' }),
-                refusal: createLayoutRefusal,
-                onCreate: () => {
-                  const result = authoring.complete({ kind: 'created-layout' });
-                  setCreateLayoutRefusal(result.kind === 'refused' ? result.refusal : null);
-                },
-              }
-            : undefined
-        }
+        createLayout={{
+          disabled: presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
+          refusal: createLayoutRefusal ?? layoutManagementRefusal,
+          onCreate: () => {
+            const result = authoring.complete({ kind: 'created-layout' });
+            setCreateLayoutRefusal(result.kind === 'refused' ? result.refusal : null);
+            setLayoutManagementRefusal(null);
+            if (result.kind === 'completed') setCardsDrawerOpen(true);
+          },
+        }}
         persistence={{
           control: (
             <PersistenceControl
@@ -935,6 +967,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
               }
         }
         titleEdit={titleEdit}
+        entityActions={layoutActions}
       />
     );
 

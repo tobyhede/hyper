@@ -338,7 +338,7 @@ describe('Space Authoring', () => {
 
   it('renames a Card after explicitly creating a Layout from the completed placement', () => {
     const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
-      newId: mintingIds(LAYOUT_ID),
+      newId: mintingIds(LAYOUT_ID, MINTED_GRAPH_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -362,10 +362,7 @@ describe('Space Authoring', () => {
       { id: CARD_A, document: { title: 'Renamed A', kind: 'markdown', body: 'A' } },
       { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
     ]);
-    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 40, open: false },
-    });
+    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({});
     expect(session.getState().working.document.layouts?.[0]?.graphs[0]?.id).toBe(MINTED_GRAPH_ID);
     // Written *and* selected. Creation that stored the Layout without repointing
     // the renderer would leave the graph drawing the Computed View, so the next
@@ -602,7 +599,7 @@ describe('Space Authoring', () => {
     // Only the Layout: this Edit mints no Card, and the Graph its creation
     // returns is identified by the resolver composed above.
     const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
-      newId: mintingIds(LAYOUT_ID),
+      newId: mintingIds(LAYOUT_ID, MINTED_GRAPH_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -619,10 +616,7 @@ describe('Space Authoring', () => {
         id: LAYOUT_ID,
         title: 'Layout 1',
         kind: 'positioned',
-        positions: {
-          [CARD_A]: { x: 10, y: 20, open: false },
-          [CARD_B]: { x: 300, y: 40, open: false },
-        },
+        positions: {},
         // Coloured on the way out: a Graph a conversion mints stores the same
         // rotating palette choice Add Graph would have given it, so the two
         // creation gestures do not produce different Graph properties.
@@ -689,7 +683,7 @@ describe('Space Authoring', () => {
         document: { ...positionedSnapshot.document, defaultRenderer: undefined },
       },
       FLOW_SPACE_VIEW_ID,
-      { newId: mintingIds(CONVERTED_LAYOUT_ID) },
+      { newId: mintingIds(CONVERTED_LAYOUT_ID, MINTED_GRAPH_ID) },
     );
     replacePlacementForTest(
       authoring,
@@ -704,7 +698,7 @@ describe('Space Authoring', () => {
     expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
       kind: 'refused',
-      refusal: { code: 'edge-already-exists' },
+      refusal: { code: 'edge-card-outside-layout' },
     });
 
     const layouts = session.getState().working.document.layouts ?? [];
@@ -712,12 +706,13 @@ describe('Space Authoring', () => {
     // Untouched: the Graph that was emphasised belongs to the Layout that owns
     // it, and nothing about this Edit reached across.
     expect(layouts[0]?.graphs).toEqual([MAIN_GRAPH]);
-    // The Computed View's Graph is a snapshot under a fresh owned identity.
+    // Add Layout creates a fresh empty Graph and copies no Computed View state.
     expect(layouts[1]?.graphs).toEqual([
       {
         id: MINTED_GRAPH_ID,
-        title: 'Main',
-        edges: [{ from: CARD_A, to: CARD_B }],
+        title: 'Graph 1',
+        color: GRAPH_PALETTE[0],
+        edges: [],
       },
     ]);
     expect(layouts[1]?.activeGraph).toBe(MINTED_GRAPH_ID);
@@ -827,7 +822,7 @@ describe('Space Authoring', () => {
       new MemorySpaceBackend([loaded], control),
       loaded,
       FLOW_SPACE_VIEW_ID,
-      { newId: mintingIds(CONVERTED_LAYOUT_ID) },
+      { newId: mintingIds(CONVERTED_LAYOUT_ID, MINTED_GRAPH_ID) },
     );
     replacePlacementForTest(
       authoring,
@@ -845,9 +840,10 @@ describe('Space Authoring', () => {
     expect(control.attempts).toEqual([]);
 
     expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
-    expect(offersConnection(authoring, CARD_B, CARD_A)).toBe(true);
+    expect(offersConnection(authoring, CARD_B, CARD_A)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
-      kind: 'completed',
+      kind: 'refused',
+      refusal: { code: 'edge-card-outside-layout' },
     });
 
     const layouts = session.getState().working.document.layouts ?? [];
@@ -861,13 +857,9 @@ describe('Space Authoring', () => {
       graphs: [
         {
           id: MINTED_GRAPH_ID,
-          title: 'Main',
-          edges: [
-            { from: CARD_A, to: CARD_B },
-            { from: CARD_B, to: CARD_A },
-          ],
+          title: 'Graph 1',
+          edges: [],
         },
-        { title: 'Aside', edges: [{ from: CARD_B, to: CARD_A }] },
       ],
       activeGraph: MINTED_GRAPH_ID,
     });
@@ -979,7 +971,7 @@ describe('Space Authoring', () => {
       navigation,
       currentSpace,
       resolveRenderer,
-      newId: mintingIds(LAYOUT_ID),
+      newId: mintingIds(LAYOUT_ID, MINTED_GRAPH_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1017,7 +1009,7 @@ describe('Space Authoring', () => {
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
     const { authoring, session } = openAuthoring(graphLess, undefined, {
-      newId: mintingIds(LAYOUT_ID, CREATED_CARD_ID),
+      newId: mintingIds(LAYOUT_ID, MINTED_GRAPH_ID, CREATED_CARD_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1025,14 +1017,11 @@ describe('Space Authoring', () => {
     );
 
     expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
-    expect(offersEmptyDrop(authoring, CARD_A)).toBe(true);
-    expect(
-      complete(authoring, {
-        kind: 'create-and-connect',
-        from: CARD_A,
-        position: { x: 420, y: 360 },
-      }),
-    ).toEqual({ kind: 'completed', createdCardId: CREATED_CARD_ID });
+    expect(offersEmptyDrop(authoring, CARD_A)).toBe(false);
+    expect(authoring.complete({ kind: 'created-card', anchor: { x: 420, y: 360 } })).toEqual({
+      kind: 'completed',
+      createdCardId: CREATED_CARD_ID,
+    });
 
     expect(session.getState().working).toEqual({
       ...graphLess,
@@ -1044,7 +1033,6 @@ describe('Space Authoring', () => {
             title: 'Layout 1',
             kind: 'positioned',
             positions: {
-              [CARD_A]: { x: 120, y: 240, open: false },
               [CREATED_CARD_ID]: { x: 420, y: 360, open: false },
             },
             graphs: [
@@ -1052,7 +1040,7 @@ describe('Space Authoring', () => {
                 id: MINTED_GRAPH_ID,
                 title: 'Graph 1',
                 color: GRAPH_PALETTE[0],
-                edges: [{ from: CARD_A, to: CREATED_CARD_ID }],
+                edges: [],
               },
             ],
             activeGraph: MINTED_GRAPH_ID,
@@ -1068,11 +1056,11 @@ describe('Space Authoring', () => {
         },
       ],
     });
-    expect(offersConnection(authoring, CREATED_CARD_ID, CARD_A)).toBe(true);
+    expect(offersConnection(authoring, CREATED_CARD_ID, CARD_A)).toBe(false);
     expect(
       complete(authoring, { kind: 'connected-cards', from: CREATED_CARD_ID, to: CARD_A }),
-    ).toEqual({ kind: 'completed' });
-    expect(graphsOf(session.getState().working)[0]?.edges).toHaveLength(2);
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-layout' } });
+    expect(graphsOf(session.getState().working)[0]?.edges).toHaveLength(0);
   });
 
   it('queues a reentrant completion behind publication of the fully installed Edit', () => {
@@ -1134,7 +1122,7 @@ describe('Space Authoring', () => {
   it('refuses a completion reentered during explicit Layout creation instead of replaying it', () => {
     // A spare identity proves the refused movement does not create another Layout.
     const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
-      newId: mintingIds(CONVERTED_LAYOUT_ID, COMPETING_LAYOUT_ID),
+      newId: mintingIds(CONVERTED_LAYOUT_ID, MINTED_GRAPH_ID, COMPETING_LAYOUT_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1171,10 +1159,7 @@ describe('Space Authoring', () => {
     // The attempted movement is not replayed after Navigation selects the new
     // Layout: creation captures the Computed View placement that was current
     // before the reentrant attempt.
-    expect(working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 40, open: false },
-    });
+    expect(working.document.layouts?.[0]?.positions).toEqual({});
     expect(navigation.getState().selectedRenderer).toEqual(CONVERTED_LAYOUT_ID);
   });
 
@@ -1219,7 +1204,7 @@ describe('Space Authoring', () => {
 
   it('publishes once after the optimistic Space and navigation consequences are installed', () => {
     const { authoring } = openAuthoring(undefined, undefined, {
-      newId: mintingIds(LAYOUT_ID),
+      newId: mintingIds(LAYOUT_ID, MINTED_GRAPH_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1416,14 +1401,13 @@ describe('Space Authoring', () => {
           // it is the collision ADR 0016 names as the reason a global mock ends
           // up needing a generator anyway.
           const converting = openAuthoring(undefined, undefined, {
-            newId: mintingIds(LAYOUT_ID),
+            newId: mintingIds(LAYOUT_ID, MINTED_GRAPH_ID),
           });
           converting.authoring.reportRendered(rendered);
           converting.authoring.complete({ kind: 'created-layout' });
-          expect(converting.session.getState().working.document.layouts?.[0]?.positions).toEqual({
-            [CARD_A]: { x: renderedAX, y: renderedAY, open: false },
-            [CARD_B]: { x: renderedBX, y: renderedBY, open: false },
-          });
+          expect(converting.session.getState().working.document.layouts?.[0]?.positions).toEqual(
+            {},
+          );
 
           const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
           const backend = new MemorySpaceBackend([loaded]);
@@ -1559,7 +1543,7 @@ describe('Space Authoring', () => {
     // took an id from the real generator — invisible, because the assertions are
     // about titles.
     const { authoring, session } = openAuthoring(numbered, undefined, {
-      newId: mintingIds(LAYOUT_ID, CREATED_CARD_ID),
+      newId: mintingIds(LAYOUT_ID, MINTED_GRAPH_ID, CREATED_CARD_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1570,9 +1554,10 @@ describe('Space Authoring', () => {
     );
 
     expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
-    expect(
-      complete(authoring, { kind: 'create-and-connect', from: CARD_A, position: { x: 5, y: 6 } }),
-    ).toEqual({ kind: 'completed', createdCardId: CREATED_CARD_ID });
+    expect(authoring.complete({ kind: 'created-card', anchor: { x: 5, y: 6 } })).toEqual({
+      kind: 'completed',
+      createdCardId: CREATED_CARD_ID,
+    });
 
     expect(session.getState().working.cards.at(-1)?.document.title).toBe('Card 10');
     expect(session.getState().working.document.layouts?.at(-1)?.title).toBe('Layout 8');
@@ -1829,7 +1814,7 @@ describe('Space Authoring', () => {
       navigation,
       currentSpace,
       resolveRenderer,
-      newId: mintingIds(LAYOUT_ID),
+      newId: mintingIds(LAYOUT_ID, MINTED_GRAPH_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1998,7 +1983,7 @@ describe('Space Authoring', () => {
       resolveRenderer,
       // Named although the Edit under test is refused: an unexpected mint
       // exhausts this and fails here rather than in the assertions below.
-      newId: mintingIds(LAYOUT_ID),
+      newId: mintingIds(LAYOUT_ID, MINTED_GRAPH_ID),
     });
     replacePlacementForTest(
       authoring,

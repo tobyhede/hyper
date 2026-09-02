@@ -231,17 +231,12 @@ describe('presenting after explicit Layout creation', () => {
     // has no Graphs at all, so there is no Active Graph.
     expect(await screen.findByTestId('present-button')).toBeDisabled();
 
-    const createLayout = await screen.findByRole('button', { name: 'Create Layout' });
+    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
     await waitFor(() => expect(createLayout).toBeEnabled());
     fireEvent.click(createLayout);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
-    const input = screen.getByRole('textbox', { name: 'Card title' });
-    fireEvent.change(input, { target: { value: 'Renamed A' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-
-    // Explicit creation made a Layout active on its fresh empty Graph; the
-    // later title Edit changed only the Card.
+    // Explicit creation made a Layout active on its fresh empty Graph and left
+    // existing Cards outside it for the Cards View.
     await waitFor(() =>
       expect(session.getState().working.document.layouts?.[0]?.graphs).toEqual([
         expect.objectContaining({ edges: [] }),
