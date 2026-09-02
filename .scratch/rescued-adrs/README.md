@@ -22,7 +22,9 @@ while these sat uncommitted:
 `main` is at 0080. A number vacated by supersession is not free: 0075 keeps
 naming the decision it always named, from `superseded/`. Landing either draft
 means giving it the next unused number, reconciling its `Refines:`/`Related:`
-lists against the current corpus, and adding a row to `docs/adr/README.md`.
+lists against the current corpus, writing the reciprocal `Refined by:` entry
+into every ADR those lists name — `test/unit/adr-status-blocks.test.ts` fails
+until each points back — and adding a row to `docs/adr/README.md`.
 
 ## What they say
 

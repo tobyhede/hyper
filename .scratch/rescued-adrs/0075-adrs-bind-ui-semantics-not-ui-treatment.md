@@ -1,3 +1,7 @@
+> **Rescued draft — not in force.** Its `Status:` and number are the ones it
+> was written with in a worktree that no longer exists; neither is `main`'s.
+> See [`README.md`](README.md) before citing or landing it.
+
 # ADRs bind UI semantics, not UI treatment
 
 Status: accepted
