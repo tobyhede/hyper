@@ -470,6 +470,48 @@ describe('Space app failure reporting', () => {
 });
 
 describe('Space app Cards drawer', () => {
+  it('opens once for the client whose working load created the empty Layout', () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 1n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp(
+      { space: runtime(base), spaceSession: session, initialization: 'created-layout' },
+      (app) => render(app),
+    );
+
+    expect(screen.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
+    expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
+  });
+
+  it('opens an accessible empty drawer for an initialized zero-Card Space', () => {
+    const seeded = snapshot('Space', 'Card', 10, 20);
+    const empty: SpaceSnapshot = {
+      ...seeded,
+      cards: [],
+      document: {
+        ...seeded.document,
+        layouts: seeded.document.layouts?.map((layout) => ({ ...layout, positions: {} })),
+      },
+    };
+    const stored = { snapshot: empty, revision: 1n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp(
+      { space: runtime(empty), spaceSession: session, initialization: 'created-layout' },
+      (app) => render(app),
+    );
+
+    expect(screen.getByRole('dialog', { name: 'Cards' })).toHaveTextContent(
+      'This Space has no Cards.',
+    );
+    const addCard = screen.getByRole('button', { name: 'Add Card' });
+    expect(addCard).toBeEnabled();
+    fireEvent.click(addCard);
+    expect(session.getState().working.cards).toHaveLength(1);
+  });
+
   it('adds an empty selected Layout and reveals its existing Cards once', () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };

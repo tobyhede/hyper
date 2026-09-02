@@ -1,5 +1,10 @@
+import { newUuid, type UUID } from '@project/core';
 import { HttpSpaceBackend, resolveProductDestination } from '@project/http';
-import { createSpaceSessionRegistry, type SpaceBackend } from '@project/persistence';
+import {
+  createSpaceSessionRegistry,
+  createWorkingSpaceLoader,
+  type SpaceBackend,
+} from '@project/persistence';
 import { openLoadedSpace } from './open-space';
 import type { OpenedApplicationStartup } from './startup';
 import { destinationOpening } from './destination-opening';
@@ -13,11 +18,13 @@ export interface SpaceStartup {
 /** Compose browser startup around one fixed persistence backend. */
 export const createSpaceStartup = (
   backend: SpaceBackend = new HttpSpaceBackend(),
+  newId: () => UUID = newUuid,
 ): SpaceStartup => {
   const registry = createSpaceSessionRegistry(backend);
+  const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
   return {
     resolve: async (pathname) => {
-      const resolution = await resolveProductDestination(backend, pathname);
+      const resolution = await resolveProductDestination({ loadSpace: loadWorkingSpace }, pathname);
       if (resolution.kind === 'outside') {
         throw new Error('The URL is outside product addressing.');
       }

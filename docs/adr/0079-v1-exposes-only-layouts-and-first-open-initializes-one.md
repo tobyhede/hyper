@@ -4,6 +4,7 @@ Status: accepted
 Supersedes: 0031, 0045, 0072, 0075
 Refines: 0014, 0015, 0053, 0064, 0068, 0069
 Related: 0018, 0040, 0041, 0054, 0056
+Refined by: 0080
 
 V1 exposes only authored **Layouts** as the selectable and addressable way to
 see a Space. **Computed View** and the union term **Space View** leave the v1

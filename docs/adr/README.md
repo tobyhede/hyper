@@ -49,6 +49,7 @@ under `superseded/`.
 | [0014](0014-layout-is-the-authored-data-strategy-is-the-behaviour.md) | A Layout is authored data. A LayoutStrategy is behaviour. |
 | [0040](0040-layouts-own-card-membership-and-routes.md) | A Layout owns its Card membership and its Graphs. |
 | [0079](0079-v1-exposes-only-layouts-and-first-open-initializes-one.md) | An authored Layout is the only selectable and addressable canvas context, and first working load initializes one. |
+| [0080](0080-new-spaces-start-complete-and-layoutless-stored-spaces-are-repaired.md) | New Spaces persist their first Card in a complete Layout; first working load repairs stored layoutless Spaces without placing their Cards. |
 | [0015](0015-a-space-may-have-no-routes.md) | A Space may hold no Graph. It then cannot present. |
 | [0003](0003-routes-may-conflict.md) | Graphs are independent, and their orders may disagree. |
 | [0032](0032-routes-may-contain-cycles.md) | A Graph may contain a cycle. |

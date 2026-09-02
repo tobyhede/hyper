@@ -11,7 +11,21 @@ const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 export const contractLoaded: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
-    document: { version: 1, title: 'One' },
+    document: {
+      version: 1,
+      title: 'One',
+      defaultRenderer: LAYOUT_ID,
+      layouts: [
+        {
+          id: LAYOUT_ID,
+          title: 'Layout 1',
+          kind: 'positioned',
+          positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+          graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+          activeGraph: GRAPH_ID,
+        },
+      ],
+    },
     cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
   },
   revision: 9_007_199_254_740_993n,

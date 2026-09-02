@@ -130,7 +130,9 @@ describe('Space Card lifecycle', () => {
         backend,
         registry,
         newId: idSource(
-          operation === 'create' ? [TARGET_ID, TARGET_CARD_ID, SPACE_CARD_ID] : [SPACE_CARD_ID],
+          operation === 'create'
+            ? [TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]
+            : [SPACE_CARD_ID],
         ),
       });
 
@@ -671,7 +673,13 @@ describe('Space Card lifecycle', () => {
     const lifecycle = createSpaceCardLifecycle({
       backend,
       registry,
-      newId: idSource([TARGET_ID, TARGET_CARD_ID, SPACE_CARD_ID]),
+      newId: idSource([
+        TARGET_ID,
+        TARGET_CARD_ID,
+        TARGET_LAYOUT_ID,
+        TARGET_GRAPH_ID,
+        SPACE_CARD_ID,
+      ]),
     });
 
     await lifecycle.create({
@@ -699,7 +707,13 @@ describe('Space Card lifecycle', () => {
     const lifecycle = createSpaceCardLifecycle({
       backend,
       registry,
-      newId: idSource([TARGET_ID, TARGET_CARD_ID, SPACE_CARD_ID]),
+      newId: idSource([
+        TARGET_ID,
+        TARGET_CARD_ID,
+        TARGET_LAYOUT_ID,
+        TARGET_GRAPH_ID,
+        SPACE_CARD_ID,
+      ]),
     });
 
     await lifecycle.create({
@@ -734,7 +748,13 @@ describe('Space Card lifecycle', () => {
     const lifecycle = createSpaceCardLifecycle({
       backend,
       registry,
-      newId: idSource([TARGET_ID, TARGET_CARD_ID, SPACE_CARD_ID]),
+      newId: idSource([
+        TARGET_ID,
+        TARGET_CARD_ID,
+        TARGET_LAYOUT_ID,
+        TARGET_GRAPH_ID,
+        SPACE_CARD_ID,
+      ]),
     });
 
     await lifecycle.create({
@@ -775,7 +795,13 @@ describe('Space Card lifecycle', () => {
     const lifecycle = createSpaceCardLifecycle({
       backend,
       registry,
-      newId: idSource([TARGET_ID, TARGET_CARD_ID, SPACE_CARD_ID]),
+      newId: idSource([
+        TARGET_ID,
+        TARGET_CARD_ID,
+        TARGET_LAYOUT_ID,
+        TARGET_GRAPH_ID,
+        SPACE_CARD_ID,
+      ]),
     });
     await lifecycle.create({
       containingSpaceId: META_ID,
@@ -816,7 +842,13 @@ describe('Space Card lifecycle', () => {
     const lifecycle = createSpaceCardLifecycle({
       backend,
       registry,
-      newId: idSource([TARGET_ID, TARGET_CARD_ID, SPACE_CARD_ID]),
+      newId: idSource([
+        TARGET_ID,
+        TARGET_CARD_ID,
+        TARGET_LAYOUT_ID,
+        TARGET_GRAPH_ID,
+        SPACE_CARD_ID,
+      ]),
     });
     await lifecycle.create({
       containingSpaceId: META_ID,
@@ -936,7 +968,13 @@ describe('Space Card lifecycle', () => {
     const lifecycle = createSpaceCardLifecycle({
       backend,
       registry,
-      newId: idSource([TARGET_ID, TARGET_CARD_ID, SPACE_CARD_ID]),
+      newId: idSource([
+        TARGET_ID,
+        TARGET_CARD_ID,
+        TARGET_LAYOUT_ID,
+        TARGET_GRAPH_ID,
+        SPACE_CARD_ID,
+      ]),
     });
 
     await lifecycle.create({
@@ -985,7 +1023,13 @@ describe('Space Card lifecycle', () => {
     const lifecycle = createSpaceCardLifecycle({
       backend,
       registry,
-      newId: idSource([TARGET_ID, TARGET_CARD_ID, SPACE_CARD_ID]),
+      newId: idSource([
+        TARGET_ID,
+        TARGET_CARD_ID,
+        TARGET_LAYOUT_ID,
+        TARGET_GRAPH_ID,
+        SPACE_CARD_ID,
+      ]),
     });
     await lifecycle.create({
       containingSpaceId: META_ID,
@@ -1024,7 +1068,13 @@ describe('Space Card lifecycle', () => {
     const lifecycle = createSpaceCardLifecycle({
       backend,
       registry,
-      newId: idSource([TARGET_ID, TARGET_CARD_ID, SPACE_CARD_ID]),
+      newId: idSource([
+        TARGET_ID,
+        TARGET_CARD_ID,
+        TARGET_LAYOUT_ID,
+        TARGET_GRAPH_ID,
+        SPACE_CARD_ID,
+      ]),
     });
 
     await expect(
@@ -1059,6 +1109,17 @@ describe('Space Card lifecycle', () => {
         document: {
           version: 1,
           title: 'Architecture',
+          defaultRenderer: TARGET_LAYOUT_ID,
+          layouts: [
+            {
+              id: TARGET_LAYOUT_ID,
+              title: 'Layout 1',
+              kind: 'positioned',
+              positions: { [TARGET_CARD_ID]: { x: 0, y: 0, open: false } },
+              graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
+              activeGraph: TARGET_GRAPH_ID,
+            },
+          ],
         },
         cards: [
           {

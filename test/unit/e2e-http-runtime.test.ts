@@ -34,13 +34,13 @@ describe('e2e HTTP runtime', () => {
             kind: 'update',
             spaceId: FIXTURE_ID,
             snapshot: changed,
-            expectedRevision: 0n,
+            expectedRevision: loaded.revision,
           },
         ],
       }),
     ).resolves.toEqual({
       kind: 'committed',
-      revisions: [{ spaceId: FIXTURE_ID, revision: 1n }],
+      revisions: [{ spaceId: FIXTURE_ID, revision: loaded.revision + 1n }],
       deletedSpaceIds: [],
     });
 

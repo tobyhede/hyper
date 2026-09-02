@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { uuidSchema } from '@project/core';
 import {
   encodeCommitRequest,
   MemorySpaceBackend,
@@ -7,9 +8,32 @@ import {
 } from '@project/persistence';
 import { spaceBackendContract } from '@project/persistence/test-support';
 import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
-import { SPACE_ID, oneCardSnapshot as snapshot } from '../support/space-fixtures';
+import { CARD_ID, SPACE_ID, oneCardSnapshot as snapshot } from '../support/space-fixtures';
 
-const loaded: LoadedSpace = { snapshot, revision: 4n, exportedRevision: 3n };
+const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+
+const loaded: LoadedSpace = {
+  snapshot: {
+    ...snapshot,
+    document: {
+      ...snapshot.document,
+      defaultRenderer: LAYOUT_ID,
+      layouts: [
+        {
+          id: LAYOUT_ID,
+          title: 'Layout 1',
+          kind: 'positioned',
+          positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+          graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+          activeGraph: GRAPH_ID,
+        },
+      ],
+    },
+  },
+  revision: 4n,
+  exportedRevision: 3n,
+};
 
 const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceResourceRepository => ({
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),

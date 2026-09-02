@@ -52,3 +52,4 @@ export * from './repository';
 export { openSpaceSession } from './session';
 export type { SpaceSession, SpaceSessionOptions, SpaceSessionState } from './session';
 export * from './session-registry';
+export * from './working-space';

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { FLOW_SPACE_VIEW_ID } from '@project/core';
 import { graphStartCard, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import { defaultRenderer } from '../src/renderer';
@@ -55,14 +54,14 @@ describe('the story Spaces', () => {
     ).not.toHaveLength(0);
   });
 
-  /** A new Space names no view, so production's own fallback answers (ADR 0018, ADR 0025). */
-  it('opens the unauthored Space on Flow, owning no Layout to open on', () => {
+  /** ADR 0080 makes a newly created Space complete before it is first opened. */
+  it('opens the newly created Space on its authored Layout', () => {
     const opens = defaultRenderer(unauthoredSpace);
 
-    expect(opens).toEqual(FLOW_SPACE_VIEW_ID);
-    expect(unauthoredSpace.layouts).toEqual([]);
-    expect(unauthoredSpace.graphs).toEqual([]);
-    expect(currentRenderer(canvasRenderers(unauthoredSpace), opens).title).toBe('Flow');
+    expect(opens).toEqual(unauthoredSpace.layouts[0]?.id);
+    expect(unauthoredSpace.layouts).toHaveLength(1);
+    expect(unauthoredSpace.graphs).toHaveLength(1);
+    expect(currentRenderer(canvasRenderers(unauthoredSpace), opens).title).toBe('Layout 1');
   });
 
   /**

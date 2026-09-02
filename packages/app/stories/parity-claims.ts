@@ -316,7 +316,7 @@ export const parityClaims: readonly ParityClaim[] = [
       "The Space app's error boundary reports a mounted app's render throw instead of leaving a blank page.",
     // Every production write path that could hand `App` a bad working
     // snapshot validates first and refuses inline rather than installing it:
-    // `openStoredSpace` (initial load), Space Authoring's edit completion,
+    // `createStoredSpaceOpener` (initial load), Space Authoring's edit completion,
     // and the conflict accept/reload flow (`acceptStoredSpace` in
     // space-authoring.ts, guarding exactly this). Reaching this boundary means
     // an invariant already broke — see `SpaceApp.tsx`'s own doc comment — and
@@ -326,7 +326,7 @@ export const parityClaims: readonly ParityClaim[] = [
     // is no legitimate user- or network-observable flow left to drive it
     // through the real app, so this claim is Ladle-only.
     applicationEvidence:
-      'Unreachable through any current legitimate browser-driven flow — every production path that could install a bad working snapshot validates first (openStoredSpace, Space Authoring edit completion, conflict accept/reload). Covered instead by packages/app/test/SpaceApp.test.tsx, which reaches the boundary only via the internal openSpaceSession API.',
+      'Unreachable through any current legitimate browser-driven flow — every production path that could install a bad working snapshot validates first (createStoredSpaceOpener, Space Authoring edit completion, conflict accept/reload). Covered instead by packages/app/test/SpaceApp.test.tsx, which reaches the boundary only via the internal openSpaceSession API.',
   },
   {
     id: 'operational-feedback-placement-failure',

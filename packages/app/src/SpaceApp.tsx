@@ -52,7 +52,7 @@ class SpaceAppFailure extends Component<{ children: ReactNode }, SpaceAppFailure
  * the boundary to catch it in. Both paths report the same sentence, for the
  * same reason: an uncaught throw leaves a blank page, which says nothing.
  *
- * `openStoredSpace` validates the snapshot and the session then clones that
+ * `createStoredSpaceOpener` validates the snapshot and the session then clones that
  * same value, so the two halves of an `OpenedSpace` agree on every route this
  * app actually opens by. This guard is therefore a backstop, not a path with a
  * caller: it catches a composition assembled from halves that disagree, and it

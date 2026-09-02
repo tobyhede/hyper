@@ -31,6 +31,26 @@ const startupFor = (...snapshots: SpaceSnapshot[]) => {
 };
 
 describe('HTTP space startup composition', () => {
+  it('initializes a layoutless Space through an injected memory backend before opening it', async () => {
+    const backend = new MemorySpaceBackend([
+      { snapshot: snapshot(), revision: 0n, exportedRevision: null },
+    ]);
+    const ids = [LAYOUT_ID, GRAPH_ID];
+    const startup = createSpaceStartup(backend, () => {
+      const id = ids.shift();
+      if (id === undefined) throw new Error('initializer minted too many identities');
+      return id;
+    });
+
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
+    );
+
+    expect(result.opened.initialization).toBe('created-layout');
+    expect(result.opened.spaceSession.getState().acknowledgedRevision).toBe(1n);
+    expect(result.opened.space.lookup.layout(LAYOUT_ID)?.layout.positions).toEqual({});
+  });
+
   it('opens the Space named by the compact product-route id through HTTP', async () => {
     const startup = startupFor(snapshot());
 
@@ -40,7 +60,7 @@ describe('HTTP space startup composition', () => {
 
     expect(result.kind).toBe('opened');
     expect(result.opened.space.id).toBe(SPACE_ID);
-    expect(result.opened.spaceSession.getState().acknowledgedRevision).toBe(0n);
+    expect(result.opened.spaceSession.getState().acknowledgedRevision).toBe(1n);
   });
 
   it('fails when the product-route id no longer resolves', async () => {

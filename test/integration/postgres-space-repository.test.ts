@@ -1,5 +1,5 @@
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
-import type { LoadedSpace } from '@project/persistence';
+import { createWorkingSpaceLoader, type LoadedSpace } from '@project/persistence';
 import { afterAll, afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import type {
@@ -312,6 +312,37 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       revision: 1n,
       snapshot: { document: { title: 'Authored winner' } },
+    });
+  });
+
+  it('persists first-working-load initialization for a fresh repository host', async () => {
+    const imported = await repository.importSpaces([snapshot]);
+    trackImported(imported);
+    if (imported.kind !== 'imported') throw new Error(imported.message);
+
+    const ids = [LAYOUT_ID, GRAPH_ID];
+    const first = await createWorkingSpaceLoader(repository, () => {
+      const id = ids.shift();
+      if (id === undefined) throw new Error('initializer minted too many identities');
+      return id;
+    })(SPACE_ID);
+
+    expect(first).toMatchObject({ revision: 1n, initialization: 'created-layout' });
+    expect(first?.snapshot.document.layouts?.[0]).toMatchObject({
+      id: LAYOUT_ID,
+      positions: {},
+      activeGraph: GRAPH_ID,
+    });
+
+    const freshHost = new PostgresSpaceRepository(db);
+    await expect(
+      createWorkingSpaceLoader(freshHost, () => {
+        throw new Error('an initialized Space must not mint identities');
+      })(SPACE_ID),
+    ).resolves.toEqual({
+      snapshot: first?.snapshot,
+      revision: 1n,
+      exportedRevision: null,
     });
   });
 

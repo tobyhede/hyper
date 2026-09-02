@@ -1,4 +1,4 @@
-import { uuidSchema } from '@project/core';
+import { newUuid, uuidSchema, type UUID } from '@project/core';
 import {
   decodeCommitRequest,
   encodeCommitConflict,
@@ -7,6 +7,7 @@ import {
   encodeLoadedAggregate,
   encodeProblemDetails,
   encodeLoadedSpace,
+  createWorkingSpaceLoader,
   problemCatalogue,
   type HyperProblemCode,
   type ProblemError,
@@ -50,6 +51,7 @@ const SPACE_RESOURCE_PATTERN = /^\/api\/spaces\/([^/]+)$/;
 
 export interface SpaceHttpAppOptions {
   logError?: (message: string, error: unknown) => void;
+  newId?: () => UUID;
 }
 
 const defaultLogError = (message: string, error: unknown): void => {
@@ -343,6 +345,8 @@ export const createSpaceHttpApp = (
   options: SpaceHttpAppOptions = {},
 ) => {
   const logError = options.logError ?? defaultLogError;
+  const newId = options.newId ?? newUuid;
+  const loadWorkingSpace = createWorkingSpaceLoader(repository, newId);
   const app = new Hono()
     .use('*', applyTransportPolicy)
     .get(SPACE_COLLECTION_PATH, async (context) => {
@@ -391,9 +395,12 @@ export const createSpaceHttpApp = (
     .get(SPACE_RESOURCE_PATH, validateSpaceId, async (context) => {
       const { id } = context.req.valid('param');
       try {
-        const loaded = await repository.loadSpace(id);
+        const loaded = await loadWorkingSpace(id);
         if (loaded === undefined) {
           return problem(context, 'not-found', `Choose a Space that exists; Space ${id} does not.`);
+        }
+        if (loaded.initialization === 'created-layout') {
+          context.header('X-Hyper-Space-Initialization', 'created-layout');
         }
         return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {
