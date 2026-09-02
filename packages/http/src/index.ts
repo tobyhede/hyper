@@ -79,7 +79,7 @@ const invokeLogError = (
  * this allowance the drain stops, the body is left unconsumed and the host
  * drops the connection, which is the answer that costs us least.
  */
-const MAX_DRAINED_BODY_BYTES = MAX_COMMIT_BODY_BYTES * 8;
+export const MAX_DRAINED_BODY_BYTES = MAX_COMMIT_BODY_BYTES * 8;
 
 const problem = (
   context: Context,

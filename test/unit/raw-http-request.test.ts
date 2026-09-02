@@ -28,7 +28,7 @@ describe('raw HTTP request helper', () => {
     if (address === null || typeof address === 'string') throw new Error('Expected TCP address');
     try {
       await expect(
-        send(`http://127.0.0.1:${address.port}`, '/api/spaces', '', {}, undefined, 'GET'),
+        send(`http://127.0.0.1:${address.port}`, '/api/spaces', '', {}, 'GET'),
       ).rejects.toThrow();
     } finally {
       await new Promise<void>((resolve, reject) =>
