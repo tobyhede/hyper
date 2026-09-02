@@ -10,7 +10,7 @@ import {
   editedSnapshot,
   MINTED_GRAPH_ID_BASE,
   storyGraphIds,
-  unauthoredSpace,
+  newSpaceFixture,
   traversalSpace,
 } from '../stories/support/spaces';
 
@@ -56,12 +56,12 @@ describe('the story Spaces', () => {
 
   /** ADR 0080 makes a newly created Space complete before it is first opened. */
   it('opens the newly created Space on its authored Layout', () => {
-    const opens = defaultRenderer(unauthoredSpace);
+    const opens = defaultRenderer(newSpaceFixture);
 
-    expect(opens).toEqual(unauthoredSpace.layouts[0]?.id);
-    expect(unauthoredSpace.layouts).toHaveLength(1);
-    expect(unauthoredSpace.graphs).toHaveLength(1);
-    expect(currentRenderer(canvasRenderers(unauthoredSpace), opens).title).toBe('Layout 1');
+    expect(opens).toEqual(newSpaceFixture.layouts[0]?.id);
+    expect(newSpaceFixture.layouts).toHaveLength(1);
+    expect(newSpaceFixture.graphs).toHaveLength(1);
+    expect(currentRenderer(canvasRenderers(newSpaceFixture), opens).title).toBe('Layout 1');
   });
 
   /**
@@ -105,7 +105,7 @@ describe('the story Spaces', () => {
    * to be asked for: `0x40` is the highest id declared, and a counter that
    * began anywhere below it would be caught inside this many draws.
    *
-   * `unauthoredSpace` is deliberately not in the set. `newSpace()` mints a real
+   * `newSpaceFixture` is deliberately not in the set. `newSpace()` mints a real
    * v4 uuid on every load, so its ids are not tracked literals this could be
    * held against, and asserting over them would make the test a coin toss
    * rather than a claim about the block.

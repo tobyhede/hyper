@@ -223,13 +223,36 @@ describe('hyper CLI', () => {
     expect(result.stdout).toBe(`Opened space ${created.id} at revision 0\n`);
     expect(created.title).toBe('New space');
     const stored = await repository.loadSpace(created.id);
+    // A new Space begins complete: its Card is already placed in an authored
+    // default Layout owning one empty Active Graph (ADR 0080). Every id in it is
+    // minted, so the shape is asserted against the ones that arrived.
+    const layout = stored?.snapshot.document.layouts?.[0];
+    if (layout === undefined) throw new Error('Expected the new space to arrive with its Layout');
+    const graph = layout.graphs[0];
+    if (graph === undefined) throw new Error('Expected the new Layout to arrive with its Graph');
+    const cardId = stored?.snapshot.cards[0]?.id;
+    if (cardId === undefined) throw new Error('Expected the new space to arrive with its Card');
     expect(stored).toEqual({
       snapshot: {
         id: created.id,
-        document: { version: 1, title: 'New space' },
+        document: {
+          version: 1,
+          title: 'New space',
+          layouts: [
+            {
+              id: layout.id,
+              title: 'Layout 1',
+              kind: 'positioned',
+              positions: { [cardId]: { x: 0, y: 0, open: false } },
+              graphs: [{ id: graph.id, title: 'Graph 1', edges: [] }],
+              activeGraph: graph.id,
+            },
+          ],
+          defaultRenderer: layout.id,
+        },
         cards: [
           {
-            id: stored?.snapshot.cards[0]?.id,
+            id: cardId,
             document: { title: 'Card 1', kind: 'markdown', body: '' },
           },
         ],
@@ -237,7 +260,9 @@ describe('hyper CLI', () => {
       revision: 0n,
       exportedRevision: null,
     });
-    expect(uuidSchema.safeParse(stored?.snapshot.cards[0]?.id).success).toBe(true);
+    for (const id of [cardId, layout.id, graph.id]) {
+      expect(uuidSchema.safeParse(id).success).toBe(true);
+    }
   });
 
   it('reopens the sole stored space without duplicating it', async () => {

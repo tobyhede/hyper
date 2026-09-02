@@ -1,6 +1,6 @@
 import type { Story } from '@ladle/react';
 import { SpaceSidebarFixture } from '../support/SpaceSidebarFixture';
-import { unauthoredSpace } from '../support/spaces';
+import { newSpaceFixture } from '../support/spaces';
 
 export default { title: 'Space/Space' };
 
@@ -21,13 +21,13 @@ export default { title: 'Space/Space' };
 export const Settled: Story = () => <SpaceSidebarFixture />;
 Settled.meta = { iframed: true };
 
-/** A Space before its first Edit authors a Layout: two groups with nothing in them. */
-export const Unauthored: Story = () => <SpaceSidebarFixture space={unauthoredSpace} />;
-Unauthored.meta = { iframed: true };
+/** The ordinary one-Card, one-Layout starting state. */
+export const NewSpace: Story = () => <SpaceSidebarFixture space={newSpaceFixture} />;
+NewSpace.meta = { iframed: true };
 
-export const ComputedViewReady: Story = () => (
+export const AddLayoutReady: Story = () => (
   <SpaceSidebarFixture
-    space={unauthoredSpace}
+    space={newSpaceFixture}
     createLayout={{
       refusal: null,
       onCreate: () => {
@@ -36,7 +36,7 @@ export const ComputedViewReady: Story = () => (
     }}
   />
 );
-ComputedViewReady.meta = { iframed: true };
+AddLayoutReady.meta = { iframed: true };
 
 export const Presenting: Story = () => <SpaceSidebarFixture presenting authoringDisabled />;
 Presenting.meta = { iframed: true };

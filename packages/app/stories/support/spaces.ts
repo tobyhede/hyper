@@ -195,19 +195,21 @@ export const editedSnapshot: SpaceSnapshot = {
 };
 
 /**
- * A Space before its first Edit: one Card, no Layout and so no Graph.
+ * A newly created Space: one Card, placed in one authored Layout owning one
+ * empty Active Graph (ADR 0018, ADR 0080).
  *
- * `newSpace()` is the one encoding of ADR 0018, and a hand-written snapshot
- * beside it would be a second — the story would go on saying "one Card" long
- * after the rule said something else. It returns the **on-disk** shape, a space
- * file and its card files, which is why this is `loadSpace` rather than
- * `loadSpaceSnapshot`.
+ * `newSpace()` is the one encoding of that starting state, and a hand-written
+ * snapshot beside it would be a second — the story would go on saying "one Card
+ * and no Layout" long after the rule said something else. It returns the
+ * **on-disk** shape, a space file and its card files, which is why this is
+ * `loadSpace` rather than `loadSpaceSnapshot`.
  *
  * It mints fresh ids on every page load, and nothing reads one: no story and no
- * Ladle spec names a Card, a Layout or a Graph of this Space.
+ * Ladle spec names a Card, a Layout or a Graph of this Space by id, only the
+ * `Layout 1` and `Graph 1` titles `newSpace()` mints for them.
  */
 const minted = newSpace();
-export const unauthoredSpace: Space = loaded(loadSpace(minted.file, minted.cardFiles));
+export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.cardFiles));
 
 /**
  * Where a story's converted Graph takes its identity.

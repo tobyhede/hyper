@@ -225,20 +225,20 @@ export const parityClaims: readonly ParityClaim[] = [
   {
     id: 'space-sidebar-names-unauthored-state',
     storyFile: 'space/space.stories.tsx',
-    storyExport: 'Unauthored',
-    claim: 'An unauthored Space names its empty Layout and Graph groups and cannot present.',
+    storyExport: 'NewSpace',
+    claim: 'A new Space names its initial Layout and empty Active Graph and cannot present.',
   },
   {
     id: 'space-sidebar-adds-empty-layout',
     storyFile: 'space/space.stories.tsx',
-    storyExport: 'ComputedViewReady',
+    storyExport: 'AddLayoutReady',
     claim:
       'Add Layout is an ordinary enabled command and dispatches its production callback without implicitly placing Cards.',
   },
   {
     id: 'mobile-space-sidebar-adds-empty-layout',
     storyFile: 'space/space.stories.tsx',
-    storyExport: 'ComputedViewReady',
+    storyExport: 'AddLayoutReady',
     claim: 'The narrow Sidebar offers Add Layout and dismisses after the command runs.',
   },
   {

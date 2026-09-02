@@ -50,11 +50,14 @@ test(
   'Space Sidebar offers Add Layout as an ordinary command',
   { tag: '@parity:space-sidebar-adds-empty-layout' },
   async ({ page }) => {
-    await page.goto('/?story=space--space--computed-view-ready&mode=preview');
+    await page.goto('/?story=space--space--add-layout-ready&mode=preview');
 
     const create = page.getByRole('button', { name: 'Add Layout' });
     await expect(create).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
+    // Add Layout stands beside Add Card rather than in place of it: the new
+    // Space already opens on an authored Layout, so both commands are live and
+    // the evidence is that Add Layout dispatches its own (ADR 0080).
+    await expect(page.getByRole('button', { name: 'Add Card' })).toBeEnabled();
     await create.click();
     await expect(page.locator('body')).toHaveAttribute('data-create-layout', 'requested');
   },
@@ -65,7 +68,7 @@ test(
   { tag: '@parity:mobile-space-sidebar-adds-empty-layout' },
   async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/?story=space--space--computed-view-ready&mode=preview');
+    await page.goto('/?story=space--space--add-layout-ready&mode=preview');
     await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
 
     const create = page.getByRole('button', { name: 'Add Layout' });
@@ -176,28 +179,28 @@ test(
 );
 
 /**
- * A Space opens on a computed View owning no Layout and no Graph (ADR 0025, ADR
- * 0018).
+ * A newly created Space opens complete: one authored Layout, selected, owning
+ * one empty Active Graph (ADR 0018, ADR 0080).
  *
  * The header names the Space itself, and the title is `newSpace()`'s own rather
  * than a word the harness supplies: this story draws the Space ADR 0018
  * describes, so "New space" is the evidence that it is really that Space and not
- * a hand-built stand-in wearing the catalogue's label.
+ * a hand-built stand-in wearing the catalogue's label. `Layout 1` and `Graph 1`
+ * are read for the same reason — they are the titles `newSpace()` mints, not
+ * ones the story chose.
  */
 test(
-  'Space Sidebar story says an unauthored Space has nothing yet',
+  'Space Sidebar story shows the complete new-Space starting state',
   { tag: '@parity:space-sidebar-names-unauthored-state' },
   async ({ page }) => {
-    await page.goto('/?story=space--space--unauthored&mode=preview');
+    await page.goto('/?story=space--space--new-space&mode=preview');
 
-    await expect(page.getByRole('button', { name: 'Flow' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
+    await expect(
+      page.getByTestId('space-sidebar').getByRole('button', { name: 'Layout 1' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('selected-canvas')).toContainText('Layout 1');
     await expect(page.getByTestId('space-title')).toHaveText('New space');
-    await expect(page.getByTestId('no-authored-layouts')).toBeVisible();
-    await expect(page.getByTestId('no-graphs')).toBeVisible();
+    await expect(page.getByTestId('graph-choice')).toContainText('Graph 1');
     await expect(page.getByTestId('present-button')).toBeDisabled();
   },
 );
