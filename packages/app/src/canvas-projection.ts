@@ -85,13 +85,10 @@ export function canvasProjection(
   // surface that reveals those Cards without manufacturing positions (ADR 0040,
   // ADR 0069).
   const cardIds = renderer.subject.cards.map((card) => card.id);
-  const authored =
-    renderer.kind === 'layout' ? Placement.fromLayout(renderer.resolvedLayout.layout) : null;
-  const openCardIds = new Set(
-    authored === null ? [] : [...authored].filter(([, at]) => at.open).map(([cardId]) => cardId),
-  );
+  const authored = Placement.fromLayout(renderer.resolvedLayout.layout);
+  const openCardIds = new Set([...authored].filter(([, at]) => at.open).map(([cardId]) => cardId));
   const strategyGraph = buildLayoutStrategyGraph(cardIds, handles, edges, (cardId) => {
-    const at = authored?.get(cardId);
+    const at = authored.get(cardId);
     return at?.open === true ? at.openSize : CARD_SIZE;
   });
 
@@ -114,7 +111,7 @@ export function canvasProjection(
 
       return {
         nodes: projectCardNodes(space, handles, colors, {
-          readOnly: renderer.kind === 'view',
+          readOnly: false,
           activeCardId: interaction.activeCardId,
           selectedCardId: interaction.selectedCardId,
           showActiveCardContent: interaction.presenting,

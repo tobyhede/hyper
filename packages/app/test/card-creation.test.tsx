@@ -41,7 +41,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
@@ -91,12 +91,12 @@ const noCards: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [],
 });
 
-/** A Space with no Layout at all, so the Flow Algorithmic View draws it (ADR 0025). */
+/** A stored Space with no Layout, before working-state initialization. */
 const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: { version: 1, title: 'Space' },
@@ -286,7 +286,7 @@ describe('Add Card', () => {
 describe('Add Alias', () => {
   /**
    * The creation state is editor-local and nothing else (ADR 0042): no Card, no
-   * conversion, no commit. This is the package's own gate — cancelling before a
+   * authored Card and no commit. This is the package's own gate — cancelling before a
    * Target creates nothing.
    */
   it('creates nothing when it is cancelled before a Target is chosen', async () => {

@@ -30,7 +30,7 @@ export function activeGraphColor(
  * Stored rather than resolved. Every creation gesture rotates by this same
  * Layout-local rule, so a Graph does not get different properties according to
  * whether it was added through Graph management or minted by the first
- * connection drawn on an Algorithmic View.
+ * connection drawn in a Layout.
  *
  * The palette is an authoring constant, not a domain constraint:
  * {@link graphColorMap} still resolves a fallback for an imported graph that

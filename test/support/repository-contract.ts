@@ -62,7 +62,7 @@ const card = (id: UUID, title: string) => ({
 const spaceCard = (
   id: UUID,
   target: UUID,
-  selection: { readonly spaceView?: UUID; readonly graph?: UUID } = {},
+  selection: { readonly layout?: UUID; readonly graph?: UUID } = {},
 ) => ({
   id,
   document: { title: `Open ${target}`, kind: 'space' as const, spaceId: target, ...selection },
@@ -490,7 +490,7 @@ export const spaceRepositoryContract = (
         document: {
           version: 1,
           title: 'Target',
-          defaultRenderer: LAYOUT_ID,
+          defaultLayout: LAYOUT_ID,
           layouts: [
             {
               id: LAYOUT_ID,
@@ -511,13 +511,13 @@ export const spaceRepositoryContract = (
       };
       const unselected = spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID);
       const selectedView = spaceCard(LINK_CARD_ID, OTHER_SPACE_ID, {
-        spaceView: SECOND_LAYOUT_ID,
+        layout: SECOND_LAYOUT_ID,
       });
       const selectedGraphWithDefaultView = spaceCard(THIRD_SPACE_CARD_ID, OTHER_SPACE_ID, {
         graph: GRAPH_ID,
       });
       const selectedViewAndGraph = spaceCard(FOURTH_SPACE_CARD_ID, OTHER_SPACE_ID, {
-        spaceView: SECOND_LAYOUT_ID,
+        layout: SECOND_LAYOUT_ID,
         graph: SECOND_GRAPH_ID,
       });
       const linked = {
@@ -542,7 +542,7 @@ export const spaceRepositoryContract = (
 
       const retargetedDefault: SpaceSnapshot = {
         ...target,
-        document: { ...target.document, defaultRenderer: SECOND_LAYOUT_ID },
+        document: { ...target.document, defaultLayout: SECOND_LAYOUT_ID },
       };
       await expect(commitUpdate(repository, retargetedDefault, 0n)).resolves.toMatchObject({
         kind: 'aggregate-refused',

@@ -749,7 +749,7 @@ export const writeReleaseSpace = (
         activeGraph: criticalGraphId,
       },
     ],
-    defaultRenderer: layoutId,
+    defaultLayout: layoutId,
   };
   mkdirSync(destination, { recursive: true });
   writeFileSync(join(destination, 'space.json'), `${JSON.stringify(space, null, 2)}\n`);

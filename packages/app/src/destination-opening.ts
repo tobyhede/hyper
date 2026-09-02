@@ -1,7 +1,7 @@
 import type { CardId, GraphId } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
-import { defaultRenderer, type CanvasRendererId } from './renderer';
+import { defaultLayout, type CanvasRendererId } from './renderer';
 
 export interface DestinationOpening {
   readonly selection: CanvasRendererId;
@@ -17,31 +17,31 @@ export function destinationOpening(
 ): DestinationOpening {
   if (destination.kind === 'space') {
     return {
-      selection: defaultRenderer(space),
+      selection: defaultLayout(space),
       cardId: null,
       graphId: null,
       presentationCardId: null,
     };
   }
-  if (destination.kind === 'space-view') {
+  if (destination.kind === 'layout') {
     return {
-      selection: destination.spaceViewId,
+      selection: destination.layoutId,
       cardId: null,
       graphId: null,
       presentationCardId: null,
     };
   }
-  if (destination.kind === 'space-view-card') {
+  if (destination.kind === 'layout-card') {
     return {
-      selection: destination.spaceViewId,
+      selection: destination.layoutId,
       cardId: destination.cardId,
       graphId: null,
       presentationCardId: null,
     };
   }
-  if (destination.kind === 'space-view-graph') {
+  if (destination.kind === 'layout-graph') {
     return {
-      selection: destination.spaceViewId,
+      selection: destination.layoutId,
       cardId: null,
       graphId: destination.graphId,
       presentationCardId: null,
@@ -49,7 +49,7 @@ export function destinationOpening(
   }
   if (destination.kind === 'presentation') {
     return {
-      selection: destination.spaceViewId,
+      selection: destination.layoutId,
       cardId: null,
       graphId: destination.graphId,
       presentationCardId: destination.cardId,
@@ -68,7 +68,7 @@ export function destinationOpening(
     };
   }
   return {
-    selection: defaultRenderer(space),
+    selection: defaultLayout(space),
     cardId: destination.cardId,
     graphId: null,
     presentationCardId: null,

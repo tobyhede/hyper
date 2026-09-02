@@ -1,5 +1,4 @@
 import type { Locator, Page } from '@playwright/test';
-import { FLOW_SPACE_VIEW_ID, encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test } from './fixtures';
 import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
 import {
@@ -22,8 +21,6 @@ import {
   sidebar,
   viewportTransform,
 } from './graph';
-
-const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 
 /**
  * The barrier a *negative* assertion needs.
@@ -515,12 +512,8 @@ test('opened Markdown editing persists source while expansion displaces and rest
 /**
  * Dragging a card writes its placement into the Layout.
  *
- * The fixture names no `defaultRenderer`, so it opens in Flow however many Layouts
- * it declares, and this first edit converts the resolved automatic placement
- * into a Layout of its own (ADR 0025). What this asserts is the point of
- * the whole pivot: a card goes where you put it and *nothing else moves*. Three
- * spike increments failed exactly here — a global optimiser reshuffled the rest
- * of the graph on every edit, so a drop landed somewhere arbitrary.
+ * The fixture opens in its declared default Layout. A Card goes where the
+ * author puts it and nothing else moves.
  */
 
 test('a dragged card stays where it is dropped, and nothing else moves', async ({ page }) => {
@@ -559,31 +552,8 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   }
 });
 
-test('explicit creation addresses the minted Layout and reload does not create again', async ({
-  page,
-}) => {
-  await page.goto(
-    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
-  );
-  const a = nodeByTitle(page, 'A').first();
-  await expect(a).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await settled(page);
-
-  await sidebar(page).getByRole('button', { name: 'Add Layout' }).click();
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
-  const convertedUrl = page.url();
-  expect(convertedUrl).toMatch(/\/views\/[A-Za-z0-9_-]{22}$/);
-  expect(convertedUrl).not.toContain(encodeCompactUuid(FLOW_SPACE_VIEW_ID));
-
-  await page.reload();
-  await expect(page).toHaveURL(convertedUrl);
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(sidebar(page).getByRole('button', { name: 'Layout 1', exact: true })).toHaveCount(1);
-});
-
 test(
-  'selecting Flow or Grid is navigation and does not persist',
+  'selecting Layouts is navigation and does not persist',
   { tag: '@parity:space-sidebar-marks-one-current-renderer' },
   async ({ page }) => {
     await page.goto('/');
@@ -593,8 +563,7 @@ test(
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    // One list over both, so the fixture's Layouts and the built-in Views are
-    // rows of the same menu and only one of them is pressed (ADR 0053).
+    // One Layout list with exactly one pressed row (ADR 0053/0079).
     await expect(
       sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
     ).toBeVisible();
@@ -603,21 +572,19 @@ test(
       sidebar(page).locator('[data-testid="canvas-renderer"][aria-pressed="true"]'),
     ).toHaveCount(1);
 
-    await selectCanvas(page, 'Grid');
-    await expect(sidebar(page).getByRole('button', { name: 'Grid' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await selectCanvas(page, 'Collection 2');
+    await expect(
+      sidebar(page).getByRole('button', { name: 'Collection 2', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
     await expect(
       sidebar(page).locator('[data-testid="canvas-renderer"][aria-pressed="true"]'),
     ).toHaveCount(1);
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    await selectCanvas(page, 'Flow');
-    await expect(sidebar(page).getByRole('button', { name: 'Flow' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await selectCanvas(page, 'Collection 1');
+    await expect(
+      sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
     await expect(
       sidebar(page).locator('[data-testid="canvas-renderer"][aria-pressed="true"]'),
     ).toHaveCount(1);
@@ -649,7 +616,7 @@ test(
     await expect(selectedCanvas(page)).toContainText('Layout 1');
     expect(await allPositions(page)).toEqual({});
 
-    await sidebar(page).getByRole('button', { name: 'Actions for Space View Layout 1' }).click();
+    await sidebar(page).getByRole('button', { name: 'Actions for Layout Layout 1' }).click();
     await page.getByRole('menuitem', { name: 'Rename' }).click();
     const title = sidebar(page).getByRole('textbox', { name: 'Layout name' });
     await title.fill('Workshop');
@@ -659,7 +626,7 @@ test(
 
     await page.reload();
     await expect(selectedCanvas(page)).toContainText('Workshop');
-    await sidebar(page).getByRole('button', { name: 'Actions for Space View Workshop' }).click();
+    await sidebar(page).getByRole('button', { name: 'Actions for Layout Workshop' }).click();
     await page.getByRole('menuitem', { name: 'Delete Layout' }).click();
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -670,35 +637,6 @@ test(
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   },
 );
-
-test('Flow withholds Card authoring and explains how to make it editable', async ({ page }) => {
-  await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
-  await settled(page);
-  const before = await allPositions(page);
-  const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', '0');
-
-  await card.hover();
-  await expect(card.getByRole('button', { name: 'Open Card A' })).toHaveCount(0);
-  await expect(card.getByRole('button', { name: 'Edit Title A' })).toHaveCount(0);
-  await expect(card.locator('.rf-card-node__authoring-handle')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
-  await expect(sidebar(page).getByRole('button', { name: 'Add Layout' })).toBeEnabled();
-
-  await card.click();
-  await page.keyboard.press('F2');
-  await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveCount(0);
-  await page.keyboard.press('c');
-  await expect(nodeByTitle(page, 'Card 1')).toHaveCount(0);
-  await quiescent(page);
-
-  await expect(selectedCanvas(page)).toContainText('Flow');
-  await expect(persistence).toHaveAttribute('data-revision', '0');
-  expect(await allPositions(page)).toEqual(before);
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
-});
 
 test(
   'resizing an open Card persists its authored rect through reload',
@@ -1312,41 +1250,9 @@ test('opening animates the Card wrapper and displaced neighbours from one durati
   ).toBe(true);
 });
 
-test('Flow and Grid expose the same read-only canvas and explicit creation command', async ({
+test('Add Layout creates an empty Layout and leaves existing Cards in the Cards View', async ({
   page,
 }) => {
-  await page.goto('/');
-  for (const view of ['Flow', 'Grid'] as const) {
-    await test.step(view, async () => {
-      if (view === 'Grid') await selectCanvas(page, view);
-
-      const source = nodeByTitle(page, 'A').first();
-      await expect(source).toBeVisible();
-      await source.hover();
-      await settled(page);
-      const before = await allPositions(page);
-      const persistence = page.getByTestId('persistence-status');
-      await expect(persistence).toHaveAttribute('data-revision', '0');
-
-      await expect(source.locator('.rf-card-node__authoring-handle')).toHaveCount(0);
-      await expect(source.getByRole('button', { name: 'Edit Title A' })).toHaveCount(0);
-      await expect(source.getByRole('button', { name: 'Open Card A' })).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
-      await expect(sidebar(page).getByRole('button', { name: 'Add Layout' })).toBeEnabled();
-
-      const from = await positionOf(source);
-      await dragBy(page, source, 0, 200);
-      expect(await positionOf(source)).toEqual(from);
-
-      await quiescent(page);
-      await expect(persistence).toHaveAttribute('data-revision', '0');
-      await expect(persistence).toHaveText('Persisted');
-      expect(await allPositions(page)).toEqual(before);
-    });
-  }
-});
-
-test('creating from a Computed View leaves existing Cards in the Cards View', async ({ page }) => {
   await page.goto('/');
   await sidebar(page).getByRole('button', { name: 'Add Layout' }).click();
 
@@ -1357,10 +1263,8 @@ test('creating from a Computed View leaves existing Cards in the Cards View', as
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
-  // `Persisted` says the commit was acknowledged, not that the conversion is what
-  // reopens. Reload against the same repository: the created Layout must still be
-  // `defaultRenderer`, still hold the created Card and still carry its Edge — a
-  // conversion that only lived in runtime state passes every assertion above.
+  // `Persisted` says the commit was acknowledged, not that this Layout reopens.
+  // Reload against the same repository to prove the empty Layout is durable.
   await page.reload();
   await expect(page.locator('.react-flow__node')).toHaveCount(0);
   await expect(selectedCanvas(page)).toContainText('Layout 1');
@@ -1641,7 +1545,7 @@ test('editing an existing Layout updates it instead of creating another one', as
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(selectedCanvas(page)).toContainText('Collection 1');
 
-  await selectCanvas(page, 'Grid');
+  await selectCanvas(page, 'Collection 2');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await selectCanvas(page, 'Collection 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
@@ -1662,9 +1566,7 @@ test(
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await selectedCanvas(page)
-      .getByRole('button', { name: 'Edit Space View Collection 1' })
-      .click();
+    await selectedCanvas(page).getByRole('button', { name: 'Edit Layout Collection 1' }).click();
     const layoutName = page.getByRole('textbox', { name: 'Layout name' });
     await layoutName.fill('Workshop');
     await expect(
@@ -1697,7 +1599,7 @@ test(
  * Dragged in an authored Layout, because that is where a Card and the Edges
  * around it stay together.
  *
- * Computed Views are read-only, so the fixture's own `Collection 1` owns Long,
+ * The fixture's own `Collection 1` owns Long,
  * Mid and Short over
  * the spine, so dragging A there updates that Layout in place and its Edges are
  * still drawn around the Card that moved.
@@ -2095,7 +1997,6 @@ for (const key of ['Backspace', 'Delete'] as const) {
   test(`${key} removes the selected Edge from its Graph and nothing else`, async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
     // An Edge belongs to a Layout's Graph, so an Edge Edit needs one selected.
     await selectCanvas(page, 'Collection 1');
     await settled(page);
@@ -2126,7 +2027,6 @@ for (const key of ['Backspace', 'Delete'] as const) {
     await page.goto('/');
     const card = nodeByTitle(page, 'A').first();
     await expect(card).toBeVisible();
-    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
     await selectCanvas(page, 'Collection 1');
     await settled(page);
     const drawnCards = await page.locator('.react-flow__node').count();
@@ -2251,7 +2151,6 @@ test(
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
     await selectCanvas(page, 'Collection 1');
     await settled(page);
     const drawn = await page.locator('.react-flow__edge').count();
@@ -2322,7 +2221,6 @@ test(
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
     await selectCanvas(page, 'Collection 1');
     await settled(page);
     const drawn = await page.locator('.react-flow__edge').count();
@@ -2377,48 +2275,6 @@ test(
 );
 
 /**
- * A Computed View draws Edges for reading, without exposing endpoint authoring.
- */
-test(
-  'endpoint editing is absent on a computed View, with the read-only reason',
-  { tag: '@parity:selected-edge-endpoint-refusal-disables-its-choice' },
-  async ({ page }) => {
-    await page.goto('/');
-    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    await settled(page);
-    // The tracked fixture names no `defaultRenderer`, so this opens in Flow.
-
-    await expect(page.getByRole('button', { name: 'Edit this Edge' })).toHaveCount(0);
-    await expect(page.locator('.react-flow__edgeupdater')).toHaveCount(0);
-    await expect(page.locator('.react-flow__edge[tabindex="0"]')).toHaveCount(0);
-    await expect(sidebar(page).getByRole('button', { name: 'Add Layout' })).toBeEnabled();
-  },
-);
-
-/**
- * Deletion controls and shortcuts are withheld while the Computed View remains
- * selectable for reading.
- */
-test(
-  'Edge deletion is absent on a computed View and its shortcut changes nothing',
-  { tag: '@parity:selected-edge-deletion-refusal-stays-on-its-controls' },
-  async ({ page }) => {
-    await page.goto('/');
-    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    await settled(page);
-    const drawn = await page.locator('.react-flow__edge').count();
-
-    await expect(page.getByRole('button', { name: 'Delete this Edge' })).toHaveCount(0);
-    await expect(sidebar(page).getByRole('button', { name: 'Add Layout' })).toBeEnabled();
-    await page.locator('.react-flow__pane').click({ position: { x: 20, y: 20 } });
-    await page.keyboard.press('Delete');
-    await quiescent(page);
-    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
-    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-  },
-);
-
-/**
  * A selected Edge's reconnect anchors sit over the Card's four authoring handles
  * where they overlap, and the anchors have to win.
  *
@@ -2429,7 +2285,6 @@ test(
 test('reconnect anchors exist only on the selected Edge', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await selectCanvas(page, 'Collection 1');
   await settled(page);
   const anchors = page.locator('.react-flow__edgeupdater');
@@ -2458,7 +2313,6 @@ test('dragging an endpoint onto another Card moves it and keeps the Edge in its 
 }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
@@ -2502,7 +2356,6 @@ test('dragging an endpoint onto another Card moves it and keeps the Edge in its 
 test('an Alt empty-drop still works after a reconnection', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
@@ -2539,7 +2392,6 @@ test('an Alt empty-drop still works after a reconnection', async ({ page }) => {
 test('dragging the source endpoint moves the end the author took hold of', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await selectCanvas(page, 'Collection 1');
   await activateGraph(page, 'Short');
   await settled(page);
@@ -2575,7 +2427,6 @@ test('dragging the source endpoint moves the end the author took hold of', async
 test('an endpoint dropped back where it came from stays valid throughout', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
@@ -2617,7 +2468,6 @@ test('an endpoint dropped back where it came from stays valid throughout', async
 test('dragging an endpoint onto empty canvas deletes the Edge', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
@@ -2636,7 +2486,6 @@ test('dragging an endpoint onto empty canvas deletes the Edge', async ({ page })
 test('dragging an endpoint off the canvas restores the Edge', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
@@ -2763,18 +2612,15 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
 /**
  * Add Card after explicit Layout creation, and the naming that follows it.
  *
- * The fixture opens in Flow because it declares no `defaultRenderer`, so this is the
- * explicit creation happens exactly once and the created Card really is under
+ * Explicit creation happens exactly once and the created Card really is under
  * the caret, in a browser where focus is the browser's to give.
  */
-test('Add Card follows explicit Layout creation and names the Card in place', async ({ page }) => {
+test('Add Card names the new Card in place in the selected Layout', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
   const addCard = page.getByTestId('add-card');
-  await expect(addCard).toHaveCount(0);
-  await sidebar(page).getByRole('button', { name: 'Add Layout' }).click();
   await expect(addCard).toBeEnabled();
 
   await addCard.click();
@@ -2782,9 +2628,8 @@ test('Add Card follows explicit Layout creation and names the Card in place', as
   const title = page.getByRole('textbox', { name: 'Card title' });
   await expect(title).toBeFocused();
   await expect(title).toHaveValue('Card 1');
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  // Explicit creation leaves existing Cards outside the new Layout.
+  await expect(selectedCanvas(page)).toContainText('Collection 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   const after = await allPositions(page);
   expect(after).not.toEqual(before);
 
@@ -2792,10 +2637,8 @@ test('Add Card follows explicit Layout creation and names the Card in place', as
   await title.press('Enter');
 
   await expect(nodeByTitle(page, 'Consequences')).toBeVisible();
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
-  // One explicit creation, so one new Layout beside the two the fixture declares —
-  // five rows in the one canvas list, with the two built-in Views.
-  await expect(sidebar(page).getByTestId('canvas-renderer')).toHaveCount(5);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(sidebar(page).getByTestId('canvas-renderer')).toHaveCount(2);
 });
 
 /**

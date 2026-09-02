@@ -1,6 +1,6 @@
 # 03 — Make Layout the only V1 canvas selection
 
-Status: ready-for-agent
+Status: done
 Tags: release/v1
 Blocked by: 02
 

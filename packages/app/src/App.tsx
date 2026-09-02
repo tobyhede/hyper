@@ -93,7 +93,7 @@ export const createApp = (
     const [creatingAlias, setCreatingAlias] = useState(false);
     const [addressedCardId, setAddressedCardId] = useState<CardId | null>(opening?.cardId ?? null);
     // Keyed on the renderer as well as the Card: `installDestinationOpening` clears
-    // the published selection, and moving between two Space Views that address
+    // the published selection, and moving between two Layouts that address
     // the *same* Card leaves `addressedCardId` untouched, so keying on the Card
     // alone would let React bail out and never restore it. Clearing on `null` is
     // the other half — an address that stops naming a Card must stop selecting
@@ -205,7 +205,7 @@ export const createApp = (
       selectedCardId === null ? undefined : rendererSpace.lookup.card(selectedCardId);
 
     /**
-     * Whether the selected Card has a contextual address in this Space View.
+     * Whether the selected Card has a contextual address in this Layout.
      *
      * A Layout's members *are* its position keys (ADR 0040). Cards outside them
      * remain available in the Sidebar Cards collection, but have no contextual
@@ -213,21 +213,18 @@ export const createApp = (
      */
     const contextualCardLink =
       selectedCard === undefined ||
-      renderer.kind !== 'layout' ||
       renderer.resolvedLayout.layout.positions[selectedCard.id] !== undefined;
     const cardsOutsideSelectedLayout = useMemo(
       () =>
-        renderer.kind === 'layout'
-          ? rendererSpace.cards.filter(
-              (card) => renderer.resolvedLayout.layout.positions[card.id] === undefined,
-            )
-          : [],
+        rendererSpace.cards.filter(
+          (card) => renderer.resolvedLayout.layout.positions[card.id] === undefined,
+        ),
       [renderer, rendererSpace.cards],
     );
     // The one condition the toggle's `disabled` and the drawer's own open state
     // both read, so neither can drift from the other into an enabled control
     // over a drawer that will not open.
-    const cardsDrawerAvailable = renderer.kind === 'layout' && !presenting && !creatingAlias;
+    const cardsDrawerAvailable = !presenting && !creatingAlias;
     // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
     // `cardsDrawerOpen`. Presenting and creating an Alias both pass through here,
     // and a drawer that reopened itself on the way back would take
@@ -241,8 +238,8 @@ export const createApp = (
     // recomputes `cardsOutsideSelectedLayout` with a fresh array identity, and
     // re-running on that alone would reopen a drawer the reader just closed.
     // The renderer is part of the key, not just the Card id — a canonical Card
-    // link addresses no Space View of its own, so the same Card can be
-    // revealed once in one Layout and then adopt a different default renderer
+    // link addresses no Layout of its own, so the same Card can be
+    // revealed once in one Layout and then adopt a different default Layout
     // that omits it, and that is a second reveal rather than a repeat.
     const revealedAddressRef = useRef<{
       readonly renderer: CanvasRendererId;
@@ -250,7 +247,7 @@ export const createApp = (
     } | null>(null);
     useEffect(() => {
       if (addressedCardId === null) {
-        // Only a real navigation clears the address — choosing a Space View,
+        // Only a real navigation clears the address — choosing a Layout,
         // activating a Graph, or restoring a destination that names no Card —
         // so leaving it is the reader moving on rather than the incidental
         // recomputation this guard absorbs. Arriving back at the same address
@@ -318,16 +315,15 @@ export const createApp = (
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
     const cardResize = useRenderAdapter((s) => s.cardResize);
-    // There are Cards on the canvas to interact with once placement resolves and
-    // the store has taken it. Authoring additionally requires an authored Layout:
-    // a Computed View is a read-only preview until its explicit Create Layout Edit.
+    // There are Cards on the canvas to interact with once placement resolves
+    // and the store has taken it.
     const hasCardsOnCanvas = liveProjection !== null;
     const canvas = canvasContent(placement, hasCardsOnCanvas);
-    const editable = hasCardsOnCanvas && current.kind === 'authored';
-    // Both refusals are drawn under Add Layout and both are about the canvas
+    const editable = hasCardsOnCanvas;
+    // Both refusals are drawn under Add Layout and both are about the Layout
     // that was selected when they were refused — the Edit Add Layout would have
     // made, and the Rename or Delete on that row. Neither says anything about
-    // the canvas the reader has moved to, so the move clears them together.
+    // the Layout the reader has moved to, so the move clears them together.
     useEffect(() => {
       setCreateLayoutRefusal(null);
       setLayoutManagementRefusal(null);
@@ -341,9 +337,9 @@ export const createApp = (
     } | null>(null);
     const chromeEditingDisabled =
       !editable || presenting || creatingAlias || editingCardBody || editingCardTitle;
-    const cardIsOpen =
-      renderer.kind === 'layout' &&
-      Object.values(renderer.resolvedLayout.layout.positions).some((at) => at?.open === true);
+    const cardIsOpen = Object.values(renderer.resolvedLayout.layout.positions).some(
+      (at) => at?.open === true,
+    );
 
     /**
      * Delete Card is withdrawn wherever Add Card is, and for one reason more.
@@ -420,8 +416,7 @@ export const createApp = (
      */
     const layoutActions = (entity: SpaceEntity): readonly EntityActionGroup[] => {
       if (
-        entity.kind !== 'space-view' ||
-        entity.renderer.kind !== 'authored' ||
+        entity.kind !== 'layout' ||
         presenting ||
         creatingAlias ||
         editingCardBody ||
@@ -491,7 +486,7 @@ export const createApp = (
     }, []);
 
     /**
-     * Choosing a Space View row, including the row already current.
+     * Choosing a Layout row, including the row already current.
      *
      * The repeated choice is not a no-op and must not be skipped here:
      * `navigation.selectRenderer` publishes `mode: 'overview'`, so choosing the
@@ -900,9 +895,9 @@ export const createApp = (
               }),
             onCopyContextual: (graphId) =>
               copyProductDestination({
-                kind: 'space-view-graph',
+                kind: 'layout-graph',
                 spaceId: rendererSpace.id,
-                spaceViewId: selectedRenderer,
+                layoutId: selectedRenderer,
                 graphId,
               }),
           },
@@ -921,15 +916,10 @@ export const createApp = (
           // title editing is withdrawn while a content edit owns the keyboard
           // (ADR 0064) — so a live toolbar created a Card and then swallowed the
           // naming it exists to begin.
-          disabled:
-            current.kind !== 'authored' ||
-            presenting ||
-            creatingAlias ||
-            editingCardBody ||
-            spaceChromeEdit !== null,
+          disabled: presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
-          hidden: current.kind === 'computed',
+          hidden: presenting,
         }}
         createLayout={{
           disabled: presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
@@ -964,20 +954,19 @@ export const createApp = (
                     cardId: selectedCard.id,
                   }),
                 /**
-                 * Offered only for a Card this Space View actually holds.
+                 * Offered only for a Card this Layout actually holds.
                  *
                  * A selected Card revealed in the Cards collection is not
-                 * necessarily a member of the Layout. `space-view-card` resolves
+                 * necessarily a member of the Layout. `layout-card` resolves
                  * against `layout.positions`, so a contextual link to it is one
-                 * the host answers 404 for. There is no such thing for a Computed
-                 * View, whose subject is the whole Space.
+                 * the host answers 404 for.
                  */
                 onCopyContextual: contextualCardLink
                   ? () =>
                       copyProductDestination({
-                        kind: 'space-view-card',
+                        kind: 'layout-card',
                         spaceId: rendererSpace.id,
-                        spaceViewId: selectedRenderer,
+                        layoutId: selectedRenderer,
                         cardId: selectedCard.id,
                       })
                   : undefined,
@@ -1143,7 +1132,7 @@ export const createApp = (
                 copyProductDestination({
                   kind: 'presentation',
                   spaceId: rendererSpace.id,
-                  spaceViewId: selectedRenderer,
+                  layoutId: selectedRenderer,
                   graphId: activeGraphId,
                   cardId: activeCardId,
                 });

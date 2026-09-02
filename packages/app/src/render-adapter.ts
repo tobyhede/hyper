@@ -471,7 +471,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
         state.selection,
       );
       set({ projection: { nodes: reconciled, edges: [...edges] } });
-      // Reporting geometry, not authoring it: only Cards the selected Space View
+      // Reporting geometry, not authoring it: only Cards the selected Layout
       // draws can contribute placement.
       authoring.reportRendered(placementFromNodes(reconciled));
     },

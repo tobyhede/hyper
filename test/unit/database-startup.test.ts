@@ -171,7 +171,7 @@ describe('resolveDatabaseStartup', () => {
         document: {
           version: 1,
           title: 'New space',
-          defaultRenderer: layoutId,
+          defaultLayout: layoutId,
           layouts: [
             {
               id: layoutId,

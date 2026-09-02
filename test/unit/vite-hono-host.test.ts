@@ -6,12 +6,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { connect } from 'node:net';
-import {
-  FLOW_SPACE_VIEW_ID,
-  encodeCompactUuid,
-  uuidSchema,
-  type SpaceSnapshot,
-} from '@project/core';
+import { encodeCompactUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import {
   decodeProblemDetails,
@@ -23,6 +18,8 @@ import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
+
+const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -261,21 +258,20 @@ describe('Vite Hono host', () => {
     await expect(response.text()).resolves.toBe('<main>Canonical Space</main>');
   });
 
-  it('lets an existing Computed View destination reach the SPA fallback', async () => {
+  it('answers a removed canvas identity as not found', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceRepository = new MemorySpaceRepository([stored]);
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
     const hostApp = createSpaceHost(spaceRepository);
     const { host } = await startHost(hostApp, (_request, response) => {
-      response.end('<main>Computed View</main>');
+      response.end('<main>Application</main>');
     });
 
     const response = await fetch(
-      `${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+      `${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}`,
     );
 
-    expect(response.status).toBe(200);
-    await expect(response.text()).resolves.toBe('<main>Computed View</main>');
+    expect(response.status).toBe(404);
     expect(loadSpace).toHaveBeenCalledOnce();
     expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
   });
@@ -323,43 +319,6 @@ describe('Vite Hono host', () => {
     });
     expect(existing.status).toBe(200);
     await expect(existing.text()).resolves.toBe('');
-  });
-
-  /**
-   * A stored Layout carrying an available Computed View's id. Intake rejects
-   * one, so this is a document that reached storage some other way, and the
-   * address then names two Space Views with no rule to choose between them (ADR
-   * 0069). The fault is in what the host holds rather than in what was asked,
-   * which is the difference between this and the 404 beside it.
-   */
-  it('answers a Space View identity collision as a server fault', async () => {
-    const collided = {
-      snapshot: {
-        ...snapshot,
-        document: {
-          ...snapshot.document,
-          layouts: [
-            {
-              id: FLOW_SPACE_VIEW_ID,
-              title: 'Layout',
-              kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
-              graphs: [],
-            },
-          ],
-        },
-      },
-      revision: 0n,
-      exportedRevision: null,
-    };
-    const { host } = await startHost(createSpaceHost(new MemorySpaceRepository([collided])));
-
-    const response = await fetch(
-      `${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
-    );
-
-    expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toContain(FLOW_SPACE_VIEW_ID);
   });
 
   /**

@@ -4,15 +4,14 @@ import type { Space } from '@project/graph';
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { createNavigation, type Navigation, type NavigationState } from '#src/navigation';
-import { createRendererResolver, defaultRenderer, type ResolveRenderer } from '#src/renderer';
-import { storyGraphIds } from './spaces';
+import { createRendererResolver, defaultLayout, type ResolveRenderer } from '#src/renderer';
 
 /**
  * Production Navigation, composed the way a story needs it and no other way.
  *
  * Two surfaces now open a real Navigation — the Space Sidebar and the
  * presenting chrome — and what they share is genuinely the composition rather
- * than a look: the deterministic resolver, the Space reader Navigation resolves
+ * than a look: the Layout resolver, the Space reader Navigation resolves
  * every selection against, the rule that the instance is *state* rather than a
  * memo, and the one call that puts a story in the state it is about. Delete this
  * module and both fixtures grow the same twenty lines back, including the
@@ -61,7 +60,7 @@ function composeStoryNavigation(
   const navigation = createNavigation(
     () => current(),
     resolveRenderer,
-    defaultRenderer(initialSpace),
+    defaultLayout(initialSpace),
     initialSpace,
   );
   begin(navigation);
@@ -87,10 +86,7 @@ export function useStoryNavigation(
   currentSpace: () => Space,
   begin: (navigation: Navigation) => void = () => undefined,
 ): StoryNavigation {
-  const resolveRenderer = useMemo(
-    () => createRendererResolver({ newGraphId: storyGraphIds() }),
-    [],
-  );
+  const resolveRenderer = useMemo(() => createRendererResolver(), []);
   // State, not a memo. Navigation holds the selected renderer, the Active Graph,
   // the mode and the Traversal history — everything a Ladle spec clicks its way
   // into — and a memo is a caching hint React may discard, not a place to keep

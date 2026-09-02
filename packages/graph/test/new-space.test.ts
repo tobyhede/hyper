@@ -44,7 +44,7 @@ describe('newSpace', () => {
     expect(layout).toMatchObject({ title: 'Layout 1', activeGraph: layout.graphs[0]?.id });
     expect(layout.graphs).toMatchObject([{ title: 'Graph 1', edges: [] }]);
     expect(layout.positions[card.id]).toEqual({ x: 0, y: 0, open: false });
-    expect(result.space.defaultRenderer).toBe(layout.id);
+    expect(result.space.defaultLayout).toBe(layout.id);
   });
 
   it('mints fresh UUID identity for each new space and its first card', () => {
@@ -100,6 +100,6 @@ describe('initializeSpace', () => {
         activeGraph: GRAPH_ID,
       },
     ]);
-    expect(result.space.defaultRenderer).toBe(LAYOUT_ID);
+    expect(result.space.defaultLayout).toBe(LAYOUT_ID);
   });
 });

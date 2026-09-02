@@ -1,20 +1,13 @@
 import fc from 'fast-check';
 import { expect, it } from 'vitest';
-import {
-  FLOW_SPACE_VIEW_ID,
-  uuidSchema,
-  type Card,
-  type Graph,
-  type Layout,
-  type SpaceSnapshot,
-} from '@project/core';
+
+import { uuidSchema, type Card, type Graph, type Layout, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { composeApp } from '../src/compose-app';
 import type { AuthoringCompletion, AuthoringResult } from '../src/space-authoring';
 import type { CanvasRendererId } from '../src/renderer';
-import { mintingGraphIds } from './minting';
 
 /**
  * What every semantic operation owes, whatever order they arrive in.
@@ -91,7 +84,7 @@ const start: SpaceSnapshot = {
         ],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -158,14 +151,6 @@ type GeneratedOperation = ReturnType<typeof operation.generate>['value'];
 /** An identity that is nothing, so an out-of-range index still names something. */
 const NOTHING = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 
-/** The Graph identities a converted Algorithmic View may mint in one case. */
-const MINTED_GRAPH_IDS = [
-  uuidSchema.parse('00000000-0000-4000-8000-000000000a01'),
-  uuidSchema.parse('00000000-0000-4000-8000-000000000a02'),
-  uuidSchema.parse('00000000-0000-4000-8000-000000000a03'),
-  uuidSchema.parse('00000000-0000-4000-8000-000000000a04'),
-] as const;
-
 const pick = <T>(items: readonly T[], at: number): T | undefined => items[at];
 
 it('keeps an existing Alias Target immutable while accepting Title edits', () => {
@@ -193,7 +178,6 @@ it('keeps an existing Alias Target immutable while accepting Title edits', () =>
         const { authoring } = composeApp({
           spaceSession: session,
           selection: OTHER_LAYOUT_ID,
-          newGraphId: mintingGraphIds(...MINTED_GRAPH_IDS),
           initialPlacement: null,
         });
         const aliasLayout = snapshot.document.layouts?.find(
@@ -234,25 +218,21 @@ it('keeps the working Space loadable through any sequence of semantic operations
   fc.assert(
     fc.property(
       fc.array(operation, { minLength: 1, maxLength: 12 }),
-      fc.constantFrom<CanvasRendererId>(LAYOUT_ID, OTHER_LAYOUT_ID, FLOW_SPACE_VIEW_ID),
+      fc.constantFrom<CanvasRendererId>(LAYOUT_ID, OTHER_LAYOUT_ID, LAYOUT_ID),
       (operations, renderer) => {
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
         const { currentSpace, navigation, authoring } = composeApp({
           spaceSession: session,
           selection: renderer,
-          // Deterministic, so a shrunk counterexample replays: converting this
-          // Space's one Algorithmic View mints one Graph, and the rest of the
+          // Deterministic, so a shrunk counterexample replays: creating this
+          // Space's Layout creation mints one Graph, and the rest of the
           // block is the margin that makes an exhaustion a real signal.
-          newGraphId: mintingGraphIds(...MINTED_GRAPH_IDS),
           // These cases install the geometry a renderer would have reported by
           // now, immediately below.
           initialPlacement: null,
         });
-        // The geometry the renderer would have reported by the time an author
-        // could reach any of these controls. An Algorithmic View's placement is
-        // the whole rendered map, which is what its conversion copies; a Layout's
-        // is what it authored.
+        // The authored geometry available when an author reaches these controls.
         const selectedLayout = (): Layout | undefined => {
           const selected = navigation.getState().selectedRenderer;
           return currentSpace().lookup.layout(selected)?.layout;

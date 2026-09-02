@@ -115,10 +115,8 @@ export interface EdgeAuthoringInput {
    * was missing here, which left the pointer gesture live behind it; see
    * `SpaceCanvas`'s `canAuthorOnCanvas`.
    *
-   * *Placement*, not Layout: an Algorithmic View has no Layout and its Cards are
-   * authorable the moment its strategy resolves — editing one is what creates a
-   * Layout (ADR 0025), so requiring one here would withdraw authoring from the
-   * only surface that can produce it.
+   * Placement readiness is separate from Layout existence because the
+   * positioned strategy resolves asynchronously.
    */
   readonly enabled: boolean;
   readonly onSelectCard: (cardId: CardId) => void;

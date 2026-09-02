@@ -242,7 +242,7 @@ test(
       // placement result still arriving after Reload belongs to the Space that
       // is being replaced.
       try {
-        await selectCanvas(stalePage, 'Flow');
+        await selectCanvas(stalePage, 'Collection 2');
         await activateGraph(stalePage, 'Echo');
         await stalePage.getByTestId('present-button').click();
       } finally {
@@ -300,6 +300,7 @@ test('graph activation and presenting do not write or protect navigation', async
 
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await selectCanvas(page, 'Collection 2');
   await activateGraph(page, 'Echo');
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();

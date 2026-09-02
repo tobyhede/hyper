@@ -58,11 +58,11 @@ const ARIA_LABEL_CONFIG = {
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
 
-/** A Computed View keeps Cards readable without advertising authored gestures. */
-const READ_ONLY_ARIA_LABEL_CONFIG = {
+/** A pending placement keeps Cards readable without advertising authored gestures. */
+const PENDING_ARIA_LABEL_CONFIG = {
   ...ARIA_LABEL_CONFIG,
-  'node.a11yDescription.default': 'This Card is read-only in a Computed View.',
-  'node.a11yDescription.keyboardDisabled': 'This Card is read-only in a Computed View.',
+  'node.a11yDescription.default': 'This Card is unavailable while placement is pending.',
+  'node.a11yDescription.keyboardDisabled': 'This Card is unavailable while placement is pending.',
 } as const;
 
 /**
@@ -126,9 +126,7 @@ export interface SpaceCanvasProps {
   activeCardId: string | null;
   presenting: boolean;
   /**
-   * Whether the selected renderer may be authored and its placement is ready.
-   * Computed Views pass `false`; authored Layouts pass `true` after placement.
-   * This is derived renderer state, not an edit mode to toggle or synchronize.
+   * Whether the selected Layout's placement is ready for authoring.
    */
   editable: boolean;
   /**
@@ -589,7 +587,7 @@ export function SpaceCanvas({
       // the presented-Card connection `editing.spec.ts` has always asserted. An
       // expression nothing reads is not a decision that was made.
       nodesConnectable={canConnectOnCanvas}
-      ariaLabelConfig={editable ? ARIA_LABEL_CONFIG : READ_ONLY_ARIA_LABEL_CONFIG}
+      ariaLabelConfig={editable ? ARIA_LABEL_CONFIG : PENDING_ARIA_LABEL_CONFIG}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the
       // authoring handles refuse via `isConnectableEnd` and the graph ports via

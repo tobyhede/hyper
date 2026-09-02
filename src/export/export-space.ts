@@ -104,9 +104,9 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     title: snapshot.document.title,
   };
   const withLayouts = layouts === undefined ? fileBase : { ...fileBase, layouts };
-  return snapshot.document.defaultRenderer === undefined
+  return snapshot.document.defaultLayout === undefined
     ? withLayouts
-    : { ...withLayouts, defaultRenderer: snapshot.document.defaultRenderer };
+    : { ...withLayouts, defaultLayout: snapshot.document.defaultLayout };
 };
 
 const canonicalCard = (
@@ -124,7 +124,7 @@ const canonicalCard = (
       kind: 'space',
       spaceId: document.spaceId,
     };
-    if (document.spaceView !== undefined) card.spaceView = document.spaceView;
+    if (document.layout !== undefined) card.layout = document.layout;
     if (document.graph !== undefined) card.graph = document.graph;
     return card;
   }

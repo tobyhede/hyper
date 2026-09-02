@@ -1,7 +1,5 @@
 # The app's two spaces
 
-**ADR 0079 — decided, not built:** Computed Views, the union term Space View and the persisted `defaultRenderer` selection leave V1. An authored Layout becomes the only selectable and addressable canvas context, Add Layout creates an *empty* Layout rather than capturing a placement, and first working load initializes a layoutless Space. **Nothing below has changed yet** — the descriptions here are the code as it stands, and they are what `.scratch/layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md` removes. Do not build new work onto the Computed View contract.
-
 `fixture/` is the abstract space `pnpm dev:fixture` loads, and the one Playwright drives.
 It is a **test bed**, not the product demo — the narrative demo lives in
 `example/` and is kept for when real space-loading exists. Tests assert
@@ -13,7 +11,7 @@ This file sits here rather than in `fixture/` on purpose. A space is a directory
 there would be scanned as one and fail to parse for want of frontmatter.
 
 Each space is a directory: `space.json` holding structure — `version`, `id`,
-`title`, `layouts` and an optional `defaultRenderer` — and one markdown file per
+`title`, `layouts` and `defaultLayout` — and one markdown file per
 card, either beside it or under `cards/`. The fixture uses both locations
 (`a.md` at the top, the rest in `cards/`) so the two-location scan is exercised
 by the space the app actually loads.
@@ -41,7 +39,7 @@ did not move when they were declared. That is checked rather than claimed:
 fixture and compares every seeded position, so a change to the ELK options that
 would silently rearrange the fixture fails there.
 
-`defaultRenderer` is **absent**, so the fixture still opens in Flow. Flow's subject
+`defaultLayout` is **absent**, so the fixture still opens in Flow. Flow's subject
 is the Space's Cards, so it draws the flatten of every Graph across both
 Layouts (ADR 0045) — the one place in the tree where that flatten crosses a
 Layout boundary, and the reason the split is two Layouts rather than one.

@@ -81,7 +81,7 @@ describe('loadWorkingSpace', () => {
               activeGraph: GRAPH,
             },
           ],
-          defaultRenderer: LAYOUT,
+          defaultLayout: LAYOUT,
         },
       },
       revision: 8n,
@@ -131,7 +131,7 @@ describe('loadWorkingSpace', () => {
     });
 
     expect(committed?.document.layouts).toEqual(existing.document.layouts);
-    expect(committed?.document.defaultRenderer).toBe(LAYOUT);
+    expect(committed?.document.defaultLayout).toBe(LAYOUT);
     expect(loaded).not.toHaveProperty('initialization');
   });
 
@@ -150,7 +150,7 @@ describe('loadWorkingSpace', () => {
             activeGraph: GRAPH,
           },
         ],
-        defaultRenderer: LAYOUT,
+        defaultLayout: LAYOUT,
       },
     };
     const commit = vi.fn();
@@ -182,7 +182,7 @@ describe('loadWorkingSpace', () => {
             activeGraph: GRAPH,
           },
         ],
-        defaultRenderer: LAYOUT,
+        defaultLayout: LAYOUT,
       },
     };
     const store = {

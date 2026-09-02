@@ -49,7 +49,7 @@ export const FIXTURE_CARD_COUNT =
  * Layout, because a Graph is a nested owned value of the one that holds it (ADR
  * 0040) and the fixture spreads four Graphs over two Layouts.
  *
- * This is the count an Algorithmic View draws, which is the flatten across those
+ * This is the count across the fixture's Layouts,
  * Layouts (ADR 0045). A *selected* Layout draws only the Graphs it owns, so it
  * is not the number to assert after a conversion.
  */
@@ -111,13 +111,13 @@ export function sidebar(page: Page): Locator {
   return page.getByTestId('space-sidebar');
 }
 
-/** What the canvas header says is drawing, computed View or authored Layout alike. */
+/** What the canvas header says is drawing. */
 export function selectedCanvas(page: Page): Locator {
   return page.getByTestId('selected-canvas');
 }
 
 /**
- * Draw one computed View or one authored Layout, by title.
+ * Draw one authored Layout, by title.
  *
  * One helper for both because there is one choice (ADR 0053): the sidebar lists
  * every View and every Layout together and exactly one row is pressed. The
@@ -138,7 +138,8 @@ export function activeGraph(page: Page): Locator {
 
 /** Emphasise one Graph by title. Activating is never an Edit (ADR 0028). */
 export async function activateGraph(page: Page, title: string): Promise<void> {
-  await sidebar(page).getByRole('button', { name: title, exact: true }).click();
+  const choice = sidebar(page).getByRole('button', { name: title, exact: true });
+  if ((await choice.getAttribute('aria-pressed')) !== 'true') await choice.click();
   await expect(activeGraph(page)).toHaveText(title);
 }
 

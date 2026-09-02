@@ -210,7 +210,7 @@ export function SpaceSidebarFixture({
             disabled: authoringDisabled,
             keyShortcut: 'C',
             menuTriggerRef: addCardMenu,
-            hidden: current.kind === 'computed',
+            hidden: false,
           }}
           createLayout={
             createLayout ?? {

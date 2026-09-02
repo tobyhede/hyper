@@ -8,9 +8,7 @@ import {
   CloseCardIcon,
   EditIcon,
   FitViewIcon,
-  FlowIcon,
   GraphIcon,
-  GridIcon,
   LayoutIcon,
   MarkdownIcon,
   OpenCardIcon,
@@ -25,12 +23,6 @@ describe('the public icon facade', () => {
   it('uses Lucide for every general-purpose interface glyph', () => {
     render(
       <div>
-        <span data-testid="flow">
-          <FlowIcon />
-        </span>
-        <span data-testid="grid">
-          <GridIcon />
-        </span>
         <span data-testid="layout">
           <LayoutIcon />
         </span>
