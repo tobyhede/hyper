@@ -267,6 +267,39 @@ describe('presenting after explicit Layout creation', () => {
 });
 
 describe('browser destination restoration', () => {
+  /**
+   * Mount writes no browser history entry, whatever the location says.
+   *
+   * Startup reads `window.location.pathname` once and composes the app from it,
+   * and the `popstate` listener is registered by an effect *after* the sync
+   * effect below it — so a Back that lands between the two leaves the location
+   * somewhere the composed position does not name, with Navigation never told.
+   * Correcting the location there would silently undo the reader's Back. The
+   * pre-ADR-0081 code could not do this because it never wrote history on
+   * mount, and neither may this one.
+   */
+  it('writes no history entry on mount, even where the location names another Space View', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+    );
+    const pushState = vi.spyOn(window.history, 'pushState');
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+
+    const session = mount();
+    await screen.findByTestId('selected-canvas');
+
+    expect(pushState).not.toHaveBeenCalled();
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe(
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+    );
+    pushState.mockRestore();
+    replaceState.mockRestore();
+    await settled(session);
+  });
+
   it('reports a destination that Back or Forward can no longer resolve', async () => {
     mount();
     const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
@@ -289,6 +322,78 @@ describe('browser destination restoration', () => {
     );
   });
 
+  /**
+   * A cleared report and a corrected location are one thing, not two.
+   *
+   * The choice here is the row already current, so Navigation republishes the
+   * same address and nothing about the position moves — and the location the
+   * reader is still on is the one that could not be resolved, which reloads
+   * into a host 404. Reporting it as answered while leaving it in the address
+   * bar is the half-fix; the code this replaced could not do it, because the
+   * one call that cleared the report was the call that wrote the location.
+   */
+  it('corrects the unresolved location when a repeated choice answers the report', async () => {
+    const layoutView = `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}`;
+    window.history.replaceState(null, '', layoutView);
+    const session = mount();
+    await screen.findByTestId('selected-canvas');
+    const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(missingView)}`,
+    );
+    fireEvent(window, new PopStateEvent('popstate'));
+    await screen.findByText('Destination not found');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Layout' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('Destination not found')).not.toBeInTheDocument(),
+    );
+    expect(window.location.pathname).toBe(layoutView);
+    await settled(session);
+  });
+
+  /**
+   * Presenting from an unresolved location is a move, and a move is answered.
+   *
+   * The report is the reader's for the location they arrived at, not for every
+   * location after it. A reader who presses Back onto a dead address and then
+   * presents has moved somewhere real: leaving the dead path in the address bar
+   * strands the whole presentation behind a URL that 404s on reload and is what
+   * Copy link copies, and keeps a report on screen that the move already
+   * answered. The guard preserves the arrival, so it may only hold while the
+   * position has not moved.
+   */
+  it('corrects the unresolved location when presenting moves the address', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}`,
+    );
+    const session = mount();
+    await screen.findByTestId('selected-canvas');
+    const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(missingView)}`,
+    );
+    fireEvent(window, new PopStateEvent('popstate'));
+    await screen.findByText('Destination not found');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Present' }));
+
+    await waitFor(() =>
+      expect(window.location.pathname).toBe(
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(CARD_ID)}`,
+      ),
+    );
+    expect(screen.queryByText('Destination not found')).not.toBeInTheDocument();
+    await settled(session);
+  });
+
   it('clears a failed restoration after choosing a valid Graph', async () => {
     mount();
     const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
@@ -307,17 +412,36 @@ describe('browser destination restoration', () => {
     );
   });
 
-  it('pushes a browser entry when presenting advances over a self-Edge', async () => {
+  /**
+   * The wiring, not the rule (ADR 0081). What a self-Edge move deserves is
+   * decided by `destinationSync` and proved over it in the node environment;
+   * what this proves is that App asks that question and spends the answer on
+   * the History API — a spy on `pushState` is the only way to see that from
+   * here, and it is the only thing this asserts.
+   *
+   * Presenting a self-Edge is where the two answers differ. Entering the
+   * presentation moves the address and earns its entry; advancing across the
+   * self-Edge and retreating back out of it both grow and shrink the Traversal
+   * history without moving the address, so neither takes another one. Both used
+   * to push a duplicate entry, which is the behaviour ADR 0081 changed
+   * deliberately.
+   */
+  it('takes one browser entry for a presentation a self-Edge never moves', async () => {
     mount(selfEdge);
     const pushState = vi.spyOn(window.history, 'pushState');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Present' }));
+    await waitFor(() => expect(pushState).toHaveBeenCalledTimes(1));
+    const point = pushState.mock.calls[0]?.[2];
+    expect(point).toBe(
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(CARD_ID)}`,
+    );
+
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     fireEvent.click(await screen.findByRole('button', { name: 'Back' }));
 
-    await waitFor(() => expect(pushState).toHaveBeenCalledTimes(3));
-    expect(pushState.mock.calls[1]?.[2]).toBe(pushState.mock.calls[0]?.[2]);
-    expect(pushState.mock.calls[2]?.[2]).toBe(pushState.mock.calls[0]?.[2]);
+    await waitFor(() => expect(screen.getByTestId('presenting-chrome')).toBeVisible());
+    expect(pushState).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -46,6 +46,52 @@ export type NavigationState =
     });
 
 /**
+ * Where the reader is, as one value: the renderer drawing, the Graph emphasised
+ * and, while presenting, the Card being presented.
+ *
+ * Navigation's own vocabulary and nothing else's (ADR 0081). It is not a URL,
+ * does not name one, and carries no addressed Card — the Card a browser location
+ * may name is read from that location by `app` and never written back here.
+ */
+export interface NavigationAddress {
+  readonly selectedRenderer: CanvasRendererId;
+  readonly activeGraphId: GraphId | null;
+  readonly presentingCardId: CardId | null;
+}
+
+/**
+ * The addressable position a navigation state is at.
+ *
+ * **Derived, and never a field on the state.** A stored address would have to be
+ * maintained at all six publish sites and could then disagree with the state it
+ * describes; derived, it cannot. The mode is not repeated either: the presented
+ * Card is the last of the Traversal history while presenting and `null` in
+ * overview, so `presentingCardId !== null` *is* "presenting".
+ */
+export function navigationAddress(state: NavigationState): NavigationAddress {
+  return {
+    selectedRenderer: state.selectedRenderer,
+    activeGraphId: state.activeGraphId,
+    presentingCardId: presentedCard(state),
+  };
+}
+
+/**
+ * The Card being presented, or `null` in overview.
+ *
+ * One definition, because two things are the same fact about it: `activeCardId`,
+ * which App renders from, and {@link navigationAddress}'s `presentingCardId`.
+ * Written out twice they can drift, and the copy that drifts silently is the
+ * address — App lists `activeCardId` as the render-time dependency standing in
+ * for `presentingCardId`, so a rule added to one and not the other leaves the
+ * dependency firing while the address still reports the Card before it, and the
+ * browser sync deciding against a position the application is not at.
+ */
+function presentedCard(state: NavigationState): CardId | null {
+  return state.mode === 'presenting' ? currentCard(state.traversalHistory) : null;
+}
+
+/**
  * Whether Traversal history holds a Card to go back to.
  *
  * One rule, because two surfaces ask it: `App` draws the chrome over the real
@@ -120,8 +166,15 @@ function outgoingEdgesFrom(
 const rendererShowsGraph = (renderer: ResolvedRenderer, graphId: GraphId): boolean =>
   renderer.subject.graphs.some((graph) => graph.id === graphId);
 
-/** The Graph a renderer opens on: a Layout's own Active Graph, or a View's default. */
-const openingGraphId = (renderer: ResolvedRenderer): GraphId | null =>
+/**
+ * The Graph a renderer opens on: a Layout's own Active Graph, or a View's default.
+ *
+ * Exported because one other question needs the same answer and must not derive
+ * a second one: deciding whether a browser location *already opens* an address
+ * means asking what a location naming no Graph would leave active, which is this
+ * (ADR 0081, `destination-coordination.ts`).
+ */
+export const openingGraphId = (renderer: ResolvedRenderer): GraphId | null =>
   renderer.kind === 'layout'
     ? renderer.resolvedLayout.activeGraph.id
     : (renderer.defaultActiveGraph?.id ?? null);
@@ -185,10 +238,7 @@ export function createNavigation(
   const setState = (change: Partial<NavigationBase>): void => {
     observable.publish({ ...observable.getState(), ...change });
   };
-  const activeCardId = (): CardId | null => {
-    const state = observable.getState();
-    return state.mode === 'presenting' ? currentCard(state.traversalHistory) : null;
-  };
+  const activeCardId = (): CardId | null => presentedCard(observable.getState());
 
   return {
     getState: observable.getState,
