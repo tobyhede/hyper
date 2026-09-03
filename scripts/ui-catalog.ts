@@ -785,6 +785,20 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
     if (!claimedExports.has(story)) problems.push(`stable story ${story} has no parity claim`);
   }
 
+  // The one home of the exactly-one-test invariant, for both suites. It reads
+  // the tags out of the sources rather than out of a Playwright run, which is
+  // what makes it survive a sharded, filtered or `--last-failed` run: a reporter
+  // attached to a partial run observes a partial collection and reports every
+  // claim outside its slice as missing evidence. `ci-wall-clock/02` retired the
+  // reporter that did.
+  //
+  // It deliberately stops at *existence*, and does not grow a sibling asserting
+  // that the tagged test passed. Both Playwright configs set
+  // `failOnFlakyTests` under CI, so a green run already means every test passed
+  // without a retry — the tagged ones among them — and Playwright prints
+  // `@parity:<claim-id>` beside a failing test's title, so a lost claim is
+  // still named where the failure is. A second assertion would restate a
+  // guarantee the run already carries.
   const ladleEvidence = parityTagsIn(
     join(repositoryRoot, 'packages/app/ladle-e2e'),
     repositoryRoot,
