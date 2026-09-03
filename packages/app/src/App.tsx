@@ -156,6 +156,15 @@ export const createApp = (
       () => positionedStrategy(Placement.fromLayout(selectedLayout.layout)),
       [selectedLayout],
     );
+    // The Cards this Layout places. Memoized on the same two values the Layout
+    // is: it is the sole dependency of Edge Authoring's Card-title map and its
+    // endpoint choices, and a fresh array per render would rebuild both on every
+    // intermediate drag frame — which is the identity churn
+    // `edge-authoring-react.tsx` says its commands object must not have.
+    const placedCards = useMemo(
+      () => layoutCards(renderedSpace, selectedLayout.layout),
+      [renderedSpace, selectedLayout],
+    );
     // Everything the canvas draws, derived once from the Space and the Layout.
     // Memoized on those two alone: the interaction state below changes far more
     // often, and it is `project` that reads it rather than this.
@@ -1100,7 +1109,7 @@ export const createApp = (
                 selection={selection}
                 onSelectCard={selectCard}
                 onSelectEdge={selectEdge}
-                placedCards={layoutCards(renderedSpace, selectedLayout.layout)}
+                placedCards={placedCards}
                 newCardTitle={newCardTitle}
                 onAddCard={addCard}
                 onAddExistingCard={dropExistingCard}

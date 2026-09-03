@@ -694,9 +694,9 @@ export function createSpaceAuthoring({
    * Space (ADR 0045), so there is no second Graph the id could have meant.
    */
   const ownedGraph = (graphId: GraphId): Graph | undefined => {
-    const selectedLayoutId = selectedResolvedLayout();
+    const selectedLayout = selectedResolvedLayout();
     const owned = currentSpace().lookup.graph(graphId);
-    return owned?.owner.layout.id === selectedLayoutId.layout.id ? owned.graph : undefined;
+    return owned?.owner.layout.id === selectedLayout.layout.id ? owned.graph : undefined;
   };
 
   /**
