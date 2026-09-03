@@ -33,16 +33,15 @@ rather than being drawn anywhere else. Between them the two hold every Card
 once, so nothing is left over and nothing is in both.
 
 Their positions are **seeded from one ELK run over the whole fixture**, so
-selecting a Layout draws its Cards where Flow already had them and first paint
+selecting a Layout draws its Cards where that run put them and first paint
 did not move when they were declared. That is checked rather than claimed:
 `packages/app/test/fixture-placement.test.ts` re-runs `elkStrategy` over the
 fixture and compares every seeded position, so a change to the ELK options that
 would silently rearrange the fixture fails there.
 
-`defaultLayout` is **absent**, so the fixture still opens in Flow. Flow's subject
-is the Space's Cards, so it draws the flatten of every Graph across both
-Layouts (ADR 0045) — the one place in the tree where that flatten crosses a
-Layout boundary, and the reason the split is two Layouts rather than one.
+`defaultLayout` names **Collection 1**, so that is the Layout the fixture opens
+on (ADR 0079). A selected Layout draws only the Graphs it owns, so Collection 2
+is off the canvas until it is selected.
 
 `example/` is one connected collection of seven Cards, so its three Graphs are
 owned by a **single** Layout. Nothing renders it, so its positions are a plain
@@ -82,9 +81,9 @@ Between them the shape exercises every behaviour the e2e suite covers:
   selection.
 - **Scroll inside the frame (issue 05).** `D` is long enough to overflow the 16:9
   panel at a small viewport.
-- **Overlay counts.** 10 cards, 13 edges (4 + 3 + 2 + 4), 26 handles, 4 graphs —
-  what the Flow view draws over both Layouts. A *selected* Layout draws only the
-  Graphs it owns: 9 edges for Collection 1, 4 for Collection 2.
+- **Overlay counts.** 10 cards, 13 edges (4 + 3 + 2 + 4), 26 handles, 4 graphs
+  across both Layouts. A *selected* Layout draws only the Graphs it owns: 9
+  edges for Collection 1, 4 for Collection 2.
 
 The counts above are shape-dependent: change a Graph and the e2e counts change
 with it, deliberately.

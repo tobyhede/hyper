@@ -126,17 +126,17 @@ function sidebarActions(
       layoutId: layout.id,
     };
     return [
-      [rename('view-rename', layout.title, record)],
+      [rename('layout-rename', layout.title, record)],
       [
         copy(
-          'view-link',
+          'layout-link',
           'Copy link',
           `Opens ${layout.title} exactly as it draws now`,
           destination,
           record,
         ),
       ],
-      [openInNewTab('view-new-tab', destination, record)],
+      [openInNewTab('layout-new-tab', destination, record)],
     ];
   }
   const { graph, layout } = entity;

@@ -9,7 +9,7 @@ Every `complete(completion)` call answers exactly one **completion outcome** —
 `completed`, `unchanged` or `refused` (`CONTEXT.md`, ADR 0042/0057;
 architecture and rationale live in `docs/agents/editing-and-persistence.md`'s
 "Space Authoring's completed-edit lifecycle" section, not here). It gets there
-by running an ordered cascade: three guards common to every action, then that
+by running an ordered cascade: two guards common to every action, then that
 action's own ordered checks. First failure wins; nothing past it runs.
 `edgeEligibility`/`connectRefusal` ask the identical checks before commit,
 while a drag or connect gesture is still live in the author's hand, so the
@@ -76,10 +76,15 @@ that has not been decided.
 | Action | Its own checks, in order |
 | --- | --- |
 | `renamed-layout` | `layout-not-found` → `layout-title-required` → (same title ⇒ `unchanged`) → completed |
+| `deleted-layout` | `layout-not-found` → `space-must-keep-layout` → completed |
 
-`layout-not-found` here is not the universal gate 2 check: it is `renamed-layout`
+`layout-not-found` here is not the universal gate 2 check: it is the action
 naming a Layout other than the one the Edit resolved, which is an author's stale
 gesture rather than a broken invariant.
+
+`deleted-layout` refuses the last Layout (ADR 0079) and otherwise completes on a
+survivor: the selected Layout if it survived, else the first, which is also what
+`defaultLayout` becomes when the deleted Layout was it.
 
 ### Layout creation
 
@@ -93,10 +98,12 @@ gesture rather than a broken invariant.
 | --- | --- |
 | `settled-card-movement` | none → completed |
 
-## The 22 codes
+## The 24 codes
 
-2 contextual (`placement-pending`, `layout-not-found`) plus
-the 20 action-specific codes tabulated above — none is produced anywhere else.
+2 contextual (`placement-pending`, `layout-not-found`) plus 22 action-specific —
+none is produced anywhere else. 21 of those 22 are tabulated above;
+`layout-required` is declared and presented but currently raised nowhere, so it
+appears in no row.
 Count the codes, not the cells: several serve more than one action —
 `card-not-found`, `card-not-in-layout`, `graph-not-owned`,
 `edge-card-outside-layout` and the two `alias-target-*` each appear in more than

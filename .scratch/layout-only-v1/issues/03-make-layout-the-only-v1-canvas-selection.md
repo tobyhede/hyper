@@ -10,31 +10,31 @@ authored Layout, as ADR 0079 requires. Rename the persisted opening selection to
 `defaultLayout` and roll the unreleased repository state forward without
 compatibility intake.
 
-- [ ] Computed View identities, registries, renderer variants, conversion paths,
+- [x] Computed View identities, registries, renderer variants, conversion paths,
       selection rows and the Computed View conversion controls no longer exist in
       V1 code or generated state. Add Layout remains an ordinary authoring
       operation and keeps its control.
-- [ ] `defaultLayout` replaces `defaultRenderer` across schemas, snapshots, HTTP,
+- [x] `defaultLayout` replaces `defaultRenderer` across schemas, snapshots, HTTP,
       repositories, authoring, navigation, fixtures, seeds, stories and tests;
       the retired spelling receives no transitional reader, while a retired
       identity in the current field fails ordinary schema and intake validation.
-- [ ] Layout URLs remain durable; URLs for removed Computed View identities use
+- [x] Layout URLs remain durable; URLs for removed Computed View identities use
       the ordinary not-found behavior, while malformed destinations retain the
       existing bad-request behavior.
-- [ ] A selected Layout draws only its own Cards and owned Graphs; no canvas
+- [x] A selected Layout draws only its own Cards and owned Graphs; no canvas
       flattens Graphs across Layouts.
-- [ ] Automatic Layout strategies remain non-addressable capabilities and the
+- [x] Automatic Layout strategies remain non-addressable capabilities and the
       positioned strategy continues to draw authored Layouts; no strategy is
       privileged as the meaning of Layout.
-- [ ] Layout selection stays navigation rather than an Edit, and the next
+- [x] Layout selection stays navigation rather than an Edit, and the next
       successful Edit in that Layout may record it as the new default.
-- [ ] Package surfaces, architecture guards and vocabulary tests prevent
+- [x] Package surfaces, architecture guards and vocabulary tests prevent
       Computed View, Space View and the retired field from returning.
-- [ ] `CONTEXT.md`, `AGENTS.md`, the scoped `docs/agents/*.md` guidance, the root
+- [x] `CONTEXT.md`, `AGENTS.md`, the scoped `docs/agents/*.md` guidance, the root
       `README.md` and `packages/app/README.md` describe the Layout-only vocabulary
       the code now uses, and the ADR 0079 "decided, not built" banners are
       removed with the contract they were warning about.
-- [ ] The coordinated wide rewrite finishes green under the complete unit,
+- [x] The coordinated wide rewrite finishes green under the complete unit,
       property, UI catalogue, E2E and Ladle-E2E suites.
 
 This ticket owns the domain, persistence, HTTP, URL and application removal of
@@ -58,3 +58,20 @@ rather than a schema or wire change. They are recorded here because the wide
 rewrite is coordinated and a site discovered part-way through it is the
 expensive kind. ADR 0081's own body is provenance and stays as written; what
 changes is the code it describes.
+
+### Retired vocabulary that survived the sweep
+
+Two story parity claims still name the retired union term as a hyphenated
+adjective:
+
+- `packages/app/stories/parity-claims.ts:213` and `:219` —
+  "distinct canonical and current-Space-View copy commands", where the surface
+  they describe now reads "Copy link to … in this Layout"
+  (`packages/app/src/components/SpaceSidebar.tsx:656`, `:664`).
+
+The guard does not catch them because `RETIRED_CANVAS_TERMS`
+(`test/unit/current-domain-vocabulary.test.ts:33`) joins the two words with a
+literal space, and a hyphenated compound is a different string. Prose in a
+story claim cannot resurrect the entity, so this is the live-vocabulary tail of
+this ticket rather than a contract defect — but the guard arm the last box
+claims is narrower than the sweep it is meant to hold.

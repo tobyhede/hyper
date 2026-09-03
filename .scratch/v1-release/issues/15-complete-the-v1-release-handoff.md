@@ -53,12 +53,15 @@ it belongs to the Space Card work below.
    [architecture 14](../../architecture-review/issues/14-deepen-open-spaces-composition.md).
    Run [architecture 13](../../architecture-review/issues/13-concentrate-aggregate-commit-semantics.md)
    as the mandatory diagnostic: refactor only if its differential test exposes
-   drift. Complete
+   drift.
    [`layout-only-v1/03`](../../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md)
-   here — `layout-only-v1/01` and `02` are built, and both
-   [V1/08](08-round-trip-multi-space-import-and-export.md) and
+   is built alongside `01` and `02`, so nothing in this step waits on it:
    [Space Card reference authoring](../../entity-url-addressability/issues/07-author-a-space-card-reference.md)
-   are blocked on it. In parallel, complete
+   is unblocked, and
+   [V1/08](08-round-trip-multi-space-import-and-export.md) now waits on
+   [V1/01](01-establish-the-meta-space-lifecycle.md), architecture 12 and
+   [`layout-only-v1/04`](../../layout-only-v1/issues/04-make-space-cards-select-initialized-layouts.md)
+   alone. In parallel, complete
    [Alias Opening](../../alias-cards/issues/06-open-alias-shows-target-content-read-only.md),
    [V1/02](02-complete-the-cards-view.md), [V1/17](17-preserve-structured-aggregate-refusals.md)
    and [V1/18](18-restore-aggregate-http-wire-policy-proof.md).

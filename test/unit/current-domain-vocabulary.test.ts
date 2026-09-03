@@ -30,8 +30,12 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
  */
 const ENTITY = ['R', 'oute'].join('');
 const TRAVERSAL = ['W', 'alk'].join('');
+// Separated by a space *or a hyphen*: the retired terms were also written as
+// compound adjectives, and a guard that knew only the spaced form left the
+// hyphenated one as the spelling the sweep could hide in — which is exactly
+// where one survived, in a parity claim, until this line widened.
 const RETIRED_CANVAS_TERMS = new RegExp(
-  `${['Computed', 'View'].join(' ')}|${['Algorithmic', 'View'].join(' ')}|${['Space', 'View'].join(' ')}`,
+  `${['Computed', 'View'].join('[ -]')}|${['Algorithmic', 'View'].join('[ -]')}|${['Space', 'View'].join('[ -]')}`,
   'i',
 );
 const RETIRED_OPENING_FIELD = ['default', 'Renderer'].join('');
