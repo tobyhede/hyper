@@ -278,7 +278,7 @@ describe('release scope', () => {
     const plan = planRelease(roadmap, release);
 
     expect(release).toMatchObject({ gate: 'release/03', space: 'release/roadmap-space' });
-    expect(plan.criticalPath.map(({ reference }) => reference)).toEqual([
+    expect(plan.criticalSubgraph.map(({ reference }) => reference)).toEqual([
       'foundation/01',
       'release/01',
       'release/03',
@@ -286,15 +286,56 @@ describe('release scope', () => {
     expect(plan.parallel.map(({ reference }) => reference)).toEqual(['parallel/01']);
 
     const text = renderRoadmap(roadmap, release);
-    expect(text).toContain('CRITICAL PATH — 3');
+    expect(text).toContain('CRITICAL SUBGRAPH — 3');
     expect(text).toContain('PARALLEL WORK — 1');
     expect(text.indexOf('foundation/01')).toBeLessThan(text.indexOf('release/01'));
     expect(text.indexOf('release/01')).toBeLessThan(text.indexOf('release/03'));
 
     const html = renderRoadmapHtml(roadmap, release);
-    expect(html).toContain('<h3>Critical path<span class="tally">3</span></h3>');
+    expect(html).toContain('<h3>Critical subgraph<span class="tally">3</span></h3>');
     expect(html).toContain('<h3>Parallel work<span class="tally">1</span></h3>');
     expect(html).toContain('href="release/roadmap-space/space.json"');
+  });
+
+  it('includes every tied longest dependency path in the critical subgraph', () => {
+    const root = scratch();
+    write(
+      root,
+      'ROADMAP.md',
+      '# V1 Release\n\nTag: release/v1\nGoal: Ship V1.\nGate: release/03\n',
+    );
+    write(
+      root,
+      'left/issues/01-start.md',
+      '# 01 — Left start\n\nStatus: ready-for-agent\nTags: release/v1\n',
+    );
+    write(
+      root,
+      'left/issues/02-finish.md',
+      '# 02 — Left finish\n\nStatus: ready-for-agent\nTags: release/v1\nBlocked by: 01\n',
+    );
+    write(
+      root,
+      'right/issues/01-start.md',
+      '# 01 — Right start\n\nStatus: ready-for-agent\nTags: release/v1\n',
+    );
+    write(
+      root,
+      'right/issues/02-finish.md',
+      '# 02 — Right finish\n\nStatus: ready-for-agent\nTags: release/v1\nBlocked by: 01\n',
+    );
+    write(
+      root,
+      'release/issues/03-gate.md',
+      '# 03 — Gate\n\nStatus: ready-for-agent\nTags: release/v1\nBlocked by: `left/02`; `right/02`\n',
+    );
+
+    const release = readReleaseScope(root);
+    if (release === null) throw new Error('Expected a release.');
+
+    expect(
+      planRelease(buildRoadmap(root), release).criticalSubgraph.map(({ reference }) => reference),
+    ).toEqual(['left/01', 'right/01', 'left/02', 'right/02', 'release/03']);
   });
 
   it('treats a settled gate as a reached release rather than a broken one', () => {
@@ -320,15 +361,15 @@ describe('release scope', () => {
     if (release === null) throw new Error('Expected a release.');
     const plan = planRelease(roadmap, release);
 
-    // Reaching the gate is how a release ends, so there is no critical path left
+    // Reaching the gate is how a release ends, so there is no critical subgraph left
     // to trace to it — the work that outlived it is ordinary parallel work.
-    expect(plan.criticalPath).toEqual([]);
+    expect(plan.criticalSubgraph).toEqual([]);
     expect(plan.parallel.map(({ reference }) => reference)).toEqual(['parallel/01']);
 
     const text = renderRoadmap(roadmap, release);
-    expect(text).not.toContain('CRITICAL PATH');
+    expect(text).not.toContain('CRITICAL SUBGRAPH');
     expect(text).toContain('parallel/01');
-    expect(renderRoadmapHtml(roadmap, release)).not.toContain('<h3>Critical path');
+    expect(renderRoadmapHtml(roadmap, release)).not.toContain('<h3>Critical subgraph');
   });
 
   it('renders a fully settled release without a plan to draw', () => {
@@ -348,7 +389,7 @@ describe('release scope', () => {
     const release = readReleaseScope(root);
     if (release === null) throw new Error('Expected a release.');
 
-    expect(planRelease(roadmap, release)).toEqual({ criticalPath: [], parallel: [] });
+    expect(planRelease(roadmap, release)).toEqual({ criticalSubgraph: [], parallel: [] });
     expect(renderRoadmap(roadmap, release)).toContain('1/1 settled');
   });
 
@@ -456,8 +497,8 @@ describe('release scope', () => {
     const written: unknown = JSON.parse(readFileSync(join(destination, 'space.json'), 'utf8'));
     const file = spaceFileSchema.parse(written);
     expect(file.layouts?.[0]?.graphs.map(({ edges }) => edges)).toEqual([
-      [expect.any(Object)],
-      [expect.any(Object)],
+      [expect.any(Object), expect.any(Object)],
+      [],
     ]);
 
     const imported = await readSingleSpace(destination);
