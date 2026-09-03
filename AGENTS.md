@@ -81,6 +81,9 @@ Hard rules — **all four are now enforced, not just documented**. Two layers, b
 - For any UI/graph change, also run `pnpm e2e` and report it.
 - For any change to a component with a story, also run `pnpm e2e:ladle` and report it. It is not part of `verify` and not part of `e2e`, so nothing else runs it for you, and it is a CI job — a story left behind by a component change fails there.
 - Do not assert success without having run the commands.
+- **Assume a green baseline. Never run the bar to establish one.** CI gates all four jobs on every push and pull request, so a tree you were handed is green — that is what makes the baseline green, not what makes your change green. Run each command once, on the finished state. A full pass is minutes — `verify` 70–130s, `e2e` 100–240s, `e2e:ladle` ~75s — so a baseline run plus a final run doubles the largest cost in your session to learn nothing. Any failure you see is yours until you have evidence otherwise, and `git stash` or `git log` on the file is that evidence in seconds where a second suite run is minutes.
+- **Only run what can observe the change.** The scoping above cuts both ways. A change reaching no application or test code — `.github/**`, `.scratch/**`, `docs/**`, a README — cannot be observed by a browser, and `pnpm e2e` on it is pure cost. Match the command to what you touched, and report which commands you ran *and* which you judged inapplicable and why. A skipped command you name is honest; a skipped command you leave unmentioned reads as a passed one.
+- **The shards are the suite.** `pnpm e2e --shard=i/3` across all three `i` is the same 156 tests as `pnpm e2e`. Run one or the other, never both.
 - CI (`.github/workflows/ci.yml`) runs all four jobs on every push and PR, with `--frozen-lockfile`. It is a backstop, not a substitute — a red CI after the fact is slower than a green run before the commit.
 
 ## Scope discipline
