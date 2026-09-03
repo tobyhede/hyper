@@ -12,6 +12,7 @@ import {
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { mountSpaceApp } from '../src/SpaceApp';
+import { composeApp } from '../src/compose-app';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -122,10 +123,13 @@ function mount(value: SpaceSnapshot = snapshot): SpaceSession {
   const stored = { snapshot: value, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
   let view: RenderResult | undefined;
-  mountSpaceApp({ space: runtime(value), spaceSession: session }, (app) => {
-    if (view === undefined) view = render(app);
-    else view.rerender(app);
-  });
+  mountSpaceApp(
+    { id: runtime(value).id, session: session, app: composeApp({ spaceSession: session }) },
+    (app) => {
+      if (view === undefined) view = render(app);
+      else view.rerender(app);
+    },
+  );
   return session;
 }
 
@@ -183,6 +187,40 @@ describe('authoring a Card title on the graph', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(cardTitleOf(session, CARD_ID)).toBe('A');
+    await settled(session);
+  });
+
+  /**
+   * A refused title draft has nowhere to go but the editor still holding it.
+   *
+   * Add Layout selects the empty Layout it creates, so the canvas re-derives
+   * with no nodes at all and the edited Card unmounts — taking the draft text,
+   * the announced reason and the caret with it, with neither of the Title's own
+   * exits spent. A *valid* draft is safe without this gate, because the
+   * button's own mousedown blurs the input and a valid blur completes the Title
+   * (ADR 0065); a refused one is re-focused instead and the click lands anyway.
+   */
+  it('withdraws Add Layout while a Card title editor holds a refused draft', async () => {
+    const session = mount();
+    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
+    await waitFor(() => expect(createLayout).toBeEnabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+
+    expect(createLayout).toBeDisabled();
+
+    // And the draft survives the attempt, which is what the gate is for.
+    fireEvent.click(createLayout);
+    expect(session.getState().working.document.layouts).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
     await settled(session);
   });
 

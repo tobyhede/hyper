@@ -295,24 +295,33 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} serializes two replacements authorized against the same Meta identity`, async () => {
+  it(`${name} refuses a replacement authorized against a superseded Meta identity`, async () => {
     await withHarness(async (repository) => {
       const initial = space(SPACE_ID, 'Initial', [CARD_ID]);
       const first = space(OTHER_SPACE_ID, 'First replacement', [OTHER_CARD_ID]);
       const second = space(MISSING_SPACE_ID, 'Second replacement', [MISSING_CARD_ID]);
       await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
 
-      const results = await Promise.all([
+      await expect(
         repository.replaceAggregate({ metaSpaceId: OTHER_SPACE_ID, spaces: [first] }, SPACE_ID),
+      ).resolves.toMatchObject({ kind: 'replaced' });
+      /*
+       * A replacement names the Meta identity it read, and the first one
+       * retired SPACE_ID. So the second is authorized against an aggregate that
+       * no longer exists and is refused, whatever it proposes.
+       *
+       * Deliberately sequential. What two *overlapping* replacements do is
+       * PostgreSQL's Meta row lock deciding which is granted it last, which is
+       * transactional isolation a `Map` cannot have -- it is forced with a
+       * barrier and asserted in the integration suite, and stating it here made
+       * the contract read as though call order settled the winner.
+       */
+      await expect(
         repository.replaceAggregate({ metaSpaceId: MISSING_SPACE_ID, spaces: [second] }, SPACE_ID),
-      ]);
-      expect(results.map(({ kind }) => kind)).toEqual(['replaced', 'replaced']);
+      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: OTHER_SPACE_ID });
       await expect(repository.loadAggregate()).resolves.toEqual({
         kind: 'loaded',
-        aggregate: {
-          metaSpaceId: MISSING_SPACE_ID,
-          spaces: [stored(second, 0n, null)],
-        },
+        aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(first, 0n, null)] },
       });
     });
   });

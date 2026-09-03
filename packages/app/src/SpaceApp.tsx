@@ -1,7 +1,7 @@
 import { Component, type ReactElement, type ReactNode } from 'react';
 import { createApp } from './App';
 import { SpaceAppFailureView } from './components/SpaceAppFailureView';
-import type { OpenedSpace } from './space';
+import type { OpenSpace } from './open-spaces';
 import type { DestinationOpening } from './destination-opening';
 
 export type SpaceAppRenderer = (app: ReactElement) => void;
@@ -45,22 +45,16 @@ class SpaceAppFailure extends Component<{ children: ReactNode }, SpaceAppFailure
 /**
  * Mount one application for the lifetime of the opened Space.
  *
- * Composition is guarded as well as rendering, because it reads the same
- * snapshot: `createApp` builds Navigation, which resolves the renderer the
- * Space opens in against the session's working Space (`compose-app.ts`), so a
- * snapshot that fails domain intake throws here — before there is a tree for
- * the boundary to catch it in. Both paths report the same sentence, for the
- * same reason: an uncaught throw leaves a blank page, which says nothing.
- *
- * `createStoredSpaceOpener` validates the snapshot and the session then clones that
- * same value, so the two halves of an `OpenedSpace` agree on every route this
- * app actually opens by. This guard is therefore a backstop, not a path with a
- * caller: it catches a composition assembled from halves that disagree, and it
- * logs as well as reports because — unlike the boundary below, which React
- * traces for us — nothing else would say what threw.
+ * Open Spaces validates the snapshot and composes the collaborators once, so
+ * `createApp` no longer performs domain intake. What it still does before there
+ * is a tree is apply the addressed opening against the session's working Space,
+ * and that throws on a Space that has since stopped loading — with no boundary
+ * mounted yet to catch it. Both paths report the same sentence, for the same
+ * reason: an uncaught throw leaves a blank page, which says nothing. This guard
+ * is a backstop for a broken invariant, not a second composition path.
  */
 export function mountSpaceApp(
-  opened: OpenedSpace,
+  opened: OpenSpace,
   render: SpaceAppRenderer,
   opening?: DestinationOpening,
 ): void {

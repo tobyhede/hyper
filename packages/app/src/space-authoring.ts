@@ -1092,7 +1092,7 @@ export function createSpaceAuthoring({
       }
       // A Space Card owns the Space it names (ADR 0058), so deleting it deletes
       // that Space and everything below it — one coordinated multi-Space Edit,
-      // which is `createSpaceCardLifecycle` through the session registry and not
+      // which is Space Card lifecycle through the session registry and not
       // a single-Space update this seam can make. Completing it here would store
       // a Space whose target is unreachable, and aggregate intake refuses that
       // commit permanently with the Card already gone from the working state.

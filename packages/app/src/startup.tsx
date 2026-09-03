@@ -1,5 +1,5 @@
 import { StrictMode, type ReactNode } from 'react';
-import type { OpenedSpace } from './open-space';
+import type { OpenSpace } from './open-spaces';
 import type { DestinationOpening } from './destination-opening';
 import { mountSpaceApp } from './SpaceApp';
 import { StartupFailure } from './components/StartupFailure';
@@ -10,7 +10,7 @@ export interface ApplicationRoot {
 
 export interface OpenedApplicationStartup {
   kind: 'opened';
-  opened: OpenedSpace;
+  opened: OpenSpace;
   opening?: DestinationOpening | undefined;
 }
 
@@ -20,7 +20,7 @@ export type ApplicationStartupResolver = () => Promise<ApplicationStartupResult>
 
 const renderOpenedSpace = (
   root: ApplicationRoot,
-  opened: OpenedSpace,
+  opened: OpenSpace,
   opening?: DestinationOpening,
 ): void => {
   mountSpaceApp(

@@ -959,6 +959,23 @@ export class PostgresSpaceRepository implements SpaceRepository {
           `Compatibility import reached unexpected lifecycle result ${lifecycle.kind}`,
         );
       }
+      /*
+       * `conflict` and `uninitialized` mean the replacement rolled back, so the
+       * store still holds everything the truncate was to remove. Control that
+       * leaves this branch reaches the insert path below, writes the batch
+       * beside that data and answers `imported` — a truncate that became an
+       * insert, reported as a success.
+       *
+       * An ordinary edit is what reaches it. `commitTopologyPreservingUpdate`
+       * takes no Meta lock, so a single authored update commits while the
+       * replacement holds one, moves the revision the replacement read as its
+       * baseline, and turns it into a `conflict`.
+       *
+       * No rejection code names this and no caller can act on it, so it leaves
+       * as an error: the CLI reports a failed import and the operator runs the
+       * command again against a store the rollback left untouched.
+       */
+      throw new Error(`Truncating import could not replace the aggregate: ${lifecycle.kind}`);
     }
 
     try {

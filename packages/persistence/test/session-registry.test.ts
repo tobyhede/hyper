@@ -27,11 +27,50 @@ describe('Space session registry', () => {
     expect(registry.entry(SPACE_ID)).toEqual({ kind: 'session', session: first });
   });
 
+  it('releases an idle session after its owner safely closes it', () => {
+    const registry = createSpaceSessionRegistry(new MemorySpaceBackend(SPACE_ID, [loaded]));
+    const first = registry.open(loaded);
+
+    registry.release(SPACE_ID);
+
+    expect(registry.session(SPACE_ID)).toBeUndefined();
+    expect(registry.open(loaded)).not.toBe(first);
+  });
+
+  it('refuses to release a session a queued coordination has not yet claimed', async () => {
+    const registry = createSpaceSessionRegistry(new MemorySpaceBackend(SPACE_ID, [loaded]));
+    registry.open(loaded);
+
+    // A coordination takes its turn synchronously but raises the barrier only
+    // after awaiting that turn. Releasing inside the window between the two
+    // retires a session the coordination is about to name as a participant.
+    const linking = registry
+      .spaceCards(() => CARD_ID)
+      .link({
+        containingSpaceId: SPACE_ID,
+        layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000009'),
+        targetSpaceId: SPACE_ID,
+        title: 'Linked',
+        position: { x: 0, y: 0 },
+      });
+    expect(registry.release(SPACE_ID)).toBe(false);
+
+    await expect(linking).resolves.toBeDefined();
+    expect(registry.session(SPACE_ID)).toBeDefined();
+  });
+
   it('offers Space Card coordination only through the three lifecycle operations', () => {
     const registry = createSpaceSessionRegistry(new MemorySpaceBackend(SPACE_ID, [loaded]));
     const lifecycle = registry.spaceCards(() => CARD_ID);
 
     expect(Object.keys(lifecycle).sort()).toEqual(['create', 'delete', 'link']);
-    expect(Object.keys(registry).sort()).toEqual(['entry', 'open', 'session', 'spaceCards']);
+    expect(Object.keys(registry).sort()).toEqual([
+      'entry',
+      'open',
+      'release',
+      'session',
+      'spaceCards',
+      'waitUntilRetirable',
+    ]);
   });
 });

@@ -1,15 +1,10 @@
+import { HttpSpaceBackend } from '@project/http';
 import { newUuid, type UUID } from '@project/core';
-import { HttpSpaceBackend, resolveProductDestination } from '@project/http';
-import {
-  createSpaceSessionRegistry,
-  createWorkingSpaceLoader,
-  type SpaceBackend,
-} from '@project/persistence';
-import { openLoadedSpace } from './open-space';
+import type { SpaceBackend } from '@project/persistence';
 import type { OpenedApplicationStartup } from './startup';
-import { destinationOpening } from './destination-opening';
+import { createOpenSpaces, type OpenSpaces } from './open-spaces';
 
-export type { OpenedSpace } from './open-space';
+export type { OpenSpace } from './open-spaces';
 
 export interface SpaceStartup {
   resolve(pathname: string): Promise<OpenedApplicationStartup>;
@@ -20,24 +15,27 @@ export const createSpaceStartup = (
   backend: SpaceBackend = new HttpSpaceBackend(),
   newId: () => UUID = newUuid,
 ): SpaceStartup => {
-  const registry = createSpaceSessionRegistry(backend);
-  const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
+  let owner: Promise<OpenSpaces> | undefined;
+  const openSpaces = (): Promise<OpenSpaces> => {
+    if (owner !== undefined) return owner;
+    const opening = backend.loadAggregate().then((result) => {
+      if (result.kind === 'uninitialized')
+        throw new Error('The Space repository is uninitialized.');
+      return createOpenSpaces({ backend, metaSpaceId: result.aggregate.metaSpaceId, newId });
+    });
+    owner = opening;
+    // A failed attempt is not the owner. Retaining the rejected promise would
+    // answer every later startup with the first transport error, so the memo
+    // holds only an owner that exists.
+    void opening.catch(() => {
+      if (owner === opening) owner = undefined;
+    });
+    return opening;
+  };
   return {
     resolve: async (pathname) => {
-      const resolution = await resolveProductDestination({ loadSpace: loadWorkingSpace }, pathname);
-      if (resolution.kind === 'outside') {
-        throw new Error('The URL is outside product addressing.');
-      }
-      if (resolution.kind === 'malformed') throw new Error('The product URL is malformed.');
-      if (resolution.kind === 'unresolved') throw new Error('The product URL does not resolve.');
-      // An available Computed View and a declared Layout claiming one id. Neither
-      // wins (ADR 0069), so there is no Space View to open and nothing here can
-      // pick one; intake rejects such a Space, which is why this is a broken
-      // invariant rather than an address the author can correct.
-      if (resolution.kind === 'collision')
-        throw new Error('The product URL names two Space Views.');
-      const opened = openLoadedSpace(backend, resolution.loaded, registry);
-      const opening = destinationOpening(opened.space, resolution.destination);
+      const spaces = await openSpaces();
+      const { opened, opening } = await spaces.openPath(pathname);
       return {
         kind: 'opened',
         opened,

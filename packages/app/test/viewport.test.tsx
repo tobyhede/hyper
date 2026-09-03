@@ -4,6 +4,7 @@ import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/co
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { mountSpaceApp } from '../src/SpaceApp';
+import { composeApp } from '../src/compose-app';
 
 /**
  * React Flow positions the whole graph with one viewport transform, and derives
@@ -100,10 +101,13 @@ describe('graph viewport', () => {
     });
 
     let view: RenderResult | undefined;
-    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
-      if (view === undefined) view = render(app);
-      else view.rerender(app);
-    });
+    mountSpaceApp(
+      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      (app) => {
+        if (view === undefined) view = render(app);
+        else view.rerender(app);
+      },
+    );
     await screen.findByText('Local space');
     expect(viewportTransform()).not.toMatch(/NaN/);
 

@@ -82,8 +82,17 @@ export function useCanvasCardAuthoring({
   }, [bodyEditing, onBodyEditingChange]);
   useEffect(() => {
     onTitleEditingChange?.(editingTitleCardId !== null);
-    // A renderer change remounts the canvas and takes its draft with it.
-    // Return Space chrome even when no editor callback gets to settle the edit.
+    // Returning the Space chrome on unmount is the whole of the safety net,
+    // and it is narrower than "a renderer change remounts the canvas" would
+    // suggest. Only a renderer move that drops the projection unmounts this
+    // canvas; a move made *through* a completed Edit installs the next
+    // projection instead, so the canvas stays mounted and the caret with it —
+    // even where the Card it names has left `nodes`, since the caret is keyed
+    // by Card id and nothing here watches them. So a surface that moves the
+    // renderer that way withdraws itself while the caret is held rather than
+    // relying on this, and what remains here is the unmount case: a canvas that
+    // goes away must not leave the chrome withdrawn against an editor no
+    // callback will ever settle.
     return () => onTitleEditingChange?.(false);
   }, [editingTitleCardId, onTitleEditingChange]);
 
