@@ -6,11 +6,12 @@ import {
   type Graph,
   type GraphEdge,
   type GraphId,
+  type LayoutId,
   type LayoutPosition,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement, type Space } from '@project/graph';
+import { loadSpaceSnapshot, Placement, type ResolvedLayout, type Space } from '@project/graph';
 import {
   createNonThrowingReporter,
   createObservableState,
@@ -26,12 +27,7 @@ import {
   withoutIncidentEdges,
 } from './snapshot';
 import { nextCardTitle, nextGraphTitle, nextLayoutTitle } from './titles';
-import {
-  defaultLayout,
-  type CanvasRendererId,
-  type ResolvedRenderer,
-  type ResolveRenderer,
-} from './renderer';
+import { requireDefaultLayout, resolveLayout } from './layout-resolution';
 
 /** Which end of an Edge a reconnection replaces. */
 export type EdgeEndpoint = 'from' | 'to';
@@ -325,7 +321,7 @@ interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
   readonly placement: Placement;
   /** The Layout this Edit wrote, which Navigation continues in. */
-  readonly nextRenderer: CanvasRendererId;
+  readonly nextRenderer: LayoutId;
   /**
    * The Active Graph of that Layout, which Navigation adopts along with it.
    *
@@ -386,14 +382,6 @@ interface SpaceAuthoringDependencies {
    * Space's own `lookup`.
    */
   readonly currentSpace: () => Space;
-  /**
-   * The composition's one renderer resolver, shared with App rendering and
-   * Navigation.
-   *
-   * Authoring needs it because which Layout an Edit writes, and what that Layout
-   * owns, is the renderer's answer.
-   */
-  readonly resolveRenderer: ResolveRenderer;
   readonly initialPlacement?: Placement | null;
   readonly reportObserverError?: ObserverErrorReporter | undefined;
   /**
@@ -607,7 +595,6 @@ export function createSpaceAuthoring({
   session,
   navigation,
   currentSpace,
-  resolveRenderer,
   initialPlacement = null,
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
   newId,
@@ -630,8 +617,8 @@ export function createSpaceAuthoring({
     placement = nextPlacement;
   };
 
-  const selectedResolvedRenderer = (): ResolvedRenderer =>
-    resolveRenderer(currentSpace(), navigation.getState().selectedRenderer);
+  const selectedResolvedRenderer = (): ResolvedLayout =>
+    resolveLayout(currentSpace(), navigation.getState().selectedRenderer);
 
   const mergeBase = (): Placement | null => placement;
 
@@ -709,9 +696,7 @@ export function createSpaceAuthoring({
   const ownedGraph = (graphId: GraphId): Graph | undefined => {
     const selectedRenderer = selectedResolvedRenderer();
     const owned = currentSpace().lookup.graph(graphId);
-    return owned?.owner.layout.id === selectedRenderer.resolvedLayout.layout.id
-      ? owned.graph
-      : undefined;
+    return owned?.owner.layout.id === selectedRenderer.layout.id ? owned.graph : undefined;
   };
 
   /**
@@ -898,15 +883,15 @@ export function createSpaceAuthoring({
     // resolving, because the resolver answers that case by throwing.
     //
     // Not the thing ADR 0045 forbids, which is turning a *thrown*
-    // `RendererInvariantError` into a refusal — there is no catch here and a
-    // renderer that refuses still takes the Edit down with it. This asks a
+    // `LayoutNotFoundError` into a refusal — there is no catch here and a
+    // resolver that refuses still takes the Edit down with it. This asks a
     // question of the Space instead, and the answer is an author's state rather
     // than a defect: the Layout this gesture was aimed at is gone, so there is
     // nothing to write it into.
     if (space.lookup.layout(selection) === undefined) {
       return refuse({ code: 'layout-not-found' });
     }
-    const renderer = resolveRenderer(space, selection);
+    const renderer = resolveLayout(space, selection);
     /**
      * What this Edit does to the placement, held rather than applied.
      *
@@ -1101,12 +1086,12 @@ export function createSpaceAuthoring({
       connection = { from: completion.from, to: completion.to };
     }
     // Which Layout this Edit writes, and what it owns afterwards.
-    const layoutId: UUID = renderer.resolvedLayout.layout.id;
+    const layoutId: UUID = renderer.layout.id;
     let layoutTitle: string;
     let ownedGraphs: readonly Graph[];
     let activeGraphId: GraphId | null;
     let createdGraphId: GraphId | undefined;
-    const { layout } = renderer.resolvedLayout;
+    const { layout } = renderer;
     layoutTitle = layout.title;
     ownedGraphs = layout.graphs;
     activeGraphId = navigationState.activeGraphId;
@@ -1438,9 +1423,9 @@ export function createSpaceAuthoring({
         .map((error) => `  - ${error.message}`)
         .join('\n')}`;
     }
-    const selection = defaultLayout(accepted.space);
-    const resolved = resolveRenderer(accepted.space, selection);
-    const acceptedPlacement = Placement.fromLayout(resolved.resolvedLayout.layout);
+    const selection = requireDefaultLayout(accepted.space);
+    const resolved = resolveLayout(accepted.space, selection);
+    const acceptedPlacement = Placement.fromLayout(resolved.layout);
     installTogether(() => {
       session.acceptRemote();
       install(acceptedPlacement);

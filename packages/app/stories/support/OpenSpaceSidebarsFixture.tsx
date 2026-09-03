@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Space } from '@project/graph';
 import { AppShell } from '@project/ui';
+import { resolveLayout } from '#src/layout-resolution';
 import { graphColorMap } from '#src/colors';
 import { PersistenceControl } from '#components/PersistenceControl';
 import { OpenSpaceSidebars, type OpenSpaceSidebar } from '#components/OpenSpaceSidebars';
@@ -10,21 +11,21 @@ import { authoredSpace, deepDiveSpace, traversalSpace } from './spaces';
 
 function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
   const readSpace = useCallback(() => space, [space]);
-  const { navigation, state, resolveRenderer } = useStoryNavigation(readSpace);
+  const { navigation, state } = useStoryNavigation(readSpace);
   const addCardMenu = useRef<HTMLButtonElement>(null);
   const renderer = useMemo(
-    () => resolveRenderer(space, state.selectedRenderer),
-    [resolveRenderer, space, state.selectedRenderer],
+    () => resolveLayout(space, state.selectedRenderer),
+    [space, state.selectedRenderer],
   );
   const sidebar: SpaceSidebarProps = {
     spaceTitle: space.title,
     canvas: {
       layouts: space.layouts,
-      selected: renderer.resolvedLayout.layout,
+      selected: renderer.layout,
       onSelect: navigation.selectRenderer,
     },
     graph: {
-      graphs: renderer.subject.graphs,
+      graphs: renderer.layout.graphs,
       activeGraphId: state.activeGraphId,
       colorByGraphId: graphColorMap(space),
       onActivate: navigation.activateGraph,
@@ -56,7 +57,7 @@ function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
     sidebar,
     status,
   };
-  return { entry, layout: renderer.resolvedLayout.layout };
+  return { entry, layout: renderer.layout };
 }
 
 /** Fixture-only state around the production Open Spaces and Sidebar composition. */

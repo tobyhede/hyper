@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
-import { uuidSchema, type CardId, type GraphId, type UUID } from '@project/core';
+import { uuidSchema, type CardId, type GraphId, type LayoutId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import {
   canRetreat,
@@ -10,25 +10,14 @@ import {
   type NavigationState,
   type NavigationOptions,
 } from '../src/navigation';
-import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 import { cardFile } from './card-files';
-
-/** Navigation over one composed resolver, the way `createApp` composes it. */
-const resolveRenderer = createRendererResolver();
 
 const navigationFor = (
   currentSpace: () => Space,
-  initialRenderer: CanvasRendererId,
+  initialRenderer: LayoutId,
   initialSpace?: Space,
   options?: NavigationOptions,
-) =>
-  createNavigation(
-    currentSpace,
-    resolveRenderer,
-    initialRenderer,
-    initialSpace ?? currentSpace(),
-    options ?? {},
-  );
+) => createNavigation(currentSpace, initialRenderer, initialSpace ?? currentSpace(), options ?? {});
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 

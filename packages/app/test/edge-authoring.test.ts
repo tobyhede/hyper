@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type LayoutId, type SpaceSnapshot, type UUID } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
@@ -12,7 +12,7 @@ import {
   type DropTarget,
   type ElementDropTarget,
 } from '../src/edge-authoring';
-import type { CanvasRendererId } from '../src/renderer';
+
 import { CARD_SIZE } from '../src/card';
 import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
@@ -93,7 +93,7 @@ const positionedSnapshot: SpaceSnapshot = {
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  renderer: CanvasRendererId = LAYOUT_ID,
+  renderer: LayoutId = LAYOUT_ID,
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };

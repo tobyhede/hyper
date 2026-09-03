@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
-import { loadSpace, type Space } from '@project/graph';
+import { uuidSchema, type LayoutId } from '@project/core';
+import { loadSpace, Placement, positionedStrategy, type Space } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
 import { GRAPH_PALETTE } from '../src/colors';
-import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
-
-const resolveRenderer = createRendererResolver();
+import { resolveLayout } from '../src/layout-resolution';
 import { cardFile } from './card-files';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -61,15 +59,17 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
   return result.space;
 }
 
-/** Arrange through the view's own strategy, so a test sees what the app renders. */
+/** Arrange through the Layout's own strategy, so a test sees what the app renders. */
 async function projectThrough(
   space: Space,
   interaction: CanvasInteraction = AT_REST,
-  selection?: CanvasRendererId,
+  selection?: LayoutId,
 ) {
-  const view = resolveRenderer(space, selection);
-  const projection = canvasProjection(space, view);
-  const laidOut = await view.strategy(projection.strategyGraph);
+  const resolved = resolveLayout(space, selection);
+  const projection = canvasProjection(space, resolved);
+  const laidOut = await positionedStrategy(Placement.fromLayout(resolved.layout))(
+    projection.strategyGraph,
+  );
   return { ...projection, ...projection.project(laidOut, interaction) };
 }
 
@@ -172,13 +172,15 @@ describe('canvasProjection', () => {
       },
     };
     const space = spaceWith({ layouts: [layout] });
-    const renderer = resolveRenderer(space, LAYOUT);
-    const projection = canvasProjection(space, renderer);
+    const resolved = resolveLayout(space, LAYOUT);
+    const projection = canvasProjection(space, resolved);
     const strategyCard = projection.strategyGraph.cards.find(({ id }) => id === CARD_A);
 
     expect(strategyCard).toMatchObject({ width: 560, height: 420 });
 
-    const laidOut = await renderer.strategy(projection.strategyGraph);
+    const laidOut = await positionedStrategy(Placement.fromLayout(resolved.layout))(
+      projection.strategyGraph,
+    );
     const node = projection.project(laidOut, AT_REST).nodes.find(({ id }) => id === CARD_A);
     expect(node).toMatchObject({ width: 560, height: 420, data: { expanded: true } });
   });

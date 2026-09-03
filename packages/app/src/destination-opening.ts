@@ -1,10 +1,11 @@
 import type { CardId, GraphId } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
-import { defaultLayout, type CanvasRendererId } from './renderer';
+import type { LayoutId } from '@project/core';
+import { requireDefaultLayout } from './layout-resolution';
 
 export interface DestinationOpening {
-  readonly selection: CanvasRendererId;
+  readonly selection: LayoutId;
   readonly cardId: CardId | null;
   readonly graphId: GraphId | null;
   readonly presentationCardId: CardId | null;
@@ -17,7 +18,7 @@ export function destinationOpening(
 ): DestinationOpening {
   if (destination.kind === 'space') {
     return {
-      selection: defaultLayout(space),
+      selection: requireDefaultLayout(space),
       cardId: null,
       graphId: null,
       presentationCardId: null,
@@ -68,7 +69,7 @@ export function destinationOpening(
     };
   }
   return {
-    selection: defaultLayout(space),
+    selection: requireDefaultLayout(space),
     cardId: destination.cardId,
     graphId: null,
     presentationCardId: null,

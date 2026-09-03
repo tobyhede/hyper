@@ -1,12 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { uuidSchema, type Graph, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  uuidSchema,
+  type Graph,
+  type LayoutId,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { composeApp } from '../src/compose-app';
 import type { SpaceAuthoring } from '../src/space-authoring';
-import type { CanvasRendererId } from '../src/renderer';
+
 import { mintingIds } from './minting';
 
 /**
@@ -81,7 +87,7 @@ const layoutOf = (snapshot: SpaceSnapshot, layoutId: string) =>
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  renderer: CanvasRendererId = LAYOUT_ID,
+  renderer: LayoutId = LAYOUT_ID,
   // The ids this Edit will mint, named by the test that asserts on them rather
   // than taken from the ambient generator (ADR 0016, and `./minting`).
   newId: () => UUID = mintingIds(MINTED),

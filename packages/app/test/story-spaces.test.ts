@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LayoutId } from '@project/core';
 import { graphStartCard, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
-import { defaultLayout } from '../src/renderer';
+import { requireDefaultLayout } from '../src/layout-resolution';
 import {
   authoredSnapshot,
   authoredSpace,
@@ -19,7 +19,7 @@ import {
  *
  * ADR 0052 makes a stable story evidence about the UI Hyper ships, and its
  * negative to remember forbids making one possible by "translating its state in
- * the harness". Where a Space opens is `defaultLayout` reading
+ * the harness". Where a Space opens is `requireDefaultLayout` reading
  * `space.defaultLayout` — so the story fixture must not answer that question
  * itself, and these Spaces have to *declare* what the Ladle specs then assert.
  *
@@ -34,7 +34,7 @@ const openedLayoutTitle = (space: Space, id: LayoutId): string | undefined =>
 
 describe('the story Spaces', () => {
   it('opens the authored Space on the Layout its stories press', () => {
-    const opens = defaultLayout(authoredSpace);
+    const opens = requireDefaultLayout(authoredSpace);
 
     expect(opens).toBe(authoredSpace.defaultLayout);
     expect(openedLayoutTitle(authoredSpace, opens)).toBe('Collection 1');
@@ -48,7 +48,7 @@ describe('the story Spaces', () => {
   it('opens the sparse authored Space on a Layout some Cards are absent from', () => {
     const space = loadSpaceSnapshot(sparseAuthoredSnapshot);
     if (!space.ok) throw new Error('sparse story Space did not load');
-    const opens = defaultLayout(space.space);
+    const opens = requireDefaultLayout(space.space);
 
     expect(opens).toBe(space.space.defaultLayout);
     const layout = space.space.lookup.layout(opens)?.layout;
@@ -60,7 +60,7 @@ describe('the story Spaces', () => {
 
   /** ADR 0080 makes a newly created Space complete before it is first opened. */
   it('opens the newly created Space on its authored Layout', () => {
-    const opens = defaultLayout(newSpaceFixture);
+    const opens = requireDefaultLayout(newSpaceFixture);
 
     expect(opens).toEqual(newSpaceFixture.layouts[0]?.id);
     expect(newSpaceFixture.layouts).toHaveLength(1);
@@ -82,7 +82,7 @@ describe('the story Spaces', () => {
     const edited = loadSpaceSnapshot(editedSnapshot);
     if (!edited.ok) throw new Error(edited.errors.map((error) => error.message).join('\n'));
 
-    const opens = defaultLayout(authoredSpace);
+    const opens = requireDefaultLayout(authoredSpace);
 
     expect(openedLayoutTitle(edited.space, opens)).toBe('Collection 1');
     expect(edited.space.layouts.slice(0, authoredSpace.layouts.length)).toEqual(
@@ -150,7 +150,7 @@ describe('the story Spaces', () => {
   /**
    * The traversal Spaces open where they say, on the one Graph their Layout
    * owns — so a presenting story calls `present()` and nothing else, and the
-   * Graph it presents is the one `defaultLayout` and ADR 0026 answer rather
+   * Graph it presents is the one `requireDefaultLayout` and ADR 0026 answer rather
    * than one the harness picked.
    */
   it('opens each traversal Space on the Layout and Graph it declares', () => {
@@ -158,7 +158,7 @@ describe('the story Spaces', () => {
       [traversalSpace, 'Traversal'],
       [deepDiveSpace, 'Deep dive'],
     ] as const) {
-      const opens = defaultLayout(space);
+      const opens = requireDefaultLayout(space);
       expect(opens).toBe(space.defaultLayout);
       expect(openedLayoutTitle(space, opens)).toBe(title);
       expect(space.graphs.map((graph) => graph.title)).toEqual([title]);
