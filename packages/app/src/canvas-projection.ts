@@ -21,9 +21,9 @@ import { activeGraphColor, graphColorMap } from './colors';
 import { layoutCards } from './layout-resolution';
 
 /**
- * What the canvas draws, derived from a Space and the renderer drawing it.
+ * What the canvas draws, derived from a Space and the Layout drawing it.
  *
- * Everything here is a pure function of the Space, the resolved renderer and the
+ * Everything here is a pure function of the Space, the resolved Layout and the
  * interaction state — no store, no React, no DOM. It is split in two because a
  * layout strategy runs asynchronously: the outer call answers everything a
  * strategy needs and everything the canvas draws *around* the cards, and

@@ -25,7 +25,7 @@ import { createWorkingSpaceReader, snapshotFromSpace } from '#src/snapshot';
 import { createSpaceAuthoring } from '#src/space-authoring';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import {
-  SelectedCanvasRenderer,
+  SelectedLayoutName,
   SpaceSidebar,
   type SpaceChromeTitleEdit,
   type SpaceChromeTitleSubject,
@@ -49,7 +49,7 @@ export interface SpaceSidebarFixtureProps {
   readonly onRetry?: () => void;
   /** Real AppShell canvas content supplied by a story-specific fixture. */
   readonly children?: ReactNode;
-  /** Story-specific controls beside the real selected-renderer header. */
+  /** Story-specific controls beside the real selected-Layout header. */
   readonly headerActions?: ReactNode;
   /** Whether this fixture supplies the selected Card's URL commands. */
   readonly showCardLinks?: boolean;
@@ -114,7 +114,7 @@ export function SpaceSidebarFixture({
     },
   );
   const authoring = useMemo(() => {
-    const selected = navigation.getState().selectedRenderer;
+    const selected = navigation.getState().selectedLayoutId;
     const selectedLayout = readEditableSpace().lookup.layout(selected)?.layout;
     return createSpaceAuthoring({
       session: editSession,
@@ -139,7 +139,7 @@ export function SpaceSidebarFixture({
   // drawing; the header below reads that Layout rather than a title of the
   // fixture's own. The selection, its Active Graph and its mode are all
   // Navigation's published state.
-  const selectedLayout = resolveLayout(displayedSpace, navigationState.selectedRenderer).layout;
+  const selectedLayout = resolveLayout(displayedSpace, navigationState.selectedLayoutId).layout;
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
@@ -192,7 +192,7 @@ export function SpaceSidebarFixture({
           canvas={{
             layouts: displayedSpace.layouts,
             selected: selectedLayout,
-            onSelect: navigation.selectRenderer,
+            onSelect: navigation.selectLayout,
           }}
           graph={{
             graphs: selectedLayout.graphs,
@@ -247,7 +247,7 @@ export function SpaceSidebarFixture({
       }
       header={
         <>
-          <SelectedCanvasRenderer layout={selectedLayout} titleEdit={chromeTitleEdit} />
+          <SelectedLayoutName layout={selectedLayout} titleEdit={chromeTitleEdit} />
           {headerActions}
         </>
       }
@@ -276,7 +276,7 @@ export function SpaceSidebarFixture({
  * copy of it and would reparse on every publication. The reader caches on
  * snapshot identity, and a session replaces `working` only when a submission
  * does, so the two states this story passes through cost two parses and hand
- * `canvasRenderers` a stable `Space` in between.
+ * `resolveLayout` a stable `Space` in between.
  */
 export function RetryableSpaceSidebarFixture() {
   const session = useMemo(() => {

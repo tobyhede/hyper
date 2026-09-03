@@ -192,7 +192,7 @@ const EDGES = [
  * `graphs: z.array(graphSchema).min(1)` (`core/src/schema.ts`, asserted by
  * `core/test/persistence-schema.test.ts`), `ResolvedLayout.activeGraph`
  * resolves named-or-first and is never null, Navigation writes only an Active
- * Graph the selected renderer's subject holds, and Graph deletion refuses the
+ * Graph the selected Layout owns, and Graph deletion refuses the
  * last one (`layout-must-keep-graph`).
  *
  * So the stand-in is what exercises the channel at all, and the alternative —
@@ -358,7 +358,7 @@ function CanvasHarness({
       selection={selection}
       onSelectCard={adapter.getState().selectCard}
       onSelectEdge={adapter.getState().selectEdge}
-      subjectCards={currentSpace().cards}
+      placedCards={currentSpace().cards}
       newCardTitle="Card 4"
       onAddCard={() => undefined}
       onAddExistingCard={() => undefined}
@@ -494,7 +494,7 @@ describe('the Edge toolbar', () => {
         selection: { kind: 'edge', ...SUBJECT },
         activeGraphId: GRAPH_ID,
         graphs: composed.currentSpace().graphs,
-        subjectCards: composed.currentSpace().cards,
+        placedCards: composed.currentSpace().cards,
         newCardTitle: 'Card 4',
         enabled: true,
         onSelectCard: NO_OP,
@@ -857,7 +857,7 @@ const surface = (composed: ReturnType<typeof compose>) =>
         selection: { kind: 'edge', ...SUBJECT },
         activeGraphId: GRAPH_ID,
         graphs: composed.currentSpace().graphs,
-        subjectCards: composed.currentSpace().cards,
+        placedCards: composed.currentSpace().cards,
         newCardTitle: 'Card 4',
         enabled: true,
         onSelectCard: NO_OP,
@@ -1286,7 +1286,7 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
+          placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: true,
           onSelectCard: NO_OP,
@@ -1315,7 +1315,7 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
+          placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: true,
           onSelectCard: NO_OP,
@@ -1350,7 +1350,7 @@ describe('the React Flow properties', () => {
           selection: { kind: 'edge', graphId: GRAPH_ID, edge: EDGE },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
+          placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: true,
           onSelectCard: NO_OP,
@@ -1383,7 +1383,7 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
+          placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: false,
           onSelectCard: NO_OP,

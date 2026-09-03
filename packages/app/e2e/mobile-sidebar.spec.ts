@@ -111,8 +111,8 @@ test('Delete on a mobile Sidebar control leaves the selected Card on the canvas'
   await card.click();
 
   await openMobileSidebar(page);
-  const renderer = page.getByRole('button', { name: 'Collection 1', exact: true });
-  await renderer.focus();
+  const layoutRow = page.getByRole('button', { name: 'Collection 1', exact: true });
+  await layoutRow.focus();
   await page.keyboard.press('Delete');
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');

@@ -63,7 +63,7 @@ test('choosing a Layout pushes history and Back, Forward and reload restore it w
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
 
-  await page.getByTestId('canvas-renderer').filter({ hasText: 'Collection 2' }).click();
+  await page.getByTestId('layout-row').filter({ hasText: 'Collection 2' }).click();
   await expect(page).toHaveURL(second);
   await page.reload();
   await expect(page.getByText('Collection 2', { exact: true }).first()).toBeVisible();

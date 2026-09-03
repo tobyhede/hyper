@@ -5,7 +5,7 @@ import { resolveLayout } from '#src/layout-resolution';
 import { graphColorMap } from '#src/colors';
 import { PersistenceControl } from '#components/PersistenceControl';
 import { OpenSpaceSidebars, type OpenSpaceSidebar } from '#components/OpenSpaceSidebars';
-import { SelectedCanvasRenderer, type SpaceSidebarProps } from '#components/SpaceSidebar';
+import { SelectedLayoutName, type SpaceSidebarProps } from '#components/SpaceSidebar';
 import { useStoryNavigation } from './navigation';
 import { authoredSpace, deepDiveSpace, traversalSpace } from './spaces';
 
@@ -13,19 +13,19 @@ function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
   const readSpace = useCallback(() => space, [space]);
   const { navigation, state } = useStoryNavigation(readSpace);
   const addCardMenu = useRef<HTMLButtonElement>(null);
-  const renderer = useMemo(
-    () => resolveLayout(space, state.selectedRenderer),
-    [space, state.selectedRenderer],
+  const resolved = useMemo(
+    () => resolveLayout(space, state.selectedLayoutId),
+    [space, state.selectedLayoutId],
   );
   const sidebar: SpaceSidebarProps = {
     spaceTitle: space.title,
     canvas: {
       layouts: space.layouts,
-      selected: renderer.layout,
-      onSelect: navigation.selectRenderer,
+      selected: resolved.layout,
+      onSelect: navigation.selectLayout,
     },
     graph: {
-      graphs: renderer.layout.graphs,
+      graphs: resolved.layout.graphs,
       activeGraphId: state.activeGraphId,
       colorByGraphId: graphColorMap(space),
       onActivate: navigation.activateGraph,
@@ -57,7 +57,7 @@ function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
     sidebar,
     status,
   };
-  return { entry, layout: renderer.layout };
+  return { entry, layout: resolved.layout };
 }
 
 /** Fixture-only state around the production Open Spaces and Sidebar composition. */
@@ -77,7 +77,7 @@ export function OpenSpaceSidebarsFixture() {
   return (
     <AppShell
       sidebar={<OpenSpaceSidebars spaces={spaces} activeId={activeId} onSelect={setActiveId} />}
-      header={<SelectedCanvasRenderer layout={selectedLayout} />}
+      header={<SelectedLayoutName layout={selectedLayout} />}
     >
       <div className="h-full" data-testid="space-canvas-stand-in" />
     </AppShell>

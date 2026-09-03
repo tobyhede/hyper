@@ -46,7 +46,7 @@ class SpaceAppFailure extends Component<{ children: ReactNode }, SpaceAppFailure
  * Mount one application for the lifetime of the opened Space.
  *
  * Composition is guarded as well as rendering, because it reads the same
- * snapshot: `createApp` builds Navigation, which resolves the renderer the
+ * snapshot: `createApp` builds Navigation, which resolves the Layout the
  * Space opens in against the session's working Space (`compose-app.ts`), so a
  * snapshot that fails domain intake throws here — before there is a tree for
  * the boundary to catch it in. Both paths report the same sentence, for the

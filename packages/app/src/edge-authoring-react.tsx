@@ -105,8 +105,8 @@ export interface EdgeAuthoringInput {
   readonly selection: CanvasSelection;
   readonly activeGraphId: GraphId | null;
   readonly graphs: readonly Graph[];
-  /** The Cards this renderer's subject holds — what a picker may offer. */
-  readonly subjectCards: readonly Card[];
+  /** The Cards this Layout places — what a picker may offer. */
+  readonly placedCards: readonly Card[];
   readonly newCardTitle: string;
   /**
    * Edge authoring is withdrawn before a placement resolves, while a modal pane
@@ -173,7 +173,7 @@ export function useEdgeAuthoring({
   selection,
   activeGraphId,
   graphs,
-  subjectCards,
+  placedCards,
   newCardTitle,
   enabled,
   onSelectCard,
@@ -526,8 +526,8 @@ export function useEdgeAuthoring({
   }, [focusRequest, authoring, focusTargetOf]);
 
   const cardTitles = useMemo(
-    () => new Map(subjectCards.map((card) => [card.id, card.title])),
-    [subjectCards],
+    () => new Map(placedCards.map((card) => [card.id, card.title])),
+    [placedCards],
   );
   const graphTitles = useMemo(
     () => new Map(graphs.map((graph) => [graph.id, graph.title])),
@@ -602,7 +602,7 @@ export function useEdgeAuthoring({
     // whose own `kind` would overwrite the proposal's and ask a different
     // question of eligibility entirely.
     ({ graphId, edge }: EdgeSubject, endpoint: EdgeEndpoint): CardChoice[] =>
-      subjectCards.map((card) =>
+      placedCards.map((card) =>
         cardChoiceOf(
           card,
           latest.current.authoring.eligibility({
@@ -614,7 +614,7 @@ export function useEdgeAuthoring({
           }),
         ),
       ),
-    [subjectCards],
+    [placedCards],
   );
 
   // **Every Edge surface is gated on `enabled`, not on the draft alone.** The

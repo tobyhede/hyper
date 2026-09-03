@@ -210,7 +210,7 @@ function DeleteCardControl({
  * An entity this Sidebar draws a row for, named the way the row knows it.
  *
  * It carries the whole `Layout`/`Graph` rather than an id, for the reason
- * `SelectedCanvasRenderer` takes the Layout: handed an id, a caller has to find
+ * `SelectedLayoutName` takes the Layout: handed an id, a caller has to find
  * the thing again down a second path, and the Sidebar and the menu on its own
  * row are then free to disagree about what they are naming.
  */
@@ -285,15 +285,15 @@ function LayoutRows({
             >
               {isEditing ? (
                 // The row keeps its addressing hooks while its own rename is
-                // live: an open pane marks the root `inert`, so `data-renderer`
+                // live: an open pane marks the root `inert`, so `data-layout`
                 // is how a covered Sidebar is reached at all (docs/agents/ui.md).
                 // `aria-pressed` is not carried across — this branch renders a
                 // `div`, and pressed state on a non-button is not a thing to say.
                 <SidebarMenuButton
                   render={<div />}
                   isActive={active}
-                  data-testid="canvas-renderer"
-                  data-renderer={layoutId}
+                  data-testid="layout-row"
+                  data-layout={layoutId}
                 >
                   <LayoutIcon />
                   <InlineTitleEditor
@@ -316,8 +316,8 @@ function LayoutRows({
                 <SidebarMenuButton
                   isActive={active}
                   aria-pressed={active}
-                  data-testid="canvas-renderer"
-                  data-renderer={layoutId}
+                  data-testid="layout-row"
+                  data-layout={layoutId}
                   onClick={(event) => {
                     if (active && titleEdit !== undefined && titleEdit.disabled !== true) {
                       const row = event.currentTarget.closest('li');
@@ -721,7 +721,7 @@ export function SpaceSidebar({
  * list it reports on are free to disagree again. Taking the Layout means the
  * header and the row are reading one value.
  */
-export function SelectedCanvasRenderer({
+export function SelectedLayoutName({
   layout,
   titleEdit,
 }: {

@@ -126,7 +126,7 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
   const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
 
   await expect(selectedCanvas(page)).toContainText('Collection 1');
-  await expect(sidebar(page).getByTestId('canvas-renderer')).toHaveCount(2);
+  await expect(sidebar(page).getByTestId('layout-row')).toHaveCount(2);
 
   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
   await selectCanvas(page, 'Collection 1');

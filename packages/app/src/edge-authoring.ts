@@ -488,7 +488,7 @@ export function createEdgeAuthoring({
   // Invalidation. The draft is cancelled by anything that changes what it is
   // about, and by nothing else — an unrelated completed Edit leaves it standing.
   let replacementEpoch = authoring.getState().replacementEpoch;
-  let selectedRenderer = authoring.getState().navigation.selectedRenderer;
+  let selectedLayoutId = authoring.getState().navigation.selectedLayoutId;
   let activeGraphId = authoring.getState().navigation.activeGraphId;
   let presenting = authoring.getState().navigation.mode === 'presenting';
   const unsubscribeAuthoring = authoring.subscribe(() => {
@@ -496,7 +496,7 @@ export function createEdgeAuthoring({
     const nowPresenting = state.navigation.mode === 'presenting';
     const contextChanged =
       state.replacementEpoch !== replacementEpoch ||
-      state.navigation.selectedRenderer !== selectedRenderer ||
+      state.navigation.selectedLayoutId !== selectedLayoutId ||
       state.navigation.activeGraphId !== activeGraphId ||
       // Presenting withdraws Edge authoring altogether, so a draft made before
       // it has no context left to complete in. Cancelled rather than merely
@@ -504,7 +504,7 @@ export function createEdgeAuthoring({
       // and an Edge editor behind it reopens when the author returns.
       (nowPresenting && !presenting);
     replacementEpoch = state.replacementEpoch;
-    selectedRenderer = state.navigation.selectedRenderer;
+    selectedLayoutId = state.navigation.selectedLayoutId;
     activeGraphId = state.navigation.activeGraphId;
     presenting = nowPresenting;
     const { draft, refusal } = observable.getState();

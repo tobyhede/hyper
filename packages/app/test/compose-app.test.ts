@@ -96,7 +96,7 @@ describe('what the composition opens on', () => {
   it('opens in the Space default when no selection is named', () => {
     const { navigation } = composeCore({ spaceSession: openSession() });
 
-    expect(navigation.getState().selectedRenderer).toEqual(LAYOUT_ID);
+    expect(navigation.getState().selectedLayoutId).toEqual(LAYOUT_ID);
   });
 
   it('opens a selected Layout on the placement that Layout already authored', () => {

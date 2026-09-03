@@ -166,7 +166,7 @@ function mountGraph(
         selection={{ kind: 'none' }}
         onSelectCard={onSelectCard}
         onSelectEdge={() => undefined}
-        subjectCards={[]}
+        placedCards={[]}
         newCardTitle="Card 2"
         onAddCard={addCard}
         onAddExistingCard={() => undefined}

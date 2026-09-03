@@ -18,7 +18,7 @@ export interface ApplicationChromeFixtureProps extends Pick<
 
 /**
  * Reusable Ladle application harness composed entirely from production chrome:
- * AppShell, SpaceSidebar, selected-renderer header and the real React Flow
+ * AppShell, SpaceSidebar, selected-Layout header and the real React Flow
  * adapter canvas. Stories supply state and optional surface slots, not replicas.
  */
 export function ApplicationChromeFixture({

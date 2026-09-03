@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { uuidSchema, type Layout } from '@project/core';
 import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
 import {
-  SelectedCanvasRenderer,
+  SelectedLayoutName,
   SpaceSidebar,
   type SpaceChromeTitleEdit,
   type SpaceSidebarProps,
@@ -142,7 +142,7 @@ describe('SpaceSidebar', () => {
       return (
         <>
           <SpaceSidebar {...props} titleEdit={titleEdit} />
-          <SelectedCanvasRenderer layout={LAYOUT} titleEdit={titleEdit} />
+          <SelectedLayoutName layout={LAYOUT} titleEdit={titleEdit} />
         </>
       );
     }
@@ -162,12 +162,12 @@ describe('SpaceSidebar', () => {
   });
 
   /**
-   * A covered Sidebar is located by `data-renderer`, because an open pane marks
+   * A covered Sidebar is located by `data-layout`, because an open pane marks
    * the root `inert` and the row leaves the accessibility tree
    * (`docs/agents/ui.md`). A row that sheds that hook while its own rename is
    * live is unreachable by role and by attribute at the same time.
    */
-  it('keeps a renderer row addressable while its rename is live', () => {
+  it('keeps a Layout row addressable while its rename is live', () => {
     function Fixture() {
       const [draft, setDraft] = useState<string | null>(null);
       const titleEdit: SpaceChromeTitleEdit = {
@@ -188,16 +188,16 @@ describe('SpaceSidebar', () => {
     }
 
     draw(<Fixture />);
-    const before = screen.getAllByTestId('canvas-renderer').length;
+    const before = screen.getAllByTestId('layout-row').length;
     fireEvent.click(screen.getByRole('button', { name: 'Layout 1', pressed: true }));
 
     expect(screen.getByRole('textbox', { name: 'Layout name' })).toBeVisible();
-    expect(screen.getAllByTestId('canvas-renderer')).toHaveLength(before);
-    expect(document.querySelector(`[data-renderer="${LAYOUT_ID}"]`)).toBeInTheDocument();
+    expect(screen.getAllByTestId('layout-row')).toHaveLength(before);
+    expect(document.querySelector(`[data-layout="${LAYOUT_ID}"]`)).toBeInTheDocument();
   });
 
   it('names the Layout as plain text when no title edit is offered', () => {
-    draw(<SelectedCanvasRenderer layout={LAYOUT} />);
+    draw(<SelectedLayoutName layout={LAYOUT} />);
 
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout 1');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -359,8 +359,8 @@ describe('SpaceSidebar', () => {
     draw(<SpaceSidebar {...props} />);
 
     const pressed = screen
-      .getAllByTestId('canvas-renderer')
-      .filter((renderer) => renderer.getAttribute('aria-pressed') === 'true');
+      .getAllByTestId('layout-row')
+      .filter((row) => row.getAttribute('aria-pressed') === 'true');
     expect(pressed).toHaveLength(1);
     expect(pressed[0]).toHaveTextContent('Layout 1');
     expect(screen.getByRole('button', { name: 'Layout 2' })).toHaveAttribute(
@@ -377,7 +377,7 @@ describe('SpaceSidebar', () => {
    * a second value of equal shape hands in two Layouts that are equal and not
    * the same object. A `===` test drew that as a Layout list with nothing
    * pressed: no throw, and nothing in the type to catch it. The id is what the
-   * row keys and `data-renderer` already carry, so the sidebar asks the one
+   * row keys and `data-layout` already carry, so the sidebar asks the one
    * question it answers everywhere else.
    */
   it('presses an equal Layout that a second value described', () => {
@@ -388,10 +388,10 @@ describe('SpaceSidebar', () => {
     draw(<SpaceSidebar {...base} canvas={{ ...base.canvas, selected: rebuilt }} />);
 
     const pressed = screen
-      .getAllByTestId('canvas-renderer')
-      .filter((renderer) => renderer.getAttribute('aria-pressed') === 'true');
+      .getAllByTestId('layout-row')
+      .filter((row) => row.getAttribute('aria-pressed') === 'true');
     expect(pressed).toHaveLength(1);
-    expect(pressed[0]).toHaveAttribute('data-renderer', LAYOUT_ID);
+    expect(pressed[0]).toHaveAttribute('data-layout', LAYOUT_ID);
   });
 
   it('forwards the selection', () => {
@@ -758,8 +758,8 @@ describe('SpaceSidebar', () => {
       </SidebarProvider>,
     );
     const saving = screen.getByRole('button', { name: 'Saving changes' });
-    for (const renderer of screen.getAllByTestId('canvas-renderer')) {
-      expect(renderer).not.toContainElement(saving);
+    for (const row of screen.getAllByTestId('layout-row')) {
+      expect(row).not.toContainElement(saving);
     }
   });
 });

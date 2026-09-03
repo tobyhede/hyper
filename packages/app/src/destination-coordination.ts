@@ -78,7 +78,7 @@ export interface AddressedPosition extends NavigationAddress {
 }
 
 const sameAddress = (one: NavigationAddress, other: NavigationAddress): boolean =>
-  one.selectedRenderer === other.selectedRenderer &&
+  one.selectedLayoutId === other.selectedLayoutId &&
   one.activeGraphId === other.activeGraphId &&
   one.presentingCardId === other.presentingCardId;
 
@@ -97,12 +97,12 @@ export const samePosition = (one: AddressedPosition, other: AddressedPosition): 
  * `installDestinationOpening` decides it.
  *
  * A location that names no Graph does not leave the Active Graph unknown: it
- * opens whatever its renderer opens on, which is Navigation's own
+ * opens whatever its Layout opens on, which is Navigation's own
  * {@link openingGraphId} rather than a second answer written here.
  */
 function openingPosition(space: Space, opening: DestinationOpening): AddressedPosition {
   return {
-    selectedRenderer: opening.selection,
+    selectedLayoutId: opening.selection,
     activeGraphId: opening.graphId ?? openingGraphId(resolveLayout(space, opening.selection)),
     presentingCardId: opening.presentationCardId,
     addressedCardId: opening.cardId,
@@ -123,12 +123,12 @@ function openingPosition(space: Space, opening: DestinationOpening): AddressedPo
  * recognised as already open.
  *
  * Two rules decide whether the URL names the Active Graph. It must, when the
- * renderer would open on some other Graph — a Layout URL that reopens a
+ * Layout would open on some other Graph — a Layout URL that reopens a
  * different Graph does not name this position at all. It also keeps naming one
  * the location already named in this same Layout: leaving a presentation
  * returns to the Graph the presentation URL spelled out, and widening it to the
  * bare Layout would throw away specificity the reader is holding. That
- * second rule is the surviving half of `adoptedRendererDestination` — do not
+ * second rule is the surviving half of `adoptedLayoutDestination` — do not
  * widen a URL that already names something inside this Layout.
  */
 function positionDestination(
@@ -137,30 +137,30 @@ function positionDestination(
   opening: DestinationOpening | null,
 ): ProductDestination {
   const spaceId = space.id;
-  const { selectedRenderer, activeGraphId, presentingCardId } = position;
+  const { selectedLayoutId, activeGraphId, presentingCardId } = position;
   if (presentingCardId !== null && activeGraphId !== null) {
     return {
       kind: 'presentation',
       spaceId,
-      layoutId: selectedRenderer,
+      layoutId: selectedLayoutId,
       graphId: activeGraphId,
       cardId: presentingCardId,
     };
   }
   const namesGraph =
-    opening !== null && opening.selection === selectedRenderer && opening.graphId !== null;
+    opening !== null && opening.selection === selectedLayoutId && opening.graphId !== null;
   if (
     activeGraphId !== null &&
-    (namesGraph || activeGraphId !== openingGraphId(resolveLayout(space, selectedRenderer)))
+    (namesGraph || activeGraphId !== openingGraphId(resolveLayout(space, selectedLayoutId)))
   ) {
     return {
       kind: 'layout-graph',
       spaceId,
-      layoutId: selectedRenderer,
+      layoutId: selectedLayoutId,
       graphId: activeGraphId,
     };
   }
-  return { kind: 'layout', spaceId, layoutId: selectedRenderer };
+  return { kind: 'layout', spaceId, layoutId: selectedLayoutId };
 }
 
 /**

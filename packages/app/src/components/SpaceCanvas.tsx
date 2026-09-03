@@ -108,7 +108,7 @@ const NOT_A_CANVAS_COMMAND =
  *
  * Answered from the projection rather than from the DOM id alone, which is what
  * keeps a second canvas's node — a story, a catalogue page — from naming a Card
- * this renderer is not drawing.
+ * this Layout is not drawing.
  */
 const focusedCard = (target: Element, nodes: readonly CardFlowNode[]): CardId | null => {
   const element = target.closest<HTMLElement>('.react-flow__node[data-id]');
@@ -150,8 +150,8 @@ export interface SpaceCanvasProps {
   selection: CanvasSelection;
   onSelectCard: (cardId: CardId) => void;
   onSelectEdge: (subject: EdgeSubject) => void;
-  /** The Cards this renderer's subject holds — what an Edge picker may offer. */
-  subjectCards: readonly Card[];
+  /** The Cards this Layout places — what an Edge picker may offer. */
+  placedCards: readonly Card[];
   /** Exact neutral title shown by the transient empty-drop preview. */
   newCardTitle: string;
   /**
@@ -205,7 +205,7 @@ export function SpaceCanvas({
   selection,
   onSelectCard,
   onSelectEdge,
-  subjectCards,
+  placedCards,
   newCardTitle,
   onAddCard,
   onAddExistingCard,
@@ -272,7 +272,7 @@ export function SpaceCanvas({
     selection,
     activeGraphId,
     graphs,
-    subjectCards,
+    placedCards,
     newCardTitle,
     enabled: canAuthorOnCanvas,
     onSelectCard,

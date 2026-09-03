@@ -11,7 +11,7 @@ export type CanvasContent =
  * are on the canvas the editor owns those positions outright, so they are the
  * current state rather than a stale copy of whatever is being recomputed —
  * and taking them away mid-recompute would interrupt a drag. Navigating to
- * another renderer is the case that does clear them, which is why that is the
+ * another Layout is the case that does clear them, which is why that is the
  * editor's decision and not this one.
  */
 export function canvasContent(

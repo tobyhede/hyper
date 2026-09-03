@@ -87,7 +87,7 @@ const layoutOf = (snapshot: SpaceSnapshot, layoutId: string) =>
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  renderer: LayoutId = LAYOUT_ID,
+  layoutId: LayoutId = LAYOUT_ID,
   // The ids this Edit will mint, named by the test that asserts on them rather
   // than taken from the ambient generator (ADR 0016, and `./minting`).
   newId: () => UUID = mintingIds(MINTED),
@@ -96,7 +96,7 @@ function open(
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const { navigation, authoring } = composeApp({
     spaceSession: session,
-    selection: renderer,
+    selection: layoutId,
     newId,
     // These cases install whatever geometry they are about through `place`.
     initialPlacement: null,
@@ -104,7 +104,7 @@ function open(
   return { session, navigation, authoring };
 }
 
-/** Install the geometry the renderer would have reported by now. */
+/** Install the geometry the canvas would have reported by now. */
 const place = (authoring: SpaceAuthoring, entries: Record<string, [number, number]>): void => {
   authoring.replacePlacement(
     Placement.fromEntries(
@@ -150,7 +150,7 @@ describe('Add Layout', () => {
       },
     ]);
     expect(session.getState().working.document.defaultLayout).toBe(MINTED);
-    expect(navigation.getState().selectedRenderer).toBe(MINTED);
+    expect(navigation.getState().selectedLayoutId).toBe(MINTED);
   });
 
   it('does not require the current canvas placement to resolve', () => {
@@ -162,7 +162,7 @@ describe('Add Layout', () => {
 
     expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
     expect(session.getState().working.document.layouts).toHaveLength(2);
-    expect(navigation.getState().selectedRenderer).toBe(MINTED);
+    expect(navigation.getState().selectedLayoutId).toBe(MINTED);
   });
 });
 
@@ -611,7 +611,7 @@ describe('Rename Layout', () => {
 
   /**
    * The Edit is addressed by Layout id, as Rename Graph is by Graph id. Without
-   * that the rename lands on whichever Layout the renderer happens to resolve,
+   * that the rename lands on whichever Layout the resolver happens to answer,
    * so a draft begun on one Layout and completed after the drawing Layout
    * changed writes the title onto a Layout the author never named.
    */
@@ -668,7 +668,7 @@ describe('Delete Layout', () => {
     expect(session.getState().working.document.layouts).toEqual([
       positionedSnapshot.document.layouts![0]!,
     ]);
-    expect(navigation.getState().selectedRenderer).toBe(LAYOUT_ID);
+    expect(navigation.getState().selectedLayoutId).toBe(LAYOUT_ID);
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
     expect(authoring.authoredPlacement()?.get(CARD_A)).toEqual({ x: 10, y: 20, open: false });
   });
