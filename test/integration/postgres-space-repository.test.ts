@@ -341,14 +341,13 @@ describe('PostgresSpaceRepository', () => {
    * authorized against before either write lands, so both replace, and the
    * survivor is whichever PostgreSQL grants the Meta row lock to last.
    *
-   * The blocking transaction is what makes that determinate here, twice over.
-   * It guarantees the two genuinely overlap -- issued back to back they might
-   * simply run one after the other, and the second would then read the new
-   * identity and conflict. And because the row lock's waiters are served in the
-   * order they queue, the replacement issued second is granted it second, so it
-   * is the one that writes last however the calls are collected afterwards.
+   * The blocking transaction is what the shared contract cannot have. It makes
+   * the two genuinely overlap: issued back to back they might simply run one
+   * after the other, and the second would then read the new identity and
+   * conflict, so `replaced` twice is itself a race there and is asserted here
+   * instead.
    */
-  it('gives the whole store to whichever replacement takes the Meta row lock last', async () => {
+  it('leaves one whole proposal when two replacements overlap on the Meta row lock', async () => {
     await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
 
     const metaLockHeld = Promise.withResolvers<undefined>();
@@ -374,19 +373,38 @@ describe('PostgresSpaceRepository', () => {
     releaseMetaLock.resolve(undefined);
     await blocking;
 
-    // Collected in the reverse of the order they were issued, because the order
-    // a caller happens to read the results in settles nothing about the store.
-    await expect(Promise.all([queuedSecond, queuedFirst])).resolves.toMatchObject([
+    // Both replace, and the barrier is what makes that certain: neither could
+    // take the lock while the blocking transaction held it, so both had already
+    // read the identity they are authorized against by the time it released.
+    await expect(Promise.all([queuedFirst, queuedSecond])).resolves.toMatchObject([
       { kind: 'replaced' },
       { kind: 'replaced' },
     ]);
-    await expect(repository.loadAggregate()).resolves.toEqual({
-      kind: 'loaded',
-      aggregate: {
-        metaSpaceId: CONCURRENT_SPACE_ID,
-        spaces: [{ snapshot: concurrentSnapshot, revision: 0n, exportedRevision: null }],
+    /*
+     * Which one survives is not asserted. PostgreSQL serves the waiters in the
+     * order they queue, but that is its behaviour rather than a promise it
+     * makes, and a test that fixes a flake by depending on it has moved the
+     * flake rather than removed it. What the store owes is that it holds one
+     * proposal whole -- its Meta identity and its Space from the same
+     * replacement, never a mixture of the two.
+     */
+    const loaded = await repository.loadAggregate();
+    expect([
+      {
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: OTHER_SPACE_ID,
+          spaces: [{ snapshot: otherSnapshot, revision: 0n, exportedRevision: null }],
+        },
       },
-    });
+      {
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: CONCURRENT_SPACE_ID,
+          spaces: [{ snapshot: concurrentSnapshot, revision: 0n, exportedRevision: null }],
+        },
+      },
+    ]).toContainEqual(loaded);
   });
 
   /*

@@ -385,6 +385,31 @@ describe('Open Spaces', () => {
     expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
   });
 
+  it('leaves a pending activation to finish when two later calls throw out of order', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const { openSpaces } = setup(control);
+    const other = await openSpaces.open(OTHER_ID);
+    other.session.submit(edit(other.session.getState().working));
+    await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('pending'));
+
+    const opening = openSpaces.open(META_ID);
+    await Promise.resolve();
+    // Both number an intent and both give it back, earlier first. The earlier
+    // one cannot subtract while the later is still outstanding, so the later
+    // one uncovers a number that is itself abandoned. Stepping back only one
+    // leaves the count resting on a choice nobody made, and the activation
+    // still waiting on the Space being left reads it as a newer one.
+    const earlier = openSpaces.openPath('/not-a-product-url');
+    const later = openSpaces.openPath('/also-not-a-product-url');
+    await expect(earlier).rejects.toThrow('outside product addressing');
+    await expect(later).rejects.toThrow('outside product addressing');
+
+    release();
+    await opening;
+    expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
+  });
+
   it('reports the selection an already-open Space actually kept', async () => {
     const { openSpaces } = setup();
     const path = productDestinationPath({

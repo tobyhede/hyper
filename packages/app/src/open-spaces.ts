@@ -127,6 +127,18 @@ export function createOpenSpaces({
   const retired = new WeakSet<OpenSpace>();
 
   /**
+   * The numbers whose calls threw before activating.
+   *
+   * Recorded rather than simply subtracted, because two calls can give their
+   * numbers back in either order. The earlier one cannot subtract while the
+   * later is still outstanding — that later number is a real choice, and the
+   * supersession stands. So when the later one is given back too, the number it
+   * uncovers may itself be abandoned, and stepping back only one leaves the
+   * count resting on a choice nobody made.
+   */
+  const abandoned = new Set<number>();
+
+  /**
    * Number one activation intent.
    *
    * A call that throws before it activates has to give its number back. A
@@ -134,14 +146,19 @@ export function createOpenSpaces({
    * everything already waiting, so a legitimately pending activation declines
    * the canvas for a choice nobody made. Giving it back is only right while
    * nothing newer has been numbered — if something has, that is the real
-   * supersession and the number stands.
+   * supersession and the number stands, until that newer one is given back in
+   * its turn and the two collapse together.
    */
   const beginActivation = () => {
     const request = ++activationRequest;
     return {
       request,
       abandon: () => {
-        if (activationRequest === request) activationRequest = request - 1;
+        abandoned.add(request);
+        while (abandoned.has(activationRequest)) {
+          abandoned.delete(activationRequest);
+          activationRequest -= 1;
+        }
       },
     };
   };
