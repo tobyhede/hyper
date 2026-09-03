@@ -44,13 +44,25 @@ test('a direct canonical URL opens its exact existing Space', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Layout fixture', exact: true })).toBeVisible();
 });
 
+/**
+ * Deliberately not the Space's `defaultLayout`. A URL naming the Layout the
+ * Space would have opened on anyway is satisfied by ignoring the id in the path
+ * altogether, so it proves nothing about the address being read; the second
+ * authored Layout is the only one whose appearance can only have come from the
+ * path. The assertions are the header naming the one selected Layout and the
+ * canvas drawing that Layout's Cards rather than the default's — the Sidebar
+ * lists every Layout title at all times, so matching a title as plain page text
+ * would be true whatever is selected.
+ */
 test('a direct Layout URL restores the named authored Layout', async ({ page }) => {
   const response = await page.goto(
-    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}`,
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(SECOND_LAYOUT_ID)}`,
   );
 
   expect(response?.status()).toBe(200);
-  await expect(page.getByText('Collection 1', { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
+  await expect(page.locator(`.react-flow__node[data-id="${CARD_E_ID}"]`)).toBeVisible();
+  await expect(page.locator(`.react-flow__node[data-id="${CARD_A_ID}"]`)).toHaveCount(0);
 });
 
 test('choosing a Layout pushes history and Back, Forward and reload restore it without authoring', async ({
@@ -66,7 +78,7 @@ test('choosing a Layout pushes history and Back, Forward and reload restore it w
   await page.getByTestId('layout-row').filter({ hasText: 'Collection 2' }).click();
   await expect(page).toHaveURL(second);
   await page.reload();
-  await expect(page.getByText('Collection 2', { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
 
   await page.goBack();
   await expect(page).toHaveURL(canonical);
