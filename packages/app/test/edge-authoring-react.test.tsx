@@ -8,12 +8,11 @@ import {
   type InternalNode,
 } from '@xyflow/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
 import { inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
-import type { CanvasRenderer } from '../src/canvas-renderers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import { edgeSelectionOf } from '../src/render-adapter';
 import type { ConnectionCompletion } from '../src/connection-completion';
@@ -42,15 +41,21 @@ const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
 /** The one row this chrome draws, named so `selected` can be that very value. */
-const LAYOUT_ONE: CanvasRenderer = { selection: LAYOUT_ID, title: 'Layout 1' };
+const LAYOUT_ONE: Layout = {
+  id: LAYOUT_ID,
+  title: 'Layout 1',
+  kind: 'positioned',
+  positions: {},
+  graphs: [],
+};
 /** The real app chrome, composed as `App` composes it, outside the canvas. */
 const appChrome = (
   <SidebarProvider>
     <SpaceSidebar
       spaceTitle="Space"
       canvas={{
-        renderers: [LAYOUT_ONE],
-        current: LAYOUT_ONE,
+        layouts: [LAYOUT_ONE],
+        selected: LAYOUT_ONE,
         onSelect: () => undefined,
       }}
       graph={{

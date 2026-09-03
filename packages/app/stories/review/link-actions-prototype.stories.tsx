@@ -119,19 +119,19 @@ function sidebarActions(
     ];
   }
   if (entity.kind === 'layout') {
-    const { renderer } = entity;
+    const { layout } = entity;
     const destination: ProductDestination = {
       kind: 'layout',
       spaceId,
-      layoutId: renderer.selection,
+      layoutId: layout.id,
     };
     return [
-      [rename('view-rename', renderer.title, record)],
+      [rename('view-rename', layout.title, record)],
       [
         copy(
           'view-link',
           'Copy link',
-          `Opens ${renderer.title} exactly as it draws now`,
+          `Opens ${layout.title} exactly as it draws now`,
           destination,
           record,
         ),
@@ -139,7 +139,7 @@ function sidebarActions(
       [openInNewTab('view-new-tab', destination, record)],
     ];
   }
-  const { graph, renderer } = entity;
+  const { graph, layout } = entity;
   return [
     [rename('graph-rename', graph.title, record)],
     [
@@ -147,7 +147,7 @@ function sidebarActions(
         'graph-here',
         'Copy link',
         `Opens ${graph.title} inside the Layout drawing now`,
-        { kind: 'layout-graph', spaceId, layoutId: renderer.selection, graphId: graph.id },
+        { kind: 'layout-graph', spaceId, layoutId: layout.id, graphId: graph.id },
         record,
       ),
       copy(

@@ -17,7 +17,6 @@ import { composeApp, openingPlacement } from './compose-app';
 import type { AuthoringRefusal } from './space-authoring';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
-import { canvasRenderers, currentRenderer } from './canvas-renderers';
 import { canvasContent } from './canvas-content';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { usePlacementRendering } from './placement-rendering';
@@ -151,11 +150,6 @@ export const createApp = (
     const renderer = useMemo(
       () => resolveRenderer(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
-    );
-    const renderers = useMemo(() => canvasRenderers(rendererSpace), [rendererSpace]);
-    const current = useMemo(
-      () => currentRenderer(renderers, selectedRenderer),
-      [renderers, selectedRenderer],
     );
     // Everything the canvas draws, derived once from the Space and the renderer.
     // Memoized on those two alone: the interaction state below changes far more
@@ -424,7 +418,7 @@ export const createApp = (
         spaceChromeEdit !== null
       )
         return [];
-      const { selection: layoutId, title } = entity.renderer;
+      const { id: layoutId, title } = entity.layout;
       return [
         [
           {
@@ -880,7 +874,11 @@ export const createApp = (
     const sidebar = (
       <SpaceSidebar
         spaceTitle={rendererSpace.title}
-        canvas={{ renderers, current, onSelect: selectCanvasRenderer }}
+        canvas={{
+          layouts: rendererSpace.layouts,
+          selected: renderer.resolvedLayout.layout,
+          onSelect: selectCanvasRenderer,
+        }}
         graph={{
           graphs: projection.visibleGraphs,
           activeGraphId,
@@ -998,7 +996,7 @@ export const createApp = (
         insetEnd={cardsDrawerOpen ? DRAWER_WIDTH : undefined}
         header={
           <>
-            <SelectedCanvasRenderer renderer={current} titleEdit={titleEdit} />
+            <SelectedCanvasRenderer layout={renderer.resolvedLayout.layout} titleEdit={titleEdit} />
             {/* Trigger and panel are one component: only the trigger renders
                 here, the drawer portalling its popup over the canvas. That is
                 what stops the toggle's `disabled` and the surface it names from
