@@ -148,6 +148,51 @@ jobs:
     if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Three shards, and the number is arithmetic rather than taste. The suite is
+    # CPU-saturated on one runner: 156 tests summing 382s of test time, and
+    # raising Playwright's workers past cores/2 made it slower on *both* wall
+    # clock and total work (98s at 4 workers, 110s at 8), so more workers on one
+    # 4-vCPU runner is not a lever. Parallel efficiency at cores/2 is already
+    # ~97%, which leaves only more machines. Against ~55s of fixed setup and the
+    # ~134s the `verify` path is heading for:
+    #
+    #     shards   slowest shard        vs the ~134s cap
+    #       1        202 + 55 = 257s     over
+    #       2        101 + 55 = 156s     over
+    #       3         67 + 55 = 122s     under  ← this
+    #       4         50 + 55 = 105s     under, buys nothing
+    #
+    # Two is still over the cap and four is under a cap it is no longer the one
+    # setting, so a fourth runner buys zero total CI wall clock. Standard runners
+    # are free and unmetered on a public repository, which is why sharding at
+    # this size is right here and wrong in the ecosystem's usual advice — the
+    # alternative everyone reaches for, a larger runner, is billed even here.
+    # The matrix list and the `/3` denominator on the `pnpm e2e` call below move
+    # together.
+    #
+    # This works at all because `playwright.config.ts` sets `fullyParallel:
+    # true`, so Playwright shards at test level rather than file level:
+    # `--shard=i/3 --list` gives 52/52/52 even though `editing.spec.ts` alone
+    # holds 73 of the 156 tests. File-level sharding would pin one shard to that
+    # file and the split would be worthless.
+    #
+    # `fail-fast: false` because the default cancels the surviving shards the
+    # moment one fails, and a cancelled shard uploads no report — losing exactly
+    # the evidence a three-way failure exists to give you. It also keeps this
+    # job's aggregate result unambiguously `failure` for the `ci` gate below
+    # rather than a mixture the gate would have to reason about.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    # The container stays, and that was a decision rather than an oversight.
+    # Dropping it would save ~25s of image pull per shard, taking each to ~95s —
+    # under a cap that is already ~134s, so it buys zero wall clock, while
+    # reversing the decision below and handing back the `install-deps` failure
+    # mode that removed. Sharding is also not a reason to fear the container's
+    # cost: each shard is its own 4-vCPU runner still running cores/2 workers,
+    # so this lowers per-runner load rather than raising it.
+    #
     # Playwright's own image, so nothing in this job reaches an apt mirror: the
     # browsers, the shared libraries they need and the font set are all baked
     # into its layers. It is the Ubuntu package path that is gone, not every
@@ -216,6 +261,20 @@ jobs:
       - name: Resolve the pnpm store
         id: pnpm-store
         run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      # **One key across all three shards, not one each** — the opposite call
+      # from `ladle` below, for a reason that does not apply there. The shards
+      # are one job: one image, one `HOME`, one lockfile hash, one store path,
+      # so their archives would be byte-identical and three keys would buy three
+      # copies of the same bytes. Restoring is not racy — only saving is, and
+      # `actions/cache` reserves a key *before* uploading, so on a cold run the
+      # two losers log a 409 and skip the upload rather than spending it and
+      # discarding the result. Three keys would instead put three ~200MB uploads
+      # on the critical path of the job whose entire purpose is wall clock. The
+      # 409 is louder than the one `ladle` weighed — two per cold run rather
+      # than one — and no less benign, and it happens only when
+      # `pnpm-lock.yaml` moves. Sharing `verify`'s key remains off the table for
+      # the reason `ladle`'s comment gives: it resolves its store under
+      # `/home/runner/…` and every `container:` job under `/github/home/…`.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -223,12 +282,21 @@ jobs:
           restore-keys: pnpm-store-e2e-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm e2e
+      # Nothing about a shard changes a host's port: `packages/app/e2e` starts
+      # one Vite host per *test* on `E2E_PORT_BASE + workerIndex` under
+      # `strictPort`, and sharding does not change a shard's worker count. Each
+      # shard is its own runner, so nothing is shared across the three anyway.
+      - run: pnpm e2e --shard=${{ matrix.shard }}/3
 
+      # Its own artifact name per shard. `upload-artifact` refuses a second
+      # upload under a name already claimed in the same run — the trap the
+      # `ladle` job below hit between two jobs, and worse here, because all
+      # three shards can fail together and that is precisely the run where you
+      # want all three reports.
       - if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
@@ -313,6 +381,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      # `e2e` is a matrix and still reads as one `needs` result: Actions waits
+      # for every shard and reports the job's aggregate, which is `failure` if
+      # any shard failed. So the loop below needs no new entry and no new
+      # dependency — one red shard fails the gate exactly as one red job did.
+      # `fail-fast: false` on that matrix is what keeps the aggregate a clean
+      # `failure` rather than a failure beside two cancellations, which matters
+      # because `!cancelled()` above is about *this run* being superseded by
+      # `cancel-in-progress`, not about a leg being abandoned mid-matrix.
       - name: Require reused or successful CI
         env:
           REUSED: ${{ needs.reuse-pr-ci.outputs.should_skip }}
