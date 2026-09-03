@@ -239,10 +239,29 @@ describe('what the check probes', () => {
   });
 
   it('runs first in verify, ahead of the typechecks it vouches for', () => {
+    // `verify` is composed rather than flat: CI runs its two halves as two jobs,
+    // so it reads `pnpm verify:static && pnpm test:coverage` and the ordering
+    // this guards lives one level down. Whichever half carries the typechecks
+    // has to carry this check ahead of them, so the chain is followed rather
+    // than the head of `verify` read literally.
     const manifest = readFileSync(join(repositoryRoot, 'package.json'), 'utf8');
-    const verify = /"verify":\s*"([^"]+)"/.exec(manifest)?.[1];
-    expect(verify).toBeDefined();
-    expect(verify?.startsWith('pnpm typecheck:toolchain && ')).toBe(true);
+    const script = (name: string): string => {
+      const found = new RegExp(`"${name}":\\s*"([^"]+)"`).exec(manifest)?.[1];
+      if (found === undefined) throw new Error(`package.json declares no ${name} script`);
+      return found;
+    };
+    const chain = (name: string): readonly string[] =>
+      script(name)
+        .split(' && ')
+        .flatMap((step) => {
+          const nested = /^pnpm ([\w:-]+)$/.exec(step)?.[1];
+          if (nested === undefined || nested === name) return [step];
+          // Only a step naming another chain is followed; `pnpm typecheck` names
+          // one command and stays the step it is.
+          return script(nested).includes(' && ') ? chain(nested) : [step];
+        });
+
+    expect(chain('verify').slice(0, 2)).toEqual(['pnpm typecheck:toolchain', 'pnpm typecheck']);
   });
 });
 

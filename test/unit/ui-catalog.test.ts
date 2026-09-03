@@ -157,6 +157,26 @@ describe('UI catalogue', () => {
     );
   });
 
+  // The other half of "exactly once", and the half a Playwright reporter used
+  // to own before `ci-wall-clock/02` retired it: two tests tagging one claim is
+  // evidence no reader can be pointed at. Both suites are checked, and each
+  // failure has to name the suite it is about.
+  it.each([
+    ['application', 'packages/app/e2e'],
+    ['Ladle', 'packages/app/ladle-e2e'],
+  ])('rejects a claim two %s tests both tag', (suite, directory) => {
+    const root = fixture();
+    write(
+      root,
+      `${directory}/button-again.spec.ts`,
+      `test('a second button test', { tag: '@parity:button-is-operable' }, async () => undefined);`,
+    );
+
+    expect(() => buildUiCatalog(root)).toThrowError(
+      new RegExp(`button-is-operable requires exactly one ${suite} test; found 2`),
+    );
+  });
+
   it.each(['test.skip', 'test.fixme', 'test.describe.skip'])(
     '%s cannot supply parity evidence',
     (modifier) => {

@@ -17,7 +17,12 @@ export default defineConfig({
   // suite or the runner is at fault.
   failOnFlakyTests: !!process.env['CI'],
   retries: process.env['CI'] ? 2 : 0,
-  reporter: [['list'], ['./scripts/parity-reporter.ts', { suite: 'Ladle' }]],
+  // The list reporter and nothing else, for the reasons `playwright.config.ts`
+  // sets out: the exactly-one-tagged-test invariant is `pnpm ui:catalog:check`'s
+  // — for this suite it holds over every claim, none being exempt from Ladle
+  // evidence — and `failOnFlakyTests` above is what makes a green run mean each
+  // of those tests passed without a retry.
+  reporter: [['list']],
   use: {
     ...devices['Desktop Chrome'],
     baseURL: `http://localhost:${PORT}`,
