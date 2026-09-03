@@ -350,17 +350,45 @@ describe('Open Spaces', () => {
     await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('pending'));
 
     // The activation parks until Meta settles. Closing Other retires its
-    // session and disposes its composition while it waits, so reinstating it
-    // would hand the canvas a Space nothing can commit for.
+    // session and disposes its composition while it waits, so neither
+    // reinstating it nor answering with it leaves the caller a Space anything
+    // can commit for — the close is the newer choice and the activation fails.
     const switching = openSpaces.switchTo(OTHER_ID);
     await Promise.resolve();
     await expect(openSpaces.close(OTHER_ID)).resolves.toEqual({ kind: 'closed' });
 
     release();
-    await switching;
+    await expect(switching).rejects.toThrow('was closed while it was being activated');
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
     expect(openSpaces.getState().entries).toEqual([meta]);
     expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
+  });
+
+  it('reloads a Space chosen while its close was still waiting', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const { openSpaces } = setup(control);
+    const other = await openSpaces.open(OTHER_ID);
+    await openSpaces.open(META_ID);
+    other.session.submit(edit(other.session.getState().working));
+    await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('pending'));
+
+    // The close parks until Other settles, and both caches still advertise the
+    // entry it is going to retire while it does. The author choosing Other back
+    // is the newer choice, so it waits the close out and takes the Space the
+    // close leaves behind rather than the composition it has just retired.
+    const closing = openSpaces.close(OTHER_ID);
+    await Promise.resolve();
+    const switching = openSpaces.switchTo(OTHER_ID);
+
+    release();
+    await expect(closing).resolves.toEqual({ kind: 'closed' });
+    const switched = await switching;
+
+    expect(switched).not.toBe(other);
+    expect(switched.session).not.toBe(other.session);
+    expect(openSpaces.entry(OTHER_ID)).toBe(switched);
+    expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
   });
 
   it('leaves a pending activation to finish when a later call throws before activating', async () => {

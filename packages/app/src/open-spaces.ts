@@ -139,6 +139,19 @@ export function createOpenSpaces({
   const abandoned = new Set<number>();
 
   /**
+   * The closes that have begun and not yet settled, by Space.
+   *
+   * A close waits arbitrarily long for its Space to become retirable, and both
+   * caches still advertise the entry it is going to retire while it does. An
+   * activation reading one of them inside that window would hand the author a
+   * composition the close is about to dispose and a session the registry is
+   * about to release. So an activation that finds a close underway waits it out
+   * and takes the Space the close leaves behind — the reloaded one, or this
+   * same entry if the close was refused.
+   */
+  const closing = new Map<UUID, Promise<unknown>>();
+
+  /**
    * Number one activation intent.
    *
    * A call that throws before it activates has to give its number back. A
@@ -196,12 +209,13 @@ export function createOpenSpaces({
     return { ...opened, initialization: 'created-layout' };
   };
 
-  const composeValidated = (
+  const composeValidated = async (
     validated: ValidatedLoadedSpace,
     selection?: CanvasRendererId,
   ): Promise<OpenSpace> => {
     const { loaded } = validated;
     const spaceId = loaded.snapshot.id;
+    await closing.get(spaceId);
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
     const opening = Promise.resolve().then(() => buildLoaded(validated, selection));
@@ -210,7 +224,8 @@ export function createOpenSpaces({
     return opening;
   };
 
-  const compose = (spaceId: UUID, selection?: CanvasRendererId): Promise<OpenSpace> => {
+  const compose = async (spaceId: UUID, selection?: CanvasRendererId): Promise<OpenSpace> => {
+    await closing.get(spaceId);
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
     const opening = loadWorkingSpace(spaceId).then((loaded) => {
@@ -230,7 +245,12 @@ export function createOpenSpaces({
     if (active !== null && active !== target.id) {
       await registry.waitUntilRetirable(active);
     }
-    if (retired.has(target)) return target;
+    if (retired.has(target)) {
+      // The close is the newer choice and has already taken this Space off the
+      // canvas, so there is nothing to reinstate — and nothing to answer with
+      // either, since the composition it names can no longer commit.
+      throw new Error(`Space ${target.id} was closed while it was being activated`);
+    }
     if (request !== activationRequest) {
       include(target, observable.getState().activeSpaceId ?? target.id);
       return target;
@@ -294,22 +314,22 @@ export function createOpenSpaces({
     if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
     const { request, abandon } = beginActivation();
     try {
-      return await activateAfterLeavingSettles(target, request);
+      // `entries` still advertises a Space a close is waiting to retire, so
+      // this entry is only the target while nothing is closing it. `compose`
+      // waits that close out and answers whatever it leaves behind.
+      const entry = closing.has(spaceId) ? await compose(spaceId) : target;
+      return await activateAfterLeavingSettles(entry, request);
     } catch (error) {
       abandon();
       throw error;
     }
   };
 
-  const close = async (
+  const retireOpenSpace = async (
     spaceId: UUID,
+    target: OpenSpace,
     confirmation?: RejectedCloseConfirmation,
   ): Promise<CloseSpaceResult> => {
-    if (spaceId === metaSpaceId) {
-      return { kind: 'refused', refusal: { code: 'meta-space-permanent' } };
-    }
-    const target = observable.getState().entries.find(({ id }) => id === spaceId);
-    if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
     // Waiting and retiring cannot be one step: a coordination can raise the
     // barrier in the microtask between them, which makes this Space one of its
     // participants again. So the wait, the reading it justifies and the
@@ -347,6 +367,28 @@ export function createOpenSpaces({
     compositions.delete(spaceId);
     observable.publish({ activeSpaceId, entries });
     return { kind: 'closed' };
+  };
+
+  const close = async (
+    spaceId: UUID,
+    confirmation?: RejectedCloseConfirmation,
+  ): Promise<CloseSpaceResult> => {
+    if (spaceId === metaSpaceId) {
+      return { kind: 'refused', refusal: { code: 'meta-space-permanent' } };
+    }
+    const target = observable.getState().entries.find(({ id }) => id === spaceId);
+    if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
+    const closed = retireOpenSpace(spaceId, target, confirmation);
+    // Recorded before the first wait, because the window an activation has to
+    // see is the whole of it — and recorded as a settlement rather than an
+    // outcome, since a close that threw has still stopped standing in the way.
+    const settled = closed.catch(() => undefined);
+    closing.set(spaceId, settled);
+    try {
+      return await closed;
+    } finally {
+      if (closing.get(spaceId) === settled) closing.delete(spaceId);
+    }
   };
 
   return {
