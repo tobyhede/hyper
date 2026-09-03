@@ -24,7 +24,7 @@ test:coverage             38s       ~106s
                           69s        193s
 ```
 
-Coverage is over half of it and lint is another third; the other six commands together are about 25s. Two jobs — everything but coverage in one, coverage in the other — makes the path ~112s and ~134s rather than 221s, which puts the cap at ~134s and just under ticket 03's ~122s shards.
+Coverage is over half of it and lint is another third; the other six commands together are about 29s. On top of the chain the job pays ~28s of checkout and install, so the whole of it is ~221s. Two jobs — everything but coverage in one, coverage in the other — each pay that setup once, making the paths ~116s and ~134s rather than one 221s run, which puts the cap at ~134s and just under ticket 03's ~122s shards.
 
 This also matches the reason `ci.yml` already gives for `ladle` being its own job rather than a step in `e2e`: "a red catalogue and a red application are different diagnoses, and the check name on a pull request should say which one failed." A red `tsc` and a red Vitest run are different diagnoses too.
 
@@ -38,13 +38,13 @@ Both halves need the `--prune-suppressions` behaviour to stay correct: the ratch
 
 ## What to weigh before splitting further
 
-Three jobs (static / lint / coverage) would take the cap to ~106s, but coverage alone is that number, so the third job buys ~6s and costs a third install. Two is the split; say so in the comment.
+Three jobs (static / lint / coverage) would be ~57s, ~87s and ~134s, so the cap is the coverage job either way: the third job buys nothing and costs a third install. Two is the split; say so in the comment.
 
 ## Acceptance criteria
 
 - [ ] CI runs the verify chain as two jobs, and the `ci` gate requires both.
 - [ ] `pnpm verify` locally still runs all eight commands, in the current order, with `typecheck:toolchain` first.
 - [ ] The eight commands are listed in exactly one place; the CI halves compose that list rather than repeating it.
-- [ ] Both jobs' real durations are read off the first green run and recorded here against the ~112s and ~134s estimates.
+- [ ] Both jobs' real durations are read off the first green run and recorded here against the ~116s and ~134s estimates.
 - [ ] `ci.yml` says why two jobs and not three.
 - [ ] The overall CI wall clock before and after is recorded, together with ticket 03's, so the combined effect is one number and not two claims.
