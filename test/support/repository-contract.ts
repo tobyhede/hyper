@@ -295,38 +295,34 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} serializes two replacements authorized against the same Meta identity`, async () => {
+  it(`${name} refuses a replacement authorized against a superseded Meta identity`, async () => {
     await withHarness(async (repository) => {
       const initial = space(SPACE_ID, 'Initial', [CARD_ID]);
       const first = space(OTHER_SPACE_ID, 'First replacement', [OTHER_CARD_ID]);
       const second = space(MISSING_SPACE_ID, 'Second replacement', [MISSING_CARD_ID]);
       await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
 
-      const results = await Promise.all([
+      await expect(
         repository.replaceAggregate({ metaSpaceId: OTHER_SPACE_ID, spaces: [first] }, SPACE_ID),
-        repository.replaceAggregate({ metaSpaceId: MISSING_SPACE_ID, spaces: [second] }, SPACE_ID),
-      ]);
-      expect(results.map(({ kind }) => kind)).toEqual(['replaced', 'replaced']);
+      ).resolves.toMatchObject({ kind: 'replaced' });
       /*
-       * Both proposals read the identity they are authorized against before
-       * either write lands, so both replace and the later write is the one that
-       * survives. Which of the two writes later is not the call order: the
-       * memory adapter defers its write to a microtask and PostgreSQL grants
-       * the Meta row lock in whatever order it grants it. What is owed is that
-       * the store holds one proposal whole -- its Meta identity and its Space
-       * from the same replacement, never a mixture of the two.
+       * A replacement names the Meta identity it read, and the first one
+       * retired SPACE_ID. So the second is authorized against an aggregate that
+       * no longer exists and is refused, whatever it proposes.
+       *
+       * Deliberately sequential. What two *overlapping* replacements do is
+       * PostgreSQL's Meta row lock deciding which is granted it last, which is
+       * transactional isolation a `Map` cannot have -- it is forced with a
+       * barrier and asserted in the integration suite, and stating it here made
+       * the contract read as though call order settled the winner.
        */
-      const loaded = await repository.loadAggregate();
-      expect([
-        {
-          kind: 'loaded',
-          aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(first, 0n, null)] },
-        },
-        {
-          kind: 'loaded',
-          aggregate: { metaSpaceId: MISSING_SPACE_ID, spaces: [stored(second, 0n, null)] },
-        },
-      ]).toContainEqual(loaded);
+      await expect(
+        repository.replaceAggregate({ metaSpaceId: MISSING_SPACE_ID, spaces: [second] }, SPACE_ID),
+      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: OTHER_SPACE_ID });
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(first, 0n, null)] },
+      });
     });
   });
 

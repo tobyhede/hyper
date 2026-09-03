@@ -68,7 +68,7 @@ export interface SpaceSessionRegistry {
    * answering whether it was retired.
    *
    * The check and the retirement are one synchronous step because they cannot
-   * be two: a coordination can raise the barrier in the microtask between an
+   * be two: a coordination can take its turn in the microtask between an
    * owner's {@link waitUntilRetirable} resolving and its call to this, and a
    * session that has become a coordination participant must not vanish from
    * under it. `false` says exactly that happened — wait again and retry.
@@ -184,6 +184,18 @@ export function createSpaceSessionRegistry(
   const uncommittedCreates = new Set<UUID>();
   let lifecycleTail = Promise.resolve();
   let persistenceBarrier = false;
+  /**
+   * Coordinations that hold a turn, whether or not they have started one.
+   *
+   * A coordination takes its `lifecycleTail` slot synchronously and raises
+   * `persistenceBarrier` only after awaiting the turn ahead of it, so between
+   * the two the barrier reports nothing while a coordination is already
+   * committed to running. Retiring a session in that window takes a
+   * participant out from under it, and it fails deriving its changes rather
+   * than refusing. Counting the turn is what closes the window, because the
+   * count moves in the same synchronous step that takes the slot.
+   */
+  let coordinationTurns = 0;
 
   const open = (loaded: LoadedSpace): SpaceSession => {
     const id = loaded.snapshot.id;
@@ -208,6 +220,7 @@ export function createSpaceSessionRegistry(
     lifecycleTail = new Promise<void>((resolve) => {
       releaseTurn = resolve;
     });
+    coordinationTurns += 1;
     await previous;
     persistenceBarrier = true;
     for (const managed of sessions.values()) managed.pausePersistence();
@@ -542,6 +555,7 @@ export function createSpaceSessionRegistry(
       return result;
     } finally {
       persistenceBarrier = false;
+      coordinationTurns -= 1;
       for (const managed of sessions.values()) managed.resumePersistence();
       releaseTurn();
     }
@@ -765,11 +779,11 @@ export function createSpaceSessionRegistry(
     for (;;) {
       const managed = sessions.get(spaceId);
       if (managed === undefined) return;
-      // A coordination has paused every session, so queued work cannot drain
-      // and the participant set must not change under it. Wait the turn out:
-      // its `finally` lowers the barrier and resumes, which is what lets the
+      // A coordination holds a turn, so queued work cannot drain and the
+      // participant set must not change under it. Wait the turn out: its
+      // `finally` lowers the barrier and resumes, which is what lets the
       // queued snapshot become an in-flight commit this loop can then await.
-      if (persistenceBarrier) {
+      if (coordinationTurns > 0) {
         await lifecycleTail;
         continue;
       }
@@ -784,7 +798,7 @@ export function createSpaceSessionRegistry(
     release: (spaceId) => {
       const managed = sessions.get(spaceId);
       if (managed === undefined) return true;
-      if (persistenceBarrier) return false;
+      if (coordinationTurns > 0) return false;
       if (!managed.isIdle() || managed.hasQueuedWork()) return false;
       managed.setCoordinatedRecovery(undefined);
       sessions.delete(spaceId);

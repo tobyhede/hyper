@@ -114,6 +114,38 @@ export function createOpenSpaces({
    */
   let activationRequest = 0;
 
+  /**
+   * The entries `close` has retired.
+   *
+   * An activation captures its target and then waits arbitrarily long for the
+   * Space being left. A close completing inside that wait retires the session
+   * and disposes the composition, so reinstating the target on the canvas would
+   * hand the author a Space nothing can commit for. Identity is the test, not
+   * the Space Id: the same Space reopened is a different entry and reinstating
+   * *it* would be correct.
+   */
+  const retired = new WeakSet<OpenSpace>();
+
+  /**
+   * Number one activation intent.
+   *
+   * A call that throws before it activates has to give its number back. A
+   * consumed number no activation will ever claim reads as a newer choice to
+   * everything already waiting, so a legitimately pending activation declines
+   * the canvas for a choice nobody made. Giving it back is only right while
+   * nothing newer has been numbered — if something has, that is the real
+   * supersession and the number stands.
+   */
+  const beginActivation = () => {
+    const request = ++activationRequest;
+    return {
+      request,
+      abandon: () => {
+        if (activationRequest === request) activationRequest = request - 1;
+      },
+    };
+  };
+
   const include = (entry: OpenSpace, activeSpaceId: UUID): void => {
     const state = observable.getState();
     if (state.entries.some(({ id }) => id === entry.id)) {
@@ -129,6 +161,10 @@ export function createOpenSpaces({
     selection?: CanvasRendererId,
   ): OpenSpace => {
     const spaceId = loaded.snapshot.id;
+    // A session the registry already holds keeps the snapshot it was opened on
+    // and discards this one, so anything read off `loaded` afterwards describes
+    // a read that was thrown away.
+    const reused = registry.session(spaceId) !== undefined;
     const session = registry.open(loaded);
     // Every identity and every observer failure in a composed Space comes from
     // the seams Open Spaces was given (ADR 0016). Leaving either off here lets
@@ -139,7 +175,7 @@ export function createOpenSpaces({
       session,
       app: composeApp({ spaceSession: session, selection, newId, reportObserverError: report }),
     };
-    if (loaded.initialization !== 'created-layout') return opened;
+    if (reused || loaded.initialization !== 'created-layout') return opened;
     return { ...opened, initialization: 'created-layout' };
   };
 
@@ -177,6 +213,7 @@ export function createOpenSpaces({
     if (active !== null && active !== target.id) {
       await registry.waitUntilRetirable(active);
     }
+    if (retired.has(target)) return target;
     if (request !== activationRequest) {
       include(target, observable.getState().activeSpaceId ?? target.id);
       return target;
@@ -189,12 +226,29 @@ export function createOpenSpaces({
     // Numbered before the Space is loaded, not after: composition is itself a
     // wait, and a request made first must not be superseded by one made second
     // merely because the second Space was already in hand.
-    const request = ++activationRequest;
-    return activateAfterLeavingSettles(await compose(spaceId, selection), request);
+    const { request, abandon } = beginActivation();
+    try {
+      return await activateAfterLeavingSettles(await compose(spaceId, selection), request);
+    } catch (error) {
+      abandon();
+      throw error;
+    }
   };
 
   const openPath: OpenSpaces['openPath'] = async (pathname) => {
-    const request = ++activationRequest;
+    const { request, abandon } = beginActivation();
+    try {
+      return await openResolvedPath(pathname, request);
+    } catch (error) {
+      abandon();
+      throw error;
+    }
+  };
+
+  const openResolvedPath = async (
+    pathname: string,
+    request: number,
+  ): ReturnType<OpenSpaces['openPath']> => {
     // Resolving an address is a working load, so it initializes a stored
     // layoutless Space before the destination is read off it (ADR 0079).
     const resolution = await resolveProductDestination({ loadSpace: loadWorkingSpace }, pathname);
@@ -219,10 +273,15 @@ export function createOpenSpaces({
   };
 
   const switchTo = async (spaceId: UUID): Promise<OpenSpace> => {
-    const request = ++activationRequest;
     const target = observable.getState().entries.find(({ id }) => id === spaceId);
     if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
-    return activateAfterLeavingSettles(target, request);
+    const { request, abandon } = beginActivation();
+    try {
+      return await activateAfterLeavingSettles(target, request);
+    } catch (error) {
+      abandon();
+      throw error;
+    }
   };
 
   const close = async (
@@ -267,6 +326,7 @@ export function createOpenSpaces({
     // The composition goes with the session the registry has just stopped owning.
     target.app.edgeAuthoring.dispose();
     target.app.authoring.dispose();
+    retired.add(target);
     compositions.delete(spaceId);
     observable.publish({ activeSpaceId, entries });
     return { kind: 'closed' };

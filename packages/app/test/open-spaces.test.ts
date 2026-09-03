@@ -12,6 +12,7 @@ import { mintingIds } from './minting';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const UNOPENED_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -337,6 +338,51 @@ describe('Open Spaces', () => {
     await opening;
     expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
     expect(openSpaces.entry(META_ID)).toBeDefined();
+  });
+
+  it('never reinstates a Space closed while an activation waited on the one being left', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const { openSpaces } = setup(control);
+    await openSpaces.open(OTHER_ID);
+    const meta = await openSpaces.open(META_ID);
+    meta.session.submit(edit(meta.session.getState().working));
+    await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('pending'));
+
+    // The activation parks until Meta settles. Closing Other retires its
+    // session and disposes its composition while it waits, so reinstating it
+    // would hand the canvas a Space nothing can commit for.
+    const switching = openSpaces.switchTo(OTHER_ID);
+    await Promise.resolve();
+    await expect(openSpaces.close(OTHER_ID)).resolves.toEqual({ kind: 'closed' });
+
+    release();
+    await switching;
+    expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
+    expect(openSpaces.getState().entries).toEqual([meta]);
+    expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
+  });
+
+  it('leaves a pending activation to finish when a later call throws before activating', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const { openSpaces } = setup(control);
+    const other = await openSpaces.open(OTHER_ID);
+    other.session.submit(edit(other.session.getState().working));
+    await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('pending'));
+
+    const opening = openSpaces.open(META_ID);
+    await Promise.resolve();
+    // Neither call activates anything, so neither supersedes the choice
+    // already waiting on the Space being left.
+    await expect(openSpaces.switchTo(UNOPENED_ID)).rejects.toThrow('is not open');
+    await expect(openSpaces.openPath('/not-a-product-url')).rejects.toThrow(
+      'outside product addressing',
+    );
+
+    release();
+    await opening;
+    expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
   });
 
   it('reports the selection an already-open Space actually kept', async () => {

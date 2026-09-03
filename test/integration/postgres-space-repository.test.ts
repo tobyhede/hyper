@@ -59,6 +59,7 @@ const MISSING_CARD_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666')
 const OTHER_SPACE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 const OTHER_CARD_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
 const CONCURRENT_SPACE_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
+const CONCURRENT_CARD_ID = uuidSchema.parse('9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a');
 const MIXED_FIRST_CARD_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 const MIXED_SECOND_CARD_ID = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 const UNRESOLVED_CARD_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
@@ -112,6 +113,24 @@ const otherSnapshot: SpaceSnapshot = {
         title: 'Other card',
         kind: 'markdown',
         body: 'Owned by the other space.',
+      },
+    },
+  ],
+};
+
+const concurrentSnapshot: SpaceSnapshot = {
+  id: CONCURRENT_SPACE_ID,
+  document: {
+    version: 1,
+    title: 'Concurrent space',
+  },
+  cards: [
+    {
+      id: CONCURRENT_CARD_ID,
+      document: {
+        title: 'Concurrent card',
+        kind: 'markdown',
+        body: 'Owned by the concurrent space.',
       },
     },
   ],
@@ -312,6 +331,61 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       revision: 1n,
       snapshot: { document: { title: 'Authored winner' } },
+    });
+  });
+
+  /*
+   * The regression this pins: a CI run failed asserting that the *second* of
+   * two concurrent replacements is the one whose state survives. It is not the
+   * call order that decides. Both proposals read the Meta identity they are
+   * authorized against before either write lands, so both replace, and the
+   * survivor is whichever PostgreSQL grants the Meta row lock to last.
+   *
+   * The blocking transaction is what makes that determinate here, twice over.
+   * It guarantees the two genuinely overlap -- issued back to back they might
+   * simply run one after the other, and the second would then read the new
+   * identity and conflict. And because the row lock's waiters are served in the
+   * order they queue, the replacement issued second is granted it second, so it
+   * is the one that writes last however the calls are collected afterwards.
+   */
+  it('gives the whole store to whichever replacement takes the Meta row lock last', async () => {
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
+
+    const metaLockHeld = Promise.withResolvers<undefined>();
+    const releaseMetaLock = Promise.withResolvers<undefined>();
+    const blocking = db.transaction(async ({ orm }) => {
+      await orm.public.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId: SPACE_ID });
+      metaLockHeld.resolve(undefined);
+      await releaseMetaLock.promise;
+    });
+    await metaLockHeld.promise;
+
+    const queuedFirst = repository.replaceAggregate(
+      { metaSpaceId: OTHER_SPACE_ID, spaces: [otherSnapshot] },
+      SPACE_ID,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const queuedSecond = repository.replaceAggregate(
+      { metaSpaceId: CONCURRENT_SPACE_ID, spaces: [concurrentSnapshot] },
+      SPACE_ID,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    releaseMetaLock.resolve(undefined);
+    await blocking;
+
+    // Collected in the reverse of the order they were issued, because the order
+    // a caller happens to read the results in settles nothing about the store.
+    await expect(Promise.all([queuedSecond, queuedFirst])).resolves.toMatchObject([
+      { kind: 'replaced' },
+      { kind: 'replaced' },
+    ]);
+    await expect(repository.loadAggregate()).resolves.toEqual({
+      kind: 'loaded',
+      aggregate: {
+        metaSpaceId: CONCURRENT_SPACE_ID,
+        spaces: [{ snapshot: concurrentSnapshot, revision: 0n, exportedRevision: null }],
+      },
     });
   });
 
