@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { LayoutId } from '@project/core';
 import { graphStartCard, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
-import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import { defaultLayout } from '../src/renderer';
 import {
   authoredSnapshot,
@@ -28,12 +28,16 @@ import {
  * because the Space says so through the same call production makes. Delete the
  * `defaultLayout` and this fails here rather than in a browser.
  */
+/** The title of the Layout an id names, asked of the Space that declares it. */
+const openedLayoutTitle = (space: Space, id: LayoutId): string | undefined =>
+  space.lookup.layout(id)?.layout.title;
+
 describe('the story Spaces', () => {
   it('opens the authored Space on the Layout its stories press', () => {
     const opens = defaultLayout(authoredSpace);
 
     expect(opens).toBe(authoredSpace.defaultLayout);
-    expect(currentRenderer(canvasRenderers(authoredSpace), opens).title).toBe('Collection 1');
+    expect(openedLayoutTitle(authoredSpace, opens)).toBe('Collection 1');
   });
 
   /**
@@ -48,7 +52,7 @@ describe('the story Spaces', () => {
 
     expect(opens).toBe(space.space.defaultLayout);
     const layout = space.space.lookup.layout(opens)?.layout;
-    expect(currentRenderer(canvasRenderers(space.space), opens).title).toBe('Collection 2');
+    expect(openedLayoutTitle(space.space, opens)).toBe('Collection 2');
     expect(
       space.space.cards.filter((card) => layout?.positions[card.id] === undefined),
     ).not.toHaveLength(0);
@@ -61,14 +65,14 @@ describe('the story Spaces', () => {
     expect(opens).toEqual(newSpaceFixture.layouts[0]?.id);
     expect(newSpaceFixture.layouts).toHaveLength(1);
     expect(newSpaceFixture.graphs).toHaveLength(1);
-    expect(currentRenderer(canvasRenderers(newSpaceFixture), opens).title).toBe('Layout 1');
+    expect(openedLayoutTitle(newSpaceFixture, opens)).toBe('Layout 1');
   });
 
   /**
    * The retryable story hands the fixture a Space that changes: it opens on
    * `authoredSnapshot` and submits `editedSnapshot`. The fixture seeds `selected`
    * once and never reconciles it, so an Edit withdrawing the opened Layout would
-   * make `canvasRenderers` throw on the second render — a blank story rather than a
+   * leave the sidebar with no Layout to press — a blank story rather than a
    * degraded one. The Edit appends, and this is what says so, at `verify` rather
    * than in a browser — including that it appends *something*, since an
    * `editedSnapshot` that stopped differing from what the session loaded would
@@ -80,7 +84,7 @@ describe('the story Spaces', () => {
 
     const opens = defaultLayout(authoredSpace);
 
-    expect(currentRenderer(canvasRenderers(edited.space), opens).title).toBe('Collection 1');
+    expect(openedLayoutTitle(edited.space, opens)).toBe('Collection 1');
     expect(edited.space.layouts.slice(0, authoredSpace.layouts.length)).toEqual(
       authoredSpace.layouts,
     );
@@ -156,7 +160,7 @@ describe('the story Spaces', () => {
     ] as const) {
       const opens = defaultLayout(space);
       expect(opens).toBe(space.defaultLayout);
-      expect(currentRenderer(canvasRenderers(space), opens).title).toBe(title);
+      expect(openedLayoutTitle(space, opens)).toBe(title);
       expect(space.graphs.map((graph) => graph.title)).toEqual([title]);
     }
   });

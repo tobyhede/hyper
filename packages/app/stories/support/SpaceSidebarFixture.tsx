@@ -18,7 +18,6 @@ import { AppShell } from '@project/ui';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
-import { canvasRenderers, currentRenderer } from '#src/canvas-renderers';
 import { graphColorMap } from '#src/colors';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { createWorkingSpaceReader, snapshotFromSpace } from '#src/snapshot';
@@ -137,13 +136,12 @@ export function SpaceSidebarFixture({
     else navigation.exitPresenting();
   }, [navigation, presenting]);
   const addCardMenu = useRef<HTMLButtonElement>(null);
-  // One module answers which canvas renderers exist and which is current, and
-  // the header below reads the row it named rather than a title of the
-  // fixture's own. The selected renderer, its Active Graph and its mode are all
+  // The Space answers which Layouts exist and the resolver answers which one is
+  // drawing; the header below reads that Layout rather than a title of the
+  // fixture's own. The selection, its Active Graph and its mode are all
   // Navigation's published state.
-  const renderers = canvasRenderers(displayedSpace);
-  const current = currentRenderer(renderers, navigationState.selectedRenderer);
   const renderer = resolveRenderer(displayedSpace, navigationState.selectedRenderer);
+  const selectedLayout = renderer.resolvedLayout.layout;
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
@@ -193,7 +191,11 @@ export function SpaceSidebarFixture({
       sidebar={
         <SpaceSidebar
           spaceTitle={displayedSpace.title}
-          canvas={{ renderers, current, onSelect: navigation.selectRenderer }}
+          canvas={{
+            layouts: displayedSpace.layouts,
+            selected: selectedLayout,
+            onSelect: navigation.selectRenderer,
+          }}
           graph={{
             graphs: renderer.subject.graphs,
             activeGraphId: navigationState.activeGraphId,
@@ -247,7 +249,7 @@ export function SpaceSidebarFixture({
       }
       header={
         <>
-          <SelectedCanvasRenderer renderer={current} titleEdit={chromeTitleEdit} />
+          <SelectedCanvasRenderer layout={selectedLayout} titleEdit={chromeTitleEdit} />
           {headerActions}
         </>
       }

@@ -1,9 +1,8 @@
 import { createRef, useState, type ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { uuidSchema, type Layout } from '@project/core';
 import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
-import type { CanvasRenderer } from '../src/canvas-renderers';
 import {
   SelectedCanvasRenderer,
   SpaceSidebar,
@@ -66,27 +65,30 @@ const stubViewport = (mobile: boolean): void => {
 const draw = (element: ReactElement) => render(<SidebarProvider>{element}</SidebarProvider>);
 
 /**
- * The rows, written out here rather than derived from a Space.
+ * The Layouts, written out here rather than loaded from a Space.
  *
- * `canvasRenderers` owns the derivation and `canvas-renderers.test.ts` owns testing
- * it. What is left for this file is what the sidebar *draws*, and a test of a
- * list should not need a Space to state it. They are named constants so a test
- * can say which row it expects pressed by naming the same value it listed —
- * which is convenience here, not the contract: the sidebar matches by
- * `canvasRendererKey`, and the test below hands it an equal row it never listed.
+ * What is left for this file is what the sidebar *draws*, and a test of a list
+ * should not need a Space to state it. They are named constants so a test can
+ * say which row it expects pressed by naming the same value it listed — which
+ * is convenience here, not the contract: the sidebar matches by **Layout id**,
+ * and the test below hands it an equal Layout it never listed.
  */
-const LAYOUT_ONE: CanvasRenderer = { selection: LAYOUT_ID, title: 'Layout 1' };
-const LAYOUT_TWO: CanvasRenderer = { selection: OTHER_LAYOUT_ID, title: 'Layout 2' };
-const LAYOUT: CanvasRenderer = {
-  selection: LAYOUT_ID,
-  title: 'Layout 1',
-};
+const layout = (id: typeof LAYOUT_ID, title: string): Layout => ({
+  id,
+  title,
+  kind: 'positioned',
+  positions: {},
+  graphs: [],
+});
+const LAYOUT_ONE = layout(LAYOUT_ID, 'Layout 1');
+const LAYOUT_TWO = layout(OTHER_LAYOUT_ID, 'Layout 2');
+const LAYOUT = layout(LAYOUT_ID, 'Layout 1');
 
 const settledProps = (): SpaceSidebarProps => ({
   spaceTitle: 'Space',
   canvas: {
-    renderers: [LAYOUT_ONE, LAYOUT_TWO],
-    current: LAYOUT_ONE,
+    layouts: [LAYOUT_ONE, LAYOUT_TWO],
+    selected: LAYOUT_ONE,
     onSelect: vi.fn(),
   },
   graph: {
@@ -113,7 +115,7 @@ const settledProps = (): SpaceSidebarProps => ({
 
 const withLayout = (props: SpaceSidebarProps): SpaceSidebarProps => ({
   ...props,
-  canvas: { ...props.canvas, renderers: [LAYOUT] },
+  canvas: { ...props.canvas, layouts: [LAYOUT] },
 });
 
 describe('SpaceSidebar', () => {
@@ -140,7 +142,7 @@ describe('SpaceSidebar', () => {
       return (
         <>
           <SpaceSidebar {...props} titleEdit={titleEdit} />
-          <SelectedCanvasRenderer renderer={LAYOUT} titleEdit={titleEdit} />
+          <SelectedCanvasRenderer layout={LAYOUT} titleEdit={titleEdit} />
         </>
       );
     }
@@ -195,7 +197,7 @@ describe('SpaceSidebar', () => {
   });
 
   it('names the Layout as plain text when no title edit is offered', () => {
-    draw(<SelectedCanvasRenderer renderer={LAYOUT} />);
+    draw(<SelectedCanvasRenderer layout={LAYOUT} />);
 
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout 1');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -230,7 +232,7 @@ describe('SpaceSidebar', () => {
     unmount();
 
     const authored = withLayout(settledProps());
-    draw(<SpaceSidebar {...authored} canvas={{ ...authored.canvas, current: LAYOUT }} />);
+    draw(<SpaceSidebar {...authored} canvas={{ ...authored.canvas, selected: LAYOUT }} />);
     expect(screen.getByRole('button', { name: 'Add Layout' })).toBeVisible();
   });
 
@@ -282,7 +284,7 @@ describe('SpaceSidebar', () => {
     const base = withLayout(settledProps());
     const props: SpaceSidebarProps = {
       ...base,
-      canvas: { ...base.canvas, current: LAYOUT },
+      canvas: { ...base.canvas, selected: LAYOUT },
       titleEdit,
       entityActions: () => [[{ id: 'rename', label: 'Rename', onSelect: vi.fn() }]],
     };
@@ -352,7 +354,7 @@ describe('SpaceSidebar', () => {
     const base = settledProps();
     const props: SpaceSidebarProps = {
       ...base,
-      canvas: { ...base.canvas, current: LAYOUT },
+      canvas: { ...base.canvas, selected: LAYOUT },
     };
     draw(<SpaceSidebar {...props} />);
 
@@ -369,25 +371,21 @@ describe('SpaceSidebar', () => {
   });
 
   /**
-   * The pressed row is decided by the one identity rule, not by object identity.
+   * The pressed row is decided by Layout id, not by object identity.
    *
-   * `canvasRenderers` mints a fresh authored row per call, so a caller listing
-   * from one call and taking its current row from a second hands in two equal
-   * values that are not the same object — see `canvas-renderers.test.ts`. A
-   * `===` test drew that as a Layout list with nothing pressed: no throw, and
-   * nothing in the type to catch it. `canvasRendererKey` is the rule the row
-   * keys and `data-renderer` already carry, so the sidebar now asks the one
+   * A caller that lists one Space's Layouts and takes its selected Layout from
+   * a second value of equal shape hands in two Layouts that are equal and not
+   * the same object. A `===` test drew that as a Layout list with nothing
+   * pressed: no throw, and nothing in the type to catch it. The id is what the
+   * row keys and `data-renderer` already carry, so the sidebar asks the one
    * question it answers everywhere else.
    */
-  it('presses an equal row that a second derivation built', () => {
+  it('presses an equal Layout that a second value described', () => {
     const base = withLayout(settledProps());
-    const rebuilt: CanvasRenderer = {
-      selection: LAYOUT_ID,
-      title: 'Layout 1',
-    };
+    const rebuilt = layout(LAYOUT_ID, 'Layout 1');
     expect(rebuilt).not.toBe(LAYOUT);
 
-    draw(<SpaceSidebar {...base} canvas={{ ...base.canvas, current: rebuilt }} />);
+    draw(<SpaceSidebar {...base} canvas={{ ...base.canvas, selected: rebuilt }} />);
 
     const pressed = screen
       .getAllByTestId('canvas-renderer')

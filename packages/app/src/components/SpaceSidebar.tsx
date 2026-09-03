@@ -1,5 +1,5 @@
 import { useState, type ReactNode, type Ref } from 'react';
-import { type Graph, type GraphId, type UUID } from '@project/core';
+import { type Graph, type GraphId, type Layout, type LayoutId, type UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
@@ -43,9 +43,7 @@ import {
   useSidebar,
 } from '@project/ui';
 import type { EntityActionGroup } from '@project/ui';
-import type { CanvasRenderers, CanvasRenderer } from '../canvas-renderers';
 import { describeAuthoringRefusal } from '../authoring-refusal';
-import { canvasRendererKey, type CanvasRendererId } from '../renderer';
 import type { AuthoringRefusal } from '../space-authoring';
 
 export interface SpaceSidebarProps {
@@ -68,26 +66,25 @@ export interface SpaceSidebarProps {
    */
   readonly className?: string;
   readonly canvas: {
-    /** The computed and authored rows `canvasRenderers` derives from the Space. */
-    readonly renderers: CanvasRenderers;
+    /** The Space's authored Layouts, in the order it declares them. */
+    readonly layouts: readonly Layout[];
     /**
-     * The row that is drawing, which `currentRenderer` answers from that list.
+     * The Layout that is drawing.
      *
-     * Matched to a row by `canvasRendererKey` and not by object identity. The
+     * Matched to a row by **Layout id** and not by object identity. The
      * interface is structural, so "this came out of that list" is a thing a
      * hand-built literal can break and the compiler cannot check; making the
-     * pressed test the one identity rule means it does not have to. A caller
-     * that lists from one derivation and takes its current row from a second
-     * presses the right row rather than none.
+     * pressed test compare ids means it does not have to. A caller that lists
+     * one Space's Layouts and takes its selected Layout from a second value of
+     * equal shape presses the right row rather than none.
      */
-    readonly current: CanvasRenderer;
+    readonly selected: Layout;
     /**
-     * Hands back the bare selection, which is what Navigation takes. The row's
-     * title belongs to whoever built the list: a caller that has to name what is
-     * drawing reads `current` rather than deriving a second title of its
-     * own.
+     * Hands back the bare Layout id, which is what Navigation takes. The
+     * Layout's title belongs to the Layout: a caller that has to name what is
+     * drawing reads `selected` rather than deriving a second title of its own.
      */
-    readonly onSelect: (selection: CanvasRendererId) => void;
+    readonly onSelect: (selection: LayoutId) => void;
   };
   readonly graph: {
     readonly graphs: readonly Graph[];
@@ -212,15 +209,15 @@ function DeleteCardControl({
 /**
  * An entity this Sidebar draws a row for, named the way the row knows it.
  *
- * It carries the whole `CanvasRenderer`/`Graph` rather than an id, for the
- * reason `SelectedCanvasRenderer` takes the row: handed an id, a caller has to
- * find the thing again down a second path, and the Sidebar and the menu on its
- * own row are then free to disagree about what they are naming.
+ * It carries the whole `Layout`/`Graph` rather than an id, for the reason
+ * `SelectedCanvasRenderer` takes the Layout: handed an id, a caller has to find
+ * the thing again down a second path, and the Sidebar and the menu on its own
+ * row are then free to disagree about what they are naming.
  */
 export type SpaceEntity =
   | { readonly kind: 'space' }
-  | { readonly kind: 'layout'; readonly renderer: CanvasRenderer }
-  | { readonly kind: 'graph'; readonly graph: Graph; readonly renderer: CanvasRenderer };
+  | { readonly kind: 'layout'; readonly layout: Layout }
+  | { readonly kind: 'graph'; readonly graph: Graph; readonly layout: Layout };
 
 export interface SpaceChromeTitleEdit {
   readonly subject: SpaceChromeTitleSubject | null;
@@ -256,35 +253,34 @@ const editing = (
 
 /** The selectable Layout rows. */
 function LayoutRows({
-  renderers,
+  layouts,
   selected,
   onSelect,
   titleEdit,
   entityActions,
 }: {
-  readonly renderers: readonly CanvasRenderer[];
-  readonly selected: CanvasRenderer;
-  readonly onSelect: (selection: CanvasRendererId) => void;
+  readonly layouts: readonly Layout[];
+  readonly selected: Layout;
+  readonly onSelect: (selection: LayoutId) => void;
   readonly titleEdit: SpaceChromeTitleEdit | undefined;
   readonly entityActions: SpaceSidebarProps['entityActions'];
 }) {
-  const selectedKey = canvasRendererKey(selected.selection);
   return (
     <SidebarMenu>
-      {renderers.map((renderer) => {
-        const active = canvasRendererKey(renderer.selection) === selectedKey;
-        const layoutId = renderer.selection;
+      {layouts.map((layout) => {
+        const active = layout.id === selected.id;
+        const layoutId = layout.id;
         const isEditing =
           editing(titleEdit, 'layout', layoutId) && titleEdit?.surface === 'sidebar';
         const shownTitle = editing(titleEdit, 'layout', layoutId)
-          ? (titleEdit?.draft ?? renderer.title)
-          : renderer.title;
+          ? (titleEdit?.draft ?? layout.title)
+          : layout.title;
         return (
-          <SidebarMenuItem key={canvasRendererKey(renderer.selection)} tabIndex={-1}>
+          <SidebarMenuItem key={layoutId} tabIndex={-1}>
             <EntityActionsRow
-              entity={{ kind: 'layout', renderer }}
+              entity={{ kind: 'layout', layout }}
               entityActions={entityActions}
-              label={`Actions for Layout ${renderer.title}`}
+              label={`Actions for Layout ${layout.title}`}
               editing={isEditing}
             >
               {isEditing ? (
@@ -297,12 +293,12 @@ function LayoutRows({
                   render={<div />}
                   isActive={active}
                   data-testid="canvas-renderer"
-                  data-renderer={canvasRendererKey(renderer.selection)}
+                  data-renderer={layoutId}
                 >
                   <LayoutIcon />
                   <InlineTitleEditor
                     className="flex-1"
-                    title={renderer.title}
+                    title={layout.title}
                     label="Layout name"
                     variant="sidebar"
                     draft={titleEdit.draft}
@@ -321,18 +317,18 @@ function LayoutRows({
                   isActive={active}
                   aria-pressed={active}
                   data-testid="canvas-renderer"
-                  data-renderer={canvasRendererKey(renderer.selection)}
+                  data-renderer={layoutId}
                   onClick={(event) => {
                     if (active && titleEdit !== undefined && titleEdit.disabled !== true) {
                       const row = event.currentTarget.closest('li');
                       titleEdit.onBegin(
                         { kind: 'layout', id: layoutId },
-                        renderer.title,
+                        layout.title,
                         'sidebar',
                         () => row?.focus(),
                       );
                     } else {
-                      onSelect(renderer.selection);
+                      onSelect(layoutId);
                     }
                   }}
                 >
@@ -521,12 +517,12 @@ export function SpaceSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Layout</SidebarGroupLabel>
           <SidebarGroupContent>
-            {canvas.renderers.length === 0 ? (
+            {canvas.layouts.length === 0 ? (
               <NothingYet testId="no-authored-layouts">No Layouts yet.</NothingYet>
             ) : (
               <LayoutRows
-                renderers={canvas.renderers}
-                selected={canvas.current}
+                layouts={canvas.layouts}
+                selected={canvas.selected}
                 onSelect={onCanvas(canvas.onSelect)}
                 titleEdit={titleEdit}
                 entityActions={canvasAwareEntityActions}
@@ -586,7 +582,7 @@ export function SpaceSidebar({
                   return (
                     <SidebarMenuItem key={candidate.id} tabIndex={-1}>
                       <EntityActionsRow
-                        entity={{ kind: 'graph', graph: candidate, renderer: canvas.current }}
+                        entity={{ kind: 'graph', graph: candidate, layout: canvas.selected }}
                         entityActions={canvasAwareEntityActions}
                         label={`Actions for Graph ${candidate.title}`}
                         editing={isEditing}
@@ -720,27 +716,27 @@ export function SpaceSidebar({
  * survives the sidebar closing — the single choice is still named when the list
  * it was made in is off screen.
  *
- * It takes the **row**, never a bare title and kind. Handed those two, a caller
- * can name what is drawing down a second path — off the resolved renderer, say —
- * and the header and the list it reports on are free to disagree again. Taking
- * the row means the only way to draw this is to have built the list.
+ * It takes the **Layout**, never a bare title and id. Handed those two, a
+ * caller can name what is drawing down a second path and the header and the
+ * list it reports on are free to disagree again. Taking the Layout means the
+ * header and the row are reading one value.
  */
 export function SelectedCanvasRenderer({
-  renderer,
+  layout,
   titleEdit,
 }: {
-  readonly renderer: CanvasRenderer;
+  readonly layout: Layout;
   readonly titleEdit?: SpaceChromeTitleEdit;
 }) {
-  const layoutId = renderer.selection;
+  const layoutId = layout.id;
   const sameEdit = editing(titleEdit, 'layout', layoutId);
   const isEditing = sameEdit && titleEdit?.surface === 'header';
-  const shownTitle = sameEdit ? (titleEdit?.draft ?? renderer.title) : renderer.title;
+  const shownTitle = sameEdit ? (titleEdit?.draft ?? layout.title) : layout.title;
   return (
     <div data-testid="selected-canvas" className="flex min-w-0" tabIndex={-1}>
       {isEditing ? (
         <InlineTitleEditor
-          title={renderer.title}
+          title={layout.title}
           label="Layout name"
           variant="header"
           draft={titleEdit.draft}
@@ -775,7 +771,7 @@ export function SelectedCanvasRenderer({
           aria-label={`Edit Layout ${shownTitle}`}
           onClick={(event) => {
             const header = event.currentTarget.parentElement;
-            titleEdit.onBegin({ kind: 'layout', id: layoutId }, renderer.title, 'header', () =>
+            titleEdit.onBegin({ kind: 'layout', id: layoutId }, layout.title, 'header', () =>
               header?.focus(),
             );
           }}
