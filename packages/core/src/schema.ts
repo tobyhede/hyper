@@ -143,11 +143,11 @@ export const graphSchema = z.object({
   /**
    * Possibly none. A graph *is* its edges, but it is no longer minted by
    * drawing one: creating a layout creates its initial empty active graph in
-   * the same edit (ADR 0040), and the Flow view converts by returning exactly
-   * that — one fresh graph holding no edges (ADR 0045). Deleting a graph's last
-   * edge leaves the same shape, and graph management may not delete the graph
-   * itself to avoid it. The superseded rule read ADR 0033's connect gesture as
-   * the only way a graph came into being, which ADR 0040 replaced.
+   * the same edit (ADR 0040), and Add Layout produces exactly that — one fresh
+   * graph holding no edges (ADR 0079). Deleting a graph's last edge leaves the
+   * same shape, and graph management may not delete the graph itself to avoid
+   * it. The superseded rule read ADR 0033's connect gesture as the only way a
+   * graph came into being, which ADR 0040 replaced.
    *
    * A card may appear as the `from` of several edges (a fork) and the `to` of
    * several (a merge); nothing here constrains that.
@@ -188,7 +188,7 @@ export const cardPlacementSchema = z.discriminatedUnion('open', [
  * id is unique across the *space* (ADR 0045), because the flatten a
  * space-subject view draws keys colour, handles and activation on the id alone.
  *
- * **Strict, unlike every other object here.** Under the version 2 shape this
+ * **Strict**, as the space file itself is. Under the version 2 shape this
  * key held a filter — an array of graph ids naming the graphs the layout drew.
  * Reading one of those as an owned collection would be a type error, but a
  * *stripped* one would read a file that said "draw only these" as a layout with
@@ -264,8 +264,23 @@ export const SPACE_FILE_VERSION = 1;
  * It holds **structure and nothing else** (ADR 0020): cards are not listed here,
  * because a card exists by virtue of its file existing. `loadSpace` takes the
  * card files alongside this.
+ *
+ * **Strict**, for the reason `positionedLayoutSchema` is. A stripped key is a
+ * question answered silently: a top-level `cards` or `edges` array (ADR 0020,
+ * ADR 0007) half-describes a space nothing loads from, and a file still
+ * spelling the opening selection the way ADR 0079 renamed it reaches
+ * `workingSpace`, which adopts `layouts[0]` and commits it — the Layout its
+ * author named replaced by one they did not, and then persisted. Rejecting
+ * says so instead.
+ *
+ * This is a policy and not a compatibility path, which is what lets it answer
+ * a renamed key at all: it declines every key it does not declare, so it never
+ * names a retired one and carries no knowledge of a shape that cannot reach it
+ * (ADR 0056). `.omit()` and `.extend()` carry the mode, so the stored
+ * document, the snapshot and the import variant decline one too — the same
+ * answer at every door.
  */
-const spaceFileObjectSchema = z.object({
+const spaceFileObjectSchema = z.strictObject({
   version: z.literal(SPACE_FILE_VERSION),
   /**
    * What names this space. Required today; ADR 0019 makes ids optional and

@@ -93,16 +93,31 @@ describe('space file schema', () => {
     expect(file.layouts?.[0]?.graphs).toHaveLength(1);
   });
 
+  it('rejects an undeclared key rather than opening on a Layout its author did not name', () => {
+    // What answers the opening selection ADR 0079 renamed. Stripped, a file
+    // still carrying the old spelling reaches `workingSpace`, which adopts
+    // `layouts[0]` and commits it — the author's stated Layout silently
+    // replaced and then written back.
+    //
+    // The key below is arbitrary on purpose. Rejection is by policy and not by
+    // name, so neither the schema nor this test spells the retired one; a test
+    // that did would be the codebase carrying knowledge of a shape that cannot
+    // reach it, which is what ADR 0056 forbids.
+    const result = spaceFileSchema.safeParse({
+      ...validSpaceFile,
+      undeclaredKey: '00000000-0000-4000-8000-000000000010',
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('holds no cards — a card exists because its file does (ADR 0020)', () => {
-    // The same treatment a top-level `edges` array gets: an older file still
-    // parses, and the array is dropped rather than honoured, so nothing can
+    // Strict, so the array is refused rather than dropped, and nothing can
     // half-load from it.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       cards: [{ id: '00000000-0000-4000-8000-000000000002', title: 'A', content: 'cards/a.md' }],
     });
-    expect(result.success).toBe(true);
-    expect(result.success && 'cards' in result.data).toBe(false);
+    expect(result.success).toBe(false);
   });
 
   it('rejects version 2, which put the graphs beside the layouts instead of in them', () => {
@@ -147,10 +162,10 @@ describe('space file schema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('drops a top-level edges array, which graphs replaced', () => {
+  it('rejects a top-level edges array, which graphs replaced', () => {
     // ADR 0007 deleted the structural layer beside graphs; a graph's own `edges`
     // (ADR 0032) are a different thing that happens to share the word. An older
-    // file carrying the old array still parses, and the array is ignored.
+    // file carrying the old array is refused rather than read past.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       edges: [
@@ -161,8 +176,7 @@ describe('space file schema', () => {
         },
       ],
     });
-    expect(result.success).toBe(true);
-    expect(result.success && 'edges' in result.data).toBe(false);
+    expect(result.success).toBe(false);
   });
 
   it('accepts a space file with no layouts — a new space has no structure yet', () => {
