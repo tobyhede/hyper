@@ -87,7 +87,14 @@ const sync = (
   synced: NavigationAddress,
   addressedCardId: CardId | null = null,
 ) =>
-  destinationSync({ space, snapshot, pathname, resolveRenderer, address, addressedCardId, synced });
+  destinationSync({
+    space,
+    snapshot,
+    pathname,
+    resolveRenderer,
+    position: { ...address, addressedCardId },
+    synced,
+  });
 
 describe('what the browser should do about an address', () => {
   it('does nothing when the location already opens the address, however it got there', () => {

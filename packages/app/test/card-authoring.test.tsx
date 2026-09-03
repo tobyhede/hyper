@@ -355,6 +355,45 @@ describe('browser destination restoration', () => {
     await settled(session);
   });
 
+  /**
+   * Presenting from an unresolved location is a move, and a move is answered.
+   *
+   * The report is the reader's for the location they arrived at, not for every
+   * location after it. A reader who presses Back onto a dead address and then
+   * presents has moved somewhere real: leaving the dead path in the address bar
+   * strands the whole presentation behind a URL that 404s on reload and is what
+   * Copy link copies, and keeps a report on screen that the move already
+   * answered. The guard preserves the arrival, so it may only hold while the
+   * position has not moved.
+   */
+  it('corrects the unresolved location when presenting moves the address', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}`,
+    );
+    const session = mount();
+    await screen.findByTestId('selected-canvas');
+    const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(missingView)}`,
+    );
+    fireEvent(window, new PopStateEvent('popstate'));
+    await screen.findByText('Destination not found');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Present' }));
+
+    await waitFor(() =>
+      expect(window.location.pathname).toBe(
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(CARD_ID)}`,
+      ),
+    );
+    expect(screen.queryByText('Destination not found')).not.toBeInTheDocument();
+    await settled(session);
+  });
+
   it('clears a failed restoration after choosing a valid Graph', async () => {
     mount();
     const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');

@@ -1,6 +1,6 @@
 # Navigation answers its own address
 
-Status: ready-for-agent
+Status: resolved
 Tags: Improvement
 Blocked by: none
 Decided by: ADR 0081
@@ -84,18 +84,62 @@ adapter resets its placement, a different question with the same shape.
 
 ## Acceptance
 
-- [ ] `navigationAddress` is a pure function over `NavigationState`, not a stored
+- [x] `navigationAddress` is a pure function over `NavigationState`, not a stored
       field, and `navigation.ts` imports nothing new.
-- [ ] `navigation.test.ts` asserts the address after each of the six operations,
+- [x] `navigation.test.ts` asserts the address after each of the six operations,
       with no browser API involved.
-- [ ] The push/replace/none decision is a pure function with its own node-environment
+- [x] The push/replace/none decision is a pure function with its own node-environment
       test covering all three outcomes, including the popstate case.
-- [ ] The four inline comparisons, `adoptedRendererDestination` and the
+- [x] The four inline comparisons, `adoptedRendererDestination` and the
       `previousRenderer` ref are gone; `changesRenderer` at `:479` remains.
-- [ ] The two self-Edge behaviour changes have tests naming them as intended.
-- [ ] `card-authoring.test.tsx:312`'s `pushState` spy proves the wiring, not the
+- [x] The two self-Edge behaviour changes have tests naming them as intended.
+- [x] `card-authoring.test.tsx:312`'s `pushState` spy proves the wiring, not the
       rule.
-- [ ] `pnpm verify` and `pnpm e2e` green, with real output reported.
+- [x] `pnpm verify` and `pnpm e2e` green, with real output reported.
+
+## Answer
+
+Implemented across `2c3bf084` (the decision) and `1ee4e847` (the change), with
+the review fixes on top.
+
+`navigationAddress(state)` is a pure derivation in `navigation.ts`, which gained
+no import; `presentedCard` is the one definition behind both it and
+`activeCardId`, so the address and the render-time dependency App stands it in
+for cannot drift. `destinationSync` in `destination-coordination.ts` is the pure
+push/replace/none decision, taking one `AddressedPosition` rather than an address
+and a loose Card that could disagree with it, and tested over all three outcomes
+in the node environment (`destination-coordination.test.ts`). One effect in
+`App.tsx` is the only place a position becomes a history entry:
+`adoptedRendererDestination`, the `previousRenderer` ref and the four inline
+comparisons are gone, and `changesRenderer` survives where it gates the render
+adapter's placement reset.
+
+The unresolved-location guard is scoped to the arrival and nothing after it. It
+first suppressed *every* later history write, so a reader who pressed Back onto a
+dead address and then presented traversed the whole presentation behind a path
+that 404s on reload and is what Copy link copies, with the report still on
+screen. It now holds only while the position has not moved; the first move away
+is written, and writing it is what clears the report.
+
+TDD evidence: `card-authoring.test.tsx`'s "corrects the unresolved location when
+presenting moves the address" failed on the dead path
+(`/spaces/…/views/<missing>` where the presentation point was expected) before
+the guard was scoped, and passed after. The self-Edge rule has both an
+integration test asserting one browser entry for a presentation the self-Edge
+never moves and an E2E test asserting no browser entry for the move itself; the
+`pushState` spy asserts only that App spends `destinationSync`'s answer on the
+History API, never the rule.
+
+Final verification: `pnpm verify` green — 173 test files, 2147 passed, 2 skipped.
+`pnpm e2e` green — 156 passed, no flakes. `pnpm e2e:ladle` green — 73 passed.
+
+Review: three independent reviewers (Standards+Spec, the built-in review, and
+CodeRabbit). CodeRabbit reported zero findings. Seven findings survived
+verification and all seven are addressed here or in the same change: the
+unresolved-location guard, the stale `app` bullet in `CLAUDE.md`, two ADR 0081
+statements that named `replace` where the code answers `none` and `push`, this
+record, the split `destinationSync` input, the `syncDestination` clear that the
+guard had made unreachable, and the duplicated presented-Card derivation.
 
 ## Not in scope
 

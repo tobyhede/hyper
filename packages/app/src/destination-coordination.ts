@@ -1,9 +1,9 @@
-import type { CardId, GraphId, SpaceSnapshot } from '@project/core';
+import type { CardId, SpaceSnapshot } from '@project/core';
 import { resolveProductDestinationInSnapshot, type ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
 import { openingGraphId, type NavigationAddress } from './navigation';
-import type { CanvasRendererId, ResolveRenderer } from './renderer';
+import type { ResolveRenderer } from './renderer';
 
 export type DestinationRestoration =
   | { readonly kind: 'opening'; readonly opening: DestinationOpening }
@@ -48,26 +48,33 @@ export interface DestinationSyncInput {
   /** The browser location as it stands now, read by the caller. */
   readonly pathname: string;
   readonly resolveRenderer: ResolveRenderer;
-  readonly address: NavigationAddress;
+  /** The position the application is at now. */
+  readonly position: AddressedPosition;
   /**
-   * The Card the location addresses, which is `app`'s and not Navigation's
-   * (ADR 0081): it is read from a URL and never written back, so it belongs to
-   * the position the browser is showing without belonging to the address that
-   * decides push from replace.
+   * The address the browser was last synced to. An address and not a position,
+   * because only the address decides push from replace — a caller holding a
+   * whole position passes it and the extra field is simply not read.
    */
-  readonly addressedCardId: CardId | null;
-  /** The address the browser was last synced to. */
   readonly synced: NavigationAddress;
 }
 
 /**
  * The complete position a browser location shows: the address, plus the Card
  * the location addresses within it.
+ *
+ * It **extends** the address rather than restating its three fields, and the
+ * Card arrives inside it rather than beside it. Both were separate once and
+ * both cost the same thing: a caller could hand `destinationSync` an address
+ * already carrying a Card and a second Card argument that disagreed with it,
+ * and structural typing had nothing to say — the spread that built the position
+ * silently preferred the loose one while the `synced` comparison had seen the
+ * other. One value cannot disagree with itself.
+ *
+ * The addressed Card is `app`'s and not Navigation's (ADR 0081): it is read
+ * from a URL and never written back, so it belongs to the position the browser
+ * is showing without belonging to the address that decides push from replace.
  */
-export interface AddressedPosition {
-  readonly selectedRenderer: CanvasRendererId;
-  readonly activeGraphId: GraphId | null;
-  readonly presentingCardId: CardId | null;
+export interface AddressedPosition extends NavigationAddress {
   readonly addressedCardId: CardId | null;
 }
 
@@ -84,10 +91,7 @@ const sameAddress = (one: NavigationAddress, other: NavigationAddress): boolean 
  * invocation of the same effect, from writing history at all.
  */
 export const samePosition = (one: AddressedPosition, other: AddressedPosition): boolean =>
-  one.selectedRenderer === other.selectedRenderer &&
-  one.activeGraphId === other.activeGraphId &&
-  one.presentingCardId === other.presentingCardId &&
-  one.addressedCardId === other.addressedCardId;
+  sameAddress(one, other) && one.addressedCardId === other.addressedCardId;
 
 /**
  * The position an opening puts the application in, decided the way
@@ -180,13 +184,11 @@ export function destinationSync({
   snapshot,
   pathname,
   resolveRenderer,
-  address,
-  addressedCardId,
+  position,
   synced,
 }: DestinationSyncInput): DestinationSync {
   const restoration = destinationRestoration(space, snapshot, pathname);
   const opening = restoration.kind === 'opening' ? restoration.opening : null;
-  const position: AddressedPosition = { ...address, addressedCardId };
   if (
     opening !== null &&
     samePosition(openingPosition(space, resolveRenderer, opening), position)
@@ -194,7 +196,7 @@ export function destinationSync({
     return { kind: 'none' };
   }
   const destination = positionDestination(space, resolveRenderer, position, opening);
-  if (!sameAddress(address, synced)) return { kind: 'push', destination };
+  if (!sameAddress(position, synced)) return { kind: 'push', destination };
   if (restoration.kind === 'ignored') return { kind: 'none' };
   return { kind: 'replace', destination };
 }

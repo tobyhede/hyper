@@ -583,22 +583,26 @@ export const createApp = (
         addressedCardId,
       };
       const previous = syncedPosition.current;
-      if (samePosition(previous, position) && syncedUnresolved.current === destinationNotFound)
-        return;
+      const moved = !samePosition(previous, position);
+      if (!moved && syncedUnresolved.current === destinationNotFound) return;
       syncedUnresolved.current = destinationNotFound;
-      // A location this Space could not resolve is the reader's until they
-      // choose otherwise: it is reported rather than corrected, and rewriting
-      // it on arrival would take the entry they navigated to. The choice that
-      // clears the report is what brings the run below back.
-      if (destinationNotFound) return;
+      // A location this Space could not resolve is the reader's *arrival*, and
+      // only that. It is reported rather than corrected, because rewriting it
+      // on arrival would take the entry they navigated to — but the report is
+      // answered the moment the position moves, whether the move came from a
+      // choice or from presenting, and holding it past that would strand every
+      // move after it behind a path that 404s on reload and is what Copy link
+      // copies. So the guard holds the arrival and nothing after it. Writing
+      // the location is what clears the report, which is `syncDestination`'s
+      // own first act rather than a second thing to remember here.
+      if (destinationNotFound && !moved) return;
       syncedPosition.current = position;
       const sync = destinationSync({
         space: currentSpace(),
         snapshot: spaceSession.getState().working,
         pathname: window.location.pathname,
         resolveRenderer,
-        address: position,
-        addressedCardId,
+        position,
         synced: previous,
       });
       if (sync.kind === 'none') return;

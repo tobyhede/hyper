@@ -41,9 +41,13 @@ current pathname resolves to:
 - the address changed — push.
 
 The third outcome is new. Today every path pushes or replaces, and the reason a
-repeated choice still replaces is that Navigation may have cleared a Card or
-Graph the URL still names — which is the second outcome, stated rather than
-inferred.
+repeated choice replaces at all is that the URL may still name something
+narrower than the position — which is the second outcome, stated rather than
+inferred. Note what falls on which side of the line: a *presenting* Card and the
+Active Graph are inside `NavigationAddress`, so a repeated choice that clears
+either has moved the address and earns an entry. What is left for `replace` is
+the addressed Card, which is read off a location and never written back, and a
+stale or unresolved location under an address that has not moved.
 
 ## The alternative that was rejected
 
@@ -80,9 +84,12 @@ invocation is harmless.
 Two behaviours change. `advance` across a self-Edge appends the same Card and
 grows the Traversal history without moving the address, and `retreat` out of a
 two-entry history of one Card does the same in reverse. Both push a duplicate
-address today; both now replace. This follows from addressing the position rather
-than detecting that state changed, and is the reason the fact is the address and
-not "did anything publish".
+address today; both now answer `none` — the address has not moved and the
+location already opens it, so there is nothing for the browser to do, and the
+decision is not even reached because the effect's dependencies are the address's
+own fields. This follows from addressing the position rather than detecting that
+state changed, and is the reason the fact is the address and not "did anything
+publish".
 
 `adoptedRendererDestination` and its `previousRenderer` ref are deleted; the rule
 they carried — do not widen the URL to a Space View when it already names a Graph

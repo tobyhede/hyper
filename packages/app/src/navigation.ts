@@ -72,8 +72,23 @@ export function navigationAddress(state: NavigationState): NavigationAddress {
   return {
     selectedRenderer: state.selectedRenderer,
     activeGraphId: state.activeGraphId,
-    presentingCardId: state.mode === 'presenting' ? currentCard(state.traversalHistory) : null,
+    presentingCardId: presentedCard(state),
   };
+}
+
+/**
+ * The Card being presented, or `null` in overview.
+ *
+ * One definition, because two things are the same fact about it: `activeCardId`,
+ * which App renders from, and {@link navigationAddress}'s `presentingCardId`.
+ * Written out twice they can drift, and the copy that drifts silently is the
+ * address — App lists `activeCardId` as the render-time dependency standing in
+ * for `presentingCardId`, so a rule added to one and not the other leaves the
+ * dependency firing while the address still reports the Card before it, and the
+ * browser sync deciding against a position the application is not at.
+ */
+function presentedCard(state: NavigationState): CardId | null {
+  return state.mode === 'presenting' ? currentCard(state.traversalHistory) : null;
 }
 
 /**
@@ -223,10 +238,7 @@ export function createNavigation(
   const setState = (change: Partial<NavigationBase>): void => {
     observable.publish({ ...observable.getState(), ...change });
   };
-  const activeCardId = (): CardId | null => {
-    const state = observable.getState();
-    return state.mode === 'presenting' ? currentCard(state.traversalHistory) : null;
-  };
+  const activeCardId = (): CardId | null => presentedCard(observable.getState());
 
   return {
     getState: observable.getState,
