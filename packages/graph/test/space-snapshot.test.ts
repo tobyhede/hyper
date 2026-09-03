@@ -101,15 +101,34 @@ describe('loadSpaceSnapshot', () => {
   });
 
   it('returns the parsed snapshot accepted by intake', () => {
+    // The parsed value and not the argument: a Layout written without its
+    // `kind` is the shape `layoutSchema` fills in, so a snapshot carrying the
+    // default back is the parse's own answer rather than the input echoed.
+    const { kind: _kind, ...authoredLayout } = snapshot.document.layouts![0]!;
     const result = loadSpaceSnapshot({
       ...snapshot,
-      ignored: 'not part of a snapshot',
-      document: { ...snapshot.document, ignored: 'not part of a document' },
+      document: { ...snapshot.document, layouts: [authoredLayout] },
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.snapshot).toEqual(snapshot);
+  });
+
+  it('rejects a stored document carrying a key the shape does not declare', () => {
+    // `spaceFileObjectSchema` is strict and `.omit()` carries the mode, so the
+    // stored door answers an undeclared key the way the file door does — which
+    // is what stops a stale producer committing one. The opening selection ADR
+    // 0079 renamed is the case that asked for it; the key here is arbitrary,
+    // because the refusal is by policy rather than by name (ADR 0056).
+    const result = loadSpaceSnapshot({
+      ...snapshot,
+      document: { ...snapshot.document, undeclaredKey: LAYOUT_ID },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors[0]?.kind).toBe('invalid-shape');
   });
 
   it('canonicalizes backend card order by title and id', () => {
