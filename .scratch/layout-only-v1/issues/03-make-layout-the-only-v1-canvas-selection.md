@@ -40,3 +40,21 @@ compatibility intake.
 This ticket owns the domain, persistence, HTTP, URL and application removal of
 Computed View and Space View, and the live-vocabulary edits that follow the code.
 The historical ADR bodies under `docs/adr/` are provenance and stay as written.
+
+## Comments
+
+### Surface added after this ticket was written
+
+ADR 0081 landed two new types in the retiring renderer vocabulary, so the
+rewrite above has sites this ticket did not name when it was drafted:
+
+- `NavigationAddress` (`packages/app/src/navigation.ts`) — its
+  `selectedRenderer` field, and `navigationAddress`, the function deriving it.
+- `AddressedPosition` (`packages/app/src/destination-coordination.ts`) — the
+  same field, plus `samePosition` and `openingPosition` over it.
+
+Both are `app`-layer and neither is persisted, so they cost this ticket a rename
+rather than a schema or wire change. They are recorded here because the wide
+rewrite is coordinated and a site discovered part-way through it is the
+expensive kind. ADR 0081's own body is provenance and stays as written; what
+changes is the code it describes.

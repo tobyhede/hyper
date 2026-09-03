@@ -432,7 +432,15 @@ test('entering, advancing and retreating each append presentation history', asyn
   await expect(page).toHaveURL(atA);
 });
 
-test('a self-Edge presentation move adds a same-URL browser entry', async ({ page }) => {
+/**
+ * A self-Edge is where a Traversal history move and an address move come apart:
+ * advancing appends the same Card, so the history grows and the position does
+ * not. Under ADR 0081 the browser is told about the position, so entering the
+ * presentation earns an entry and the move over the self-Edge earns none. This
+ * asserted the opposite until that decision — a second entry at the same URL,
+ * which made Back a no-op the reader had to press twice.
+ */
+test('a self-Edge presentation move takes no browser entry', async ({ page }) => {
   const seeded = await seedPositionedLayout(page, 'Self Edge', () => ({
     [CARD_A_ID]: { x: 20, y: 20, open: false },
   }));
@@ -475,10 +483,10 @@ test('a self-Edge presentation move adds a same-URL browser entry', async ({ pag
   await expect(page).toHaveURL(point);
   await page.keyboard.press('ArrowRight');
   await expect(page).toHaveURL(point);
-
-  await page.goBack();
-  await expect(page).toHaveURL(point);
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
+
+  // One Back leaves the presentation, because the self-Edge move added nothing
+  // to go back through.
   await page.goBack();
   await expect(page).toHaveURL(graph);
   await page.goForward();

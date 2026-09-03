@@ -1,4 +1,4 @@
-import { expect, expectTypeOf, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import {
   FLOW_SPACE_VIEW_ID,
   GRID_SPACE_VIEW_ID,
@@ -11,6 +11,8 @@ import { loadSpace, type Space } from '@project/graph';
 import {
   canRetreat,
   createNavigation,
+  navigationAddress,
+  type Navigation,
   type NavigationState,
   type NavigationOptions,
 } from '../src/navigation';
@@ -686,4 +688,156 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
   expect(navigation.moves().find((move) => move.selected)?.cardId).toBe(cardC);
   navigation.advance();
   expect(navigation.activeCardId()).toBe(cardC);
+});
+
+/**
+ * The addressable position, after every operation that writes one.
+ *
+ * One assertion shape for all of them, because the point of the address is that
+ * it is *one* fact: before it, `App` reconstructed the position four separate
+ * ways, each comparing the single field its own call site happened to supply
+ * (ADR 0081). Nothing here touches a browser API — Navigation does not know what
+ * a URL is, and this is where that stays true.
+ */
+describe('the address Navigation answers', () => {
+  const addressOf = (navigation: Navigation) => navigationAddress(navigation.getState());
+
+  it('answers the renderer a Space opens in, its Active Graph, and no presented Card', () => {
+    const navigation = navigationFor(fixture, LAYOUT);
+
+    expect(addressOf(navigation)).toEqual({
+      selectedRenderer: LAYOUT,
+      activeGraphId: GRAPH_TWO,
+      presentingCardId: null,
+    });
+  });
+
+  it('answers the selected renderer’s own Active Graph after selectRenderer', () => {
+    const navigation = navigationFor(fixture, FLOW_SPACE_VIEW_ID);
+
+    navigation.selectRenderer(LAYOUT);
+
+    expect(addressOf(navigation)).toEqual({
+      selectedRenderer: LAYOUT,
+      activeGraphId: GRAPH_TWO,
+      presentingCardId: null,
+    });
+  });
+
+  it('answers a replacement Space’s opening position after openFresh', () => {
+    const navigation = navigationFor(fixture, FLOW_SPACE_VIEW_ID);
+    navigation.present();
+
+    navigation.openFresh(FIRST_LAYOUT);
+
+    expect(addressOf(navigation)).toEqual({
+      selectedRenderer: FIRST_LAYOUT,
+      activeGraphId: GRAPH_ONE,
+      presentingCardId: null,
+    });
+  });
+
+  it('answers the adopted renderer and the Graph handed with it after continueInRenderer', () => {
+    const navigation = navigationFor(fixture, FLOW_SPACE_VIEW_ID);
+    navigation.present();
+    const presented = navigation.activeCardId();
+
+    navigation.continueInRenderer(FIRST_LAYOUT, GRAPH_ONE);
+
+    // Adopting a renderer must not interrupt a traversal, so the presented Card
+    // is still part of the address it answers.
+    expect(addressOf(navigation)).toEqual({
+      selectedRenderer: FIRST_LAYOUT,
+      activeGraphId: GRAPH_ONE,
+      presentingCardId: presented,
+    });
+  });
+
+  it('answers the addressed Graph in its named renderer after openGraph', () => {
+    const navigation = navigationFor(fixture, FLOW_SPACE_VIEW_ID);
+
+    navigation.openGraph(LAYOUT, GRAPH_TWO);
+
+    expect(addressOf(navigation)).toEqual({
+      selectedRenderer: LAYOUT,
+      activeGraphId: GRAPH_TWO,
+      presentingCardId: null,
+    });
+  });
+
+  it('answers the exact Card an addressed presentation starts at after openPresentation', () => {
+    const navigation = navigationFor(fixture, FLOW_SPACE_VIEW_ID);
+
+    navigation.openPresentation(LAYOUT, GRAPH_TWO, CARD_C);
+
+    expect(addressOf(navigation)).toEqual({
+      selectedRenderer: LAYOUT,
+      activeGraphId: GRAPH_TWO,
+      presentingCardId: CARD_C,
+    });
+  });
+
+  it('answers the activated Graph, and no presented Card, after activateGraph', () => {
+    const navigation = navigationFor(fixture, FIRST_LAYOUT);
+    navigation.present();
+
+    navigation.activateGraph(GRAPH_ONE);
+
+    expect(addressOf(navigation)).toEqual({
+      selectedRenderer: FIRST_LAYOUT,
+      activeGraphId: GRAPH_ONE,
+      presentingCardId: null,
+    });
+  });
+
+  it('moves the presented Card through present, advance, retreat and exitPresenting', () => {
+    const navigation = navigationFor(fixture, FIRST_LAYOUT);
+
+    navigation.present();
+    expect(addressOf(navigation).presentingCardId).toBe(CARD_A);
+
+    navigation.advance();
+    expect(addressOf(navigation).presentingCardId).toBe(CARD_B);
+
+    navigation.retreat();
+    expect(addressOf(navigation).presentingCardId).toBe(CARD_A);
+
+    navigation.exitPresenting();
+    expect(addressOf(navigation)).toEqual({
+      selectedRenderer: FIRST_LAYOUT,
+      activeGraphId: GRAPH_ONE,
+      presentingCardId: null,
+    });
+  });
+
+  /**
+   * The address is derived, never stored (ADR 0081): a stored field would have
+   * to be maintained at all six publish sites and could disagree with the state
+   * it describes. Selecting a branch publishes a state that is not the one
+   * before it and addresses the same position, which is the cheapest proof that
+   * the address is read off the state rather than written beside it.
+   */
+  it('does not move while a fork’s branch is being chosen', () => {
+    const forked = spaceOwning(
+      'Fork',
+      [
+        {
+          id: GRAPH_ONE,
+          title: 'Fork',
+          edges: [
+            { from: CARD_A, to: CARD_B },
+            { from: CARD_A, to: CARD_C },
+          ],
+        },
+      ],
+      [{ id: CARD_A }, { id: CARD_B }, { id: CARD_C }],
+    );
+    const navigation = navigationFor(() => forked, FIRST_LAYOUT);
+    navigation.present();
+    const before = addressOf(navigation);
+
+    navigation.selectBranch(1);
+
+    expect(addressOf(navigation)).toEqual(before);
+  });
 });
