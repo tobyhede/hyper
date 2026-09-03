@@ -1,5 +1,4 @@
-import { FLOW_SPACE_VIEW_ID, type UUID } from '@project/core';
-import { computedViewSubject } from './computed-view';
+import type { UUID } from '@project/core';
 import { loadSpaceSnapshot, type Space, type SpaceError } from './space';
 
 /** The aggregate intake brand's carrier. */
@@ -45,13 +44,13 @@ export type SpaceAggregateError =
   | ({ readonly kind: 'space-card-reference-cycle' } & SpaceCardLocation)
   | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: UUID }
   | ({
-      readonly kind: 'space-card-space-view-missing';
-      readonly spaceViewId: UUID;
+      readonly kind: 'space-card-layout-missing';
+      readonly layoutId: UUID;
     } & SpaceCardLocation)
   | ({ readonly kind: 'space-card-graph-missing'; readonly graphId: UUID } & SpaceCardLocation)
   | ({
-      readonly kind: 'space-card-graph-outside-space-view';
-      readonly spaceViewId: UUID;
+      readonly kind: 'space-card-graph-outside-layout';
+      readonly layoutId: UUID;
       readonly graphId: UUID;
     } & SpaceCardLocation);
 
@@ -139,17 +138,27 @@ export function loadSpaceAggregate({
       if (card.kind !== 'space') continue;
       const target = byId.get(card.spaceId);
       if (target === undefined) continue;
-      const spaceViewId = card.spaceView ?? target.defaultRenderer ?? FLOW_SPACE_VIEW_ID;
-      const computedSubject = computedViewSubject(target, spaceViewId);
-      const resolvedLayout =
-        computedSubject === undefined ? target.lookup.layout(spaceViewId) : undefined;
-      if (computedSubject === undefined && resolvedLayout === undefined) {
+      const layoutId = card.layout ?? target.defaultLayout;
+      if (layoutId === undefined) {
+        if (card.graph !== undefined && target.lookup.graph(card.graph) === undefined) {
+          errors.push({
+            kind: 'space-card-graph-missing',
+            spaceId: space.id,
+            cardId: card.id,
+            targetSpaceId: target.id,
+            graphId: card.graph,
+          });
+        }
+        continue;
+      }
+      const resolvedLayout = target.lookup.layout(layoutId);
+      if (resolvedLayout === undefined) {
         errors.push({
-          kind: 'space-card-space-view-missing',
+          kind: 'space-card-layout-missing',
           spaceId: space.id,
           cardId: card.id,
           targetSpaceId: target.id,
-          spaceViewId,
+          layoutId,
         });
         continue;
       }
@@ -164,14 +173,14 @@ export function loadSpaceAggregate({
         });
         continue;
       }
-      const subjectGraphs = computedSubject?.graphs ?? resolvedLayout?.layout.graphs ?? [];
+      const subjectGraphs = resolvedLayout.layout.graphs;
       if (!subjectGraphs.some((graph) => graph.id === card.graph)) {
         errors.push({
-          kind: 'space-card-graph-outside-space-view',
+          kind: 'space-card-graph-outside-layout',
           spaceId: space.id,
           cardId: card.id,
           targetSpaceId: target.id,
-          spaceViewId,
+          layoutId,
           graphId: card.graph,
         });
       }

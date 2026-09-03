@@ -92,7 +92,7 @@ describe('Placement.fromLayoutStrategyGraph', () => {
     const converted = Placement.fromLayoutStrategyGraph(laid);
 
     // Nothing comes back Open: a converted Layout is authored from an
-    // Algorithmic View, where nothing is (ADR 0025, ADR 0064).
+    // empty Placement, where nothing is (ADR 0025, ADR 0064).
     expect([...converted.values()].every((at) => !at.open)).toBe(true);
     // And B comes back at its *drawn* x, carrying A's growth as authorship.
     // That is the whole reason this may only ever be handed a strategy graph
@@ -166,7 +166,7 @@ describe('Placement.next', () => {
   });
 
   it('adopts the whole rendered map when nothing is authored yet', () => {
-    // An Algorithmic View authors nothing, and conversion copies every Card
+    // An automatic strategy authors nothing; capturing its result copies every Card
     // already on screen so nothing moves at the moment it happens (ADR 0025).
     const rendered = at({
       '00000000-0000-4000-8000-000000000002': [10, 20],

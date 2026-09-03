@@ -1,5 +1,5 @@
 import fc from 'fast-check';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { LoadedSpace } from '../src/backend';
@@ -23,7 +23,7 @@ import {
   problemCatalogue,
   problemCodeForType,
 } from '../src/http-protocol';
-import type { HyperProblemCode, HyperProblemType } from '../src/http-protocol';
+import type { CommitRefusalBody, HyperProblemCode, HyperProblemType } from '../src/http-protocol';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -191,13 +191,12 @@ describe('aggregate wire protocol', () => {
       { kind: 'duplicate-card-id', ...described },
       { kind: 'duplicate-graph-id', ...described },
       { kind: 'duplicate-layout-id', ...described },
-      { kind: 'space-view-id-collision', ...described },
       { kind: 'layout-member-missing-card', ...described },
       { kind: 'layout-active-graph-missing', ...described },
       { kind: 'layout-active-graph-outside-layout', ...described },
       { kind: 'graph-edge-missing-card', ...described },
       { kind: 'graph-edge-card-outside-layout', ...described },
-      { kind: 'unresolved-default-renderer', ...described },
+      { kind: 'unresolved-default-layout', ...described },
       { kind: 'duplicate-graph-edge', ...described },
       { kind: 'unresolved-alias-target', ...described },
       { kind: 'alias-self-reference', ...described },
@@ -214,18 +213,28 @@ describe('aggregate wire protocol', () => {
       { kind: 'space-card-target-missing', ...location },
       { kind: 'space-card-reference-cycle', ...location },
       { kind: 'ordinary-space-unreferenced', spaceId: secondId },
-      { kind: 'space-card-space-view-missing', ...location, spaceViewId: secondId },
+      { kind: 'space-card-layout-missing', ...location, layoutId: secondId },
       { kind: 'space-card-graph-missing', ...location, graphId: secondId },
       {
-        kind: 'space-card-graph-outside-space-view',
+        kind: 'space-card-graph-outside-layout',
         ...location,
-        spaceViewId: SPACE_ID,
+        layoutId: SPACE_ID,
         graphId: secondId,
       },
     ];
     const refusal = { kind: 'aggregate-refused' as const, errors };
 
     expect(decodeCommitRefusal(encodeCommitRefusal(refusal))).toEqual(refusal);
+  });
+
+  it('declares the Space Card Layout refusal the way its decoder reads it', () => {
+    type WireLayoutMissing = Extract<
+      CommitRefusalBody['errors'][number],
+      { readonly kind: 'space-card-layout-missing' }
+    >;
+    // `decodeCommitRefusal` reads this key with `requiredUuid`, so a body
+    // omitting it is refused rather than decoded.
+    expectTypeOf<WireLayoutMissing['layoutId']>().toEqualTypeOf<string>();
   });
 
   it('rejects unknown aggregate refusal identities and fields', () => {

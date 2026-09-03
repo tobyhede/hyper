@@ -14,9 +14,7 @@ declare const PLACEMENT: unique symbol;
  * A **Placement** is the card→position map itself: which cards sit where, and
  * nothing more. A `Layout` is the authored thing a Space holds; the placement is
  * the map inside it. It is also what an automatic strategy computes and what
- * `positionedStrategy` reads, and it is the same value in both directions —
- * editing an Algorithmic View copies the computed placement into a new Layout,
- * which is the crossing ADR 0025 describes.
+ * `positionedStrategy` reads.
  *
  * Not the placement layer ADR 0004 rejected. That was an entity between a card
  * and its position that edges and graphs referenced instead of the card, letting
@@ -113,8 +111,8 @@ function fromLayout(layout: Layout): Placement {
 }
 
 /**
- * The placement a laid-out graph describes — `positionedStrategy` run backwards,
- * and the ADR 0025 crossing from computed to authored.
+ * The placement a laid-out strategy graph describes — `positionedStrategy`
+ * run backwards.
  *
  * A card the strategy left unplaced is omitted rather than defaulted, because
  * collapsing that to `(0, 0)` would assert a placement no strategy made.

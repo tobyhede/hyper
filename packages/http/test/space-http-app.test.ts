@@ -399,7 +399,7 @@ describe('Space HTTP reads', () => {
               activeGraph: GRAPH_ID,
             },
           ],
-          defaultRenderer: LAYOUT_ID,
+          defaultLayout: LAYOUT_ID,
         },
       },
       revision: '1',

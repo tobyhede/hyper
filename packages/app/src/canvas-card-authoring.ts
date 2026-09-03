@@ -82,7 +82,7 @@ export function useCanvasCardAuthoring({
   }, [bodyEditing, onBodyEditingChange]);
   useEffect(() => {
     onTitleEditingChange?.(editingTitleCardId !== null);
-    // A renderer change remounts the canvas and takes its draft with it.
+    // A Layout change remounts the canvas and takes its draft with it.
     // Return Space chrome even when no editor callback gets to settle the edit.
     return () => onTitleEditingChange?.(false);
   }, [editingTitleCardId, onTitleEditingChange]);

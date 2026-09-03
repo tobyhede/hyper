@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  COMPUTED_VIEW_IDS,
-  FLOW_SPACE_VIEW_ID,
-  type Card,
-  type CardPlacement,
-} from '@project/core';
+
+import { type Card, type CardPlacement } from '@project/core';
 import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
 import { aliasFile, cardFile, uuid } from './card-files';
@@ -42,7 +38,7 @@ const ABSENT = uuid('00000000-0000-4000-8000-000000000099');
 /** What both loaders are handed: a document's structure, and the cards under it. */
 interface Document {
   readonly layouts?: readonly unknown[];
-  readonly defaultRenderer?: string;
+  readonly defaultLayout?: string;
   readonly cards: readonly Card[];
 }
 
@@ -61,7 +57,7 @@ const viaFiles: Loader = ({ cards, ...structure }) =>
         : card.kind === 'space'
           ? {
               path: `cards/${card.id}.md`,
-              text: `---\nid: ${card.id}\ntitle: ${card.title}\nkind: space\nspaceId: ${card.spaceId}\n${card.spaceView === undefined ? '' : `spaceView: ${card.spaceView}\n`}${card.graph === undefined ? '' : `graph: ${card.graph}\n`}---\n`,
+              text: `---\nid: ${card.id}\ntitle: ${card.title}\nkind: space\nspaceId: ${card.spaceId}\n${card.layout === undefined ? '' : `layout: ${card.layout}\n`}${card.graph === undefined ? '' : `graph: ${card.graph}\n`}---\n`,
             }
           : cardFile(card.id, card.title, card.body),
     ),
@@ -112,7 +108,7 @@ const layout = (
 ) => ({ id, title: `Layout ${id}`, kind: 'positioned', positions, graphs, ...extra });
 
 /** One Layout over A and B, owning one Graph that joins them. */
-const simple = (defaultRenderer?: string): Document => {
+const simple = (defaultLayout?: string): Document => {
   const document: Document = {
     cards: [markdown(A, 'A'), markdown(B, 'B')],
     layouts: [
@@ -121,7 +117,7 @@ const simple = (defaultRenderer?: string): Document => {
       ]),
     ],
   };
-  return defaultRenderer === undefined ? document : { ...document, defaultRenderer };
+  return defaultLayout === undefined ? document : { ...document, defaultLayout };
 };
 
 const loaded = (result: LoadSpaceResult) => {
@@ -621,41 +617,20 @@ describe.each([
   });
 
   describe('the view a space opens in', () => {
-    it('accepts a defaultRenderer naming a declared layout', () => {
-      expect(loaded(load(simple(WORKING))).defaultRenderer).toBe(WORKING);
+    it('accepts a defaultLayout naming a declared layout', () => {
+      expect(loaded(load(simple(WORKING))).defaultLayout).toBe(WORKING);
     });
 
-    it('accepts a defaultRenderer naming a Computed View', () => {
-      for (const view of COMPUTED_VIEW_IDS) {
-        expect(loaded(load(simple(view))).defaultRenderer).toBe(view);
-      }
-    });
-
-    it('refuses a Layout whose id collides with an available Computed View', () => {
-      const errors = refused(
-        load({
-          cards: [markdown(A, 'A')],
-          layouts: [
-            layout(FLOW_SPACE_VIEW_ID, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-          ],
-        }),
-      );
-
-      expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'space-view-id-collision', ref: FLOW_SPACE_VIEW_ID }),
-      );
-    });
-
-    it('refuses a defaultRenderer naming neither', () => {
+    it('refuses a defaultLayout naming no declared Layout', () => {
       // The kind names the field the document actually has (ADR 0055). A kind
       // and the message beside it that name two different fields is the split
       // the rename exists to close, and a consumer matching on the kind is the
       // one that reads the retired name.
       const errors = refused(load(simple(ABSENT)));
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'unresolved-default-renderer', ref: ABSENT }),
+        expect.objectContaining({ kind: 'unresolved-default-layout', ref: ABSENT }),
       );
-      expect(errors.map(({ message }) => message).join('\n')).toContain('defaultRenderer');
+      expect(errors.map(({ message }) => message).join('\n')).toContain('defaultLayout');
     });
   });
 
@@ -668,12 +643,12 @@ describe.each([
             layout(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
             layout(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
-          defaultRenderer: ABSENT,
+          defaultLayout: ABSENT,
         }),
       );
 
       expect(new Set(errors.map(({ kind }) => kind))).toEqual(
-        new Set(['duplicate-layout-id', 'unresolved-default-renderer', 'unresolved-alias-target']),
+        new Set(['duplicate-layout-id', 'unresolved-default-layout', 'unresolved-alias-target']),
       );
     });
 

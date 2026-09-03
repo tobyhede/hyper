@@ -31,7 +31,7 @@ const snapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
@@ -53,7 +53,7 @@ const snapshotWithoutCard = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [],
 });

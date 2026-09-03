@@ -56,8 +56,8 @@ export interface Space {
    * declared nowhere (ADR 0025).
    */
   readonly layouts: readonly Layout[];
-  /** Which Space View this Space opens in — one UUID namespace for both variants. */
-  readonly defaultRenderer: UUID | undefined;
+  /** Which Layout this Space opens in — one UUID namespace for both variants. */
+  readonly defaultLayout: UUID | undefined;
   /**
    * Contextual entity resolution — the only one. The Maps behind it are closed
    * over and appear nowhere on this value, so no caller can index the space a
@@ -114,21 +114,17 @@ function unsupportedDocumentVersion(document: unknown): UnsupportedVersionError 
  * `null` when it does not carry one.
  *
  * Read before parsing, beside {@link unsupportedDocumentVersion}, because
- * `spaceFileSchema` is a plain object and Zod *strips* a key it does not
- * declare. That is the right answer for the retired `cards` and `edges` keys:
- * they carried nothing the rest of the document does not already say — a card
- * exists because its file does, an edge because a graph holds it — so dropping
- * them loses nothing. A space-level `graphs` carried the whole topology (ADR
- * 0040), so stripping it in silence discards exactly what its author wrote and
- * yields a space that loads looking complete.
+ * `spaceFileSchema` is strict, so an undeclared key is already refused rather
+ * than stripped. This survives it to *name* the one that matters. A space-level
+ * `graphs` carried the whole topology (ADR 0040), and a reader told only that
+ * some key is undeclared has to work out which and why; a version 1 document
+ * carrying both shapes at once is the case worth a sentence of its own.
  *
- * Here rather than declared in the schema, and not by making the schema
- * `.strict()`. Strict would reject `cards` and `edges` too, taking that
- * deliberate leniency with it. Declaring the key — as `z.never()` or
- * `z.undefined()` — puts it in the inferred document type, and Hono maps an
+ * Here rather than declared in the schema. Declaring the key — as `z.never()`
+ * or `z.undefined()` — puts it in the inferred document type, and Hono maps an
  * always-undefined property to `never` when it infers the JSON response, so the
  * RPC contract stops matching the schema it is checked against
- * (`space-http-app-types.test.ts`). The pre-parse hook has neither cost, and it
+ * (`space-http-app-types.test.ts`). The pre-parse hook has no such cost, and it
  * is already where the version answer lives.
  *
  * A version 2 document is answered by its version before this is reached; what
@@ -234,7 +230,7 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
     title: file.title,
     cards,
     layouts: file.layouts,
-    defaultRenderer: file.defaultRenderer,
+    defaultLayout: file.defaultLayout,
   });
 }
 
@@ -276,7 +272,7 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
     title: document.title,
     cards,
     layouts: document.layouts,
-    defaultRenderer: document.defaultRenderer,
+    defaultLayout: document.defaultLayout,
   });
   return loaded.ok ? { ...loaded, snapshot: parsed.data } : loaded;
 }
@@ -286,7 +282,7 @@ function buildSpace(input: {
   title: string;
   cards: Card[];
   layouts: Layout[] | undefined;
-  defaultRenderer: UUID | undefined;
+  defaultLayout: UUID | undefined;
 }): LoadSpaceResult {
   // Array order is read only by automatic strategies, so title order is the one
   // default stable across filesystem scans and unordered relational reads. Ties
@@ -325,7 +321,7 @@ function buildSpace(input: {
       cards,
       graphs,
       layouts,
-      defaultRenderer: input.defaultRenderer,
+      defaultLayout: input.defaultLayout,
       lookup: built.lookup,
     }),
   };

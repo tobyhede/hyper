@@ -42,7 +42,7 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
         },
       ],
-      defaultRenderer: LAYOUT_ID,
+      defaultLayout: LAYOUT_ID,
     },
     cards: [{ id: CARD_ID, document: { title: cardTitle, kind: 'markdown', body: cardTitle } }],
   });

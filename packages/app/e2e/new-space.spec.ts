@@ -10,7 +10,6 @@ import {
   positionOf,
   selectedCanvas,
   settled,
-  sidebar,
 } from './graph';
 import { seedPositionedLayout, type HttpLoadedSpace } from './seed';
 
@@ -309,7 +308,7 @@ test('the first self-connection authors into the Graph the explicit Layout owns'
   await expect(selectedCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  // Authoring the Edge must not move the Card captured by Create Layout.
+  // Authoring the Edge must not move the Card already placed in the Layout.
   await settled(page);
   expect(await positionOf(card)).toEqual(before);
 });
@@ -488,7 +487,7 @@ test(
                   ],
                 },
               ],
-              defaultRenderer: layoutId,
+              defaultLayout: layoutId,
             },
           },
         }),
@@ -499,56 +498,5 @@ test(
     const alert = page.getByRole('alert');
     await expect(alert.getByText('Application could not start')).toBeVisible();
     await expect(alert).toContainText(missingCardId);
-  },
-);
-
-/**
- * The Flow view's strategy, `elkStrategy`, loads elkjs as a dynamic import on
- * first use (`elk-strategy.ts`) — a real network condition (a chunk-load
- * blip, a stale service worker) can fail that fetch, and this proves the
- * rejection reaches `PlacementFailure` through `usePlacementRendering`'s own
- * catch rather than an unhandled rejection or a stuck busy state. The fresh
- * Space starts on its authored Layout, so the test explicitly chooses Flow.
- */
-test(
-  'a blocked elkjs chunk fails placement with the real strategy diagnostic',
-  { tag: '@parity:operational-feedback-placement-failure' },
-  async ({ page }) => {
-    await page.route('**/deps/elkjs*', (route) => route.abort('failed'));
-
-    await page.goto('/');
-    await sidebar(page).getByRole('button', { name: 'Flow', exact: true }).click();
-    const alert = page.getByRole('alert');
-    await expect(alert.getByText('Unable to arrange this view')).toBeVisible();
-    await expect(alert).toContainText('elkjs');
-  },
-);
-
-/**
- * `usePlacementRendering` starts every strategy pending and only resolves
- * once it settles (`placement-rendering.ts`). The elkjs chunk request is held
- * open while the test explicitly chooses Flow, so the pending state is
- * asserted deterministically instead of racing real layout latency.
- */
-test(
-  'a fresh Space shows the busy state while elk is still arranging it',
-  { tag: '@parity:operational-feedback-placement-pending' },
-  async ({ page }) => {
-    let releaseElk = (): void => undefined;
-    const elkGate = new Promise<void>((resolve) => {
-      releaseElk = resolve;
-    });
-    await page.route('**/deps/elkjs*', async (route) => {
-      await elkGate;
-      await route.continue();
-    });
-
-    try {
-      await page.goto('/');
-      await sidebar(page).getByRole('button', { name: 'Flow', exact: true }).click();
-      await expect(page.getByRole('status')).toHaveText('Arranging…');
-    } finally {
-      releaseElk();
-    }
   },
 );

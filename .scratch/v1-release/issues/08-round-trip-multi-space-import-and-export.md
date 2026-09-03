@@ -47,12 +47,13 @@ canonical initial aggregate without an import source.
 - [ ] Export followed by import produces the same V1 authored aggregate through
       normal intake, including converging Space Cards, a formerly layoutless
       Space and all selected Layouts and Graphs.
-- [ ] Canonical export writes each initialized Space's `defaultLayout` — a Space
-      still awaiting initialization has none and none is invented — together with
-      its Layouts and Layout-owned Graphs, and every Space Card's selected Layout
-      and Graph.
-      Canonical import validates those identities and references across the
-      complete aggregate and preserves them exactly.
+- [ ] Canonical export writes every initialized Space's `defaultLayout`, its
+      Layouts and Layout-owned Graphs, and every Space Card's selected Layout and
+      Graph. A Space still layoutless before its first working load has no
+      `defaultLayout` to write and round-trips in that state unchanged; neither
+      export nor import initializes it. Canonical import validates the identities
+      and references that are present across the complete aggregate and preserves
+      them exactly.
 - [ ] A layoutless imported Space stays layoutless in its source and stored
       aggregate until its first complete working-state request initializes it;
       import itself never rewrites the source Markdown, so an export taken before

@@ -1,6 +1,6 @@
 # Deepen the server-side repository around Meta lifecycle
 
-Status: ready-for-agent
+Status: resolved
 Tags: release/v1, Improvement
 Blocked by: none — PR 134 delivered the aggregate foundation
 
@@ -117,33 +117,47 @@ import facade. Neither release ticket may recreate its policy.
 
 ## Implementation acceptance
 
-- [ ] Add `initializeAggregate` and `replaceAggregate` only to the server-side
+- [x] Add `initializeAggregate` and `replaceAggregate` only to the server-side
       repository interface; browser-facing repository consumers gain no
       lifecycle administration operation.
-- [ ] Make both operations accept an explicit Meta-rooted aggregate without
+- [x] Make both operations accept an explicit Meta-rooted aggregate without
       repository revisions, assign fresh revisions and return the authoritative
       loaded aggregate.
-- [ ] Make `loadAggregate` distinguish `uninitialized` from a validated `loaded`
+- [x] Make `loadAggregate` distinguish `uninitialized` from a validated `loaded`
       aggregate and fail explicitly for every contradictory stored state.
-- [ ] Preserve the topology-preserving single-Space commit fast path without the
+- [x] Preserve the topology-preserving single-Space commit fast path without the
       singleton Meta lock.
-- [ ] Coordinate replacement with repository state and every affected Space so
+- [x] Coordinate replacement with repository state and every affected Space so
       it is atomic against authored commits; preserve authorized
       last-replacement-wins behavior without adding an aggregate revision.
-- [ ] Run one shared behavioral contract against PostgreSQL and memory covering
+- [x] Run one shared behavioral contract against PostgreSQL and memory covering
       empty initialization, canonical identical concurrency, different
       concurrent proposals, invalid input, corrupt stored state, immutable Meta,
       validated reads, stale replacement, authored-commit races, two authorized
       replacements, rollback and returned revisions.
-- [ ] Keep SQL locks, singleton rows, foreign keys and memory candidate-state
+- [x] Keep SQL locks, singleton rows, foreign keys and memory candidate-state
       replacement private to their adapters; shared callers and tests never
       inspect or branch on adapter mechanics.
-- [ ] Replace `lockRepositoryState` and `establishMetaSpace` with the deeper
+- [x] Replace `lockRepositoryState` and `establishMetaSpace` with the deeper
       repository implementation rather than layering new lifecycle helpers over
       them.
-- [ ] Turn `importSpaces` into a temporary compatibility facade with no Meta
+- [x] Turn `importSpaces` into a temporary compatibility facade with no Meta
       policy of its own, mark it for deletion by `v1-release/08`, and admit no
       new callers.
-- [ ] Update `v1-release/01` and `v1-release/08` to consume this interface and to
+- [x] Update `v1-release/01` and `v1-release/08` to consume this interface and to
       own the remaining expand-contract migration steps rather than restating
       persistence ordering.
+
+## Answer
+
+Delivered by PR 142 (`614c9c14`). The server-side repository now owns Meta lifecycle through
+`initializeAggregate`, `replaceAggregate` and the explicit `uninitialized | loaded` aggregate read.
+Memory and PostgreSQL pass the same lifecycle contract, including canonical concurrent
+initialization, replacement authorization and races with authored commits, while each adapter keeps
+its candidate state, locks and transactions private. The unlocked topology-preserving commit path
+remains intact.
+
+The old caller-owned Meta establishment policy has been absorbed into the repository. The existing
+`importSpaces` surface remains only as a marked compatibility facade that delegates to the lifecycle
+operations. `v1-release/01` now owns startup initialization through `initializeAggregate`, and
+`v1-release/08` owns administrative replacement plus removal of `ImportMode` and the facade.

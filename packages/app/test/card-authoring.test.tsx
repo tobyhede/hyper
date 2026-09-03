@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
+
 import {
   encodeCompactUuid,
-  FLOW_SPACE_VIEW_ID,
   spaceSnapshotSchema,
   uuidSchema,
   type CardId,
@@ -22,6 +22,8 @@ const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 
 /** Replace CodeMirror source through its public editable surface. */
 const replaceMarkdownSource = (value: string): HTMLElement => {
@@ -34,7 +36,7 @@ const replaceMarkdownSource = (value: string): HTMLElement => {
 
 /**
  * Two Cards on one Graph the Layout owns, so the graph opens on a Positioned
- * renderer with a placement already installed and presenting has a traversal to
+ * canvas with a placement already installed and presenting has a traversal to
  * run.
  */
 const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
@@ -54,7 +56,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
@@ -67,7 +69,7 @@ const selfEdge: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
     layouts: [
       {
         id: LAYOUT_ID,
@@ -110,6 +112,27 @@ const twiceAliased: SpaceSnapshot = spaceSnapshotSchema.parse({
     { id: ALIAS_ID, document: { title: 'A again', kind: 'alias', target: CARD_ID } },
     { id: SECOND_ALIAS_ID, document: { title: 'A once more', kind: 'alias', target: CARD_ID } },
   ],
+});
+
+/**
+ * The same Space with a second Layout, so a location can name a Layout the
+ * Space does not open on by default.
+ */
+const secondLayout: SpaceSnapshot = spaceSnapshotSchema.parse({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    layouts: [
+      ...snapshot.document.layouts!,
+      {
+        id: OTHER_LAYOUT_ID,
+        title: 'Other Layout',
+        kind: 'positioned',
+        positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+        graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
+      },
+    ],
+  },
 });
 
 const runtime = (value: SpaceSnapshot) => {
@@ -204,7 +227,7 @@ describe('authoring a Card title on the graph', () => {
  * place it now opens.
  *
  * Dropping a Graph's minimum Edge count made an empty Graph legal, and ADR 0040
- * made it *ordinary*: converting an Algorithmic View mints a Layout whose one
+ * made it *ordinary*: creating a Layout mints its one
  * Active Graph holds nothing, so this is the state the author is in immediately
  * after their first edit on the Flow view. `graphStartCard` has no answer for
  * such a Graph, so `present()` returns having changed nothing — and an enabled
@@ -214,45 +237,7 @@ describe('authoring a Card title on the graph', () => {
  * Neither half proves this on its own: the refusal is in Navigation and the
  * enablement is in `GraphSelector`, and what went wrong was that they disagreed.
  */
-describe('presenting after explicit Layout creation', () => {
-  const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
-    ...snapshot,
-    document: { version: 1, title: 'Space' },
-  });
-
-  it('offers no Present action while the created Layout’s Graph is empty', async () => {
-    window.history.replaceState(
-      null,
-      '',
-      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
-    );
-    const session = mount(noLayouts);
-    // Nothing to present before the conversion either: a Space with no Layouts
-    // has no Graphs at all, so there is no Active Graph.
-    expect(await screen.findByTestId('present-button')).toBeDisabled();
-
-    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
-    await waitFor(() => expect(createLayout).toBeEnabled());
-    fireEvent.click(createLayout);
-
-    // Explicit creation made a Layout active on its fresh empty Graph and left
-    // existing Cards outside it for the Cards View.
-    await waitFor(() =>
-      expect(session.getState().working.document.layouts?.[0]?.graphs).toEqual([
-        expect.objectContaining({ edges: [] }),
-      ]),
-    );
-    const layoutId = session.getState().working.document.layouts?.[0]?.id;
-    expect(layoutId).toBeDefined();
-    await waitFor(() =>
-      expect(window.location.pathname).toBe(
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(uuidSchema.parse(layoutId))}`,
-      ),
-    );
-    expect(screen.getByTestId('present-button')).toBeDisabled();
-    await settled(session);
-  });
-
+describe('presenting from a Layout', () => {
   it('offers Present on a Layout whose Active Graph holds an Edge', async () => {
     // The other half of the same control, and the reason it is here: the test
     // above passes just as well against a Present that is disabled always, so
@@ -267,6 +252,39 @@ describe('presenting after explicit Layout creation', () => {
 });
 
 describe('browser destination restoration', () => {
+  /**
+   * Mount writes no browser history entry, whatever the location says.
+   *
+   * Startup reads `window.location.pathname` once and composes the app from it,
+   * and the `popstate` listener is registered by an effect *after* the sync
+   * effect below it — so a Back that lands between the two leaves the location
+   * somewhere the composed position does not name, with Navigation never told.
+   * Correcting the location there would silently undo the reader's Back. The
+   * pre-ADR-0081 code could not do this because it never wrote history on
+   * mount, and neither may this one.
+   */
+  it('writes no history entry on mount, even where the location names another Layout', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(OTHER_LAYOUT_ID)}`,
+    );
+    const pushState = vi.spyOn(window.history, 'pushState');
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+
+    const session = mount(secondLayout);
+    await screen.findByTestId('selected-canvas');
+
+    expect(pushState).not.toHaveBeenCalled();
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe(
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(OTHER_LAYOUT_ID)}`,
+    );
+    pushState.mockRestore();
+    replaceState.mockRestore();
+    await settled(session);
+  });
+
   it('reports a destination that Back or Forward can no longer resolve', async () => {
     mount();
     const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
@@ -289,6 +307,78 @@ describe('browser destination restoration', () => {
     );
   });
 
+  /**
+   * A cleared report and a corrected location are one thing, not two.
+   *
+   * The choice here is the row already current, so Navigation republishes the
+   * same address and nothing about the position moves — and the location the
+   * reader is still on is the one that could not be resolved, which reloads
+   * into a host 404. Reporting it as answered while leaving it in the address
+   * bar is the half-fix; the code this replaced could not do it, because the
+   * one call that cleared the report was the call that wrote the location.
+   */
+  it('corrects the unresolved location when a repeated choice answers the report', async () => {
+    const layoutView = `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}`;
+    window.history.replaceState(null, '', layoutView);
+    const session = mount();
+    await screen.findByTestId('selected-canvas');
+    const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(missingView)}`,
+    );
+    fireEvent(window, new PopStateEvent('popstate'));
+    await screen.findByText('Destination not found');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Layout' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('Destination not found')).not.toBeInTheDocument(),
+    );
+    expect(window.location.pathname).toBe(layoutView);
+    await settled(session);
+  });
+
+  /**
+   * Presenting from an unresolved location is a move, and a move is answered.
+   *
+   * The report is the reader's for the location they arrived at, not for every
+   * location after it. A reader who presses Back onto a dead address and then
+   * presents has moved somewhere real: leaving the dead path in the address bar
+   * strands the whole presentation behind a URL that 404s on reload and is what
+   * Copy link copies, and keeps a report on screen that the move already
+   * answered. The guard preserves the arrival, so it may only hold while the
+   * position has not moved.
+   */
+  it('corrects the unresolved location when presenting moves the address', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}`,
+    );
+    const session = mount();
+    await screen.findByTestId('selected-canvas');
+    const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+    window.history.replaceState(
+      null,
+      '',
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(missingView)}`,
+    );
+    fireEvent(window, new PopStateEvent('popstate'));
+    await screen.findByText('Destination not found');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Present' }));
+
+    await waitFor(() =>
+      expect(window.location.pathname).toBe(
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(CARD_ID)}`,
+      ),
+    );
+    expect(screen.queryByText('Destination not found')).not.toBeInTheDocument();
+    await settled(session);
+  });
+
   it('clears a failed restoration after choosing a valid Graph', async () => {
     mount();
     const missingView = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
@@ -307,17 +397,36 @@ describe('browser destination restoration', () => {
     );
   });
 
-  it('pushes a browser entry when presenting advances over a self-Edge', async () => {
+  /**
+   * The wiring, not the rule (ADR 0081). What a self-Edge move deserves is
+   * decided by `destinationSync` and proved over it in the node environment;
+   * what this proves is that App asks that question and spends the answer on
+   * the History API — a spy on `pushState` is the only way to see that from
+   * here, and it is the only thing this asserts.
+   *
+   * Presenting a self-Edge is where the two answers differ. Entering the
+   * presentation moves the address and earns its entry; advancing across the
+   * self-Edge and retreating back out of it both grow and shrink the Traversal
+   * history without moving the address, so neither takes another one. Both used
+   * to push a duplicate entry, which is the behaviour ADR 0081 changed
+   * deliberately.
+   */
+  it('takes one browser entry for a presentation a self-Edge never moves', async () => {
     mount(selfEdge);
     const pushState = vi.spyOn(window.history, 'pushState');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Present' }));
+    await waitFor(() => expect(pushState).toHaveBeenCalledTimes(1));
+    const point = pushState.mock.calls[0]?.[2];
+    expect(point).toBe(
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(CARD_ID)}`,
+    );
+
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     fireEvent.click(await screen.findByRole('button', { name: 'Back' }));
 
-    await waitFor(() => expect(pushState).toHaveBeenCalledTimes(3));
-    expect(pushState.mock.calls[1]?.[2]).toBe(pushState.mock.calls[0]?.[2]);
-    expect(pushState.mock.calls[2]?.[2]).toBe(pushState.mock.calls[0]?.[2]);
+    await waitFor(() => expect(screen.getByTestId('presenting-chrome')).toBeVisible());
+    expect(pushState).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -488,15 +597,13 @@ describe('authoring an opened Card', () => {
     const session = mount();
     await settled(session);
 
-    expect(
-      screen.getByRole('button', { name: 'Actions for Space View Layout' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actions for Layout Layout' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
     expect(await screen.findByRole('textbox', { name: 'Card title' })).toBeVisible();
 
     expect(
-      screen.queryByRole('button', { name: 'Actions for Space View Layout' }),
+      screen.queryByRole('button', { name: 'Actions for Layout Layout' }),
     ).not.toBeInTheDocument();
     await settled(session);
   });

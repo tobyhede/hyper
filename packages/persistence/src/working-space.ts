@@ -23,13 +23,13 @@ const initializedSnapshot = (
 ): { readonly snapshot: SpaceSnapshot; readonly createdLayout: boolean } | undefined => {
   const layouts = snapshot.document.layouts ?? [];
   if (layouts.length > 0) {
-    if (snapshot.document.defaultRenderer !== undefined) return undefined;
+    if (snapshot.document.defaultLayout !== undefined) return undefined;
     const firstLayout = layouts[0];
     if (firstLayout === undefined) throw new Error('A non-empty Layout list lost its first value');
     return {
       snapshot: {
         ...snapshot,
-        document: { ...snapshot.document, defaultRenderer: firstLayout.id },
+        document: { ...snapshot.document, defaultLayout: firstLayout.id },
       },
       createdLayout: false,
     };
@@ -51,8 +51,7 @@ const initializedSnapshot = (
             activeGraph: graphId,
           },
         ],
-        // Ticket 03 renames this transitional persisted selection to defaultLayout.
-        defaultRenderer: layoutId,
+        defaultLayout: layoutId,
       },
     },
     createdLayout: true,

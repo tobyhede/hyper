@@ -24,20 +24,11 @@ test('database persistence never writes structural edits back to imported author
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(13);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   await settled(page);
 
-  await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Add Layout' })).toBeEnabled();
-  await card.hover();
-  await expect(authoringHandle(card, 'source', 'right')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Add Layout' }).click();
   await expect(page.getByRole('button', { name: 'Add Card' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Add A to Layout' }).click();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
-
+  await expect(page.getByRole('button', { name: 'Add Layout' })).toBeEnabled();
   await card.hover();
   await connectToEmptyWithAlt(page, authoringHandle(card, 'source', 'right'));
   const created = nodeByTitle(page, 'Card 1');
@@ -49,8 +40,8 @@ test('database persistence never writes structural edits back to imported author
   // was drawn, so a commit that recorded a placement and dropped the Edge fails
   // here rather than passing as "persisted".
   await expect(page.getByLabel(/^Edge from A to Card 1 in /)).toBeVisible();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(10);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   expect(readFixture()).toEqual(before);

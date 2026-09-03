@@ -201,7 +201,7 @@ test(
 /**
  * The HUD on a real canvas: React Flow's own MiniMap over nodes it measured.
  *
- * What the story fixes is the key beside it — every Graph the renderer draws,
+ * What the story fixes is the key beside it — every Graph the Layout draws,
  * each with its resolved colour, and exactly one emphasised. **Emphasis is not
  * filtering** (ADR 0040): the inactive Graphs stay listed and stay coloured.
  * That the emphasis *moves* with an activation, and that the Sidebar agrees

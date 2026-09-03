@@ -1,29 +1,31 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Space } from '@project/graph';
 import { AppShell } from '@project/ui';
-import { canvasRenderers, currentRenderer } from '#src/canvas-renderers';
+import { resolveLayout } from '#src/layout-resolution';
 import { graphColorMap } from '#src/colors';
 import { PersistenceControl } from '#components/PersistenceControl';
 import { OpenSpaceSidebars, type OpenSpaceSidebar } from '#components/OpenSpaceSidebars';
-import { SelectedCanvasRenderer, type SpaceSidebarProps } from '#components/SpaceSidebar';
+import { SelectedLayoutName, type SpaceSidebarProps } from '#components/SpaceSidebar';
 import { useStoryNavigation } from './navigation';
 import { authoredSpace, deepDiveSpace, traversalSpace } from './spaces';
 
 function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
   const readSpace = useCallback(() => space, [space]);
-  const { navigation, state, resolveRenderer } = useStoryNavigation(readSpace);
+  const { navigation, state } = useStoryNavigation(readSpace);
   const addCardMenu = useRef<HTMLButtonElement>(null);
-  const renderers = canvasRenderers(space);
-  const current = currentRenderer(renderers, state.selectedRenderer);
-  const renderer = useMemo(
-    () => resolveRenderer(space, state.selectedRenderer),
-    [resolveRenderer, space, state.selectedRenderer],
+  const resolved = useMemo(
+    () => resolveLayout(space, state.selectedLayoutId),
+    [space, state.selectedLayoutId],
   );
   const sidebar: SpaceSidebarProps = {
     spaceTitle: space.title,
-    canvas: { renderers, current, onSelect: navigation.selectRenderer },
+    canvas: {
+      layouts: space.layouts,
+      selected: resolved.layout,
+      onSelect: navigation.selectLayout,
+    },
     graph: {
-      graphs: renderer.subject.graphs,
+      graphs: resolved.layout.graphs,
       activeGraphId: state.activeGraphId,
       colorByGraphId: graphColorMap(space),
       onActivate: navigation.activateGraph,
@@ -55,7 +57,7 @@ function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
     sidebar,
     status,
   };
-  return { entry, current };
+  return { entry, layout: resolved.layout };
 }
 
 /** Fixture-only state around the production Open Spaces and Sidebar composition. */
@@ -65,17 +67,17 @@ export function OpenSpaceSidebarsFixture() {
   const deepDive = useOpenSpace(deepDiveSpace);
   const spaces = [authored.entry, traversal.entry, deepDive.entry] as const;
   const [activeId, setActiveId] = useState(traversal.entry.id);
-  const current =
+  const selectedLayout =
     activeId === authored.entry.id
-      ? authored.current
+      ? authored.layout
       : activeId === deepDive.entry.id
-        ? deepDive.current
-        : traversal.current;
+        ? deepDive.layout
+        : traversal.layout;
 
   return (
     <AppShell
       sidebar={<OpenSpaceSidebars spaces={spaces} activeId={activeId} onSelect={setActiveId} />}
-      header={<SelectedCanvasRenderer renderer={current} />}
+      header={<SelectedLayoutName layout={selectedLayout} />}
     >
       <div className="h-full" data-testid="space-canvas-stand-in" />
     </AppShell>

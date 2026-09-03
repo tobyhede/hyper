@@ -14,14 +14,12 @@ import {
 } from './graph';
 
 // The app loads the abstract layout fixture (packages/app/fixture) — two
-// disconnected collections sharing no cards, laid out by ELK as separate bands:
+// disconnected collections sharing no Cards:
 //   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — graphs over one spine
 //   2. Echo (E→F→G→H→E′) — a plain linear collection
 // Each collection is a Layout, because a Graph is a nested owned value of one
-// (ADR 0040) and these two share no cards. The fixture names no `defaultRenderer`,
-// so it opens in Flow — whose subject is the Space's cards, and which therefore
-// draws the flatten across both Layouts (ADR 0045). That flatten crossing a
-// Layout boundary is what this file exercises and nothing else in the tree does.
+// (ADR 0040) and these two share no Cards. The fixture opens in Collection 1,
+// and each Layout draws only the Cards and Graphs it owns.
 // Each returns to its start via an alias, so this particular fixture is acyclic
 // and lays out as clean forward paths even though Graphs may contain cycles
 // (ADR 0032). These tests assert *behaviour* against that shape; none read card prose. See
@@ -44,30 +42,27 @@ function nodeByTitle(page: Page, title: string): Locator {
 test('offers more than one named graph', async ({ page }) => {
   await page.goto('/');
   // The sidebar's Graphs group lists every Graph the canvas draws.
-  await expect(sidebar(page).getByTestId('graph-choice')).toHaveCount(4);
+  await expect(sidebar(page).getByTestId('graph-choice')).toHaveCount(3);
 });
 
-test('draws every graph at once, each in its own color', async ({ page }) => {
+test('draws every Graph in the selected Layout, each in its own color', async ({ page }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
 
-  // Four graphs across two Layouts: the Algorithmic View's subject is the
-  // Space's cards, so what it draws is the flatten (ADR 0045) rather than the
-  // graphs of any one Layout. A legend maps each to a color.
-  await expect(page.getByTestId('graph-legend').locator('.legend__item')).toHaveCount(4);
+  // Collection 1 owns three Graphs. A legend maps each to a color.
+  await expect(page.getByTestId('graph-legend').locator('.legend__item')).toHaveCount(3);
 
-  // Two collections: 5 + 5 = 10 cards, and one drawn edge per authored edge:
-  // Long 4 + Mid 3 + Short 2 + Echo 4 = 13. Handles per (graph, direction)
-  // through a card sum to 18 (collection 1) + 8 (collection 2) = 26.
-  await expect(page.locator('.react-flow__node')).toHaveCount(10);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(13);
-  await expect(page.locator('.rf-card-node__port')).toHaveCount(26);
+  // Five Cards, Long's four Edges plus Mid's three plus Short's two, and 18 handles.
+  await expect(page.locator('.react-flow__node')).toHaveCount(5);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
+  await expect(page.locator('.rf-card-node__port')).toHaveCount(18);
 
   // Distinct colors, so the graphs can be told apart.
   const strokes = await page
     .locator('.react-flow__edge-path')
     .evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke));
   expect(strokes.every((s) => s && s !== 'none' && s !== 'rgb(0, 0, 0)')).toBe(true);
-  expect(new Set(strokes).size).toBe(4);
+  expect(new Set(strokes).size).toBe(3);
 });
 
 test(
@@ -121,12 +116,8 @@ test(
 );
 
 /**
- * A Layout draws the Graphs it owns, and the flatten is what crosses them.
- *
- * The Algorithmic View above draws all four; selecting either Layout narrows to
- * that Layout's own — which is the difference between a Graph belonging to the
- * Space and a Graph belonging to one Layout (ADR 0040). Selecting is navigation
- * and writes nothing (ADR 0031), so the revision is unmoved throughout.
+ * A Layout draws the Graphs it owns. Selecting is navigation and writes
+ * nothing (ADR 0031), so the revision is unmoved throughout.
  */
 test('selecting a Layout draws the Graphs it owns and only those', async ({ page }) => {
   await page.goto('/');
@@ -134,10 +125,8 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
   await expect(persistence).toHaveAttribute('data-revision', '0');
   const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
 
-  // Declaring Layouts is not naming one to open in: `defaultRenderer` is absent, so
-  // the fixture arrives in Flow with no Layout selected.
-  await expect(selectedCanvas(page)).toContainText('Flow');
-  await expect(sidebar(page).getByTestId('canvas-renderer')).toHaveCount(4);
+  await expect(selectedCanvas(page)).toContainText('Collection 1');
+  await expect(sidebar(page).getByTestId('layout-row')).toHaveCount(2);
 
   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
   await selectCanvas(page, 'Collection 1');
@@ -172,10 +161,9 @@ test(
   async ({ page }) => {
     await page.goto('/');
     const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
-    await expect(legendItems).toHaveCount(4);
+    await expect(legendItems).toHaveCount(3);
 
-    // Titles, in the same order: the flatten across Layouts, which both read
-    // off the renderer's subject.
+    // Titles, in the same order from the selected Layout.
     expect(await legendItems.allInnerTexts()).toEqual(
       await sidebar(page).getByTestId('graph-choice').allInnerTexts(),
     );
@@ -190,7 +178,7 @@ test(
       .locator('[aria-hidden="true"]')
       .evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
     expect(hudColors).toEqual(sidebarColors);
-    expect(new Set(hudColors).size).toBe(4);
+    expect(new Set(hudColors).size).toBe(3);
 
     // Emphasis, through an activation neither surface owns — and asserted on
     // **both** surfaces, because agreement is the claim. Reading only the HUD
@@ -208,7 +196,7 @@ test(
     await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
     await expect(page.locator('[data-slot="sidebar"]')).toHaveAttribute('data-state', 'collapsed');
     await expect(emphasised).toHaveText('Mid');
-    await expect(legendItems).toHaveCount(4);
+    await expect(legendItems).toHaveCount(3);
   },
 );
 
@@ -237,35 +225,15 @@ test('handles stay measurable, so edges attach where the layout put them', async
   expect(boxes.every((box) => box.width > 0 && box.height > 0)).toBe(true);
 });
 
-test("edges are drawn along ELK's routing, not default beziers", async ({ page }) => {
-  await page.goto('/');
-
-  // Retries until the async ELK layout resolves and replaces the first-paint
-  // bezier fallback with the routed polyline (a single layout pass routes them
-  // all, so once one has an `L` command they all do). No visibility check — a
-  // dead-horizontal SVG line has a zero-height box, which Playwright reads as
-  // hidden.
-  const first = page.locator('.react-flow__edge-path').first();
-  await expect(first).toHaveAttribute('d', /L/);
-
-  // Every graph edge is a polyline along ELK's routed points (issue 03) — none
-  // is a React Flow cubic bezier, which would carry a `C` command.
-  const paths = await page
-    .locator('.react-flow__edge-path')
-    .evaluateAll((els) => els.map((el) => el.getAttribute('d') ?? ''));
-  expect(paths).toHaveLength(13);
-  expect(paths.every((d) => d.startsWith('M') && !d.includes('C'))).toBe(true);
-});
-
 test('selecting a graph keeps the others on screen', async ({ page }) => {
   await page.goto('/');
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
   // Selection is emphasis: it never hides the rest of the space.
-  await activateGraph(page, 'Echo');
-  await expect(page.locator('.react-flow__node')).toHaveCount(10);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(13);
+  await activateGraph(page, 'Mid');
+  await expect(page.locator('.react-flow__node')).toHaveCount(5);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   // Activating a graph changes emphasis, not the persisted document.
   await page.waitForTimeout(50);
   await expect(persistence).toHaveAttribute('data-revision', '0');
@@ -273,23 +241,20 @@ test('selecting a graph keeps the others on screen', async ({ page }) => {
 
 test('selecting a graph emphasises it without hiding the others', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('.react-flow__edge')).toHaveCount(13);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
 
   const opacities = async () =>
     page
       .locator('.react-flow__edge-path')
       .evaluateAll((els) => els.map((el) => Number(getComputedStyle(el).opacity)));
 
-  // "Long" is the flatten's first graph, so it is active on load and every
-  // other graph recedes — Mid 3 + Short 2 + Echo 4 = 9 edges. Echo is owned by
-  // the *other* Layout and recedes exactly like the two beside Long: emphasis
-  // is over what the view draws, and this view draws across both.
+  // Long is active on load, so Mid's three and Short's two Edges recede.
   const faded = (await opacities()).filter((o) => o < 1);
-  expect(faded).toHaveLength(9);
+  expect(faded).toHaveLength(5);
   expect(faded[0]!).toBeGreaterThan(0);
 
   // Every graph stays drawn.
-  await expect(page.locator('.react-flow__edge')).toHaveCount(13);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
 });
 
 test('a card shows its title in the graph, and opens to show rendered Markdown', async ({

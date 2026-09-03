@@ -82,7 +82,16 @@ export default defineConfig({
        * logic is exactly where that goes unnoticed.
        */
       thresholds: {
-        'packages/core/src/**': { statements: 96, branches: 88, functions: 95 },
+        /*
+         * `core`'s branch number moved down when ADR 0079's removal deleted
+         * covered core source: what is left uncovered is two of v8's synthetic
+         * module-load records (`card-geometry.ts` and `compact-uuid.ts` both
+         * report line 1 uncovered while every function in them is exercised),
+         * and the smaller denominator stopped diluting them. No test reaches
+         * one — importing the module directly leaves the record untaken — so
+         * this is re-pinned at what holds rather than chased.
+         */
+        'packages/core/src/**': { statements: 96, branches: 87, functions: 95 },
         'packages/graph/src/**': { statements: 95, branches: 90, functions: 95 },
         'packages/http/src/**': { statements: 98, branches: 94, functions: 96 },
         'packages/persistence/src/**': { statements: 95, branches: 90, functions: 95 },

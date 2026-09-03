@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { FLOW_SPACE_VIEW_ID, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp, composeCore } from '../src/compose-app';
 import { createConnectionCompletion } from '../src/connection-completion';
-import { mintingGraphIds, mintingIds } from './minting';
 
 /**
  * What an opened Space is composed of, asserted at the composition rather than
@@ -23,8 +22,6 @@ const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const MINTED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
-const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -43,7 +40,7 @@ const snapshot: SpaceSnapshot = {
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -99,7 +96,7 @@ describe('what the composition opens on', () => {
   it('opens in the Space default when no selection is named', () => {
     const { navigation } = composeCore({ spaceSession: openSession() });
 
-    expect(navigation.getState().selectedRenderer).toEqual(LAYOUT_ID);
+    expect(navigation.getState().selectedLayoutId).toEqual(LAYOUT_ID);
   });
 
   it('opens a selected Layout on the placement that Layout already authored', () => {
@@ -111,15 +108,6 @@ describe('what the composition opens on', () => {
         [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
-  });
-
-  it('opens an Algorithmic View on no placement at all', () => {
-    const { authoring } = composeApp({
-      spaceSession: openSession(),
-      selection: FLOW_SPACE_VIEW_ID,
-    });
-
-    expect(authoring.authoredPlacement()).toBeNull();
   });
 });
 
@@ -143,36 +131,5 @@ describe('the connection completion Edge Authoring is given', () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]?.adapter).toBe(composed.adapter);
     expect(seen[0]?.authoring).toBe(composed.authoring);
-  });
-});
-
-/**
- * Both minters are passed explicitly, so neither collaborator falls back to
- * `newUuid` on its own and a test that drives the real composition can name the
- * identities it is about to assert on (ADR 0016).
- */
-describe('where a composition mints identities', () => {
-  it('mints an explicitly created Layout and its Graph from the functions it was given', () => {
-    const viewOnly: SpaceSnapshot = {
-      id: SPACE_ID,
-      document: { version: 1, title: 'New space' },
-      cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
-    };
-    const spaceSession = openSession(viewOnly);
-    const rendered = Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]);
-    const { authoring, navigation } = composeApp({
-      spaceSession,
-      selection: FLOW_SPACE_VIEW_ID,
-      newId: mintingIds(MINTED_LAYOUT_ID, MINTED_GRAPH_ID),
-      newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
-      initialPlacement: rendered,
-    });
-
-    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
-
-    const layouts = spaceSession.getState().working.document.layouts ?? [];
-    expect(layouts.map((layout) => layout.id)).toEqual([MINTED_LAYOUT_ID]);
-    expect(layouts[0]?.graphs.map((graph) => graph.id)).toEqual([MINTED_GRAPH_ID]);
-    expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
   });
 });

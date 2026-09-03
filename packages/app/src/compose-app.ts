@@ -1,26 +1,20 @@
-import { newUuid, type GraphId, type SpaceSnapshot, type UUID } from '@project/core';
-import { Placement, type Space } from '@project/graph';
+import { newUuid, type LayoutId, type SpaceSnapshot, type UUID } from '@project/core';
+import { Placement, type ResolvedLayout, type Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
 import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
 import { createNavigation, type Navigation } from './navigation';
 import { createRenderAdapter, type RenderAdapter } from './render-adapter';
-import {
-  createRendererResolver,
-  defaultRenderer,
-  type CanvasRendererId,
-  type ResolvedRenderer,
-  type ResolveRenderer,
-} from './renderer';
+import { requireDefaultLayout, resolveLayout } from './layout-resolution';
 import { createWorkingSpaceReader } from './snapshot';
 import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
 
 /**
  * What an opened Space is composed of.
  *
- * The order below is not free — the resolver exists before Navigation, the
- * resolved renderer before the opening placement, Authoring before the render
- * adapter, and both before Edge Authoring — and every collaborator closes over
+ * The order below is not free — the opening Layout resolves before Navigation
+ * and before the opening placement, Authoring before the render adapter, and
+ * both before Edge Authoring — and every collaborator closes over
  * **one** {@link createWorkingSpaceReader}, which is what gives them a single
  * `Space` identity to share. Written out at a call site, that is ten statements
  * whose ordering and shared reader nothing checks; written here, a caller
@@ -46,19 +40,12 @@ export interface ComposeCoreDependencies {
    * parses the stored snapshot and `openSpaceSession` then `structuredClone`s
    * it, so the Space a caller holds at open and the session's `working` are
    * equal values with different identities; taking both is how production came
-   * to resolve its opening renderer against one and everything after it against
+   * to resolve its opening Layout against one and everything after it against
    * the other.
    */
   readonly spaceSession: SpaceSession;
-  /** Which renderer the Space opens in; the Space's own default when absent. */
-  readonly selection?: CanvasRendererId | undefined;
-  /**
-   * Where a converted Graph's identity comes from (ADR 0016).
-   *
-   * Passed explicitly to {@link createRendererResolver} rather than left to a
-   * default, so the identity has one visible source in the composition.
-   */
-  readonly newGraphId?: (() => GraphId) | undefined;
+  /** Which Layout the Space opens in; the Space's own default when absent. */
+  readonly selection?: LayoutId | undefined;
 }
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
@@ -66,18 +53,15 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * Mints the identity of every Card, Layout and Graph a completed Edit creates
    * (ADR 0016).
    *
-   * Passed explicitly for the same reason `newGraphId` is: with a default here,
-   * `createSpaceAuthoring` falls back to its own and the composition can no
-   * longer say where an Edit's identities came from.
+   * Passed explicitly so `createSpaceAuthoring` cannot fall back to its own and
+   * the composition always says where an Edit's identities came from.
    */
   readonly newId?: (() => UUID) | undefined;
   /**
    * The placement the Space opens on.
    *
-   * Absent, the opening renderer answers it: a selected Layout supplies its
-   * already-authored, possibly sparse map, and an Algorithmic View starts null
-   * and is promoted only by a completed edit (ADR 0025). An explicit `null`
-   * says "none", which is not the same statement.
+   * Absent, the opening Layout supplies its already-authored, possibly sparse
+   * map. An explicit `null` says "none", which is not the same statement.
    */
   readonly initialPlacement?: Placement | null | undefined;
   /**
@@ -121,16 +105,15 @@ export interface AppCore {
    */
   readonly readWorkingSpace: (snapshot: SpaceSnapshot) => Space;
   readonly currentSpace: () => Space;
-  readonly resolveRenderer: ResolveRenderer;
   readonly navigation: Navigation;
   /**
-   * The renderer selection this composition opened in.
+   * The Layout this composition opened in.
    *
    * Answered rather than read back off Navigation: it is what `composeCore`
    * decided, and recovering it through `navigation.getState()` makes the
    * decision look like Navigation's when it is this module's.
    */
-  readonly openingSelection: CanvasRendererId;
+  readonly openingSelection: LayoutId;
 }
 
 export interface ComposedApp extends AppCore {
@@ -140,44 +123,34 @@ export interface ComposedApp extends AppCore {
 }
 
 /**
- * The placement a resolved renderer opens on (ADR 0025).
+ * The placement a resolved Layout opens on (ADR 0025).
  *
- * Exported because selecting a renderer asks the same question again
+ * Exported because selecting a Layout asks the same question again
  * (`App.tsx`), and a Space that opens on one placement while re-selecting the
- * same renderer installs another is two sources of truth for one rule.
+ * same Layout installs another is two sources of truth for one rule.
  */
-export const openingPlacement = (renderer: ResolvedRenderer): Placement | null =>
-  renderer.kind === 'view' ? null : Placement.fromLayout(renderer.resolvedLayout.layout);
+export const openingPlacement = (resolved: ResolvedLayout): Placement | null =>
+  Placement.fromLayout(resolved.layout);
 
 /**
- * Navigation and everything it needs, over one reader and one resolver.
+ * Navigation and everything it needs, over one working-space reader.
  *
  * Stops here because a test that wraps Navigation before handing it to
  * Authoring has to compose that wrapper itself — that seam is what those tests
  * are about, and a hook for it would hide it.
  */
-export function composeCore({
-  spaceSession,
-  selection,
-  newGraphId = newUuid,
-}: ComposeCoreDependencies): AppCore {
+export function composeCore({ spaceSession, selection }: ComposeCoreDependencies): AppCore {
   // One validated aggregate per working snapshot, shared by the render path and
   // by Navigation. Both read the same reader, so in the steady state a snapshot
   // is parsed and indexed once rather than once per render.
   const readWorkingSpace = createWorkingSpaceReader();
   const currentSpace = (): Space => readWorkingSpace(spaceSession.getState().working);
-  // **One resolver for the whole composition**, handed to every collaborator
-  // that needs one. Nondeterminism is injected here rather than reached for
-  // inside a domain operation: a converted Graph's identity comes from
-  // `newGraphId`, so a test composes a deterministic resolver instead of mocking
-  // a global, and nothing downstream has to name identity minting at all.
-  const resolveRenderer = createRendererResolver({ newGraphId });
-  // Which renderer this space opens in. It also answers which graphs are drawn
+  // Which Layout this space opens in. It also answers which Graphs are drawn
   // and which of them opens active (ADR 0026), so it has to resolve before
   // anything that reads the canvas is built.
-  const openingSelection = selection ?? defaultRenderer(currentSpace());
-  const navigation = createNavigation(currentSpace, resolveRenderer, openingSelection);
-  return { readWorkingSpace, currentSpace, resolveRenderer, navigation, openingSelection };
+  const openingSelection = selection ?? requireDefaultLayout(currentSpace());
+  const navigation = createNavigation(currentSpace, openingSelection);
+  return { readWorkingSpace, currentSpace, navigation, openingSelection };
 }
 
 /** The whole composition: Navigation, Space Authoring, the render adapter and Edge Authoring. */
@@ -190,19 +163,18 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     connections,
   } = dependencies;
   const core = composeCore(dependencies);
-  const { currentSpace, resolveRenderer, navigation, openingSelection } = core;
+  const { currentSpace, navigation, openingSelection } = core;
   // Live nodes hold whichever positions are on screen. Absent an argument, the
-  // renderer the composition opened in answers what they start as; an explicit
+  // Layout the composition opened in answers what they start as; an explicit
   // one — `null` included — is the caller's own statement and stands.
   const placement =
     initialPlacement === undefined
-      ? openingPlacement(resolveRenderer(currentSpace(), openingSelection))
+      ? openingPlacement(resolveLayout(currentSpace(), openingSelection))
       : initialPlacement;
   const authoring = createSpaceAuthoring({
     session: spaceSession,
     navigation,
     currentSpace,
-    resolveRenderer,
     initialPlacement: placement,
     newId,
     reportObserverError,

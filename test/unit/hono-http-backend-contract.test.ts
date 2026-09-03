@@ -18,7 +18,7 @@ const loaded: LoadedSpace = {
     ...snapshot,
     document: {
       ...snapshot.document,
-      defaultRenderer: LAYOUT_ID,
+      defaultLayout: LAYOUT_ID,
       layouts: [
         {
           id: LAYOUT_ID,

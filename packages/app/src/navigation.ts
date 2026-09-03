@@ -1,7 +1,13 @@
-import type { CardId, GraphId } from '@project/core';
-import { graphCardIds, outgoingEdges, graphStartCard, type Space } from '@project/graph';
+import type { CardId, GraphId, LayoutId } from '@project/core';
+import {
+  graphCardIds,
+  outgoingEdges,
+  graphStartCard,
+  type ResolvedLayout,
+  type Space,
+} from '@project/graph';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
-import type { CanvasRendererId, ResolvedRenderer, ResolveRenderer } from './renderer';
+import { resolveLayout } from './layout-resolution';
 
 export interface Move {
   readonly cardId: CardId;
@@ -22,7 +28,7 @@ type TraversalHistory = readonly [CardId, ...CardId[]];
 
 /** What navigation carries whatever it is doing. */
 interface NavigationBase {
-  readonly selectedRenderer: CanvasRendererId;
+  readonly selectedLayoutId: LayoutId;
   readonly activeGraphId: GraphId | null;
 }
 
@@ -46,6 +52,52 @@ export type NavigationState =
     });
 
 /**
+ * Where the reader is, as one value: the Layout drawing, the Graph emphasised
+ * and, while presenting, the Card being presented.
+ *
+ * Navigation's own vocabulary and nothing else's (ADR 0081). It is not a URL,
+ * does not name one, and carries no addressed Card — the Card a browser location
+ * may name is read from that location by `app` and never written back here.
+ */
+export interface NavigationAddress {
+  readonly selectedLayoutId: LayoutId;
+  readonly activeGraphId: GraphId | null;
+  readonly presentingCardId: CardId | null;
+}
+
+/**
+ * The addressable position a navigation state is at.
+ *
+ * **Derived, and never a field on the state.** A stored address would have to be
+ * maintained at all six publish sites and could then disagree with the state it
+ * describes; derived, it cannot. The mode is not repeated either: the presented
+ * Card is the last of the Traversal history while presenting and `null` in
+ * overview, so `presentingCardId !== null` *is* "presenting".
+ */
+export function navigationAddress(state: NavigationState): NavigationAddress {
+  return {
+    selectedLayoutId: state.selectedLayoutId,
+    activeGraphId: state.activeGraphId,
+    presentingCardId: presentedCard(state),
+  };
+}
+
+/**
+ * The Card being presented, or `null` in overview.
+ *
+ * One definition, because two things are the same fact about it: `activeCardId`,
+ * which App renders from, and {@link navigationAddress}'s `presentingCardId`.
+ * Written out twice they can drift, and the copy that drifts silently is the
+ * address — App lists `activeCardId` as the render-time dependency standing in
+ * for `presentingCardId`, so a rule added to one and not the other leaves the
+ * dependency firing while the address still reports the Card before it, and the
+ * browser sync deciding against a position the application is not at.
+ */
+function presentedCard(state: NavigationState): CardId | null {
+  return state.mode === 'presenting' ? currentCard(state.traversalHistory) : null;
+}
+
+/**
  * Whether Traversal history holds a Card to go back to.
  *
  * One rule, because two surfaces ask it: `App` draws the chrome over the real
@@ -62,26 +114,22 @@ export function canRetreat(state: NavigationState): boolean {
 export interface Navigation {
   readonly getState: () => NavigationState;
   readonly subscribe: (listener: () => void) => () => void;
-  readonly selectRenderer: (selection: CanvasRendererId) => void;
+  readonly selectLayout: (selection: LayoutId) => void;
   /** Open a replacement Space as new navigation, retaining no prior reading state. */
-  readonly openFresh: (selection: CanvasRendererId) => void;
+  readonly openFresh: (selection: LayoutId) => void;
   /**
-   * Adopt a renderer created by an Edit, and the Active Graph that goes with it,
+   * Adopt a Layout created by an Edit, and the Active Graph that goes with it,
    * without interrupting the current navigation.
    *
    * The two arrive together because under ADR 0040 they are one answer: a Layout
    * owns its Graphs, so the Graph a Layout opens on is a fact about that Layout
-   * and not something Navigation carries across from the renderer before it.
+   * and not something Navigation carries across from the Layout before it.
    */
-  readonly continueInRenderer: (selection: CanvasRendererId, activeGraphId: GraphId | null) => void;
-  /** Open an addressed Graph in one compatible renderer without authoring either selection. */
-  readonly openGraph: (selection: CanvasRendererId, graphId: GraphId) => void;
+  readonly continueInLayout: (selection: LayoutId, activeGraphId: GraphId | null) => void;
+  /** Open an addressed Graph in one compatible Layout without authoring either selection. */
+  readonly openGraph: (selection: LayoutId, graphId: GraphId) => void;
   /** Start an addressed presentation at one exact Card with fresh Traversal history. */
-  readonly openPresentation: (
-    selection: CanvasRendererId,
-    graphId: GraphId,
-    cardId: CardId,
-  ) => void;
+  readonly openPresentation: (selection: LayoutId, graphId: GraphId, cardId: CardId) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   readonly present: () => void;
   readonly exitPresenting: () => void;
@@ -110,21 +158,25 @@ function outgoingEdgesFrom(
 }
 
 /**
- * Whether a renderer draws a Graph — its subject's membership test, and the
+ * Whether a Layout draws a Graph — its owned-Graph membership test, and the
  * whole of it (ADR 0045).
  *
- * Read off the subject rather than decided a second time. Which Graphs a
- * renderer draws is the renderer's answer, and a Navigation that computed its
- * own would disagree with it the moment the two sets differ again.
+ * Read off the Layout rather than decided a second time. Which Graphs a Layout
+ * draws is the Layout's own answer, and a Navigation that computed its own
+ * would disagree with it the moment the two sets differ again.
  */
-const rendererShowsGraph = (renderer: ResolvedRenderer, graphId: GraphId): boolean =>
-  renderer.subject.graphs.some((graph) => graph.id === graphId);
+const layoutShowsGraph = (resolved: ResolvedLayout, graphId: GraphId): boolean =>
+  resolved.layout.graphs.some((graph) => graph.id === graphId);
 
-/** The Graph a renderer opens on: a Layout's own Active Graph, or a View's default. */
-const openingGraphId = (renderer: ResolvedRenderer): GraphId | null =>
-  renderer.kind === 'layout'
-    ? renderer.resolvedLayout.activeGraph.id
-    : (renderer.defaultActiveGraph?.id ?? null);
+/**
+ * The Graph a Layout opens on: its own Active Graph.
+ *
+ * Exported because one other question needs the same answer and must not derive
+ * a second one: deciding whether a browser location *already opens* an address
+ * means asking what a location naming no Graph would leave active, which is this
+ * (ADR 0081, `destination-coordination.ts`).
+ */
+export const openingGraphId = (resolved: ResolvedLayout): GraphId => resolved.activeGraph.id;
 
 /**
  * The Card at the end of Traversal history, read in place.
@@ -149,35 +201,34 @@ function currentCard(traversalHistory: TraversalHistory): CardId {
  * here to stop, arriving through the back door as an untyped property.
  */
 function baseOf(state: NavigationState): NavigationBase {
-  const { selectedRenderer, activeGraphId } = state;
-  return { selectedRenderer, activeGraphId };
+  const { selectedLayoutId, activeGraphId } = state;
+  return { selectedLayoutId, activeGraphId };
 }
 
 /**
  * Navigation as a Space first opens in it: nothing traversed, nothing read, and
- * the active Graph the resolved renderer answers.
+ * the active Graph the resolved Layout answers.
  *
  * The one definition, shared by the initial state and by `openFresh` — a
  * replacement Space is opened, not navigated to, so the two cannot be allowed
  * to disagree about what "opened" means.
  */
-function openedState(selection: CanvasRendererId, renderer: ResolvedRenderer): NavigationState {
+function openedState(selection: LayoutId, resolved: ResolvedLayout): NavigationState {
   return {
-    selectedRenderer: selection,
+    selectedLayoutId: selection,
     mode: 'overview',
-    activeGraphId: openingGraphId(renderer),
+    activeGraphId: openingGraphId(resolved),
   };
 }
 
 export function createNavigation(
   currentSpace: () => Space,
-  resolveRenderer: ResolveRenderer,
-  initialRenderer: CanvasRendererId,
+  initialLayoutId: LayoutId,
   initialSpace: Space = currentSpace(),
   options: NavigationOptions = {},
 ): Navigation {
   const observable = createObservableState(
-    openedState(initialRenderer, resolveRenderer(initialSpace, initialRenderer)),
+    openedState(initialLayoutId, resolveLayout(initialSpace, initialLayoutId)),
     options.reportObserverError ?? reportToConsole,
   );
   // Whatever navigation is doing, it goes on doing: a change to the fields both
@@ -185,20 +236,17 @@ export function createNavigation(
   const setState = (change: Partial<NavigationBase>): void => {
     observable.publish({ ...observable.getState(), ...change });
   };
-  const activeCardId = (): CardId | null => {
-    const state = observable.getState();
-    return state.mode === 'presenting' ? currentCard(state.traversalHistory) : null;
-  };
+  const activeCardId = (): CardId | null => presentedCard(observable.getState());
 
   return {
     getState: observable.getState,
     subscribe: observable.subscribe,
-    selectRenderer: (selection) => {
-      const renderer = resolveRenderer(currentSpace(), selection);
+    selectLayout: (selection) => {
+      const resolved = resolveLayout(currentSpace(), selection);
       observable.publish({
         ...baseOf(observable.getState()),
-        selectedRenderer: selection,
-        activeGraphId: openingGraphId(renderer),
+        selectedLayoutId: selection,
+        activeGraphId: openingGraphId(resolved),
         mode: 'overview',
       });
     },
@@ -208,31 +256,26 @@ export function createNavigation(
     // once it stopped naming `traversalHistory` it stopped clearing Traversal history, and
     // history from a Space that was gone rode across under a `mode` saying there was none.
     openFresh: (selection) => {
-      observable.publish(openedState(selection, resolveRenderer(currentSpace(), selection)));
+      observable.publish(openedState(selection, resolveLayout(currentSpace(), selection)));
     },
-    // Resolve first so navigation can never name a renderer the current Space
+    // Resolve first so navigation can never name a Layout the current Space
     // does not hold. Unlike explicit selection, adopting the Layout an Edit just
     // created is not navigation and must not interrupt a traversal.
     //
-    // **The Active Graph arrives with the renderer rather than surviving it.**
-    // Under ADR 0040 a Layout owns its Graphs, so the two are one answer and the
-    // Edit is what knows it: converting an Algorithmic View mints a Graph the
-    // new Layout owns, while the Graph that was merely emphasised on that view
-    // belongs to some other Layout and cannot come across. Carrying the previous
-    // Active Graph over and checking it — which is what this did while every
-    // renderer drew every Graph — now refuses the ordinary first conversion.
+    // **The Active Graph arrives with the Layout rather than surviving it.**
+    // Under ADR 0040 a Layout owns its Graphs, so the two are one answer.
     //
     // The refusal below is `activateGraph`'s, from the other side. What either
-    // one protects is the *pair* — the selected renderer and the Active Graph —
-    // and there is no third writer of it: `openedState` and `selectRenderer`
+    // one protects is the *pair* — the selected Layout and the Active Graph —
+    // and there is no third writer of it: `openedState` and `selectLayout`
     // resolve both together, `activateGraph` writes the Graph against the
-    // selected renderer, and this writes both. The state either one keeps out is
-    // the same dead Edit: an Active Graph the renderer does not draw rides into
+    // selected Layout, and this writes both. The state either one keeps out is
+    // the same dead Edit: an Active Graph the Layout does not draw rides into
     // `updatePositionedLayout` as the Layout's `activeGraph`, which intake
     // rejects outright.
     //
     // **Re-resolving instead of refusing was the wrong repair.** Falling back to
-    // the adopted renderer's own Active Graph moves the emphasis without being
+    // the adopted Layout's own Active Graph moves the emphasis without being
     // asked, and this call is the one that must not interrupt a traversal: the
     // history being presented belongs to the Graph that was active, so silently
     // naming another strands `moves()` on Edges out of Cards nothing is
@@ -245,13 +288,13 @@ export function createNavigation(
     // in a snapshot domain intake accepted a line earlier — and intake is
     // precisely the check that a Layout's named `activeGraph` is a Graph it
     // owns. An absent Active Graph names nothing and is exempt.
-    continueInRenderer: (selection, activeGraphId) => {
-      const renderer = resolveRenderer(currentSpace(), selection);
-      if (activeGraphId !== null && !rendererShowsGraph(renderer, activeGraphId)) {
-        throw new Error(`The adopted renderer does not show the active Graph ${activeGraphId}.`);
+    continueInLayout: (selection, activeGraphId) => {
+      const resolved = resolveLayout(currentSpace(), selection);
+      if (activeGraphId !== null && !layoutShowsGraph(resolved, activeGraphId)) {
+        throw new Error(`The adopted Layout does not show the active Graph ${activeGraphId}.`);
       }
       setState({
-        selectedRenderer: selection,
+        selectedLayoutId: selection,
         activeGraphId,
       });
     },
@@ -260,12 +303,12 @@ export function createNavigation(
       if (space.lookup.graph(graphId) === undefined) {
         throw new Error(`The Graph ${graphId} does not exist.`);
       }
-      const renderer = resolveRenderer(space, selection);
-      if (!rendererShowsGraph(renderer, graphId)) {
-        throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
+      const resolved = resolveLayout(space, selection);
+      if (!layoutShowsGraph(resolved, graphId)) {
+        throw new Error(`The selected Layout does not show the Graph ${graphId}.`);
       }
       observable.publish({
-        selectedRenderer: selection,
+        selectedLayoutId: selection,
         activeGraphId: graphId,
         mode: 'overview',
       });
@@ -275,22 +318,22 @@ export function createNavigation(
       if (space.lookup.graph(graphId) === undefined) {
         throw new Error(`The Graph ${graphId} does not exist.`);
       }
-      const renderer = resolveRenderer(space, selection);
-      if (!rendererShowsGraph(renderer, graphId)) {
-        throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
+      const resolved = resolveLayout(space, selection);
+      if (!layoutShowsGraph(resolved, graphId)) {
+        throw new Error(`The selected Layout does not show the Graph ${graphId}.`);
       }
       if (!graphCardIds(space, graphId).includes(cardId)) {
         throw new Error(`The Graph ${graphId} does not contain the Card ${cardId}.`);
       }
       observable.publish({
-        selectedRenderer: selection,
+        selectedLayoutId: selection,
         activeGraphId: graphId,
         mode: 'presenting',
         traversalHistory: [cardId],
         branchIndex: 0,
       });
     },
-    // Resolved first, for the same reason a renderer is: Navigation may not name
+    // Resolved first, for the same reason a Layout is: Navigation may not name
     // structure the current view does not hold. Activating is never an Edit
     // (ADR 0028), so it cannot mint the Graph it is handed.
     //
@@ -304,15 +347,15 @@ export function createNavigation(
     // of that reasoning; the tests point at it rather than restating it.
     //
     // **The two refusals are separate again.** They were the same check while
-    // every renderer drew every Graph in the Space; under ADR 0040 a Layout
+    // every canvas drew every Graph in the Space; under ADR 0040 a Layout
     // draws only the Graphs it *owns*, so a Graph that plainly exists — because
-    // a second Layout owns it — is one this renderer does not show. "Does not
+    // a second Layout owns it — is one this Layout does not show. "Does not
     // exist" and "does not show" are different mistakes by the caller and each
     // says which.
     //
-    // The visible set is read off the resolved renderer's subject rather than
-    // recomputed here: one place answers which Graphs a renderer draws (ADR
-    // 0026, ADR 0045), and two would disagree the moment the answers differ.
+    // The visible set is read off the resolved Layout's own Graphs rather than
+    // recomputed here: one place answers which Graphs a Layout draws (ADR 0026,
+    // ADR 0045), and two would disagree the moment the answers differ.
     //
     // Both refusals throw, and deliberately alike. Neither is reachable through
     // the product — `GraphSelector` is fed the visible Graphs — so each is a
@@ -321,11 +364,11 @@ export function createNavigation(
     // to be written by every Edit after it. Throwing names the wrong call at
     // the call that made it, which is the whole point of moving this refusal
     // off the commit. Nothing is half-applied either way: both checks sit above
-    // `publish`, so Navigation is left exactly as `selectRenderer` leaves it.
+    // `publish`, so Navigation is left exactly as `selectLayout` leaves it.
     //
     // **A minted Graph passes by ordering, not by an exemption.** Edit
     // completion submits, *then* adopts the Layout it wrote, and only then
-    // activates — so what this resolves is that Layout rather than the renderer
+    // activates — so what this resolves is that Layout rather than the one
     // the Edit began in, and the Graph the same snapshot added is one that
     // Layout draws.
     activateGraph: (graphId) => {
@@ -334,8 +377,8 @@ export function createNavigation(
       if (space.lookup.graph(graphId) === undefined) {
         throw new Error(`The Graph ${graphId} does not exist.`);
       }
-      if (!rendererShowsGraph(resolveRenderer(space, state.selectedRenderer), graphId)) {
-        throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
+      if (!layoutShowsGraph(resolveLayout(space, state.selectedLayoutId), graphId)) {
+        throw new Error(`The selected Layout does not show the Graph ${graphId}.`);
       }
       observable.publish({
         ...baseOf(state),
@@ -356,10 +399,9 @@ export function createNavigation(
     // The **edge-less Graph** below was once the shape `graphSchema` forbade,
     // and its guard was type ceremony. It is now ordinary: creating a Layout
     // creates its initial Active Graph *empty* in the same Edit (ADR 0040), and
-    // a Computed View converts only through Create Layout by returning exactly
-    // that (ADR 0045), so every explicitly created Layout sits here until the author draws an
-    // Edge. `graphStartCard` has no answer for such a Graph. Presenting has
-    // something real to decline.
+    // every new Layout sits here until the author draws an Edge.
+    // `graphStartCard` has no answer for such a Graph. Presenting has something
+    // real to decline.
     //
     // Between them, a Graph that is active *and* holds an Edge can always be
     // presented — cyclic ones included (ADR 0032).

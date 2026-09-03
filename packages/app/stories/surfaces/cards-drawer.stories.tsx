@@ -85,7 +85,7 @@ function RefusedAdd() {
   const composed = useMemo(() => composeApp({ spaceSession: session }), [session]);
   useSyncExternalStore(session.subscribe, session.getState);
   const space = composed.currentSpace();
-  const layout = space.lookup.layout(composed.navigation.getState().selectedRenderer)?.layout;
+  const layout = space.lookup.layout(composed.navigation.getState().selectedLayoutId)?.layout;
   const cards =
     layout === undefined
       ? []

@@ -27,9 +27,7 @@ test('a Sidebar row opens its actions menu from the trailing icon', async ({ pag
   // mouseup in the same tick, and the dismissal that this regressed on never
   // gets a turn between them — the spec passed against the broken build until
   // this was added. A person's press is tens of milliseconds long.
-  await page
-    .getByRole('button', { name: 'Actions for Space View Collection 1' })
-    .click({ delay: 120 });
+  await page.getByRole('button', { name: 'Actions for Layout Collection 1' }).click({ delay: 120 });
 
   const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
@@ -73,7 +71,7 @@ test('a Card opens the same actions menu from a right click', async ({ page }) =
   await expect(menu.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
 });
 
-test('a Graph contextual link uses the selected Space View', async ({ page }) => {
+test('a Graph contextual link uses the selected Layout', async ({ page }) => {
   await page.goto('/?story=review--link-actions--sidebar&mode=preview');
 
   await page.getByRole('button', { name: 'Long', exact: true }).hover();

@@ -55,8 +55,8 @@ test('traverses the graph, and the space is still what you are looking at', asyn
   await present(page);
 
   // No second surface (ADR 0027): every card is still drawn, on the same canvas.
-  await expect(page.locator('.react-flow__node')).toHaveCount(10);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(13);
+  await expect(page.locator('.react-flow__node')).toHaveCount(5);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
 
   // Long starts at A — the card no edge arrives at, not the first in any list.
   await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000002');
@@ -82,7 +82,7 @@ test('the active card draws its content rendered, and only that card does', asyn
   // Content is not embedded in every node (ADR 0006) — the other nine still draw
   // their titles. Counted inside the nodes: the Alt-drop preview draws the same
   // `CanvasCard`, so an unscoped count would include a Card that does not exist.
-  await expect(page.locator('.react-flow__node').getByTestId('card')).toHaveCount(9);
+  await expect(page.locator('.react-flow__node').getByTestId('card')).toHaveCount(4);
 });
 
 test('a body heading is just a heading, drawn once alongside the title (ADR 0020)', async ({
@@ -151,7 +151,7 @@ test(
     await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add Layout' })).toBeDisabled();
     await expect(
-      page.getByRole('button', { name: /^Actions for Space View Collection 1$/ }),
+      page.getByRole('button', { name: /^Actions for Layout Collection 1$/ }),
     ).toHaveCount(0);
     await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
 
@@ -209,10 +209,10 @@ test('clicking a card while presenting does not open it', async ({ page }) => {
   await present(page);
 
   await expect(activeCard(page)).toHaveCSS('pointer-events', 'none');
-  await expect(nodeByTitle(page, 'E')).toHaveCSS('pointer-events', 'none');
+  await expect(nodeByTitle(page, 'D')).toHaveCSS('pointer-events', 'none');
 
   await activeCard(page).dispatchEvent('click');
-  await nodeByTitle(page, 'E').dispatchEvent('click');
+  await nodeByTitle(page, 'D').dispatchEvent('click');
 
   await expect(page.getByRole('button', { name: /^Close Card/ })).toHaveCount(0);
 });
@@ -224,7 +224,7 @@ test('returning to the overview restores the space and its gestures', async ({ p
   await expect(page.getByTestId('presenting-chrome')).toHaveCount(0);
   // No card is active, so every node is back to drawing its title.
   await expect(activeCard(page)).toHaveCount(0);
-  await expect(page.locator('.react-flow__node').getByTestId('card')).toHaveCount(10);
+  await expect(page.locator('.react-flow__node').getByTestId('card')).toHaveCount(5);
 
   // Opening works again — through the Card's own control, which is the only
   // pointer graph to it (ADR 0036, 0037).
@@ -361,7 +361,6 @@ test(
   async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.react-flow__node').first()).toBeVisible();
-    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
     await settled(page);
 
     // An authored Layout, so the Edge joins a Graph that already holds one out

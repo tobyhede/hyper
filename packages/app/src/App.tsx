@@ -9,26 +9,30 @@ import {
   DRAWER_WIDTH,
   type EntityActionGroup,
 } from '@project/ui';
-import { type CardId, type GraphId, type LayoutPosition } from '@project/core';
+import { type CardId, type GraphId, type LayoutId, type LayoutPosition } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
-import { graphCardIds } from '@project/graph';
+import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { composeApp, openingPlacement } from './compose-app';
 import type { AuthoringRefusal } from './space-authoring';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
-import { canvasRenderers, currentRenderer } from './canvas-renderers';
 import { canvasContent } from './canvas-content';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
-import { canRetreat } from './navigation';
+import { canRetreat, navigationAddress } from './navigation';
 import { copyLink } from './clipboard';
 import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
-import type { CanvasRendererId } from './renderer';
+import { layoutCards, resolveLayout } from './layout-resolution';
 import type { DestinationOpening } from './destination-opening';
-import { adoptedRendererDestination, destinationRestoration } from './destination-coordination';
+import {
+  destinationRestoration,
+  destinationSync,
+  samePosition,
+  type AddressedPosition,
+} from './destination-coordination';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CardDestinationFocus } from './components/CardDestinationFocus';
@@ -39,7 +43,7 @@ import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
 import {
-  SelectedCanvasRenderer,
+  SelectedLayoutName,
   SpaceSidebar,
   type SpaceChromeTitleEdit,
   type SpaceEntity,
@@ -50,12 +54,11 @@ export const createApp = (
   opening?: DestinationOpening,
 ) => {
   // What an opened Space is composed of, stated once (`compose-app.ts`): one
-  // working-space reader every collaborator shares, one renderer resolver, and
+  // working-space reader every collaborator shares, and
   // the order the six of them have to be built in.
   const {
     readWorkingSpace,
     currentSpace,
-    resolveRenderer,
     navigation,
     authoring,
     adapter: useRenderAdapter,
@@ -65,19 +68,19 @@ export const createApp = (
   const openingPresentationCardId = opening?.presentationCardId ?? null;
   if (openingGraphId !== null && openingPresentationCardId !== null) {
     navigation.openPresentation(
-      navigation.getState().selectedRenderer,
+      navigation.getState().selectedLayoutId,
       openingGraphId,
       openingPresentationCardId,
     );
   } else if (openingGraphId !== null) {
-    navigation.openGraph(navigation.getState().selectedRenderer, openingGraphId);
+    navigation.openGraph(navigation.getState().selectedLayoutId, openingGraphId);
   }
 
   function App() {
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
     const sessionState = authoringState.session;
     const navigationState = authoringState.navigation;
-    const selectedRenderer = navigationState.selectedRenderer;
+    const selectedLayoutId = navigationState.selectedLayoutId;
     /**
      * The Alias creation state: editor-local, and nothing else (ADR 0042).
      *
@@ -87,8 +90,8 @@ export const createApp = (
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
     const [addressedCardId, setAddressedCardId] = useState<CardId | null>(opening?.cardId ?? null);
-    // Keyed on the renderer as well as the Card: `installDestinationOpening` clears
-    // the published selection, and moving between two Space Views that address
+    // Keyed on the Layout as well as the Card: `installDestinationOpening` clears
+    // the published selection, and moving between two Layouts that address
     // the *same* Card leaves `addressedCardId` untouched, so keying on the Card
     // alone would let React bail out and never restore it. Clearing on `null` is
     // the other half — an address that stops naming a Card must stop selecting
@@ -98,7 +101,7 @@ export const createApp = (
       const adapter = useRenderAdapter.getState();
       if (addressedCardId === null) adapter.clearSelection();
       else adapter.selectCard(addressedCardId);
-    }, [addressedCardId, selectedRenderer]);
+    }, [addressedCardId, selectedLayoutId]);
     /**
      * Whether a Card's content edit is running, reported up by the canvas.
      *
@@ -137,47 +140,44 @@ export const createApp = (
     const [addedCardToFocus, setAddedCardToFocus] = useState<CardId | null>(null);
     const cardsDrag = useRef<{
       readonly cardId: CardId;
-      readonly rendererId: CanvasRendererId;
+      readonly layoutId: LayoutId;
     } | null>(null);
-    const rendererSpace = useMemo(
+    const renderedSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
     );
-    const renderer = useMemo(
-      () => resolveRenderer(rendererSpace, selectedRenderer),
-      [rendererSpace, selectedRenderer],
+    const selectedLayout = useMemo(
+      () => resolveLayout(renderedSpace, selectedLayoutId),
+      [renderedSpace, selectedLayoutId],
     );
-    const renderers = useMemo(() => canvasRenderers(rendererSpace), [rendererSpace]);
-    const current = useMemo(
-      () => currentRenderer(renderers, selectedRenderer),
-      [renderers, selectedRenderer],
+    // The positioned strategy that draws this Layout, built where it is used:
+    // its one consumer is the placement rendering below (ADR 0025, ADR 0041).
+    const strategy = useMemo(
+      () => positionedStrategy(Placement.fromLayout(selectedLayout.layout)),
+      [selectedLayout],
     );
-    // Everything the canvas draws, derived once from the Space and the renderer.
+    // The Cards this Layout places. Memoized on the same two values the Layout
+    // is: it is the sole dependency of Edge Authoring's Card-title map and its
+    // endpoint choices, and a fresh array per render would rebuild both on every
+    // intermediate drag frame — which is the identity churn
+    // `edge-authoring-react.tsx` says its commands object must not have.
+    const placedCards = useMemo(
+      () => layoutCards(renderedSpace, selectedLayout.layout),
+      [renderedSpace, selectedLayout],
+    );
+    // Everything the canvas draws, derived once from the Space and the Layout.
     // Memoized on those two alone: the interaction state below changes far more
     // often, and it is `project` that reads it rather than this.
     const projection = useMemo(
-      () => canvasProjection(rendererSpace, renderer),
-      [rendererSpace, renderer],
+      () => canvasProjection(renderedSpace, selectedLayout),
+      [renderedSpace, selectedLayout],
     );
 
     const { activeGraphId } = navigationState;
-    const previousRenderer = useRef(selectedRenderer);
-    useEffect(() => {
-      if (previousRenderer.current === selectedRenderer) return;
-      previousRenderer.current = selectedRenderer;
-
-      const destination = adoptedRendererDestination(
-        currentSpace(),
-        spaceSession.getState().working,
-        window.location.pathname,
-        selectedRenderer,
-      );
-      if (destination !== null) syncDestination('push', destination);
-    }, [selectedRenderer, syncDestination]);
     const presenting = navigationState.mode === 'presenting';
     useEffect(() => {
       cardsDrag.current = null;
-    }, [selectedRenderer, presenting, authoringState.replacementEpoch]);
+    }, [selectedLayoutId, presenting, authoringState.replacementEpoch]);
     // There is a Card to go back to only once a traversal has left its first, and only
     // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
@@ -200,7 +200,7 @@ export const createApp = (
     // Read at the point of use, like `moves` above and for the same reason: the
     // placement is not published state, and subscribing to it through the
     // render adapter — a store that knows nothing about either the placement or
-    // the selected renderer — only worked because every install happened to be
+    // the selected Layout — only worked because every install happened to be
     // followed by an unrelated notification. This component already re-renders
     // on both stores, and a render-time read cannot be stale at the render that
     // uses it. `replacePlacement` keeps the map's identity when the value is
@@ -210,32 +210,28 @@ export const createApp = (
     const selection = useRenderAdapter((s) => s.selection);
     const selectedCardId = selectedCardOf(selection);
     const selectedCard =
-      selectedCardId === null ? undefined : rendererSpace.lookup.card(selectedCardId);
+      selectedCardId === null ? undefined : renderedSpace.lookup.card(selectedCardId);
 
     /**
-     * Whether the selected Card has a contextual address in this Space View.
+     * Whether the selected Card has a contextual address in this Layout.
      *
      * A Layout's members *are* its position keys (ADR 0040). Cards outside them
      * remain available in the Sidebar Cards collection, but have no contextual
      * address in that Layout.
      */
     const contextualCardLink =
-      selectedCard === undefined ||
-      renderer.kind !== 'layout' ||
-      renderer.resolvedLayout.layout.positions[selectedCard.id] !== undefined;
+      selectedCard === undefined || selectedLayout.layout.positions[selectedCard.id] !== undefined;
     const cardsOutsideSelectedLayout = useMemo(
       () =>
-        renderer.kind === 'layout'
-          ? rendererSpace.cards.filter(
-              (card) => renderer.resolvedLayout.layout.positions[card.id] === undefined,
-            )
-          : [],
-      [renderer, rendererSpace.cards],
+        renderedSpace.cards.filter(
+          (card) => selectedLayout.layout.positions[card.id] === undefined,
+        ),
+      [selectedLayout, renderedSpace.cards],
     );
     // The one condition the toggle's `disabled` and the drawer's own open state
     // both read, so neither can drift from the other into an enabled control
     // over a drawer that will not open.
-    const cardsDrawerAvailable = renderer.kind === 'layout' && !presenting && !creatingAlias;
+    const cardsDrawerAvailable = !presenting && !creatingAlias;
     // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
     // `cardsDrawerOpen`. Presenting and creating an Alias both pass through here,
     // and a drawer that reopened itself on the way back would take
@@ -244,21 +240,21 @@ export const createApp = (
     useEffect(() => {
       if (!cardsDrawerAvailable) setCardsDrawerOpen(false);
     }, [cardsDrawerAvailable]);
-    // Reveals the drawer once per (renderer, address) rather than on every
+    // Reveals the drawer once per (Layout, address) rather than on every
     // dependency change: an unrelated edit elsewhere in the Space still
     // recomputes `cardsOutsideSelectedLayout` with a fresh array identity, and
     // re-running on that alone would reopen a drawer the reader just closed.
-    // The renderer is part of the key, not just the Card id — a canonical Card
-    // link addresses no Space View of its own, so the same Card can be
-    // revealed once in one Layout and then adopt a different default renderer
+    // The Layout is part of the key, not just the Card id — a canonical Card
+    // link addresses no Layout of its own, so the same Card can be
+    // revealed once in one Layout and then adopt a different default Layout
     // that omits it, and that is a second reveal rather than a repeat.
     const revealedAddressRef = useRef<{
-      readonly renderer: CanvasRendererId;
+      readonly layoutId: LayoutId;
       readonly cardId: CardId;
     } | null>(null);
     useEffect(() => {
       if (addressedCardId === null) {
-        // Only a real navigation clears the address — choosing a Space View,
+        // Only a real navigation clears the address — choosing a Layout,
         // activating a Graph, or restoring a destination that names no Card —
         // so leaving it is the reader moving on rather than the incidental
         // recomputation this guard absorbs. Arriving back at the same address
@@ -267,7 +263,7 @@ export const createApp = (
         return;
       }
       if (
-        revealedAddressRef.current?.renderer === selectedRenderer &&
+        revealedAddressRef.current?.layoutId === selectedLayoutId &&
         revealedAddressRef.current.cardId === addressedCardId
       ) {
         return;
@@ -275,12 +271,12 @@ export const createApp = (
       if (cardsOutsideSelectedLayout.some(({ id }) => id === addressedCardId)) {
         setCardsDrawerOpen(true);
       }
-      revealedAddressRef.current = { renderer: selectedRenderer, cardId: addressedCardId };
-    }, [addressedCardId, selectedRenderer, cardsOutsideSelectedLayout]);
+      revealedAddressRef.current = { layoutId: selectedLayoutId, cardId: addressedCardId };
+    }, [addressedCardId, selectedLayoutId, cardsOutsideSelectedLayout]);
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
-      renderer.strategy,
+      strategy,
       resizeDraft?.placement ?? authoredPositions,
     );
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
@@ -326,20 +322,19 @@ export const createApp = (
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
     const cardResize = useRenderAdapter((s) => s.cardResize);
-    // There are Cards on the canvas to interact with once placement resolves and
-    // the store has taken it. Authoring additionally requires an authored Layout:
-    // a Computed View is a read-only preview until its explicit Create Layout Edit.
+    // There are Cards on the canvas to interact with once placement resolves
+    // and the store has taken it.
     const hasCardsOnCanvas = liveProjection !== null;
     const canvas = canvasContent(placement, hasCardsOnCanvas);
-    const editable = hasCardsOnCanvas && current.kind === 'authored';
-    // Both refusals are drawn under Add Layout and both are about the canvas
+    const editable = hasCardsOnCanvas;
+    // Both refusals are drawn under Add Layout and both are about the Layout
     // that was selected when they were refused — the Edit Add Layout would have
     // made, and the Rename or Delete on that row. Neither says anything about
-    // the canvas the reader has moved to, so the move clears them together.
+    // the Layout the reader has moved to, so the move clears them together.
     useEffect(() => {
       setCreateLayoutRefusal(null);
       setLayoutManagementRefusal(null);
-    }, [selectedRenderer]);
+    }, [selectedLayoutId]);
     const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
       readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;
       readonly draft: string;
@@ -349,9 +344,9 @@ export const createApp = (
     } | null>(null);
     const chromeEditingDisabled =
       !editable || presenting || creatingAlias || editingCardBody || editingCardTitle;
-    const cardIsOpen =
-      renderer.kind === 'layout' &&
-      Object.values(renderer.resolvedLayout.layout.positions).some((at) => at?.open === true);
+    const cardIsOpen = Object.values(selectedLayout.layout.positions).some(
+      (at) => at?.open === true,
+    );
 
     /**
      * Delete Card is withdrawn wherever Add Card is, and for one reason more.
@@ -428,8 +423,7 @@ export const createApp = (
      */
     const layoutActions = (entity: SpaceEntity): readonly EntityActionGroup[] => {
       if (
-        entity.kind !== 'space-view' ||
-        entity.renderer.kind !== 'authored' ||
+        entity.kind !== 'layout' ||
         presenting ||
         creatingAlias ||
         editingCardBody ||
@@ -437,7 +431,7 @@ export const createApp = (
         spaceChromeEdit !== null
       )
         return [];
-      const { selection: layoutId, title } = entity.renderer;
+      const { id: layoutId, title } = entity.layout;
       return [
         [
           {
@@ -446,7 +440,7 @@ export const createApp = (
             onSelect: () => {
               setLayoutManagementRefusal(null);
               titleEdit.onBegin({ kind: 'layout', id: layoutId }, title, 'sidebar', () => {
-                document.querySelector<HTMLElement>(`[data-renderer="${layoutId}"]`)?.focus();
+                document.querySelector<HTMLElement>(`[data-layout="${layoutId}"]`)?.focus();
               });
             },
           },
@@ -475,38 +469,40 @@ export const createApp = (
     // with two sources of truth.
     const installDestinationOpening = useCallback((opening: DestinationOpening) => {
       setSpaceChromeEdit(null);
-      const resolved = resolveRenderer(currentSpace(), opening.selection);
-      const changesRenderer = navigation.getState().selectedRenderer !== opening.selection;
-      if (opening.graphId === null) navigation.selectRenderer(opening.selection);
+      // Choosing a destination is what answers a failed restoration, and it
+      // answers it whether or not the choice moves the address — so this belongs
+      // to the choice rather than to the history entry it may not earn. It is
+      // also what asks the sync effect below to correct the location the report
+      // was about, which is why the report is one of that effect's dependencies.
+      setDestinationNotFound(false);
+      const resolved = resolveLayout(currentSpace(), opening.selection);
+      const changesLayout = navigation.getState().selectedLayoutId !== opening.selection;
+      if (opening.graphId === null) navigation.selectLayout(opening.selection);
       else if (opening.presentationCardId === null) {
         navigation.openGraph(opening.selection, opening.graphId);
       } else {
         navigation.openPresentation(opening.selection, opening.graphId, opening.presentationCardId);
       }
       // A current row can be chosen again after reload. Its UUID is already the
-      // Navigation value, so no renderer dependency will change and no placement
+      // Navigation value, so no Layout dependency will change and no placement
       // effect will rerun; clearing the published projection here would strand
       // the canvas in its pending state. Navigation still receives the choice so
-      // it can apply its own same-renderer semantics.
-      if (!changesRenderer) return;
-      useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
+      // it can apply its own same-Layout semantics.
+      if (!changesLayout) return;
+      useRenderAdapter.getState().selectLayout(openingPlacement(resolved));
     }, []);
 
     /**
-     * Choosing a Space View row, including the row already current.
+     * Choosing a Layout row, including the row already current.
      *
      * The repeated choice is not a no-op and must not be skipped here:
-     * `navigation.selectRenderer` publishes `mode: 'overview'`, so choosing the
-     * current row is how an author leaves a presentation. What the repeat may
-     * not do is *push* —
-     * the destination has not changed, and a pushed entry would make Back a
-     * no-op. It still replaces, because the address it is leaving may be a
-     * narrower destination in this same Space View (a Card, a Graph, a
-     * presentation point) that Navigation has just cleared.
+     * `navigation.selectLayout` publishes `mode: 'overview'`, so choosing the
+     * current row is how an author leaves a presentation. Whether that earns a
+     * history entry is not asked here at all — the address it produces is what
+     * the sync effect below decides from (ADR 0081).
      */
-    const selectCanvasRenderer = useCallback(
-      (selection: CanvasRendererId) => {
-        const moves = navigation.getState().selectedRenderer !== selection;
+    const selectLayoutRow = useCallback(
+      (selection: LayoutId) => {
         setAddressedCardId(null);
         installDestinationOpening({
           selection,
@@ -514,96 +510,112 @@ export const createApp = (
           presentationCardId: null,
           cardId: null,
         });
-        const destination: ProductDestination = {
-          kind: 'space-view',
-          spaceId: currentSpace().id,
-          spaceViewId: selection,
-        };
-        syncDestination(moves ? 'push' : 'replace', destination);
       },
-      [installDestinationOpening, syncDestination],
+      [installDestinationOpening],
     );
 
-    const pushPresentationCard = useCallback(
-      (cardId: CardId) => {
-        if (activeGraphId === null) return;
-        syncDestination('push', {
-          kind: 'presentation',
-          spaceId: currentSpace().id,
-          spaceViewId: selectedRenderer,
-          graphId: activeGraphId,
-          cardId,
-        });
-      },
-      [activeGraphId, selectedRenderer, syncDestination],
-    );
+    const present = navigation.present;
+    const advance = navigation.advance;
+    const retreat = navigation.retreat;
+    const exitPresenting = navigation.exitPresenting;
 
-    const present = useCallback(() => {
-      navigation.present();
-      const cardId = navigation.activeCardId();
-      if (cardId !== null) pushPresentationCard(cardId);
-    }, [pushPresentationCard]);
-
-    const advance = useCallback(() => {
-      const before = navigation.getState();
-      const beforeLength = before.mode === 'presenting' ? before.traversalHistory.length : 0;
-      navigation.advance();
-      const after = navigation.getState();
-      const cardId = navigation.activeCardId();
-      if (
-        cardId !== null &&
-        after.mode === 'presenting' &&
-        after.traversalHistory.length > beforeLength
-      ) {
-        pushPresentationCard(cardId);
-      }
-    }, [pushPresentationCard]);
-
-    const retreat = useCallback(() => {
-      const before = navigation.getState();
-      const beforeLength = before.mode === 'presenting' ? before.traversalHistory.length : 0;
-      navigation.retreat();
-      const after = navigation.getState();
-      const cardId = navigation.activeCardId();
-      if (
-        cardId !== null &&
-        after.mode === 'presenting' &&
-        after.traversalHistory.length < beforeLength
-      ) {
-        pushPresentationCard(cardId);
-      }
-    }, [pushPresentationCard]);
-
-    const exitPresenting = useCallback(() => {
-      navigation.exitPresenting();
-      if (activeGraphId === null) return;
-      syncDestination('push', {
-        kind: 'space-view-graph',
-        spaceId: currentSpace().id,
-        spaceViewId: selectedRenderer,
-        graphId: activeGraphId,
-      });
-    }, [activeGraphId, selectedRenderer, syncDestination]);
-
-    // Same rule as `selectCanvasRenderer`, for the same reason: activating the
+    // Same rule as `selectLayoutRow`, for the same reason: activating the
     // Graph that is already active publishes `mode: 'overview'`, which is how
-    // the Graph row leaves a presentation, so the call may not be skipped — only
-    // the history entry may.
-    const activateGraph = useCallback(
-      (graphId: GraphId) => {
-        const moves = navigation.getState().activeGraphId !== graphId;
-        setAddressedCardId(null);
-        navigation.activateGraph(graphId);
-        const destination: ProductDestination = {
-          kind: 'space-view-graph',
-          spaceId: currentSpace().id,
-          spaceViewId: selectedRenderer,
-          graphId,
-        };
-        syncDestination(moves ? 'push' : 'replace', destination);
-      },
-      [selectedRenderer, syncDestination],
-    );
+    // the Graph row leaves a presentation, so the call may not be skipped.
+    const activateGraph = useCallback((graphId: GraphId) => {
+      setDestinationNotFound(false);
+      setAddressedCardId(null);
+      navigation.activateGraph(graphId);
+    }, []);
+
+    /**
+     * The position the browser was last told about: the address, and the Card
+     * the location addresses within it.
+     *
+     * A ref and not state: nothing renders from it, and writing it must not
+     * schedule a render of its own. Its initial value is the position the
+     * application mounted at, which is what makes mount decide nothing at all —
+     * startup read the location once and composed from it, and the `popstate`
+     * listener below is registered by a later effect, so a Back that lands in
+     * between leaves a location Navigation was never told about. Correcting it
+     * there would silently undo the reader's Back, and the code this replaced
+     * could not do that because it never wrote history on mount.
+     *
+     * Comparing the whole position rather than counting runs is also what makes
+     * StrictMode's second invocation decide nothing: it sees the position the
+     * first one recorded.
+     */
+    const syncedPosition = useRef<AddressedPosition>({
+      ...navigationAddress(navigation.getState()),
+      addressedCardId,
+    });
+    /**
+     * Whether the location the reader is on failed to resolve, as the sync
+     * below last saw it.
+     *
+     * The decision reads `window.location`, which React cannot depend on, and
+     * this is the one signal App has that the location moved somewhere the
+     * position does not name. It is therefore a dependency of the sync as much
+     * as the address is — and clearing the report is what asks for the stale
+     * location to be corrected, which is the pairing the single
+     * `syncDestination` call used to make on its own.
+     */
+    const syncedUnresolved = useRef(destinationNotFound);
+    /**
+     * The one place a position becomes a browser history entry (ADR 0081).
+     *
+     * Navigation answers where the reader is; this asks what the browser should
+     * do about it, and does that. Nothing on the way in decides — the five sites
+     * that used to compare the one field they happened to have passed are gone,
+     * and with them the `previousLayoutId` ref that stood in for the call Edit
+     * completion never made.
+     *
+     * It decides exactly once per position, because its dependencies are the
+     * address's own three fields, the Card the location addresses and whether
+     * the location resolved at all, and a state it has already decided about is
+     * skipped above. The decision then reads the current pathname rather than
+     * tracking whether it wrote it, so after Back the location already opens
+     * the restored position and the answer is `none`.
+     */
+    useEffect(() => {
+      // Read off Navigation rather than rebuilt from the dependencies above:
+      // the address has one definition and this is not a second one.
+      const position: AddressedPosition = {
+        ...navigationAddress(navigation.getState()),
+        addressedCardId,
+      };
+      const previous = syncedPosition.current;
+      const moved = !samePosition(previous, position);
+      if (!moved && syncedUnresolved.current === destinationNotFound) return;
+      syncedUnresolved.current = destinationNotFound;
+      // A location this Space could not resolve is the reader's *arrival*, and
+      // only that. It is reported rather than corrected, because rewriting it
+      // on arrival would take the entry they navigated to — but the report is
+      // answered the moment the position moves, whether the move came from a
+      // choice or from presenting, and holding it past that would strand every
+      // move after it behind a path that 404s on reload and is what Copy link
+      // copies. So the guard holds the arrival and nothing after it. Writing
+      // the location is what clears the report, which is `syncDestination`'s
+      // own first act rather than a second thing to remember here.
+      if (destinationNotFound && !moved) return;
+      syncedPosition.current = position;
+      const sync = destinationSync({
+        space: currentSpace(),
+        snapshot: spaceSession.getState().working,
+        pathname: window.location.pathname,
+        position,
+        synced: previous,
+      });
+      if (sync.kind === 'none') return;
+      syncDestination(sync.kind, sync.destination);
+    }, [
+      selectedLayoutId,
+      activeGraphId,
+      activeCardId,
+      addressedCardId,
+      destinationNotFound,
+      syncDestination,
+    ]);
 
     useEffect(() => {
       const restoreDestination = () => {
@@ -642,8 +654,8 @@ export const createApp = (
     }, [sessionState.persistence.kind]);
 
     const activeGraphCardIds = useMemo(
-      () => new Set(activeGraphId === null ? [] : graphCardIds(rendererSpace, activeGraphId)),
-      [rendererSpace, activeGraphId],
+      () => new Set(activeGraphId === null ? [] : graphCardIds(renderedSpace, activeGraphId)),
+      [renderedSpace, activeGraphId],
     );
 
     // The two selection writes the canvas makes that are not React Flow's own —
@@ -704,10 +716,10 @@ export const createApp = (
       (cardId: CardId, anchor: LayoutPosition): void => {
         const drag = cardsDrag.current;
         cardsDrag.current = null;
-        if (drag?.cardId !== cardId || drag.rendererId !== selectedRenderer) return;
+        if (drag?.cardId !== cardId || drag.layoutId !== selectedLayoutId) return;
         addExistingCard(cardId, anchor, false);
       },
-      [addExistingCard, selectedRenderer],
+      [addExistingCard, selectedLayoutId],
     );
 
     /**
@@ -855,8 +867,8 @@ export const createApp = (
      * content is not a thing a Layout owns.
      */
     const aliasTargets = useMemo(
-      () => rendererSpace.cards.filter((card) => card.kind === 'markdown'),
-      [rendererSpace],
+      () => renderedSpace.cards.filter((card) => card.kind === 'markdown'),
+      [renderedSpace],
     );
     // Scans every title in the Space, so it must not re-run on every drag
     // frame — `projection` (and this component) re-renders on each
@@ -873,8 +885,12 @@ export const createApp = (
 
     const sidebar = (
       <SpaceSidebar
-        spaceTitle={rendererSpace.title}
-        canvas={{ renderers, current, onSelect: selectCanvasRenderer }}
+        spaceTitle={renderedSpace.title}
+        canvas={{
+          layouts: renderedSpace.layouts,
+          selected: selectedLayout.layout,
+          onSelect: selectLayoutRow,
+        }}
         graph={{
           graphs: projection.visibleGraphs,
           activeGraphId,
@@ -884,14 +900,14 @@ export const createApp = (
             onCopyCanonical: (graphId) =>
               copyProductDestination({
                 kind: 'graph',
-                spaceId: rendererSpace.id,
+                spaceId: renderedSpace.id,
                 graphId,
               }),
             onCopyContextual: (graphId) =>
               copyProductDestination({
-                kind: 'space-view-graph',
-                spaceId: rendererSpace.id,
-                spaceViewId: selectedRenderer,
+                kind: 'layout-graph',
+                spaceId: renderedSpace.id,
+                layoutId: selectedLayoutId,
                 graphId,
               }),
           },
@@ -910,15 +926,10 @@ export const createApp = (
           // title editing is withdrawn while a content edit owns the keyboard
           // (ADR 0064) — so a live toolbar created a Card and then swallowed the
           // naming it exists to begin.
-          disabled:
-            current.kind !== 'authored' ||
-            presenting ||
-            creatingAlias ||
-            editingCardBody ||
-            spaceChromeEdit !== null,
+          disabled: presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
-          hidden: current.kind === 'computed',
+          hidden: presenting,
         }}
         createLayout={{
           disabled: presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
@@ -949,24 +960,23 @@ export const createApp = (
                 onCopyCanonical: () =>
                   copyProductDestination({
                     kind: 'card',
-                    spaceId: rendererSpace.id,
+                    spaceId: renderedSpace.id,
                     cardId: selectedCard.id,
                   }),
                 /**
-                 * Offered only for a Card this Space View actually holds.
+                 * Offered only for a Card this Layout actually holds.
                  *
                  * A selected Card revealed in the Cards collection is not
-                 * necessarily a member of the Layout. `space-view-card` resolves
+                 * necessarily a member of the Layout. `layout-card` resolves
                  * against `layout.positions`, so a contextual link to it is one
-                 * the host answers 404 for. There is no such thing for a Computed
-                 * View, whose subject is the whole Space.
+                 * the host answers 404 for.
                  */
                 onCopyContextual: contextualCardLink
                   ? () =>
                       copyProductDestination({
-                        kind: 'space-view-card',
-                        spaceId: rendererSpace.id,
-                        spaceViewId: selectedRenderer,
+                        kind: 'layout-card',
+                        spaceId: renderedSpace.id,
+                        layoutId: selectedLayoutId,
                         cardId: selectedCard.id,
                       })
                   : undefined,
@@ -998,7 +1008,7 @@ export const createApp = (
         insetEnd={cardsDrawerOpen ? DRAWER_WIDTH : undefined}
         header={
           <>
-            <SelectedCanvasRenderer renderer={current} titleEdit={titleEdit} />
+            <SelectedLayoutName layout={selectedLayout.layout} titleEdit={titleEdit} />
             {/* Trigger and panel are one component: only the trigger renders
                 here, the drawer portalling its popup over the canvas. That is
                 what stops the toggle's `disabled` and the surface it names from
@@ -1009,12 +1019,12 @@ export const createApp = (
               onOpenChange={setCardsDrawerOpen}
               disabled={!cardsDrawerAvailable}
               cards={cardsOutsideSelectedLayout}
-              allCards={rendererSpace.cards}
+              allCards={renderedSpace.cards}
               onAdd={(card, activation) =>
                 addExistingCard(card.id, centreAnchor(), activation === 'keyboard')
               }
               onDragStart={(cardId) => {
-                cardsDrag.current = { cardId, rendererId: selectedRenderer };
+                cardsDrag.current = { cardId, layoutId: selectedLayoutId };
               }}
               onDragEnd={() => {
                 cardsDrag.current = null;
@@ -1099,7 +1109,7 @@ export const createApp = (
                 selection={selection}
                 onSelectCard={selectCard}
                 onSelectEdge={selectEdge}
-                subjectCards={renderer.subject.cards}
+                placedCards={placedCards}
                 newCardTitle={newCardTitle}
                 onAddCard={addCard}
                 onAddExistingCard={dropExistingCard}
@@ -1131,8 +1141,8 @@ export const createApp = (
                 if (activeGraphId === null || activeCardId === null) return;
                 copyProductDestination({
                   kind: 'presentation',
-                  spaceId: rendererSpace.id,
-                  spaceViewId: selectedRenderer,
+                  spaceId: renderedSpace.id,
+                  layoutId: selectedLayoutId,
                   graphId: activeGraphId,
                   cardId: activeCardId,
                 });

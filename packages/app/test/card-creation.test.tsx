@@ -41,7 +41,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
@@ -91,15 +91,9 @@ const noCards: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [],
-});
-
-/** A Space with no Layout at all, so the Flow Algorithmic View draws it (ADR 0025). */
-const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
-  ...snapshot,
-  document: { version: 1, title: 'Space' },
 });
 
 const runtime = (value: SpaceSnapshot) => {
@@ -263,21 +257,20 @@ describe('Add Card', () => {
     await settled(session);
   });
 
-  it('requires explicit Layout creation before Card creation', async () => {
-    const session = mount(noLayouts);
-    expect(layoutsOf(session)).toEqual([]);
-    expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
-
-    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
-    await waitFor(() => expect(createLayout).toBeEnabled());
-    fireEvent.click(createLayout);
-    await waitFor(() => expect(layoutsOf(session)).toHaveLength(1));
+  /**
+   * An empty Layout is the state Add Layout leaves behind, and the one a
+   * layoutless Space is initialized into (ADR 0079). A Space with no Layout at
+   * all no longer reaches this surface — `SpaceApp.test.tsx` owns Add Layout
+   * itself, and working-state initialization owns the Layout being there.
+   */
+  it('creates the first Card of an empty Layout as its only member', async () => {
+    const session = mount(noCards);
 
     fireEvent.click(await readyToAuthor());
 
     const layout = layoutsOf(session)[0]!;
+    expect(cardTitles(session)).toEqual(['Card 1']);
     expect(layout.graphs).toEqual([expect.objectContaining({ edges: [] })]);
-    // The new Layout starts empty; only the Card created in it becomes a member.
     expect(Object.keys(layout.positions)).toHaveLength(1);
     await settled(session);
   });
@@ -286,7 +279,7 @@ describe('Add Card', () => {
 describe('Add Alias', () => {
   /**
    * The creation state is editor-local and nothing else (ADR 0042): no Card, no
-   * conversion, no commit. This is the package's own gate — cancelling before a
+   * authored Card and no commit. This is the package's own gate — cancelling before a
    * Target creates nothing.
    */
   it('creates nothing when it is cancelled before a Target is chosen', async () => {

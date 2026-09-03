@@ -23,7 +23,7 @@ export interface PresentingChromeProps {
   /** Traverse back, the same Navigation operation Arrow Left performs. */
   onRetreat: () => void;
   onExit: () => void;
-  /** Copy the exact Space View, Graph and Card currently being presented. */
+  /** Copy the exact Layout, Graph and Card currently being presented. */
   onCopyLink: () => void;
 }
 

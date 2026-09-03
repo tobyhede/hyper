@@ -408,7 +408,8 @@ export interface PlannedReleaseIssue extends TaggedIssue {
 }
 
 export interface ReleasePlan {
-  readonly criticalPath: readonly PlannedReleaseIssue[];
+  /** Every zero-slack issue on at least one longest dependency path to the gate. */
+  readonly criticalSubgraph: readonly PlannedReleaseIssue[];
   readonly parallel: readonly PlannedReleaseIssue[];
 }
 
@@ -423,7 +424,7 @@ const taggedReference = ({ feature, issue }: TaggedIssue): string =>
   `${feature}/${issue.number ?? '--'}`;
 
 /**
- * Unit-weight critical path to the declared release gate. Issue files remain the
+ * Unit-weight critical subgraph to the declared release gate. Issue files remain the
  * dependency source; `ROADMAP.md` names only which sink means "release done".
  */
 export const planRelease = (roadmap: Roadmap, release: ReleaseScope): ReleasePlan => {
@@ -464,46 +465,48 @@ export const planRelease = (roadmap: Roadmap, release: ReleaseScope): ReleasePla
 
   const planned = open.map((tagged) => ({ ...tagged, depth: depthOf(tagged.reference) }));
   /** Every open issue as flat parallel work, for the two cases with no path to draw. */
-  const withoutCriticalPath = (): ReleasePlan => ({
-    criticalPath: [],
+  const withoutCriticalSubgraph = (): ReleasePlan => ({
+    criticalSubgraph: [],
     parallel: [...planned].sort(
       (left, right) => left.depth - right.depth || left.reference.localeCompare(right.reference),
     ),
   });
-  if (release.gate === null) return withoutCriticalPath();
+  if (release.gate === null) return withoutCriticalSubgraph();
   if (!byReference.has(release.gate)) {
     // Reaching the gate is how a release ends, not a misconfiguration to refuse
-    // every command over. A settled gate leaves no critical path to trace to it,
+    // every command over. A settled gate leaves no critical subgraph to trace to it,
     // and any tagged work that outlived it is ordinary parallel work. Only a gate
     // naming nothing tagged for this release is an error.
     if (!taggedIssues.some(({ reference }) => reference === release.gate)) {
       throw new Error(`Release gate ${release.gate} is not an issue tagged ${release.tag}.`);
     }
-    return withoutCriticalPath();
+    return withoutCriticalSubgraph();
   }
 
-  const paths = new Map<string, readonly string[]>();
-  const pathTo = (reference: string): readonly string[] => {
-    const known = paths.get(reference);
-    if (known !== undefined) return known;
+  // Depth is the longest unit-weight path from a source, so a blocker one depth
+  // below an issue already on the subgraph has zero slack and belongs to it too.
+  // Walking every such predecessor from the gate collects the whole critical
+  // subgraph, ties included, without choosing between equally long paths.
+  const criticalSet = new Set<string>();
+  const includeTiedCriticalPredecessors = (reference: string): void => {
+    if (criticalSet.has(reference)) return;
+    criticalSet.add(reference);
     const tagged = byReference.get(reference);
     if (tagged === undefined) throw new Error(`Unknown open release issue ${reference}.`);
-    const candidates = tagged.issue.unmetBlockers
-      .map((blocker) => pathTo(blocker))
-      .sort(
-        (left, right) =>
-          right.length - left.length || left.join('\u0000').localeCompare(right.join('\u0000')),
-      );
-    const path = [...(candidates[0] ?? []), reference];
-    paths.set(reference, path);
-    return path;
+    const criticalPredecessorDepth = depthOf(reference) - 1;
+    for (const blocker of tagged.issue.unmetBlockers) {
+      if (depthOf(blocker) === criticalPredecessorDepth) {
+        includeTiedCriticalPredecessors(blocker);
+      }
+    }
   };
-
-  const criticalReferences = pathTo(release.gate);
-  const criticalSet = new Set(criticalReferences);
+  includeTiedCriticalPredecessors(release.gate);
+  const criticalReferences = [...criticalSet].sort(
+    (left, right) => depthOf(left) - depthOf(right) || left.localeCompare(right),
+  );
   const plannedByReference = new Map(planned.map((issue) => [issue.reference, issue]));
   return {
-    criticalPath: criticalReferences.map((reference) => {
+    criticalSubgraph: criticalReferences.map((reference) => {
       const issue = plannedByReference.get(reference);
       if (issue === undefined) throw new Error(`Missing planned release issue ${reference}.`);
       return issue;
@@ -569,14 +572,14 @@ export const renderRoadmap = (roadmap: Roadmap, release: ReleaseScope | null = n
           ...(release.definition === null ? [] : [`  Definition: ${release.definition}`]),
           ...(release.space === null ? [] : [`  Space: ${release.space}`]),
           // Keyed on whether there is a path to draw rather than on whether a
-          // gate was declared: `planRelease` answers an empty critical path for
+          // gate was declared: `planRelease` answers an empty critical subgraph for
           // a gate already reached as well as for a release that declared none,
           // and an open gate always contributes at least itself.
-          ...(releasePlan === null || releasePlan.criticalPath.length === 0
+          ...(releasePlan === null || releasePlan.criticalSubgraph.length === 0
             ? openReleaseIssues.map(releaseIssueLine)
             : [
-                `  CRITICAL PATH — ${releasePlan.criticalPath.length}`,
-                ...releasePlan.criticalPath.map(releaseIssueLine),
+                `  CRITICAL SUBGRAPH — ${releasePlan.criticalSubgraph.length}`,
+                ...releasePlan.criticalSubgraph.map(releaseIssueLine),
                 `  PARALLEL WORK — ${releasePlan.parallel.length}`,
                 ...releasePlan.parallel.map(releaseIssueLine),
               ]),
@@ -662,7 +665,7 @@ export const writeReleaseSpace = (
   }
 
   const plan = planRelease(roadmap, release);
-  const issues = [...plan.criticalPath, ...plan.parallel].sort((left, right) =>
+  const issues = [...plan.criticalSubgraph, ...plan.parallel].sort((left, right) =>
     left.reference.localeCompare(right.reference),
   );
   const idByReference = new Map(
@@ -684,10 +687,12 @@ export const writeReleaseSpace = (
     );
   }
 
-  const criticalEdges = plan.criticalPath.slice(1).map((issue, index) => ({
-    from: cardId(plan.criticalPath[index]?.reference ?? ''),
-    to: cardId(issue.reference),
-  }));
+  const criticalReferences = new Set(plan.criticalSubgraph.map(({ reference }) => reference));
+  const criticalEdges = plan.criticalSubgraph.flatMap((issue) =>
+    issue.issue.unmetBlockers
+      .filter((blocker) => criticalReferences.has(blocker))
+      .map((blocker) => ({ from: cardId(blocker), to: cardId(issue.reference) })),
+  );
   const criticalKeys = new Set(criticalEdges.map(({ from, to }) => `${from}\u0000${to}`));
   const parallelEdges = issues.flatMap((planned) =>
     planned.issue.unmetBlockers.flatMap((blocker) => {
@@ -696,15 +701,14 @@ export const writeReleaseSpace = (
     }),
   );
 
+  const criticalSlotByDepth = new Map<number, number>();
   const parallelSlotByDepth = new Map<number, number>();
-  const criticalIndex = new Map(
-    plan.criticalPath.map(({ reference }, index) => [reference, index]),
-  );
   const positions = Object.fromEntries(
     issues.map((planned) => {
-      const onCriticalPath = criticalIndex.get(planned.reference);
-      if (onCriticalPath !== undefined) {
-        return [cardId(planned.reference), { x: 0, y: onCriticalPath * 300, open: false }];
+      if (criticalReferences.has(planned.reference)) {
+        const slot = criticalSlotByDepth.get(planned.depth) ?? 0;
+        criticalSlotByDepth.set(planned.depth, slot + 1);
+        return [cardId(planned.reference), { x: slot * 420, y: planned.depth * 300, open: false }];
       }
       const slot = parallelSlotByDepth.get(planned.depth) ?? 0;
       parallelSlotByDepth.set(planned.depth, slot + 1);
@@ -731,7 +735,7 @@ export const writeReleaseSpace = (
         graphs: [
           {
             id: criticalGraphId,
-            title: 'Critical path',
+            title: 'Critical subgraph',
             color: '#dc2626',
             edges: criticalEdges,
           },
@@ -745,7 +749,7 @@ export const writeReleaseSpace = (
         activeGraph: criticalGraphId,
       },
     ],
-    defaultRenderer: layoutId,
+    defaultLayout: layoutId,
   };
   mkdirSync(destination, { recursive: true });
   writeFileSync(join(destination, 'space.json'), `${JSON.stringify(space, null, 2)}\n`);
@@ -839,14 +843,14 @@ const htmlReleaseScope = (roadmap: Roadmap, release: ReleaseScope): string => {
     release.space === null
       ? ''
       : `<p><a href="${escapeHtml(`${release.space}/space.json`)}">Dogfood roadmap Space</a></p>`;
-  // As in `renderRoadmap`: an empty critical path is a release with no gate
-  // declared or one whose gate has been reached, and neither has a path to draw.
+  // As in `renderRoadmap`: an empty critical subgraph is a release with no gate
+  // declared or one whose gate has been reached, and neither has a graph to draw.
   const issueLists =
-    plan.criticalPath.length === 0
+    plan.criticalSubgraph.length === 0
       ? `<ul>${open.map(htmlReleaseIssue).join('')}</ul>`
       : [
-          `<h3>Critical path<span class="tally">${plan.criticalPath.length}</span></h3>`,
-          `<ol class="release-path">${plan.criticalPath.map(htmlReleaseIssue).join('')}</ol>`,
+          `<h3>Critical subgraph<span class="tally">${plan.criticalSubgraph.length}</span></h3>`,
+          `<ul class="release-critical">${plan.criticalSubgraph.map(htmlReleaseIssue).join('')}</ul>`,
           `<h3>Parallel work<span class="tally">${plan.parallel.length}</span></h3>`,
           `<ul>${plan.parallel.map(htmlReleaseIssue).join('')}</ul>`,
         ].join('');
@@ -950,7 +954,7 @@ details .path { font-family: ui-monospace, monospace; font-size: .78rem; color: 
 }
 .release-scope p { margin: .5rem 0; color: var(--ink); }
 .release-scope ul, .release-scope ol { list-style: none; margin: .4rem 0 0; padding: 0; }
-.release-path .issue { border-left: 2px solid var(--accent); padding-left: .65rem; }
+.release-critical .issue { border-left: 2px solid var(--accent); padding-left: .65rem; }
 .release-scope .ref { font-family: ui-monospace, monospace; color: var(--muted); font-size: .8rem; }
 `;
 

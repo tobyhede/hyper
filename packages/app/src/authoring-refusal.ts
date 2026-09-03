@@ -10,8 +10,6 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return `This view could not place its Cards: ${refusal.error.message}`;
     case 'placement-pending':
       return 'This view has not finished placing its Cards, so there is nowhere to write yet.';
-    case 'computed-view-read-only':
-      return 'Create a Layout from this Computed View before editing.';
     case 'layout-not-found':
       return 'This Layout is no longer part of the Space.';
     case 'layout-required':
@@ -95,7 +93,6 @@ const form = null;
 /** Alias creation owns Title and Target, and nothing else. */
 const titleAndTargetPlacements = {
   'placement-pending': form,
-  'computed-view-read-only': form,
   'layout-not-found': form,
   'layout-required': form,
   'card-not-found': form,
@@ -142,7 +139,6 @@ export const presentNewAliasRefusal = (refusal: AuthoringRefusal): NewAliasRefus
  */
 const correctableByCardChoice = {
   'placement-pending': false,
-  'computed-view-read-only': false,
   'layout-not-found': false,
   'layout-required': false,
   'card-not-found': false,

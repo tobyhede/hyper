@@ -105,8 +105,8 @@ export interface EdgeAuthoringInput {
   readonly selection: CanvasSelection;
   readonly activeGraphId: GraphId | null;
   readonly graphs: readonly Graph[];
-  /** The Cards this renderer's subject holds — what a picker may offer. */
-  readonly subjectCards: readonly Card[];
+  /** The Cards this Layout places — what a picker may offer. */
+  readonly placedCards: readonly Card[];
   readonly newCardTitle: string;
   /**
    * Edge authoring is withdrawn before a placement resolves, while a modal pane
@@ -115,10 +115,8 @@ export interface EdgeAuthoringInput {
    * was missing here, which left the pointer gesture live behind it; see
    * `SpaceCanvas`'s `canAuthorOnCanvas`.
    *
-   * *Placement*, not Layout: an Algorithmic View has no Layout and its Cards are
-   * authorable the moment its strategy resolves — editing one is what creates a
-   * Layout (ADR 0025), so requiring one here would withdraw authoring from the
-   * only surface that can produce it.
+   * Placement readiness is separate from Layout existence because the
+   * positioned strategy resolves asynchronously.
    */
   readonly enabled: boolean;
   readonly onSelectCard: (cardId: CardId) => void;
@@ -175,7 +173,7 @@ export function useEdgeAuthoring({
   selection,
   activeGraphId,
   graphs,
-  subjectCards,
+  placedCards,
   newCardTitle,
   enabled,
   onSelectCard,
@@ -528,8 +526,8 @@ export function useEdgeAuthoring({
   }, [focusRequest, authoring, focusTargetOf]);
 
   const cardTitles = useMemo(
-    () => new Map(subjectCards.map((card) => [card.id, card.title])),
-    [subjectCards],
+    () => new Map(placedCards.map((card) => [card.id, card.title])),
+    [placedCards],
   );
   const graphTitles = useMemo(
     () => new Map(graphs.map((graph) => [graph.id, graph.title])),
@@ -604,7 +602,7 @@ export function useEdgeAuthoring({
     // whose own `kind` would overwrite the proposal's and ask a different
     // question of eligibility entirely.
     ({ graphId, edge }: EdgeSubject, endpoint: EdgeEndpoint): CardChoice[] =>
-      subjectCards.map((card) =>
+      placedCards.map((card) =>
         cardChoiceOf(
           card,
           latest.current.authoring.eligibility({
@@ -616,7 +614,7 @@ export function useEdgeAuthoring({
           }),
         ),
       ),
-    [subjectCards],
+    [placedCards],
   );
 
   // **Every Edge surface is gated on `enabled`, not on the draft alone.** The

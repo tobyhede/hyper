@@ -439,7 +439,7 @@ const replaceStoredSpace = async (
 };
 
 const preservesAggregateBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
-  if (current.document.defaultRenderer !== next.document.defaultRenderer) return false;
+  if (current.document.defaultLayout !== next.document.defaultLayout) return false;
   if (
     JSON.stringify(current.document.layouts ?? []) !== JSON.stringify(next.document.layouts ?? [])
   ) {
@@ -453,7 +453,7 @@ const preservesAggregateBoundary = (current: SpaceSnapshot, next: SpaceSnapshot)
     if (card.document.kind !== 'space' || previous.document.kind !== 'space') return true;
     return (
       previous.document.spaceId === card.document.spaceId &&
-      previous.document.spaceView === card.document.spaceView &&
+      previous.document.layout === card.document.layout &&
       previous.document.graph === card.document.graph
     );
   });
