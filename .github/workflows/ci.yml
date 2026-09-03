@@ -44,19 +44,55 @@ jobs:
           do_not_skip: '["pull_request", "workflow_dispatch", "schedule", "merge_group"]'
           skip_after_successful_duplicate: 'true'
 
-  verify:
+  static-checks:
     needs: reuse-pr-ci
     # `reuse-pr-ci` is skipped on every pull request, and a skipped `needs`
     # skips its dependents unless the default `success()` is overridden — hence
     # a condition here at all. `!cancelled()` rather than `always()` because the
     # two differ in exactly one case and `cancel-in-progress` above makes that
     # case routine: under `always()` a superseded run cancels and then starts
-    # these jobs anyway, and the `ci` gate below reads four cancelled results
-    # and reports a red *CI passed*. The three jobs after this one carry the
+    # these jobs anyway, and the `ci` gate below reads five cancelled results
+    # and reports a red *CI passed*. The four jobs after this one carry the
     # same condition for the same reason.
     if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # `pnpm verify` is one serial chain of eight commands with very uneven
+    # costs, and with `e2e` sharded it is the whole of this workflow's wall
+    # clock. Measured on CI, where the chain takes 193s against 69s on a
+    # laptop — about 2.8x:
+    #
+    #     typecheck:toolchain   ~3s      lint             ~59s
+    #     typecheck             ~3s      lint:anti-slop    ~3s
+    #     typecheck:packages    ~6s      format:check     ~11s
+    #     ui:catalog:check      ~3s      test:coverage   ~106s
+    #
+    # Coverage is over half of it, which is the one place a split pays: the
+    # seven commands here are ~87s and `coverage` below is ~106s, and each job
+    # pays the ~28s of checkout and install the one job used to pay once — so
+    # ~116s and ~134s side by side rather than a single ~221s run. It also makes
+    # a red `tsc` and a red Vitest run two check names on a pull request rather
+    # than one, which is the reason the `ladle` job below gives for existing at
+    # all.
+    #
+    # **Two jobs and not three.** Splitting `lint` out as a third gives ~57s,
+    # ~87s and ~134s, so the cap is this file's `coverage` job either way: the
+    # third job lowers nothing and costs a third checkout, install and cache
+    # restore. That is the shape of every further split — the cap belongs to
+    # coverage until coverage itself gets cheaper.
+    #
+    # **The eight commands are listed in `package.json` and nowhere else.**
+    # This job runs `verify:static`, which is the first seven in order;
+    # `coverage` runs the eighth; and `pnpm verify` is defined as those two, so
+    # a developer's one command and CI's two cannot drift apart. That is also
+    # what keeps `typecheck:toolchain` first — it sits at the head of
+    # `verify:static`, because a typecheck against the wrong compiler still
+    # passes and proving which `tsc` ran has to happen before trusting what it
+    # said — and what keeps `--prune-suppressions` on the `lint` this job runs.
+    #
+    # `contract:check` is not part of `verify` and rides here rather than in
+    # `coverage` because it is another static check of the tree; running it in
+    # both would pay for it twice to learn the same thing.
     steps:
       # Every action is pinned to the commit its tag named when it was added or
       # last bumped, because a tag can be repointed at new code and a SHA
@@ -89,7 +125,39 @@ jobs:
       # rather than documentation.
       - run: pnpm install --frozen-lockfile
       - run: pnpm contract:check
-      - run: pnpm verify
+      - run: pnpm verify:static
+
+  coverage:
+    needs: reuse-pr-ci
+    if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The eighth command of `pnpm verify`, and the whole of this job. Read
+    # `static-checks` above for the split, the measured costs behind it, and
+    # why it is two jobs and not three. `test:coverage` is ~106s of the chain's
+    # 193s, so this job — not that one, and no further split of it — is the
+    # ~134s wall-clock cap the `e2e` shard arithmetic below is measured against.
+    #
+    # It shares `static-checks`' pnpm cache deliberately, and the key is the one
+    # `setup-node`'s `cache: pnpm` derives from the lockfile: same runner image,
+    # same `/home/runner/…` store path, same lockfile hash, so the two archives
+    # would be byte-identical and a second key would buy a second copy of the
+    # same bytes against the repository's 10 GB limit. `postgres` below already
+    # shares it for that reason. On a cold run whichever job saves second logs a
+    # 409 and skips the upload rather than spending it. This is the opposite
+    # call from the two `container:` jobs further down, and only because they
+    # resolve their store under `/github/home/…` and so cannot restore this
+    # archive into a path they read.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:coverage
 
   postgres:
     needs: reuse-pr-ci
@@ -249,10 +317,10 @@ jobs:
       # stays paired with `@playwright/test`. `setup-node` has no `cache: pnpm`
       # because that would key a store resolved
       # under the container's `HOME` — `/github/home`, which Actions mounts and
-      # sets for every `container:` job — against the key `verify` uses for
-      # `/home/runner/…`, restoring each job's archive into the other's wrong
-      # path. pnpm is the one thing the image lacks, so `action-setup` stays and
-      # the store is cached below under a key that cannot collide.
+      # sets for every `container:` job — against the key the non-container jobs
+      # use for `/home/runner/…`, restoring each job's archive into the other's
+      # wrong path. pnpm is the one thing the image lacks, so `action-setup`
+      # stays and the store is cached below under a key that cannot collide.
       #
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -272,9 +340,10 @@ jobs:
       # on the critical path of the job whose entire purpose is wall clock. The
       # 409 is louder than the one `ladle` weighed — two per cold run rather
       # than one — and no less benign, and it happens only when
-      # `pnpm-lock.yaml` moves. Sharing `verify`'s key remains off the table for
-      # the reason `ladle`'s comment gives: it resolves its store under
-      # `/home/runner/…` and every `container:` job under `/github/home/…`.
+      # `pnpm-lock.yaml` moves. Sharing the non-container jobs' key remains off
+      # the table for the reason `ladle`'s comment gives: they resolve their
+      # store under `/home/runner/…` and every `container:` job under
+      # `/github/home/…`.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -311,14 +380,14 @@ jobs:
     # acceptance evidence. Until this job existed nothing but a developer's
     # memory executed `pnpm e2e:ladle`, so the evidence accumulated ungated.
     #
-    # It is its own job rather than a step in `verify` because `verify` —
-    # typecheck:toolchain, typecheck, typecheck:packages, ui:catalog:check,
-    # lint, lint:anti-slop, format:check, test:coverage — has never needed a
-    # browser binary, runs on a plain
-    # `ubuntu-latest`, and is the loop developers run constantly. Two commands,
-    # two jobs. It is its own job rather than a second command in `e2e` because
-    # a red catalogue and a red application are different diagnoses, and the
-    # check name on a pull request should say which one failed.
+    # It is its own job rather than a step in the `verify` chain because that
+    # chain — the `static-checks` and `coverage` jobs above, which between them
+    # are exactly `pnpm verify` — has never needed a browser binary, runs on a
+    # plain `ubuntu-latest`, and is the loop developers run constantly. A
+    # different command earns a different job. It is its own job rather than a
+    # second command in `e2e` because a red catalogue and a red application are
+    # different diagnoses, and the check name on a pull request should say
+    # which one failed.
     #
     # Every environment decision below is the `e2e` job's above, made for the
     # reasons its comments give and not repeated here: the same image pinned by
@@ -348,9 +417,9 @@ jobs:
       # store, both try to save it, and the loser logs a 409 — benign and noisy
       # on exactly the runs a reader is already reading the log. A second copy
       # against the repository's 10 GB cache limit is the cheaper of the two.
-      # Sharing `verify`'s key is not on the table: it resolves its store under
-      # `/home/runner/…`, so each job would restore the other's archive into a
-      # path it never reads.
+      # Sharing the non-container jobs' key is not on the table: they resolve
+      # their store under `/home/runner/…`, so each job would restore the
+      # other's archive into a path it never reads.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -376,7 +445,7 @@ jobs:
 
   ci:
     name: CI passed
-    needs: [reuse-pr-ci, verify, postgres, e2e, ladle]
+    needs: [reuse-pr-ci, static-checks, coverage, postgres, e2e, ladle]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -389,10 +458,17 @@ jobs:
       # `failure` rather than a failure beside two cancellations, which matters
       # because `!cancelled()` above is about *this run* being superseded by
       # `cancel-in-progress`, not about a leg being abandoned mid-matrix.
+      #
+      # `static-checks` and `coverage` are two entries and not one for the same
+      # reason they are two jobs: `pnpm verify` is required in full, so the gate
+      # names both halves and a red half fails it exactly as the one `verify`
+      # job did. Nothing here reads the two together — the halves are
+      # independent, and a green one beside a red one is still a red gate.
       - name: Require reused or successful CI
         env:
           REUSED: ${{ needs.reuse-pr-ci.outputs.should_skip }}
-          VERIFY: ${{ needs.verify.result }}
+          STATIC_CHECKS: ${{ needs.static-checks.result }}
+          COVERAGE: ${{ needs.coverage.result }}
           POSTGRES: ${{ needs.postgres.result }}
           E2E: ${{ needs.e2e.result }}
           LADLE: ${{ needs.ladle.result }}
@@ -402,7 +478,7 @@ jobs:
             exit 0
           fi
 
-          for result in "$VERIFY" "$POSTGRES" "$E2E" "$LADLE"; do
+          for result in "$STATIC_CHECKS" "$COVERAGE" "$POSTGRES" "$E2E" "$LADLE"; do
             if [ "$result" != "success" ]; then
               echo "A required CI job did not succeed: $result"
               exit 1

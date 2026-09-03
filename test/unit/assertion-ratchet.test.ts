@@ -72,6 +72,24 @@ const script = (name: string): string => {
   return found;
 };
 
+/**
+ * The commands one script runs, with any `pnpm <script>` step replaced by the
+ * steps that script itself runs. `verify` is composed rather than flat — CI runs
+ * its halves as two jobs — so reading its literal text would answer `pnpm
+ * verify:static` and miss the `lint` the ratchet depends on.
+ */
+const chain = (name: string): readonly string[] =>
+  script(name)
+    .split(' && ')
+    .flatMap((step) => {
+      const nested = /^pnpm ([\w:-]+)$/.exec(step)?.[1];
+      // Only a step naming another *chain* is expanded. `pnpm lint` names a
+      // single command and stays the step it is, which is what the callers
+      // below assert on.
+      if (nested === undefined || nested === name) return [step];
+      return script(nested).includes(' && ') ? chain(nested) : [step];
+    });
+
 /** How the rule is set for one file, once ESLint has resolved every override. */
 type Severity = 'unconfigured' | 'off' | 'warn' | 'error';
 
@@ -166,7 +184,7 @@ describe('the suppressions baseline', () => {
   it('is pruned by the lint verify runs, so a removed assertion lowers the ceiling', () => {
     // Without this the file goes stale and the ratchet stops being one.
     expect(script('lint')).toContain('--prune-suppressions');
-    expect(script('verify').split(' && ')).toContain('pnpm lint');
+    expect(chain('verify')).toContain('pnpm lint');
   });
 
   it('still runs under --max-warnings=0, which a suppressed finding must not evade', () => {
