@@ -389,6 +389,78 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
+  /*
+   * A truncating import that cannot replace the aggregate must fail, not become
+   * an insert.
+   *
+   * `replaceAggregate` reads every revision without a lock, then locks each row
+   * and reads it again. An authored update that commits in between moves the
+   * revision and rolls the replacement back as a `conflict` -- and an ordinary
+   * update reaches this, because `commitTopologyPreservingUpdate` holds no Meta
+   * lock and so runs while the replacement holds one. The blocking transaction
+   * below stands in for that update, and holds the row lock so the replacement
+   * has to read its baseline first.
+   *
+   * `importSpaces` used to let that `conflict` fall out of its truncate branch
+   * into the insert path below it. The batch was then written beside the data
+   * the truncate was to remove, and answered `imported`: the CLI printed
+   * `Imported space <id> at revision 0` for a truncate that never happened.
+   */
+  it('fails a truncating import that cannot replace the aggregate, storing none of it', async () => {
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
+
+    const updateApplied = Promise.withResolvers<undefined>();
+    const releaseCommit = Promise.withResolvers<undefined>();
+    const committing = db.transaction(async ({ orm }) => {
+      await orm.public.Space.where({ id: SPACE_ID }).update({
+        document: { version: 1, title: 'Authored winner' },
+        revision: 1,
+      });
+      updateApplied.resolve(undefined);
+      await releaseCommit.promise;
+    });
+    await updateApplied.promise;
+
+    const importing = repository.importSpaces(
+      [
+        {
+          id: CONCURRENT_SPACE_ID,
+          document: { version: 1, title: 'Truncating import' },
+          cards: [
+            {
+              id: CONCURRENT_CARD_ID,
+              document: { title: 'Imported card', kind: 'markdown', body: 'Imported.' },
+            },
+          ],
+        },
+      ],
+      'truncate',
+    );
+    // Settled only once the authored update releases the row: the replacement
+    // reads its baseline before that and then waits for the lock.
+    let settled = false;
+    void importing.then(
+      () => (settled = true),
+      () => (settled = true),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(settled).toBe(false);
+
+    releaseCommit.resolve(undefined);
+    await committing;
+
+    await expect(importing).rejects.toThrow(
+      'Truncating import could not replace the aggregate: conflict',
+    );
+    // The rollback left the store as the authored update wrote it, and the
+    // batch is nowhere: neither replacing it nor added beside it.
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: SPACE_ID, title: 'Authored winner' },
+    ]);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({ revision: 1n });
+    await expect(repository.loadSpace(CONCURRENT_SPACE_ID)).resolves.toBeUndefined();
+  });
+
   it('persists first-working-load initialization for a fresh repository host', async () => {
     const imported = await repository.importSpaces([snapshot]);
     trackImported(imported);
