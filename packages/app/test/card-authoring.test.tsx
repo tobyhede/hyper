@@ -190,6 +190,40 @@ describe('authoring a Card title on the graph', () => {
     await settled(session);
   });
 
+  /**
+   * A refused title draft has nowhere to go but the editor still holding it.
+   *
+   * Add Layout selects the empty Layout it creates, so the canvas re-derives
+   * with no nodes at all and the edited Card unmounts — taking the draft text,
+   * the announced reason and the caret with it, with neither of the Title's own
+   * exits spent. A *valid* draft is safe without this gate, because the
+   * button's own mousedown blurs the input and a valid blur completes the Title
+   * (ADR 0065); a refused one is re-focused instead and the click lands anyway.
+   */
+  it('withdraws Add Layout while a Card title editor holds a refused draft', async () => {
+    const session = mount();
+    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
+    await waitFor(() => expect(createLayout).toBeEnabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+
+    expect(createLayout).toBeDisabled();
+
+    // And the draft survives the attempt, which is what the gate is for.
+    fireEvent.click(createLayout);
+    expect(session.getState().working.document.layouts).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    await settled(session);
+  });
+
   it('stores a title without the whitespace surrounding it', async () => {
     const session = mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));

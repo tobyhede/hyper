@@ -929,7 +929,23 @@ export const createApp = (
           hidden: current.kind === 'computed',
         }}
         createLayout={{
-          disabled: presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
+          // Reads `editingCardTitle` for the reason `layoutActions` does, and
+          // for one more that is this control's own. Creating a Layout selects
+          // it, and the created Layout is empty — so the canvas re-derives with
+          // no nodes and a Card mid-rename unmounts, taking the draft, the
+          // reason it was refused and the caret with it. A valid draft would
+          // have been committed by the blur this button's own mousedown causes
+          // (ADR 0065), which is precisely why a refused one is the case worth
+          // withdrawing for: it is re-focused rather than settled, and nothing
+          // else stands between the click and the Card that holds it. Add Card
+          // above omits the same condition deliberately — it *begins* a title
+          // edit rather than outliving one.
+          disabled:
+            presenting ||
+            creatingAlias ||
+            editingCardBody ||
+            editingCardTitle ||
+            spaceChromeEdit !== null,
           refusal: createLayoutRefusal ?? layoutManagementRefusal,
           onCreate: () => {
             const result = authoring.complete({ kind: 'created-layout' });
