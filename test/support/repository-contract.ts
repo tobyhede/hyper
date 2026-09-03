@@ -307,13 +307,26 @@ export const spaceRepositoryContract = (
         repository.replaceAggregate({ metaSpaceId: MISSING_SPACE_ID, spaces: [second] }, SPACE_ID),
       ]);
       expect(results.map(({ kind }) => kind)).toEqual(['replaced', 'replaced']);
-      await expect(repository.loadAggregate()).resolves.toEqual({
-        kind: 'loaded',
-        aggregate: {
-          metaSpaceId: MISSING_SPACE_ID,
-          spaces: [stored(second, 0n, null)],
+      /*
+       * Both proposals read the identity they are authorized against before
+       * either write lands, so both replace and the later write is the one that
+       * survives. Which of the two writes later is not the call order: the
+       * memory adapter defers its write to a microtask and PostgreSQL grants
+       * the Meta row lock in whatever order it grants it. What is owed is that
+       * the store holds one proposal whole -- its Meta identity and its Space
+       * from the same replacement, never a mixture of the two.
+       */
+      const loaded = await repository.loadAggregate();
+      expect([
+        {
+          kind: 'loaded',
+          aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(first, 0n, null)] },
         },
-      });
+        {
+          kind: 'loaded',
+          aggregate: { metaSpaceId: MISSING_SPACE_ID, spaces: [stored(second, 0n, null)] },
+        },
+      ]).toContainEqual(loaded);
     });
   });
 
