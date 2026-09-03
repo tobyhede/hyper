@@ -1,6 +1,6 @@
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { describe, expect, it } from 'vitest';
-import { loadSpaceAggregate } from '../src/index';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import { loadSpaceAggregate, type SpaceAggregateError } from '../src/index';
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 const META = uuid('00000000-0000-4000-8000-000000000101');
@@ -233,6 +233,16 @@ describe('loadSpaceAggregate', () => {
         layoutId: OTHER,
       },
     ]);
+  });
+
+  it('cannot report a missing Layout without naming the Layout it looked for', () => {
+    type LayoutMissing = Extract<
+      SpaceAggregateError,
+      { readonly kind: 'space-card-layout-missing' }
+    >;
+    // The only producer resolves `card.layout ?? target.defaultLayout` and
+    // continues when that is absent, so the refusal always names a Layout.
+    expectTypeOf<LayoutMissing['layoutId']>().toEqualTypeOf<UUID>();
   });
 
   it('locates an explicit Graph that the target does not hold', () => {

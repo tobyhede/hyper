@@ -45,7 +45,7 @@ export type SpaceAggregateError =
   | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: UUID }
   | ({
       readonly kind: 'space-card-layout-missing';
-      readonly layoutId: UUID | undefined;
+      readonly layoutId: UUID;
     } & SpaceCardLocation)
   | ({ readonly kind: 'space-card-graph-missing'; readonly graphId: UUID } & SpaceCardLocation)
   | ({

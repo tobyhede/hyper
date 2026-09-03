@@ -483,7 +483,7 @@ export interface CommitRefusalBody {
         readonly spaceId: string;
         readonly cardId: string;
         readonly targetSpaceId: string;
-        readonly layoutId: string | undefined;
+        readonly layoutId: string;
       }
     | {
         readonly kind: 'space-card-graph-missing';

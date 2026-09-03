@@ -1,5 +1,5 @@
 import fc from 'fast-check';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { LoadedSpace } from '../src/backend';
@@ -23,7 +23,7 @@ import {
   problemCatalogue,
   problemCodeForType,
 } from '../src/http-protocol';
-import type { HyperProblemCode, HyperProblemType } from '../src/http-protocol';
+import type { CommitRefusalBody, HyperProblemCode, HyperProblemType } from '../src/http-protocol';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -225,6 +225,16 @@ describe('aggregate wire protocol', () => {
     const refusal = { kind: 'aggregate-refused' as const, errors };
 
     expect(decodeCommitRefusal(encodeCommitRefusal(refusal))).toEqual(refusal);
+  });
+
+  it('declares the Space Card Layout refusal the way its decoder reads it', () => {
+    type WireLayoutMissing = Extract<
+      CommitRefusalBody['errors'][number],
+      { readonly kind: 'space-card-layout-missing' }
+    >;
+    // `decodeCommitRefusal` reads this key with `requiredUuid`, so a body
+    // omitting it is refused rather than decoded.
+    expectTypeOf<WireLayoutMissing['layoutId']>().toEqualTypeOf<string>();
   });
 
   it('rejects unknown aggregate refusal identities and fields', () => {
