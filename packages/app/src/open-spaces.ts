@@ -136,7 +136,14 @@ export function createOpenSpaces({
   const followActiveSpace = (): void => {
     const { activeSpaceId, entries } = observable.getState();
     const active = entries.find(({ id }) => id === activeSpaceId);
-    if (active === undefined || active.app === followed) return;
+    // Closing the last Space leaves nothing on the canvas, and holding the
+    // composition it disposed would keep the whole graph behind that entry
+    // alive and claim a Space is followed that is not.
+    if (active === undefined) {
+      followed = null;
+      return;
+    }
+    if (active.app === followed) return;
     followed = active.app;
     browserLocation.follow(active.app);
   };

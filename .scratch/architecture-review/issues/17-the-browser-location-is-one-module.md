@@ -342,7 +342,10 @@ choice call site with `arriveAt`.
 
 - **The chrome title Edit draft.** `setSpaceChromeEdit(null)` stays a call-site
   act in App. Giving that Interaction draft its own module is the 2026-09-04
-  review's candidate "useSpaceChromeTitleEdit" and wants its own ticket.
+  review's candidate "useSpaceChromeTitleEdit", and it now has its own ticket:
+  `architecture-review/18`, which also carries the deliberate behaviour loss
+  recorded above — `titleEdit.onBegin`'s clear of the destination report — as a
+  decision to take rather than a debt to repay.
 - **The clipboard.** `copyLink` and `clipboardFailure` stay in App. This module
   answers `href(destination)` and nothing about copying.
 - **The disablement matrix, the authorable-selection answer and the resize
