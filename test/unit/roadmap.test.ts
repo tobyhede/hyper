@@ -180,6 +180,55 @@ describe('blockers', () => {
     expect(issue?.unmetBlockers).toEqual([]);
   });
 
+  it('reads the references on a wrapped blocker paragraph', () => {
+    const root = scratch();
+    write(root, 'other/issues/05-a.md', 'Status: ready-for-agent\n');
+    write(root, 'other/issues/06-b.md', 'Status: ready-for-agent\n');
+    write(
+      root,
+      'effort/issues/01-a.md',
+      '**Blocked by:** `other/05` \u2014 Author a reference;\n`other/06` \u2014 Extend the fixture.\n\n**Status:** ready-for-agent\n',
+    );
+
+    const blocked = featureNamed(buildRoadmap(root), 'effort').issues[0];
+
+    expect(blocked?.unmetBlockers).toEqual(['other/05', 'other/06']);
+  });
+
+  it('stops the blocker paragraph at the next field rather than reading its references', () => {
+    const root = scratch();
+    write(root, 'other/issues/05-a.md', 'Status: ready-for-agent\n');
+    write(root, 'other/issues/09-c.md', 'Status: ready-for-agent\n');
+    write(
+      root,
+      'effort/issues/01-a.md',
+      'Status: ready-for-agent\nBlocked by: `other/05`\nRelated: `other/09`\n',
+    );
+
+    const blocked = featureNamed(buildRoadmap(root), 'effort').issues[0];
+
+    expect(blocked?.unmetBlockers).toEqual(['other/05']);
+  });
+
+  it('stops the blocker paragraph at a nested heading rather than reading its references', () => {
+    const root = scratch();
+    write(root, 'other/issues/05-a.md', 'Status: ready-for-agent\n');
+    write(
+      root,
+      'effort/issues/01-a.md',
+      'Status: ready-for-agent\nBlocked by: `other/05`\n## 07 \u2014 Follow-up\n',
+    );
+    write(
+      root,
+      'effort/issues/02-b.md',
+      'Status: ready-for-agent\nBlocked by: `other/05`\n###### 08 \u2014 Footnote\n',
+    );
+
+    const issues = featureNamed(buildRoadmap(root), 'effort').issues;
+
+    expect(issues.map((issue) => issue.unmetBlockers)).toEqual([['other/05'], ['other/05']]);
+  });
+
   it('treats a declared absence of blockers as unblocked', () => {
     const root = scratch();
     write(root, 'effort/issues/01-a.md', 'Status: ready-for-agent\n**Blocked by:** None.\n');

@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 02
+Blocked by: none
 
 **What to build:** Remove Computed Views and Space Views from the complete V1
 product contract so every selectable and addressable canvas context is an
@@ -15,9 +15,12 @@ compatibility intake.
       code or generated state. Add Layout and its control remain: they author an
       empty Layout rather than converting one.
 - [ ] `defaultLayout` replaces `defaultRenderer` across schemas, snapshots, HTTP,
-      repositories, authoring, navigation, fixtures, seeds, stories and tests;
-      the retired spelling receives no transitional reader, and ordinary schema
-      rejection is what a document still carrying it meets.
+      repositories, authoring, navigation, fixtures, seeds, stories and tests,
+      and at the two write sites those categories miss:
+      `writeReleaseSpace` in `scripts/roadmap.ts`, which writes the field into
+      the generated roadmap Space, and `src/export/export-space.ts:107` and
+      `:109`, which write it from the CLI exporter. The retired spelling receives no transitional reader, and
+      ordinary schema rejection is what a document still carrying it meets.
 - [ ] Layout URLs remain durable; URLs for removed Computed View identities use
       the ordinary not-found behavior, while malformed destinations retain the
       existing bad-request behavior.

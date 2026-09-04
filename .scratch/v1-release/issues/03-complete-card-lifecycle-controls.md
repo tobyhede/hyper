@@ -16,5 +16,7 @@ semantics; this ticket composes them and does not implement them again.
 - [ ] Rename edits the Card's own Title for every kind.
 - [ ] Delete distinguishes whole-Space deletion from Remove from Layout and confirms
       every cascade before completing one Edit.
-- [ ] The complete workflow works on desktop and narrow screens with keyboard and
-      pointer input.
+- [ ] The Card lifecycle controls this ticket owns — kind selection, rename and
+      the delete confirmations — work on desktop and narrow screens with keyboard
+      and pointer input. The complete V1 workflow across every command surface is
+      `v1-release/06`'s, and it is blocked by this ticket.

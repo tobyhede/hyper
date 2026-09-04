@@ -106,6 +106,20 @@ const NUMBERED_TITLE_PATTERN = /^\d{2}[ \t]*[—–-][ \t]*/u;
 const FILE_NUMBER_PATTERN = /^(\d{2})-/u;
 const NO_BLOCKERS_PATTERN = /^(none|nothing|n\/a)\b/iu;
 /**
+ * A blocker list is a wrapped paragraph, so the references after the first line
+ * break belong to it. It ends at a blank line, a heading, or the next `Label:`
+ * field — the adjacent `Assignee:`, `Related:` and `Superseded by:` lines that
+ * some tickets write without a blank line between, whose references are not
+ * blockers.
+ */
+const FIELD_PATTERN = /^\*{0,2}[a-z][a-z ]*:/iu;
+/**
+ * `HEADING_PATTERN` reads a ticket's own `#` title, so it deliberately matches one
+ * hash. A blocker paragraph ends at a heading of any level, and a nested one whose
+ * text carries a two-digit number would otherwise be read as a blocker reference.
+ */
+const ANY_HEADING_PATTERN = /^#{1,6}[ \t]+/u;
+/**
  * A blocked-by line carries prose alongside its references, and that prose cites
  * ADR and PR numbers. Requiring no adjacent digit and no leading `#` keeps `0052`
  * and `#83` out while still reading `03` and `space-authoring/05`.
@@ -177,10 +191,16 @@ const readTitle = (lines: readonly string[], fallback: string): string => {
 };
 
 const readBlockers = (lines: readonly string[]): readonly BlockerReference[] => {
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     const matched = BLOCKED_PATTERN.exec(line);
     if (matched === null) continue;
-    const value = matched[1] ?? '';
+    const paragraph = [matched[1] ?? ''];
+    for (const continuation of lines.slice(index + 1)) {
+      if (continuation.trim() === '') break;
+      if (ANY_HEADING_PATTERN.test(continuation) || FIELD_PATTERN.test(continuation)) break;
+      paragraph.push(continuation);
+    }
+    const value = paragraph.join(' ');
     if (NO_BLOCKERS_PATTERN.test(value.trim())) return [];
     const references: BlockerReference[] = [];
     for (const reference of value.matchAll(REFERENCE_PATTERN)) {

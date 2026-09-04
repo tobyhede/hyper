@@ -2,19 +2,20 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01, 02, 03, 05, 06, 08, 16, 17, 18, 19, 20; `alias-cards/06`; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`; `architecture-review/14`
+Blocked by: 01, 03, 05, 06, 08, 16, 17, 19; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`; `architecture-review/14`
 
 **What to build:** Close every V1 Definition of Done line with executable evidence
 or an explicit deferred-scope link and apply ticket 14's complete, commit-specific
 `v1.0.0` release gate. This ticket does not define or rename the earlier untagged
 End-to-end checkpoint.
 
-[V1/20](20-land-and-reconcile-layout-only-v1.md) is the one durable Layout-only
-prerequisite this ticket names. The `layout-only-v1` implementation tickets reach
-it through [V1/08](08-round-trip-multi-space-import-and-export.md) and are not
-enumerated here. No proof-matrix row may claim, waive or defer a Computed View or
-Space View behaviour; ADR 0079 retired it, so the Definition of Done is corrected
-instead.
+The one durable Layout-only prerequisite is settled:
+[V1/20](20-land-and-reconcile-layout-only-v1.md) is resolved, so this ticket no
+longer names it as a blocker. The `layout-only-v1` implementation tickets reach
+this ticket through [V1/08](08-round-trip-multi-space-import-and-export.md) and
+are not enumerated here. No proof-matrix row may claim, waive or defer a Computed
+View or Space View behaviour; ADR 0079 retired it, so the Definition of Done is
+corrected instead.
 
 - [ ] No known defect blocks creating, editing, saving, reopening, importing,
       exporting or presenting the V1 authored aggregate.

@@ -2,17 +2,18 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01, 02, 03, 08, 16, 17, 18, 20; `alias-cards/06`; `entity-url-addressability/08`; `space-cards/10`; `architecture-review/13`; `architecture-review/14`
+Blocked by: 01, 03, 08, 16, 17; `entity-url-addressability/08`; `space-cards/10`; `architecture-review/14`
 
 **What to build:** Complete the untagged End-to-end checkpoint with one recorded
 technical-author rehearsal from a clean clone and a compact proof matrix linking
 every checkpoint claim to its executable or observed proof.
 
-[V1/20](20-land-and-reconcile-layout-only-v1.md) is the one durable Layout-only
-prerequisite this ticket names; the `layout-only-v1` implementation tickets reach
-it through [V1/08](08-round-trip-multi-space-import-and-export.md). The rehearsal
-exercises Add Layout and first-load initialization, never a Computed View, and
-includes presenting from the Active Graph of an initialized Space.
+The one durable Layout-only prerequisite is settled:
+[V1/20](20-land-and-reconcile-layout-only-v1.md) is resolved, so this ticket no
+longer names it as a blocker; the `layout-only-v1` implementation tickets reach
+this ticket through [V1/08](08-round-trip-multi-space-import-and-export.md). The
+rehearsal exercises Add Layout and first-load initialization, never a Computed
+View, and includes presenting from the Active Graph of an initialized Space.
 
 - [ ] Document the supported Node/pnpm, Docker PostgreSQL and desktop Chromium
       setup path for macOS or Linux without assuming an existing checkout state.

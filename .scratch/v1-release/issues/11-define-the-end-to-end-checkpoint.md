@@ -84,10 +84,10 @@ authoring the journey is understandable.
   tracked, and the Definition of Done and the affected Layout, Space Card and URL
   tickets are reconciled. The checkpoint exercises Add Layout and first-load
   initialization rather than the superseded conversion path.
-- Resolve architecture issues 12, 13 and 14 before their dependent feature work
-  begins. Each must either own the shared Meta lifecycle, aggregate-commit or
-  Open Spaces seam and become an explicit blocker, or close as advice. Parallel
-  tickets must not build competing seams.
+- Resolve architecture issue 14 before its dependent feature work begins. It
+  must either own the shared Open Spaces seam and become an explicit blocker, or
+  close as advice; parallel tickets must not build a competing seam. Issues 12
+  and 13 are resolved and gate nothing.
 - Ticket 19 owns the clean-clone setup and rehearsal work package, including
   defects found while following the supported setup.
 - Make `space-cards/10` an explicit checkpoint dependency.

@@ -12,15 +12,16 @@ a Space Card reference; `space-cards/01` — Open and edit a Space Card in place
 **Status:** ready-for-agent
 Tags: release/v1
 
-- [ ] Opening shows the Space Card's authored selection without changing the
-      target Space's own active selections.
+- [ ] Opening in place draws the target through the context the Card supplies and
+      leaves the target Space's own active selections untouched.
 - [ ] Enter shows the target as the Space being worked in, with its complete
       command surface and editing capabilities.
 - [ ] Enter loads the target from repository state already accepted by complete
       aggregate intake. Navigation performs no second cycle check and does not
       carry an ancestor chain as an integrity mechanism.
-- [ ] Enter starts from the Space Card's Layout and Graph selections.
-      Navigation while entered authors neither the Card nor target Space.
+- [ ] Enter resolves the stored context `layout-only-v1/04` owns rather than
+      restating it here; this ticket owns the Enter surface, not the selection
+      or its write-back rule.
 - [ ] Entering an already-open Space reuses its live context. An author can move
       among open Spaces without losing work, close an ordinary context
       explicitly, and never close the Meta Space.
