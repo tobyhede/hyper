@@ -52,6 +52,23 @@ export interface EntityAction {
    * seen rather than happening behind a menu that has already gone.
    */
   readonly confirmation?: string | undefined;
+  /**
+   * The glyph drawn in the item's leading column — `<CopyIcon />` for an
+   * address, `<EditIcon />` for a rename.
+   *
+   * Optional, and the column it sits in belongs to the **menu** rather than to
+   * the item: as soon as one command in a menu carries an icon, every other
+   * command reserves the same width, so a group of labels stays a column
+   * instead of stepping in and out as commands are withheld.
+   */
+  readonly icon?: ReactNode;
+  /**
+   * `destructive` for a command that removes something, drawn in the
+   * primitive's own destructive item treatment rather than a local one — both
+   * `DropdownMenuItem` and `ContextMenuItem` already carry that variant, so the
+   * two paths get the same red by construction.
+   */
+  readonly variant?: 'default' | 'destructive' | undefined;
   readonly onSelect: () => void;
 }
 
@@ -65,8 +82,17 @@ export interface EntityAction {
  */
 export type EntityActionGroup = readonly EntityAction[];
 
-/** How wide either menu draws, so the two are the same menu in both senses. */
-const MENU_WIDTH = 'w-72';
+/**
+ * How wide either menu draws, so the two are the same menu in both senses.
+ *
+ * `w-80` rather than the `w-72` this started at: the leading icon column and
+ * its gap take a little over 20px off the text, and at `w-72` the longest
+ * destination sentence a Card or Graph produces — "Always opens <title> on its
+ * own, wherever it is placed" — went from two lines to three. The extra 32px
+ * buys that line back without the popup reaching across the Sidebar it opens
+ * against.
+ */
+const MENU_WIDTH = 'w-80';
 
 /**
  * The confirmation an item shows in place of its label, and the announcement
@@ -130,6 +156,11 @@ function EntityActionItems({
   const Item = as === 'context-menu' ? ContextMenuItem : DropdownMenuItem;
   const Separator = as === 'context-menu' ? ContextMenuSeparator : DropdownMenuSeparator;
   const drawn = groups.filter((group) => group.length > 0);
+  // One decision for the whole menu, not per item: a menu with any icon in it
+  // reserves the column on every item, so the labels of the commands that have
+  // no glyph line up with the ones that do rather than sitting 22px to their
+  // left.
+  const iconColumn = drawn.some((group) => group.some((action) => action.icon !== undefined));
   return (
     <>
       {drawn.map((group, index) => (
@@ -141,9 +172,26 @@ function EntityActionItems({
               // Held open only while there is a swap to see. A command with no
               // confirmation closes the menu the way every menu item does.
               closeOnClick={action.confirmation === undefined}
+              variant={action.variant ?? 'default'}
+              // `items-start`, because an item is two lines whenever it carries
+              // a destination sentence and the primitive's own `items-center`
+              // would then hang the glyph between them. The column below is
+              // `h-5` — the `text-sm` line box — so the glyph centres on the
+              // label's line whether or not a second line follows it.
+              className="items-start"
               onClick={() => fire(action)}
             >
-              <span className="flex flex-col gap-0.5">
+              {/* `w-4` fixed rather than content-sized, so an item with no
+                  glyph still spends the column and the labels stay a column. */}
+              {iconColumn && (
+                <span
+                  aria-hidden="true"
+                  className="flex h-5 w-4 shrink-0 items-center justify-center"
+                >
+                  {action.icon}
+                </span>
+              )}
+              <span className="flex min-w-0 flex-col gap-0.5">
                 <span>{action.id === confirmedId ? action.confirmation : action.label}</span>
                 {action.description !== undefined && (
                   <span className="text-xs text-muted-foreground">{action.description}</span>
@@ -179,6 +227,17 @@ export interface EntityActionsTriggerProps {
    * the treatment of the cluster it sits in rather than importing a second one.
    */
   readonly render?: TriggerRender;
+  /**
+   * The glyph the trigger draws, because what reads as "the actions" depends on
+   * what the trigger sits beside rather than on this component.
+   *
+   * A Sidebar row stands alone and passes `<EntityActionsIcon />`, the
+   * conventional "more" glyph. A Card rail sits in a cluster where every other
+   * control names its own command, and keeps `LinkActionsIcon` — which is the
+   * default here for exactly one reason: the rail is the only caller that does
+   * not pass this, so leaving the default alone is what leaves the rail alone.
+   */
+  readonly icon?: ReactNode;
   readonly className?: string;
 }
 
@@ -194,6 +253,7 @@ export function EntityActionsTrigger({
   groups,
   label,
   render,
+  icon = <LinkActionsIcon />,
   className,
 }: EntityActionsTriggerProps) {
   const { confirmedId, fire, announcement } = useConfirmation();
@@ -208,7 +268,7 @@ export function EntityActionsTrigger({
           className={className}
           data-slot="entity-actions-trigger"
         >
-          <LinkActionsIcon />
+          {icon}
         </DropdownMenuTrigger>
         {/* `align="end"` keeps the popup under the trailing icon rather than
             running off the edge that icon already sits against. The width

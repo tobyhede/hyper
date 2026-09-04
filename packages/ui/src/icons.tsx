@@ -2,7 +2,9 @@ import {
   Check,
   ChevronDown,
   CircleAlert,
+  Copy,
   CornerDownRight,
+  Ellipsis,
   FileText,
   Link,
   Maximize,
@@ -17,6 +19,7 @@ import {
   Search,
   Square,
   SquareSquare,
+  Trash2,
   X,
 } from 'lucide-react';
 import type { ComponentProps } from 'react';
@@ -102,13 +105,33 @@ export const AlertIcon = () => <CircleAlert />;
 export const CloseIcon = () => <X size={14} strokeWidth={3} />;
 
 /**
- * Open an entity's actions menu — the two link forms it can be reached by,
- * plus rename where the entity has one.
+ * Open an entity's actions menu, on a **Card rail**.
  *
- * A link glyph rather than the conventional kebab. Every other control on a
- * Card rail names its command (`EditIcon`, `OpenCardIcon`, `CloseCardIcon`), so
- * a generic "more" glyph beside them would be the one control saying nothing
- * about what it does — and what this menu is mostly for is the entity's
- * addresses (ADR 0069, ADR 0072).
+ * A link glyph rather than the conventional kebab, and that argument is the
+ * rail's alone: every other control there names its command (`EditIcon`,
+ * `OpenCardIcon`, `CloseCardIcon`), so a generic "more" glyph beside them would
+ * be the one control saying nothing about what it does.
+ *
+ * It is no longer the glyph the menu wears everywhere. The menu grew a rename
+ * and a delete beside its addresses, so a Sidebar row — which has no cluster of
+ * self-naming commands to sit in — draws `EntityActionsIcon` instead. Whether
+ * the rail follows is a rail decision, taken when `CardNode` first supplies the
+ * actions; until then this stays exactly what it draws today.
  */
 export const LinkActionsIcon = (props: CardActionIconProps) => <Link size={14} {...props} />;
+
+/**
+ * Open an entity's actions menu, where the menu is not mostly one thing.
+ *
+ * The conventional "more" glyph, and conventional is the whole argument: a
+ * Space title or a Sidebar row carries no other command to be generic beside,
+ * and the menu behind it holds a rename, two addresses and a delete. A glyph
+ * naming any one of those would name the wrong one.
+ */
+export const EntityActionsIcon = (props: CardActionIconProps) => <Ellipsis size={14} {...props} />;
+
+/** Put an address on the clipboard. */
+export const CopyIcon = (props: CardActionIconProps) => <Copy size={14} {...props} />;
+
+/** Remove the entity the surrounding command names. */
+export const DeleteIcon = (props: CardActionIconProps) => <Trash2 size={14} {...props} />;
