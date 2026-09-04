@@ -89,8 +89,16 @@ const frontOf = (
 
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 
-const searchableText = (card: Card, titleById: ReadonlyMap<CardId, string>): string =>
-  card.kind === 'alias' ? `${card.title} ${targetTitle(card, titleById)}` : card.title;
+/** The Card's own Title plus whatever second name its front draws, so search matches what the reader sees. */
+const searchableText = (
+  card: Card,
+  titleById: ReadonlyMap<CardId, string>,
+  spaceTitleById: ReadonlyMap<UUID, string>,
+): string => {
+  if (card.kind === 'alias') return `${card.title} ${targetTitle(card, titleById)}`;
+  if (card.kind === 'space') return `${card.title} ${spaceTitleById.get(card.spaceId) ?? ''}`;
+  return card.title;
+};
 
 const emptyMessage = (available: number, inSpace: number): string =>
   inSpace === 0
@@ -134,6 +142,7 @@ export function CardsDrawer({
     () => new Map(allCards.map((card) => [card.id, card.title])),
     [allCards],
   );
+  const spaceTitles = spaceTitleById ?? NO_SPACE_TITLES;
   const visible = useMemo(
     () =>
       cards
@@ -141,7 +150,7 @@ export function CardsDrawer({
         .filter(
           ({ card }) =>
             (kind === 'all' || card.kind === kind) &&
-            searchableText(card, titleById)
+            searchableText(card, titleById, spaceTitles)
               .toLocaleLowerCase()
               .includes(query.trim().toLocaleLowerCase()),
         )
@@ -150,7 +159,7 @@ export function CardsDrawer({
             left.card.title.localeCompare(right.card.title) || left.index - right.index,
         )
         .map(({ card }) => card),
-    [titleById, cards, kind, query],
+    [titleById, spaceTitles, cards, kind, query],
   );
 
   const beginDrag = (event: DragEvent<HTMLButtonElement>, cardId: CardId): void => {
@@ -284,7 +293,7 @@ export function CardsDrawer({
                       aria-label={`Add ${card.title} to Layout`}
                     >
                       <CanvasCard
-                        front={frontOf(card, titleById, spaceTitleById ?? NO_SPACE_TITLES)}
+                        front={frontOf(card, titleById, spaceTitles)}
                         title={card.title}
                         state="rest"
                         graphColor={FALLBACK_GRAPH_COLOR}

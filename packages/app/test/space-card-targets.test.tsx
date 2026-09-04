@@ -11,17 +11,31 @@ const TARGET_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003'
 const OTHER_SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const OTHER_TARGET_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const OTHER_TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
 const target: SpaceCardTarget = {
   id: TARGET_ID,
   title: 'Architecture',
-  layouts: [{ id: TARGET_LAYOUT_ID, title: 'Layout 1', graphs: [] }],
+  layouts: [
+    {
+      id: TARGET_LAYOUT_ID,
+      title: 'Layout 1',
+      graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1' }],
+    },
+  ],
 };
 
 const otherTarget: SpaceCardTarget = {
   id: OTHER_TARGET_ID,
   title: 'Roadmap',
-  layouts: [{ id: OTHER_TARGET_LAYOUT_ID, title: 'Layout 1', graphs: [] }],
+  layouts: [
+    {
+      id: OTHER_TARGET_LAYOUT_ID,
+      title: 'Layout 1',
+      graphs: [{ id: OTHER_TARGET_GRAPH_ID, title: 'Graph 1' }],
+    },
+  ],
 };
 
 /** The Cards a completed Edit hands the canvas: one Space Card, a fresh array. */
