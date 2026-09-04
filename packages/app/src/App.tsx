@@ -405,22 +405,23 @@ export const createApp = (
      * Whether a menu's Rename and Delete may be offered at all.
      *
      * Rename begins the very chrome title edit `chromeEditingDisabled`
-     * withdraws while a Card title editor owns the caret — and the effect above
-     * discards a draft begun against that condition on the same render. So the
-     * gate reads `editingCardTitle` too, and Delete Layout goes with it rather
-     * than standing alone in a menu whose other item cannot run.
+     * withdraws — the effect above discards a draft begun against that
+     * condition on the same render — so this reads that condition itself rather
+     * than a second spelling of it that can fall behind. It once was one, and
+     * what the copy dropped was `editable`: while placement is pending there is
+     * no projected canvas, so Rename opened an editor the effect closed on the
+     * same render and Delete Layout ran a real Edit against it. Delete Layout
+     * goes with Rename rather than standing alone in a menu whose other item
+     * cannot run.
+     *
+     * `spaceChromeEdit === null` is the term `chromeEditingDisabled` does not
+     * carry: it is what stops a second Rename beginning over a live one.
      *
      * The copy commands are deliberately **not** behind it: an address is a
      * fact about the entity rather than an Edit, and nothing about a live
      * rename or a presentation makes one uncopyable.
      */
-    const entityEditsAvailable = !(
-      presenting ||
-      creatingAlias ||
-      editingCardBody ||
-      editingCardTitle ||
-      spaceChromeEdit !== null
-    );
+    const entityEditsAvailable = !chromeEditingDisabled && spaceChromeEdit === null;
 
     const entityActions = spaceEntityActions({
       spaceId: renderedSpace.id,

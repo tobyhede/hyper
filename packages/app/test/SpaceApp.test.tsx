@@ -583,6 +583,44 @@ describe('Space app Cards drawer', () => {
     expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
   });
 
+  /**
+   * The menu's Edits are withdrawn wherever the chrome title edit is, and
+   * `editable` is one of that condition's terms.
+   *
+   * Before the strategy has placed anything there is no projected canvas, which
+   * is the state the placeholder above announces. Offering Rename there is
+   * offering an item that does nothing — the effect that discards a draft begun
+   * against a disabled edit runs on the same render — and offering Delete
+   * Layout there runs a real Edit against a Space with nothing drawn. The copy
+   * command stays, because an address is a fact about the entity rather than an
+   * Edit.
+   *
+   * Asserted synchronously, because that is the whole of the window: awaiting
+   * anything at all lets the strategy settle and the Edits come back.
+   */
+  it('withholds a menu’s Edits until the canvas has a placement to edit', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
+      (app) => render(app),
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Arranging…');
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
+
+    expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Delete Layout' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /^Copy link/ })).toBeInTheDocument();
+
+    // Left settling rather than abandoned mid-placement: the strategy resolves
+    // against an unmounted tree otherwise, and the Edits it restores are the
+    // other half of the rule.
+    await screen.findByRole('menuitem', { name: 'Rename' });
+  });
+
   it('offers Layout rename and delete actions and explains why the last cannot be deleted', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
