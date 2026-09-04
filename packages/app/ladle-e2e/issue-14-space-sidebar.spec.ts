@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 test(
   'Persistence Indicator story renders the production save lifecycle',
@@ -28,9 +28,11 @@ test(
     await page.goto('/?story=space--space--settled&mode=preview');
 
     const other = page.getByRole('button', { name: 'Collection 2', exact: true });
+    // `exact`, because every row now carries a trailing "Actions for Layout
+    // <title>" trigger whose name contains the row's own.
     const collection = page
       .getByTestId('space-sidebar')
-      .getByRole('button', { name: 'Collection 1' });
+      .getByRole('button', { name: 'Collection 1', exact: true });
 
     await expect(collection).toHaveAttribute('aria-pressed', 'true');
     await expect(other).toHaveAttribute('aria-pressed', 'false');
@@ -152,6 +154,22 @@ test('Space Sidebar story keeps the Add Card split control whole', async ({ page
   await expect(moreKinds).toBeFocused();
 });
 
+/**
+ * The two addresses an entity has, reached from the entity's own menu.
+ *
+ * They were two standing buttons per entity in the Sidebar until
+ * `.scratch/link-ux/issues/02`; the fixture records the **kind** of destination
+ * each command builds rather than a name it made up, so what this presses is
+ * production's own `spaceEntityActions` deciding which address is "the link"
+ * here and which is the permanent one.
+ */
+const copyFrom = async (page: Page, trigger: string, command: RegExp): Promise<void> => {
+  await page.getByRole('button', { name: trigger }).click({ delay: 120 });
+  await page.getByRole('menuitem', { name: command }).click();
+  // A copy confirms in place, so the menu is deliberately still open.
+  await page.keyboard.press('Escape');
+};
+
 test(
   'Space Sidebar story dispatches distinct Card and Graph copy commands',
   {
@@ -163,14 +181,17 @@ test(
   async ({ page }) => {
     await page.goto('/?story=space--space--settled&mode=preview');
 
-    await page.getByRole('button', { name: 'Copy link to Card 1' }).click();
-    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'card-canonical');
-    await page.getByRole('button', { name: 'Copy link in this Layout' }).click();
-    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'card-contextual');
-    await page.getByRole('button', { name: 'Copy link to Long', exact: true }).click();
-    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'graph-canonical');
-    await page.getByRole('button', { name: 'Copy link to Long in this Layout' }).click();
-    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'graph-contextual');
+    await page.getByTestId('selected-card-row').hover();
+    await copyFrom(page, 'Actions for Card Card 1', /^Copy link/);
+    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'layout-card');
+    await copyFrom(page, 'Actions for Card Card 1', /^Copy permanent link/);
+    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'card');
+
+    await page.getByRole('button', { name: 'Long', exact: true }).hover();
+    await copyFrom(page, 'Actions for Graph Long', /^Copy link/);
+    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'layout-graph');
+    await copyFrom(page, 'Actions for Graph Long', /^Copy permanent link/);
+    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'graph');
   },
 );
 
@@ -192,7 +213,7 @@ test(
     await page.goto('/?story=space--space--new-space&mode=preview');
 
     await expect(
-      page.getByTestId('space-sidebar').getByRole('button', { name: 'Layout 1' }),
+      page.getByTestId('space-sidebar').getByRole('button', { name: 'Layout 1', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('selected-canvas')).toContainText('Layout 1');
     await expect(page.getByTestId('space-title')).toHaveText('New space');
@@ -212,7 +233,7 @@ test(
   async ({ page }) => {
     await page.goto('/?story=space--space--settled&mode=preview');
     await expect(
-      page.getByTestId('space-sidebar').getByRole('button', { name: 'Collection 1' }),
+      page.getByTestId('space-sidebar').getByRole('button', { name: 'Collection 1', exact: true }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden();
 
@@ -227,7 +248,7 @@ test(
     // `Collection 3` is in the snapshot the session submitted and in no revision
     // the backend has stored, so a sidebar drawing anything but its own session's
     // working Space cannot show it.
-    const unsaved = page.getByRole('button', { name: 'Collection 3' });
+    const unsaved = page.getByRole('button', { name: 'Collection 3', exact: true });
     await expect(unsaved).toBeVisible();
     const retry = failure.getByRole('button', { name: 'Retry' });
     await retry.click();
@@ -244,6 +265,17 @@ test(
     await page.goto('/?story=space--space--presenting&mode=preview');
     await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Card' })).toBeDisabled();
+    // A Layout row keeps its menu and loses the two Edits in it. The
+    // application pair is `presenting.spec.ts`'s own assertion on the same
+    // three items.
+    await page.getByRole('button', { name: 'Collection 1', exact: true }).hover();
+    await page
+      .getByRole('button', { name: /^Actions for Layout Collection 1$/ })
+      .click({ delay: 120 });
+    const presentingMenu = page.getByRole('menu');
+    await expect(presentingMenu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
+    await expect(presentingMenu.getByRole('menuitem', { name: 'Delete Layout' })).toHaveCount(0);
+    await expect(presentingMenu.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
   },
 );
 
@@ -269,7 +301,7 @@ test('Space Sidebar story draws and activates only the selected Layout graphs', 
     'true',
   );
 
-  await page.getByRole('button', { name: 'Collection 2' }).click();
+  await page.getByRole('button', { name: 'Collection 2', exact: true }).click();
 
   await expect(page.getByRole('button', { name: 'Echo', exact: true })).toHaveAttribute(
     'aria-pressed',

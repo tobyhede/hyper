@@ -1,8 +1,13 @@
 import { createRef, useState, type ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Layout } from '@project/core';
-import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
+import { uuidSchema, type Card, type Layout } from '@project/core';
+import {
+  PersistenceIndicator,
+  SidebarProvider,
+  SidebarTrigger,
+  type EntityAction,
+} from '@project/ui';
 import {
   SelectedLayoutName,
   SpaceSidebar,
@@ -83,6 +88,26 @@ const layout = (id: typeof LAYOUT_ID, title: string): Layout => ({
 const LAYOUT_ONE = layout(LAYOUT_ID, 'Layout 1');
 const LAYOUT_TWO = layout(OTHER_LAYOUT_ID, 'Layout 2');
 const LAYOUT = layout(LAYOUT_ID, 'Layout 1');
+
+/** The Card the footer names, so its own actions menu has an entity to be about. */
+const SELECTED_CARD: Card = {
+  id: CARD_A,
+  title: 'Start here',
+  kind: 'markdown',
+  body: '',
+};
+
+/**
+ * What a Card's menu offers, as a Sidebar test can state it.
+ *
+ * The real command set is `spaceEntityActions`' and is proved over that module
+ * and in the browser; what this file holds is that the footer's Card row is an
+ * entity the menu can be hung off at all.
+ */
+const cardActions =
+  (onSelect: EntityAction['onSelect']): NonNullable<SpaceSidebarProps['entityActions']> =>
+  (entity) =>
+    entity.kind === 'card' ? [[], [{ id: 'copy-link', label: 'Copy link', onSelect }], []] : [];
 
 const settledProps = (): SpaceSidebarProps => ({
   spaceTitle: 'Space',
@@ -295,22 +320,34 @@ describe('SpaceSidebar', () => {
     expect(editor.closest('[data-slot="entity-actions"]')).not.toBeInTheDocument();
   });
 
-  it('offers distinct canonical and contextual copy commands for a selected Card', () => {
+  /**
+   * The selected Card's addresses are reached the way every other entity's are.
+   *
+   * They used to be two standing buttons in the footer. What replaces them is
+   * the footer naming the Card as a row and that row carrying the same menu a
+   * Layout row and a Graph row carry — so this holds the *reach*, and which
+   * addresses the menu offers is `entity-actions.test.tsx`'s.
+   */
+  it('reaches a selected Card\u2019s copy commands through its own actions menu', async () => {
+    const onSelect = vi.fn();
     const props: SpaceSidebarProps = {
       ...settledProps(),
-      cardLinks: {
-        title: 'Start here',
-        onCopyCanonical: vi.fn(),
-        onCopyContextual: vi.fn(),
-      },
+      selectedCard: { card: SELECTED_CARD },
+      entityActions: cardActions(onSelect),
     };
     draw(<SpaceSidebar {...props} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy link to Start here' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Copy link in this Layout' }));
+    expect(screen.getByTestId('selected-card-row')).toHaveTextContent('Start here');
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Card Start here' }));
 
-    expect(props.cardLinks?.onCopyCanonical).toHaveBeenCalledOnce();
-    expect(props.cardLinks?.onCopyContextual).toHaveBeenCalledOnce();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy link' }));
+    expect(onSelect).toHaveBeenCalledOnce();
+  });
+
+  it('leaves the footer empty when the canvas has selected no Card', () => {
+    draw(<SpaceSidebar {...settledProps()} />);
+
+    expect(screen.queryByTestId('selected-card-row')).not.toBeInTheDocument();
   });
 
   /**
@@ -325,10 +362,8 @@ describe('SpaceSidebar', () => {
   it('keeps a refused Delete on the confirmation that asked for it', async () => {
     const props: SpaceSidebarProps = {
       ...settledProps(),
-      cardLinks: {
-        title: 'Start here',
-        onCopyCanonical: vi.fn(),
-        onCopyContextual: vi.fn(),
+      selectedCard: {
+        card: SELECTED_CARD,
         onDelete: () => 'Retarget or delete the Aliases of this Card first: Alias 1.',
       },
     };
@@ -425,27 +460,35 @@ describe('SpaceSidebar', () => {
     expect(props.graph.onActivate).toHaveBeenCalledWith(GRAPH_ID);
   });
 
-  it('offers distinct canonical and Layout copy commands for the Active Graph', () => {
+  /**
+   * A Graph's two addresses are reached from the Graph's own row.
+   *
+   * They used to be two buttons under the Graphs list, offered for the *active*
+   * Graph alone. Every Graph row carries its own menu now, so which Graph an
+   * address is for is the row it was opened from rather than a selection made
+   * somewhere else.
+   */
+  it('reaches a Graph\u2019s copy commands from its own row, active or not', async () => {
+    const onSelect = vi.fn();
     const base = settledProps();
     const props: SpaceSidebarProps = {
       ...base,
       graph: {
         ...base.graph,
         graphs: [{ id: GRAPH_ID, title: 'Authored', color: '#123456', edges: [] }],
-        activeGraphId: GRAPH_ID,
-        links: {
-          onCopyCanonical: vi.fn(),
-          onCopyContextual: vi.fn(),
-        },
+        activeGraphId: null,
       },
+      entityActions: (entity) =>
+        entity.kind === 'graph'
+          ? [[], [{ id: 'copy-permanent-link', label: 'Copy permanent link', onSelect }], []]
+          : [],
     };
     draw(<SpaceSidebar {...props} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy link to Authored' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Copy link to Authored in this Layout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Graph Authored' }));
 
-    expect(props.graph.links?.onCopyCanonical).toHaveBeenCalledWith(GRAPH_ID);
-    expect(props.graph.links?.onCopyContextual).toHaveBeenCalledWith(GRAPH_ID);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy permanent link' }));
+    expect(onSelect).toHaveBeenCalledOnce();
   });
 
   /** An empty Active Graph cannot begin presenting. */
@@ -587,12 +630,7 @@ describe('SpaceSidebar', () => {
       const onDelete = vi.fn(() => null);
       const props: SpaceSidebarProps = {
         ...settledProps(),
-        cardLinks: {
-          title: 'Start here',
-          onCopyCanonical: vi.fn(),
-          onCopyContextual: vi.fn(),
-          onDelete,
-        },
+        selectedCard: { card: SELECTED_CARD, onDelete },
       };
       openSheet(props);
 
@@ -611,10 +649,8 @@ describe('SpaceSidebar', () => {
     it('stays open when a Delete is refused', async () => {
       const props: SpaceSidebarProps = {
         ...settledProps(),
-        cardLinks: {
-          title: 'Start here',
-          onCopyCanonical: vi.fn(),
-          onCopyContextual: vi.fn(),
+        selectedCard: {
+          card: SELECTED_CARD,
           onDelete: () => 'This Card is no longer part of the Space.',
         },
       };
@@ -630,6 +666,53 @@ describe('SpaceSidebar', () => {
         'This Card is no longer part of the Space.',
       );
       expect(screen.getByTestId('space-title')).toBeVisible();
+    });
+
+    /**
+     * A Layout's Delete is the one menu command with a canvas result, so it is
+     * the one the sheet is dismissed for — but only once there is a result.
+     *
+     * The same rule the refused Card Delete above follows, and for the same
+     * reason: the Sidebar renders a refused Layout Edit in its own alert, and
+     * below this breakpoint that alert is on the Sheet. Dismissing the Sheet
+     * first takes the only surface the reader could have been told on.
+     */
+    const layoutActions =
+      (onSelect: EntityAction['onSelect']): NonNullable<SpaceSidebarProps['entityActions']> =>
+      (entity) =>
+        entity.kind === 'layout'
+          ? [[], [], [{ id: 'delete-layout', label: 'Delete Layout', onSelect }]]
+          : [];
+
+    it('stays open when a Layout deletion is refused', async () => {
+      const onSelect = vi.fn(() => 'failed' as const);
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        entityActions: layoutActions(onSelect),
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout 1' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+
+      // Waited for rather than asserted on the spot: the dismissal this
+      // withholds is decided on what the command answers, which is a microtask
+      // away even when the command answers synchronously.
+      await waitFor(() => expect(onSelect).toHaveBeenCalledOnce());
+      expect(screen.getByTestId('space-title')).toBeVisible();
+    });
+
+    it('dismisses itself when a Layout is deleted', async () => {
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        entityActions: layoutActions(() => 'done'),
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout 1' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+
+      await dismissed();
     });
 
     it('dismisses itself when a Graph is activated', async () => {
@@ -650,73 +733,46 @@ describe('SpaceSidebar', () => {
       await dismissed();
     });
 
-    it.each([
-      {
-        name: 'the canonical Card link is copied',
-        button: 'Copy link to Start here',
-        callback: 'canonical' as const,
-      },
-      {
-        name: 'the contextual Card link is copied',
-        button: 'Copy link in this Layout',
-        callback: 'contextual' as const,
-      },
-    ])('dismisses itself when $name', async ({ button, callback }) => {
-      const onCopyCanonical = vi.fn();
-      const onCopyContextual = vi.fn();
+    /**
+     * Copying is the one command that does **not** dismiss the sheet, and the
+     * reversal is deliberate.
+     *
+     * These were two standing footer buttons, and a button that acts on the
+     * canvas leaves the author looking at a sidebar instead of the result. A
+     * menu item that copies has no canvas result to look at — what it has is a
+     * confirmation, and `EntityActionsMenu` shows that confirmation by swapping
+     * the item's own label in place. Dismissing the sheet takes the surface
+     * that confirmation is on away with it.
+     */
+    it('stays open while a copy command confirms in place', async () => {
+      const onSelect = vi.fn(() => 'done' as const);
       const props: SpaceSidebarProps = {
         ...settledProps(),
-        cardLinks: {
-          title: 'Start here',
-          onCopyCanonical,
-          onCopyContextual,
-        },
+        selectedCard: { card: SELECTED_CARD },
+        entityActions: (entity) =>
+          entity.kind === 'card'
+            ? [
+                [],
+                [
+                  {
+                    id: 'copy-link',
+                    label: 'Copy link',
+                    report: { done: 'Copied', failed: 'Not copied' },
+                    onSelect,
+                  },
+                ],
+                [],
+              ]
+            : [],
       };
       openSheet(props);
 
-      fireEvent.click(screen.getByRole('button', { name: button }));
+      fireEvent.click(screen.getByRole('button', { name: 'Actions for Card Start here' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy link' }));
 
-      const expected = callback === 'canonical' ? onCopyCanonical : onCopyContextual;
-      const other = callback === 'canonical' ? onCopyContextual : onCopyCanonical;
-      expect(expected).toHaveBeenCalledOnce();
-      expect(other).not.toHaveBeenCalled();
-      await dismissed();
-    });
-
-    it.each([
-      {
-        name: 'the canonical Graph link is copied',
-        button: 'Copy link to Graph 1',
-        callback: 'canonical' as const,
-      },
-      {
-        name: 'the contextual Graph link is copied',
-        button: 'Copy link to Graph 1 in this Layout',
-        callback: 'contextual' as const,
-      },
-    ])('dismisses itself when $name', async ({ button, callback }) => {
-      const onCopyCanonical = vi.fn();
-      const onCopyContextual = vi.fn();
-      const base = settledProps();
-      const props: SpaceSidebarProps = {
-        ...base,
-        graph: {
-          ...base.graph,
-          graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
-          activeGraphId: GRAPH_ID,
-          links: { onCopyCanonical, onCopyContextual },
-        },
-      };
-      openSheet(props);
-
-      fireEvent.click(screen.getByRole('button', { name: button }));
-
-      const expected = callback === 'canonical' ? onCopyCanonical : onCopyContextual;
-      const other = callback === 'canonical' ? onCopyContextual : onCopyCanonical;
-      expect(expected).toHaveBeenCalledOnce();
-      expect(expected).toHaveBeenCalledWith(GRAPH_ID);
-      expect(other).not.toHaveBeenCalled();
-      await dismissed();
+      expect(onSelect).toHaveBeenCalledOnce();
+      expect(await screen.findByRole('menuitem', { name: 'Copied' })).toBeVisible();
+      expect(screen.getByTestId('space-title')).toBeVisible();
     });
 
     it('dismisses itself when presenting begins', async () => {

@@ -150,9 +150,19 @@ test(
     await present(page);
     await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add Layout' })).toBeDisabled();
-    await expect(
-      page.getByRole('button', { name: /^Actions for Layout Collection 1$/ }),
-    ).toHaveCount(0);
+    // The Layout's own menu is withdrawn down to its address. Rename and Delete
+    // Layout are Edits and go with the rest of authoring; copying a link is not
+    // an Edit, and nothing about a presentation makes an address uncopyable
+    // (`.scratch/link-ux/issues/02`).
+    await page.getByRole('button', { name: 'Collection 1', exact: true }).hover();
+    await page
+      .getByRole('button', { name: /^Actions for Layout Collection 1$/ })
+      .click({ delay: 120 });
+    const layoutMenu = page.getByRole('menu');
+    await expect(layoutMenu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
+    await expect(layoutMenu.getByRole('menuitem', { name: 'Delete Layout' })).toHaveCount(0);
+    await expect(layoutMenu.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
 
     // A line gives a one-member choice at each card — the degenerate fork, not a

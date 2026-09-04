@@ -61,6 +61,8 @@ export { EntityActions, EntityActionsTrigger } from './EntityActionsMenu';
 export type {
   EntityAction,
   EntityActionGroup,
+  EntityActionOutcome,
+  EntityActionReport,
   EntityActionsProps,
   EntityActionsTriggerProps,
 } from './EntityActionsMenu';
@@ -75,7 +77,10 @@ export {
   ChevronDownIcon,
   CloseIcon,
   CloseCardIcon,
+  CopyIcon,
+  DeleteIcon,
   EditIcon,
+  EntityActionsIcon,
   FitViewIcon,
   GraphIcon,
   LayoutIcon,

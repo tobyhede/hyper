@@ -15,6 +15,21 @@ const CARD_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_C_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const CARD_E_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
+/**
+ * Copy one address out of the entity's own actions menu.
+ *
+ * Every copy command lives in that menu now, reached from the row's trailing
+ * icon — the path that needs no pointer gesture beyond a press, and the one
+ * ADR 0052's right-click accelerator is explicitly an enhancement over. A copy
+ * confirms in place without closing the menu, so this dismisses it before the
+ * next one.
+ */
+const copyFromMenu = async (page: Page, trigger: string, command: RegExp): Promise<void> => {
+  await page.getByRole('button', { name: trigger }).click({ delay: 120 });
+  await page.getByRole('menuitem', { name: command }).click();
+  await page.keyboard.press('Escape');
+};
+
 const installClipboard = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
@@ -270,18 +285,52 @@ test(
     const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}`;
     await page.goto(view);
     await page.locator(`.react-flow__node[data-id="${CARD_A_ID}"]`).click();
+    await page.getByTestId('selected-card-row').hover();
 
-    await page.getByRole('button', { name: 'Copy link to A' }).click();
+    await copyFromMenu(page, 'Actions for Card A', /^Copy permanent link/);
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(
         `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/cards/${encodeCompactUuid(CARD_A_ID)}`,
       );
 
-    await page.getByRole('button', { name: 'Copy link in this Layout' }).click();
+    await copyFromMenu(page, 'Actions for Card A', /^Copy link/);
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(`${new URL(page.url()).origin}${view}/cards/${encodeCompactUuid(CARD_A_ID)}`);
+  },
+);
+
+/**
+ * The application half of the entity-actions menu claim.
+ *
+ * Its Ladle pair drives the same real `SpaceSidebar` in the catalogue; this
+ * proves the running application reaches it, from both trigger paths, over the
+ * commands `App.tsx` actually supplies.
+ */
+test(
+  'a Layout row opens one actions menu from its icon and from a right click',
+  { tag: '@parity:space-sidebar-entity-actions-menu' },
+  async ({ page }) => {
+    await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
+    const row = page.getByRole('button', { name: 'Collection 1', exact: true });
+    await expect(row).toBeVisible();
+    await row.hover();
+
+    await page
+      .getByRole('button', { name: 'Actions for Layout Collection 1' })
+      .click({ delay: 120 });
+    const menu = page.getByRole('menu');
+    await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Delete Layout' })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await row.click({ button: 'right' });
+    const contextMenu = page.getByRole('menu');
+    await expect(contextMenu.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
+    await expect(contextMenu.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
+    await expect(contextMenu.getByRole('menuitem', { name: 'Delete Layout' })).toBeVisible();
   },
 );
 
@@ -343,14 +392,16 @@ test(
     const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}`;
     await page.goto(view);
 
-    await page.getByRole('button', { name: 'Copy link to Long', exact: true }).click();
+    await page.getByRole('button', { name: 'Long', exact: true }).hover();
+
+    await copyFromMenu(page, 'Actions for Graph Long', /^Copy permanent link/);
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(
         `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`,
       );
 
-    await page.getByRole('button', { name: 'Copy link to Long in this Layout' }).click();
+    await copyFromMenu(page, 'Actions for Graph Long', /^Copy link/);
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(`${new URL(page.url()).origin}${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);

@@ -207,13 +207,22 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'space-sidebar-copies-card-destinations',
     storyFile: 'space/space.stories.tsx',
     storyExport: 'Settled',
-    claim: 'A selected Card offers distinct canonical and current-Layout copy commands.',
+    claim:
+      "The selected Card's own actions menu offers Copy link and Copy permanent link, building the current-Layout address and the Card's own address respectively.",
   },
   {
     id: 'space-sidebar-copies-graph-destinations',
     storyFile: 'space/space.stories.tsx',
     storyExport: 'Settled',
-    claim: 'The Active Graph offers distinct canonical and current-Layout copy commands.',
+    claim:
+      "A Graph's own row menu offers Copy link and Copy permanent link, building the current-Layout address and the Graph's own address respectively.",
+  },
+  {
+    id: 'space-sidebar-entity-actions-menu',
+    storyFile: 'space/space.stories.tsx',
+    storyExport: 'Settled',
+    claim:
+      'One entity-actions menu is reached two ways from a Sidebar row — its trailing icon and a right click — and holds the same Rename, address and Delete Layout commands either way.',
   },
   {
     id: 'space-chrome-edits-names',
@@ -269,7 +278,8 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'space-sidebar-withdraws-authoring-while-presenting',
     storyFile: 'space/space.stories.tsx',
     storyExport: 'Presenting',
-    claim: 'Presenting replaces its entry action with Stop and withdraws authoring.',
+    claim:
+      "Presenting replaces its entry action with Stop and withdraws authoring, including the Rename and Delete Layout in a Layout row's actions menu while leaving its address there.",
   },
   {
     id: 'presenting-line-offers-one-move',

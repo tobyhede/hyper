@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Placement, type Space } from '@project/graph';
+import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
@@ -21,6 +22,7 @@ import { AppShell } from '@project/ui';
 import { resolveLayout } from '#src/layout-resolution';
 import { graphColorMap } from '#src/colors';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
+import { spaceEntityActions } from '#src/entity-actions';
 import { createWorkingSpaceReader, snapshotFromSpace } from '#src/snapshot';
 import { createSpaceAuthoring } from '#src/space-authoring';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
@@ -34,7 +36,21 @@ import {
 import { useStoryNavigation } from './navigation';
 import { authoredSnapshot, authoredSpace, editedSnapshot, storyGraphIds } from './spaces';
 
-type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+/**
+ * What a copy command leaves behind for a behaviour test to read.
+ *
+ * The **kind** of destination it built, not a name this fixture invented: the
+ * commands come from production's own `spaceEntityActions`, so which address a
+ * menu item copies is what a Ladle spec should be able to press, and a label of
+ * the harness's own choosing would only prove the harness.
+ */
+const recordCopy = (destination: ProductDestination): boolean => {
+  document.body.dataset['copyCommand'] = destination.kind;
+  document.body.dataset['copyPath'] = productDestinationPath(destination);
+  // Recording cannot fail, so the story draws the confirmation the application
+  // draws when the clipboard accepts the link.
+  return true;
+};
 
 export interface SpaceSidebarFixtureProps {
   /** Which Space the sidebar reports on. See `./spaces`. */
@@ -51,11 +67,19 @@ export interface SpaceSidebarFixtureProps {
   readonly children?: ReactNode;
   /** Story-specific controls beside the real selected-Layout header. */
   readonly headerActions?: ReactNode;
-  /** Whether this fixture supplies the selected Card's URL commands. */
-  readonly showCardLinks?: boolean;
-  /** Whether this fixture supplies the active Graph's URL commands. */
-  readonly showGraphLinks?: boolean;
-  /** The per-entity actions menu the real Sidebar draws on its rows. */
+  /**
+   * Whether the footer names a selected Card, which is what gives that Card's
+   * own actions menu an entity to hang off.
+   */
+  readonly showSelectedCard?: boolean;
+  /**
+   * The per-entity actions menu the real Sidebar draws on its rows.
+   *
+   * Defaulted to **production's own** `spaceEntityActions`, with copying and
+   * renaming recorded rather than performed. A fixture that built its own
+   * command list would be a second menu agreeing with the application only
+   * while somebody kept the two in step.
+   */
   readonly entityActions?: SpaceSidebarProps['entityActions'];
   readonly createLayout?: SpaceSidebarProps['createLayout'];
 }
@@ -79,8 +103,7 @@ export function SpaceSidebarFixture({
   onRetry = () => undefined,
   children,
   headerActions,
-  showCardLinks = true,
-  showGraphLinks = true,
+  showSelectedCard = true,
   entityActions,
   createLayout,
 }: SpaceSidebarFixtureProps) {
@@ -145,9 +168,6 @@ export function SpaceSidebarFixture({
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
   const colorByGraphId = graphColorMap(displayedSpace);
   const linkedCard = displayedSpace.cards[0];
-  const recordCopyCommand = (command: string) => () => {
-    document.body.dataset['copyCommand'] = command;
-  };
   const chromeTitleEdit: SpaceChromeTitleEdit = {
     subject: presenting || authoringDisabled ? null : (titleEdit?.subject ?? null),
     surface: presenting || authoringDisabled ? null : (titleEdit?.surface ?? null),
@@ -173,16 +193,33 @@ export function SpaceSidebarFixture({
     onReturnFocus: () => titleEdit?.returnFocus(),
   };
 
-  const entityActionsProps: Mutable<Pick<SpaceSidebarProps, 'entityActions'>> = {};
-  if (entityActions !== undefined) entityActionsProps.entityActions = entityActions;
-
-  const graphLinksProps: Mutable<Pick<SpaceSidebarProps['graph'], 'links'>> = {};
-  if (showGraphLinks) {
-    graphLinksProps.links = {
-      onCopyCanonical: recordCopyCommand('graph-canonical'),
-      onCopyContextual: recordCopyCommand('graph-contextual'),
-    };
-  }
+  // The production builder, over the fixture's own Space, with the two side
+  // effects replaced: a copy records the destination it would have written and
+  // a rename runs the real chrome title edit above, which is the Sidebar's own.
+  // Both Edits are behind one condition, and it is `App.tsx`'s whole condition
+  // rather than the first half of it. A Layout rename begins the chrome title
+  // edit `chromeTitleEdit.disabled` withdraws, and Delete Layout goes with it
+  // rather than standing alone in a menu whose other Edit cannot run — that is
+  // the first term. The second is `titleEdit === null`, production's
+  // `spaceChromeEdit === null`: while a rename is already running, no row's
+  // menu offers a second start to it. Reading only the first drew a menu in the
+  // catalogue that the application does not have, which is the one thing a
+  // story owing an application proof must not do (ADR 0052). Copying is in
+  // front of both — an address is a fact about the entity rather than a change
+  // to it.
+  const editsAvailable = chromeTitleEdit.disabled !== true && titleEdit === null;
+  const productionEntityActions = spaceEntityActions({
+    spaceId: displayedSpace.id,
+    spaceTitle: displayedSpace.title,
+    onCopy: recordCopy,
+    onRename: editsAvailable
+      ? (subject, title, returnFocus) =>
+          chromeTitleEdit.onBegin(subject, title, 'sidebar', returnFocus)
+      : null,
+    onDeleteLayout: editsAvailable
+      ? (layoutId) => authoring.complete({ kind: 'deleted-layout', layoutId }).kind === 'completed'
+      : null,
+  });
 
   return (
     <AppShell
@@ -202,7 +239,6 @@ export function SpaceSidebarFixture({
             onPresent: navigation.present,
             presenting: navigationState.mode === 'presenting',
             onExitPresenting: navigation.exitPresenting,
-            ...graphLinksProps,
           }}
           addCard={{
             onAddCard: () => undefined,
@@ -232,17 +268,11 @@ export function SpaceSidebarFixture({
             state: persistence.kind,
             acknowledgedRevision,
           }}
-          cardLinks={
-            !showCardLinks || linkedCard === undefined
-              ? undefined
-              : {
-                  title: linkedCard.title,
-                  onCopyCanonical: recordCopyCommand('card-canonical'),
-                  onCopyContextual: recordCopyCommand('card-contextual'),
-                }
+          selectedCard={
+            !showSelectedCard || linkedCard === undefined ? undefined : { card: linkedCard }
           }
           titleEdit={chromeTitleEdit}
-          {...entityActionsProps}
+          entityActions={entityActions ?? productionEntityActions}
         />
       }
       header={

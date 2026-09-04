@@ -376,14 +376,29 @@ describe('Space app failure reporting', () => {
     expect(session.getState().working).toEqual(addressed);
   });
 
+  /**
+   * Every copy command is a menu item now, so the refusal is reported from
+   * inside an open menu rather than from a standing button — and reported
+   * twice, because the two reports do not reach the same reader. The shell's
+   * alert is the standing one; the item's own label is the only one visible on
+   * a phone, where the Sidebar is a Sheet drawn over the area that alert
+   * renders in.
+   *
+   * Asserted through `role="alert"`, because the notice really is in the
+   * accessibility tree while this menu is open: Base UI's dropdown menu is
+   * **not** modal — `MenuPopup` passes `modal: isContextMenu` — so it hides
+   * nothing outside the popup. (Its context-menu sibling is modal and does hide
+   * the background, which is the other half of why the failure has to be
+   * legible in the menu itself.)
+   */
   it.each([
-    'Copy link to Card',
-    'Copy link in this Layout',
-    'Copy link to Graph',
-    'Copy link to Graph in this Layout',
+    { entity: 'Actions for Card Card', command: /^Copy link/ },
+    { entity: 'Actions for Card Card', command: /^Copy permanent link/ },
+    { entity: 'Actions for Graph Graph', command: /^Copy link/ },
+    { entity: 'Actions for Graph Graph', command: /^Copy permanent link/ },
   ])(
-    'reports a rejected clipboard write from %s without unmounting the Space',
-    async (copyAction) => {
+    'reports a rejected clipboard write from $entity $command without unmounting the Space',
+    async ({ entity, command }) => {
       const valid = snapshot('Space', 'Card', 10, 20);
       const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
         snapshot: valid,
@@ -409,12 +424,19 @@ describe('Space app failure reporting', () => {
           },
         );
 
-        fireEvent.click(await screen.findByRole('button', { name: copyAction }));
+        fireEvent.click(await screen.findByRole('button', { name: entity }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: command }));
 
-        const report = await screen.findByRole('alert');
-        expect(report).toHaveTextContent('Link not copied');
-        expect(report).toHaveTextContent('The browser refused clipboard access.');
-        expect(screen.getByText('Space')).toBeVisible();
+        const alert = await screen.findByRole('alert');
+        expect(alert).toHaveTextContent('Link not copied');
+        expect(alert).toHaveTextContent('The browser refused clipboard access.');
+        expect(screen.getByText('Space')).toBeInTheDocument();
+
+        // The command did not do what its label says, so the item does not say
+        // it did. It reads the failure instead, in the one place a reader who
+        // cannot see the alert behind the Sheet is looking.
+        expect(await screen.findByRole('menuitem', { name: /^Not copied/ })).toBeVisible();
+        expect(screen.queryByRole('menuitem', { name: /^Copied/ })).not.toBeInTheDocument();
       } finally {
         if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
         else Object.defineProperty(navigator, 'clipboard', previousClipboard);
@@ -571,6 +593,44 @@ describe('Space app Cards drawer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
     expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * The menu's Edits are withdrawn wherever the chrome title edit is, and
+   * `editable` is one of that condition's terms.
+   *
+   * Before the strategy has placed anything there is no projected canvas, which
+   * is the state the placeholder above announces. Offering Rename there is
+   * offering an item that does nothing — the effect that discards a draft begun
+   * against a disabled edit runs on the same render — and offering Delete
+   * Layout there runs a real Edit against a Space with nothing drawn. The copy
+   * command stays, because an address is a fact about the entity rather than an
+   * Edit.
+   *
+   * Asserted synchronously, because that is the whole of the window: awaiting
+   * anything at all lets the strategy settle and the Edits come back.
+   */
+  it('withholds a menu’s Edits until the canvas has a placement to edit', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+
+    mountSpaceApp(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
+      (app) => render(app),
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Arranging…');
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
+
+    expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Delete Layout' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /^Copy link/ })).toBeInTheDocument();
+
+    // Left settling rather than abandoned mid-placement: the strategy resolves
+    // against an unmounted tree otherwise, and the Edits it restores are the
+    // other half of the rule.
+    await screen.findByRole('menuitem', { name: 'Rename' });
   });
 
   it('offers Layout rename and delete actions and explains why the last cannot be deleted', async () => {

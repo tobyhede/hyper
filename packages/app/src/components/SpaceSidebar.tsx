@@ -1,5 +1,12 @@
 import { useState, type ReactNode, type Ref } from 'react';
-import { type Graph, type GraphId, type Layout, type LayoutId, type UUID } from '@project/core';
+import {
+  type Card,
+  type Graph,
+  type GraphId,
+  type Layout,
+  type LayoutId,
+  type UUID,
+} from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
@@ -18,8 +25,10 @@ import {
   AlertTitle,
   Button,
   buttonVariants,
+  CardKindIcon,
   cn,
   EntityActions,
+  EntityActionsIcon,
   EntityActionsTrigger,
   FALLBACK_GRAPH_COLOR,
   GraphIcon,
@@ -42,7 +51,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from '@project/ui';
-import type { EntityActionGroup } from '@project/ui';
+import type { EntityAction, EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringRefusal } from '../space-authoring';
 
@@ -91,10 +100,6 @@ export interface SpaceSidebarProps {
     readonly colorByGraphId: Readonly<Record<string, string>>;
     readonly activeGraphId: string | null;
     readonly onActivate: (graphId: GraphId) => void;
-    readonly links?: {
-      readonly onCopyCanonical: (graphId: GraphId) => void;
-      readonly onCopyContextual: (graphId: GraphId) => void;
-    };
     readonly onPresent: () => void;
     /**
      * Whether presenting may start. False while a content edit is running:
@@ -124,17 +129,18 @@ export interface SpaceSidebarProps {
     readonly state: SpaceSessionState['persistence']['kind'];
     readonly acknowledgedRevision: bigint;
   };
-  readonly cardLinks?:
+  /**
+   * The Card the canvas has selected, named in the footer so its own actions
+   * menu has an entity to hang off.
+   *
+   * The Card itself rather than a title and a pair of copy callbacks: its
+   * addresses are `entityActions`' to build now, exactly as a Layout's and a
+   * Graph's are, and handing this surface a title would leave it naming a Card
+   * down a second path from the one the menu is built over.
+   */
+  readonly selectedCard?:
     | {
-        readonly title: string;
-        readonly onCopyCanonical: () => void;
-        /**
-         * Absent when the Card has no address in the current Layout — a
-         * Card the selected Layout omits and the Cards drawer reveals. The
-         * command is withheld rather than shown and refused, because the
-         * destination it would copy does not exist.
-         */
-        readonly onCopyContextual?: (() => void) | undefined;
+        readonly card: Card;
         /** Delete this Card from the whole Space, returning a refusal to show in place. */
         readonly onDelete?: (() => string | null) | undefined;
       }
@@ -217,7 +223,8 @@ function DeleteCardControl({
 export type SpaceEntity =
   | { readonly kind: 'space' }
   | { readonly kind: 'layout'; readonly layout: Layout }
-  | { readonly kind: 'graph'; readonly graph: Graph; readonly layout: Layout };
+  | { readonly kind: 'graph'; readonly graph: Graph; readonly layout: Layout }
+  | { readonly kind: 'card'; readonly card: Card; readonly layout: Layout };
 
 export interface SpaceChromeTitleEdit {
   readonly subject: SpaceChromeTitleSubject | null;
@@ -390,6 +397,11 @@ function EntityActionsRow({
       <EntityActionsTrigger
         groups={groups}
         label={label}
+        // The general "more" glyph, not the Card rail's link glyph. A Sidebar
+        // row has no cluster of self-naming commands for a generic icon to be
+        // the odd one out in, and the menu behind this one holds a rename, one
+        // or two addresses and a delete — a link glyph would name a third of it.
+        icon={<EntityActionsIcon />}
         render={<SidebarMenuAction showOnHover />}
       />
     </>
@@ -419,7 +431,7 @@ export function SpaceSidebar({
   addCard,
   createLayout,
   persistence,
-  cardLinks,
+  selectedCard,
   entityActions,
   titleEdit,
   collapsible = 'offcanvas',
@@ -427,17 +439,50 @@ export function SpaceSidebar({
 }: SpaceSidebarProps) {
   // Below the primitive's breakpoint this whole surface is a modal Sheet drawn
   // *over* the canvas, with a focus trap and everything behind it inert. Every
-  // command here acts on the canvas, so every one of them dismisses the sheet
-  // first: Add Card and Add Alias open an editor that otherwise cannot take
-  // focus at all, and the rest would leave the author looking at the sidebar
-  // instead of the result. Above the breakpoint the sidebar is beside the canvas
-  // and there is nothing to dismiss.
+  // command here acts on the canvas, so every one of them dismisses the sheet:
+  // Add Card and Add Alias open an editor that otherwise cannot take focus at
+  // all, and the rest would leave the author looking at the sidebar instead of
+  // the result. A command that can be *refused* dismisses it only once it has
+  // done something, because the refusal is reported on this surface — the two
+  // wrappers below are that difference. Above the breakpoint the sidebar is
+  // beside the canvas and there is nothing to dismiss.
   const { isMobile, setOpenMobile } = useSidebar();
+  const dismissSheet = () => {
+    if (isMobile) setOpenMobile(false);
+  };
+  // Generic in what the command takes and answers alike, so a wrapped command
+  // is still the command it wrapped. Every command it wraps is a control whose
+  // whole result is on the canvas and that cannot be refused, so the sheet goes
+  // first and nothing is waited for.
   const onCanvas =
-    <Args extends readonly unknown[]>(command: (...args: Args) => void) =>
-    (...args: Args): void => {
-      if (isMobile) setOpenMobile(false);
-      command(...args);
+    <Args extends readonly unknown[], Result>(command: (...args: Args) => Result) =>
+    (...args: Args): Result => {
+      dismissSheet();
+      return command(...args);
+    };
+  /**
+   * The menu's version of `onCanvas`, with the order inverted: run the command,
+   * and dismiss the sheet only for the outcome that leaves something on the
+   * canvas to look at.
+   *
+   * The inversion is the whole point. `delete-layout` is the one wrapped
+   * command an Edit can **refuse** — the last Layout cannot go — and a refused
+   * Layout Edit is reported in this Sidebar's own alert, which below this
+   * breakpoint is on the sheet. Dismissing first took that surface away with
+   * the sentence still on it, and the reader was told nothing. `DeleteCardControl`
+   * below already closes only on a Delete that happened, for the same reason;
+   * this is that rule where the outcome arrives as an `EntityActionOutcome`
+   * rather than as a refusal string.
+   *
+   * `async` because an `onSelect` may answer with a promise, and awaiting is
+   * what makes the two cases one. The synchronous answer this command gives
+   * costs a microtask nobody can observe.
+   */
+  const onCanvasOutcome =
+    (command: EntityAction['onSelect']) => async (): Promise<EntityActionOutcome> => {
+      const outcome = await command();
+      if (outcome === 'done') dismissSheet();
+      return outcome;
     };
   const canvasAwareEntityActions: SpaceSidebarProps['entityActions'] =
     entityActions === undefined
@@ -446,7 +491,7 @@ export function SpaceSidebar({
           entityActions(entity).map((group) =>
             group.map((action) =>
               action.id === 'delete-layout'
-                ? { ...action, onSelect: onCanvas(action.onSelect) }
+                ? { ...action, onSelect: onCanvasOutcome(action.onSelect) }
                 : action,
             ),
           );
@@ -645,58 +690,48 @@ export function SpaceSidebar({
                 })}
               </SidebarMenu>
             )}
-            {graph.links !== undefined && activeGraph !== undefined && (
-              <div className="grid gap-1 pt-1">
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  className="w-full justify-start"
-                  onClick={onCanvas(() => graph.links?.onCopyCanonical(activeGraph.id))}
-                >
-                  Copy link to {activeGraph.title}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  className="w-full justify-start"
-                  onClick={onCanvas(() => graph.links?.onCopyContextual(activeGraph.id))}
-                >
-                  Copy link to {activeGraph.title} in this Layout
-                </Button>
-              </div>
-            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="nokey">
-        {cardLinks !== undefined && (
+        {selectedCard !== undefined && (
           <div className="grid gap-1">
-            <Button
-              variant="secondary"
-              size="compact"
-              onClick={onCanvas(cardLinks.onCopyCanonical)}
-            >
-              Copy link to {cardLinks.title}
-            </Button>
-            {cardLinks.onCopyContextual !== undefined && (
-              <Button
-                variant="secondary"
-                size="compact"
-                onClick={onCanvas(cardLinks.onCopyContextual)}
-              >
-                Copy link in this Layout
-              </Button>
-            )}
-            {cardLinks.onDelete !== undefined && (
+            {/* The selected Card as a row of its own, so its addresses hang off
+                the entity the way a Layout's and a Graph's do rather than
+                standing as two more buttons in the footer. It is a
+                `SidebarMenuButton` over a `div`: there is nothing to press
+                here — the Card is already selected, on the canvas — and the
+                row exists to be the thing the menu and the right click are
+                *about*. */}
+            <SidebarMenu>
+              <SidebarMenuItem tabIndex={-1}>
+                <EntityActionsRow
+                  entity={{ kind: 'card', card: selectedCard.card, layout: canvas.selected }}
+                  entityActions={canvasAwareEntityActions}
+                  label={`Actions for Card ${selectedCard.card.title}`}
+                  editing={false}
+                >
+                  <SidebarMenuButton
+                    render={<div />}
+                    data-testid="selected-card-row"
+                    data-card={selectedCard.card.id}
+                  >
+                    <CardKindIcon kind={selectedCard.card.kind} />
+                    <span>{selectedCard.card.title}</span>
+                  </SidebarMenuButton>
+                </EntityActionsRow>
+              </SidebarMenuItem>
+            </SidebarMenu>
+            {selectedCard.onDelete !== undefined && (
               <DeleteCardControl
-                title={cardLinks.title}
+                title={selectedCard.card.title}
                 /* `onCanvas` by hand rather than by the helper: only a
                    *completed* Delete has a canvas result to dismiss the sheet
                    for. A refusal keeps the dialog open (`DeleteCardControl`
                    below), and dismissing the sheet under it would take the
                    surface the sentence is on with it. */
                 onDelete={() => {
-                  const refusal = cardLinks.onDelete?.() ?? null;
+                  const refusal = selectedCard.onDelete?.() ?? null;
                   if (refusal === null && isMobile) setOpenMobile(false);
                   return refusal;
                 }}

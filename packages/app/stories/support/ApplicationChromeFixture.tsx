@@ -49,7 +49,7 @@ export function ApplicationChromeFixture({
   if (canvasCards !== undefined) canvasOptionalProps.cards = canvasCards;
 
   return (
-    <SpaceSidebarFixture {...sidebarOptionalProps} showCardLinks={false} showGraphLinks={false}>
+    <SpaceSidebarFixture {...sidebarOptionalProps} showSelectedCard={false}>
       <div className="flex size-full min-w-0">
         <div
           className="relative min-w-0 flex-1"

@@ -25,6 +25,45 @@ import { cn } from './lib/utils';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
+/**
+ * What running a command answers, and therefore which word the item reports.
+ *
+ * Every command answers one of the two, and a command that cannot fail answers
+ * `done` — there is no "said nothing" arm on purpose. A command that reported
+ * nothing had its outcome invented for it, which is the whole defect this
+ * exists to close: the label swapped to "Copied" on the press rather than on
+ * the copy, so a clipboard write the browser refused still read as done.
+ *
+ * A promise is admitted because that refusal arrives *after* the press —
+ * writing the clipboard is asynchronous — so an item that reported at the call
+ * could only ever report on having been pressed.
+ */
+export type EntityActionOutcome = 'done' | 'failed';
+
+/**
+ * The words an item reports with, one for each way its command can go.
+ *
+ * **Both or neither**, which is why this is one field rather than two optional
+ * ones. What the item shows is the word for whichever outcome the command
+ * answered, and holding the menu open to show it is decided *before* the answer
+ * arrives — so an item that named only one word could be held open over the
+ * outcome it had nothing to say about, and sit there under its unchanged label
+ * with no report to show and no timer to take one away. Pairing them means the
+ * menu is held open exactly when there is a word coming, either way it goes.
+ *
+ * Keyed by the outcome itself so the two cannot drift apart: `done` is what the
+ * label becomes once the command **has run** — "Copied", and once it has run
+ * rather than once it has been pressed, since the swap waits on what `onSelect`
+ * answers. `failed` is what it becomes instead when the command answers that it
+ * did not, "Not copied".
+ *
+ * The menu is where a failure has to be legible, not only in whatever standing
+ * notice the application also renders: below the Sidebar's breakpoint that
+ * surface is a Sheet drawn *over* the shell, so a report pinned under the header
+ * is behind it and a reader on a phone never sees it.
+ */
+export type EntityActionReport = Readonly<Record<EntityActionOutcome, string>>;
+
 /** How a trigger takes the treatment of the cluster it sits in. */
 type TriggerRender = ComponentProps<typeof DropdownMenuTrigger>['render'];
 
@@ -47,12 +86,28 @@ export interface EntityAction {
    */
   readonly description?: string | undefined;
   /**
-   * What the item's own label becomes once the command has run — "Copied". Its
-   * presence is also what holds the menu open through the press, so the swap is
-   * seen rather than happening behind a menu that has already gone.
+   * The words this item reports its outcome with, or absent for a command that
+   * says nothing and simply closes the menu.
    */
-  readonly confirmation?: string | undefined;
-  readonly onSelect: () => void;
+  readonly report?: EntityActionReport | undefined;
+  /**
+   * The glyph drawn in the item's leading column — `<CopyIcon />` for an
+   * address, `<EditIcon />` for a rename.
+   *
+   * Optional, and the column it sits in belongs to the **menu** rather than to
+   * the item: as soon as one command in a menu carries an icon, every other
+   * command reserves the same width, so a group of labels stays a column
+   * instead of stepping in and out as commands are withheld.
+   */
+  readonly icon?: ReactNode;
+  /**
+   * `destructive` for a command that removes something, drawn in the
+   * primitive's own destructive item treatment rather than a local one — both
+   * `DropdownMenuItem` and `ContextMenuItem` already carry that variant, so the
+   * two paths get the same red by construction.
+   */
+  readonly variant?: 'default' | 'destructive' | undefined;
+  readonly onSelect: () => EntityActionOutcome | Promise<EntityActionOutcome>;
 }
 
 /**
@@ -65,40 +120,73 @@ export interface EntityAction {
  */
 export type EntityActionGroup = readonly EntityAction[];
 
-/** How wide either menu draws, so the two are the same menu in both senses. */
-const MENU_WIDTH = 'w-72';
+/**
+ * How wide either menu draws, so the two are the same menu in both senses.
+ *
+ * `w-80` rather than the `w-72` this started at: the leading icon column and
+ * its gap take a little over 20px off the text, and at `w-72` the longest
+ * destination sentence a Card or Graph produces — "Always opens <title> on its
+ * own, wherever it is placed" — went from two lines to three. The extra 32px
+ * buys that line back without the popup reaching across the Sidebar it opens
+ * against.
+ */
+const MENU_WIDTH = 'w-80';
+
+/** Which item is reporting, and the one word it is reporting in place of its label. */
+interface ActionReport {
+  readonly id: string;
+  readonly word: string;
+}
+
+/** Whether an item has anything to say after the press, either way it goes. */
+const reports = (action: EntityAction): boolean => action.report !== undefined;
 
 /**
- * The confirmation an item shows in place of its label, and the announcement
- * that goes with it.
+ * What an item shows in place of its label once its command has answered, and
+ * the announcement that goes with it.
+ *
+ * **Once it has answered.** The command is what reports, not the press: the
+ * outcome is awaited, so a clipboard write the browser refuses swaps the label
+ * to the failure word rather than to "Copied".
  *
  * The announcement is the whole reason this is not just local state in the
- * item: the label swap is a visual confirmation with no focus change, so a
- * screen reader is told nothing by it. A polite live region outside the menu
- * carries the same words — and it has to sit outside, because the popup it
- * would otherwise live in is unmounted moments later and an unmounted region
- * announces nothing.
+ * item: the label swap is a visual report with no focus change, so a screen
+ * reader is told nothing by it. A polite live region outside the menu carries
+ * the same word — and it sits outside for two reasons. The popup it would
+ * otherwise live in is unmounted moments later, and an unmounted region
+ * announces nothing; and outside is not hidden, because Base UI's `markOthers`
+ * keeps every `[aria-live]` element and its ancestors out of the set a modal
+ * popup hides, exactly so a region like this one still announces. The dropdown
+ * path is not modal at all (`MenuPopup` passes `modal: isContextMenu`), and
+ * `test/EntityActionsMenu.test.tsx` pins the modal context-menu path, which is
+ * the demanding one of the two.
  */
 function useConfirmation() {
-  const [confirmed, setConfirmed] = useState<EntityAction | null>(null);
+  const [report, setReport] = useState<ActionReport | null>(null);
   const clearTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => () => window.clearTimeout(clearTimer.current), []);
 
   const fire = useCallback((action: EntityAction) => {
-    action.onSelect();
-    if (action.confirmation === undefined) return;
-    setConfirmed(action);
-    window.clearTimeout(clearTimer.current);
-    clearTimer.current = window.setTimeout(() => setConfirmed(null), 1600);
+    const outcome = action.onSelect();
+    // Read once, before the await: an item that names its words has one for
+    // every outcome, so past this line there is always a word to show and the
+    // menu the press held open is never held over nothing.
+    const words = action.report;
+    if (words === undefined) return;
+    void Promise.resolve(outcome).then((answered) => {
+      window.clearTimeout(clearTimer.current);
+      setReport({ id: action.id, word: words[answered] });
+      clearTimer.current = window.setTimeout(() => setReport(null), 1600);
+    });
   }, []);
 
   return {
-    confirmedId: confirmed?.id ?? null,
+    report,
     fire,
     announcement: (
       <span aria-live="polite" className="sr-only">
-        {confirmed?.confirmation ?? ''}
+        {report?.word ?? ''}
       </span>
     ),
   };
@@ -118,18 +206,23 @@ const groupKey = (group: EntityActionGroup): string => group.map((action) => act
  */
 function EntityActionItems({
   groups,
-  confirmedId,
+  report,
   fire,
   as,
 }: {
   readonly groups: readonly EntityActionGroup[];
-  readonly confirmedId: string | null;
+  readonly report: ActionReport | null;
   readonly fire: (action: EntityAction) => void;
   readonly as: 'menu' | 'context-menu';
 }) {
   const Item = as === 'context-menu' ? ContextMenuItem : DropdownMenuItem;
   const Separator = as === 'context-menu' ? ContextMenuSeparator : DropdownMenuSeparator;
   const drawn = groups.filter((group) => group.length > 0);
+  // One decision for the whole menu, not per item: a menu with any icon in it
+  // reserves the column on every item, so the labels of the commands that have
+  // no glyph line up with the ones that do rather than sitting 22px to their
+  // left.
+  const iconColumn = drawn.some((group) => group.some((action) => action.icon !== undefined));
   return (
     <>
       {drawn.map((group, index) => (
@@ -138,13 +231,32 @@ function EntityActionItems({
           {group.map((action) => (
             <Item
               key={action.id}
-              // Held open only while there is a swap to see. A command with no
-              // confirmation closes the menu the way every menu item does.
-              closeOnClick={action.confirmation === undefined}
+              // Held open only while there is a swap to see — either way the
+              // command goes, since a failure has still less business being
+              // reported behind a menu that has gone. A command that reports
+              // nothing closes the menu the way every menu item does.
+              closeOnClick={!reports(action)}
+              variant={action.variant ?? 'default'}
+              // `items-start`, because an item is two lines whenever it carries
+              // a destination sentence and the primitive's own `items-center`
+              // would then hang the glyph between them. The column below is
+              // `h-5` — the `text-sm` line box — so the glyph centres on the
+              // label's line whether or not a second line follows it.
+              className="items-start"
               onClick={() => fire(action)}
             >
-              <span className="flex flex-col gap-0.5">
-                <span>{action.id === confirmedId ? action.confirmation : action.label}</span>
+              {/* `w-4` fixed rather than content-sized, so an item with no
+                  glyph still spends the column and the labels stay a column. */}
+              {iconColumn && (
+                <span
+                  aria-hidden="true"
+                  className="flex h-5 w-4 shrink-0 items-center justify-center"
+                >
+                  {action.icon}
+                </span>
+              )}
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span>{action.id === report?.id ? report.word : action.label}</span>
                 {action.description !== undefined && (
                   <span className="text-xs text-muted-foreground">{action.description}</span>
                 )}
@@ -179,6 +291,17 @@ export interface EntityActionsTriggerProps {
    * the treatment of the cluster it sits in rather than importing a second one.
    */
   readonly render?: TriggerRender;
+  /**
+   * The glyph the trigger draws, because what reads as "the actions" depends on
+   * what the trigger sits beside rather than on this component.
+   *
+   * A Sidebar row stands alone and passes `<EntityActionsIcon />`, the
+   * conventional "more" glyph. A Card rail sits in a cluster where every other
+   * control names its own command, and keeps `LinkActionsIcon` — which is the
+   * default here for exactly one reason: the rail is the only caller that does
+   * not pass this, so leaving the default alone is what leaves the rail alone.
+   */
+  readonly icon?: ReactNode;
   readonly className?: string;
 }
 
@@ -194,9 +317,10 @@ export function EntityActionsTrigger({
   groups,
   label,
   render,
+  icon = <LinkActionsIcon />,
   className,
 }: EntityActionsTriggerProps) {
-  const { confirmedId, fire, announcement } = useConfirmation();
+  const { report, fire, announcement } = useConfirmation();
   const renderProp: Mutable<Pick<EntityActionsTriggerProps, 'render'>> = {};
   if (render !== undefined) renderProp.render = render;
   return (
@@ -208,14 +332,14 @@ export function EntityActionsTrigger({
           className={className}
           data-slot="entity-actions-trigger"
         >
-          <LinkActionsIcon />
+          {icon}
         </DropdownMenuTrigger>
         {/* `align="end"` keeps the popup under the trailing icon rather than
             running off the edge that icon already sits against. The width
             overrides `DropdownMenuContent`'s `w-(--anchor-width)`, which would
             otherwise size this menu to the icon that opened it. */}
         <DropdownMenuContent align="end" className={MENU_WIDTH}>
-          <EntityActionItems groups={groups} confirmedId={confirmedId} fire={fire} as="menu" />
+          <EntityActionItems groups={groups} report={report} fire={fire} as="menu" />
         </DropdownMenuContent>
       </DropdownMenu>
       {announcement}
@@ -246,7 +370,7 @@ export interface EntityActionsProps {
  * wrapper that appeared underneath it.
  */
 export function EntityActions({ groups, children, className }: EntityActionsProps) {
-  const { confirmedId, fire, announcement } = useConfirmation();
+  const { report, fire, announcement } = useConfirmation();
   return (
     <>
       <ContextMenu>
@@ -254,12 +378,7 @@ export function EntityActions({ groups, children, className }: EntityActionsProp
           {children}
         </ContextMenuTrigger>
         <ContextMenuContent className={MENU_WIDTH}>
-          <EntityActionItems
-            groups={groups}
-            confirmedId={confirmedId}
-            fire={fire}
-            as="context-menu"
-          />
+          <EntityActionItems groups={groups} report={report} fire={fire} as="context-menu" />
         </ContextMenuContent>
       </ContextMenu>
       {announcement}

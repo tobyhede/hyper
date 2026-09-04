@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+  type RenderResult,
+} from '@testing-library/react';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -631,18 +638,32 @@ describe('authoring an opened Card', () => {
    * offered a Rename that began an edit the same render discarded, with a
    * Delete Layout beside it.
    */
-  it('withdraws the Layout actions while a Card title editor is open', async () => {
+  /**
+   * The Layout's Edits are withdrawn while a Card title editor owns the caret;
+   * its addresses are not.
+   *
+   * Rename begins the very chrome title edit that condition withdraws, and
+   * Delete Layout runs an Edit that would unmount the Card holding the draft.
+   * Copying an address does neither — an address is a fact about the Layout
+   * rather than a change to it — so the menu stays, one command shorter, rather
+   * than the whole trigger disappearing off the row.
+   */
+  it('withdraws the Layout Edits, but not its addresses, while a Card title editor is open', async () => {
     const session = mount();
     await settled(session);
 
-    expect(screen.getByRole('button', { name: 'Actions for Layout Layout' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
+    expect(await screen.findByRole('menuitem', { name: 'Rename' })).toBeVisible();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
     expect(await screen.findByRole('textbox', { name: 'Card title' })).toBeVisible();
 
-    expect(
-      screen.queryByRole('button', { name: 'Actions for Layout Layout' }),
-    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: 'Delete Layout' })).not.toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
     await settled(session);
   });
 
@@ -756,7 +777,13 @@ describe('the Card affordance on the graph', () => {
 
     fireEvent.keyDown(await screen.findByTestId(`rf__node-${SPACE_CARD_ID}`), { key: 'Enter' });
 
-    await waitFor(() => expect(screen.getByText('Nested')).toBeVisible());
+    // Scoped to the node: selecting the Card also names it in the Sidebar
+    // footer, which is where its own actions menu now hangs off.
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId(`rf__node-${SPACE_CARD_ID}`)).getByText('Nested'),
+      ).toBeVisible(),
+    );
     expect(placementOf(session, SPACE_CARD_ID)).toEqual(before);
     expect(screen.queryByRole('button', { name: 'Close Card Nested' })).not.toBeInTheDocument();
     await settled(session);

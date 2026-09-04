@@ -120,21 +120,44 @@ test('Delete on a mobile Sidebar control leaves the selected Card on the canvas'
   await expect(card).toBeVisible();
 });
 
-test('Card and Graph copy commands close the mobile sidebar', async ({ page }) => {
+/**
+ * The one command that deliberately does **not** close the sheet.
+ *
+ * Every other command here acts on the canvas, so leaving the sheet up would
+ * leave the reader looking at a sidebar instead of the result. A copy has no
+ * canvas result — what it has is a confirmation, and `EntityActionsMenu` shows
+ * that by swapping the item's own label in place. Dismissing the sheet takes
+ * the surface the confirmation is on with it, so the copy commands stopped
+ * dismissing it when they became menu items (`.scratch/link-ux/issues/02`).
+ */
+test('a copy command confirms in the open mobile sidebar rather than closing it', async ({
+  page,
+}) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await nodeByTitle(page, 'A').first().click();
 
-  for (const name of [
-    'Copy link to A',
-    'Copy link in this Layout',
-    'Copy link to Long',
-    'Copy link to Long in this Layout',
-  ]) {
-    await openMobileSidebar(page);
-    await page.getByRole('button', { name, exact: true }).click();
-    await expect(sheet(page)).toHaveCount(0);
-  }
+  await openMobileSidebar(page);
+  await page.getByRole('button', { name: 'Actions for Card A' }).click({ delay: 120 });
+  const menu = page.getByRole('menu');
+
+  // The confirmation is a label swap the menu holds for a moment and then puts
+  // back, so the wait for it is armed *before* the press that starts it. An
+  // `expect` written after the click does not look until that command's round
+  // trip has returned, and a swap already reverted by then is not a retryable
+  // miss — the matcher polls an element that will never come back and fails on
+  // its own timeout. Waiting from before the press makes the assertion a
+  // question about whether the confirmation happened rather than about how long
+  // it was held, which is what keeps it honest if that duration changes.
+  await Promise.all([
+    menu.getByRole('menuitem', { name: 'Copied' }).waitFor(),
+    menu.getByRole('menuitem', { name: /^Copy link/ }).click(),
+  ]);
+
+  // `toBeVisible`, not the `toHaveCount` this file uses to say a sheet has gone:
+  // the point being made is that the sheet is still *shown*, which is what
+  // `openMobileSidebar` asserts to say it arrived.
+  await expect(sheet(page)).toBeVisible();
 });
 
 test('Present from the mobile sidebar leaves the presentation reachable', async ({ page }) => {
