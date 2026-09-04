@@ -376,14 +376,24 @@ describe('Space app failure reporting', () => {
     expect(session.getState().working).toEqual(addressed);
   });
 
+  /**
+   * Every copy command is a menu item now, so the refusal is reported from
+   * inside an open menu rather than from a standing button.
+   *
+   * Asserted by text rather than by `role="alert"`: Base UI's menu is modal by
+   * default, so while the popup is open the notice behind it is `aria-hidden`
+   * and out of the accessibility tree the role query reads. The report is still
+   * on screen, which is what this is about — the alternative would be closing
+   * the menu first and testing a different moment than the one that broke.
+   */
   it.each([
-    'Copy link to Card',
-    'Copy link in this Layout',
-    'Copy link to Graph',
-    'Copy link to Graph in this Layout',
+    { entity: 'Actions for Card Card', command: /^Copy link/ },
+    { entity: 'Actions for Card Card', command: /^Copy permanent link/ },
+    { entity: 'Actions for Graph Graph', command: /^Copy link/ },
+    { entity: 'Actions for Graph Graph', command: /^Copy permanent link/ },
   ])(
-    'reports a rejected clipboard write from %s without unmounting the Space',
-    async (copyAction) => {
+    'reports a rejected clipboard write from $entity $command without unmounting the Space',
+    async ({ entity, command }) => {
       const valid = snapshot('Space', 'Card', 10, 20);
       const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
         snapshot: valid,
@@ -409,12 +419,12 @@ describe('Space app failure reporting', () => {
           },
         );
 
-        fireEvent.click(await screen.findByRole('button', { name: copyAction }));
+        fireEvent.click(await screen.findByRole('button', { name: entity }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: command }));
 
-        const report = await screen.findByRole('alert');
-        expect(report).toHaveTextContent('Link not copied');
-        expect(report).toHaveTextContent('The browser refused clipboard access.');
-        expect(screen.getByText('Space')).toBeVisible();
+        expect(await screen.findByText('Link not copied')).toBeInTheDocument();
+        expect(screen.getByText('The browser refused clipboard access.')).toBeInTheDocument();
+        expect(screen.getByText('Space')).toBeInTheDocument();
       } finally {
         if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
         else Object.defineProperty(navigator, 'clipboard', previousClipboard);

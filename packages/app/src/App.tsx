@@ -7,7 +7,6 @@ import {
   AlertTitle,
   AppShell,
   DRAWER_WIDTH,
-  type EntityActionGroup,
 } from '@project/ui';
 import { type CardId, type GraphId, type LayoutId, type LayoutPosition } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
@@ -23,6 +22,7 @@ import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { canRetreat, navigationAddress } from './navigation';
 import { copyLink } from './clipboard';
+import { spaceEntityActions } from './entity-actions';
 import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
 import { layoutCards, resolveLayout } from './layout-resolution';
@@ -46,7 +46,6 @@ import {
   SelectedLayoutName,
   SpaceSidebar,
   type SpaceChromeTitleEdit,
-  type SpaceEntity,
 } from './components/SpaceSidebar';
 
 export const createApp = (
@@ -209,15 +208,6 @@ export const createApp = (
     const selectedCard =
       selectedCardId === null ? undefined : renderedSpace.lookup.card(selectedCardId);
 
-    /**
-     * Whether the selected Card has a contextual address in this Layout.
-     *
-     * A Layout's members *are* its position keys (ADR 0040). Cards outside them
-     * remain available in the Sidebar Cards collection, but have no contextual
-     * address in that Layout.
-     */
-    const contextualCardLink =
-      selectedCard === undefined || selectedLayout.layout.positions[selectedCard.id] !== undefined;
     const cardsOutsideSelectedLayout = useMemo(
       () =>
         renderedSpace.cards.filter(
@@ -412,48 +402,43 @@ export const createApp = (
     };
 
     /**
-     * Rename Layout begins the very chrome title edit `chromeEditingDisabled`
-     * withdraws while a Card title editor owns the caret — and the effect below
+     * Whether a menu's Rename and Delete may be offered at all.
+     *
+     * Rename begins the very chrome title edit `chromeEditingDisabled`
+     * withdraws while a Card title editor owns the caret — and the effect above
      * discards a draft begun against that condition on the same render. So the
      * gate reads `editingCardTitle` too, and Delete Layout goes with it rather
      * than standing alone in a menu whose other item cannot run.
+     *
+     * The copy commands are deliberately **not** behind it: an address is a
+     * fact about the entity rather than an Edit, and nothing about a live
+     * rename or a presentation makes one uncopyable.
      */
-    const layoutActions = (entity: SpaceEntity): readonly EntityActionGroup[] => {
-      if (
-        entity.kind !== 'layout' ||
-        presenting ||
-        creatingAlias ||
-        editingCardBody ||
-        editingCardTitle ||
-        spaceChromeEdit !== null
-      )
-        return [];
-      const { id: layoutId, title } = entity.layout;
-      return [
-        [
-          {
-            id: 'rename-layout',
-            label: 'Rename',
-            onSelect: () => {
-              setLayoutManagementRefusal(null);
-              titleEdit.onBegin({ kind: 'layout', id: layoutId }, title, 'sidebar', () => {
-                document.querySelector<HTMLElement>(`[data-layout="${layoutId}"]`)?.focus();
-              });
-            },
-          },
-        ],
-        [
-          {
-            id: 'delete-layout',
-            label: 'Delete Layout',
-            onSelect: () => {
-              const result = authoring.complete({ kind: 'deleted-layout', layoutId });
-              setLayoutManagementRefusal(result.kind === 'refused' ? result.refusal : null);
-            },
-          },
-        ],
-      ];
-    };
+    const entityEditsAvailable = !(
+      presenting ||
+      creatingAlias ||
+      editingCardBody ||
+      editingCardTitle ||
+      spaceChromeEdit !== null
+    );
+
+    const entityActions = spaceEntityActions({
+      spaceId: renderedSpace.id,
+      spaceTitle: renderedSpace.title,
+      onCopy: copyProductDestination,
+      onRename: entityEditsAvailable
+        ? (subject, title, returnFocus) => {
+            setLayoutManagementRefusal(null);
+            titleEdit.onBegin(subject, title, 'sidebar', returnFocus);
+          }
+        : null,
+      onDeleteLayout: entityEditsAvailable
+        ? (layoutId) => {
+            const result = authoring.complete({ kind: 'deleted-layout', layoutId });
+            setLayoutManagementRefusal(result.kind === 'refused' ? result.refusal : null);
+          }
+        : null,
+    });
 
     // One decision resolved from one Space, applied in an order that cannot
     // leave the two collaborators disagreeing.
@@ -893,21 +878,6 @@ export const createApp = (
           activeGraphId,
           colorByGraphId: projection.colors,
           onActivate: activateGraph,
-          links: {
-            onCopyCanonical: (graphId) =>
-              copyProductDestination({
-                kind: 'graph',
-                spaceId: renderedSpace.id,
-                graphId,
-              }),
-            onCopyContextual: (graphId) =>
-              copyProductDestination({
-                kind: 'layout-graph',
-                spaceId: renderedSpace.id,
-                layoutId: selectedLayoutId,
-                graphId,
-              }),
-          },
           onPresent: present,
           canPresent: !editingCardBody && spaceChromeEdit === null,
           presenting,
@@ -965,34 +935,16 @@ export const createApp = (
           state: sessionState.persistence.kind,
           acknowledgedRevision: sessionState.acknowledgedRevision,
         }}
-        cardLinks={
+        selectedCard={
           selectedCard === undefined
             ? undefined
             : {
-                title: selectedCard.title,
-                onCopyCanonical: () =>
-                  copyProductDestination({
-                    kind: 'card',
-                    spaceId: renderedSpace.id,
-                    cardId: selectedCard.id,
-                  }),
-                /**
-                 * Offered only for a Card this Layout actually holds.
-                 *
-                 * A selected Card revealed in the Cards collection is not
-                 * necessarily a member of the Layout. `layout-card` resolves
-                 * against `layout.positions`, so a contextual link to it is one
-                 * the host answers 404 for.
-                 */
-                onCopyContextual: contextualCardLink
-                  ? () =>
-                      copyProductDestination({
-                        kind: 'layout-card',
-                        spaceId: renderedSpace.id,
-                        layoutId: selectedLayoutId,
-                        cardId: selectedCard.id,
-                      })
-                  : undefined,
+                // Which of its addresses this Card has is `spaceEntityActions`'
+                // to decide from the Layout it is handed, not this call site's:
+                // a selected Card the Cards drawer revealed is not necessarily
+                // placed by the drawing Layout, and `layout-card` resolves
+                // against `layout.positions`.
+                card: selectedCard,
                 onDelete: deleteCardAvailable
                   ? () => {
                       const result = authoring.complete({
@@ -1007,7 +959,7 @@ export const createApp = (
               }
         }
         titleEdit={titleEdit}
-        entityActions={layoutActions}
+        entityActions={entityActions}
       />
     );
 

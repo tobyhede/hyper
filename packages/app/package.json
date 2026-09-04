@@ -7,6 +7,7 @@
     "#components/*": "./src/components/*.tsx",
     "#hooks/*": "./src/hooks/*.ts",
     "#lib/*": "./src/lib/*.ts",
+    "#src/entity-actions": "./src/entity-actions.tsx",
     "#src/*": "./src/*.ts"
   },
   "scripts": {

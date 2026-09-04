@@ -1,5 +1,12 @@
 import { useState, type ReactNode, type Ref } from 'react';
-import { type Graph, type GraphId, type Layout, type LayoutId, type UUID } from '@project/core';
+import {
+  type Card,
+  type Graph,
+  type GraphId,
+  type Layout,
+  type LayoutId,
+  type UUID,
+} from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
@@ -18,8 +25,10 @@ import {
   AlertTitle,
   Button,
   buttonVariants,
+  CardKindIcon,
   cn,
   EntityActions,
+  EntityActionsIcon,
   EntityActionsTrigger,
   FALLBACK_GRAPH_COLOR,
   GraphIcon,
@@ -91,10 +100,6 @@ export interface SpaceSidebarProps {
     readonly colorByGraphId: Readonly<Record<string, string>>;
     readonly activeGraphId: string | null;
     readonly onActivate: (graphId: GraphId) => void;
-    readonly links?: {
-      readonly onCopyCanonical: (graphId: GraphId) => void;
-      readonly onCopyContextual: (graphId: GraphId) => void;
-    };
     readonly onPresent: () => void;
     /**
      * Whether presenting may start. False while a content edit is running:
@@ -124,17 +129,18 @@ export interface SpaceSidebarProps {
     readonly state: SpaceSessionState['persistence']['kind'];
     readonly acknowledgedRevision: bigint;
   };
-  readonly cardLinks?:
+  /**
+   * The Card the canvas has selected, named in the footer so its own actions
+   * menu has an entity to hang off.
+   *
+   * The Card itself rather than a title and a pair of copy callbacks: its
+   * addresses are `entityActions`' to build now, exactly as a Layout's and a
+   * Graph's are, and handing this surface a title would leave it naming a Card
+   * down a second path from the one the menu is built over.
+   */
+  readonly selectedCard?:
     | {
-        readonly title: string;
-        readonly onCopyCanonical: () => void;
-        /**
-         * Absent when the Card has no address in the current Layout — a
-         * Card the selected Layout omits and the Cards drawer reveals. The
-         * command is withheld rather than shown and refused, because the
-         * destination it would copy does not exist.
-         */
-        readonly onCopyContextual?: (() => void) | undefined;
+        readonly card: Card;
         /** Delete this Card from the whole Space, returning a refusal to show in place. */
         readonly onDelete?: (() => string | null) | undefined;
       }
@@ -217,7 +223,8 @@ function DeleteCardControl({
 export type SpaceEntity =
   | { readonly kind: 'space' }
   | { readonly kind: 'layout'; readonly layout: Layout }
-  | { readonly kind: 'graph'; readonly graph: Graph; readonly layout: Layout };
+  | { readonly kind: 'graph'; readonly graph: Graph; readonly layout: Layout }
+  | { readonly kind: 'card'; readonly card: Card; readonly layout: Layout };
 
 export interface SpaceChromeTitleEdit {
   readonly subject: SpaceChromeTitleSubject | null;
@@ -390,6 +397,11 @@ function EntityActionsRow({
       <EntityActionsTrigger
         groups={groups}
         label={label}
+        // The general "more" glyph, not the Card rail's link glyph. A Sidebar
+        // row has no cluster of self-naming commands for a generic icon to be
+        // the odd one out in, and the menu behind this one holds a rename, one
+        // or two addresses and a delete — a link glyph would name a third of it.
+        icon={<EntityActionsIcon />}
         render={<SidebarMenuAction showOnHover />}
       />
     </>
@@ -419,7 +431,7 @@ export function SpaceSidebar({
   addCard,
   createLayout,
   persistence,
-  cardLinks,
+  selectedCard,
   entityActions,
   titleEdit,
   collapsible = 'offcanvas',
@@ -645,58 +657,48 @@ export function SpaceSidebar({
                 })}
               </SidebarMenu>
             )}
-            {graph.links !== undefined && activeGraph !== undefined && (
-              <div className="grid gap-1 pt-1">
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  className="w-full justify-start"
-                  onClick={onCanvas(() => graph.links?.onCopyCanonical(activeGraph.id))}
-                >
-                  Copy link to {activeGraph.title}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  className="w-full justify-start"
-                  onClick={onCanvas(() => graph.links?.onCopyContextual(activeGraph.id))}
-                >
-                  Copy link to {activeGraph.title} in this Layout
-                </Button>
-              </div>
-            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="nokey">
-        {cardLinks !== undefined && (
+        {selectedCard !== undefined && (
           <div className="grid gap-1">
-            <Button
-              variant="secondary"
-              size="compact"
-              onClick={onCanvas(cardLinks.onCopyCanonical)}
-            >
-              Copy link to {cardLinks.title}
-            </Button>
-            {cardLinks.onCopyContextual !== undefined && (
-              <Button
-                variant="secondary"
-                size="compact"
-                onClick={onCanvas(cardLinks.onCopyContextual)}
-              >
-                Copy link in this Layout
-              </Button>
-            )}
-            {cardLinks.onDelete !== undefined && (
+            {/* The selected Card as a row of its own, so its addresses hang off
+                the entity the way a Layout's and a Graph's do rather than
+                standing as two more buttons in the footer. It is a
+                `SidebarMenuButton` over a `div`: there is nothing to press
+                here — the Card is already selected, on the canvas — and the
+                row exists to be the thing the menu and the right click are
+                *about*. */}
+            <SidebarMenu>
+              <SidebarMenuItem tabIndex={-1}>
+                <EntityActionsRow
+                  entity={{ kind: 'card', card: selectedCard.card, layout: canvas.selected }}
+                  entityActions={canvasAwareEntityActions}
+                  label={`Actions for Card ${selectedCard.card.title}`}
+                  editing={false}
+                >
+                  <SidebarMenuButton
+                    render={<div />}
+                    data-testid="selected-card-row"
+                    data-card={selectedCard.card.id}
+                  >
+                    <CardKindIcon kind={selectedCard.card.kind} />
+                    <span>{selectedCard.card.title}</span>
+                  </SidebarMenuButton>
+                </EntityActionsRow>
+              </SidebarMenuItem>
+            </SidebarMenu>
+            {selectedCard.onDelete !== undefined && (
               <DeleteCardControl
-                title={cardLinks.title}
+                title={selectedCard.card.title}
                 /* `onCanvas` by hand rather than by the helper: only a
                    *completed* Delete has a canvas result to dismiss the sheet
                    for. A refusal keeps the dialog open (`DeleteCardControl`
                    below), and dismissing the sheet under it would take the
                    surface the sentence is on with it. */
                 onDelete={() => {
-                  const refusal = cardLinks.onDelete?.() ?? null;
+                  const refusal = selectedCard.onDelete?.() ?? null;
                   if (refusal === null && isMobile) setOpenMobile(false);
                   return refusal;
                 }}
