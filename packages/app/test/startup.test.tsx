@@ -4,6 +4,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
+import { recordingHistory } from './browser-history';
 import { startApplication } from '../src/startup';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -45,16 +46,20 @@ it('mounts an opened startup result without interpreting the browser path again'
   document.body.append(container);
   const root = createRoot(container);
   const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
-  const opened = await createOpenSpaces({
+  const spaces = createOpenSpaces({
     backend,
     metaSpaceId: SPACE_ID,
     newId: () => CARD_ID,
-  }).open(SPACE_ID);
+    history: recordingHistory(),
+  });
+  const opened = await spaces.open(SPACE_ID);
   window.history.replaceState(null, '', '/already-resolved-by-startup');
 
   try {
     await act(async () => {
-      await startApplication(root, () => Promise.resolve({ kind: 'opened', opened }));
+      await startApplication(root, () =>
+        Promise.resolve({ kind: 'opened', opened, browserLocation: spaces.browserLocation }),
+      );
     });
 
     expect(within(container).getByRole('heading', { name: 'Stored space' })).toBeVisible();

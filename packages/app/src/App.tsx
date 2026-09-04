@@ -8,11 +8,11 @@ import {
   AppShell,
   DRAWER_WIDTH,
 } from '@project/ui';
-import { type CardId, type GraphId, type LayoutId, type LayoutPosition } from '@project/core';
-import { productDestinationPath, type ProductDestination } from '@project/http';
+import { type CardId, type LayoutId, type LayoutPosition } from '@project/core';
+import type { ProductDestination } from '@project/http';
 import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
+import type { BrowserLocation } from './browser-location';
 import type { OpenSpace } from './open-spaces';
-import { openingPlacement } from './compose-app';
 import type { AuthoringRefusal } from './space-authoring';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
@@ -20,19 +20,13 @@ import { canvasContent } from './canvas-content';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
-import { canRetreat, navigationAddress } from './navigation';
+import { canRetreat } from './navigation';
 import { copyLink } from './clipboard';
 import { spaceEntityActions } from './entity-actions';
 import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
 import { layoutCards, resolveLayout } from './layout-resolution';
 import type { DestinationOpening } from './destination-opening';
-import {
-  destinationRestoration,
-  destinationSync,
-  samePosition,
-  type AddressedPosition,
-} from './destination-coordination';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CardDestinationFocus } from './components/CardDestinationFocus';
@@ -50,11 +44,11 @@ import {
 
 export const createApp = (
   { app: composition, session: spaceSession, initialization }: OpenSpace,
+  browserLocation: BrowserLocation,
   opening?: DestinationOpening,
 ) => {
   const {
     readWorkingSpace,
-    currentSpace,
     navigation,
     authoring,
     adapter: useRenderAdapter,
@@ -85,9 +79,20 @@ export const createApp = (
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
-    const [addressedCardId, setAddressedCardId] = useState<CardId | null>(opening?.cardId ?? null);
-    // Keyed on the Layout as well as the Card: `installDestinationOpening` clears
-    // the published selection, and moving between two Layouts that address
+    /**
+     * The two things the browser's location tells this component (ADR 0081).
+     *
+     * Read rather than owned: the location follows one Space, is answered by
+     * `browser-location.ts`, and outlives any one mount. What is *not* here is
+     * the position that module last synced to — publishing it would let this
+     * decide about a position twice.
+     */
+    const { addressedCardId, destinationNotFound } = useSyncExternalStore(
+      browserLocation.subscribe,
+      browserLocation.getState,
+    );
+    // Keyed on the Layout as well as the Card: a deliberate move clears the
+    // published selection, and moving between two Layouts that address
     // the *same* Card leaves `addressedCardId` untouched, so keying on the Card
     // alone would let React bail out and never restore it. Clearing on `null` is
     // the other half — an address that stops naming a Card must stop selecting
@@ -115,16 +120,6 @@ export const createApp = (
       null,
     );
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
-    const [destinationNotFound, setDestinationNotFound] = useState(false);
-    const syncDestination = useCallback(
-      (method: 'push' | 'replace', destination: ProductDestination): void => {
-        setDestinationNotFound(false);
-        const path = productDestinationPath(destination);
-        if (method === 'push') window.history.pushState(null, '', path);
-        else window.history.replaceState(null, '', path);
-      },
-      [],
-    );
     /**
      * Copy one address, answering whether it reached the clipboard.
      *
@@ -133,12 +128,15 @@ export const createApp = (
      * swapped its label at the first one — "Copied" over a link the browser had
      * refused, with the refusal rendering as an alert the reader might not even
      * be able to see (the Sidebar is a Sheet over that area on a phone).
+     *
+     * The clipboard half of Copy link, and only that. What a destination's URL
+     * *is* belongs to the browser location (ADR 0081); what happens to it after
+     * is this surface's.
      */
     const copyProductDestination = useCallback(
       async (destination: ProductDestination): Promise<boolean> => {
-        const path = productDestinationPath(destination);
         setClipboardFailure(null);
-        const failure = await copyLink(new URL(path, window.location.href).href);
+        const failure = await copyLink(browserLocation.href(destination));
         setClipboardFailure(failure);
         return failure === null;
       },
@@ -402,10 +400,8 @@ export const createApp = (
       draft: spaceChromeEdit?.draft ?? '',
       error: spaceChromeEdit?.error ?? null,
       disabled: chromeEditingDisabled,
-      onBegin: (subject, title, surface, returnFocus) => {
-        setDestinationNotFound(false);
-        setSpaceChromeEdit({ subject, draft: title, error: null, surface, returnFocus });
-      },
+      onBegin: (subject, title, surface, returnFocus) =>
+        setSpaceChromeEdit({ subject, draft: title, error: null, surface, returnFocus }),
       onDraftChange: (draft) =>
         setSpaceChromeEdit((current) => (current === null ? null : { ...current, draft })),
       onErrorChange: (error) =>
@@ -461,185 +457,24 @@ export const createApp = (
         : null,
     });
 
-    // One decision resolved from one Space, applied in an order that cannot
-    // leave the two collaborators disagreeing.
-    //
-    // Both steps that may refuse the selection run first — the resolve here and
-    // Navigation's own — and the render adapter update is a plain store write
-    // that cannot fail. Resolving against the session's live Space rather than
-    // the rendered one matters because Navigation resolves against the live one
-    // too: deciding from a snapshot Navigation will not consult is one decision
-    // with two sources of truth.
-    const installDestinationOpening = useCallback((opening: DestinationOpening) => {
-      setSpaceChromeEdit(null);
-      // Choosing a destination is what answers a failed restoration, and it
-      // answers it whether or not the choice moves the address — so this belongs
-      // to the choice rather than to the history entry it may not earn. It is
-      // also what asks the sync effect below to correct the location the report
-      // was about, which is why the report is one of that effect's dependencies.
-      setDestinationNotFound(false);
-      const resolved = resolveLayout(currentSpace(), opening.selection);
-      const changesLayout = navigation.getState().selectedLayoutId !== opening.selection;
-      if (opening.graphId === null) navigation.selectLayout(opening.selection);
-      else if (opening.presentationCardId === null) {
-        navigation.openGraph(opening.selection, opening.graphId);
-      } else {
-        navigation.openPresentation(opening.selection, opening.graphId, opening.presentationCardId);
-      }
-      // A current row can be chosen again after reload. Its UUID is already the
-      // Navigation value, so no Layout dependency will change and no placement
-      // effect will rerun; clearing the published projection here would strand
-      // the canvas in its pending state. Navigation still receives the choice so
-      // it can apply its own same-Layout semantics.
-      if (!changesLayout) return;
-      useRenderAdapter.getState().selectLayout(openingPlacement(resolved));
-    }, []);
-
     /**
      * Choosing a Layout row, including the row already current.
      *
-     * The repeated choice is not a no-op and must not be skipped here:
-     * `navigation.selectLayout` publishes `mode: 'overview'`, so choosing the
-     * current row is how an author leaves a presentation. Whether that earns a
-     * history entry is not asked here at all — the address it produces is what
-     * the sync effect below decides from (ADR 0081).
+     * Two acts, and only one of them is this component's. Discarding the chrome
+     * title draft belongs to whichever module owns that Interaction — it is not
+     * a fact about the browser's location — so it stays at the call site, in
+     * front of the choice.
      */
-    const selectLayoutRow = useCallback(
-      (selection: LayoutId) => {
-        setAddressedCardId(null);
-        installDestinationOpening({
-          selection,
-          graphId: null,
-          presentationCardId: null,
-          cardId: null,
-        });
-      },
-      [installDestinationOpening],
-    );
+    const selectLayoutRow = useCallback((selection: LayoutId) => {
+      setSpaceChromeEdit(null);
+      browserLocation.chooseLayout(selection);
+    }, []);
 
     const present = navigation.present;
     const advance = navigation.advance;
     const retreat = navigation.retreat;
     const exitPresenting = navigation.exitPresenting;
-
-    // Same rule as `selectLayoutRow`, for the same reason: activating the
-    // Graph that is already active publishes `mode: 'overview'`, which is how
-    // the Graph row leaves a presentation, so the call may not be skipped.
-    const activateGraph = useCallback((graphId: GraphId) => {
-      setDestinationNotFound(false);
-      setAddressedCardId(null);
-      navigation.activateGraph(graphId);
-    }, []);
-
-    /**
-     * The position the browser was last told about: the address, and the Card
-     * the location addresses within it.
-     *
-     * A ref and not state: nothing renders from it, and writing it must not
-     * schedule a render of its own. Its initial value is the position the
-     * application mounted at, which is what makes mount decide nothing at all —
-     * startup read the location once and composed from it, and the `popstate`
-     * listener below is registered by a later effect, so a Back that lands in
-     * between leaves a location Navigation was never told about. Correcting it
-     * there would silently undo the reader's Back, and the code this replaced
-     * could not do that because it never wrote history on mount.
-     *
-     * Comparing the whole position rather than counting runs is also what makes
-     * StrictMode's second invocation decide nothing: it sees the position the
-     * first one recorded.
-     */
-    const syncedPosition = useRef<AddressedPosition>({
-      ...navigationAddress(navigation.getState()),
-      addressedCardId,
-    });
-    /**
-     * Whether the location the reader is on failed to resolve, as the sync
-     * below last saw it.
-     *
-     * The decision reads `window.location`, which React cannot depend on, and
-     * this is the one signal App has that the location moved somewhere the
-     * position does not name. It is therefore a dependency of the sync as much
-     * as the address is — and clearing the report is what asks for the stale
-     * location to be corrected, which is the pairing the single
-     * `syncDestination` call used to make on its own.
-     */
-    const syncedUnresolved = useRef(destinationNotFound);
-    /**
-     * The one place a position becomes a browser history entry (ADR 0081).
-     *
-     * Navigation answers where the reader is; this asks what the browser should
-     * do about it, and does that. Nothing on the way in decides — the five sites
-     * that used to compare the one field they happened to have passed are gone,
-     * and with them the `previousLayoutId` ref that stood in for the call Edit
-     * completion never made.
-     *
-     * It decides exactly once per position, because its dependencies are the
-     * address's own three fields, the Card the location addresses and whether
-     * the location resolved at all, and a state it has already decided about is
-     * skipped above. The decision then reads the current pathname rather than
-     * tracking whether it wrote it, so after Back the location already opens
-     * the restored position and the answer is `none`.
-     */
-    useEffect(() => {
-      // Read off Navigation rather than rebuilt from the dependencies above:
-      // the address has one definition and this is not a second one.
-      const position: AddressedPosition = {
-        ...navigationAddress(navigation.getState()),
-        addressedCardId,
-      };
-      const previous = syncedPosition.current;
-      const moved = !samePosition(previous, position);
-      if (!moved && syncedUnresolved.current === destinationNotFound) return;
-      syncedUnresolved.current = destinationNotFound;
-      // A location this Space could not resolve is the reader's *arrival*, and
-      // only that. It is reported rather than corrected, because rewriting it
-      // on arrival would take the entry they navigated to — but the report is
-      // answered the moment the position moves, whether the move came from a
-      // choice or from presenting, and holding it past that would strand every
-      // move after it behind a path that 404s on reload and is what Copy link
-      // copies. So the guard holds the arrival and nothing after it. Writing
-      // the location is what clears the report, which is `syncDestination`'s
-      // own first act rather than a second thing to remember here.
-      if (destinationNotFound && !moved) return;
-      syncedPosition.current = position;
-      const sync = destinationSync({
-        space: currentSpace(),
-        snapshot: spaceSession.getState().working,
-        pathname: window.location.pathname,
-        position,
-        synced: previous,
-      });
-      if (sync.kind === 'none') return;
-      syncDestination(sync.kind, sync.destination);
-    }, [
-      selectedLayoutId,
-      activeGraphId,
-      activeCardId,
-      addressedCardId,
-      destinationNotFound,
-      syncDestination,
-    ]);
-
-    useEffect(() => {
-      const restoreDestination = () => {
-        const space = currentSpace();
-        const restoration = destinationRestoration(
-          space,
-          spaceSession.getState().working,
-          window.location.pathname,
-        );
-        if (restoration.kind !== 'opening') {
-          setDestinationNotFound(restoration.kind === 'not-found');
-          return;
-        }
-        setDestinationNotFound(false);
-        const { opening } = restoration;
-        installDestinationOpening(opening);
-        setAddressedCardId(opening.cardId);
-      };
-      window.addEventListener('popstate', restoreDestination);
-      return () => window.removeEventListener('popstate', restoreDestination);
-    }, [installDestinationOpening]);
+    const activateGraph = browserLocation.activateGraph;
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.

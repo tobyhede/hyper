@@ -1,6 +1,7 @@
 import { Component, type ReactElement, type ReactNode } from 'react';
 import { createApp } from './App';
 import { SpaceAppFailureView } from './components/SpaceAppFailureView';
+import type { BrowserLocation } from './browser-location';
 import type { OpenSpace } from './open-spaces';
 import type { DestinationOpening } from './destination-opening';
 
@@ -55,12 +56,13 @@ class SpaceAppFailure extends Component<{ children: ReactNode }, SpaceAppFailure
  */
 export function mountSpaceApp(
   opened: OpenSpace,
+  browserLocation: BrowserLocation,
   render: SpaceAppRenderer,
   opening?: DestinationOpening,
 ): void {
   let App: ReturnType<typeof createApp>;
   try {
-    App = createApp(opened, opening);
+    App = createApp(opened, browserLocation, opening);
   } catch (error) {
     console.error('Composing the Space app failed', error);
     render(<SpaceAppFailureView message={failureMessage(error)} />);

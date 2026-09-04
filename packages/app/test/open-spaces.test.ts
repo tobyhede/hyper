@@ -6,6 +6,7 @@ import {
   type CommitResult,
 } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
+import { recordingHistory } from './browser-history';
 import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
 
@@ -102,7 +103,12 @@ const setup = (control?: MemorySpaceBackendTestControl, newId: () => UUID = () =
   );
   return {
     backend,
-    openSpaces: createOpenSpaces({ backend, metaSpaceId: META_ID, newId }),
+    openSpaces: createOpenSpaces({
+      backend,
+      metaSpaceId: META_ID,
+      newId,
+      history: recordingHistory(),
+    }),
   };
 };
 

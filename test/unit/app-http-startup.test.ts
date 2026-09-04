@@ -1,9 +1,21 @@
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { createSpaceHttpApp, HttpSpaceBackend, productDestinationPath } from '@project/http';
-import { MemorySpaceBackend } from '@project/persistence';
+import { MemorySpaceBackend, type SpaceBackend } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
-import { createSpaceStartup } from '../../packages/app/src/space';
+import { createSpaceStartup, type SpaceStartup } from '../../packages/app/src/space';
+import { recordingHistory } from '../../packages/app/test/browser-history';
+
+/**
+ * Startup over the recording browser rather than the ambient one.
+ *
+ * `createSpaceStartup` is the one module that names `window.history` and
+ * `window.location`, and it names them as the default third seam (ADR 0081).
+ * These tests run in the node environment, so each supplies the other adapter —
+ * which is what a seam required below the composition root is for.
+ */
+const startupOver = (backend: SpaceBackend, newId: () => UUID = newUuid): SpaceStartup =>
+  createSpaceStartup(backend, newId, recordingHistory());
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -34,7 +46,7 @@ const startupFor = (...snapshots: SpaceSnapshot[]) => {
     snapshots.map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
   );
   const app = createSpaceHttpApp(repository);
-  return createSpaceStartup(
+  return startupOver(
     new HttpSpaceBackend('http://hyper.test', {
       fetch: (input, init) => Promise.resolve(app.fetch(new Request(input, init))),
     }),
@@ -47,7 +59,7 @@ describe('HTTP space startup composition', () => {
       { snapshot: snapshot(), revision: 0n, exportedRevision: null },
     ]);
     const ids = [LAYOUT_ID, GRAPH_ID];
-    const startup = createSpaceStartup(backend, () => {
+    const startup = startupOver(backend, () => {
       const id = ids.shift();
       if (id === undefined) throw new Error('initializer minted too many identities');
       return id;
@@ -111,7 +123,7 @@ describe('HTTP space startup composition', () => {
     const backend = new FlakyAggregateBackend(SPACE_ID, [
       { snapshot: snapshot(), revision: 0n, exportedRevision: null },
     ]);
-    const startup = createSpaceStartup(backend);
+    const startup = startupOver(backend);
     const destination = productDestinationPath({ kind: 'space', spaceId: SPACE_ID });
 
     await expect(startup.resolve(destination)).rejects.toThrow('aggregate transport exploded');
@@ -154,7 +166,7 @@ describe('HTTP space startup composition', () => {
     };
     const backend = new MemorySpaceBackend([loaded]);
     const loadSpace = vi.spyOn(backend, 'loadSpace');
-    const startup = createSpaceStartup(backend);
+    const startup = startupOver(backend);
 
     const result = await startup.resolve(
       productDestinationPath({
@@ -174,7 +186,7 @@ describe('HTTP space startup composition', () => {
     const loaded = { snapshot: snapshot(), revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const loadSpace = vi.spyOn(backend, 'loadSpace');
-    const startup = createSpaceStartup(backend);
+    const startup = startupOver(backend);
     const destination = productDestinationPath({ kind: 'space', spaceId: SPACE_ID });
 
     const first = await startup.resolve(destination);
@@ -207,7 +219,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+    const startup = startupOver(new MemorySpaceBackend([loaded]));
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'graph', spaceId: SPACE_ID, graphId: GRAPH_ID }),
@@ -251,7 +263,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+    const startup = startupOver(new MemorySpaceBackend([loaded]));
 
     const result = await startup.resolve(
       productDestinationPath({
@@ -296,7 +308,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+    const startup = startupOver(new MemorySpaceBackend([loaded]));
 
     const result = await startup.resolve(
       productDestinationPath({
@@ -351,7 +363,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+    const startup = startupOver(new MemorySpaceBackend([loaded]));
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: omittedId }),
