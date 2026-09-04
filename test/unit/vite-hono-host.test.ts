@@ -9,6 +9,7 @@ import { connect } from 'node:net';
 import { encodeCompactUuid, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import {
+  decodeLoadedSpace,
   decodeProblemDetails,
   encodeCommitRequest,
   type SpaceResourceRepository,
@@ -21,6 +22,8 @@ import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const MINTED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -223,6 +226,40 @@ describe('Vite Hono host', () => {
     const again = await fetch(`${host.url}/`, { redirect: 'manual' });
     expect(again.headers.get('location')).toBe(response.headers.get('location'));
     await expect(spaceRepository.listSpaces()).resolves.toHaveLength(1);
+  });
+
+  it('mints working-load initialization from the identity source it was composed with', async () => {
+    // The host's `newId` reaches both things it composes that mint, not just
+    // the root address. A stored layoutless Space is durably initialized on
+    // first working load (ADR 0079), and that Layout and Graph are the ones
+    // this composition named — not the ambient generator's, which is what
+    // `createSpaceHttpApp`'s own default would have supplied.
+    const ids = [MINTED_LAYOUT_ID, MINTED_GRAPH_ID];
+    const spaceRepository = new MemorySpaceRepository(
+      [{ snapshot, revision: 0n, exportedRevision: null }],
+      SPACE_ID,
+    );
+    const hostApp = createSpaceHost(spaceRepository, () => {
+      const id = ids.shift();
+      if (id === undefined) throw new Error('The working-space loader minted more ids than named');
+      return id;
+    });
+    const { host } = await startHost(hostApp);
+
+    const response = await fetch(`${host.url}/api/spaces/${SPACE_ID}`);
+
+    expect(response.status).toBe(200);
+    expect(decodeLoadedSpace(await response.json()).snapshot.document).toMatchObject({
+      defaultLayout: MINTED_LAYOUT_ID,
+      layouts: [
+        {
+          id: MINTED_LAYOUT_ID,
+          graphs: [{ id: MINTED_GRAPH_ID }],
+          activeGraph: MINTED_GRAPH_ID,
+        },
+      ],
+    });
+    expect(ids).toHaveLength(0);
   });
 
   it('answers contradictory stored Meta state as an explicit failure', async () => {

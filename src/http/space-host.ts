@@ -60,15 +60,21 @@ const methodNotAllowed = (accept?: string): ProductResponse => {
  * Compose API resources and the product paths the HTTP host owns before SPA
  * fallback.
  *
- * `newId` is the composition-owned identity source (ADR 0016): the root address
- * establishes the Meta Space when the repository has none, and that mints
- * identities.
+ * `newId` is the composition-owned identity source (ADR 0016), and it is the
+ * host's only one. Two things the host composes mint: the root address
+ * establishes the Meta Space when the repository has none, and the API tree's
+ * working-space loader durably initializes a stored layoutless Space on first
+ * load (ADR 0079). So it is forwarded to `createSpaceHttpApp` rather than left
+ * to that function's own default, which would reinstate the ambient generator
+ * for the second of them behind this composition's back — a host handed a
+ * deterministic minter would then be deterministic at the root and random on
+ * load.
  */
 export const createSpaceHost = (
   repository: SpaceRepository,
   newId: () => UUID,
 ): SpaceHostApplication => {
-  const api = createSpaceHttpApp(repository);
+  const api = createSpaceHttpApp(repository, { newId });
   const resolveProductRequest = async (
     pathname: string,
     method: string,
