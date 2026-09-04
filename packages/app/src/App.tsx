@@ -877,14 +877,24 @@ export const createApp = (
      * covered by the pane. Keyed on the fact rather than
      * wrapped around the control, so a second way into presenting cannot leave a
      * creation state open over a presentation.
+     *
+     * The one thing it waits for is a coordinated Edit already in flight. The
+     * Space Card pane withholds Cancel and Escape while one is running, because
+     * the Edit completes whether or not the surface that began it is still
+     * mounted — and closing here would make exactly that abandonment through a
+     * route the pane cannot refuse. Presenting is reachable from under a modal
+     * pane in one way: Back onto a presenting Card URL is a browser navigation,
+     * and `popstate` does not consult a focus trap. The completion clears the
+     * running state, which runs this again and takes the pane away then.
      */
     useEffect(() => {
       if (!presenting) return;
       setCreatingAlias(false);
       setAliasRefusal(null);
+      if (creatingSpaceCardBusy) return;
       setCreatingSpaceCard(false);
       setSpaceCardFailure(null);
-    }, [presenting]);
+    }, [presenting, creatingSpaceCardBusy]);
 
     /**
      * Every Card an Alias may name.

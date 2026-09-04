@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
@@ -35,6 +35,7 @@ const HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const HOME_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
 const HOME_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const HOME_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
+const HOME_NEXT_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000014');
 
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -86,13 +87,28 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: HOME_LAYOUT_ID,
         title: 'Layout 1',
         kind: 'positioned',
-        positions: { [HOME_CARD_ID]: { x: 10, y: 20, open: false } },
-        graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        positions: {
+          [HOME_CARD_ID]: { x: 10, y: 20, open: false },
+          [HOME_NEXT_CARD_ID]: { x: 310, y: 20, open: false },
+        },
+        // An Edge, so this Space can be presented: presenting is one of the
+        // things that closes the creation pane, and a Graph with no Edge
+        // declines to start (ADR 0032).
+        graphs: [
+          {
+            id: HOME_GRAPH_ID,
+            title: 'Graph 1',
+            edges: [{ from: HOME_CARD_ID, to: HOME_NEXT_CARD_ID }],
+          },
+        ],
       },
     ],
     defaultLayout: HOME_LAYOUT_ID,
   },
-  cards: [{ id: HOME_CARD_ID, document: { title: 'Start here', kind: 'markdown', body: '' } }],
+  cards: [
+    { id: HOME_CARD_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
+    { id: HOME_NEXT_CARD_ID, document: { title: 'And then', kind: 'markdown', body: '' } },
+  ],
 });
 
 const other: SpaceSnapshot = spaceSnapshotSchema.parse({
@@ -125,6 +141,8 @@ const runtime = (value: SpaceSnapshot) => {
 interface Mounted {
   readonly backend: MemorySpaceBackend;
   readonly session: SpaceSession;
+  /** The composition behind the surface, for the operations only a browser navigation reaches. */
+  readonly app: ReturnType<typeof composeApp>;
 }
 
 /**
@@ -147,12 +165,13 @@ function mount(
   const stored = { snapshot: home, revision: 0n, exportedRevision: null };
   const { spaceSession: session, spaceCards: authoring } = openTestSpace(backend, stored);
   const spaceCards: SpaceCardAuthoring = { ...authoring, ...broken };
+  const app = composeApp({ spaceSession: session });
   let view: RenderResult | undefined;
   mountSpace(
     {
       id: runtime(home).id,
       session,
-      app: composeApp({ spaceSession: session }),
+      app,
       spaceCards,
     },
     (app) => {
@@ -160,7 +179,7 @@ function mount(
       else view.rerender(app);
     },
   );
-  return { backend, session };
+  return { backend, session, app };
 }
 
 const cardsOf = (session: SpaceSession) => session.getState().working.cards;
@@ -553,6 +572,31 @@ describe('a coordination that broke rather than refused', () => {
       'aria-busy',
       'true',
     );
+    await settled(session);
+  });
+
+  /**
+   * Presenting takes the pane away, and an Edit in flight is what it waits for.
+   *
+   * Presenting is reachable while the pane is open even though the pane is
+   * modal: Back onto a presenting Card URL is a browser navigation, and the
+   * `popstate` a focus trap does not see reopens the presentation. Closing on
+   * that would be the abandonment the pane already refuses to make itself —
+   * Cancel and Escape are both withheld while a coordinated Edit is running,
+   * because the Edit completes whether or not the surface that began it is
+   * still there. So the pane stays until the Edit answers, and the answer is
+   * what takes it away.
+   */
+  it('keeps the pane over a presentation entered while a create is in flight', async () => {
+    const { session, app } = mount(other, { create: () => new Promise<never>(() => undefined) });
+    await openSpaceCardCreation();
+
+    createNamed('Architecture');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled());
+
+    act(() => app.navigation.openPresentation(HOME_LAYOUT_ID, HOME_GRAPH_ID, HOME_CARD_ID));
+
+    expect(screen.getByRole('dialog', { name: 'New Space Card' })).toBeVisible();
     await settled(session);
   });
 
