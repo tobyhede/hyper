@@ -939,8 +939,11 @@ describe('Space Card lifecycle', () => {
         },
         cards: [
           {
+            // The typed title names the *Space*. Its first Card takes the same
+            // neutral `Card 1` every new Space's first Card takes, because the
+            // two are independent from the moment they exist (ADR 0068).
             id: TARGET_CARD_ID,
-            document: { title: 'Architecture', kind: 'markdown', body: '' },
+            document: { title: 'Card 1', kind: 'markdown', body: '' },
           },
         ],
       },

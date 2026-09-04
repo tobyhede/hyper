@@ -28,6 +28,7 @@ import {
 import { activeGraphColor } from '../colors';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import { useCanvasCardAuthoring } from '../canvas-card-authoring';
+import type { SpaceCardTargets } from '../space-card-targets';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import type { EdgeAuthoring } from '../edge-authoring';
 import type { CanvasSelection, CardResize, EdgeSubject } from '../render-adapter';
@@ -189,6 +190,8 @@ export interface SpaceCanvasProps {
   colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: GraphId | null;
   activeGraphCardIds: ReadonlySet<string>;
+  /** What each Space Card's target offers it, for the Cards of kind `space` on this canvas. */
+  spaceCardTargets?: SpaceCardTargets;
 }
 
 export function SpaceCanvas({
@@ -219,6 +222,7 @@ export function SpaceCanvas({
   colorByGraphId,
   activeGraphId,
   activeGraphCardIds,
+  spaceCardTargets,
 }: SpaceCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   /**
@@ -262,6 +266,7 @@ export function SpaceCanvas({
     onSelectCard,
     onBodyEditingChange,
     onTitleEditingChange,
+    spaceCardTargets,
   });
   const { bodyEditing, canAuthorOnCanvas, openCard: onOpenCard, beginTitleEditing } = cardAuthoring;
 

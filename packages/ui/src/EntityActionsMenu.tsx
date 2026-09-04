@@ -164,21 +164,80 @@ const reports = (action: EntityAction): boolean => action.report !== undefined;
 function useConfirmation() {
   const [report, setReport] = useState<ActionReport | null>(null);
   const clearTimer = useRef<number | undefined>(undefined);
+  /**
+   * Which press the one `report` and the one timer currently belong to.
+   *
+   * A reporting item is held open (`closeOnClick` is false), so a second
+   * command can be pressed while the first is still in flight — and both used
+   * to overwrite the pair unconditionally on arrival, so the slow one landed
+   * last and won. A copy the author had given up on took the confirmation off
+   * the row they had just pressed, cleared its timer, and announced itself a
+   * second time.
+   *
+   * The counter makes the **last press** win rather than the last answer: a
+   * settlement whose press has been overtaken has nothing to say about a
+   * confirmation asked for after it.
+   */
+  const press = useRef(0);
 
-  useEffect(() => () => window.clearTimeout(clearTimer.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(clearTimer.current);
+      // Unmounting is the last press, and bumping the counter is what makes it
+      // one. The line above clears the timer that is pending *now*; a command
+      // still in flight would otherwise land behind this cleanup, set state on
+      // a component that has gone, and arm a fresh 1600ms timeout with no
+      // surviving path to clear it. The Sidebar going mid-clipboard-write is an
+      // ordinary Space switch, or the mobile Sheet closing.
+      press.current += 1;
+    },
+    [],
+  );
 
   const fire = useCallback((action: EntityAction) => {
-    const outcome = action.onSelect();
-    // Read once, before the await: an item that names its words has one for
-    // every outcome, so past this line there is always a word to show and the
-    // menu the press held open is never held over nothing.
+    // Read once, up front: an item that names its words has one for every
+    // outcome, so past this line there is always a word to show and the menu
+    // the press held open is never held over nothing.
     const words = action.report;
-    if (words === undefined) return;
-    void Promise.resolve(outcome).then((answered) => {
+    const pressed = (press.current += 1);
+    const confirm = (answered: EntityActionOutcome) => {
+      // Two ways there is no confirmation left to make: the author has pressed
+      // something since — or unmounted the menu, which counts as pressing
+      // something since — and an item that names no words has nothing to swap
+      // its label for either way it goes.
+      if (pressed !== press.current || words === undefined) return;
       window.clearTimeout(clearTimer.current);
       setReport({ id: action.id, word: words[answered] });
       clearTimer.current = window.setTimeout(() => setReport(null), 1600);
-    });
+    };
+    /*
+     * The call sits *inside* the async body rather than in front of it, which
+     * is what makes the two ways a command can go wrong one way here. An
+     * `async` body still runs synchronously to its first `await`, so `onSelect`
+     * is called on this click exactly as before — but a command that throws
+     * before it ever returns a promise now rejects instead of throwing out of a
+     * React event handler, which no error boundary catches. The Sidebar's
+     * Delete Layout is that command: it runs an Edit, and `complete` throws
+     * outright for a Space that has stopped loading.
+     */
+    void (async () => {
+      try {
+        confirm(await action.onSelect());
+      } catch (failure) {
+        /*
+         * A command that threw is a command that failed, and is reported as
+         * one — but a throw is a broken contract rather than an answered
+         * outcome, and an item naming no words has nothing to show for it
+         * either way. So it is recorded here as well, because the alternative
+         * is what this replaced: the promise was never consumed on the
+         * wordless path, so a refused Delete Layout became an unhandled
+         * rejection and the author pressed it to no effect and no message
+         * anywhere.
+         */
+        console.error('An entity action failed', failure);
+        confirm('failed');
+      }
+    })();
   }, []);
 
   return {

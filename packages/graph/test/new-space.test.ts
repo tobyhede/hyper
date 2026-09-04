@@ -88,7 +88,7 @@ describe('initializeSpace', () => {
     expect(result.space).toMatchObject({
       id: SPACE_ID,
       title: 'Architecture',
-      cards: [{ id: CARD_ID, title: 'Architecture', kind: 'markdown', body: '' }],
+      cards: [{ id: CARD_ID, title: 'Card 1', kind: 'markdown', body: '' }],
     });
     expect(result.space.layouts).toEqual([
       {

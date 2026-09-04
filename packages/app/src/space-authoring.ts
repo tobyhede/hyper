@@ -675,8 +675,87 @@ export function createSpaceAuthoring({
     }
   };
 
+  /**
+   * Bring the placement back in step with a working snapshot this module did
+   * not write.
+   *
+   * Space Authoring installs the placement for every Edit it completes, so this
+   * is about the Edits it does not: a Space Card lifecycle operation is one
+   * atomic Edit across several Spaces and installs the containing Space's
+   * snapshot through the session directly (ADR 0076). The Layout it wrote then
+   * holds a Card this placement has never heard of, and every operation keyed on
+   * placement membership — Opening it, resizing it, removing it from the Layout
+   * — refuses `card-not-in-layout` for a Card plainly on the canvas. Read the
+   * other way, a Card the cascade deleted would linger as a position naming no
+   * Card, which is a reference error the next Edit's intake would throw on.
+   *
+   * **Membership only.** A Card the Layout has gained takes the position the
+   * Layout authored for it, one it has lost is dropped, and every Card both
+   * still hold keeps the value the placement holds — which is what stops a
+   * reconciliation discarding a live drag, an Open state or a resize the stored
+   * snapshot has not caught up with.
+   */
+  const reconcilePlacement = (): void => {
+    /**
+     * A snapshot that no longer passes intake has no Layout to reconcile
+     * against, and saying so is not this function's job.
+     *
+     * `selectedResolvedLayout` resolves against `currentSpace()`, which throws
+     * for exactly that snapshot — and this runs inside a session observer,
+     * which `SpaceSession` contains by design. A throw here would therefore
+     * never reach anyone: it would go to the observer sink and take the
+     * publication below with it, leaving the canvas drawing a stale Space with
+     * nothing on screen to say why. Returning instead lets the publication
+     * happen, `App` re-derive the same aggregate on the next render, and
+     * `SpaceAppFailure` report the throw with its diagnostic — which is where an
+     * unloadable snapshot is supposed to surface (`SpaceApp.tsx`).
+     */
+    let resolved: ResolvedLayout;
+    try {
+      resolved = selectedResolvedLayout();
+    } catch {
+      return;
+    }
+    const authored = Placement.fromLayout(resolved.layout);
+    /**
+     * Nothing installed is nothing to merge, so the Layout's own map is what
+     * there is to adopt.
+     *
+     * This does not overrule `composeApp`'s "an explicit `null` — is the
+     * caller's own statement and stands". That statement is about the placement
+     * a Space *opens* on, and every later install writes over the opening value
+     * as a matter of course: a rendered report, a completed Edit, a re-selected
+     * Layout. What is adopted here is the same value the composition would have
+     * opened on had the caller said nothing at all, so a placement that was
+     * pending ends on geometry the Layout already holds rather than on geometry
+     * this module invented — which is the sense in which this is still
+     * membership only.
+     *
+     * No production composition reaches it. `composeApp` derives its opening
+     * placement from the Layout it opened in and `Placement.fromLayout` is
+     * total, so the only `null` placements are the ones a caller states, and the
+     * one non-test caller that states one (`stories/support/SpaceSidebarFixture`)
+     * states it for exactly the Layout that does not resolve — which the `catch`
+     * above has already returned on.
+     */
+    if (placement === null) {
+      install(authored);
+      return;
+    }
+    let merged = placement;
+    for (const [cardId, at] of authored) {
+      if (!merged.has(cardId)) merged = Placement.place(merged, cardId, at);
+    }
+    for (const cardId of [...merged.keys()]) {
+      if (!authored.has(cardId)) merged = Placement.remove(merged, cardId);
+    }
+    install(merged);
+  };
+
   const unsubscribeSession = session.subscribe(() => {
-    if (installing === 0) publish();
+    if (installing !== 0) return;
+    reconcilePlacement();
+    publish();
   });
   const unsubscribeNavigation = navigation.subscribe(() => {
     if (installing === 0) publish();

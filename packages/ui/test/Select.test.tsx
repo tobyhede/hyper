@@ -39,7 +39,17 @@ function openList(content: Partial<ContentProps> = {}): HTMLElement {
 }
 
 describe('SelectContent placement', () => {
-  it('does not carry a canvas key marker without a production consumer', () => {
+  /**
+   * The canvas key marker belongs to the caller, not to this wrapper.
+   *
+   * React Flow subscribes its delete key on `document`, so a portalled popup
+   * needs `nokey` exactly where it is drawn over a canvas — which the Open
+   * Space Card's selectors and the Space Card creation pane both do, and which
+   * a Select used anywhere else does not. Marking it here would put the marker
+   * on every consumer to serve the ones that need it, so the wrapper stays
+   * unmarked and the two call sites say so themselves.
+   */
+  it('leaves the canvas key marker to the surface that draws it', () => {
     openList();
 
     expect(screen.getByRole('combobox', { name: 'Pick' })).not.toHaveClass('nokey');

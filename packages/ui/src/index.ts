@@ -20,6 +20,8 @@ export type {
   CanvasCardFront,
   CanvasCardProps,
   CanvasCardState,
+  CanvasSpaceCardChoice,
+  CanvasSpaceCardSelection,
 } from './CanvasCard';
 export { usePresence } from './use-presence';
 export type { Presence, PresenceState } from './use-presence';

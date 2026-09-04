@@ -8,17 +8,28 @@ import {
   type LoadedSpace,
   type ObserverErrorReporter,
   type SpaceBackend,
-  type SpaceCardLifecycle,
   type SpaceSession,
 } from '@project/persistence';
 import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
+import { createSpaceCardLifecycle, type SpaceCardAuthoring } from './space-card-lifecycle';
 
 export interface OpenSpace {
   readonly id: UUID;
   readonly session: SpaceSession;
   readonly app: ComposedApp;
+  /**
+   * Authoring the Space Cards this Space holds (ADR 0074, ADR 0076).
+   *
+   * Carried on the entry rather than composed inside the app because it is
+   * written over the *registry*, not over one session: creating, referencing
+   * and deleting a Space Card are Edits across several Spaces, and the registry
+   * is what holds the others. Every entry names the same one — which is why it
+   * is required rather than optional, and why an app is never composed half
+   * able to author a Space Card.
+   */
+  readonly spaceCards: SpaceCardAuthoring;
   /** Set when this Space's first working load authored its opening Layout. */
   readonly initialization?: 'created-layout';
 }
@@ -60,7 +71,7 @@ export interface OpenSpaces {
     spaceId: UUID,
     confirmation?: RejectedCloseConfirmation,
   ) => Promise<CloseSpaceResult>;
-  readonly spaceCards: SpaceCardLifecycle;
+  readonly spaceCards: SpaceCardAuthoring;
   /**
    * The browser's location, following whichever Space is on the canvas.
    *
@@ -117,6 +128,7 @@ export function createOpenSpaces({
   // Opening a Space is a working load, so it initializes a stored layoutless
   // Space before anything composes against it (ADR 0079).
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
+  const spaceCards = createSpaceCardLifecycle({ backend, registry, newId });
   const observable = createObservableState<OpenSpacesState>(
     { activeSpaceId: null, entries: [] },
     report,
@@ -247,6 +259,7 @@ export function createOpenSpaces({
       id: spaceId,
       session,
       app: composeApp({ spaceSession: session, selection, newId, reportObserverError: report }),
+      spaceCards,
     };
     if (reused || loaded.initialization !== 'created-layout') return opened;
     return { ...opened, initialization: 'created-layout' };
@@ -443,7 +456,7 @@ export function createOpenSpaces({
     enter: open,
     switchTo,
     close,
-    spaceCards: registry.spaceCards(newId),
+    spaceCards,
     browserLocation,
   };
 }

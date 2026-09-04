@@ -1,6 +1,6 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
-import type { CanvasCardBodyEditor } from '@project/ui';
+import type { CanvasCardBodyEditor, CanvasSpaceCardSelection } from '@project/ui';
 import type { Card, CardId, LayoutPosition, GraphId } from '@project/core';
 import { inHandleId, outHandleId, resolveContentCard } from '@project/graph';
 import type {
@@ -162,6 +162,17 @@ export type CardNodeData = {
   /** For an alias, the title of the card it shows — so the node can name what it
    *  redraws. Absent on non-alias cards. */
   aliasOf?: string;
+  /**
+   * For a space card, the Title of the Space it references, and what that
+   * Space offers its selections to be chosen from.
+   *
+   * Neither is derived here, and neither could be: both describe a *second*
+   * Space, which this projection has no reader for and no business loading.
+   * The composition that read the target supplies them, exactly as it supplies
+   * every other operation on this node (ADR 0068, ADR 0074).
+   */
+  spaceTitle?: string;
+  spaceSelection?: CanvasSpaceCardSelection;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
@@ -354,9 +365,13 @@ export function projectCardNodes(
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
     const showContent = active && showActiveCardContent;
-    const open =
-      options.openCardIds?.has(card.id) === true &&
-      (card.kind === 'markdown' || card.kind === 'alias');
+    // Every Card kind Opens, so the Layout's Open set is the whole answer and
+    // there is no kind guard beside it. The guard this replaced named the two
+    // kinds that had a front to draw when Open; a Space Card gained one with
+    // `entity-url-addressability/07` (ADR 0068), which left the third arm the
+    // only thing standing between a stored Open state and the Card that state
+    // is about.
+    const open = options.openCardIds?.has(card.id) === true;
     // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
     const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).

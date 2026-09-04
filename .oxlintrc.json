@@ -386,17 +386,15 @@
       }
     },
     {
-      // Each of these takes a deliberately raw or deliberately invalid value
-      // and hands it straight to a real intake or schema this repo already
-      // trusts to parse it: `open-space.ts`'s `spaceFile` goes straight
-      // into `loadSpace` (the one intake, ADR 0010); the three test files
-      // build a value and pass it to `loadSpace`, `importSpaces`, or
-      // `decodeCommitRequest` specifically to exercise their refusal paths —
-      // the same "deliberately loosely-typed fixture, so the real runtime
-      // validation is what's under test" case as issue 04/05's `spaceWith`
-      // exception. There is nothing to parse ahead of the parser itself.
+      // Each of these three test files builds a deliberately raw or
+      // deliberately invalid value and hands it straight to a real intake or
+      // schema this repo already trusts to parse it — `loadSpace` (the one
+      // intake, ADR 0010), `importSpaces` or `decodeCommitRequest` —
+      // specifically to exercise their refusal paths: the same "deliberately
+      // loosely-typed fixture, so the real runtime validation is what's under
+      // test" case as issue 04/05's `spaceWith` exception. There is nothing to
+      // parse ahead of the parser itself.
       "files": [
-        "packages/app/src/open-space.ts",
         "packages/core/test/persistence-schema.test.ts",
         "packages/react-flow-adapter/test/projection.test.ts",
         "test/unit/postgres-import-decoding.test.ts"

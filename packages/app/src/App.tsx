@@ -8,7 +8,7 @@ import {
   AppShell,
   DRAWER_WIDTH,
 } from '@project/ui';
-import { type CardId, type LayoutId, type LayoutPosition } from '@project/core';
+import { type CardId, type LayoutId, type LayoutPosition, type UUID } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
@@ -17,7 +17,8 @@ import type { AuthoringRefusal } from './space-authoring';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
 import { canvasContent } from './canvas-content';
-import { describeAuthoringRefusal } from './authoring-refusal';
+import { describeAuthoringRefusal, describeSpaceCardRefusal } from './authoring-refusal';
+import { useSpaceCardTargets } from './space-card-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { canRetreat } from './navigation';
@@ -32,6 +33,11 @@ import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CardDestinationFocus } from './components/CardDestinationFocus';
 import { CardsDrawer } from './components/CardsDrawer';
 import { NewAlias } from './components/NewAlias';
+import {
+  NewSpaceCard,
+  type SpaceCardAttemptFailure,
+  type SpaceCardTargetListing,
+} from './components/NewSpaceCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -43,12 +49,13 @@ import {
 } from './components/SpaceSidebar';
 
 export const createApp = (
-  { app: composition, session: spaceSession, initialization }: OpenSpace,
+  { app: composition, session: spaceSession, spaceCards, initialization }: OpenSpace,
   browserLocation: BrowserLocation,
   opening?: DestinationOpening,
 ) => {
   const {
     readWorkingSpace,
+    currentSpace,
     navigation,
     authoring,
     adapter: useRenderAdapter,
@@ -79,6 +86,37 @@ export const createApp = (
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
+    /**
+     * The Space Card creation state, which holds a little more than the Alias
+     * one beside it.
+     *
+     * `targetChoices` is the list the target chooser draws, read when the pane
+     * opens rather than kept — the Spaces stored beside this one are not this
+     * Space's state, and holding them would mean deciding when to refresh
+     * something no gesture here changes. Reading it on opening is what makes it
+     * a *listing* rather than an array: it begins `pending` on every opening,
+     * and the pane withholds its completion until it has been read, so an
+     * author cannot create a Space against a list they have not been shown.
+     * `busy` is the half an Alias has no need of: the Edit this pane completes
+     * is coordinated across Spaces and answers asynchronously (ADR 0076), so
+     * the surface has to stay up, and inert, until it does.
+     */
+    const [creatingSpaceCard, setCreatingSpaceCard] = useState(false);
+    const [spaceCardTargetChoices, setSpaceCardTargetChoices] = useState<SpaceCardTargetListing>({
+      kind: 'pending',
+    });
+    const [spaceCardFailure, setSpaceCardFailure] = useState<SpaceCardAttemptFailure | null>(null);
+    const [creatingSpaceCardBusy, setCreatingSpaceCardBusy] = useState(false);
+    /**
+     * A creation pane is open, whichever kind it is creating.
+     *
+     * The condition every surface outside the pane reads. Both are modal — a
+     * focus trap and a backdrop over the whole graph area — so "one authoring
+     * surface at a time" is one rule, and writing it as a disjunction at each
+     * of its six call sites is how a third kind would come to be withdrawn from
+     * five of them.
+     */
+    const creatingCard = creatingAlias || creatingSpaceCard;
     /**
      * The two things the browser's location tells this component (ADR 0081).
      *
@@ -230,7 +268,7 @@ export const createApp = (
     // The one condition the toggle's `disabled` and the drawer's own open state
     // both read, so neither can drift from the other into an enabled control
     // over a drawer that will not open.
-    const cardsDrawerAvailable = !presenting && !creatingAlias;
+    const cardsDrawerAvailable = !presenting && !creatingCard;
     // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
     // `cardsDrawerOpen`. Presenting and creating an Alias both pass through here,
     // and a drawer that reopened itself on the way back would take
@@ -342,7 +380,7 @@ export const createApp = (
       readonly returnFocus: () => void;
     } | null>(null);
     const chromeEditingDisabled =
-      !editable || presenting || creatingAlias || editingCardBody || editingCardTitle;
+      !editable || presenting || creatingCard || editingCardBody || editingCardTitle;
     const cardIsOpen = Object.values(selectedLayout.layout.positions).some(
       (at) => at?.open === true,
     );
@@ -362,7 +400,7 @@ export const createApp = (
       editable &&
       !presenting &&
       !cardIsOpen &&
-      !creatingAlias &&
+      !creatingCard &&
       !editingCardBody &&
       !editingCardTitle &&
       spaceChromeEdit === null;
@@ -677,10 +715,160 @@ export const createApp = (
       setAliasRefusal(null);
     }, []);
     useEffect(() => {
-      if (creatingAlias || !restoringAddCardFocus.current) return;
+      if (creatingCard || !restoringAddCardFocus.current) return;
       restoringAddCardFocus.current = false;
       addCardMenu.current?.focus();
-    }, [creatingAlias]);
+    }, [creatingCard]);
+
+    /**
+     * Add Space Card: one typed title, and a Space that exists or one this
+     * creates.
+     *
+     * Not a completed Edit through Space Authoring, and that is ADR 0076 rather
+     * than a shortcut. Both outcomes write more than one Space — a reference
+     * changes the containing Space and, on the create path, brings a second one
+     * into existence — so they are one atomic Edit over coordinated per-Space
+     * sessions, whose interface is the Space Card lifecycle. Space Authoring
+     * continues to own every single-Space Edit, including the Title and
+     * selection edits this Card takes afterwards.
+     *
+     * A refusal keeps the surface open with its reason, exactly as Alias
+     * creation does: the one refusal the author can act on here is about the
+     * Space they just chose — a cycle, or a target that has gone — and closing
+     * would take away the field that answers it.
+     *
+     * There is no naming continuation. The lifecycle answers `completed` and
+     * nothing else, so the created Card has no id to select, and it needs none:
+     * the title was typed on the pane before the Edit ran, which is why this
+     * pane has a title field where Add Card has an inline editor.
+     */
+    const createSpaceCard = useCallback((targetSpaceId: UUID | null, title: string) => {
+      // Resolved here rather than closed over: the Layout a Space Card is
+      // added to is the one drawing when the author confirms, and the pane has
+      // been open across renders. `create` still refuses `layout-not-found` on
+      // its own account, against the Layout the coordinated Edit actually sees.
+      const resolved = resolveLayout(currentSpace(), navigation.getState().selectedLayoutId);
+      setCreatingSpaceCardBusy(true);
+      const input = {
+        containingSpaceId: currentSpace().id,
+        layoutId: resolved.layout.id,
+        title,
+        position: centreAnchor(),
+      };
+      // The Cards the Space held before the Edit, so the one it added can be
+      // recognised afterwards. The lifecycle answers a completed Edit and not
+      // the identity it minted (ADR 0076), and the storyboard's created Card is
+      // the selected one — continued authoring carries on from it, as it does
+      // after Add Card and Add Alias. Comparing before with after is the whole
+      // of the recovery: the Edit is atomic and installs every participant at
+      // once, so exactly one Card can have appeared in this Space.
+      const before = new Set(spaceSession.getState().working.cards.map(({ id }) => id));
+      void (async () => {
+        try {
+          const result = await (targetSpaceId === null
+            ? spaceCards.create(input)
+            : spaceCards.link({ ...input, targetSpaceId }));
+          setCreatingSpaceCardBusy(false);
+          if (result.kind === 'refused') {
+            setSpaceCardFailure({ kind: 'refused', refusal: result.refusal });
+            return;
+          }
+          // Unlike Add Alias there is no naming continuation to hand focus to
+          // — the title was typed on the pane before the Edit ran — so success
+          // restores it the way cancellation does, rather than leaving it on
+          // `<body>` when the modal unmounts.
+          restoringAddCardFocus.current = true;
+          setCreatingSpaceCard(false);
+          setSpaceCardFailure(null);
+          const created = spaceSession.getState().working.cards.find(({ id }) => !before.has(id));
+          if (created !== undefined) useRenderAdapter.getState().selectCard(created.id);
+        } catch (failure) {
+          // A rejection is not a refusal: the lifecycle refuses for everything
+          // it can name, so reaching here means a session it was coordinating
+          // has gone — an invariant break with nothing to say on a field. What
+          // must not survive it is the running state, which withholds both of
+          // the pane's exits and would leave the author with neither.
+          setCreatingSpaceCardBusy(false);
+          // Giving the exits back is only half of it. Restored controls and no
+          // sentence say the attempt is over and nothing more, so the author
+          // presses Create again and watches the same nothing happen. The
+          // message is what threw rather than a refusal code invented to carry
+          // it: a refusal code is a stable domain identity (ADR 0057), and this
+          // is the same reasoning `DeleteCardControl` follows for the rejection
+          // its own coordinated Edit can produce. It is the console report's
+          // pair, not its replacement — one is for whoever is looking at the
+          // log, the other for the author looking at the pane.
+          setSpaceCardFailure({
+            kind: 'broke',
+            message: failure instanceof Error ? failure.message : String(failure),
+          });
+          console.error('The Space Card coordination failed', failure);
+        }
+      })();
+    }, []);
+
+    /**
+     * The Spaces the target chooser offers, read once per opening.
+     *
+     * Read here rather than held, because they are not this Space's state: no
+     * gesture on this canvas changes what is stored beside it, and a list kept
+     * across the session would have to decide when to disagree with the
+     * repository. Opening the pane is the moment the answer is wanted, so it is
+     * the moment it is asked for.
+     */
+    useEffect(() => {
+      if (!creatingSpaceCard) return;
+      let current = true;
+      void spaceCards.referenceableSpaces(currentSpace().id).then(
+        (spaces) => {
+          if (current) setSpaceCardTargetChoices({ kind: 'read', spaces });
+        },
+        () => {
+          // A listing that failed is not an empty repository, and the list on
+          // its own cannot tell the author which it was — "A new Space" alone
+          // reads as "there are no others", and creating a duplicate of a Space
+          // they meant to reference is the mistake that follows. Said with the
+          // refusal the coordination itself uses for an unreadable repository,
+          // so one failure is not worded two ways. The reason itself is not
+          // taken: nothing here would say anything different for one transport
+          // failure than for another.
+          if (current) {
+            setSpaceCardTargetChoices({ kind: 'unreadable' });
+            setSpaceCardFailure({ kind: 'refused', refusal: { code: 'persistence-read-failed' } });
+          }
+        },
+      );
+      return () => {
+        current = false;
+      };
+    }, [creatingSpaceCard]);
+
+    /**
+     * Editing a field ends the attempt the message described — except the one
+     * message that never described an attempt.
+     *
+     * A refusal and a break are both about the Create that has just been
+     * pressed, so both go on the next keystroke. A failed listing is not: it is
+     * a fact about the target list rather than about anything the author typed,
+     * and Create stays disabled until the Card is titled — so withdrawing it on
+     * the first keystroke would leave "A new Space" standing alone with nothing
+     * saying why, which is the duplicate the message exists to prevent. It goes
+     * when the pane closes or a real attempt answers.
+     */
+    const clearSpaceCardFailure = useCallback(
+      () =>
+        setSpaceCardFailure((current) =>
+          current?.kind === 'refused' && current.refusal.code === 'persistence-read-failed'
+            ? current
+            : null,
+        ),
+      [],
+    );
+    const cancelSpaceCard = useCallback(() => {
+      restoringAddCardFocus.current = true;
+      setCreatingSpaceCard(false);
+      setSpaceCardFailure(null);
+    }, []);
 
     /**
      * Presenting closes the Alias creation state, creating nothing.
@@ -689,12 +877,24 @@ export const createApp = (
      * covered by the pane. Keyed on the fact rather than
      * wrapped around the control, so a second way into presenting cannot leave a
      * creation state open over a presentation.
+     *
+     * The one thing it waits for is a coordinated Edit already in flight. The
+     * Space Card pane withholds Cancel and Escape while one is running, because
+     * the Edit completes whether or not the surface that began it is still
+     * mounted — and closing here would make exactly that abandonment through a
+     * route the pane cannot refuse. Presenting is reachable from under a modal
+     * pane in one way: Back onto a presenting Card URL is a browser navigation,
+     * and `popstate` does not consult a focus trap. The completion clears the
+     * running state, which runs this again and takes the pane away then.
      */
     useEffect(() => {
       if (!presenting) return;
       setCreatingAlias(false);
       setAliasRefusal(null);
-    }, [presenting]);
+      if (creatingSpaceCardBusy) return;
+      setCreatingSpaceCard(false);
+      setSpaceCardFailure(null);
+    }, [presenting, creatingSpaceCardBusy]);
 
     /**
      * Every Card an Alias may name.
@@ -713,6 +913,14 @@ export const createApp = (
     // intermediate drag position, but `sessionState.working` only changes on
     // a completed Edit.
     const newCardTitle = useMemo(() => nextCardTitle(sessionState.working), [sessionState.working]);
+    // One read per set of referenced Spaces, shared by the canvas and the Cards
+    // collection so a Space Card names the same Space wherever it is drawn.
+    const readSpaceCardTarget = useCallback((spaceId: UUID) => spaceCards.target(spaceId), []);
+    const spaceCardTargets = useSpaceCardTargets(renderedSpace.cards, readSpaceCardTarget);
+    const spaceTitleById = useMemo(
+      () => new Map([...spaceCardTargets].map(([id, target]) => [id, target.title])),
+      [spaceCardTargets],
+    );
     // Global Traversal commands are bound only while presenting.
     usePresentingKeys(presenting, {
       advance,
@@ -742,6 +950,11 @@ export const createApp = (
         addCard={{
           onAddCard: addCard,
           onAddAlias: () => setCreatingAlias(true),
+          onAddSpaceCard: () => {
+            setSpaceCardTargetChoices({ kind: 'pending' });
+            setSpaceCardFailure(null);
+            setCreatingSpaceCard(true);
+          },
           // `editingCardBody` is here for the reason it is on `canPresent`
           // above, and it is the condition that makes this control agree with
           // the `C` shortcut answering the same operation on the canvas. Add
@@ -749,7 +962,7 @@ export const createApp = (
           // title editing is withdrawn while a content edit owns the keyboard
           // (ADR 0064) — so a live toolbar created a Card and then swallowed the
           // naming it exists to begin.
-          disabled: presenting || creatingAlias || editingCardBody || spaceChromeEdit !== null,
+          disabled: presenting || creatingCard || editingCardBody || spaceChromeEdit !== null,
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
           hidden: presenting,
@@ -768,7 +981,7 @@ export const createApp = (
           // edit rather than outliving one.
           disabled:
             presenting ||
-            creatingAlias ||
+            creatingCard ||
             editingCardBody ||
             editingCardTitle ||
             spaceChromeEdit !== null,
@@ -801,16 +1014,39 @@ export const createApp = (
                 // placed by the drawing Layout, and `layout-card` resolves
                 // against `layout.positions`.
                 card: selectedCard,
+                /**
+                 * Two paths, because deleting a Space Card is a different Edit.
+                 *
+                 * An ordinary Card is removed from one Space, which is Space
+                 * Authoring's. A Space Card owns its target's lifetime together
+                 * with every other reference to it, so deleting one can delete
+                 * that Space and every Space below it that nothing else
+                 * references — one atomic Edit over coordinated per-Space
+                 * sessions, which is the Space Card lifecycle's and not a
+                 * single-Space update this seam could make (ADR 0074, ADR 0076).
+                 * Space Authoring refuses it on its own account, so the choice
+                 * is made here rather than discovered there.
+                 */
                 onDelete: deleteCardAvailable
-                  ? () => {
-                      const result = authoring.complete({
-                        kind: 'deleted-card',
-                        cardId: selectedCard.id,
-                      });
-                      return result.kind === 'refused'
-                        ? describeAuthoringRefusal(result.refusal)
-                        : null;
-                    }
+                  ? selectedCard.kind === 'space'
+                    ? async () => {
+                        const result = await spaceCards.delete({
+                          containingSpaceId: renderedSpace.id,
+                          cardId: selectedCard.id,
+                        });
+                        return result.kind === 'refused'
+                          ? describeSpaceCardRefusal(result.refusal)
+                          : null;
+                      }
+                    : () => {
+                        const result = authoring.complete({
+                          kind: 'deleted-card',
+                          cardId: selectedCard.id,
+                        });
+                        return result.kind === 'refused'
+                          ? describeAuthoringRefusal(result.refusal)
+                          : null;
+                      }
                   : undefined,
               }
         }
@@ -841,6 +1077,7 @@ export const createApp = (
               disabled={!cardsDrawerAvailable}
               cards={cardsOutsideSelectedLayout}
               allCards={renderedSpace.cards}
+              spaceTitleById={spaceTitleById}
               onAdd={(card, activation) =>
                 addExistingCard(card.id, centreAnchor(), activation === 'keyboard')
               }
@@ -923,7 +1160,7 @@ export const createApp = (
                 // The toolbar's Add Card already reads the pair; this read only
                 // the opened Card, so `C` and the inline title editor stayed
                 // live behind an open Alias creation pane.
-                titleEditingEnabled={!creatingAlias && spaceChromeEdit === null}
+                titleEditingEnabled={!creatingCard && spaceChromeEdit === null}
                 onNodesChange={changeNodes}
                 onEdgesChange={changeEdges}
                 edgeAuthoring={edgeAuthoring}
@@ -944,6 +1181,7 @@ export const createApp = (
                 colorByGraphId={projection.colors}
                 activeGraphId={activeGraphId}
                 activeGraphCardIds={activeGraphCardIds}
+                spaceCardTargets={spaceCardTargets}
               />
             </ReactFlowProvider>
           ) : (
@@ -981,6 +1219,17 @@ export const createApp = (
               onCreate={createAlias}
               onCancel={cancelAlias}
               onRefusalStale={clearAliasRefusal}
+            />
+          )}
+
+          {creatingSpaceCard && (
+            <NewSpaceCard
+              targets={spaceCardTargetChoices}
+              failure={spaceCardFailure}
+              busy={creatingSpaceCardBusy}
+              onCreate={createSpaceCard}
+              onCancel={cancelSpaceCard}
+              onFailureStale={clearSpaceCardFailure}
             />
           )}
         </div>

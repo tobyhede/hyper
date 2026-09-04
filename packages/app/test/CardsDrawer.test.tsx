@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Card } from '@project/core';
+import { uuidSchema, type Card, type UUID } from '@project/core';
 import { CardsDrawer, CARD_DRAG_TYPE } from '../src/components/CardsDrawer';
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
@@ -18,6 +18,9 @@ const CARDS: readonly Card[] = [
   },
 ];
 
+/** No target Space read yet, which is what a Space Card meets on the first render. */
+const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
+
 /** The composition the shell writes: a self-opening drawer beside the surface it feeds. */
 function Fixture({
   cards = CARDS,
@@ -25,12 +28,14 @@ function Fixture({
   disabled = false,
   onAdd = vi.fn(),
   onDragStart = vi.fn(),
+  spaceTitleById = NO_SPACE_TITLES,
 }: {
   readonly cards?: readonly Card[];
   readonly allCards?: readonly Card[];
   readonly disabled?: boolean;
   readonly onAdd?: (card: Card, activation: 'keyboard' | 'pointer') => string | null;
   readonly onDragStart?: (cardId: Card['id']) => void;
+  readonly spaceTitleById?: ReadonlyMap<UUID, string>;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -44,6 +49,7 @@ function Fixture({
         disabled={disabled}
         onAdd={onAdd}
         onDragStart={onDragStart}
+        spaceTitleById={spaceTitleById}
       />
     </>
   );
@@ -217,6 +223,31 @@ describe('CardsDrawer', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Add Constraints to Layout' })).toBeVisible();
+  });
+
+  it('finds a Space Card by the target Space title it draws', async () => {
+    render(<Fixture spaceTitleById={new Map([[id('000000000012'), 'Roadmap']])} />);
+    await openDrawer();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search cards' }), {
+      target: { value: 'Roadmap' },
+    });
+
+    expect(screen.getByRole('button', { name: 'Add Alpha to Layout' })).toBeVisible();
+    expect(cardButtons()).toHaveLength(1);
+  });
+
+  /** The titles arrive from a read that outlives the mount, so the list has to recompute. */
+  it('finds a Space Card by a target title that arrives after the first render', async () => {
+    const view = render(<Fixture />);
+    await openDrawer();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search cards' }), {
+      target: { value: 'Roadmap' },
+    });
+    expect(screen.queryByRole('button', { name: /^Add .* to Layout$/ })).not.toBeInTheDocument();
+
+    view.rerender(<Fixture spaceTitleById={new Map([[id('000000000012'), 'Roadmap']])} />);
+
+    expect(screen.getByRole('button', { name: 'Add Alpha to Layout' })).toBeVisible();
   });
 
   it('shows no Target name for an Alias whose Target is absent from allCards', async () => {

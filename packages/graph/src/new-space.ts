@@ -22,9 +22,12 @@ export interface NewSpace {
 /** The first neutral Card title; later creation continues the same sequence. */
 const FIRST_CARD_TITLE = 'Card 1';
 
+/** The Space title an unnamed new Space takes until an Edit renames it. */
+const NEW_SPACE_TITLE = 'New space';
+
 /** Inputs to the one normal-Space initializer used by every provisioning path. */
 export interface InitializeSpaceOptions {
-  /** Seeds both the Space and its first Card; later edits make them independent. */
+  /** Names the **Space**; its first Card takes the neutral `Card 1` instead. */
   readonly title: string;
   /**
    * The composition-owned identity source. A complete new Space needs four:
@@ -40,13 +43,20 @@ export interface InitializeSpaceOptions {
  * A normal Space begins complete: one Markdown Card in its default authored
  * Layout, with one empty Active Graph. Meta bootstrap, ordinary startup and
  * Space Card creation share this shape.
+ *
+ * The supplied title names the **Space** and nothing else. Its first Card takes
+ * the same neutral `Card 1` {@link newSpace} mints, because the two are separate
+ * things from the moment they exist: creating a Space Card seeds the Card, the
+ * Space and that first Card from one typed title, and titling the content after
+ * the Space it lives in only reads as deliberate until the first rename makes
+ * the pair disagree.
  */
 export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSpace {
   const spaceId = newId();
   const cardId = newId();
   const layoutId = newId();
   const graphId = newId();
-  const card: Card = { id: cardId, title, kind: 'markdown', body: '' };
+  const card: Card = { id: cardId, title: FIRST_CARD_TITLE, kind: 'markdown', body: '' };
 
   return {
     file: {
@@ -70,6 +80,5 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
 }
 
 export function newSpace(): NewSpace {
-  const created = initializeSpace({ title: FIRST_CARD_TITLE, newId: newUuid });
-  return { ...created, file: { ...created.file, title: 'New space' } };
+  return initializeSpace({ title: NEW_SPACE_TITLE, newId: newUuid });
 }

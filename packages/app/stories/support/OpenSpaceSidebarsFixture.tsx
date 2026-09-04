@@ -36,6 +36,7 @@ function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
     addCard: {
       onAddCard: () => undefined,
       onAddAlias: () => undefined,
+      onAddSpaceCard: () => undefined,
       keyShortcut: 'C',
       menuTriggerRef: addCardMenu,
     },

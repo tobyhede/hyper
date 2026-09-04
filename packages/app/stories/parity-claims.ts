@@ -174,6 +174,30 @@ export const parityClaims: readonly ParityClaim[] = [
       "The canvas Card's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
   },
   {
+    id: 'new-space-card-completes-on-a-labelled-create',
+    storyFile: 'components/space-card-panes.stories.tsx',
+    storyExport: 'NewSpaceCardPane',
+    // The clause about the target list says "a new Space or an existing one"
+    // rather than naming a Space, because the list a real repository offers is
+    // whatever is stored and the story's is fixed.
+    claim:
+      'Adding a Space Card offers Title and a target that is either a new Space or an existing one, and completes on a labelled Create that stays disabled until the Card is titled.',
+  },
+  {
+    id: 'new-space-card-keeps-a-refused-attempt-on-its-target-field',
+    storyFile: 'components/space-card-panes.stories.tsx',
+    storyExport: 'NewSpaceCardPaneRefused',
+    claim:
+      'A Space Card creation refused for a reference cycle keeps the pane open and puts the reason on the Target field rather than closing over it.',
+    // A cycle needs a Space that already references the containing one, and the
+    // only gesture that could author it is a Space Card created from *inside* an
+    // entered Space — which `entity-url-addressability/08` builds. Until then
+    // the refusal is unreachable in a browser, so the story is handed the
+    // structured refusal and this claim takes the documented exemption.
+    applicationEvidence:
+      'A reference cycle cannot be authored through a browser gesture yet: it needs a Space Card created inside an entered Space, and Entering is `entity-url-addressability/08`. `packages/app/test/space-card-authoring.test.tsx` proves the refusal through the application path meanwhile.',
+  },
+  {
     id: 'new-alias-completes-on-the-target-chosen',
     storyFile: 'components/card-and-alias-panes.stories.tsx',
     storyExport: 'NewAliasPane',

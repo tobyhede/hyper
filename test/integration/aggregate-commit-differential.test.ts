@@ -247,6 +247,15 @@ const comparableAggregate = ({ metaSpaceId, spaces }: LoadedAggregate): LoadedAg
   spaces: [...spaces].sort((left, right) => left.snapshot.id.localeCompare(right.snapshot.id)),
 });
 
+/**
+ * Both adapters' answers put in one comparable shape.
+ *
+ * `loadAggregate` answers a *result*, and whether the repository is initialized
+ * at all is part of what the two adapters have to agree on — so the
+ * normalisation has to run over the result rather than over an aggregate the
+ * caller has already assumed. Comparing a raw result against a bare aggregate,
+ * as this did, could only ever be false.
+ */
 const comparableAggregateResult = (result: AggregateLoadResult): AggregateLoadResult =>
   result.kind === 'loaded'
     ? { kind: 'loaded', aggregate: comparableAggregate(result.aggregate) }

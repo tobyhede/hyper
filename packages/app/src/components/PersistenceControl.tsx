@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { SpaceAggregateError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   Alert,
@@ -17,6 +16,7 @@ import {
   Button,
   PersistenceIndicator,
 } from '@project/ui';
+import { describeAggregateRefusal } from '../authoring-refusal';
 
 export interface PersistenceControlProps {
   readonly persistence: SpaceSessionState['persistence'];
@@ -52,42 +52,8 @@ const CONFLICT_DESCRIPTIONS = {
   none: 'There is no stored version of this space. Keep your local version to restore it.',
 } satisfies Record<ConflictRecovery, string>;
 
-/**
- * What each refusal means, in the author's terms rather than the repository's.
- *
- * A refusal code is a stable domain identity (ADR 0057), which is exactly why
- * it is the wrong thing to show: `space-card-target-missing` names the fact for
- * a caller matching on it, and says nothing to the person who has just been
- * told their work would not save. The identity stays on the wire; only this
- * translation is user-facing.
- *
- * Deliberately without ids. Every one of these carries at least a Space id and
- * some carry three, and a dialog reciting UUIDs is less legible than one
- * sentence about what is wrong — the author is about to be returned to the
- * canvas where the offending Card is the one they were editing.
- */
-const AGGREGATE_REFUSAL_REASONS = {
-  'invalid-space-snapshot': 'A space in this edit is not valid.',
-  'duplicate-space-id': 'Two spaces in this edit share one identity.',
-  'duplicate-card-id': 'Two spaces in this edit claim the same card.',
-  'meta-space-missing': 'The repository’s Meta Space is missing.',
-  'space-card-target-missing': 'A space card points at a space that no longer exists.',
-  'space-card-reference-cycle': 'A space card would make a space contain itself.',
-  'ordinary-space-unreferenced': 'A space would be left with nothing pointing at it.',
-  'space-card-layout-missing': 'A space card points at a Layout that no longer exists.',
-  'space-card-graph-missing': 'A space card points at a Graph that no longer exists.',
-  'space-card-graph-outside-layout': 'A space card names a Graph that its Layout does not own.',
-  // `satisfies` rather than an annotation: it still fails the moment a refusal
-  // kind is added without a sentence, and it keeps each value's literal type
-  // instead of widening the map to an open dictionary.
-} satisfies Record<SpaceAggregateError['kind'], string>;
-
 const rejectionDescription = ({ failure }: Rejection): string =>
-  failure.kind === 'aggregate-refused'
-    ? // One refusal commonly repeats across several Spaces, and the same
-      // sentence three times reads as three problems rather than one.
-      [...new Set(failure.errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ')
-    : failure.message;
+  failure.kind === 'aggregate-refused' ? describeAggregateRefusal(failure.errors) : failure.message;
 
 const rejectionIdentity = ({ failure }: Rejection): string =>
   failure.kind === 'aggregate-refused'

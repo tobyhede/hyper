@@ -243,6 +243,7 @@ export function SpaceSidebarFixture({
           addCard={{
             onAddCard: () => undefined,
             onAddAlias: () => undefined,
+            onAddSpaceCard: () => undefined,
             disabled: authoringDisabled,
             keyShortcut: 'C',
             menuTriggerRef: addCardMenu,

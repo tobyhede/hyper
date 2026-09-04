@@ -14,6 +14,15 @@ export interface CardPaneProps {
   readonly testId: string;
   /** Cancel and Escape both discard this surface's draft (ADR 0048). */
   readonly onDismiss: () => void;
+  /**
+   * An Edit begun from this pane is still running.
+   *
+   * Stated on the dialog rather than left to be read off the controls it
+   * disables: a pane whose exits have gone quiet is otherwise indistinguishable
+   * from one that has broken, and a coordinated Edit can take a while
+   * (ADR 0076).
+   */
+  readonly busy?: boolean;
   readonly children: ReactNode;
 }
 
@@ -21,7 +30,7 @@ export interface CardPaneProps {
  * A modal surface shared by opening a Card and creating an Alias. Base UI owns
  * containment, Escape and accessible dialog semantics; App owns focus return.
  */
-export function CardPane({ ariaLabel, testId, onDismiss, children }: CardPaneProps) {
+export function CardPane({ ariaLabel, testId, onDismiss, busy, children }: CardPaneProps) {
   const popup = useRef<HTMLDivElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const captureOwnerDocument = useCallback((node: HTMLSpanElement | null) => {
@@ -55,6 +64,7 @@ export function CardPane({ ariaLabel, testId, onDismiss, children }: CardPanePro
             <DialogBackdrop className="card-pane__backdrop" />
             <DialogPopup
               ref={popup}
+              aria-busy={busy === true ? true : undefined}
               className="card-pane__panel"
               // The primitive still owns modality; the effect above supplies the
               // declared field instead of its generic first-tabbable default.

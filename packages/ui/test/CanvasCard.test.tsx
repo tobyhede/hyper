@@ -1,7 +1,20 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import { CanvasCard, type CanvasCardFront } from '../src';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { CanvasCard, type CanvasCardFront, type CanvasSpaceCardSelection } from '../src';
+
+/**
+ * Base UI's Select positions itself by measuring, and jsdom ships no pointer
+ * capture. Both are reached before a Space Card's selector can open at all,
+ * which is why this file needs the stubs `Select.test.tsx` already makes; the
+ * `scrollIntoView` an item-aligned list calls is stubbed globally in
+ * `vitest.setup.ts`.
+ */
+beforeAll(() => {
+  HTMLElement.prototype.hasPointerCapture = () => false;
+  HTMLElement.prototype.setPointerCapture = () => undefined;
+  HTMLElement.prototype.releasePointerCapture = () => undefined;
+});
 
 describe('CanvasCard kind and interaction state', () => {
   it('does not expose entity actions when every supplied group is empty', () => {
@@ -747,5 +760,185 @@ describe('CanvasCard open Markdown front', () => {
     // two are independent rather than exclusive (ADR 0064).
     expect(screen.getByRole('textbox', { name: 'Card title' })).toBeVisible();
     expect(screen.getByText('the Card’s own source')).toBeVisible();
+  });
+});
+
+describe('CanvasCard Space front', () => {
+  const selection = (over: Partial<CanvasSpaceCardSelection> = {}): CanvasSpaceCardSelection => ({
+    layouts: [
+      { id: 'l1', title: 'Collection 1' },
+      { id: 'l2', title: 'Collection 2' },
+    ],
+    graphs: [{ id: 'g1', title: 'Long' }],
+    layoutId: 'l1',
+    graphId: 'g1',
+    onLayoutChange: vi.fn(),
+    onGraphChange: vi.fn(),
+    ...over,
+  });
+
+  /**
+   * Which Space this Card reaches is a fact about the Card, so it is drawn
+   * while the Card is Closed — the same line, in the same place, that an Alias
+   * draws its Target on. What a Closed Space Card does not draw is either
+   * selector: those are what Opening it is for.
+   */
+  it('names the Space it references while closed', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'space', spaceTitle: 'Strategy', open: false, selection: selection() }}
+        state="rest"
+        title="Strategy elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    const card = screen.getByRole('article', { name: 'Strategy elsewhere' });
+    expect(card).toHaveAttribute('data-kind', 'space');
+    expect(screen.getByTestId('space-marker')).toHaveTextContent('Strategy');
+    expect(screen.queryByTestId('space-card-layout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-card-graph')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Opening is the shared Card operation, not a Space-Card-specific one, so it
+   * is the same rail control an Alias uses and it names the same two states. A
+   * Space Card offers nothing beside it: it has no content of its own, so there
+   * is no Edit, Save or Cancel for the rail to draw.
+   */
+  it('opens and closes through the shared rail control, and offers no content edit', () => {
+    const onOpenChange = vi.fn(() => 'completed' as const);
+    const { rerender } = render(
+      <CanvasCard
+        front={{ kind: 'space', spaceTitle: 'Strategy', open: false, onOpenChange }}
+        state="selected"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    screen.getByRole('button', { name: 'Open Card Elsewhere' }).click();
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole('button', { name: 'Edit Card Elsewhere' })).not.toBeInTheDocument();
+
+    rerender(
+      <CanvasCard
+        front={{ kind: 'space', spaceTitle: 'Strategy', open: true, onOpenChange }}
+        state="selected"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    screen.getByRole('button', { name: 'Close Card Elsewhere' }).click();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('offers both selectors seeded with the Card’s own selections when open', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'space', spaceTitle: 'Strategy', open: true, selection: selection() }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    expect(screen.getByTestId('space-marker')).toHaveTextContent('Strategy');
+    // Named by their labels, not only reachable by test id: the two controls
+    // are one word apart and an author has to be able to tell which is which.
+    expect(screen.getByRole('combobox', { name: 'Layout' })).toHaveTextContent('Collection 1');
+    expect(screen.getByRole('combobox', { name: 'Graph' })).toHaveTextContent('Long');
+    expect(screen.getByTestId('space-card-layout')).toBeEnabled();
+    expect(screen.getByTestId('space-card-graph')).toBeEnabled();
+  });
+
+  /**
+   * The Card publishes the choice and authors nothing itself — the selected
+   * Layout is the caller's to store and hand back, which is what makes the
+   * Graph list beside it the selected Layout's rather than a stale one.
+   */
+  it('publishes a chosen Layout without selecting it itself', () => {
+    const onLayoutChange = vi.fn();
+    render(
+      <CanvasCard
+        front={{
+          kind: 'space',
+          spaceTitle: 'Strategy',
+          open: true,
+          selection: selection({ onLayoutChange }),
+        }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    // Opened and chosen from the keyboard: the list is Base UI's own, and its
+    // arrow navigation is the path a pointer's click ends at anyway.
+    fireEvent.keyDown(screen.getByTestId('space-card-layout'), { key: 'ArrowDown' });
+    const chosen = screen.getByRole('option', { name: 'Collection 2' });
+    fireEvent.keyDown(chosen, { key: 'ArrowDown' });
+    fireEvent.keyDown(chosen, { key: 'Enter' });
+
+    expect(onLayoutChange).toHaveBeenCalledWith('l2');
+    expect(screen.getByRole('combobox', { name: 'Layout' })).toHaveTextContent('Collection 1');
+  });
+
+  /** A Space with no Graphs is an ordinary thing to reference. */
+  it('draws an empty list as unavailable rather than opening onto nothing', () => {
+    render(
+      <CanvasCard
+        front={{
+          kind: 'space',
+          spaceTitle: 'Strategy',
+          open: true,
+          selection: selection({ graphs: [], graphId: null }),
+        }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    const graph = screen.getByTestId('space-card-graph');
+    expect(graph).toBeDisabled();
+    expect(graph).toHaveTextContent('No Graph');
+  });
+
+  it('stands a plain note in for the selectors while the Space is unread', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'space', spaceTitle: 'Strategy', open: true }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    expect(screen.getByText('Reading the referenced Space…')).toBeVisible();
+    expect(screen.queryByTestId('space-card-layout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-card-graph')).not.toBeInTheDocument();
+    // One note, not a live region: a canvas of Space Cards resolving would
+    // otherwise announce each one, for a wait nobody asked for.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('withholds both selectors from a read-only Card', () => {
+    render(
+      <CanvasCard
+        readOnly
+        front={{ kind: 'space', spaceTitle: 'Strategy', open: true, selection: selection() }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    // The marker stays: it is what the Card shows, not something an author can
+    // change about it.
+    expect(screen.getByTestId('space-marker')).toHaveTextContent('Strategy');
+    expect(screen.queryByTestId('space-card-layout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-card-graph')).not.toBeInTheDocument();
   });
 });
