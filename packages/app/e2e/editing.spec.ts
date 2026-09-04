@@ -569,7 +569,7 @@ test(
     ).toBeVisible();
     await expect(sidebar(page).getByRole('button', { name: 'Long', exact: true })).toBeVisible();
     await expect(
-      sidebar(page).locator('[data-testid="canvas-renderer"][aria-pressed="true"]'),
+      sidebar(page).locator('[data-testid="layout-row"][aria-pressed="true"]'),
     ).toHaveCount(1);
 
     await selectCanvas(page, 'Collection 2');
@@ -577,7 +577,7 @@ test(
       sidebar(page).getByRole('button', { name: 'Collection 2', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true');
     await expect(
-      sidebar(page).locator('[data-testid="canvas-renderer"][aria-pressed="true"]'),
+      sidebar(page).locator('[data-testid="layout-row"][aria-pressed="true"]'),
     ).toHaveCount(1);
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
@@ -586,7 +586,7 @@ test(
       sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true');
     await expect(
-      sidebar(page).locator('[data-testid="canvas-renderer"][aria-pressed="true"]'),
+      sidebar(page).locator('[data-testid="layout-row"][aria-pressed="true"]'),
     ).toHaveCount(1);
     await expect(persistence).toHaveAttribute('data-revision', '0');
   },
@@ -2638,7 +2638,7 @@ test('Add Card names the new Card in place in the selected Layout', async ({ pag
 
   await expect(nodeByTitle(page, 'Consequences')).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await expect(sidebar(page).getByTestId('canvas-renderer')).toHaveCount(2);
+  await expect(sidebar(page).getByTestId('layout-row')).toHaveCount(2);
 });
 
 /**

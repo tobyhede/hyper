@@ -197,10 +197,10 @@ export interface RenderAdapterState {
   /** Publish projected Card nodes, their declared handles and Graph Edges together. */
   syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
   /**
-   * Navigate to another renderer. The replacement placement will arrive via
-   * `syncProjection`; renderer selection itself is not an edit.
+   * Navigate to another Layout. The replacement placement will arrive via
+   * `syncProjection`; Layout selection itself is not an edit.
    */
-  selectRenderer: (placement: Placement | null) => void;
+  selectLayout: (placement: Placement | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
   /**
@@ -450,7 +450,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const current = get().projection;
       // The empty list rather than a separate branch for the first projection:
       // it too may be the one that first draws a Card already selected, since
-      // `selectRenderer` clears the projection and a selection can be made
+      // `selectLayout` clears the projection and a selection can be made
       // before the next one lands.
       //
       // `withSelection` over the reconciled list is what seeds a Card the live
@@ -476,7 +476,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       authoring.reportRendered(placementFromNodes(reconciled));
     },
 
-    selectRenderer: (placement) => {
+    selectLayout: (placement) => {
       set({
         projection: null,
         dragOrigins: new Map(),
@@ -624,7 +624,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
   // A replacement Space arrives without unmounting anything, so the projection
   // this store is holding describes Cards that may no longer exist and drag
   // bookkeeping for a gesture made against the Space that is gone. Dropping it
-  // is the same reset `selectRenderer` performs, for the same reason: what is on
+  // is the same reset `selectLayout` performs, for the same reason: what is on
   // screen no longer describes what is being rendered.
   //
   // The unsubscribe is deliberately dropped: this store's lifetime is the

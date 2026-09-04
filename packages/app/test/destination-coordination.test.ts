@@ -73,13 +73,13 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
 const space = createWorkingSpaceReader()(snapshot);
 
 const overview = (activeGraphId: UUID | null = OPENING_GRAPH): NavigationAddress => ({
-  selectedRenderer: LAYOUT,
+  selectedLayoutId: LAYOUT,
   activeGraphId,
   presentingCardId: null,
 });
 
 const presenting = (cardId: CardId, activeGraphId: UUID = OPENING_GRAPH): NavigationAddress => ({
-  selectedRenderer: LAYOUT,
+  selectedLayoutId: LAYOUT,
   activeGraphId,
   presentingCardId: cardId,
 });
@@ -262,7 +262,7 @@ describe('what the browser should do about an address', () => {
       sync(
         view,
         {
-          selectedRenderer: OTHER_LAYOUT,
+          selectedLayoutId: OTHER_LAYOUT,
           activeGraphId: OTHER_LAYOUT_GRAPH,
           presentingCardId: null,
         },

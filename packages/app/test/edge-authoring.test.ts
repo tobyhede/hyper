@@ -93,14 +93,14 @@ const positionedSnapshot: SpaceSnapshot = {
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  renderer: LayoutId = LAYOUT_ID,
+  layoutId: LayoutId = LAYOUT_ID,
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const { navigation, authoring, adapter, edgeAuthoring } = composeApp({
     spaceSession: session,
-    selection: renderer,
+    selection: layoutId,
     newId,
     initialPlacement: Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: false }],
@@ -298,11 +298,11 @@ describe('deleting an Edge', () => {
  * it is *about*; an unrelated completed Edit leaves it standing.
  */
 describe('draft invalidation', () => {
-  it('cancels the draft when the selected renderer changes', () => {
+  it('cancels the draft when the selected Layout changes', () => {
     const { edges, navigation } = open();
     edges.beginPointerConnect(CARD_A);
 
-    navigation.selectRenderer(OTHER_LAYOUT_ID);
+    navigation.selectLayout(OTHER_LAYOUT_ID);
 
     expect(edges.getState().draft).toBeNull();
   });
@@ -383,8 +383,8 @@ describe('draft invalidation', () => {
       ({ navigation }: ReturnType<typeof open>) => navigation.activateGraph(OTHER_GRAPH_ID),
     ],
     [
-      'the renderer changes',
-      ({ navigation }: ReturnType<typeof open>) => navigation.selectRenderer(OTHER_LAYOUT_ID),
+      'the Layout changes',
+      ({ navigation }: ReturnType<typeof open>) => navigation.selectLayout(OTHER_LAYOUT_ID),
     ],
   ])('clears a refusal left by a finished gesture when %s', (_name, change) => {
     const opened = open();

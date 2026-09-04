@@ -296,9 +296,9 @@ export function createOpenSpaces({
     );
     // A Space already open keeps the selection it is being worked in, so the
     // URL's is only a proposal. Report the one that holds: a caller opening the
-    // named Graph does so against the selected Space View, and the two
-    // disagreeing is how a Graph lands on a Space View nobody named.
-    const selection = opened.app.navigation.getState().selectedRenderer;
+    // named Graph does so against the selected Layout, and the two disagreeing
+    // is how a Graph lands on a Layout nobody named.
+    const selection = opened.app.navigation.getState().selectedLayoutId;
     const opening: DestinationOpening =
       selection === destination.selection ? destination : { ...destination, selection };
     return { opened, opening };

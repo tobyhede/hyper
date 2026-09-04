@@ -234,7 +234,7 @@ export type AuthoringRefusal =
  * The published state: what the collaborators say, plus the one thing only
  * Authoring knows — that a replacement Space has been opened over them.
  *
- * The on-screen placement is deliberately absent. It is an *input* the renderer
+ * The on-screen placement is deliberately absent. It is an *input* the canvas
  * pushes in on every projection and pointer frame, not something Authoring
  * publishes, and a copy carried here could only disagree with the value
  * `authoredPlacement` answers — installing a placement is not a publication.
@@ -244,7 +244,7 @@ export interface SpaceAuthoringState {
   /**
    * ADR 0042's replacement signal: advances when a replacement Space is opened
    * over this Authoring without recreating it, and at no other time. Retry,
-   * Keep local, persistence status changes, renderer selection and completed
+   * Keep local, persistence status changes, Layout selection and completed
    * Edits all leave it where it is.
    *
    * It is invalidation rather than a registry — Authoring never learns which
@@ -321,7 +321,7 @@ interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
   readonly placement: Placement;
   /** The Layout this Edit wrote, which Navigation continues in. */
-  readonly nextRenderer: LayoutId;
+  readonly nextLayoutId: LayoutId;
   /**
    * The Active Graph of that Layout, which Navigation adopts along with it.
    *
@@ -377,7 +377,7 @@ interface SpaceAuthoringDependencies {
   /**
    * The validated aggregate behind the session's working snapshot.
    *
-   * The same reader Navigation is given, so both resolve a renderer against one
+   * The same reader Navigation is given, so both resolve a Layout against one
    * `Space` identity and one parse — and both read entity context through that
    * Space's own `lookup`.
    */
@@ -617,8 +617,8 @@ export function createSpaceAuthoring({
     placement = nextPlacement;
   };
 
-  const selectedResolvedRenderer = (): ResolvedLayout =>
-    resolveLayout(currentSpace(), navigation.getState().selectedRenderer);
+  const selectedResolvedLayout = (): ResolvedLayout =>
+    resolveLayout(currentSpace(), navigation.getState().selectedLayoutId);
 
   const mergeBase = (): Placement | null => placement;
 
@@ -694,9 +694,9 @@ export function createSpaceAuthoring({
    * Space (ADR 0045), so there is no second Graph the id could have meant.
    */
   const ownedGraph = (graphId: GraphId): Graph | undefined => {
-    const selectedRenderer = selectedResolvedRenderer();
+    const selectedLayout = selectedResolvedLayout();
     const owned = currentSpace().lookup.graph(graphId);
-    return owned?.owner.layout.id === selectedRenderer.layout.id ? owned.graph : undefined;
+    return owned?.owner.layout.id === selectedLayout.layout.id ? owned.graph : undefined;
   };
 
   /**
@@ -805,7 +805,7 @@ export function createSpaceAuthoring({
     completion,
     placement: reportedPlacement,
   }: ReportedCompletion): DerivedCompletion => {
-    const selection = navigation.getState().selectedRenderer;
+    const selection = navigation.getState().selectedLayoutId;
     if (completion.kind === 'created-layout') {
       const snapshot = session.getState().working;
       const layoutId = newId();
@@ -832,7 +832,7 @@ export function createSpaceAuthoring({
           snapshot: next,
           placement: emptyPlacement,
           nextActiveGraphId: graphId,
-          nextRenderer: layoutId,
+          nextLayoutId: layoutId,
         },
       };
     }
@@ -868,7 +868,7 @@ export function createSpaceAuthoring({
           snapshot: next,
           placement: Placement.fromLayout(nextLayout),
           nextActiveGraphId: nextLayout.activeGraph ?? nextLayout.graphs[0]?.id ?? null,
-          nextRenderer: nextLayout.id,
+          nextLayoutId: nextLayout.id,
         },
       };
     }
@@ -891,7 +891,7 @@ export function createSpaceAuthoring({
     if (space.lookup.layout(selection) === undefined) {
       return refuse({ code: 'layout-not-found' });
     }
-    const renderer = resolveLayout(space, selection);
+    const resolved = resolveLayout(space, selection);
     /**
      * What this Edit does to the placement, held rather than applied.
      *
@@ -1086,12 +1086,12 @@ export function createSpaceAuthoring({
       connection = { from: completion.from, to: completion.to };
     }
     // Which Layout this Edit writes, and what it owns afterwards.
-    const layoutId: UUID = renderer.layout.id;
+    const layoutId: UUID = resolved.layout.id;
     let layoutTitle: string;
     let ownedGraphs: readonly Graph[];
     let activeGraphId: GraphId | null;
     let createdGraphId: GraphId | undefined;
-    const { layout } = renderer;
+    const { layout } = resolved;
     layoutTitle = layout.title;
     ownedGraphs = layout.graphs;
     activeGraphId = navigationState.activeGraphId;
@@ -1232,7 +1232,7 @@ export function createSpaceAuthoring({
         snapshot: next,
         placement: completedPlacement,
         nextActiveGraphId: activeGraphId,
-        nextRenderer: layoutId,
+        nextLayoutId: layoutId,
         ...created,
       },
     };
@@ -1258,20 +1258,20 @@ export function createSpaceAuthoring({
    * never took, and for a created Card, a position for a Card that does not
    * exist. That is the strand `b091623` inverted this order to close.
    *
-   * **The renderer is adopted with the Active Graph that belongs to it**, and
+   * **The Layout is adopted with the Active Graph that belongs to it**, and
    * the ordering that used to be spread over two Navigation calls is now inside
    * one. It has not been relaxed — the Graph is still resolved against the
-   * renderer *this Edit produced* rather than the one it began in, which is the
+   * Layout *this Edit produced* rather than the one it began in, which is the
    * whole of what that ordering bought. What changed is that a Layout owns its
    * Graphs (ADR 0040), so the pair is one answer and the intermediate state
-   * where the renderer has moved and the Graph has not would name a Layout
+   * where the Layout has moved and the Graph has not would name a Layout
    * beside a Graph some other Layout owns, which Navigation refuses.
    *
    * In that order the three statements below refuse nothing, and each for a
    * reason this Edit established rather than by having no guard to trip:
    *
    * - `install` decides nothing and reads nothing.
-   * - `continueInRenderer` resolves a Layout `updatePositionedLayout` wrote into
+   * - `continueInLayout` resolves a Layout `updatePositionedLayout` wrote into
    *   the snapshot `submit` just installed, and refuses only a Layout that does
    *   not draw the Active Graph handed with it — which is that Layout's own
    *   `activeGraph`, in a snapshot `loadSpaceSnapshot` accepted a line earlier,
@@ -1287,7 +1287,7 @@ export function createSpaceAuthoring({
     installTogether(() => {
       session.submit(edit.snapshot);
       install(edit.placement);
-      navigation.continueInRenderer(edit.nextRenderer, edit.nextActiveGraphId);
+      navigation.continueInLayout(edit.nextLayoutId, edit.nextActiveGraphId);
     });
   };
 
@@ -1402,7 +1402,7 @@ export function createSpaceAuthoring({
    *
    * Accepting is an edit to this Authoring rather than a new one: the session,
    * the placement and Navigation are all replaced in place, and the replacement
-   * epoch advancing is what tells the renderer its nodes describe a Space that
+   * epoch advancing is what tells the canvas its nodes describe a Space that
    * is gone.
    */
   const acceptStoredSpace = (): string | null => {

@@ -225,22 +225,22 @@ it('keeps the working Space loadable through any sequence of semantic operations
     fc.property(
       fc.array(operation, { minLength: 1, maxLength: 12 }),
       fc.constantFrom<LayoutId>(LAYOUT_ID, OTHER_LAYOUT_ID, LAYOUT_ID),
-      (operations, renderer) => {
+      (operations, layoutId) => {
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
         const { currentSpace, navigation, authoring } = composeApp({
           spaceSession: session,
-          selection: renderer,
+          selection: layoutId,
           // Deterministic, so a shrunk counterexample replays: creating this
           // Space's Layout creation mints one Graph, and the rest of the
           // block is the margin that makes an exhaustion a real signal.
-          // These cases install the geometry a renderer would have reported by
+          // These cases install the geometry the canvas would have reported by
           // now, immediately below.
           initialPlacement: null,
         });
         // The authored geometry available when an author reaches these controls.
         const selectedLayout = (): Layout | undefined => {
-          const selected = navigation.getState().selectedRenderer;
+          const selected = navigation.getState().selectedLayoutId;
           return currentSpace().lookup.layout(selected)?.layout;
         };
         const opened = selectedLayout();

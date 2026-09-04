@@ -143,7 +143,7 @@ describe('Open Spaces', () => {
 
     expect(reopened).toBe(other);
     expect(reopened.app.navigation.getState()).toMatchObject({
-      selectedRenderer: LAYOUT_ID,
+      selectedLayoutId: LAYOUT_ID,
       activeGraphId: GRAPH_TWO,
     });
   });
@@ -231,7 +231,7 @@ describe('Open Spaces', () => {
     expect(reopened).not.toBe(first);
     expect(reopened.session).not.toBe(first.session);
     expect(reopened.app.navigation.getState()).toMatchObject({
-      selectedRenderer: LAYOUT_ID,
+      selectedLayoutId: LAYOUT_ID,
       activeGraphId: GRAPH_ONE,
     });
   });
@@ -461,11 +461,11 @@ describe('Open Spaces', () => {
       layoutId: LAYOUT_ID,
     });
     const first = await openSpaces.openPath(path);
-    first.opened.app.navigation.selectRenderer(SECOND_LAYOUT_ID);
+    first.opened.app.navigation.selectLayout(SECOND_LAYOUT_ID);
 
     // The Space is already open, so it keeps the selection it is being worked
     // in. Reporting the URL's selection anyway would have the caller open a
-    // Graph against a Space View that was never selected.
+    // Graph against a Layout that was never selected.
     const again = await openSpaces.openPath(path);
 
     expect(again.opened).toBe(first.opened);

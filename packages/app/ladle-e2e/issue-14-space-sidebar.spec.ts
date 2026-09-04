@@ -250,7 +250,7 @@ test(
 /**
  * Application pairs:
  * - `canvas-projection.test.ts`: "draws every Graph a selected Layout owns"
- * - `navigation.test.ts`: "selects a renderer and its active Graph without changing the Space"
+ * - `navigation.test.ts`: "selects a Layout and its active Graph without changing the Space"
  * - `navigation.test.ts`: "activating a Graph ends the current Traversal history without changing the Space"
  * - `navigation.test.ts`: "leaves no Traversal history behind when presenting ends"
  */

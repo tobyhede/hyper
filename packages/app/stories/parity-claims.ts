@@ -201,7 +201,7 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'space-sidebar-marks-one-current-renderer',
     storyFile: 'space/space.stories.tsx',
     storyExport: 'Settled',
-    claim: 'Exactly one authored Layout is the current renderer.',
+    claim: 'Exactly one authored Layout is the one drawing the canvas.',
   },
   {
     id: 'space-sidebar-copies-card-destinations',

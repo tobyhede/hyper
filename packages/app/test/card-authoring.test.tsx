@@ -37,7 +37,7 @@ const replaceMarkdownSource = (value: string): HTMLElement => {
 
 /**
  * Two Cards on one Graph the Layout owns, so the graph opens on a Positioned
- * renderer with a placement already installed and presenting has a traversal to
+ * canvas with a placement already installed and presenting has a traversal to
  * run.
  */
 const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({

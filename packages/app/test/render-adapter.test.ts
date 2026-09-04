@@ -138,7 +138,7 @@ function connections(
  */
 function sessionBackedAdapter(
   snapshot: SpaceSnapshot,
-  renderer: LayoutId,
+  layoutId: LayoutId,
   initialPlacement: Placement | null = null,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,
@@ -152,7 +152,7 @@ function sessionBackedAdapter(
   const session = openSpaceSession(backend, loaded);
   const { authoring, adapter } = composeApp({
     spaceSession: session,
-    selection: renderer,
+    selection: layoutId,
     initialPlacement,
     newId,
   });
@@ -279,14 +279,14 @@ describe('render adapter', () => {
     expect(adapter().getState().projection).toBeNull();
   });
 
-  it('drops the published Graph Edges with their nodes when the renderer changes', () => {
+  it('drops the published Graph Edges with their nodes when the Layout changes', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
     store.getState().syncProjection(PROJECTED, [EDGE]);
     expect(store.getState().projection?.edges).toEqual([EDGE]);
 
-    store.getState().selectRenderer(null);
+    store.getState().selectLayout(null);
 
     expect(store.getState().projection).toBeNull();
     expect(spy.installs.at(-1)).toEqual({

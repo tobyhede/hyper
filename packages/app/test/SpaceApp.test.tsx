@@ -605,7 +605,7 @@ describe('Space app Cards drawer', () => {
 
   /**
    * The refusal is drawn under Add Layout, which every canvas selection shows.
-   * A Delete Layout refusal that outlived its own renderer therefore reappeared
+   * A Delete Layout refusal that outlived its own Layout therefore reappeared
    * as the next one's, explaining a Layout the reader had just left.
    */
   it('clears a Layout management refusal when the canvas selection changes', async () => {
@@ -695,7 +695,7 @@ describe('Space app Cards drawer', () => {
           },
         ],
         // The canonical Card link below resolves to the Space's default
-        // renderer, so this second navigation lands on the Layout that omits
+        // Layout, so this second navigation lands on the Layout that omits
         // the Card rather than the one it started on.
         defaultLayout: OTHER_LAYOUT_ID,
       },
@@ -722,7 +722,7 @@ describe('Space app Cards drawer', () => {
     expect(screen.queryByRole('button', { name: 'Add Card to Layout' })).not.toBeInTheDocument();
 
     // The canonical Card link carries no Layout of its own — it opens
-    // wherever the Space's default renderer is, which is now the Layout that
+    // wherever the Space's default Layout is, which is now the Layout that
     // omits this Card.
     window.history.replaceState(
       null,

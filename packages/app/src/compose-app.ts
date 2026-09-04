@@ -40,7 +40,7 @@ export interface ComposeCoreDependencies {
    * stored snapshot and the session then `structuredClone`s
    * it, so the Space a caller holds at open and the session's `working` are
    * equal values with different identities; taking both is how production came
-   * to resolve its opening renderer against one and everything after it against
+   * to resolve its opening Layout against one and everything after it against
    * the other.
    */
   readonly spaceSession: SpaceSession;
