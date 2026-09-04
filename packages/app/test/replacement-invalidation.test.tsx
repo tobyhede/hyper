@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
-import { mountSpaceApp } from '../src/SpaceApp';
+import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 
 /**
@@ -129,7 +129,7 @@ async function mountedSpaceApp(): Promise<SpaceSession> {
   });
 
   let view: RenderResult | undefined;
-  mountSpaceApp(
+  mountSpace(
     { id: runtime(LOCAL).id, session: session, app: composeApp({ spaceSession: session }) },
     (app) => {
       if (view === undefined) view = render(app);

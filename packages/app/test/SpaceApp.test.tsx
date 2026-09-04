@@ -11,6 +11,9 @@ import {
   type SpaceSession,
 } from '@project/persistence';
 import { mountSpaceApp } from '../src/SpaceApp';
+import { createBrowserLocation } from '../src/browser-location';
+import { recordingHistory } from './browser-history';
+import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -125,7 +128,7 @@ describe('Space app conflict recovery', () => {
     });
 
     let view: RenderResult | undefined;
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
       (app) => {
         if (view === undefined) view = render(app);
@@ -182,7 +185,7 @@ describe('Space app conflict recovery', () => {
     });
 
     let view: RenderResult | undefined;
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
       (app) => {
         if (view === undefined) view = render(app);
@@ -253,7 +256,7 @@ describe('Space app conflict recovery', () => {
     await waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
 
     let view: RenderResult | undefined;
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
       (app) => {
         if (view === undefined) view = render(app);
@@ -319,7 +322,7 @@ describe('Space app permanent save refusal', () => {
     await waitFor(() => expect(session.getState().persistence.kind).toBe('rejected'));
 
     let view: RenderResult | undefined;
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
       (app) => {
         if (view === undefined) view = render(app);
@@ -361,7 +364,7 @@ describe('Space app failure reporting', () => {
       exportedRevision: null,
     });
 
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(addressed).id, session: session, app: composeApp({ spaceSession: session }) },
       (app) => render(app),
       {
@@ -413,7 +416,7 @@ describe('Space app failure reporting', () => {
       });
 
       try {
-        mountSpaceApp(
+        mountSpace(
           { id: runtime(valid).id, session: session, app: composeApp({ spaceSession: session }) },
           (app) => render(app),
           {
@@ -422,6 +425,17 @@ describe('Space app failure reporting', () => {
             graphId: null,
             presentationCardId: null,
           },
+          // The location the Card is addressed from: `openPath` composes the
+          // opening from the same pathname the browser location then follows,
+          // so the two agree in production and have to agree here.
+          recordingHistory(
+            productDestinationPath({
+              kind: 'layout-card',
+              spaceId: SPACE_ID,
+              layoutId: LAYOUT_ID,
+              cardId: CARD_ID,
+            }),
+          ),
         );
 
         fireEvent.click(await screen.findByRole('button', { name: entity }));
@@ -469,9 +483,13 @@ describe('Space app failure reporting', () => {
     // boundary. The report is the point; the duplicate is noise this test owns.
     const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
+    // `mountSpaceApp` directly, and nothing following: the browser's location
+    // follows a Space Open Spaces has validated, and this composition never
+    // was one. What is pinned here is the mount, not the location.
     expect(() =>
       mountSpaceApp(
         { id: runtime(valid).id, session, app },
+        createBrowserLocation(recordingHistory()),
         (view) => {
           render(view);
         },
@@ -498,7 +516,7 @@ describe('Space app failure reporting', () => {
       exportedRevision: null,
     });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(valid).id, session: session, app: composeApp({ spaceSession: session }) },
       (app) => {
         render(app);
@@ -523,7 +541,7 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: base, revision: 1n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp(
+    mountSpace(
       {
         id: runtime(base).id,
         session,
@@ -551,7 +569,7 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: empty, revision: 1n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp(
+    mountSpace(
       {
         id: runtime(empty).id,
         session,
@@ -575,7 +593,7 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
       (app) => render(app),
     );
@@ -615,7 +633,7 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
       (app) => render(app),
     );
@@ -638,7 +656,7 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
       (app) => render(app),
     );
@@ -673,7 +691,7 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp(
+    mountSpace(
       { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
       (app) => render(app),
     );
@@ -702,7 +720,7 @@ describe('Space app Cards drawer', () => {
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
 
-    mountSpaceApp(
+    mountSpace(
       {
         id: runtime(local).id,
         session,
@@ -715,6 +733,11 @@ describe('Space app Cards drawer', () => {
         graphId: null,
         presentationCardId: null,
       },
+      // The Card is in no Layout, so the address that names it is the canonical
+      // one — which opens the Space's default Layout, the one selected here.
+      recordingHistory(
+        productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: OUTSIDE_CARD_ID }),
+      ),
     );
 
     expect(screen.getByRole('button', { name: 'Add Outside card to Layout' })).toBeVisible();
@@ -736,6 +759,76 @@ describe('Space app Cards drawer', () => {
     expect(
       screen.queryByRole('button', { name: 'Add Outside card to Layout' }),
     ).not.toBeInTheDocument();
+  });
+
+  /**
+   * A chrome title draft belongs to the Layout it was begun on, and a Back that
+   * lands on another Layout discards it.
+   *
+   * The Graph subject is the demanding one: Graph rows are the selected
+   * Layout's, so the arrival unmounts the row the draft was begun on. A draft
+   * outliving that has no editor left to cancel it and still withdraws Add
+   * Card, Present, Delete Card and every entity menu's Edits.
+   *
+   * Choosing a Layout row spends `setSpaceChromeEdit(null)` at the call site,
+   * and this arrival does not — it is `chromeEditingDisabled` that answers it,
+   * because the Layout change clears the published projection and the canvas
+   * holds no Cards until placement resolves. That is one clear standing on
+   * another's condition, which is why the behaviour is pinned here rather than
+   * left to the reader of either.
+   */
+  it('discards an open chrome title draft when a Back moves to another Layout', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const local: SpaceSnapshot = {
+      ...base,
+      document: {
+        ...base.document,
+        layouts: [
+          ...(base.document.layouts ?? []),
+          {
+            id: OTHER_LAYOUT_ID,
+            title: 'Other Layout',
+            kind: 'positioned',
+            // The Card is placed here too, so this Layout stays editable: an
+            // empty Layout withdraws chrome editing on its own and would clear
+            // the draft for a reason that has nothing to do with the arrival.
+            positions: { [CARD_ID]: { x: 40, y: 50, open: false } },
+            graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
+          },
+        ],
+      },
+    };
+    const stored = { snapshot: local, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const history = recordingHistory(
+      productDestinationPath({ kind: 'layout', spaceId: SPACE_ID, layoutId: LAYOUT_ID }),
+    );
+
+    mountSpace(
+      {
+        id: runtime(local).id,
+        session,
+        app: composeApp({ spaceSession: session, selection: LAYOUT_ID }),
+      },
+      (app) => render(app),
+      { selection: LAYOUT_ID, cardId: null, graphId: null, presentationCardId: null },
+      history,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Graph Graph' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    expect(await screen.findByRole('textbox', { name: 'Graph name' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Card' })).toBeDisabled();
+
+    act(() => {
+      history.popTo(
+        productDestinationPath({ kind: 'layout', spaceId: SPACE_ID, layoutId: OTHER_LAYOUT_ID }),
+      );
+    });
+
+    expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Layout');
+    expect(screen.queryByRole('textbox', { name: 'Graph name' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Card' })).toBeEnabled();
   });
 
   it('reveals the addressed Card again in a newly adopted default Layout that omits it, even though the same Card was already addressed once', async () => {
@@ -762,8 +855,16 @@ describe('Space app Cards drawer', () => {
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const history = recordingHistory(
+      productDestinationPath({
+        kind: 'layout-card',
+        spaceId: SPACE_ID,
+        layoutId: LAYOUT_ID,
+        cardId: CARD_ID,
+      }),
+    );
 
-    mountSpaceApp(
+    mountSpace(
       {
         id: runtime(local).id,
         session,
@@ -776,20 +877,19 @@ describe('Space app Cards drawer', () => {
         graphId: null,
         presentationCardId: null,
       },
+      history,
     );
 
     // Card is a member of the selected Layout, so there is nothing to reveal yet.
     expect(screen.queryByRole('button', { name: 'Add Card to Layout' })).not.toBeInTheDocument();
 
-    // The canonical Card link carries no Layout of its own — it opens
-    // wherever the Space's default Layout is, which is now the Layout that
-    // omits this Card.
-    window.history.replaceState(
-      null,
-      '',
-      productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: CARD_ID }),
-    );
-    fireEvent(window, new PopStateEvent('popstate'));
+    // The second of the two mount tests, and the other direction: a Back the
+    // injected History API reports has to reach Navigation and redraw. The
+    // canonical Card link carries no Layout of its own — it opens wherever the
+    // Space's default Layout is, which is now the Layout that omits this Card.
+    act(() => {
+      history.popTo(productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: CARD_ID }));
+    });
 
     expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Layout');
     expect(await screen.findByRole('button', { name: 'Add Card to Layout' })).toBeVisible();

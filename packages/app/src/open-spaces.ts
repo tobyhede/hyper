@@ -11,6 +11,7 @@ import {
   type SpaceCardLifecycle,
   type SpaceSession,
 } from '@project/persistence';
+import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
 
@@ -60,12 +61,30 @@ export interface OpenSpaces {
     confirmation?: RejectedCloseConfirmation,
   ) => Promise<CloseSpaceResult>;
   readonly spaceCards: SpaceCardLifecycle;
+  /**
+   * The browser's location, following whichever Space is on the canvas.
+   *
+   * One module for the session rather than one per Space: there is one history
+   * stack, and N compositions each holding the position they last synced to
+   * would be N modules disagreeing about it. `openPath` is the
+   * pathname-to-opening direction and this is its inverse, so both live with
+   * the one thing that knows how many Spaces there are.
+   */
+  readonly browserLocation: BrowserLocation;
 }
 
 export interface OpenSpacesOptions {
   readonly backend: SpaceBackend;
   readonly metaSpaceId: UUID;
   readonly newId: () => UUID;
+  /**
+   * What the browser is asked for, required with no default (ADR 0016).
+   *
+   * `createSpaceStartup` supplies the one adapter over `window`; a test supplies
+   * a recording one. A default here would put the ambient browser back behind
+   * the one owner that is supposed to name it.
+   */
+  readonly history: HistoryApi;
   readonly reportObserverError?: ObserverErrorReporter;
 }
 
@@ -89,6 +108,7 @@ export function createOpenSpaces({
   backend,
   metaSpaceId,
   newId,
+  history,
   reportObserverError,
 }: OpenSpacesOptions): OpenSpaces {
   const report: ObserverErrorReporter =
@@ -102,6 +122,31 @@ export function createOpenSpaces({
     report,
   );
   const compositions = new Map<UUID, Promise<OpenSpace>>();
+  const browserLocation = createBrowserLocation(history, report);
+
+  /**
+   * Hand the browser's location whichever composition is now on the canvas.
+   *
+   * Called after every publication that can change the active Space, and
+   * comparing the composition rather than the Space Id: the same Space reopened
+   * is a different entry, and the location has to follow the one that can
+   * commit.
+   */
+  let followed: ComposedApp | null = null;
+  const followActiveSpace = (): void => {
+    const { activeSpaceId, entries } = observable.getState();
+    const active = entries.find(({ id }) => id === activeSpaceId);
+    // Closing the last Space leaves nothing on the canvas, and holding the
+    // composition it disposed would keep the whole graph behind that entry
+    // alive and claim a Space is followed that is not.
+    if (active === undefined) {
+      followed = null;
+      return;
+    }
+    if (active.app === followed) return;
+    followed = active.app;
+    browserLocation.follow(active.app);
+  };
 
   /**
    * Every activation request in the order it was made.
@@ -180,9 +225,11 @@ export function createOpenSpaces({
     if (state.entries.some(({ id }) => id === entry.id)) {
       if (state.activeSpaceId === activeSpaceId) return;
       observable.publish({ activeSpaceId, entries: state.entries });
+      followActiveSpace();
       return;
     }
     observable.publish({ activeSpaceId, entries: [...state.entries, entry] });
+    followActiveSpace();
   };
 
   const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: LayoutId): OpenSpace => {
@@ -361,6 +408,7 @@ export function createOpenSpaces({
     retired.add(target);
     compositions.delete(spaceId);
     observable.publish({ activeSpaceId, entries });
+    followActiveSpace();
     return { kind: 'closed' };
   };
 
@@ -396,5 +444,6 @@ export function createOpenSpaces({
     switchTo,
     close,
     spaceCards: registry.spaceCards(newId),
+    browserLocation,
   };
 }
