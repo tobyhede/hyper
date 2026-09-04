@@ -75,7 +75,7 @@ const AGGREGATE_REFUSAL_REASONS = {
   'space-card-reference-cycle': 'A space card would make a space contain itself.',
   'ordinary-space-unreferenced': 'A space would be left with nothing pointing at it.',
   'space-card-layout-missing': 'A space card points at a Layout that no longer exists.',
-  'space-card-graph-missing': 'A space card points at a graph that no longer exists.',
+  'space-card-graph-missing': 'A space card points at a Graph that no longer exists.',
   'space-card-graph-outside-layout': 'A space card names a Graph that its Layout does not own.',
   // `satisfies` rather than an annotation: it still fails the moment a refusal
   // kind is added without a sentence, and it keeps each value's literal type

@@ -67,7 +67,7 @@ Standard Base UI trigger/menu behavior throughout, left untouched: Tab reaches t
 ## Open follow-ups
 
 - Wire the menu's Copy link / Copy permanent link to the real `copyProductDestination` path in `App.tsx`, and Rename to the same `authoring.complete({ kind: 'renamed-card' | 'renamed-graph' | 'renamed-layout', ... })` path `chromeTitleEdit`/`InlineTitleEditor` already use. That is what makes any of this production-reachable; `SpaceSidebar`'s `graph.links` and `cardLinks` footer buttons are deliberately still there and still wired, and come out in the same change rather than ahead of it.
-- The canvas header (`SelectedCanvasRenderer`) is the one Sidebar-adjacent surface still without the menu — it names the drawing Layout outside the Sidebar and survives the Sidebar closing, so it wants the same treatment its row already has.
+- The canvas header (`SelectedLayoutName`) is the one Sidebar-adjacent surface still without the menu — it names the drawing Layout outside the Sidebar and survives the Sidebar closing, so it wants the same treatment its row already has.
 - The rail control and `CanvasCard` right-click surface are built; their interaction with React Flow's pointer handling (pan, drag, multi-select, connection dragging) still needs production evidence when `CardNode` supplies the actions.
 - `CardNode` does not pass `entityActions` through, so the rail menu is reachable from `CanvasCard` directly but not yet from a Card on the canvas. That hop is the adapter's and belongs with whichever surface lands first.
 - Decide whether Card title rename stays reachable both ways (click-to-rename and the menu) or the menu becomes the one path — same question for Graph/Layout.

@@ -82,10 +82,10 @@ test('choosing a Layout pushes history and Back, Forward and reload restore it w
 
   await page.goBack();
   await expect(page).toHaveURL(canonical);
-  await expect(page.getByText('Collection 1', { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
   await page.goForward();
   await expect(page).toHaveURL(second);
-  await expect(page.getByText('Collection 2', { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
 
   const after = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)

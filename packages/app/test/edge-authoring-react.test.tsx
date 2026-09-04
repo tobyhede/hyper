@@ -38,6 +38,7 @@ const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const LAYOUT_ONE_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
 /** The one row this chrome draws, named so `selected` can be that very value. */
@@ -46,7 +47,7 @@ const LAYOUT_ONE: Layout = {
   title: 'Layout 1',
   kind: 'positioned',
   positions: {},
-  graphs: [],
+  graphs: [{ id: LAYOUT_ONE_GRAPH_ID, title: 'Main', edges: [] }],
 };
 /** The real app chrome, composed as `App` composes it, outside the canvas. */
 const appChrome = (

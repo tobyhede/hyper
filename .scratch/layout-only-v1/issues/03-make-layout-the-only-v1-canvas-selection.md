@@ -63,19 +63,18 @@ rewrite is coordinated and a site discovered part-way through it is the
 expensive kind. ADR 0081's own body is provenance and stays as written; what
 changes is the code it describes.
 
-### Retired vocabulary that survived the sweep
+### Retired vocabulary that survived the sweep, then was closed in the same change
 
-Two story parity claims still name the retired union term as a hyphenated
-adjective:
+Two story parity claims had named the retired union term as a hyphenated
+adjective — where the surface they describe now reads "Copy link to … in this
+Layout" (`packages/app/src/components/SpaceSidebar.tsx:656`, `:664`), the
+claims themselves still read the old compound. Both now read "distinct
+canonical and current-Layout copy commands"
+(`packages/app/stories/parity-claims.ts:213` and `:219`).
 
-- `packages/app/stories/parity-claims.ts:213` and `:219` —
-  "distinct canonical and current-Space-View copy commands", where the surface
-  they describe now reads "Copy link to … in this Layout"
-  (`packages/app/src/components/SpaceSidebar.tsx:656`, `:664`).
-
-The guard does not catch them because `RETIRED_CANVAS_TERMS`
-(`test/unit/current-domain-vocabulary.test.ts:33`) joins the two words with a
-literal space, and a hyphenated compound is a different string. Prose in a
-story claim cannot resurrect the entity, so this is the live-vocabulary tail of
-this ticket rather than a contract defect — but the guard arm the last box
-claims is narrower than the sweep it is meant to hold.
+The guard had not caught them because `RETIRED_CANVAS_TERMS`
+(`test/unit/current-domain-vocabulary.test.ts:37`) joined the two words with a
+literal space, and a hyphenated compound was a different string. Prose in a
+story claim cannot resurrect the entity, so this was the live-vocabulary tail
+of this ticket rather than a contract defect — the regex now joins the pair
+with `[ -]` instead, closing the gap the last box's claim did not cover.
