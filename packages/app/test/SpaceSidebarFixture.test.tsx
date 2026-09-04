@@ -117,4 +117,43 @@ describe('the Space Sidebar story fixture', () => {
       expect(screen.getByRole('button', { name: 'Renamed collection' })).toBeVisible(),
     );
   });
+
+  /**
+   * A rename begun from the actions menu leaves the caret somewhere a keyboard
+   * can carry on from.
+   *
+   * The menu item is inside a popup that is gone by the time the editor
+   * commits, so the row is re-found by its addressing attribute rather than
+   * held on to — and both branches of the row carry that attribute, the editing
+   * one on an unfocusable `div`. `onReturnFocus` fires from inside the key
+   * handler, before React has swapped the branch back, so a selector that
+   * stops at the addressed element focuses the `div` and the caret lands on
+   * `<body>` when the editor unmounts. The row `<li>` is the element that
+   * survives the swap, which is why the click path already focuses it.
+   */
+  it.each([
+    {
+      row: 'Layout',
+      open: 'Actions for Layout Collection 1',
+      field: 'Layout name',
+      renamed: 'Renamed from the Layout menu',
+    },
+    {
+      row: 'Graph',
+      open: 'Actions for Graph Long',
+      field: 'Graph name',
+      renamed: 'Renamed from the Graph menu',
+    },
+  ])('returns focus to the $row row it renamed from the actions menu', async (subject) => {
+    render(<SpaceSidebarFixture />);
+    fireEvent.click(screen.getByRole('button', { name: subject.open }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+
+    const title = await screen.findByRole('textbox', { name: subject.field });
+    fireEvent.change(title, { target: { value: subject.renamed } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+
+    const row = await screen.findByRole('button', { name: subject.renamed });
+    expect(row.closest('li')).toHaveFocus();
+  });
 });

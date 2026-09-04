@@ -78,9 +78,16 @@ const copy = (
  * By the row's own addressing attribute rather than by a captured element: the
  * menu item that begins the rename is inside a popup that is gone by the time
  * the editor commits, so there is no element left to have held on to.
+ *
+ * The **row**, and not the addressed element: a row draws its title as a button
+ * and its live rename as a `div`, both carrying the attribute, and this runs
+ * from inside the editor's key handler — before React has swapped the editing
+ * branch back — so the element the attribute finds is the unfocusable one.
+ * The `<li>` around it is what survives the swap, which is why the click path
+ * into the same rename focuses it too.
  */
 const focusRow = (attribute: string, id: string) => () => {
-  document.querySelector<HTMLElement>(`[${attribute}="${id}"]`)?.focus();
+  document.querySelector<HTMLElement>(`[${attribute}="${id}"]`)?.closest('li')?.focus();
 };
 
 export function spaceEntityActions({
