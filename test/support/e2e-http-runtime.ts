@@ -1,4 +1,5 @@
-import { resolveDatabaseStartup } from '../../src/startup/database-startup';
+import { newUuid } from '@project/core';
+import { establishMetaSpace } from '../../src/startup/database-startup';
 import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
 import { E2eMemorySpaceRepository } from './e2e-memory-space-repository';
 import { importFixture, importSpaceDirectory } from './import-fixture';
@@ -16,10 +17,10 @@ const importCatalog = (repository: E2eMemorySpaceRepository, options: E2eHttpRun
 /** Create one isolated in-process catalog for one browser test. */
 export const createApp = async (options: E2eHttpRuntimeOptions): Promise<SpaceHostApplication> => {
   const repository = new E2eMemorySpaceRepository();
-  const imported = await importCatalog(repository, options);
-  if (options.startup === true) {
-    if (imported !== undefined) await repository.setEntrySpace(imported.snapshot.id);
-    await resolveDatabaseStartup(repository);
-  }
-  return createSpaceHost(repository);
+  await importCatalog(repository, options);
+  // An imported catalog is already initialized, and its first Space is its
+  // Meta Space; an empty one is initialized from Default Content here, exactly
+  // as the database runtime is.
+  if (options.startup === true) await establishMetaSpace(repository, newUuid);
+  return createSpaceHost(repository, newUuid);
 };

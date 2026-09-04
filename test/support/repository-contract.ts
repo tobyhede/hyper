@@ -490,6 +490,29 @@ export const spaceRepositoryContract = (
     });
   });
 
+  it(`${name} refuses an authored commit that deletes the Meta Space`, async () => {
+    await withHarness(async (repository) => {
+      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      await seed(repository, meta);
+
+      // The one Space no Space Card creates and no deletion reaches. A commit
+      // that removes it leaves an aggregate the Meta identity no longer names,
+      // which complete intake refuses by identity rather than by cardinality.
+      await expect(
+        repository.commit({
+          changes: [{ kind: 'delete', spaceId: SPACE_ID, expectedRevision: 0n }],
+        }),
+      ).resolves.toMatchObject({
+        kind: 'aggregate-refused',
+        errors: [{ kind: 'meta-space-missing', metaSpaceId: SPACE_ID }],
+      });
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(meta, 0n, null)] },
+      });
+    });
+  });
+
   it(`${name} round trips every optional Space Card selection combination across a later default change`, async () => {
     await withHarness(async (repository) => {
       const meta = space(SPACE_ID, 'Meta', [CARD_ID]);

@@ -12,7 +12,9 @@ import {
   problemCatalogue,
   type HyperProblemCode,
 } from '@project/persistence';
+import type { UUID } from '@project/core';
 import type { SpaceRepository } from '../persistence/space-repository';
+import { establishMetaSpace } from '../startup/database-startup';
 
 export type SpaceHostApplication = SpaceHttpApp & ProductRequestResolver;
 
@@ -54,8 +56,18 @@ const methodNotAllowed = (accept?: string): ProductResponse => {
   return { ...response, headers: { ...response.headers, allow: PRODUCT_METHODS } };
 };
 
-/** Compose API resources and the product paths the HTTP host owns before SPA fallback. */
-export const createSpaceHost = (repository: SpaceRepository): SpaceHostApplication => {
+/**
+ * Compose API resources and the product paths the HTTP host owns before SPA
+ * fallback.
+ *
+ * `newId` is the composition-owned identity source (ADR 0016): the root address
+ * establishes the Meta Space when the repository has none, and that mints
+ * identities.
+ */
+export const createSpaceHost = (
+  repository: SpaceRepository,
+  newId: () => UUID,
+): SpaceHostApplication => {
   const api = createSpaceHttpApp(repository);
   const resolveProductRequest = async (
     pathname: string,
@@ -65,17 +77,31 @@ export const createSpaceHost = (repository: SpaceRepository): SpaceHostApplicati
     const reads = method === 'GET' || method === 'HEAD';
     if (pathname === '/') {
       if (!reads) return methodNotAllowed(accept);
-      const entrySpaceId = await repository.entrySpaceId();
-      if (entrySpaceId === undefined)
-        return problem('not-found', 'Choose an Entry Space that exists.', accept);
-      // The document is not read to prove it is there. `entrySpaceId` is the id
-      // of the row carrying the Entry Space flag, so it names a Space that
-      // exists — and the redirect target's first act is to load that very Space
-      // anyway, which is where a Space that vanished between the two would be
-      // answered exactly as any other missing Space is.
+      // Opening the application without another destination opens the Meta
+      // Space, and an uninitialized repository is initialized here rather than
+      // redirected to nothing. Contradictory stored Meta state — Spaces without
+      // Meta, or an aggregate that fails complete intake — is an invariant
+      // failure, so it is reported as one instead of being papered over with a
+      // redirect or a guess at which Space was meant.
+      let metaSpaceId: UUID;
+      try {
+        metaSpaceId = await establishMetaSpace(repository, newId);
+      } catch (error) {
+        // The reason travels in the answer. The repository raises this as an
+        // ordinary `Error`, and anything else reaching here is a fault the
+        // caller cannot act on either way.
+        const detail =
+          error instanceof Error ? error.message : 'Stored Meta state is inconsistent.';
+        return problem('internal-error', detail, accept);
+      }
+      // The document is not read to prove it is there. `metaSpaceId` is the id
+      // the repository state names under its restraining foreign key, so it
+      // names a Space that exists — and the redirect target's first act is to
+      // load that very Space anyway, which is where a Space that vanished
+      // between the two would be answered exactly as any other missing Space is.
       return {
         status: 302,
-        headers: { location: productDestinationPath({ kind: 'space', spaceId: entrySpaceId }) },
+        headers: { location: productDestinationPath({ kind: 'space', spaceId: metaSpaceId }) },
       };
     }
 

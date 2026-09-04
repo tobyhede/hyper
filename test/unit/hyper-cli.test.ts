@@ -1,7 +1,13 @@
 import { access, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  newUuid,
+  uuidSchema,
+  type ImportSpace,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import type {
   LoadedSpace,
   RepositoryCommitResult,
@@ -42,7 +48,6 @@ const storedSpace: LoadedSpace = {
 
 class ImportRepository implements SpaceRepository {
   private readonly outcome: RepositoryImportResult | Error;
-  private entryId: UUID | undefined;
 
   constructor(outcome: RepositoryImportResult | Error) {
     this.outcome = outcome;
@@ -65,21 +70,6 @@ class ImportRepository implements SpaceRepository {
       throw new Error('Unexpected loadSpace call');
     }
     return Promise.resolve(this.outcome.spaces.find(({ snapshot }) => snapshot.id === id));
-  }
-
-  entrySpaceId(): Promise<UUID | undefined> {
-    return Promise.resolve(this.entryId);
-  }
-
-  setEntrySpace(id: UUID): Promise<void> {
-    if (this.outcome instanceof Error || this.outcome.kind !== 'imported') {
-      throw new Error('Unexpected setEntrySpace call');
-    }
-    if (!this.outcome.spaces.some(({ snapshot }) => snapshot.id === id)) {
-      throw new Error(`Space ${id} does not exist`);
-    }
-    this.entryId = id;
-    return Promise.resolve();
   }
 
   markExported(_id: UUID, _revision: bigint): Promise<void> {
@@ -163,6 +153,7 @@ describe('runHyper', () => {
     const exitCode = await runHyper(['export', SPACE_ID, destination], {
       repository: new MemorySpaceRepository([storedSpace]),
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(0);
@@ -194,6 +185,7 @@ describe('runHyper', () => {
       runHyper(args, {
         repository: new MemorySpaceRepository([storedSpace]),
         io: output.io,
+        newId: newUuid,
       }),
     ).resolves.toBe(exitCode);
     expect(output.stdout).toEqual([]);
@@ -213,6 +205,7 @@ describe('runHyper', () => {
     const exitCode = await runHyper(['export', SPACE_ID, destination], {
       repository: new MemorySpaceRepository([storedSpace]),
       io: captureIo().io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(0);
@@ -238,6 +231,7 @@ describe('runHyper', () => {
       runHyper(['export', SPACE_ID, destination], {
         repository,
         io: captureIo().io,
+        newId: newUuid,
       }),
     ).resolves.toBe(0);
 
@@ -256,7 +250,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', SPACE_ID, destination], { repository, io: output.io }),
+      runHyper(['export', SPACE_ID, destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr[0]).toMatch(/^Export failed:/);
@@ -281,7 +275,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', SPACE_ID, destination], { repository, io: output.io }),
+      runHyper(['export', SPACE_ID, destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
@@ -309,7 +303,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', SPACE_ID, destination], { repository, io: output.io }),
+      runHyper(['export', SPACE_ID, destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
@@ -339,7 +333,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', SPACE_ID, destination], { repository, io: output.io }),
+      runHyper(['export', SPACE_ID, destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
@@ -387,6 +381,7 @@ describe('runHyper', () => {
       runHyper(['export', SPACE_ID, destination], {
         repository,
         io: captureIo().io,
+        newId: newUuid,
       }),
     ).resolves.toBe(0);
 
@@ -449,6 +444,7 @@ describe('runHyper', () => {
       runHyper(['export', SPACE_ID, destination], {
         repository: new MemorySpaceRepository([{ snapshot, revision: 7n, exportedRevision: null }]),
         io: captureIo().io,
+        newId: newUuid,
       }),
     ).resolves.toBe(0);
 
@@ -487,6 +483,7 @@ describe('runHyper', () => {
       runHyper(['export', SPACE_ID, destination], {
         repository: new MemorySpaceRepository([reordered]),
         io: captureIo().io,
+        newId: newUuid,
       }),
     ).resolves.toBe(0);
 
@@ -518,6 +515,7 @@ describe('runHyper', () => {
       runHyper(['export', SPACE_ID, destination], {
         repository: new MemorySpaceRepository([withMixedLineEndings]),
         io: captureIo().io,
+        newId: newUuid,
       }),
     ).resolves.toBe(0);
 
@@ -526,44 +524,19 @@ describe('runHyper', () => {
     expect(cardFile).toContain('\nFirst\nSecond\nThird\n');
   });
 
-  it('opens the configured Entry Space without filesystem import and preserves its revision', async () => {
+  it('opens the stored Meta Space without filesystem import and preserves its revision', async () => {
     const revision = 9_007_199_254_740_993n;
     const output = captureIo();
 
     const exitCode = await runHyper([], {
       repository: new MemorySpaceRepository([{ ...storedSpace, revision }], SPACE_ID),
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(0);
     expect(output.stdout).toEqual([`Opened space ${SPACE_ID} at revision 9007199254740993\n`]);
     expect(output.stderr).toEqual([]);
-  });
-
-  it('explicitly selects an existing Entry Space', async () => {
-    const output = captureIo();
-    const repository = new MemorySpaceRepository([storedSpace]);
-
-    const exitCode = await runHyper(['entry', SPACE_ID], { repository, io: output.io });
-
-    expect(exitCode).toBe(0);
-    expect(output.stdout).toEqual([`Selected Entry Space ${SPACE_ID}\n`]);
-    expect(output.stderr).toEqual([]);
-    await expect(repository.entrySpaceId()).resolves.toBe(SPACE_ID);
-  });
-
-  it('refuses to select a missing Entry Space', async () => {
-    const output = captureIo();
-    const repository = new MemorySpaceRepository([storedSpace]);
-
-    const exitCode = await runHyper(['entry', OTHER_SPACE_ID], { repository, io: output.io });
-
-    expect(exitCode).toBe(1);
-    expect(output.stdout).toEqual([]);
-    expect(output.stderr).toEqual([
-      `Entry Space selection failed: Space ${OTHER_SPACE_ID} does not exist\n`,
-    ]);
-    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
   });
 
   it.each([
@@ -576,12 +549,13 @@ describe('runHyper', () => {
     const exitCode = await runHyper(args, {
       repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(2);
     expect(output.stdout).toEqual([]);
     expect(output.stderr).toEqual([
-      'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper entry <space-uuid>\n       hyper export <space-uuid> <destination-directory>\n',
+      'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper export <space-uuid> <destination-directory>\n',
     ]);
   });
 
@@ -600,6 +574,7 @@ describe('runHyper', () => {
         spaces: [{ ...storedSpace, revision }],
       }),
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(0);
@@ -607,12 +582,12 @@ describe('runHyper', () => {
     expect(output.stderr).toEqual([]);
   });
 
-  it('imports a UUID without changing the Entry Space', async () => {
+  it('imports a UUID into the existing catalog', async () => {
     const directory = await writeValidSpace(OTHER_SPACE_ID, 'Fresh imported talk');
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace]);
 
-    const exitCode = await runHyper([directory], { repository, io: output.io });
+    const exitCode = await runHyper([directory], { repository, io: output.io, newId: newUuid });
 
     expect(exitCode).toBe(0);
     expect(output.stdout).toEqual([`Imported space ${OTHER_SPACE_ID} at revision 0\n`]);
@@ -624,7 +599,6 @@ describe('runHyper', () => {
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toMatchObject({
       snapshot: { id: OTHER_SPACE_ID },
     });
-    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
   });
 
   it('dangerously truncates existing spaces when importing a path', async () => {
@@ -635,6 +609,7 @@ describe('runHyper', () => {
     const exitCode = await runHyper([directory, '--dangerous-truncate'], {
       repository,
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(0);
@@ -644,7 +619,7 @@ describe('runHyper', () => {
     ]);
   });
 
-  it('imports a batch without inferring an Entry Space', async () => {
+  it('imports a batch into the existing catalog', async () => {
     const collection = await makeTemporaryDirectory();
     const first = join(collection, 'first');
     const second = join(collection, 'second');
@@ -664,6 +639,7 @@ describe('runHyper', () => {
     const exitCode = await runHyper([collection], {
       repository,
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(0);
@@ -673,7 +649,6 @@ describe('runHyper', () => {
     ]);
     expect(output.stdout.join('')).not.toContain(collection);
     expect(output.stderr).toEqual([]);
-    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
   });
 
   it('reports every file diagnostic with its path', async () => {
@@ -688,6 +663,7 @@ describe('runHyper', () => {
     const exitCode = await runHyper([directory], {
       repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(1);
@@ -731,6 +707,7 @@ describe('runHyper', () => {
       const exitCode = await runHyper([directory], {
         repository: new ImportRepository(outcome),
         io: output.io,
+        newId: newUuid,
       });
 
       expect(exitCode).toBe(1);
@@ -784,6 +761,7 @@ describe('runHyper', () => {
     const exitCode = await runHyper([directory], {
       repository: new MemorySpaceRepository(),
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(1);
@@ -812,6 +790,7 @@ describe('runHyper', () => {
         message: `Space ${SPACE_ID} already exists`,
       }),
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(1);
@@ -827,6 +806,7 @@ describe('runHyper', () => {
     const exitCode = await runHyper([directory], {
       repository: new ImportRepository(new Error('connection lost')),
       io: output.io,
+      newId: newUuid,
     });
 
     expect(exitCode).toBe(1);
@@ -840,7 +820,7 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository();
     repository.loadSpace = () => Promise.reject(new Error('load unavailable'));
 
-    const exitCode = await runHyper([directory], { repository, io: output.io });
+    const exitCode = await runHyper([directory], { repository, io: output.io, newId: newUuid });
 
     expect(exitCode).toBe(0);
     expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 0\n`]);
@@ -868,7 +848,7 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository();
     repository.listSpaces = () => Promise.reject(new Error('catalog unavailable'));
 
-    const exitCode = await runHyper([collection], { repository, io: output.io });
+    const exitCode = await runHyper([collection], { repository, io: output.io, newId: newUuid });
 
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([]);
@@ -879,9 +859,9 @@ describe('runHyper', () => {
   it('classifies a no-path repository failure as database startup without a stack', async () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository();
-    repository.listSpaces = () => Promise.reject(new Error('catalog unavailable'));
+    repository.loadAggregate = () => Promise.reject(new Error('catalog unavailable'));
 
-    const exitCode = await runHyper([], { repository, io: output.io });
+    const exitCode = await runHyper([], { repository, io: output.io, newId: newUuid });
 
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([]);
@@ -897,6 +877,7 @@ describe('runCliMain', () => {
     const exitCode = await runCliMain([], {
       repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: output.io,
+      newId: newUuid,
       close: () => {
         closed = true;
         return Promise.resolve();
@@ -912,12 +893,13 @@ describe('runCliMain', () => {
   it('closes the database after no-path startup fails', async () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository();
-    repository.listSpaces = () => Promise.reject(new Error('catalog unavailable'));
+    repository.loadAggregate = () => Promise.reject(new Error('catalog unavailable'));
     let closed = false;
 
     const exitCode = await runCliMain([], {
       repository,
       io: output.io,
+      newId: newUuid,
       close: () => {
         closed = true;
         return Promise.resolve();
@@ -938,6 +920,7 @@ describe('runCliMain', () => {
     const exitCode = await runCliMain([directory], {
       repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
       io: output.io,
+      newId: newUuid,
       close: () => {
         closed = true;
         return Promise.resolve();
@@ -957,6 +940,7 @@ describe('runCliMain', () => {
     const exitCode = await runCliMain([directory], {
       repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
       io: output.io,
+      newId: newUuid,
       close: () => Promise.reject(new Error('socket stuck')),
     });
 
@@ -983,6 +967,7 @@ describe('runCliMain', () => {
     const exitCode = await runCliMain(['--bogus'], {
       repository: new MemorySpaceRepository([storedSpace]),
       io,
+      newId: newUuid,
       close: () => {
         closed = true;
         return Promise.resolve();
@@ -1000,6 +985,7 @@ describe('runCliMain', () => {
 
     const exitCode = await runCliMain(['--bogus'], {
       repository: new MemorySpaceRepository([storedSpace]),
+      newId: newUuid,
       io: {
         stdout: () => undefined,
         stderr: () => {

@@ -6,7 +6,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { connect } from 'node:net';
-import { encodeCompactUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { encodeCompactUuid, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import {
   decodeProblemDetails,
@@ -18,6 +18,7 @@ import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
 
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
@@ -187,24 +188,69 @@ describe('Vite Hono host', () => {
     await expect(response.text()).resolves.toBe('<main>Vite application</main>');
   });
 
-  it('redirects root to the compact Entry Space URL without reading its document', async () => {
+  it('redirects root to the compact Meta Space URL without reading its document', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceRepository = new MemorySpaceRepository([stored], SPACE_ID);
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
-    const { host } = await startHost(createSpaceHost(spaceRepository));
+    const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
 
     const response = await fetch(`${host.url}/`, { redirect: 'manual' });
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
     // The redirect target's first act is to load this Space, and the id came
-    // from the row that holds it — so loading it here to prove it exists is a
-    // read the answer never depended on.
+    // from the repository state that names it under a restraining foreign key —
+    // so loading it here to prove it exists is a read the answer never
+    // depended on.
     expect(loadSpace).not.toHaveBeenCalled();
   });
 
+  it('initializes an uninitialized repository at root and redirects to the Meta Space', async () => {
+    const spaceRepository = new MemorySpaceRepository();
+    const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
+
+    const response = await fetch(`${host.url}/`, { redirect: 'manual' });
+
+    const loaded = await spaceRepository.loadAggregate();
+    if (loaded.kind !== 'loaded') throw new Error('Root did not initialize the repository');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      `/spaces/${encodeCompactUuid(loaded.aggregate.metaSpaceId)}`,
+    );
+
+    // A second arrival reads the Meta Space established by the first rather
+    // than seeding a second one over it.
+    const again = await fetch(`${host.url}/`, { redirect: 'manual' });
+    expect(again.headers.get('location')).toBe(response.headers.get('location'));
+    await expect(spaceRepository.listSpaces()).resolves.toHaveLength(1);
+  });
+
+  it('answers contradictory stored Meta state as an explicit failure', async () => {
+    class MetalessSpaceRepository extends MemorySpaceRepository {
+      override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
+        return Promise.reject(new Error('Stored Spaces exist without a Meta Space'));
+      }
+    }
+    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    const { host } = await startHost(
+      createSpaceHost(new MetalessSpaceRepository([stored]), newUuid),
+    );
+
+    const response = await fetch(`${host.url}/`, {
+      redirect: 'manual',
+      headers: { Accept: 'application/problem+json' },
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get('location')).toBeNull();
+    expect(decodeProblemDetails(await response.json())).toMatchObject({
+      status: 500,
+      detail: 'Stored Spaces exist without a Meta Space',
+    });
+  });
+
   it('answers malformed and unresolved Space URLs before Vite fallback', async () => {
-    const hostApp = createSpaceHost(new MemorySpaceRepository());
+    const hostApp = createSpaceHost(new MemorySpaceRepository(), newUuid);
     const { host } = await startHost(hostApp);
 
     await expect(
@@ -213,11 +259,10 @@ describe('Vite Hono host', () => {
     await expect(
       fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`).then((value) => value.status),
     ).resolves.toBe(404);
-    await expect(fetch(`${host.url}/`).then((value) => value.status)).resolves.toBe(404);
   });
 
   it('serves product failures as Problem Details or a browser error surface', async () => {
-    const { host } = await startHost(createSpaceHost(new MemorySpaceRepository()));
+    const { host } = await startHost(createSpaceHost(new MemorySpaceRepository(), newUuid));
     const path = `/spaces/${encodeCompactUuid(SPACE_ID)}`;
 
     const protocol = await fetch(`${host.url}${path}`, {
@@ -246,7 +291,7 @@ describe('Vite Hono host', () => {
 
   it('lets an existing canonical Space URL reach the SPA fallback', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const hostApp = createSpaceHost(new MemorySpaceRepository([stored]));
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored]), newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.setHeader('Content-Type', 'text/html');
       response.end('<main>Canonical Space</main>');
@@ -262,7 +307,7 @@ describe('Vite Hono host', () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceRepository = new MemorySpaceRepository([stored]);
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
-    const hostApp = createSpaceHost(spaceRepository);
+    const hostApp = createSpaceHost(spaceRepository, newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.end('<main>Application</main>');
     });
@@ -279,7 +324,7 @@ describe('Vite Hono host', () => {
   it('leaves a path outside product addressing to the SPA fallback without loading', async () => {
     const spaceRepository = new MemorySpaceRepository();
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
-    const hostApp = createSpaceHost(spaceRepository);
+    const hostApp = createSpaceHost(spaceRepository, newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.end('<main>Outside product addressing</main>');
     });
@@ -293,7 +338,7 @@ describe('Vite Hono host', () => {
 
   it('resolves HEAD like GET while sending no product response body', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID));
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID), newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.statusCode = 200;
       response.end('<main>Vite fallback</main>');
@@ -336,10 +381,13 @@ describe('Vite Hono host', () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceRepository = new MemorySpaceRepository([stored], SPACE_ID);
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
-    const { host } = await startHost(createSpaceHost(spaceRepository), (_request, response) => {
-      response.setHeader('Content-Type', 'text/html');
-      response.end('<main>Vite fallback</main>');
-    });
+    const { host } = await startHost(
+      createSpaceHost(spaceRepository, newUuid),
+      (_request, response) => {
+        response.setHeader('Content-Type', 'text/html');
+        response.end('<main>Vite fallback</main>');
+      },
+    );
 
     const posted = await fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`, {
       method: 'POST',

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "dropConstraint.spaces.spaces_entry_key",
+    "label": "Drop constraint \"spaces_entry_key\" on \"spaces\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "spaces_entry_key",
+        "table": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"spaces_entry_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "spaces_entry_key",
+          "public",
+          "\"public\".\"spaces\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop constraint \"spaces_entry_key\"",
+        "sql": "ALTER TABLE \"public\".\"spaces\" DROP CONSTRAINT \"spaces_entry_key\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"spaces_entry_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "spaces_entry_key",
+          "public",
+          "\"public\".\"spaces\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropColumn.spaces.entry",
+    "label": "Drop column \"entry\" from \"spaces\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "entry",
+        "table": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"entry\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "entry"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop column \"entry\"",
+        "sql": "ALTER TABLE \"public\".\"spaces\" DROP COLUMN \"entry\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"entry\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "entry"
+        ]
+      }
+    ]
+  }
+]

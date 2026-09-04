@@ -1,96 +1,41 @@
-import { uuidSchema, type ImportSpace, type UUID } from '@project/core';
-import type {
-  LoadedSpace,
-  RepositoryCommitResult,
-  SpaceCommit,
-  SpaceSummary,
-} from '@project/persistence';
+import { uuidSchema, type UUID } from '@project/core';
+import type { LoadedSpace } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
-import type {
-  ImportMode,
-  RepositoryImportResult,
-  SpaceRepository,
-} from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
 import {
-  bootstrapEmptyDatabase,
+  establishMetaSpace,
   openDatabaseSelection,
   resolveDatabaseStartup,
 } from '../../src/startup/database-startup';
+import { defaultContentAggregate } from '../../src/startup/default-content';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_CARD_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+const LAYOUT_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const GRAPH_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+const LINK_CARD_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 
-class PersistenceOwnedSpaceIdRepository implements SpaceRepository {
-  readonly #memory = new MemorySpaceRepository();
+/**
+ * The identities startup is about to mint, named in the order it mints them
+ * (ADR 0016). Exhaustion throws rather than falling back to the ambient
+ * generator, so an extra mint is observable at the operation that made it.
+ */
+const mintingIds = (...ids: readonly [UUID, ...UUID[]]): (() => UUID) => {
+  let next = 0;
+  return () => {
+    const id = ids[next++];
+    if (id === undefined) throw new Error('Startup minted more identities than expected.');
+    return id;
+  };
+};
 
-  listSpaces(): Promise<readonly SpaceSummary[]> {
-    return this.#memory.listSpaces();
-  }
-
-  loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
-    return this.#memory.loadSpace(id);
-  }
-
-  loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
-    return this.#memory.loadAggregate();
-  }
-
-  initializeAggregate(
-    ...args: Parameters<SpaceRepository['initializeAggregate']>
-  ): ReturnType<SpaceRepository['initializeAggregate']> {
-    return this.#memory.initializeAggregate(...args);
-  }
-
-  replaceAggregate(
-    ...args: Parameters<SpaceRepository['replaceAggregate']>
-  ): ReturnType<SpaceRepository['replaceAggregate']> {
-    return this.#memory.replaceAggregate(...args);
-  }
-
-  commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
-    return this.#memory.commit(request);
-  }
-
-  importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {
-    const [space] = input;
-    if (space === undefined || input.length !== 1) {
-      return Promise.resolve({
-        kind: 'rejected',
-        code: 'invalid-snapshot',
-        message: 'Expected exactly one new Space',
-      });
-    }
-    if (space.id !== undefined) {
-      return Promise.resolve({
-        kind: 'rejected',
-        code: 'invalid-snapshot',
-        message: 'The repository owns the new Space identity',
-      });
-    }
-    if (space.cards.some((card) => card.id === undefined)) {
-      return Promise.resolve({
-        kind: 'rejected',
-        code: 'invalid-snapshot',
-        message: 'Card identities must already be assigned',
-      });
-    }
-
-    return this.#memory.importSpaces([{ ...space, id: SPACE_ID }], mode);
-  }
-
-  markExported(id: UUID, revision: bigint): Promise<void> {
-    return this.#memory.markExported(id, revision);
-  }
-
-  entrySpaceId(): Promise<UUID | undefined> {
-    return this.#memory.entrySpaceId();
-  }
-
-  setEntrySpace(id: UUID): Promise<void> {
-    return this.#memory.setEntrySpace(id);
+/** Stored state that no Meta identity names — an invariant failure, not an empty repository. */
+class MetalessSpaceRepository extends MemorySpaceRepository {
+  override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
+    return Promise.reject(new Error('Stored Spaces exist without a Meta Space'));
   }
 }
 
@@ -112,6 +57,37 @@ const storedSpace = (
   },
   revision,
   exportedRevision: null,
+});
+
+describe('defaultContentAggregate', () => {
+  it('mints one complete Meta Space through the injected identity source', () => {
+    const aggregate = defaultContentAggregate(mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID));
+
+    expect(aggregate).toEqual({
+      metaSpaceId: SPACE_ID,
+      spaces: [
+        {
+          id: SPACE_ID,
+          document: {
+            version: 1,
+            title: 'New space',
+            defaultLayout: LAYOUT_ID,
+            layouts: [
+              {
+                id: LAYOUT_ID,
+                title: 'Layout 1',
+                kind: 'positioned',
+                positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+                graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+                activeGraph: GRAPH_ID,
+              },
+            ],
+          },
+          cards: [{ id: CARD_ID, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+        },
+      ],
+    });
+  });
 });
 
 describe('openDatabaseSelection', () => {
@@ -138,111 +114,120 @@ describe('openDatabaseSelection', () => {
   });
 });
 
-describe('resolveDatabaseStartup', () => {
-  it('leaves the new Space identity for the repository to assign', async () => {
-    const repository = new PersistenceOwnedSpaceIdRepository();
-
-    const result = await resolveDatabaseStartup(repository);
-
-    expect(result.kind).toBe('opened');
-    expect(result.space.snapshot.id).toBe(SPACE_ID);
-    expect(uuidSchema.safeParse(result.space.snapshot.cards[0]?.id).success).toBe(true);
-  });
-
-  it('creates and opens the normal new space when the database is empty', async () => {
+describe('establishMetaSpace', () => {
+  it('initializes an uninitialized repository from Default Content', async () => {
     const repository = new MemorySpaceRepository();
 
-    const result = await resolveDatabaseStartup(repository);
+    const metaSpaceId = await establishMetaSpace(
+      repository,
+      mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID),
+    );
 
-    expect(result.kind).toBe('opened');
-    expect(uuidSchema.safeParse(result.space.snapshot.id).success).toBe(true);
-    const cardId = result.space.snapshot.cards[0]?.id;
-    const layoutId = result.space.snapshot.document.layouts?.[0]?.id;
-    const graphId = result.space.snapshot.document.layouts?.[0]?.graphs[0]?.id;
-    expect(uuidSchema.safeParse(cardId).success).toBe(true);
-    expect(uuidSchema.safeParse(layoutId).success).toBe(true);
-    expect(uuidSchema.safeParse(graphId).success).toBe(true);
-    if (cardId === undefined || layoutId === undefined || graphId === undefined) {
-      throw new Error('New Space did not create its complete working state');
-    }
-    expect(result.space).toEqual({
-      snapshot: {
-        id: result.space.snapshot.id,
-        document: {
-          version: 1,
-          title: 'New space',
-          defaultLayout: layoutId,
-          layouts: [
-            {
-              id: layoutId,
-              title: 'Layout 1',
-              kind: 'positioned',
-              positions: { [cardId]: { x: 0, y: 0, open: false } },
-              graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
-              activeGraph: graphId,
-            },
-          ],
-        },
-        cards: [
-          {
-            id: cardId,
-            document: { title: 'Card 1', kind: 'markdown', body: '' },
-          },
-        ],
-      },
-      revision: 0n,
-      exportedRevision: null,
+    expect(metaSpaceId).toBe(SPACE_ID);
+    await expect(repository.loadAggregate()).resolves.toMatchObject({
+      kind: 'loaded',
+      aggregate: { metaSpaceId: SPACE_ID },
     });
-    await expect(repository.loadSpace(result.space.snapshot.id)).resolves.toEqual(result.space);
   });
 
-  it('opens the configured Entry Space without losing its revision precision', async () => {
+  it('answers the stored Meta identity without reseeding an initialized repository', async () => {
+    const existing = storedSpace(4n);
+    const repository = new MemorySpaceRepository([existing], SPACE_ID);
+
+    // The minter refuses every call, so a second seeding attempt fails here
+    // rather than quietly replacing authored state.
+    const metaSpaceId = await establishMetaSpace(repository, () => {
+      throw new Error('Startup minted an identity for an initialized repository');
+    });
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: SPACE_ID, title: 'Existing space' },
+    ]);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(existing);
+  });
+
+  it('fails explicitly on stored Spaces that no Meta identity names', async () => {
+    const repository = new MetalessSpaceRepository([storedSpace(4n)]);
+
+    await expect(establishMetaSpace(repository, mintingIds(OTHER_SPACE_ID))).rejects.toThrow(
+      'Stored Spaces exist without a Meta Space',
+    );
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: SPACE_ID, title: 'Existing space' },
+    ]);
+  });
+});
+
+describe('resolveDatabaseStartup', () => {
+  it('creates and opens the Meta Space when the repository is uninitialized', async () => {
+    const repository = new MemorySpaceRepository();
+
+    const result = await resolveDatabaseStartup(
+      repository,
+      mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID),
+    );
+
+    expect(result).toEqual({
+      kind: 'opened',
+      space: {
+        snapshot: {
+          id: SPACE_ID,
+          document: {
+            version: 1,
+            title: 'New space',
+            defaultLayout: LAYOUT_ID,
+            layouts: [
+              {
+                id: LAYOUT_ID,
+                title: 'Layout 1',
+                kind: 'positioned',
+                positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+                graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+                activeGraph: GRAPH_ID,
+              },
+            ],
+          },
+          cards: [{ id: CARD_ID, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+        },
+        revision: 0n,
+        exportedRevision: null,
+      },
+    });
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(result.space);
+  });
+
+  it('opens the stored Meta Space without losing its revision precision', async () => {
     const existing = storedSpace(BigInt(Number.MAX_SAFE_INTEGER) + 1n);
     const repository = new MemorySpaceRepository([existing], SPACE_ID);
 
-    const result = await resolveDatabaseStartup(repository);
+    const result = await resolveDatabaseStartup(repository, mintingIds(OTHER_SPACE_ID));
 
     expect(result).toEqual({ kind: 'opened', space: existing });
   });
 
-  it('opens the configured Entry Space when several spaces are stored', async () => {
-    const entry = storedSpace(7n, OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space');
-    const repository = new MemorySpaceRepository([storedSpace(4n), entry], OTHER_SPACE_ID);
+  it('opens the Meta Space rather than the first of several stored Spaces', async () => {
+    // Ordinary Spaces live inside the Meta reachability closure, so the second
+    // one is stored *because* a Space Card in Meta names it.
+    const meta: LoadedSpace = {
+      snapshot: {
+        id: OTHER_SPACE_ID,
+        document: { version: 1, title: 'Meta space' },
+        cards: [
+          { id: OTHER_CARD_ID, document: { title: 'Meta card', kind: 'markdown', body: '' } },
+          {
+            id: LINK_CARD_ID,
+            document: { title: 'Open the child', kind: 'space', spaceId: SPACE_ID },
+          },
+        ],
+      },
+      revision: 7n,
+      exportedRevision: null,
+    };
+    const repository = new MemorySpaceRepository([storedSpace(4n), meta], OTHER_SPACE_ID);
 
-    const result = await resolveDatabaseStartup(repository);
+    const result = await resolveDatabaseStartup(repository, mintingIds(LAYOUT_ID));
 
-    expect(result).toEqual({ kind: 'opened', space: entry });
-  });
-
-  it('does not infer an Entry Space from the catalog', async () => {
-    const repository = new MemorySpaceRepository([storedSpace(4n)]);
-
-    await expect(resolveDatabaseStartup(repository)).rejects.toThrow(
-      'The database has no configured Entry Space',
-    );
-    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
-  });
-});
-
-describe('bootstrapEmptyDatabase', () => {
-  it('creates and configures the normal new Space when the database is empty', async () => {
-    const repository = new MemorySpaceRepository();
-
-    await bootstrapEmptyDatabase(repository);
-
-    const spaces = await repository.listSpaces();
-    expect(spaces).toHaveLength(1);
-    expect(spaces[0]?.title).toBe('New space');
-    await expect(repository.entrySpaceId()).resolves.toBe(spaces[0]?.id);
-  });
-
-  it('leaves a non-empty database without an Entry Space available to the host', async () => {
-    const existing = storedSpace(4n);
-    const repository = new MemorySpaceRepository([existing]);
-
-    await bootstrapEmptyDatabase(repository);
-
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(existing);
-    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
+    expect(result).toEqual({ kind: 'opened', space: meta });
   });
 });

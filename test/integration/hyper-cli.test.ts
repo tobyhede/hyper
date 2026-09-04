@@ -158,13 +158,13 @@ describe('hyper CLI', () => {
       body: 'Durable CLI body.\n',
     });
 
-    const selected = await runHyperCommand(['entry', IMPORTED_SPACE_ID]);
-    expect(selected).toEqual({
-      status: 0,
-      stdout: `Selected Entry Space ${IMPORTED_SPACE_ID}\n`,
-      stderr: '',
+    // The compatibility importer establishes Meta when it first fills an empty
+    // repository, and nothing else selects it: there is no mutable flag left to
+    // point somewhere else.
+    await expect(repository.loadAggregate()).resolves.toMatchObject({
+      kind: 'loaded',
+      aggregate: { metaSpaceId: IMPORTED_SPACE_ID },
     });
-    await expect(repository.entrySpaceId()).resolves.toBe(IMPORTED_SPACE_ID);
   });
 
   it('exports through the real command and records the projected PostgreSQL revision', async () => {
@@ -291,7 +291,7 @@ describe('hyper CLI', () => {
     await expect(repository.loadSpace(created.id)).resolves.toEqual(firstStored);
   });
 
-  it('imports the exact Space without changing Entry Space', async () => {
+  it('imports the exact Space without changing the Meta Space', async () => {
     await seedSpace(UNRELATED_SPACE_ID, 'Unrelated talk');
     const directory = await makeSpaceDirectory(EXACT_IMPORTED_SPACE_ID, 'Fresh imported talk');
 
@@ -315,7 +315,7 @@ describe('hyper CLI', () => {
     });
   });
 
-  it('imports multiple spaces without inferring an Entry Space', async () => {
+  it('imports multiple spaces without inferring a second Meta Space', async () => {
     await seedSpace(UNRELATED_SPACE_ID, 'Unrelated talk');
     const collection = await mkdtemp(join(tmpdir(), 'hyper-cli-collection-'));
     temporaryDirectories.add(collection);

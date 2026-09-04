@@ -50,7 +50,7 @@ describe('e2e HTTP runtime', () => {
     });
   });
 
-  it('configures the tracked fixture as the explicit Entry Space', async () => {
+  it('opens the tracked fixture as the repository Meta Space', async () => {
     const app = await createApp({ catalog: 'fixture', startup: true });
 
     await expect(app.resolveProductRequest('/', 'GET')).resolves.toEqual({
@@ -76,7 +76,7 @@ describe('e2e HTTP runtime', () => {
     ]);
   });
 
-  it('applies the database zero-space startup policy when hosting the browser', async () => {
+  it('initializes an empty catalog from Default Content when hosting the browser', async () => {
     const backend = await startRuntime({ catalog: 'empty', startup: true });
 
     const spaces = await backend.listSpaces();

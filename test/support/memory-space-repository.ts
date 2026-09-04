@@ -79,24 +79,11 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
 /** Behavioral repository for server-side startup tests. */
 export class MemorySpaceRepository implements SpaceRepository {
   readonly #spaces = new Map<UUID, LoadedSpace>();
-  #entrySpaceId: UUID | undefined;
   #metaSpaceId: UUID | undefined;
 
-  constructor(spaces: readonly LoadedSpace[] = [], entrySpaceId?: UUID, metaSpaceId?: UUID) {
+  constructor(spaces: readonly LoadedSpace[] = [], metaSpaceId?: UUID) {
     for (const space of spaces) this.#spaces.set(space.snapshot.id, clone(space));
-    this.#entrySpaceId = entrySpaceId;
-    this.#metaSpaceId = metaSpaceId ?? entrySpaceId ?? spaces[0]?.snapshot.id;
-  }
-
-  entrySpaceId(): Promise<UUID | undefined> {
-    return Promise.resolve(this.#entrySpaceId);
-  }
-
-  setEntrySpace(id: UUID): Promise<void> {
-    if (!this.#spaces.has(id)) return Promise.reject(new Error(`Space ${id} does not exist`));
-    this.#entrySpaceId = id;
-    this.#metaSpaceId ??= id;
-    return Promise.resolve();
+    this.#metaSpaceId = metaSpaceId ?? spaces[0]?.snapshot.id;
   }
 
   listSpaces(): Promise<readonly SpaceSummary[]> {
@@ -403,7 +390,6 @@ export class MemorySpaceRepository implements SpaceRepository {
           : this.replaceAggregate(input, this.#metaSpaceId);
       return lifecycle.then((result) => {
         if (result.kind === 'initialized' || result.kind === 'replaced') {
-          if (mode === 'truncate') this.#entrySpaceId = undefined;
           return { kind: 'imported', spaces: stored.map(read) };
         }
         if (result.kind === 'aggregate-refused') {

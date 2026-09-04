@@ -55,9 +55,6 @@ export interface SpaceRepository extends SpaceResourceRepository {
     input: AggregateInput,
     expectedMetaSpaceId: UUID,
   ): Promise<ReplaceAggregateResult>;
-  /** Application state, separate from every authored Space document. */
-  entrySpaceId(): Promise<UUID | undefined>;
-  setEntrySpace(id: UUID): Promise<void>;
   /** Temporary compatibility facade; v1-release/08 removes it after migrating current callers. */
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult>;
   /** Records the revision projected by a completed external export. */
