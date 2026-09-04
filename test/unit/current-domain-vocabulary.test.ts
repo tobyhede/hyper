@@ -30,6 +30,15 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
  */
 const ENTITY = ['R', 'oute'].join('');
 const TRAVERSAL = ['W', 'alk'].join('');
+// Separated by a space *or a hyphen*: the retired terms were also written as
+// compound adjectives, and a guard that knew only the spaced form left the
+// hyphenated one as the spelling the sweep could hide in — which is exactly
+// where one survived, in a parity claim, until this line widened.
+const RETIRED_CANVAS_TERMS = new RegExp(
+  `${['Computed', 'View'].join('[ -]')}|${['Algorithmic', 'View'].join('[ -]')}|${['Space', 'View'].join('[ -]')}`,
+  'i',
+);
+const RETIRED_OPENING_FIELD = ['default', 'Renderer'].join('');
 
 const lower = ENTITY.toLowerCase();
 const upper = ENTITY.toUpperCase();
@@ -246,6 +255,26 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
 
   it('keeps no exemption that has stopped earning itself', () => {
     expectEachExemptionEarned(QUALIFIED_FILES, RETIRED_COMPOUND);
+  });
+
+  it('finds no retired canvas vocabulary in live files', () => {
+    const found = scannableFiles().flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_CANVAS_TERMS).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no retired opening field in live files', () => {
+    const found = scannableFiles().flatMap((file) => {
+      const source = readTracked(file);
+      return source?.includes(RETIRED_OPENING_FIELD) === true ? [file] : [];
+    });
+
+    expect(found).toEqual([]);
   });
 });
 

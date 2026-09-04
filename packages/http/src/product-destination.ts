@@ -1,7 +1,6 @@
 import {
   decodeCompactUuid,
   encodeCompactUuid,
-  isComputedViewId,
   type CardId,
   type GraphId,
   type SpaceSnapshot,
@@ -11,52 +10,33 @@ import type { LoadedSpace, SpaceResourceRepository } from '@project/persistence'
 
 export type ProductDestination =
   | { readonly kind: 'space'; readonly spaceId: UUID }
-  | { readonly kind: 'space-view'; readonly spaceId: UUID; readonly spaceViewId: UUID }
+  | { readonly kind: 'layout'; readonly spaceId: UUID; readonly layoutId: UUID }
   | { readonly kind: 'card'; readonly spaceId: UUID; readonly cardId: CardId }
   | { readonly kind: 'graph'; readonly spaceId: UUID; readonly graphId: GraphId }
   | {
-      readonly kind: 'space-view-card';
+      readonly kind: 'layout-card';
       readonly spaceId: UUID;
-      readonly spaceViewId: UUID;
+      readonly layoutId: UUID;
       readonly cardId: CardId;
     }
   | {
-      readonly kind: 'space-view-graph';
+      readonly kind: 'layout-graph';
       readonly spaceId: UUID;
-      readonly spaceViewId: UUID;
+      readonly layoutId: UUID;
       readonly graphId: GraphId;
     }
   | {
       readonly kind: 'presentation';
       readonly spaceId: UUID;
-      readonly spaceViewId: UUID;
+      readonly layoutId: UUID;
       readonly graphId: GraphId;
       readonly cardId: CardId;
     };
-
-/**
- * A Space View id that an available Computed View and a declared Layout both
- * claim (ADR 0069). Neither takes precedence, so the destination names no one
- * thing and resolution says so instead of choosing.
- *
- * It is a resolution kind and not a throw because both callers are handlers:
- * server-side it decides a response, and in the browser it runs inside a
- * `popstate` listener, where an exception reaches nothing that could answer.
- * Intake already rejects such a Space (`space-view-id-collision`), so this is
- * the answer for a document that reached storage some other way — not a second
- * validation pass, which is why it costs no scan the resolution below was not
- * doing anyway.
- */
-type ProductDestinationCollision = {
-  readonly kind: 'collision';
-  readonly spaceViewId: UUID;
-};
 
 export type ProductDestinationResolution =
   | { readonly kind: 'outside' }
   | { readonly kind: 'malformed' }
   | { readonly kind: 'unresolved' }
-  | ProductDestinationCollision
   | {
       readonly kind: 'resolved';
       readonly destination: ProductDestination;
@@ -67,7 +47,6 @@ export type ProductDestinationSnapshotResolution =
   | { readonly kind: 'outside' }
   | { readonly kind: 'malformed' }
   | { readonly kind: 'unresolved' }
-  | ProductDestinationCollision
   | { readonly kind: 'resolved'; readonly destination: ProductDestination };
 
 export const productDestinationPath = (destination: ProductDestination): string => {
@@ -77,13 +56,13 @@ export const productDestinationPath = (destination: ProductDestination): string 
   if (destination.kind === 'graph') {
     return `${space}/graphs/${encodeCompactUuid(destination.graphId)}`;
   }
-  const view = `${space}/views/${encodeCompactUuid(destination.spaceViewId)}`;
+  const view = `${space}/views/${encodeCompactUuid(destination.layoutId)}`;
   if (destination.kind === 'presentation') {
     return `${view}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.cardId)}`;
   }
-  return destination.kind === 'space-view'
+  return destination.kind === 'layout'
     ? view
-    : destination.kind === 'space-view-card'
+    : destination.kind === 'layout-card'
       ? `${view}/cards/${encodeCompactUuid(destination.cardId)}`
       : `${view}/graphs/${encodeCompactUuid(destination.graphId)}`;
 };
@@ -113,28 +92,24 @@ const parseProductDestination = (pathname: string): ProductDestination | undefin
     return graphId === undefined ? undefined : { kind: 'graph', spaceId, graphId };
   }
   if (segments[3] !== 'views') return undefined;
-  const spaceViewId = decodeCompactUuid(segments[4] ?? '');
-  if (spaceViewId === undefined) return undefined;
-  if (segments.length === 5) return { kind: 'space-view', spaceId, spaceViewId };
+  const layoutId = decodeCompactUuid(segments[4] ?? '');
+  if (layoutId === undefined) return undefined;
+  if (segments.length === 5) return { kind: 'layout', spaceId, layoutId };
   if (segments.length === 9) {
     if (segments[5] !== 'graphs' || segments[7] !== 'present') return undefined;
     const graphId = decodeCompactUuid(segments[6] ?? '');
     const cardId = decodeCompactUuid(segments[8] ?? '');
     return graphId === undefined || cardId === undefined
       ? undefined
-      : { kind: 'presentation', spaceId, spaceViewId, graphId, cardId };
+      : { kind: 'presentation', spaceId, layoutId, graphId, cardId };
   }
   if (segments[5] === 'cards') {
     const cardId = decodeCompactUuid(segments[6] ?? '');
-    return cardId === undefined
-      ? undefined
-      : { kind: 'space-view-card', spaceId, spaceViewId, cardId };
+    return cardId === undefined ? undefined : { kind: 'layout-card', spaceId, layoutId, cardId };
   }
   if (segments[5] === 'graphs') {
     const graphId = decodeCompactUuid(segments[6] ?? '');
-    return graphId === undefined
-      ? undefined
-      : { kind: 'space-view-graph', spaceId, spaceViewId, graphId };
+    return graphId === undefined ? undefined : { kind: 'layout-graph', spaceId, layoutId, graphId };
   }
   return undefined;
 };
@@ -146,14 +121,14 @@ const destinationInSnapshot = (
   if (destination.spaceId !== snapshot.id) return { kind: 'unresolved' };
   if (
     destination.kind === 'card' ||
-    destination.kind === 'space-view-card' ||
+    destination.kind === 'layout-card' ||
     destination.kind === 'presentation'
   ) {
     if (!snapshot.cards.some(({ id }) => id === destination.cardId)) return { kind: 'unresolved' };
   }
   const graphOwner =
     destination.kind === 'graph' ||
-    destination.kind === 'space-view-graph' ||
+    destination.kind === 'layout-graph' ||
     destination.kind === 'presentation'
       ? snapshot.document.layouts?.find((layout) =>
           layout.graphs.some(({ id }) => id === destination.graphId),
@@ -161,38 +136,25 @@ const destinationInSnapshot = (
       : undefined;
   if (
     (destination.kind === 'graph' ||
-      destination.kind === 'space-view-graph' ||
+      destination.kind === 'layout-graph' ||
       destination.kind === 'presentation') &&
     graphOwner === undefined
   ) {
     return { kind: 'unresolved' };
   }
   if (
-    destination.kind === 'space-view' ||
-    destination.kind === 'space-view-card' ||
-    destination.kind === 'space-view-graph' ||
+    destination.kind === 'layout' ||
+    destination.kind === 'layout-card' ||
+    destination.kind === 'layout-graph' ||
     destination.kind === 'presentation'
   ) {
-    const layout = snapshot.document.layouts?.find(({ id }) => id === destination.spaceViewId);
-    const computed = isComputedViewId(destination.spaceViewId);
-    if (layout === undefined && !computed) return { kind: 'unresolved' };
-    // Both, which is the broken invariant: the id names two Space Views and
-    // neither wins. Read off the two facts the Layout branch already had rather
-    // than scanned for, so a destination naming no Space View — a canonical
-    // Space, Card or Graph — never asks the question and never pays for it.
-    if (layout !== undefined && computed) {
-      return { kind: 'collision', spaceViewId: destination.spaceViewId };
-    }
-    if (
-      destination.kind === 'space-view-card' &&
-      layout !== undefined &&
-      layout.positions[destination.cardId] === undefined
-    ) {
+    const layout = snapshot.document.layouts?.find(({ id }) => id === destination.layoutId);
+    if (layout === undefined) return { kind: 'unresolved' };
+    if (destination.kind === 'layout-card' && layout.positions[destination.cardId] === undefined) {
       return { kind: 'unresolved' };
     }
     if (
-      (destination.kind === 'space-view-graph' || destination.kind === 'presentation') &&
-      layout !== undefined &&
+      (destination.kind === 'layout-graph' || destination.kind === 'presentation') &&
       layout.id !== graphOwner?.id
     ) {
       return { kind: 'unresolved' };
@@ -267,7 +229,7 @@ export const resolveProductDestination = async (
  * Entry Space, a bad request for an address that cannot be read at all, a
  * not-found for one that reads and names nothing, a method rejection for a
  * request that is not a read, and an internal error for a stored document whose
- * Space View identities collide.
+ * Layout identities collide.
  */
 export interface ProductResponse {
   readonly status: 302 | 400 | 404 | 405 | 500;

@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
+
 import {
   encodeCompactUuid,
-  FLOW_SPACE_VIEW_ID,
   spaceSnapshotSchema,
   uuidSchema,
   type CardId,
@@ -23,6 +23,8 @@ const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 
 /** Replace CodeMirror source through its public editable surface. */
 const replaceMarkdownSource = (value: string): HTMLElement => {
@@ -55,7 +57,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
@@ -68,7 +70,7 @@ const selfEdge: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
     layouts: [
       {
         id: LAYOUT_ID,
@@ -111,6 +113,27 @@ const twiceAliased: SpaceSnapshot = spaceSnapshotSchema.parse({
     { id: ALIAS_ID, document: { title: 'A again', kind: 'alias', target: CARD_ID } },
     { id: SECOND_ALIAS_ID, document: { title: 'A once more', kind: 'alias', target: CARD_ID } },
   ],
+});
+
+/**
+ * The same Space with a second Layout, so a location can name a Layout the
+ * Space does not open on by default.
+ */
+const secondLayout: SpaceSnapshot = spaceSnapshotSchema.parse({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    layouts: [
+      ...snapshot.document.layouts!,
+      {
+        id: OTHER_LAYOUT_ID,
+        title: 'Other Layout',
+        kind: 'positioned',
+        positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+        graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
+      },
+    ],
+  },
 });
 
 const runtime = (value: SpaceSnapshot) => {
@@ -242,7 +265,7 @@ describe('authoring a Card title on the graph', () => {
  * place it now opens.
  *
  * Dropping a Graph's minimum Edge count made an empty Graph legal, and ADR 0040
- * made it *ordinary*: converting an Algorithmic View mints a Layout whose one
+ * made it *ordinary*: creating a Layout mints its one
  * Active Graph holds nothing, so this is the state the author is in immediately
  * after their first edit on the Flow view. `graphStartCard` has no answer for
  * such a Graph, so `present()` returns having changed nothing — and an enabled
@@ -252,45 +275,7 @@ describe('authoring a Card title on the graph', () => {
  * Neither half proves this on its own: the refusal is in Navigation and the
  * enablement is in `GraphSelector`, and what went wrong was that they disagreed.
  */
-describe('presenting after explicit Layout creation', () => {
-  const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
-    ...snapshot,
-    document: { version: 1, title: 'Space' },
-  });
-
-  it('offers no Present action while the created Layout’s Graph is empty', async () => {
-    window.history.replaceState(
-      null,
-      '',
-      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
-    );
-    const session = mount(noLayouts);
-    // Nothing to present before the conversion either: a Space with no Layouts
-    // has no Graphs at all, so there is no Active Graph.
-    expect(await screen.findByTestId('present-button')).toBeDisabled();
-
-    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
-    await waitFor(() => expect(createLayout).toBeEnabled());
-    fireEvent.click(createLayout);
-
-    // Explicit creation made a Layout active on its fresh empty Graph and left
-    // existing Cards outside it for the Cards View.
-    await waitFor(() =>
-      expect(session.getState().working.document.layouts?.[0]?.graphs).toEqual([
-        expect.objectContaining({ edges: [] }),
-      ]),
-    );
-    const layoutId = session.getState().working.document.layouts?.[0]?.id;
-    expect(layoutId).toBeDefined();
-    await waitFor(() =>
-      expect(window.location.pathname).toBe(
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(uuidSchema.parse(layoutId))}`,
-      ),
-    );
-    expect(screen.getByTestId('present-button')).toBeDisabled();
-    await settled(session);
-  });
-
+describe('presenting from a Layout', () => {
   it('offers Present on a Layout whose Active Graph holds an Edge', async () => {
     // The other half of the same control, and the reason it is here: the test
     // above passes just as well against a Present that is disabled always, so
@@ -316,22 +301,22 @@ describe('browser destination restoration', () => {
    * pre-ADR-0081 code could not do this because it never wrote history on
    * mount, and neither may this one.
    */
-  it('writes no history entry on mount, even where the location names another Space View', async () => {
+  it('writes no history entry on mount, even where the location names another Layout', async () => {
     window.history.replaceState(
       null,
       '',
-      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(OTHER_LAYOUT_ID)}`,
     );
     const pushState = vi.spyOn(window.history, 'pushState');
     const replaceState = vi.spyOn(window.history, 'replaceState');
 
-    const session = mount();
+    const session = mount(secondLayout);
     await screen.findByTestId('selected-canvas');
 
     expect(pushState).not.toHaveBeenCalled();
     expect(replaceState).not.toHaveBeenCalled();
     expect(window.location.pathname).toBe(
-      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(OTHER_LAYOUT_ID)}`,
     );
     pushState.mockRestore();
     replaceState.mockRestore();
@@ -650,15 +635,13 @@ describe('authoring an opened Card', () => {
     const session = mount();
     await settled(session);
 
-    expect(
-      screen.getByRole('button', { name: 'Actions for Space View Layout' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actions for Layout Layout' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
     expect(await screen.findByRole('textbox', { name: 'Card title' })).toBeVisible();
 
     expect(
-      screen.queryByRole('button', { name: 'Actions for Space View Layout' }),
+      screen.queryByRole('button', { name: 'Actions for Layout Layout' }),
     ).not.toBeInTheDocument();
     await settled(session);
   });

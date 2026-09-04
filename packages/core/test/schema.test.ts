@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  COMPUTED_VIEW_IDS,
-  FLOW_SPACE_VIEW_ID,
-  GRID_SPACE_VIEW_ID,
-  cardFrontmatterSchema,
-  cardSchema,
-  isComputedViewId,
-  spaceFileSchema,
-  uuidSchema,
-} from '../src/index';
+import { cardFrontmatterSchema, cardSchema, spaceFileSchema } from '../src/index';
 
 const MAIN = {
   id: '00000000-0000-4000-8000-000000000004',
@@ -151,7 +142,7 @@ describe('space file schema', () => {
           graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
         },
       ],
-      defaultRenderer: 'working',
+      defaultLayout: 'working',
     });
     expect(result.success).toBe(false);
   });
@@ -298,13 +289,13 @@ describe('card frontmatter schema', () => {
     expect('body' in alias).toBe(false);
   });
 
-  it('parses a Space Card with optional Space View and Graph selections', () => {
+  it('parses a Space Card with optional Layout and Graph selections', () => {
     const selected = cardFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000006',
       title: 'Nested space',
       kind: 'space',
       spaceId: '00000000-0000-4000-8000-000000000007',
-      spaceView: '00000000-0000-4000-8000-000000000008',
+      layout: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
     });
     const inherited = cardFrontmatterSchema.parse({
@@ -316,27 +307,12 @@ describe('card frontmatter schema', () => {
 
     expect(selected).toMatchObject({
       kind: 'space',
-      spaceView: '00000000-0000-4000-8000-000000000008',
+      layout: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
     });
-    expect(inherited).not.toHaveProperty('spaceView');
+    expect(inherited).not.toHaveProperty('layout');
     expect(inherited).not.toHaveProperty('graph');
   });
-
-  it.each([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID] as const)(
-    'parses a Space Card selecting the computed %s Space View',
-    (spaceView) => {
-      const card = cardFrontmatterSchema.parse({
-        id: '00000000-0000-4000-8000-000000000006',
-        title: 'Nested space',
-        kind: 'space',
-        spaceId: '00000000-0000-4000-8000-000000000007',
-        spaceView,
-      });
-
-      expect(card).toMatchObject({ kind: 'space', spaceView });
-    },
-  );
 
   it('rejects an alias with no target', () => {
     expect(
@@ -365,7 +341,7 @@ describe('space file layouts', () => {
     const { layouts: _layouts, ...withoutLayouts } = validSpaceFile;
     const file = spaceFileSchema.parse(withoutLayouts);
     expect(file.layouts).toBeUndefined();
-    expect(file.defaultRenderer).toBeUndefined();
+    expect(file.defaultLayout).toBeUndefined();
   });
 
   it('parses a positioned layout and its positions', () => {
@@ -521,28 +497,16 @@ describe('space file layouts', () => {
     expect(file.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000099');
   });
 
-  it('accepts defaultRenderer as a durable Space View id', () => {
+  it('accepts defaultLayout as a durable Layout id', () => {
     // Shape only: whether the name resolves is a reference check, since it needs
     // the declared layouts in view.
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      defaultRenderer: '00000000-0000-4000-8000-000000000010',
+      defaultLayout: '00000000-0000-4000-8000-000000000010',
     });
-    expect(file.defaultRenderer).toBe('00000000-0000-4000-8000-000000000010');
-    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultRenderer: 'flow' }).success).toBe(
+    expect(file.defaultLayout).toBe('00000000-0000-4000-8000-000000000010');
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultLayout: 'flow' }).success).toBe(
       false,
     );
-  });
-});
-
-describe('Computed View ids', () => {
-  it('names the automatic views a space can open in without declaring one', () => {
-    expect([...COMPUTED_VIEW_IDS]).toEqual([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID]);
-  });
-
-  it('recognises exactly those names', () => {
-    expect(isComputedViewId(FLOW_SPACE_VIEW_ID)).toBe(true);
-    expect(isComputedViewId(GRID_SPACE_VIEW_ID)).toBe(true);
-    expect(isComputedViewId(uuidSchema.parse('00000000-0000-4000-8000-000000000010'))).toBe(false);
   });
 });

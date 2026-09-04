@@ -63,7 +63,7 @@ export type CanvasCardFront =
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
     }
   | {
-      /** Interim closed treatment; embedding the selected Space View belongs to issue 01. */
+      /** Interim closed treatment; embedding the selected Layout belongs to issue 01. */
       readonly kind: 'space';
     };
 

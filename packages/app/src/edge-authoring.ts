@@ -110,7 +110,7 @@ export type ConnectionGesture =
   | {
       readonly kind: 'dragging';
       readonly sourceId: string;
-      /** Flow space. Both suppliers convert before handing it over. */
+      /** Canvas coordinates supplied by the active interaction. */
       readonly point: LayoutPosition;
       readonly over: DropTarget;
       /** Alt/Option, tracked on `window` so it survives leaving the canvas. */

@@ -123,18 +123,18 @@ function openingPosition(
  * something it moves to, so writing one would answer a URL no operation asked
  * for: the canonical spelling silently narrowed into its contextual form, the
  * Active Graph dropped out of the address it names nothing of, and, for a Card
- * the Space View omits, a location this Space's own resolver refuses. The Card
+ * the Layout omits, a location this Space's own resolver refuses. The Card
  * still decides {@link samePosition}, which is how a restored Card location is
  * recognised as already open.
  *
  * Two rules decide whether the URL names the Active Graph. It must, when the
- * renderer would open on some other Graph — a Space View URL that reopens a
+ * renderer would open on some other Graph — a Layout URL that reopens a
  * different Graph does not name this position at all. It also keeps naming one
- * the location already named in this same Space View: leaving a presentation
+ * the location already named in this same Layout: leaving a presentation
  * returns to the Graph the presentation URL spelled out, and widening it to the
- * bare Space View would throw away specificity the reader is holding. That
+ * bare Layout would throw away specificity the reader is holding. That
  * second rule is the surviving half of `adoptedRendererDestination` — do not
- * widen a URL that already names something inside this Space View.
+ * widen a URL that already names something inside this Layout.
  */
 function positionDestination(
   space: Space,
@@ -148,7 +148,7 @@ function positionDestination(
     return {
       kind: 'presentation',
       spaceId,
-      spaceViewId: selectedRenderer,
+      layoutId: selectedRenderer,
       graphId: activeGraphId,
       cardId: presentingCardId,
     };
@@ -160,13 +160,13 @@ function positionDestination(
     (namesGraph || activeGraphId !== openingGraphId(resolveRenderer(space, selectedRenderer)))
   ) {
     return {
-      kind: 'space-view-graph',
+      kind: 'layout-graph',
       spaceId,
-      spaceViewId: selectedRenderer,
+      layoutId: selectedRenderer,
       graphId: activeGraphId,
     };
   }
-  return { kind: 'space-view', spaceId, spaceViewId: selectedRenderer };
+  return { kind: 'layout', spaceId, layoutId: selectedRenderer };
 }
 
 /**

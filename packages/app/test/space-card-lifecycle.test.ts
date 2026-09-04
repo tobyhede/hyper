@@ -38,7 +38,7 @@ const metaSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Meta',
-    defaultRenderer: META_LAYOUT_ID,
+    defaultLayout: META_LAYOUT_ID,
     layouts: [
       {
         id: META_LAYOUT_ID,
@@ -72,7 +72,7 @@ const targetSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Architecture',
-    defaultRenderer: TARGET_LAYOUT_ID,
+    defaultLayout: TARGET_LAYOUT_ID,
     layouts: [
       {
         id: TARGET_LAYOUT_ID,
@@ -1018,7 +1018,7 @@ describe('Space Card lifecycle', () => {
         document: {
           version: 1,
           title: 'Architecture',
-          defaultRenderer: TARGET_LAYOUT_ID,
+          defaultLayout: TARGET_LAYOUT_ID,
           layouts: [
             {
               id: TARGET_LAYOUT_ID,

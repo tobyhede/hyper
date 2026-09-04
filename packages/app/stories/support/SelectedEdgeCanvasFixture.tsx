@@ -11,7 +11,7 @@ import { canvasProjection } from '#src/canvas-projection';
 import { cardChoiceOf } from '#src/card-choice';
 import type { SelectedEdgeRefusal } from '#src/edge-authoring';
 import { edgeSelectionOf } from '#src/render-adapter';
-import { createRendererResolver, defaultRenderer } from '#src/renderer';
+import { createRendererResolver, defaultLayout } from '#src/renderer';
 import { AuthorableEdge } from '#components/AuthorableEdge';
 // `#components/*` maps to `src/components/*.tsx`; this seam is a `.ts`, so it
 // comes through `#src/*` instead. Naming the wrong one resolves to nothing and
@@ -20,7 +20,7 @@ import {
   EdgeAuthoringContext,
   type EdgeAuthoringCommands,
 } from '#src/components/edge-authoring-context';
-import { authoredSpace, storyGraphIds } from './spaces';
+import { authoredSpace } from './spaces';
 import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
 
 /**
@@ -51,10 +51,7 @@ const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
  * first positioned Layout — so the placement comes from authored positions
  * rather than from running elkjs inside a story.
  */
-const RENDERER = createRendererResolver({ newGraphId: storyGraphIds() })(
-  SPACE,
-  defaultRenderer(SPACE),
-);
+const RENDERER = createRendererResolver()(SPACE, defaultLayout(SPACE));
 
 const PENDING = canvasProjection(SPACE, RENDERER);
 

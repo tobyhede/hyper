@@ -1,224 +1,47 @@
 import { describe, expect, it } from 'vitest';
-import {
-  COMPUTED_VIEW_IDS,
-  FLOW_SPACE_VIEW_ID,
-  GRID_SPACE_VIEW_ID,
-  uuidSchema,
-} from '@project/core';
-import { loadSpace, type Space } from '@project/graph';
+import { uuidSchema } from '@project/core';
+import { loadSpace } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
-import {
-  createRendererResolver,
-  RendererInvariantError,
-  type CanvasRendererId,
-} from '../src/renderer';
+import { RendererInvariantError } from '../src/renderer';
 import { cardFile } from './card-files';
 
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const FIRST_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
-const SECOND_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const ABSENT_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-0000000000aa');
-
-const layout = (id: string, title: string, graphId: string) => ({
+const CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const FIRST = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
+const SECOND = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const MISSING = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+const layout = (id: string, title: string, graph: string) => ({
   id,
   title,
   kind: 'positioned' as const,
-  positions: { [CARD_A]: { x: 0, y: 0, open: false }, [CARD_B]: { x: 420, y: 0, open: false } },
-  graphs: [{ id: graphId, title: `${title} graph`, edges: [{ from: CARD_A, to: CARD_B }] }],
+  positions: { [CARD]: { x: 0, y: 0, open: false } },
+  graphs: [{ id: graph, title: `${title} graph`, edges: [] }],
 });
-
-/** A Space with two Layouts, declared in the order the authored group must draw them. */
-const space = (layouts: readonly ReturnType<typeof layout>[] = []): Space => {
-  const file =
-    layouts.length === 0
-      ? {
-          version: 1,
-          id: uuidSchema.parse('00000000-0000-4000-8000-000000000040'),
-          title: 'Choices',
-        }
-      : {
-          version: 1,
-          id: uuidSchema.parse('00000000-0000-4000-8000-000000000040'),
-          title: 'Choices',
-          layouts,
-        };
-  const result = loadSpace(file, [cardFile(CARD_A), cardFile(CARD_B)]);
-  if (!result.ok) throw new Error(JSON.stringify(result.errors));
-  return result.space;
-};
-
-const AUTHORED = space([
-  layout(FIRST_LAYOUT, 'Collection 1', '00000000-0000-4000-8000-000000000030'),
-  layout(SECOND_LAYOUT, 'Collection 2', '00000000-0000-4000-8000-000000000031'),
-]);
-
-const FLOW: CanvasRendererId = FLOW_SPACE_VIEW_ID;
-const GRID: CanvasRendererId = GRID_SPACE_VIEW_ID;
+const loaded = loadSpace(
+  {
+    version: 1,
+    id: '00000000-0000-4000-8000-000000000040',
+    title: 'Choices',
+    defaultLayout: FIRST,
+    layouts: [
+      layout(FIRST, 'Collection 1', '00000000-0000-4000-8000-000000000030'),
+      layout(SECOND, 'Collection 2', '00000000-0000-4000-8000-000000000031'),
+    ],
+  },
+  [cardFile(CARD)],
+);
+if (!loaded.ok) throw new Error(JSON.stringify(loaded.errors));
 
 describe('canvasRenderers', () => {
-  it('offers every Computed View and every authored Layout, in the order each is declared', () => {
-    const renderers = canvasRenderers(AUTHORED);
-
-    expect(renderers.computed.map((renderer) => renderer.title)).toEqual(['Flow', 'Grid']);
-    expect(renderers.computed.map((renderer) => renderer.selection)).toEqual([FLOW, GRID]);
-    expect(renderers.authored).toEqual([
-      { kind: 'authored', selection: FIRST_LAYOUT, title: 'Collection 1' },
-      { kind: 'authored', selection: SECOND_LAYOUT, title: 'Collection 2' },
+  it('offers only authored Layouts in declaration order', () => {
+    expect(canvasRenderers(loaded.space)).toEqual([
+      { selection: FIRST, title: 'Collection 1' },
+      { selection: SECOND, title: 'Collection 2' },
     ]);
   });
 
-  /** A Space authors its first Layout by editing a View (ADR 0025), so this is how one opens. */
-  it('offers the computed group before a Space owns any Layout', () => {
-    const renderers = canvasRenderers(space());
-
-    expect(renderers.computed).toHaveLength(2);
-    expect(renderers.authored).toEqual([]);
-  });
-
-  /**
-   * The current row is the list's own row, not an equal one built beside it.
-   *
-   * Reference identity is no longer what the sidebar presses on — it matches by
-   * `canvasRendererKey`, so that it does not have to. It is still the interface:
-   * an operation that reconstructed the row would be a second derivation of a
-   * title the list already carries, and the canvas header reads that title.
-   */
-  it('answers with the very row it offered, for a View and for a Layout alike', () => {
-    const renderers = canvasRenderers(AUTHORED);
-    expect(currentRenderer(renderers, GRID)).toBe(renderers.computed[1]);
-
-    expect(currentRenderer(renderers, SECOND_LAYOUT)).toBe(renderers.authored[1]);
-  });
-
-  /**
-   * The computed group reads nothing from the Space, so two calls answering with
-   * two arrays would be per-call work nothing asked for — and a fresh identity
-   * every render for a value that never changes.
-   */
-  it('builds the computed group once, whatever Space it is asked about', () => {
-    expect(canvasRenderers(AUTHORED).computed).toBe(canvasRenderers(space()).computed);
-  });
-
-  /**
-   * The same answer `resolveRenderer` gives to the same condition. A selection
-   * naming a Layout that is gone is a caller that failed to check, which is a
-   * defect rather than an author's mistake — so it throws rather than falling
-   * back to a View and quietly drawing something else.
-   */
-  it('refuses a selection naming a Layout the Space does not hold', () => {
-    const selection: CanvasRendererId = ABSENT_LAYOUT;
-    const renderers = canvasRenderers(AUTHORED);
-
-    expect(renderers.authored.map((renderer) => renderer.title)).toEqual([
-      'Collection 1',
-      'Collection 2',
-    ]);
-    expect(() => currentRenderer(renderers, selection)).toThrow(RendererInvariantError);
-    try {
-      currentRenderer(renderers, selection);
-      expect.unreachable('a missing Layout must not resolve');
-    } catch (error) {
-      expect(error).toBeInstanceOf(RendererInvariantError);
-      // SAFETY: the assertion above just proved `error` is a
-      // RendererInvariantError at runtime; `toBeInstanceOf` has no
-      // type-narrowing effect, so this recovers what was just checked.
-      expect((error as RendererInvariantError).reason).toBe('renderer-not-found');
-    }
-  });
-
-  /**
-   * The refusal is the *same* refusal, not a matching one.
-   *
-   * "Two modules answering one condition two ways is the disagreement this
-   * ticket removes" — and a copied message is two answers that happen to agree
-   * today. This pins reason and wording together, so reworded in one place and
-   * not the other, it fails here rather than in whichever surface reads it.
-   */
-  it('refuses in the same words the resolver does', () => {
-    const selection: CanvasRendererId = ABSENT_LAYOUT;
-    const resolveRenderer = createRendererResolver({
-      newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
-    });
-
-    const fromCanvasRenderers = attempt(() =>
-      currentRenderer(canvasRenderers(AUTHORED), selection),
-    );
-    const fromResolver = attempt(() => resolveRenderer(AUTHORED, selection));
-
-    expect(fromCanvasRenderers.reason).toBe('renderer-not-found');
-    expect(fromCanvasRenderers.reason).toBe(fromResolver.reason);
-    expect(fromCanvasRenderers.message).toBe(fromResolver.message);
-  });
-
-  /**
-   * Every Computed View resolves, and to the very row the computed group holds.
-   *
-   * `COMPUTED_VIEW_IDS` enumerates the durable identities the registry holds,
-   * so this is the whole Computed View case rather than a sample of it.
-   * Reference identity is the assertion because it is what the canvas header
-   * draws and what the sidebar's list is asked about.
-   */
-  it('answers every Computed View with the row the computed group holds', () => {
-    const renderers = canvasRenderers(AUTHORED);
-
-    COMPUTED_VIEW_IDS.forEach((view, index) => {
-      expect(currentRenderer(renderers, view)).toBe(renderers.computed[index]);
-    });
-  });
-
-  /**
-   * A Computed View is answered by registry lookup, not by searching the group
-   * it was handed.
-   *
-   * The registry is total over `COMPUTED_VIEW_IDS`: there is no "no such
-   * Computed View" case to write and none to leave untested. Searching the supplied group put one back
-   * — a refusal reachable only by handing in a list `canvasRenderers` would
-   * never build, so no test could reach it without a cast. This pins the lookup
-   * by asking with the group emptied: the answer never depended on it.
-   */
-  it('answers a View without consulting the supplied computed group', () => {
-    const renderers = canvasRenderers(AUTHORED);
-
-    expect(currentRenderer({ computed: [], authored: renderers.authored }, FLOW)).toBe(
-      renderers.computed[0],
-    );
-  });
-
-  /**
-   * Two calls build two authored lists, and equal rows in them are two objects.
-   *
-   * Stated here because the sidebar is handed a list and a current row and
-   * nothing in the type says they came from one call. Under an object-identity
-   * pressed test that pairing drew a Layout list with nothing pressed, silently.
-   * `SpaceSidebar.test.tsx` pins the other half of it.
-   */
-  it('builds a fresh authored row on each call', () => {
-    const selection: CanvasRendererId = FIRST_LAYOUT;
-
-    const fromFirstCall = currentRenderer(canvasRenderers(AUTHORED), selection);
-    const fromSecondCall = currentRenderer(canvasRenderers(AUTHORED), selection);
-
-    expect(fromSecondCall).toEqual(fromFirstCall);
-    expect(fromSecondCall).not.toBe(fromFirstCall);
+  it('returns the offered row and refuses an absent Layout', () => {
+    const renderers = canvasRenderers(loaded.space);
+    expect(currentRenderer(renderers, SECOND)).toBe(renderers[1]);
+    expect(() => currentRenderer(renderers, MISSING)).toThrow(RendererInvariantError);
   });
 });
-
-/** What a `RendererInvariantError` gave, once a call is known to have thrown one. */
-interface AttemptFailure {
-  readonly reason: string;
-  readonly message: string;
-}
-
-/** The `RendererInvariantError` a call threw, or a failure naming what it did instead. */
-function attempt(call: () => void): AttemptFailure {
-  try {
-    call();
-  } catch (error) {
-    if (error instanceof RendererInvariantError) {
-      return { reason: error.reason, message: error.message };
-    }
-    throw error;
-  }
-  return expect.unreachable('a missing Layout must not resolve');
-}

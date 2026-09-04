@@ -1,12 +1,5 @@
 import { useState, type ReactNode, type Ref } from 'react';
-import {
-  FLOW_SPACE_VIEW_ID,
-  GRID_SPACE_VIEW_ID,
-  type Graph,
-  type GraphId,
-  type PerComputedView,
-  type UUID,
-} from '@project/core';
+import { type Graph, type GraphId, type UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
@@ -29,10 +22,8 @@ import {
   EntityActions,
   EntityActionsTrigger,
   FALLBACK_GRAPH_COLOR,
-  FlowIcon,
   GraphIcon,
   graphColor,
-  GridIcon,
   LayoutIcon,
   InlineTitleEditor,
   PresentIcon,
@@ -141,7 +132,7 @@ export interface SpaceSidebarProps {
         readonly title: string;
         readonly onCopyCanonical: () => void;
         /**
-         * Absent when the Card has no address in the current Space View — a
+         * Absent when the Card has no address in the current Layout — a
          * Card the selected Layout omits and the Cards drawer reveals. The
          * command is withheld rather than shown and refused, because the
          * destination it would copy does not exist.
@@ -228,7 +219,7 @@ function DeleteCardControl({
  */
 export type SpaceEntity =
   | { readonly kind: 'space' }
-  | { readonly kind: 'space-view'; readonly renderer: CanvasRenderer }
+  | { readonly kind: 'layout'; readonly renderer: CanvasRenderer }
   | { readonly kind: 'graph'; readonly graph: Graph; readonly renderer: CanvasRenderer };
 
 export interface SpaceChromeTitleEdit {
@@ -263,60 +254,8 @@ const editing = (
   id: string,
 ): boolean => edit?.subject?.kind === kind && edit.subject.id === id;
 
-/**
- * One glyph per Computed View, beside the id it draws.
- *
- * `PerComputedView` is what makes a new Computed View visible here: the tuple
- * holds one entry per id `core` ships, so a third View fails to compile until it
- * has a glyph. That is the guarantee `satisfies Record<BuiltInViewId, …>` gave
- * while a View was identified by a string literal, and its absence is silent —
- * a missing glyph is not a blank row but the authored-Layout glyph, drawn for
- * something that is not a Layout.
- *
- * The glyphs stay here rather than moving beside the View's strategy and title:
- * exactly one module draws a row today, so a glyph declared next to the strategy
- * would open a seam nothing crosses — and it would make a pure module import
- * `@project/ui`. Revisit when a second module draws a row.
- */
-const COMPUTED_VIEW_ICONS: PerComputedView<readonly [UUID, ReactNode]> = [
-  [FLOW_SPACE_VIEW_ID, <FlowIcon key={FLOW_SPACE_VIEW_ID} />],
-  [GRID_SPACE_VIEW_ID, <GridIcon key={GRID_SPACE_VIEW_ID} />],
-];
-
-const VIEW_ICONS = new Map<UUID, ReactNode>(COMPUTED_VIEW_ICONS);
-
-/**
- * A row's glyph, chosen on the kind the row already carries rather than on
- * whether a lookup missed (ADR 0072 leaves the kind to resolution, and
- * `canvasRenderers` has already resolved it).
- *
- * An authored Layout draws one glyph whatever its id; a Computed View draws the
- * one paired with it above. The tuple covers every id `core` ships, so a View
- * with no glyph cannot compile and the absent arm here cannot be reached.
- */
-const RendererIcon = ({ renderer }: { readonly renderer: CanvasRenderer }): ReactNode =>
-  renderer.kind === 'authored' ? <LayoutIcon /> : VIEW_ICONS.get(renderer.selection);
-
-/**
- * One group of the single canvas choice.
- *
- * Named for the group it draws and not for what it draws — `CanvasRenderers` is
- * the aggregate this takes one list *out of*, and one identifier meaning both
- * is what ADR 0055 is about. It compiles today only because that import is
- * type-only, so the two names sit in different declaration spaces; dropping the
- * `type` or adding a value export under that name turns it into TS2440.
- *
- * Computed Views and authored Layouts are drawn as two groups of one list and
- * not as two controls: exactly one item across both is pressed, and there is no
- * value anywhere meaning "the other group is the one drawing" (ADR 0053).
- *
- * The pressed test is `canvasRendererKey` against the row the choice already
- * named, so both groups are asked the same question by the same value — and it
- * is the same question the row keys and `data-renderer` are already written in.
- * It cannot answer twice: a key names one selection, and a Space cannot hold
- * two renderers with one id.
- */
-function RendererGroup({
+/** The selectable Layout rows. */
+function LayoutRows({
   renderers,
   selected,
   onSelect,
@@ -334,21 +273,18 @@ function RendererGroup({
     <SidebarMenu>
       {renderers.map((renderer) => {
         const active = canvasRendererKey(renderer.selection) === selectedKey;
-        const layoutId = renderer.kind === 'authored' ? renderer.selection : null;
+        const layoutId = renderer.selection;
         const isEditing =
-          layoutId !== null &&
-          editing(titleEdit, 'layout', layoutId) &&
-          titleEdit?.surface === 'sidebar';
-        const shownTitle =
-          layoutId !== null && editing(titleEdit, 'layout', layoutId)
-            ? (titleEdit?.draft ?? renderer.title)
-            : renderer.title;
+          editing(titleEdit, 'layout', layoutId) && titleEdit?.surface === 'sidebar';
+        const shownTitle = editing(titleEdit, 'layout', layoutId)
+          ? (titleEdit?.draft ?? renderer.title)
+          : renderer.title;
         return (
           <SidebarMenuItem key={canvasRendererKey(renderer.selection)} tabIndex={-1}>
             <EntityActionsRow
-              entity={{ kind: 'space-view', renderer }}
+              entity={{ kind: 'layout', renderer }}
               entityActions={entityActions}
-              label={`Actions for Space View ${renderer.title}`}
+              label={`Actions for Layout ${renderer.title}`}
               editing={isEditing}
             >
               {isEditing ? (
@@ -363,7 +299,7 @@ function RendererGroup({
                   data-testid="canvas-renderer"
                   data-renderer={canvasRendererKey(renderer.selection)}
                 >
-                  <RendererIcon renderer={renderer} />
+                  <LayoutIcon />
                   <InlineTitleEditor
                     className="flex-1"
                     title={renderer.title}
@@ -387,12 +323,7 @@ function RendererGroup({
                   data-testid="canvas-renderer"
                   data-renderer={canvasRendererKey(renderer.selection)}
                   onClick={(event) => {
-                    if (
-                      active &&
-                      layoutId !== null &&
-                      titleEdit !== undefined &&
-                      titleEdit.disabled !== true
-                    ) {
+                    if (active && titleEdit !== undefined && titleEdit.disabled !== true) {
                       const row = event.currentTarget.closest('li');
                       titleEdit.onBegin(
                         { kind: 'layout', id: layoutId },
@@ -405,7 +336,7 @@ function RendererGroup({
                     }
                   }}
                 >
-                  <RendererIcon renderer={renderer} />
+                  <LayoutIcon />
                   <span>{shownTitle}</span>
                 </SidebarMenuButton>
               )}
@@ -532,8 +463,8 @@ export function SpaceSidebar({
   // Dead on two things, and they are one rule: there is no Card to begin at. No
   // Graph is active, or the active Graph holds no Edges — and the second is not
   // a defensive nicety. Creating a Layout creates its initial Active Graph empty
-  // in the same Edit (ADR 0040), so a Layout converted out of a View by a plain
-  // explicit Create Layout Edit is always in this state until the author draws something.
+  // in the same Edit (ADR 0040), so a new Layout remains in this state until
+  // the author draws something.
   const presentDisabled =
     !graph.presenting &&
     (graph.canPresent === false || activeGraph === undefined || activeGraph.edges.length === 0);
@@ -588,22 +519,13 @@ export function SpaceSidebar({
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel>Space View</SidebarGroupLabel>
+          <SidebarGroupLabel>Layout</SidebarGroupLabel>
           <SidebarGroupContent>
-            <RendererGroup
-              renderers={canvas.renderers.computed}
-              selected={canvas.current}
-              onSelect={onCanvas(canvas.onSelect)}
-              titleEdit={titleEdit}
-              entityActions={canvasAwareEntityActions}
-            />
-            {canvas.renderers.authored.length === 0 ? (
-              <NothingYet testId="no-authored-layouts">
-                None yet — create one from the selected Computed View.
-              </NothingYet>
+            {canvas.renderers.length === 0 ? (
+              <NothingYet testId="no-authored-layouts">No Layouts yet.</NothingYet>
             ) : (
-              <RendererGroup
-                renderers={canvas.renderers.authored}
+              <LayoutRows
+                renderers={canvas.renderers}
                 selected={canvas.current}
                 onSelect={onCanvas(canvas.onSelect)}
                 titleEdit={titleEdit}
@@ -743,7 +665,7 @@ export function SpaceSidebar({
                   className="w-full justify-start"
                   onClick={onCanvas(() => graph.links?.onCopyContextual(activeGraph.id))}
                 >
-                  Copy link to {activeGraph.title} in this Space View
+                  Copy link to {activeGraph.title} in this Layout
                 </Button>
               </div>
             )}
@@ -766,7 +688,7 @@ export function SpaceSidebar({
                 size="compact"
                 onClick={onCanvas(cardLinks.onCopyContextual)}
               >
-                Copy link in this Space View
+                Copy link in this Layout
               </Button>
             )}
             {cardLinks.onDelete !== undefined && (
@@ -792,8 +714,7 @@ export function SpaceSidebar({
 }
 
 /**
- * What the canvas header says: the name of the one thing drawing, and whether
- * an author placed it or the application computed it.
+ * What the canvas header says: the name of the Layout drawing the canvas.
  *
  * Separate from the sidebar it reports on, because it sits in the inset and
  * survives the sidebar closing — the single choice is still named when the list
@@ -811,8 +732,8 @@ export function SelectedCanvasRenderer({
   readonly renderer: CanvasRenderer;
   readonly titleEdit?: SpaceChromeTitleEdit;
 }) {
-  const layoutId = renderer.kind === 'authored' ? renderer.selection : null;
-  const sameEdit = layoutId !== null && editing(titleEdit, 'layout', layoutId);
+  const layoutId = renderer.selection;
+  const sameEdit = editing(titleEdit, 'layout', layoutId);
   const isEditing = sameEdit && titleEdit?.surface === 'header';
   const shownTitle = sameEdit ? (titleEdit?.draft ?? renderer.title) : renderer.title;
   return (
@@ -835,13 +756,10 @@ export function SelectedCanvasRenderer({
       // the Sidebar row, so the header is mirroring it — offering Edit here
       // would call `onBegin` a second time and reset the draft to the committed
       // title, discarding what the author has typed.
-      layoutId === null || titleEdit === undefined || titleEdit.disabled === true || sameEdit ? (
+      titleEdit === undefined || titleEdit.disabled === true || sameEdit ? (
         // The same box as the Button below, taken from the Button's own
-        // variants rather than restated: the two branches swap as the canvas
-        // choice moves between a computed View and a Layout, and a header that
-        // changes height on that swap moves the whole canvas under the author.
-        // Only the interactive affordances are dropped — this names the Space
-        // View, it does not offer anything.
+        // variants rather than restated, so changing edit state never changes
+        // the header height or moves the canvas under the author.
         <span
           className={cn(
             buttonVariants({ variant: 'ghost', size: 'compact' }),
@@ -854,7 +772,7 @@ export function SelectedCanvasRenderer({
         <Button
           variant="ghost"
           size="compact"
-          aria-label={`Edit Space View ${shownTitle}`}
+          aria-label={`Edit Layout ${shownTitle}`}
           onClick={(event) => {
             const header = event.currentTarget.parentElement;
             titleEdit.onBegin({ kind: 'layout', id: layoutId }, renderer.title, 'header', () =>

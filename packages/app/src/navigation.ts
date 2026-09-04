@@ -167,17 +167,15 @@ const rendererShowsGraph = (renderer: ResolvedRenderer, graphId: GraphId): boole
   renderer.subject.graphs.some((graph) => graph.id === graphId);
 
 /**
- * The Graph a renderer opens on: a Layout's own Active Graph, or a View's default.
+ * The Graph a Layout opens on: its own Active Graph.
  *
  * Exported because one other question needs the same answer and must not derive
  * a second one: deciding whether a browser location *already opens* an address
  * means asking what a location naming no Graph would leave active, which is this
  * (ADR 0081, `destination-coordination.ts`).
  */
-export const openingGraphId = (renderer: ResolvedRenderer): GraphId | null =>
-  renderer.kind === 'layout'
-    ? renderer.resolvedLayout.activeGraph.id
-    : (renderer.defaultActiveGraph?.id ?? null);
+export const openingGraphId = (renderer: ResolvedRenderer): GraphId =>
+  renderer.resolvedLayout.activeGraph.id;
 
 /**
  * The Card at the end of Traversal history, read in place.
@@ -265,12 +263,7 @@ export function createNavigation(
     // created is not navigation and must not interrupt a traversal.
     //
     // **The Active Graph arrives with the renderer rather than surviving it.**
-    // Under ADR 0040 a Layout owns its Graphs, so the two are one answer and the
-    // Edit is what knows it: converting an Algorithmic View mints a Graph the
-    // new Layout owns, while the Graph that was merely emphasised on that view
-    // belongs to some other Layout and cannot come across. Carrying the previous
-    // Active Graph over and checking it — which is what this did while every
-    // renderer drew every Graph — now refuses the ordinary first conversion.
+    // Under ADR 0040 a Layout owns its Graphs, so the two are one answer.
     //
     // The refusal below is `activateGraph`'s, from the other side. What either
     // one protects is the *pair* — the selected renderer and the Active Graph —
@@ -406,10 +399,9 @@ export function createNavigation(
     // The **edge-less Graph** below was once the shape `graphSchema` forbade,
     // and its guard was type ceremony. It is now ordinary: creating a Layout
     // creates its initial Active Graph *empty* in the same Edit (ADR 0040), and
-    // a Computed View converts only through Create Layout by returning exactly
-    // that (ADR 0045), so every explicitly created Layout sits here until the author draws an
-    // Edge. `graphStartCard` has no answer for such a Graph. Presenting has
-    // something real to decline.
+    // every new Layout sits here until the author draws an Edge.
+    // `graphStartCard` has no answer for such a Graph. Presenting has something
+    // real to decline.
     //
     // Between them, a Graph that is active *and* holds an Edge can always be
     // presented — cyclic ones included (ADR 0032).

@@ -58,7 +58,7 @@ export const spaceCardFrontmatterSchema = z.object({
   title: z.string().min(1),
   kind: z.literal('space'),
   spaceId: idSchema,
-  spaceView: uuidSchema.optional(),
+  layout: uuidSchema.optional(),
   graph: idSchema.optional(),
 });
 
@@ -239,49 +239,6 @@ export const layoutSchema = z.preprocess(
   z.discriminatedUnion('kind', [positionedLayoutSchema]),
 );
 
-/** Durable identities of the Computed Views supplied by the application. */
-export const FLOW_SPACE_VIEW_ID = uuidSchema.parse('2e84c9f4-63bb-4e26-8f32-3c2a5ef6b001');
-export const GRID_SPACE_VIEW_ID = uuidSchema.parse('2e84c9f4-63bb-4e26-8f32-3c2a5ef6b002');
-
-/**
- * Computed View identity is independent of product naming. These ids are
- * application constants, available in every Space, and share the same
- * namespace as authored Layout ids (ADR 0068).
- *
- * A tuple rather than a widened array, so its *length* is part of its type and
- * {@link PerComputedView} can hold a consumer's registry to it.
- */
-export const COMPUTED_VIEW_IDS = Object.freeze([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID] as const);
-
-/**
- * One value per element of a tuple, and exactly as many.
- *
- * The tuple is a parameter and not `typeof COMPUTED_VIEW_IDS` written inline,
- * because a mapped type only maps a tuple to a tuple when its source is a naked
- * type parameter. Spelled inline it maps `keyof` an array instead — `length`,
- * `toString` and the rest — and the arity this exists for is lost.
- */
-type PerElement<Tuple extends readonly unknown[], Value> = {
-  readonly [Index in keyof Tuple]: Value;
-};
-
-/**
- * One value per Computed View, in the order the ids are declared above.
- *
- * What a consumer's registry is declared as, so that adding a Computed View
- * here fails to compile everywhere that owes an answer for one — the guarantee
- * `satisfies Record<BuiltInViewId, …>` gave while a View was named by a string
- * literal, and lost when identity became a UUID. A UUID is not a type-level
- * key, so what a type can still hold a registry to is how *many* Views there
- * are; each entry still writes its id out, where a reader sees which View it
- * answers for.
- */
-export type PerComputedView<Value> = PerElement<typeof COMPUTED_VIEW_IDS, Value>;
-
-export function isComputedViewId(id: z.infer<typeof uuidSchema>): boolean {
-  return COMPUTED_VIEW_IDS.includes(id);
-}
-
 /**
  * The **first-public** space document version.
  *
@@ -308,7 +265,7 @@ export const SPACE_FILE_VERSION = 1;
  * because a card exists by virtue of its file existing. `loadSpace` takes the
  * card files alongside this.
  */
-export const spaceFileSchema = z.object({
+const spaceFileObjectSchema = z.object({
   version: z.literal(SPACE_FILE_VERSION),
   /**
    * What names this space. Required today; ADR 0019 makes ids optional and
@@ -327,12 +284,14 @@ export const spaceFileSchema = z.object({
    * space *is*: it renders and it cannot be presented (ADR 0015).
    */
   layouts: z.array(layoutSchema).optional(),
-  /** A declared Layout's id or an available Computed View's durable id. */
-  defaultRenderer: uuidSchema.optional(),
+  /** The durable opening selection, naming one declared Layout. */
+  defaultLayout: uuidSchema.optional(),
 });
 
+export const spaceFileSchema = spaceFileObjectSchema;
+
 /** The JSONB document stored beside a space's relational UUID. */
-export const spaceDocumentSchema = spaceFileSchema.omit({ id: true });
+export const spaceDocumentSchema = spaceFileObjectSchema.omit({ id: true });
 
 /** The JSONB document stored beside a card's relational UUID. */
 export const markdownCardDocumentSchema = markdownCardSchema.omit({ id: true });
@@ -366,10 +325,12 @@ const importLayoutSchema = z.preprocess(
   z.discriminatedUnion('kind', [importPositionedLayoutSchema]),
 );
 
-export const importSpaceFileSchema = spaceFileSchema.extend({
+const importSpaceFileObjectSchema = spaceFileObjectSchema.extend({
   id: uuidSchema.optional(),
   layouts: z.array(importLayoutSchema).optional(),
 });
+
+export const importSpaceFileSchema = importSpaceFileObjectSchema;
 
 /**
  * The only shape in which entity ids may be absent. References remain UUIDs:
@@ -377,6 +338,6 @@ export const importSpaceFileSchema = spaceFileSchema.extend({
  */
 export const importSpaceSchema = z.object({
   id: uuidSchema.optional(),
-  document: importSpaceFileSchema.omit({ id: true }),
+  document: importSpaceFileObjectSchema.omit({ id: true }),
   cards: z.array(z.object({ id: uuidSchema.optional(), document: cardDocumentSchema })),
 });

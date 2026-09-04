@@ -479,11 +479,11 @@ export interface CommitRefusalBody {
       }
     | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: string }
     | {
-        readonly kind: 'space-card-space-view-missing';
+        readonly kind: 'space-card-layout-missing';
         readonly spaceId: string;
         readonly cardId: string;
         readonly targetSpaceId: string;
-        readonly spaceViewId: string;
+        readonly layoutId: string;
       }
     | {
         readonly kind: 'space-card-graph-missing';
@@ -493,11 +493,11 @@ export interface CommitRefusalBody {
         readonly graphId: string;
       }
     | {
-        readonly kind: 'space-card-graph-outside-space-view';
+        readonly kind: 'space-card-graph-outside-layout';
         readonly spaceId: string;
         readonly cardId: string;
         readonly targetSpaceId: string;
-        readonly spaceViewId: string;
+        readonly layoutId: string;
         readonly graphId: string;
       }
   )[];
@@ -555,13 +555,12 @@ const decodeSpaceError = (value: unknown): SpaceError => {
     case 'duplicate-card-id':
     case 'duplicate-graph-id':
     case 'duplicate-layout-id':
-    case 'space-view-id-collision':
     case 'layout-member-missing-card':
     case 'layout-active-graph-missing':
     case 'layout-active-graph-outside-layout':
     case 'graph-edge-missing-card':
     case 'graph-edge-card-outside-layout':
-    case 'unresolved-default-renderer':
+    case 'unresolved-default-layout':
     case 'duplicate-graph-edge':
     case 'unresolved-alias-target':
     case 'alias-self-reference':
@@ -647,16 +646,16 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       const error = exactRecord(value, ['kind', 'spaceId'], 'unreferenced Space refusal');
       return { kind, spaceId: requiredUuid(error['spaceId'], 'unreferenced Space id') };
     }
-    case 'space-card-space-view-missing': {
+    case 'space-card-layout-missing': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'spaceViewId'],
-        'Space Card Space View refusal',
+        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'layoutId'],
+        'Space Card Layout refusal',
       );
       return {
         kind,
         ...decodeSpaceCardLocation(error),
-        spaceViewId: requiredUuid(error['spaceViewId'], 'Space Card Space View id'),
+        layoutId: requiredUuid(error['layoutId'], 'Space Card Layout id'),
       };
     }
     case 'space-card-graph-missing': {
@@ -671,16 +670,16 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
         graphId: requiredUuid(error['graphId'], 'Space Card Graph id'),
       };
     }
-    case 'space-card-graph-outside-space-view': {
+    case 'space-card-graph-outside-layout': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'spaceViewId', 'graphId'],
+        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'layoutId', 'graphId'],
         'Space Card Graph membership refusal',
       );
       return {
         kind,
         ...decodeSpaceCardLocation(error),
-        spaceViewId: requiredUuid(error['spaceViewId'], 'Space Card Space View id'),
+        layoutId: requiredUuid(error['layoutId'], 'Space Card Layout id'),
         graphId: requiredUuid(error['graphId'], 'Space Card Graph id'),
       };
     }

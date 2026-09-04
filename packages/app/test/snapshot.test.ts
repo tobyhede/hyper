@@ -56,7 +56,7 @@ it('writes a Layout that owns its Graphs as a complete valid persistence snapsho
   });
 
   expect(changed.cards).toEqual(snapshot.cards);
-  expect(changed.document.defaultRenderer).toBe(LAYOUT_ID);
+  expect(changed.document.defaultLayout).toBe(LAYOUT_ID);
   expect(changed.document.layouts).toEqual([
     {
       id: LAYOUT_ID,
@@ -73,12 +73,8 @@ it('writes a Layout that owns its Graphs as a complete valid persistence snapsho
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
 });
 
-/**
- * A Layout appended by a conversion carries the Graph that conversion minted, and
- * nothing about it reaches the Space: there is no Space-level collection left for
- * a Graph to be written to (ADR 0040).
- */
-it('appends a converted Layout owning its own Graph without touching the Space', () => {
+/** A new Layout owns its Graph; there is no Space-level Graph collection. */
+it('appends a Layout owning its own Graph without touching the other Layouts', () => {
   const minted: Graph = { id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] };
   const changed = updatePositionedLayout(snapshot, {
     layoutId: OTHER_LAYOUT_ID,

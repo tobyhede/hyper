@@ -1,17 +1,12 @@
-import {
-  FLOW_SPACE_VIEW_ID,
-  GRID_SPACE_VIEW_ID,
-  encodeCompactUuid,
-  uuidSchema,
-} from '@project/core';
+import { encodeCompactUuid, uuidSchema } from '@project/core';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { selectCanvas } from './graph';
 import { SEEDED_GRAPH_ID, SEEDED_LAYOUT_ID, seedPositionedLayout } from './seed';
 
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 const FIRST_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
+const SECOND_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
 const LONG_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
 const MID_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
 const ECHO_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
@@ -49,36 +44,48 @@ test('a direct canonical URL opens its exact existing Space', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Layout fixture', exact: true })).toBeVisible();
 });
 
-test('a direct Space View URL restores the named Computed View', async ({ page }) => {
+/**
+ * Deliberately not the Space's `defaultLayout`. A URL naming the Layout the
+ * Space would have opened on anyway is satisfied by ignoring the id in the path
+ * altogether, so it proves nothing about the address being read; the second
+ * authored Layout is the only one whose appearance can only have come from the
+ * path. The assertions are the header naming the one selected Layout and the
+ * canvas drawing that Layout's Cards rather than the default's — the Sidebar
+ * lists every Layout title at all times, so matching a title as plain page text
+ * would be true whatever is selected.
+ */
+test('a direct Layout URL restores the named authored Layout', async ({ page }) => {
   const response = await page.goto(
-    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(SECOND_LAYOUT_ID)}`,
   );
 
   expect(response?.status()).toBe(200);
-  await expect(page.getByText('Flow', { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
+  await expect(page.locator(`.react-flow__node[data-id="${CARD_E_ID}"]`)).toBeVisible();
+  await expect(page.locator(`.react-flow__node[data-id="${CARD_A_ID}"]`)).toHaveCount(0);
 });
 
-test('choosing a Space View pushes history and Back, Forward and reload restore it without authoring', async ({
+test('choosing a Layout pushes history and Back, Forward and reload restore it without authoring', async ({
   page,
 }) => {
   const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}`;
-  const grid = `${canonical}/views/${encodeCompactUuid(GRID_SPACE_VIEW_ID)}`;
+  const second = `${canonical}/views/${encodeCompactUuid(SECOND_LAYOUT_ID)}`;
   await page.goto(canonical);
   const before = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
 
-  await page.getByTestId('canvas-renderer').filter({ hasText: 'Grid' }).click();
-  await expect(page).toHaveURL(grid);
+  await page.getByTestId('canvas-renderer').filter({ hasText: 'Collection 2' }).click();
+  await expect(page).toHaveURL(second);
   await page.reload();
-  await expect(page.getByText('Grid', { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
 
   await page.goBack();
   await expect(page).toHaveURL(canonical);
-  await expect(page.getByText('Flow', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Collection 1', { exact: true }).first()).toBeVisible();
   await page.goForward();
-  await expect(page).toHaveURL(grid);
-  await expect(page.getByText('Grid', { exact: true }).first()).toBeVisible();
+  await expect(page).toHaveURL(second);
+  await expect(page.getByText('Collection 2', { exact: true }).first()).toBeVisible();
 
   const after = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
@@ -136,16 +143,16 @@ test('malformed and unresolved Space URLs have real host statuses', async ({ pag
 test('canonical and contextual Card links reveal a Closed Card without authoring', async ({
   page,
 }) => {
-  const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/cards/${encodeCompactUuid(CARD_E_ID)}`;
+  const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/cards/${encodeCompactUuid(CARD_A_ID)}`;
   const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}/cards/${encodeCompactUuid(CARD_A_ID)}`;
   const before = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
 
   expect((await page.goto(canonical))?.status()).toBe(200);
-  const cardE = page.locator(`.react-flow__node[data-id="${CARD_E_ID}"]`);
-  await expect(cardE).toBeFocused();
-  await expect(cardE.getByTestId('card')).toHaveAttribute('data-expanded', 'false');
+  const canonicalCard = page.locator(`.react-flow__node[data-id="${CARD_A_ID}"]`);
+  await expect(canonicalCard).toBeFocused();
+  await expect(canonicalCard.getByTestId('card')).toHaveAttribute('data-expanded', 'false');
 
   expect((await page.goto(contextual))?.status()).toBe(200);
   const cardA = page.locator(`.react-flow__node[data-id="${CARD_A_ID}"]`);
@@ -155,7 +162,7 @@ test('canonical and contextual Card links reveal a Closed Card without authoring
   await expect(cardA).toBeFocused();
   await page.goBack();
   await expect(page).toHaveURL(canonical);
-  await expect(cardE).toBeFocused();
+  await expect(canonicalCard).toBeFocused();
   await page.goForward();
   await expect(page).toHaveURL(contextual);
   await expect(cardA).toBeFocused();
@@ -220,9 +227,10 @@ test('returning to a canonical Card address reveals it again', async ({ page }) 
   expect((await page.goto(canonical))?.status()).toBe(200);
   await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
 
-  // A Computed View owns no Layout membership, so choosing one withdraws the
-  // drawer and leaves the address behind. This is the reader moving on.
-  await selectCanvas(page, 'Grid');
+  // Dismiss the collection and leave the Card address behind. This is the
+  // reader moving on.
+  await page.keyboard.press('Escape');
+  await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
   await expect(page.getByRole('dialog', { name: 'Cards' })).toBeHidden();
 
   // Back is a second arrival at the address, not a repeat of the first, so the
@@ -237,7 +245,7 @@ test('returning to a canonical Card address reveals it again', async ({ page }) 
   );
 });
 
-test('history restores a canonical Card through the default Space View, not the context being left', async ({
+test('history restores a canonical Card through the default Layout, not the context being left', async ({
   page,
 }) => {
   const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}/cards/${encodeCompactUuid(CARD_A_ID)}`;
@@ -249,11 +257,11 @@ test('history restores a canonical Card through the default Space View, not the 
 
   await page.goForward();
   await expect(page).toHaveURL(canonical);
-  await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
 });
 
 test(
-  'copy commands distinguish canonical Card identity from its current Space View',
+  'copy commands distinguish canonical Card identity from its current Layout',
   {
     tag: '@parity:space-sidebar-copies-card-destinations',
   },
@@ -270,7 +278,7 @@ test(
         `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/cards/${encodeCompactUuid(CARD_A_ID)}`,
       );
 
-    await page.getByRole('button', { name: 'Copy link in this Space View' }).click();
+    await page.getByRole('button', { name: 'Copy link in this Layout' }).click();
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(`${new URL(page.url()).origin}${view}/cards/${encodeCompactUuid(CARD_A_ID)}`);
@@ -281,7 +289,7 @@ test('canonical and contextual Graph links restore navigation context without au
   page,
 }) => {
   const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`;
-  const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}/graphs/${encodeCompactUuid(ECHO_GRAPH_ID)}`;
+  const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(SECOND_LAYOUT_ID)}/graphs/${encodeCompactUuid(ECHO_GRAPH_ID)}`;
   const before = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
@@ -291,7 +299,7 @@ test('canonical and contextual Graph links restore navigation context without au
   await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
 
   expect((await page.goto(contextual))?.status()).toBe(200);
-  await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
   await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
@@ -326,7 +334,7 @@ test('activating a Graph pushes a contextual destination restored by Back and Fo
 });
 
 test(
-  'Graph copy commands distinguish canonical identity from the current Space View',
+  'Graph copy commands distinguish canonical identity from the current Layout',
   {
     tag: '@parity:space-sidebar-copies-graph-destinations',
   },
@@ -342,7 +350,7 @@ test(
         `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`,
       );
 
-    await page.getByRole('button', { name: 'Copy link to Long in this Space View' }).click();
+    await page.getByRole('button', { name: 'Copy link to Long in this Layout' }).click();
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(`${new URL(page.url()).origin}${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);

@@ -56,8 +56,8 @@ export interface Space {
    * declared nowhere (ADR 0025).
    */
   readonly layouts: readonly Layout[];
-  /** Which Space View this Space opens in — one UUID namespace for both variants. */
-  readonly defaultRenderer: UUID | undefined;
+  /** Which Layout this Space opens in — one UUID namespace for both variants. */
+  readonly defaultLayout: UUID | undefined;
   /**
    * Contextual entity resolution — the only one. The Maps behind it are closed
    * over and appear nowhere on this value, so no caller can index the space a
@@ -234,7 +234,7 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
     title: file.title,
     cards,
     layouts: file.layouts,
-    defaultRenderer: file.defaultRenderer,
+    defaultLayout: file.defaultLayout,
   });
 }
 
@@ -276,7 +276,7 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
     title: document.title,
     cards,
     layouts: document.layouts,
-    defaultRenderer: document.defaultRenderer,
+    defaultLayout: document.defaultLayout,
   });
   return loaded.ok ? { ...loaded, snapshot: parsed.data } : loaded;
 }
@@ -286,7 +286,7 @@ function buildSpace(input: {
   title: string;
   cards: Card[];
   layouts: Layout[] | undefined;
-  defaultRenderer: UUID | undefined;
+  defaultLayout: UUID | undefined;
 }): LoadSpaceResult {
   // Array order is read only by automatic strategies, so title order is the one
   // default stable across filesystem scans and unordered relational reads. Ties
@@ -325,7 +325,7 @@ function buildSpace(input: {
       cards,
       graphs,
       layouts,
-      defaultRenderer: input.defaultRenderer,
+      defaultLayout: input.defaultLayout,
       lookup: built.lookup,
     }),
   };

@@ -6,7 +6,6 @@ import {
   type CommitResult,
 } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
-import { DEFAULT_VIEW_ID } from '../src/renderer';
 import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
 
@@ -23,6 +22,8 @@ const META_GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const META_GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const META_SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 const MINTED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
+const SECOND_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
+const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e');
 
 /**
  * Two aggregate-valid Spaces. Every Card, Layout and Graph id is distinct
@@ -41,7 +42,7 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
     document: {
       version: 1,
       title,
-      defaultRenderer: layoutId,
+      defaultLayout: layoutId,
       layouts: [
         {
           id: layoutId,
@@ -59,6 +60,20 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
           ],
           activeGraph: graphOne,
         },
+        // A second Layout, so a selection made in an open Space can differ from
+        // the one an address proposes. Only the ordinary Space needs it.
+        ...(meta
+          ? []
+          : [
+              {
+                id: SECOND_LAYOUT_ID,
+                title: 'Second Layout',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: SECOND_GRAPH_ID, title: 'Second', edges: [] }],
+                activeGraph: SECOND_GRAPH_ID,
+              },
+            ]),
       ],
     },
     cards: meta
@@ -124,7 +139,7 @@ describe('Open Spaces', () => {
     other.app.navigation.activateGraph(GRAPH_TWO);
     await openSpaces.open(META_ID);
 
-    const reopened = await openSpaces.enter(OTHER_ID, DEFAULT_VIEW_ID);
+    const reopened = await openSpaces.enter(OTHER_ID, SECOND_LAYOUT_ID);
 
     expect(reopened).toBe(other);
     expect(reopened.app.navigation.getState()).toMatchObject({
@@ -441,12 +456,12 @@ describe('Open Spaces', () => {
   it('reports the selection an already-open Space actually kept', async () => {
     const { openSpaces } = setup();
     const path = productDestinationPath({
-      kind: 'space-view',
+      kind: 'layout',
       spaceId: OTHER_ID,
-      spaceViewId: LAYOUT_ID,
+      layoutId: LAYOUT_ID,
     });
     const first = await openSpaces.openPath(path);
-    first.opened.app.navigation.selectRenderer(DEFAULT_VIEW_ID);
+    first.opened.app.navigation.selectRenderer(SECOND_LAYOUT_ID);
 
     // The Space is already open, so it keeps the selection it is being worked
     // in. Reporting the URL's selection anyway would have the caller open a
@@ -454,7 +469,7 @@ describe('Open Spaces', () => {
     const again = await openSpaces.openPath(path);
 
     expect(again.opened).toBe(first.opened);
-    expect(again.opening?.selection).toBe(DEFAULT_VIEW_ID);
+    expect(again.opening?.selection).toBe(SECOND_LAYOUT_ID);
   });
 
   it('detaches a closed Space\u2019s composition from its retired session', async () => {

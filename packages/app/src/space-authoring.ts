@@ -1,5 +1,4 @@
 import {
-  isComputedViewId,
   type CardDocument,
   type CardId,
   COLLAPSED_CARD_SIZE,
@@ -28,7 +27,7 @@ import {
 } from './snapshot';
 import { nextCardTitle, nextGraphTitle, nextLayoutTitle } from './titles';
 import {
-  defaultRenderer,
+  defaultLayout,
   type CanvasRendererId,
   type ResolvedRenderer,
   type ResolveRenderer,
@@ -208,7 +207,6 @@ type LayoutRequiredOperation = Extract<
 /** Stable identities for every expected refusal at the Authoring seam. */
 export type AuthoringRefusal =
   | { readonly code: 'placement-pending' }
-  | { readonly code: 'computed-view-read-only' }
   | { readonly code: 'layout-not-found' }
   | { readonly code: 'layout-required'; readonly operation: LayoutRequiredOperation }
   | { readonly code: 'card-not-found' }
@@ -265,8 +263,7 @@ export interface SpaceAuthoringState {
 export interface SpaceAuthoring {
   readonly getState: () => SpaceAuthoringState;
   /**
-   * The installed placement, and only when the selected renderer is an authored
-   * Layout — an Algorithmic View computes its own positions.
+   * The selected Layout's installed placement.
    *
    * Read at the point of use rather than subscribed to. Every path that
    * installs a placement is paired with a publication from this store or from
@@ -332,11 +329,8 @@ interface CompletedEdit {
   /**
    * The Active Graph of that Layout, which Navigation adopts along with it.
    *
-   * Not "the Graph this Edit minted": under ADR 0040 a Layout owns its Graphs,
-   * so which one is active is a fact about the Layout this Edit wrote and not a
-   * separate consequence. A conversion answers the Graph it minted, an Edit on a
-   * selected Layout answers the one already active there, and the two reach
-   * Navigation the same way.
+   * Under ADR 0040 a Layout owns its Graphs, so which one is active is a fact
+   * about the Layout this Edit wrote and not a separate consequence.
    */
   readonly nextActiveGraphId: GraphId | null;
   readonly createdCardId?: CardId;
@@ -397,9 +391,7 @@ interface SpaceAuthoringDependencies {
    * Navigation.
    *
    * Authoring needs it because which Layout an Edit writes, and what that Layout
-   * owns, is the *renderer's* answer (ADR 0045) — and a converted Graph's
-   * identity comes from the resolver's composition rather than from a global,
-   * which is what lets a test drive conversion deterministically.
+   * owns, is the renderer's answer.
    */
   readonly resolveRenderer: ResolveRenderer;
   readonly initialPlacement?: Placement | null;
@@ -553,11 +545,7 @@ const aliasTargetRefusal = (space: Space, document: CardDocument): AuthoringRefu
 /**
  * A Card an Edit is creating, held rather than placed.
  *
- * A conversion is checked against a Placement whose Cards are exactly the
- * renderer's subject, and the subject is a fact about the Space as it *is* — a
- * Card this Edit adds is in neither. So the position waits here and is applied
- * after conversion, which changes nothing about what gets written: the Layout is
- * built from the placement further down either way.
+ * Its position waits here until the complete next Layout is assembled.
  */
 interface CreatedCard {
   readonly id: CardId;
@@ -645,8 +633,7 @@ export function createSpaceAuthoring({
   const selectedResolvedRenderer = (): ResolvedRenderer =>
     resolveRenderer(currentSpace(), navigation.getState().selectedRenderer);
 
-  const mergeBase = (): Placement | null =>
-    isComputedViewId(navigation.getState().selectedRenderer) ? null : placement;
+  const mergeBase = (): Placement | null => placement;
 
   const reportRendered = (rendered: Placement): void => {
     install(Placement.next(mergeBase(), rendered, []));
@@ -721,7 +708,6 @@ export function createSpaceAuthoring({
    */
   const ownedGraph = (graphId: GraphId): Graph | undefined => {
     const selectedRenderer = selectedResolvedRenderer();
-    if (selectedRenderer.kind === 'view') return undefined;
     const owned = currentSpace().lookup.graph(graphId);
     return owned?.owner.layout.id === selectedRenderer.resolvedLayout.layout.id
       ? owned.graph
@@ -731,9 +717,6 @@ export function createSpaceAuthoring({
   /**
    * The Graph a connection drawn right now would land in, or `null` when no
    * selected Layout owns one.
-   *
-   * **Only a selected Layout has an answer.** A Computed View is read-only, so
-   * the caller's eligibility gate refuses before this absence can author state.
    *
    * A Layout the Space no longer holds answers `null` too: it names no Graph,
    * and the completion that follows refuses for that reason rather than this one.
@@ -757,9 +740,7 @@ export function createSpaceAuthoring({
    *
    * Reading the installed placement rather than the stored Layout is deliberate.
    * It is the same value the completion reports, so the preview and the
-   * completion cannot disagree; and it is the only one that answers on an
-   * Computed View before explicit creation, although its read-only eligibility
-   * guard refuses authoring before this predicate is used.
+   * completion cannot disagree.
    */
   const connectable = (cardId: CardId): boolean =>
     placement !== null &&
@@ -775,8 +756,6 @@ export function createSpaceAuthoring({
    * `to === null` is the Option/Alt empty drop, whose target Card does not exist
    * yet (ADR 0033).
    *
-   * The duplicate refusal is conditional on a selected Layout because a
-   * Computed View is refused as read-only before connection-specific checks.
    * An exact duplicate within one Graph is what intake rejects (ADR 0032), so it
    * can only be a duplicate of an Edge in the Graph the Edge is about to join.
    * A created Card cannot duplicate anything, which is why the callers differ.
@@ -785,7 +764,6 @@ export function createSpaceAuthoring({
     if (!connectable(from) || (to !== null && !connectable(to))) {
       return { code: 'edge-card-outside-layout' };
     }
-    if (selectedResolvedRenderer().kind === 'view') return null;
     const graph = targetGraph();
     if (graph === null) return { code: 'layout-active-graph-required' };
     if (to !== null && indexOfEdge(graph.edges, { from, to }) !== -1) {
@@ -804,9 +782,6 @@ export function createSpaceAuthoring({
    * still change before the completion asks again.
    */
   const edgeEligibility = (proposal: EdgeProposal): EdgeEligibility => {
-    if (selectedResolvedRenderer().kind === 'view') {
-      return { kind: 'refused', refusal: { code: 'computed-view-read-only' } };
-    }
     if (proposal.kind !== 'reconnect') {
       const refusal = connectRefusal(
         proposal.from,
@@ -883,8 +858,7 @@ export function createSpaceAuthoring({
       if (target === undefined) return refuse({ code: 'layout-not-found' });
       if (layouts.length === 1) return refuse({ code: 'space-must-keep-layout' });
       const survivors = layouts.filter((layout) => layout.id !== completion.layoutId);
-      const selectedSurvives =
-        !isComputedViewId(selection) && survivors.some((layout) => layout.id === selection);
+      const selectedSurvives = survivors.some((layout) => layout.id === selection);
       const nextLayout = selectedSurvives
         ? survivors.find((layout) => layout.id === selection)
         : survivors[0];
@@ -896,10 +870,10 @@ export function createSpaceAuthoring({
         document: {
           ...snapshot.document,
           layouts: survivors,
-          defaultRenderer:
-            snapshot.document.defaultRenderer === completion.layoutId
+          defaultLayout:
+            snapshot.document.defaultLayout === completion.layoutId
               ? nextLayout.id
-              : snapshot.document.defaultRenderer,
+              : snapshot.document.defaultLayout,
         },
       };
       assertValidAuthoredSnapshot(next);
@@ -912,9 +886,6 @@ export function createSpaceAuthoring({
           nextRenderer: nextLayout.id,
         },
       };
-    }
-    if (isComputedViewId(selection)) {
-      return refuse({ code: 'computed-view-read-only' });
     }
     if (reportedPlacement === null) {
       return refuse({ code: 'placement-pending' });
@@ -932,19 +903,15 @@ export function createSpaceAuthoring({
     // question of the Space instead, and the answer is an author's state rather
     // than a defect: the Layout this gesture was aimed at is gone, so there is
     // nothing to write it into.
-    if (!isComputedViewId(selection) && space.lookup.layout(selection) === undefined) {
+    if (space.lookup.layout(selection) === undefined) {
       return refuse({ code: 'layout-not-found' });
     }
     const renderer = resolveRenderer(space, selection);
     /**
      * What this Edit does to the placement, held rather than applied.
      *
-     * A conversion is checked against a Placement whose Cards are exactly the
-     * renderer's subject, and the subject is a fact about the Space as it *is* —
-     * a Card this Edit adds is in neither, and one it removes is in both. So
-     * both wait here and are applied after conversion, which changes nothing
-     * about what gets written: the Layout is built from the placement further
-     * down either way.
+     * Card additions and removals wait here until the complete next Layout is
+     * assembled.
      */
     let createdCard: CreatedCard | null = null;
     let unplacedCardId: CardId | undefined;
@@ -1109,8 +1076,7 @@ export function createSpaceAuthoring({
           aliasTitles: incoming.map((alias) => alias.document.title),
         });
       }
-      // Deferred like a creation, and for the same reason: conversion is checked
-      // against the Space as it stands, and this Card is still in it.
+      // Deferred like a creation so the complete Layout changes atomically.
       unplacedCardId = completion.cardId;
       deletedCardId = completion.cardId;
       snapshot = {
@@ -1135,42 +1101,15 @@ export function createSpaceAuthoring({
       connection = { from: completion.from, to: completion.to };
     }
     // Which Layout this Edit writes, and what it owns afterwards.
-    //
-    // The two branches are explicit Create Layout conversion and ordinary
-    // authored Layout editing. Conversion asks the *View* for the Layout's
-    // Graphs, because that is where the choice lives (ADR 0045) — Flow and Grid
-    // preserve every subject Graph's title, colour and Edges under a fresh
-    // identity, falling back to one fresh empty Graph only when the subject has
-    // none. The renderer has already held that answer to closure, non-emptiness
-    // and fresh identity. A selected Layout keeps its id, its title and the
-    // Graph identities it already owns, and the Edit writes into them.
-    let layoutId: UUID;
+    const layoutId: UUID = renderer.resolvedLayout.layout.id;
     let layoutTitle: string;
     let ownedGraphs: readonly Graph[];
     let activeGraphId: GraphId | null;
     let createdGraphId: GraphId | undefined;
-    if (renderer.kind === 'view') {
-      const converted = renderer.convert(completedPlacement);
-      layoutId = newId();
-      layoutTitle = nextLayoutTitle(snapshot);
-      ownedGraphs = converted.graphs;
-      // The first Graph a conversion returns is the one the new Layout opens
-      // on — the same rule an absent `activeGraph` is read by (ADR 0026), taken
-      // here rather than left to be resolved because what is written down must
-      // not depend on Graph order (ADR 0028). A source Graph's identity remains
-      // with its owning Layout; only its content is copied into the new owner.
-      activeGraphId = converted.graphs[0].id;
-      // Add Graph *is* the conversion here. The new Layout's initial Graph is
-      // the Graph the author asked for, rather than a predecessor the requested
-      // one gets appended behind (ADR 0040).
-      if (completion.kind === 'added-graph') createdGraphId = activeGraphId;
-    } else {
-      const { layout } = renderer.resolvedLayout;
-      layoutId = layout.id;
-      layoutTitle = layout.title;
-      ownedGraphs = layout.graphs;
-      activeGraphId = navigationState.activeGraphId;
-    }
+    const { layout } = renderer.resolvedLayout;
+    layoutTitle = layout.title;
+    ownedGraphs = layout.graphs;
+    activeGraphId = navigationState.activeGraphId;
     if (completion.kind === 'renamed-layout') {
       // Addressed by id, exactly as Rename Graph is (ADR 0040). The Sidebar row
       // and the canvas header coordinate one draft on this id, so a rename that
@@ -1182,8 +1121,7 @@ export function createSpaceAuthoring({
       if (title === layoutTitle) return UNCHANGED;
       layoutTitle = title;
     }
-    // Applied only now: conversion is over the Space as it stands, and these are
-    // what the Edit adds to it and takes away.
+    // Apply membership changes together to the completed Layout.
     if (createdCard !== null) {
       const authoredPosition = Placement.authoredPoint(completedPlacement, createdCard.position);
       completedPlacement = Placement.place(
@@ -1211,7 +1149,7 @@ export function createSpaceAuthoring({
       // Layout owns (ADR 0040), so its incident Edges leave with it. The Graphs
       // themselves stay, empty ones included: deletion is their own action.
       ownedGraphs = withoutIncidentEdges(ownedGraphs, unplacedCardId);
-    } else if (completion.kind === 'added-graph' && renderer.kind === 'layout') {
+    } else if (completion.kind === 'added-graph') {
       const graph: Graph = {
         id: newId(),
         title: nextGraphTitle(space.graphs),
@@ -1341,9 +1279,8 @@ export function createSpaceAuthoring({
    * renderer *this Edit produced* rather than the one it began in, which is the
    * whole of what that ordering bought. What changed is that a Layout owns its
    * Graphs (ADR 0040), so the pair is one answer and the intermediate state
-   * where the renderer has moved and the Graph has not is no longer merely
-   * awkward: on a conversion it names a Layout beside a Graph some *other*
-   * Layout owns, which is exactly the pair Navigation refuses.
+   * where the renderer has moved and the Graph has not would name a Layout
+   * beside a Graph some other Layout owns, which Navigation refuses.
    *
    * In that order the three statements below refuse nothing, and each for a
    * reason this Edit established rather than by having no guard to trip:
@@ -1383,19 +1320,8 @@ export function createSpaceAuthoring({
   };
 
   let completing = false;
-  let creatingLayout = false;
   const queued: QueuedCompletion[] = [];
   const complete = (completion: AuthoringCompletion): AuthoringResult => {
-    // Explicit Layout creation publishes the captured Space before Navigation
-    // selects the new Layout. An observer can reenter during that publication,
-    // but its attempted Edit still belongs to the selected Computed View: refuse
-    // it now rather than queueing it to be replayed after selection moves.
-    if (
-      completion.kind !== 'created-layout' &&
-      (creatingLayout || isComputedViewId(navigation.getState().selectedRenderer))
-    ) {
-      return refuse({ code: 'computed-view-read-only' });
-    }
     // A pointer gesture reports where React Flow has drawn the Cards, and that
     // report is merged under `Placement.next`'s rules. Every other operation is
     // written into the placement already installed — there is no second source
@@ -1418,7 +1344,6 @@ export function createSpaceAuthoring({
       return { kind: 'queued' };
     }
     completing = true;
-    creatingLayout = completion.kind === 'created-layout';
     try {
       const result = performCompletion(reported);
       // Drain what arrived during publication. A queued Edit that cannot produce
@@ -1463,7 +1388,6 @@ export function createSpaceAuthoring({
       return result;
     } finally {
       completing = false;
-      creatingLayout = false;
       // Empty on the ordinary path, since the drain above ran it down. Anything
       // still here was enqueued by an observer and then abandoned by a throw
       // partway through the drain: those Edits are gone, and saying so is the
@@ -1514,10 +1438,9 @@ export function createSpaceAuthoring({
         .map((error) => `  - ${error.message}`)
         .join('\n')}`;
     }
-    const selection = defaultRenderer(accepted.space);
+    const selection = defaultLayout(accepted.space);
     const resolved = resolveRenderer(accepted.space, selection);
-    const acceptedPlacement =
-      resolved.kind === 'view' ? null : Placement.fromLayout(resolved.resolvedLayout.layout);
+    const acceptedPlacement = Placement.fromLayout(resolved.resolvedLayout.layout);
     installTogether(() => {
       session.acceptRemote();
       install(acceptedPlacement);

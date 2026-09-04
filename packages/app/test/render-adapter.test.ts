@@ -1,16 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
-import {
-  FLOW_SPACE_VIEW_ID,
-  uuidSchema,
-  type LayoutPosition,
-  type SpaceSnapshot,
-  type UUID,
-} from '@project/core';
+
+import { uuidSchema, type LayoutPosition, type SpaceSnapshot, type UUID } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { mintingGraphIds, mintingIds } from './minting';
+import { mintingIds } from './minting';
 import { composeApp } from '../src/compose-app';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
@@ -30,8 +25,6 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-/** Named, never reached: these compositions open on a Layout, so nothing converts. */
-const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 
 const PROJECTED = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
 
@@ -154,7 +147,6 @@ function sessionBackedAdapter(
   const { authoring, adapter } = composeApp({
     spaceSession: session,
     selection: renderer,
-    newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
     initialPlacement,
     newId,
   });
@@ -192,7 +184,7 @@ function sparsePositionedAdapter(newId?: () => UUID) {
           ],
         },
       ],
-      defaultRenderer: LAYOUT_ID,
+      defaultLayout: LAYOUT_ID,
     },
     cards: [
       {
@@ -246,7 +238,7 @@ function storedSpaceAdapter() {
           ],
         },
       ],
-      defaultRenderer: LAYOUT_ID,
+      defaultLayout: LAYOUT_ID,
     },
     cards: [
       { id: uuidSchema.parse(CARD_A), document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -553,44 +545,6 @@ describe('render adapter', () => {
     expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([CARD_A, CARD_B]);
   });
 
-  it('creates an empty Layout without capturing projected Cards', () => {
-    // No Layout, so no Graph either: a Graph is a nested owned value and a Space
-    // with nothing to own one holds none (ADR 0040). Explicit creation gives
-    // this Space both.
-    const snapshot: SpaceSnapshot = {
-      id: SPACE_ID,
-      document: {
-        version: 1,
-        title: 'Space',
-      },
-      cards: [
-        {
-          id: uuidSchema.parse(CARD_A),
-          document: { title: 'A', kind: 'markdown', body: 'A' },
-        },
-        {
-          id: uuidSchema.parse(CARD_B),
-          document: { title: 'B', kind: 'markdown', body: 'B' },
-        },
-      ],
-    };
-    // Explicit creation mints the Layout's Graph before the Layout itself.
-    const { session, store, authoring } = sessionBackedAdapter(
-      snapshot,
-      FLOW_SPACE_VIEW_ID,
-      undefined,
-      undefined,
-      mintingIds(GRAPH_ID, LAYOUT_ID),
-    );
-
-    store.getState().syncProjection(PROJECTED, []);
-    expect(authoring.complete({ kind: 'created-layout' })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({});
-  });
-
   /*
    * A reprojection can land while a Card is in flight — an activated Graph or a
    * selection redraws the graph without the gesture ending. The nodes it reports
@@ -638,8 +592,8 @@ describe('render adapter', () => {
 
   /*
    * Authoring owns eligibility; the coordinator only asks. A refusal has to stop
-   * before the placement install, because installing is what converts an
-   * Algorithmic View into a Layout (ADR 0025) — a gesture Authoring rejected
+   * before the placement install, because installing is what commits an
+   * pending placement into a Layout — a gesture Authoring rejected
    * would otherwise still author one as a side effect.
    */
   it('installs and completes nothing for a connection Authoring refuses', () => {

@@ -1,4 +1,4 @@
-import { newUuid, type GraphId, type SpaceSnapshot, type UUID } from '@project/core';
+import { newUuid, type SpaceSnapshot, type UUID } from '@project/core';
 import { Placement, type Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
@@ -7,7 +7,7 @@ import { createNavigation, type Navigation } from './navigation';
 import { createRenderAdapter, type RenderAdapter } from './render-adapter';
 import {
   createRendererResolver,
-  defaultRenderer,
+  defaultLayout,
   type CanvasRendererId,
   type ResolvedRenderer,
   type ResolveRenderer,
@@ -50,15 +50,8 @@ export interface ComposeCoreDependencies {
    * the other.
    */
   readonly spaceSession: SpaceSession;
-  /** Which renderer the Space opens in; the Space's own default when absent. */
+  /** Which Layout the Space opens in; the Space's own default when absent. */
   readonly selection?: CanvasRendererId | undefined;
-  /**
-   * Where a converted Graph's identity comes from (ADR 0016).
-   *
-   * Passed explicitly to {@link createRendererResolver} rather than left to a
-   * default, so the identity has one visible source in the composition.
-   */
-  readonly newGraphId?: (() => GraphId) | undefined;
 }
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
@@ -66,18 +59,15 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * Mints the identity of every Card, Layout and Graph a completed Edit creates
    * (ADR 0016).
    *
-   * Passed explicitly for the same reason `newGraphId` is: with a default here,
-   * `createSpaceAuthoring` falls back to its own and the composition can no
-   * longer say where an Edit's identities came from.
+   * Passed explicitly so `createSpaceAuthoring` cannot fall back to its own and
+   * the composition always says where an Edit's identities came from.
    */
   readonly newId?: (() => UUID) | undefined;
   /**
    * The placement the Space opens on.
    *
-   * Absent, the opening renderer answers it: a selected Layout supplies its
-   * already-authored, possibly sparse map, and an Algorithmic View starts null
-   * and is promoted only by a completed edit (ADR 0025). An explicit `null`
-   * says "none", which is not the same statement.
+   * Absent, the opening Layout supplies its already-authored, possibly sparse
+   * map. An explicit `null` says "none", which is not the same statement.
    */
   readonly initialPlacement?: Placement | null | undefined;
   /**
@@ -147,7 +137,7 @@ export interface ComposedApp extends AppCore {
  * same renderer installs another is two sources of truth for one rule.
  */
 export const openingPlacement = (renderer: ResolvedRenderer): Placement | null =>
-  renderer.kind === 'view' ? null : Placement.fromLayout(renderer.resolvedLayout.layout);
+  Placement.fromLayout(renderer.resolvedLayout.layout);
 
 /**
  * Navigation and everything it needs, over one reader and one resolver.
@@ -156,26 +146,19 @@ export const openingPlacement = (renderer: ResolvedRenderer): Placement | null =
  * Authoring has to compose that wrapper itself — that seam is what those tests
  * are about, and a hook for it would hide it.
  */
-export function composeCore({
-  spaceSession,
-  selection,
-  newGraphId = newUuid,
-}: ComposeCoreDependencies): AppCore {
+export function composeCore({ spaceSession, selection }: ComposeCoreDependencies): AppCore {
   // One validated aggregate per working snapshot, shared by the render path and
   // by Navigation. Both read the same reader, so in the steady state a snapshot
   // is parsed and indexed once rather than once per render.
   const readWorkingSpace = createWorkingSpaceReader();
   const currentSpace = (): Space => readWorkingSpace(spaceSession.getState().working);
   // **One resolver for the whole composition**, handed to every collaborator
-  // that needs one. Nondeterminism is injected here rather than reached for
-  // inside a domain operation: a converted Graph's identity comes from
-  // `newGraphId`, so a test composes a deterministic resolver instead of mocking
-  // a global, and nothing downstream has to name identity minting at all.
-  const resolveRenderer = createRendererResolver({ newGraphId });
+  // that needs one.
+  const resolveRenderer = createRendererResolver();
   // Which renderer this space opens in. It also answers which graphs are drawn
   // and which of them opens active (ADR 0026), so it has to resolve before
   // anything that reads the canvas is built.
-  const openingSelection = selection ?? defaultRenderer(currentSpace());
+  const openingSelection = selection ?? defaultLayout(currentSpace());
   const navigation = createNavigation(currentSpace, resolveRenderer, openingSelection);
   return { readWorkingSpace, currentSpace, resolveRenderer, navigation, openingSelection };
 }

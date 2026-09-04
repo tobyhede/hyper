@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { graphStartCard, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
-import { defaultRenderer } from '../src/renderer';
+import { defaultLayout } from '../src/renderer';
 import {
   authoredSnapshot,
   authoredSpace,
@@ -19,20 +19,20 @@ import {
  *
  * ADR 0052 makes a stable story evidence about the UI Hyper ships, and its
  * negative to remember forbids making one possible by "translating its state in
- * the harness". Where a Space opens is `defaultRenderer` reading
- * `space.defaultRenderer` — so the story fixture must not answer that question
+ * the harness". Where a Space opens is `defaultLayout` reading
+ * `space.defaultLayout` — so the story fixture must not answer that question
  * itself, and these Spaces have to *declare* what the Ladle specs then assert.
  *
  * That is what this file pins. `issue-14-space-sidebar.spec.ts` proves the
  * rendered story presses Collection 1; this proves the story is entitled to,
  * because the Space says so through the same call production makes. Delete the
- * `defaultRenderer` and this fails here rather than in a browser.
+ * `defaultLayout` and this fails here rather than in a browser.
  */
 describe('the story Spaces', () => {
   it('opens the authored Space on the Layout its stories press', () => {
-    const opens = defaultRenderer(authoredSpace);
+    const opens = defaultLayout(authoredSpace);
 
-    expect(opens).toBe(authoredSpace.defaultRenderer);
+    expect(opens).toBe(authoredSpace.defaultLayout);
     expect(currentRenderer(canvasRenderers(authoredSpace), opens).title).toBe('Collection 1');
   });
 
@@ -44,9 +44,9 @@ describe('the story Spaces', () => {
   it('opens the sparse authored Space on a Layout some Cards are absent from', () => {
     const space = loadSpaceSnapshot(sparseAuthoredSnapshot);
     if (!space.ok) throw new Error('sparse story Space did not load');
-    const opens = defaultRenderer(space.space);
+    const opens = defaultLayout(space.space);
 
-    expect(opens).toBe(space.space.defaultRenderer);
+    expect(opens).toBe(space.space.defaultLayout);
     const layout = space.space.lookup.layout(opens)?.layout;
     expect(currentRenderer(canvasRenderers(space.space), opens).title).toBe('Collection 2');
     expect(
@@ -56,7 +56,7 @@ describe('the story Spaces', () => {
 
   /** ADR 0080 makes a newly created Space complete before it is first opened. */
   it('opens the newly created Space on its authored Layout', () => {
-    const opens = defaultRenderer(newSpaceFixture);
+    const opens = defaultLayout(newSpaceFixture);
 
     expect(opens).toEqual(newSpaceFixture.layouts[0]?.id);
     expect(newSpaceFixture.layouts).toHaveLength(1);
@@ -78,7 +78,7 @@ describe('the story Spaces', () => {
     const edited = loadSpaceSnapshot(editedSnapshot);
     if (!edited.ok) throw new Error(edited.errors.map((error) => error.message).join('\n'));
 
-    const opens = defaultRenderer(authoredSpace);
+    const opens = defaultLayout(authoredSpace);
 
     expect(currentRenderer(canvasRenderers(edited.space), opens).title).toBe('Collection 1');
     expect(edited.space.layouts.slice(0, authoredSpace.layouts.length)).toEqual(
@@ -90,15 +90,8 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * The identities a story's conversion mints are not identities the story
+   * The identities an interactive story mints are not identities the story
    * already carries.
-   *
-   * `convertSubject` checks a minted Graph id against the Space's **Graphs**
-   * and nothing else, which is right: ADR 0045 makes a Graph id unique across
-   * the Graphs of a Space, and a Card's id lives in another namespace. So the
-   * boundary would accept a Graph wearing `CARD_A`'s id without a word, and the
-   * counter that produced it is the only thing that can refuse — which it can
-   * only do by starting above every id the literals above it declare.
    *
    * The counter has no upper bound, so this reads far enough past the declared
    * block to be about where it *starts* rather than about how many ids happen
@@ -110,7 +103,7 @@ describe('the story Spaces', () => {
    * held against, and asserting over them would make the test a coin toss
    * rather than a claim about the block.
    */
-  it('mints Graph identities no story literal already carries', () => {
+  it('mints Edit identities no story literal already carries', () => {
     const edited = loadSpaceSnapshot(editedSnapshot);
     if (!edited.ok) throw new Error(edited.errors.map((error) => error.message).join('\n'));
 
@@ -153,7 +146,7 @@ describe('the story Spaces', () => {
   /**
    * The traversal Spaces open where they say, on the one Graph their Layout
    * owns — so a presenting story calls `present()` and nothing else, and the
-   * Graph it presents is the one `defaultRenderer` and ADR 0026 answer rather
+   * Graph it presents is the one `defaultLayout` and ADR 0026 answer rather
    * than one the harness picked.
    */
   it('opens each traversal Space on the Layout and Graph it declares', () => {
@@ -161,8 +154,8 @@ describe('the story Spaces', () => {
       [traversalSpace, 'Traversal'],
       [deepDiveSpace, 'Deep dive'],
     ] as const) {
-      const opens = defaultRenderer(space);
-      expect(opens).toBe(space.defaultRenderer);
+      const opens = defaultLayout(space);
+      expect(opens).toBe(space.defaultLayout);
       expect(currentRenderer(canvasRenderers(space), opens).title).toBe(title);
       expect(space.graphs.map((graph) => graph.title)).toEqual([title]);
     }

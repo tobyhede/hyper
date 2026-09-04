@@ -97,7 +97,7 @@ const openFrame: CardFrameStyle = {
 
 const markdown = `## Placement is authored
 
-A **Layout** owns explicit Card rects. The strategy only supplies a computed View.`;
+A **Layout** owns explicit Card rects. A strategy only computes placement.`;
 
 type Mode = 'rendered' | 'focused' | 'unfocused';
 

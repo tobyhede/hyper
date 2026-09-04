@@ -37,12 +37,7 @@ export type {
   ParseImportCardFileResult,
 } from './card-file';
 
-export { computedViewSubject } from './computed-view';
-export type { ComputedViewSubject } from './computed-view';
-
-// The rule for "the same Edge twice in one Graph" (ADR 0032), offered because
-// the app's ADR 0045 conversion boundary refuses one before it can reach a
-// document, and intake's own refusal must be the same answer.
+// The rule for "the same Edge twice in one Graph" (ADR 0032).
 export { repeatedGraphEdges } from './graph-edges';
 
 export { gridStrategy } from './grid';

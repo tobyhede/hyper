@@ -16,7 +16,7 @@ test(
 
 /**
  * ADR 0053's first claim, proven on the rendered story: one exclusive list over
- * computed Views and authored Layouts, one pressed item, and a canvas header
+ * authored Layouts, one pressed item, and a canvas header
  * that names it.
  */
 test(
@@ -27,22 +27,21 @@ test(
   async ({ page }) => {
     await page.goto('/?story=space--space--settled&mode=preview');
 
-    const flow = page.getByRole('button', { name: 'Flow' });
-    const grid = page.getByRole('button', { name: 'Grid' });
+    const other = page.getByRole('button', { name: 'Collection 2', exact: true });
     const collection = page
       .getByTestId('space-sidebar')
       .getByRole('button', { name: 'Collection 1' });
 
     await expect(collection).toHaveAttribute('aria-pressed', 'true');
-    await expect(flow).toHaveAttribute('aria-pressed', 'false');
+    await expect(other).toHaveAttribute('aria-pressed', 'false');
     await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
     await expect(page.getByText('None', { exact: true })).toHaveCount(0);
 
-    await grid.click();
+    await other.click();
 
-    await expect(grid).toHaveAttribute('aria-pressed', 'true');
+    await expect(other).toHaveAttribute('aria-pressed', 'true');
     await expect(collection).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.getByTestId('selected-canvas')).toContainText('Grid');
+    await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
   },
 );
 
@@ -84,20 +83,17 @@ test(
  * Menubar's: Tab reaches each row, Enter activates the row it is on, and no
  * popup opens, dismisses or has focus to return.
  */
-test('Space Sidebar story defines the canvas renderer keyboard contract', async ({ page }) => {
+test('Space Sidebar story activates a Layout row from the keyboard', async ({ page }) => {
   await page.goto('/?story=space--space--settled&mode=preview');
 
-  const flow = page.getByRole('button', { name: 'Flow' });
-  const grid = page.getByRole('button', { name: 'Grid' });
+  const other = page.getByRole('button', { name: 'Collection 2', exact: true });
 
-  await flow.focus();
-  await page.keyboard.press('Tab');
-  await expect(grid).toBeFocused();
+  await other.focus();
   await page.keyboard.press('Enter');
 
-  await expect(grid).toHaveAttribute('aria-pressed', 'true');
-  await expect(grid).toBeFocused();
-  await expect(page.getByTestId('selected-canvas')).toContainText('Grid');
+  await expect(other).toHaveAttribute('aria-pressed', 'true');
+  await expect(other).toBeFocused();
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
 });
 
 test(
@@ -169,11 +165,11 @@ test(
 
     await page.getByRole('button', { name: 'Copy link to Card 1' }).click();
     await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'card-canonical');
-    await page.getByRole('button', { name: 'Copy link in this Space View' }).click();
+    await page.getByRole('button', { name: 'Copy link in this Layout' }).click();
     await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'card-contextual');
     await page.getByRole('button', { name: 'Copy link to Long', exact: true }).click();
     await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'graph-canonical');
-    await page.getByRole('button', { name: 'Copy link to Long in this Space View' }).click();
+    await page.getByRole('button', { name: 'Copy link to Long in this Layout' }).click();
     await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'graph-contextual');
   },
 );

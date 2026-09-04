@@ -95,7 +95,7 @@ const snapshot = (
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
-      defaultRenderer: LAYOUT_ID,
+      defaultLayout: LAYOUT_ID,
     },
     cards: [{ id: CARD_ID, document: { title: cardTitle, kind: 'markdown', body } }],
   });

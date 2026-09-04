@@ -77,7 +77,7 @@ describe('PostgresSpaceRepository import decoding', () => {
     const result = await repository.importSpaces(
       [
         {
-          document: { version: 9, title: 7, layouts: 4, defaultRenderer: 7 },
+          document: { version: 9, title: 7, layouts: 4, defaultLayout: 7 },
           cards: [{ document: { title: 5, kind: 'nope', body: 3 } }],
         } as never,
       ],
@@ -109,7 +109,7 @@ describe('PostgresSpaceRepository import decoding', () => {
   it('describes one malformed document the same way for the CLI and for the wire', async () => {
     const malformed = {
       id: SPACE_ID,
-      document: { version: 9, title: 7, layouts: 4, defaultRenderer: 7 },
+      document: { version: 9, title: 7, layouts: 4, defaultLayout: 7 },
       cards: [{ id: CARD_ID, document: { title: 5, kind: 'nope', body: 3 } }],
     };
 
@@ -133,7 +133,7 @@ describe('PostgresSpaceRepository import decoding', () => {
     version: number;
     title: number;
     layouts?: number;
-    defaultRenderer?: number;
+    defaultLayout?: number;
   }
 
   const documentFailingIn = (paths: 1 | 3 | 4 | 5) => {
@@ -142,7 +142,7 @@ describe('PostgresSpaceRepository import decoding', () => {
       title: 7,
     };
     if (paths >= 3) document.layouts = 4;
-    if (paths >= 4) document.defaultRenderer = 7;
+    if (paths >= 4) document.defaultLayout = 7;
     return {
       id: SPACE_ID,
       document,
@@ -232,7 +232,7 @@ describe('PostgresSpaceRepository import decoding', () => {
       { id: SPACE_ID, document: { version: 9, title: 'T' }, cards: [] },
       {
         id: SPACE_ID,
-        document: { version: 1, title: 7, layouts: 4, defaultRenderer: 7 },
+        document: { version: 1, title: 7, layouts: 4, defaultLayout: 7 },
         cards: [],
       },
       // Discriminated-union failures, on a card's kind and on a layout's.
@@ -255,10 +255,10 @@ describe('PostgresSpaceRepository import decoding', () => {
       { id: SPACE_ID, document: { version: 1, title: '' }, cards: [] },
       {
         id: SPACE_ID,
-        document: { version: 1, title: 'T', defaultRenderer: 'SpaceCanvas' },
+        document: { version: 1, title: 'T', defaultLayout: 'SpaceCanvas' },
         cards: [],
       },
-      { id: SPACE_ID, document: { version: 1, title: 'T', defaultRenderer: 7 }, cards: [] },
+      { id: SPACE_ID, document: { version: 1, title: 'T', defaultLayout: 7 }, cards: [] },
       // And the root-path renders, where neither schema sees an object at all.
       'nope',
       42,

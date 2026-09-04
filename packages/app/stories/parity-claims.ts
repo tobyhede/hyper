@@ -47,7 +47,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/cards-drawer.stories.tsx',
     storyExport: 'Disabled',
     claim:
-      'The Cards trigger is disabled while the Space View cannot accept membership edits — presenting, an open Card, or Alias creation.',
+      'The Cards trigger is disabled while the Layout cannot accept membership edits — presenting, an open Card, or Alias creation.',
   },
   {
     id: 'cards-drawer-keeps-an-add-refusal-on-its-surface',
@@ -201,26 +201,26 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'space-sidebar-marks-one-current-renderer',
     storyFile: 'space/space.stories.tsx',
     storyExport: 'Settled',
-    claim: 'Exactly one computed View or authored Layout is the current renderer.',
+    claim: 'Exactly one authored Layout is the current renderer.',
   },
   {
     id: 'space-sidebar-copies-card-destinations',
     storyFile: 'space/space.stories.tsx',
     storyExport: 'Settled',
-    claim: 'A selected Card offers distinct canonical and current-Space-View copy commands.',
+    claim: 'A selected Card offers distinct canonical and current-Layout copy commands.',
   },
   {
     id: 'space-sidebar-copies-graph-destinations',
     storyFile: 'space/space.stories.tsx',
     storyExport: 'Settled',
-    claim: 'The Active Graph offers distinct canonical and current-Space-View copy commands.',
+    claim: 'The Active Graph offers distinct canonical and current-Layout copy commands.',
   },
   {
     id: 'space-chrome-edits-names',
     storyFile: 'space/space.stories.tsx',
     storyExport: 'Settled',
     claim:
-      'An authored Layout shares one refusable name draft between its active Sidebar row and Space View label, and an active Graph edits with the same keyboard lifecycle.',
+      'An authored Layout shares one refusable name draft between its active Sidebar row and Layout label, and an active Graph edits with the same keyboard lifecycle.',
   },
   {
     id: 'space-sidebar-names-unauthored-state',
@@ -333,12 +333,16 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Placement',
     claim: 'A strategy that cannot produce positions fails placement with its own diagnostic.',
+    applicationEvidence:
+      'Selectable V1 Layouts use the in-process positioned strategy, so a browser cannot deterministically block it. Covered by packages/app/test/placement-rendering.test.tsx.',
   },
   {
     id: 'operational-feedback-placement-pending',
     storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Arranging',
     claim: 'The canvas shows a busy state while a strategy is still arranging Cards.',
+    applicationEvidence:
+      'The positioned strategy settles before Playwright can deterministically observe the pending frame. Covered by packages/app/test/placement-rendering.test.tsx.',
   },
   {
     id: 'selected-edge-controls-offer-edit-and-delete',
@@ -358,6 +362,8 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/selected-edge-controls.stories.tsx',
     storyExport: 'DisabledChoice',
     claim: 'An endpoint the Edit would refuse stays listed, disabled, with its reason.',
+    applicationEvidence:
+      'The fixture Graphs are lines, so no endpoint choice reachable in E2E is refused. Covered instead by packages/app/test/SelectedEdgeControls.test.tsx.',
   },
   {
     id: 'selected-edge-from-refusal-is-field-local',
@@ -391,13 +397,15 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'ReconnectionRefusal',
     claim: 'A stale Layout, Graph or Edge reports on the form channel and marks neither Field.',
     applicationEvidence:
-      'The reachable stale conditions on a computed View disable every row before a reconnection can be proposed, and the rest need the Space to change under an open editor. Covered instead by packages/app/test/authoring-refusal.test.ts and packages/app/test/SelectedEdgeControls.test.tsx.',
+      'The remaining stale conditions need the Space to change under an open editor. Covered instead by packages/app/test/authoring-refusal.test.ts and packages/app/test/SelectedEdgeControls.test.tsx.',
   },
   {
     id: 'selected-edge-deletion-refusal-stays-on-its-controls',
     storyFile: 'components/selected-edge-controls.stories.tsx',
     storyExport: 'DeletionRefusal',
     claim: 'A refused Delete stays on the surviving selected-Edge controls.',
+    applicationEvidence:
+      'The stale deletion refusal requires the Space to change under an open control. Covered instead by packages/app/test/SelectedEdgeControls.test.tsx.',
   },
   {
     id: 'canvas-zoom-control-operates-the-real-viewport',

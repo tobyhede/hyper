@@ -6,10 +6,7 @@ import { canvasProjection, type CanvasInteraction } from '../src/canvas-projecti
 import { GRAPH_PALETTE } from '../src/colors';
 import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 
-/** One composed resolver; nothing here converts, so its identity source is never used. */
-const resolveRenderer = createRendererResolver({
-  newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
-});
+const resolveRenderer = createRendererResolver();
 import { cardFile } from './card-files';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -22,6 +19,7 @@ const CARDS = [cardFile(CARD_A), cardFile(CARD_B)];
 
 const DRAWN = { id: DRAWN_GRAPH, title: 'Drawn', edges: [{ from: CARD_A, to: CARD_B }] };
 const OTHER = { id: OTHER_GRAPH, title: 'Other', edges: [{ from: CARD_B, to: CARD_A }] };
+const EMPTY = { id: DRAWN_GRAPH, title: 'Empty', edges: [] };
 
 /**
  * An authored Layout over both Cards, owning the Graphs it is handed.
@@ -49,7 +47,14 @@ const AT_REST: CanvasInteraction = {
 
 function spaceWith(extra: Record<string, unknown> = {}): Space {
   const result = loadSpace(
-    { version: 1, id: '00000000-0000-4000-8000-000000000001', title: 'T', ...extra },
+    {
+      version: 1,
+      id: '00000000-0000-4000-8000-000000000001',
+      title: 'T',
+      defaultLayout: LAYOUT,
+      layouts: [layoutOwning(EMPTY)],
+      ...extra,
+    },
     CARDS,
   );
   if (!result.ok) throw new Error(result.errors.map((e) => e.message).join(', '));
@@ -77,17 +82,15 @@ function handledGraphIds(nodes: readonly CardFlowNode[]): string[] {
 }
 
 describe('canvasProjection', () => {
-  it('marks Computed View Cards read-only and authored Layout Cards editable', async () => {
+  it('marks authored Layout Cards editable', async () => {
     const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
 
-    const computed = await projectThrough(space);
     const authored = await projectThrough(space, AT_REST, LAYOUT);
 
-    expect(computed.nodes.map((node) => node.data.readOnly)).toEqual([true, true]);
     expect(authored.nodes.map((node) => node.data.readOnly)).toEqual([false, false]);
   });
 
-  it('projects every Space Card when the Space has no Graphs', async () => {
+  it('projects every Layout Card when its Graph is empty', async () => {
     const { nodes } = await projectThrough(spaceWith());
 
     expect(nodes.map((node) => node.id).sort()).toEqual([CARD_A, CARD_B]);
@@ -144,16 +147,6 @@ describe('canvasProjection', () => {
     // Presenting draws the Active Card's content, and only that Card's (ADR 0027).
     expect(byId[CARD_A]?.showContent).toBe(true);
     expect(byId[CARD_B]?.showContent).toBe(false);
-  });
-
-  it('drops routed Edge geometry once a Card has been dragged out of the placement', async () => {
-    const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
-
-    const settled = await projectThrough(space);
-    const dragged = await projectThrough(space, { ...AT_REST, moved: true });
-
-    expect(settled.edges[0]?.data?.['points']).toBeDefined();
-    expect(dragged.edges[0]?.data?.['points']).toBeUndefined();
   });
 
   it('draws every Graph a selected Layout owns', async () => {

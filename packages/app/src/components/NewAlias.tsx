@@ -53,8 +53,8 @@ export interface NewAliasProps {
  *
  * **Nothing is authored until a Target is chosen**, and that is the whole shape
  * of this surface. An Alias without a Target is not a valid Card, so there is no
- * partially created Alias to hold, nothing is added to the Space, no Algorithmic
- * View is converted and nothing is persisted while this pane is open. Closing it
+ * partially created Alias to hold, nothing is added to the Space, and nothing
+ * is persisted while this pane is open. Closing it
  * creates nothing — there is no draft to discard, because there was never
  * anything but local state.
  *

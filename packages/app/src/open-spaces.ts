@@ -187,9 +187,9 @@ export function createOpenSpaces({
   };
 
   const buildLoaded = (
-    { loaded }: ValidatedLoadedSpace,
-    selection?: CanvasRendererId,
-  ): OpenSpace => {
+  { loaded }: ValidatedLoadedSpace,
+  selection?: CanvasRendererId,
+): OpenSpace => {
     const spaceId = loaded.snapshot.id;
     // A session the registry already holds keeps the snapshot it was opened on
     // and discards this one, so anything read off `loaded` afterwards describes
@@ -292,7 +292,6 @@ export function createOpenSpaces({
     if (resolution.kind === 'outside') throw new Error('The URL is outside product addressing.');
     if (resolution.kind === 'malformed') throw new Error('The product URL is malformed.');
     if (resolution.kind === 'unresolved') throw new Error('The product URL does not resolve.');
-    if (resolution.kind === 'collision') throw new Error('The product URL names two Space Views.');
     const validated = validateLoadedSpace(resolution.loaded);
     const destination = destinationOpening(validated.space, resolution.destination);
     const opened = await activateAfterLeavingSettles(

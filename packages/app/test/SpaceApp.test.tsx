@@ -1,11 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import {
-  GRID_SPACE_VIEW_ID,
-  spaceSnapshotSchema,
-  uuidSchema,
-  type SpaceSnapshot,
-} from '@project/core';
+
+import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { productDestinationPath } from '@project/http';
 import {
@@ -44,7 +40,7 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
           graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
-      defaultRenderer: LAYOUT_ID,
+      defaultLayout: LAYOUT_ID,
     },
     cards: [
       {
@@ -382,9 +378,9 @@ describe('Space app failure reporting', () => {
 
   it.each([
     'Copy link to Card',
-    'Copy link in this Space View',
+    'Copy link in this Layout',
     'Copy link to Graph',
-    'Copy link to Graph in this Space View',
+    'Copy link to Graph in this Layout',
   ])(
     'reports a rejected clipboard write from %s without unmounting the Space',
     async (copyAction) => {
@@ -587,20 +583,20 @@ describe('Space app Cards drawer', () => {
       (app) => render(app),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Layout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
     expect(screen.getByRole('alert')).toHaveTextContent('A Space keeps at least one Layout.');
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Layout' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Layout 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout 1' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
     const editor = await screen.findByRole('textbox', { name: 'Layout name' });
     fireEvent.change(editor, { target: { value: 'Workshop' } });
     fireEvent.keyDown(editor, { key: 'Enter' });
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Workshop');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Workshop' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Workshop' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
     expect(session.getState().working.document.layouts).toHaveLength(1);
     expect(session.getState().working.cards).toEqual(base.cards);
@@ -622,12 +618,15 @@ describe('Space app Cards drawer', () => {
       (app) => render(app),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Space View Layout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
     expect(screen.getByRole('alert')).toHaveTextContent('A Space keeps at least one Layout.');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
+    // The Space holds one Layout while the refusal stands, so Add Layout is the
+    // move away from it: it authors a second Layout and selects it.
+    fireEvent.click(screen.getByRole('button', { name: 'Add Layout' }));
 
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout 1');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -698,7 +697,7 @@ describe('Space app Cards drawer', () => {
         // The canonical Card link below resolves to the Space's default
         // renderer, so this second navigation lands on the Layout that omits
         // the Card rather than the one it started on.
-        defaultRenderer: OTHER_LAYOUT_ID,
+        defaultLayout: OTHER_LAYOUT_ID,
       },
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
@@ -722,7 +721,7 @@ describe('Space app Cards drawer', () => {
     // Card is a member of the selected Layout, so there is nothing to reveal yet.
     expect(screen.queryByRole('button', { name: 'Add Card to Layout' })).not.toBeInTheDocument();
 
-    // The canonical Card link carries no Space View of its own — it opens
+    // The canonical Card link carries no Layout of its own — it opens
     // wherever the Space's default renderer is, which is now the Layout that
     // omits this Card.
     window.history.replaceState(
@@ -734,50 +733,5 @@ describe('Space app Cards drawer', () => {
 
     expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Layout');
     expect(await screen.findByRole('button', { name: 'Add Card to Layout' })).toBeVisible();
-  });
-});
-
-describe('explicit Layout creation', () => {
-  it('keeps Add Layout available while a Computed View is replacing its placement', async () => {
-    const local = spaceSnapshotSchema.parse({
-      id: SPACE_ID,
-      document: {
-        version: 1,
-        title: 'Computed space',
-        layouts: [],
-        defaultRenderer: GRID_SPACE_VIEW_ID,
-      },
-      cards: [
-        {
-          id: CARD_ID,
-          document: { title: 'Card', kind: 'markdown', body: '' },
-        },
-      ],
-    });
-    const stored = { snapshot: local, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
-
-    mountSpaceApp(
-      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
-      (app) => render(app),
-    );
-
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Add Layout' })).toBeEnabled());
-    expect(screen.queryByRole('button', { name: 'Add Card' })).not.toBeInTheDocument();
-
-    act(() => {
-      session.submit({
-        ...local,
-        cards: [
-          ...local.cards,
-          {
-            id: OUTSIDE_CARD_ID,
-            document: { title: 'Another card', kind: 'markdown', body: '' },
-          },
-        ],
-      });
-    });
-
-    expect(screen.getByRole('button', { name: 'Add Layout' })).toBeEnabled();
   });
 });

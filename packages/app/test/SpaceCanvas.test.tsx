@@ -36,7 +36,7 @@ const snapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -384,7 +384,7 @@ describe.each([
     },
     ALIAS_ID,
   ],
-] as const)('a focused %s in a read-only Computed View', (_kind, projected, id) => {
+] as const)('a focused %s while placement is pending', (_kind, projected, id) => {
   it.each(['Enter', ' '])('does not open with %s', (key) => {
     const { openCard } = mountGraph([projected], undefined, undefined, false);
     const focused = nodeOf(id);
@@ -398,7 +398,9 @@ describe.each([
   it('does not announce authoring keyboard commands', () => {
     mountGraph([projected], undefined, undefined, false);
 
-    expect(nodeOf(id)).toHaveAccessibleDescription('This Card is read-only in a Computed View.');
+    expect(nodeOf(id)).toHaveAccessibleDescription(
+      'This Card is unavailable while placement is pending.',
+    );
   });
 });
 

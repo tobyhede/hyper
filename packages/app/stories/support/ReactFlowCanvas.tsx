@@ -16,12 +16,7 @@ import { CARD_SIZE, cardSizeVars } from '#src/card';
 import { createRendererResolver } from '#src/renderer';
 import { cardIds, graphIds, layoutId, space } from './fixture';
 
-const resolveRenderer = createRendererResolver({
-  // A selected Layout never converts, so the resolver cannot call this. It is
-  // still a real UUID because the resolver's interface deliberately accepts no
-  // story-specific partial adapter.
-  newGraphId: () => graphIds.short,
-});
+const resolveRenderer = createRendererResolver();
 const renderer = resolveRenderer(space, layoutId);
 const pending = canvasProjection(space, renderer);
 const laidOut = renderer.strategy(pending.strategyGraph);
