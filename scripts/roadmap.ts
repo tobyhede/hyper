@@ -114,6 +114,12 @@ const NO_BLOCKERS_PATTERN = /^(none|nothing|n\/a)\b/iu;
  */
 const FIELD_PATTERN = /^\*{0,2}[a-z][a-z ]*:/iu;
 /**
+ * `HEADING_PATTERN` reads a ticket's own `#` title, so it deliberately matches one
+ * hash. A blocker paragraph ends at a heading of any level, and a nested one whose
+ * text carries a two-digit number would otherwise be read as a blocker reference.
+ */
+const ANY_HEADING_PATTERN = /^#{1,6}[ \t]+/u;
+/**
  * A blocked-by line carries prose alongside its references, and that prose cites
  * ADR and PR numbers. Requiring no adjacent digit and no leading `#` keeps `0052`
  * and `#83` out while still reading `03` and `space-authoring/05`.
@@ -191,7 +197,7 @@ const readBlockers = (lines: readonly string[]): readonly BlockerReference[] => 
     const paragraph = [matched[1] ?? ''];
     for (const continuation of lines.slice(index + 1)) {
       if (continuation.trim() === '') break;
-      if (HEADING_PATTERN.test(continuation) || FIELD_PATTERN.test(continuation)) break;
+      if (ANY_HEADING_PATTERN.test(continuation) || FIELD_PATTERN.test(continuation)) break;
       paragraph.push(continuation);
     }
     const value = paragraph.join(' ');

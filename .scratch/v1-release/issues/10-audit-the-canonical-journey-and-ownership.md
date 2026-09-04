@@ -23,7 +23,8 @@ The matrix was audited on 1 September 2026 against the tree at that date, and
 reconciled against the tree again on 4 September 2026. Every row and finding
 below reads as of the reconciliation; where the two readings differ the later
 one stands, and the changes are the Alias, Cards View and Layout rows, the
-architecture-issue findings and the first decision.
+launch and multi-Space fixture rows, the architecture-issue and clean-clone
+findings and the first, fourth and fifth decisions.
 
 “Built” means the current source and executable tests expose the capability;
 “partial” means a usable slice exists but not the release-contract form; and
@@ -33,7 +34,7 @@ the open ticket that can close the gap.
 
 | Canonical-journey capability | State | Current evidence | Remaining owner |
 | --- | --- | --- | --- |
-| Install and launch on the supported local stack | Partial | The pinned Node/pnpm toolchain, Docker PostgreSQL setup, HTTP host and CI PostgreSQL job exist. Startup still selects mutable Entry Space state and the README does not describe the final V1 journey. | `v1-release/01` replaces Entry startup; `v1-release/07` owns final setup documentation and release proof. No separate implementation ticket owns a clean-clone launch rehearsal. |
+| Install and launch on the supported local stack | Partial | The pinned Node/pnpm toolchain, Docker PostgreSQL setup, HTTP host and CI PostgreSQL job exist. Startup still selects mutable Entry Space state and the README does not describe the final V1 journey. | `v1-release/01` replaces Entry startup; `v1-release/19` owns the clean-clone launch rehearsal and the setup-path defects it finds; `v1-release/07` owns final setup documentation and release proof. |
 | Begin in the permanent Meta Space | Unbuilt | `src/startup/database-startup.ts`, `src/http/space-host.ts`, the repository interfaces and schema still use `entrySpaceId`/`spaces.entry`. | `space-cards/03` owns singleton aggregate state; `v1-release/01` owns Meta startup and retirement of Entry. Architecture issue `12` is resolved: the server-side repository now owns Meta lifecycle, so `v1-release/01` consumes that interface rather than deciding the boundary itself. |
 | Receive deterministic Default Content only on first initialization | Unbuilt | Current startup creates the normal one-Card new Space and has no canonical initialized aggregate generator. | `v1-release/16`, after `v1-release/01` and `space-cards/01`; `alias-cards/06`, its third prerequisite, is complete. |
 | Author Markdown Cards | Built | Markdown Opening, rendered reading, source editing, Save/Cancel, Title authoring, Move/Open/Close/Resize and HTTP persistence have production tests. | No feature owner remains; `v1-release/07` owns release evidence. |
@@ -50,7 +51,7 @@ the open ticket that can close the gap.
 | Export the complete authored result | Partial | Deterministic CLI export exists for one Space and tracks its exported revision. It does not write one Meta-rooted aggregate. | `v1-release/08`, which now also owns the Layout-only aggregate format criteria. Architecture issue `13` is resolved and overlaps nothing: its differential test proved the two adapters already agree, so the read/commit seam stays where it is. |
 | Hard-reset to canonical Default Content | Unbuilt | No reset command or shared initialization/reset generator exists. | `v1-release/16`. |
 | Import and recover the same authored result | Partial | Single-Space/directory import and destructive truncation exist, but not versioned `hyper.json` aggregate intake, exact Meta identity or complete cross-Space validation. | `v1-release/08`, which now also owns the Layout-only aggregate format criteria. |
-| Exercise the multi-Space journey in development and Chromium | Unbuilt | The tracked fixture is not the complete Meta-rooted, converging multi-Space aggregate required to rehearse Open, Enter, switching, deletion and round trip through normal boundaries. | `space-cards/10`; ticket 11 must decide whether this enabling fixture is part of the End-to-end checkpoint or only later release proof. |
+| Exercise the multi-Space journey in development and Chromium | Unbuilt | The tracked fixture is not the complete Meta-rooted, converging multi-Space aggregate required to rehearse Open, Enter, switching, deletion and round trip through normal boundaries. | `space-cards/10`; ticket 11 decided this enabling fixture is checkpoint work rather than only later release proof, and `v1-release/19` carries it as a blocker. |
 | Complete responsive and accessible product treatment | Partial | The shadcn/Base UI foundation, catalogue guardrails, major production surfaces and Ladle CI exist. Remaining feature surfaces have not received one final desktop/narrow-state pass. | `v1-release/06`, after the feature tickets it lists. |
 
 ### Ownership findings
@@ -91,11 +92,13 @@ the open ticket that can close the gap.
   along with the `create-a-layout-from-the-selected-computed-view` tracker.
   Add Layout has since been made empty and is built in `layout-only-v1/01`;
   the Computed View removal is not built and is `layout-only-v1/03`'s.
-- **Clean-clone launch has proof but no implementation owner.** `v1-release/07`
-  can document and prove it, but any defect found in the supported
-  install/Docker/startup path has no named feature ticket. The End-to-end plan
-  needs an explicit launch-rehearsal work package or a rule assigning discovered
-  launch fixes to ticket 07.
+- **Clean-clone launch now has one implementation owner.** This finding is
+  closed. `v1-release/07` could document and prove the supported
+  install/Docker/startup path but owned no defect found while following it, so
+  the End-to-end plan needed an explicit launch-rehearsal work package. Ticket 11
+  named one: `v1-release/19` owns the clean-clone setup, the recorded rehearsal
+  and the setup-path defects that rehearsal discovers, with `v1-release/07`
+  behind it as the final release-proof owner.
 - **Cards View evidence has caught up with its implementation.** This finding is
   closed. `v1-release/02`'s core workflow was already built and its
   long/narrow/disabled/refused/failure application and Ladle states have since
@@ -124,12 +127,16 @@ the open ticket that can close the gap.
    Decide explicitly that observed recovery uses
    `hyper <aggregate-path> --dangerous-truncate` after reset, or change the
    journey. A merge interpretation is forbidden by ADR 0077.
-4. **Assign clean-clone launch rehearsal.** Name the work package that proves the
-   documented Node/pnpm, Docker/PostgreSQL and Chromium stack from a clean clone
-   before observed authoring begins.
-5. **Place the multi-Space fixture.** Decide whether `space-cards/10` is required
-   to make the End-to-end journey observable and repeatable or belongs only to
-   final release proof; reflect that choice in ticket 11's blockers.
+4. **Assign clean-clone launch rehearsal.** Done by ticket 11: `v1-release/19` is
+   the work package that proves the documented Node/pnpm, Docker/PostgreSQL and
+   Chromium stack from a clean clone before observed authoring begins, and it
+   owns the setup-path defects that rehearsal finds.
+5. **Place the multi-Space fixture.** Done by ticket 11: `space-cards/10` is
+   required to make the End-to-end journey observable and repeatable rather than
+   belonging only to final release proof, and it is an explicit checkpoint
+   dependency `v1-release/19` carries. Whether to reopen that placement and drop
+   the fixture from the critical path is a separate question, still open and not
+   decided here.
 6. **Choose the End-to-end cut line from this matrix.** Ticket 11 must say which
    partial capabilities are required for meaningful observed use. At minimum the
    journey cannot cross the checkpoint without Meta startup, Default Content,
