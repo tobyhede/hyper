@@ -1,7 +1,24 @@
+import type { SpaceAggregateError } from '@project/graph';
 import type { AuthoringRefusal, EdgeEndpoint } from './space-authoring';
+import type { SpaceCardLifecycleResult } from './space-card-lifecycle';
+
+/** Why a coordinated Space Card lifecycle operation refused (ADR 0076). */
+export type SpaceCardRefusal = Extract<SpaceCardLifecycleResult, { kind: 'refused' }>['refusal'];
 
 type PresentedAuthoringRefusal =
   AuthoringRefusal | { readonly code: 'placement-failed'; readonly error: Error };
+
+/**
+ * The one sentence for a Layout the Space no longer holds.
+ *
+ * Both switches in this module answer that fact — an ordinary Authoring
+ * refusal and a coordinated Space Card one — and a Layout that has gone means
+ * the same thing either way. It is written here rather than in each arm for
+ * the reason the Space Card translation below states for aggregate refusals:
+ * the two can reach the author on the same screen, so one of them reading
+ * differently would be a difference nothing could explain.
+ */
+const LAYOUT_NO_LONGER_IN_SPACE = 'This Layout is no longer part of the Space.';
 
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
@@ -11,7 +28,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
     case 'placement-pending':
       return 'This view has not finished placing its Cards, so there is nowhere to write yet.';
     case 'layout-not-found':
-      return 'This Layout is no longer part of the Space.';
+      return LAYOUT_NO_LONGER_IN_SPACE;
     case 'layout-required':
       if (refusal.operation === 'added-card-to-layout')
         return 'Select a Layout to add an existing Card to it.';
@@ -212,3 +229,80 @@ export const presentEdgeDeletionRefusal = (
   fields: {},
   form: describeAuthoringRefusal(refusal),
 });
+
+/**
+ * What each aggregate refusal means, in the author's terms rather than the
+ * repository's.
+ *
+ * A refusal kind is a stable domain identity (ADR 0057), which is exactly why
+ * it is the wrong thing to show: `space-card-target-missing` names the fact for
+ * a caller matching on it, and says nothing to the person who has just been
+ * told their work would not save. The identity stays on the wire; only this
+ * translation is user-facing.
+ *
+ * Deliberately without ids. Every one of these carries at least a Space id and
+ * some carry three, and a message reciting UUIDs is less legible than one
+ * sentence about what is wrong.
+ *
+ * It lives here rather than beside the persistence dialog that first needed it
+ * because a coordinated Edit is refused in two places now — as a rejected
+ * commit, and as a Space Card lifecycle operation that never got to commit at
+ * all — and one refusal reading differently in the two would be a difference
+ * the author could see and nothing could explain.
+ */
+const AGGREGATE_REFUSAL_REASONS = {
+  'invalid-space-snapshot': 'A space in this edit is not valid.',
+  'duplicate-space-id': 'Two spaces in this edit share one identity.',
+  'duplicate-card-id': 'Two spaces in this edit claim the same card.',
+  'meta-space-missing': 'The repository’s Meta Space is missing.',
+  'space-card-target-missing': 'A space card points at a space that no longer exists.',
+  'space-card-reference-cycle': 'A space card would make a space contain itself.',
+  'ordinary-space-unreferenced': 'A space would be left with nothing pointing at it.',
+  'space-card-layout-missing': 'A space card points at a Layout that no longer exists.',
+  'space-card-graph-missing': 'A space card points at a Graph that no longer exists.',
+  'space-card-graph-outside-layout': 'A space card names a Graph that its Layout does not own.',
+  // `satisfies` rather than an annotation: it still fails the moment a refusal
+  // kind is added without a sentence, and it keeps each value's literal type
+  // instead of widening the map to an open dictionary.
+} satisfies Record<SpaceAggregateError['kind'], string>;
+
+/**
+ * One sentence for a refused aggregate, however many errors it carries.
+ *
+ * Deduplicated because one refusal commonly repeats across several Spaces, and
+ * the same sentence three times reads as three problems rather than one.
+ */
+export const describeAggregateRefusal = (errors: readonly SpaceAggregateError[]): string =>
+  [...new Set(errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ');
+
+/** Why a coordinated Space Card operation refused, in the author's terms. */
+export const describeSpaceCardRefusal = (refusal: SpaceCardRefusal): string => {
+  switch (refusal.code) {
+    case 'layout-not-found':
+      return LAYOUT_NO_LONGER_IN_SPACE;
+    case 'space-card-not-found':
+      return 'This Space Card is no longer part of the Space.';
+    case 'persistence-recovery-required':
+      return refusal.recovery === 'retry'
+        ? 'A Space in this edit has not saved. Retry that save first.'
+        : 'A Space in this edit has a conflict. Resolve it first.';
+    case 'aggregate-refused':
+      return describeAggregateRefusal(refusal.errors);
+    case 'persistence-read-failed':
+      return 'The stored Spaces could not be read, so this edit was not attempted.';
+  }
+};
+
+/**
+ * Error placement for Space Card creation, which owns Title and Target.
+ *
+ * Only `aggregate-refused` reaches the Target field, and it is the one that
+ * has to: a cycle, a target that has gone and a Layout the target no
+ * longer holds are all answered by choosing a different Space. The rest
+ * describe the containing Space or the repository, which no row in that list
+ * would fix.
+ */
+export const presentNewSpaceCardRefusal = (refusal: SpaceCardRefusal): NewAliasRefusalErrors =>
+  refusal.code === 'aggregate-refused'
+    ? { fields: { target: describeSpaceCardRefusal(refusal) } }
+    : { fields: {}, form: describeSpaceCardRefusal(refusal) };

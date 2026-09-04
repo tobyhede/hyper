@@ -2,9 +2,10 @@ import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
-import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
+import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
+import { openTestSpace } from './opened-space';
 
 /**
  * Creating Cards, from the controls an author actually has.
@@ -105,10 +106,13 @@ const runtime = (value: SpaceSnapshot) => {
 
 function mount(value: SpaceSnapshot = snapshot): SpaceSession {
   const stored = { snapshot: value, revision: 0n, exportedRevision: null };
-  const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+  const { spaceSession: session, spaceCards } = openTestSpace(
+    new MemorySpaceBackend([stored]),
+    stored,
+  );
   let view: RenderResult | undefined;
   mountSpace(
-    { id: runtime(value).id, session: session, app: composeApp({ spaceSession: session }) },
+    { id: runtime(value).id, session, app: composeApp({ spaceSession: session }), spaceCards },
     (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);

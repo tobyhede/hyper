@@ -12,16 +12,15 @@ import {
   encodeCompactUuid,
   spaceSnapshotSchema,
   uuidSchema,
-  type CardId,
-  type LayoutPosition,
   type SpaceSnapshot,
 } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
-import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
+import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import type { HistoryApi } from '../src/browser-location';
 import { recordingHistory } from './browser-history';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
+import { openTestSpace } from './opened-space';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -30,8 +29,6 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 
@@ -134,10 +131,18 @@ const runtime = (value: SpaceSnapshot) => {
 
 function mount(value: SpaceSnapshot = snapshot, history?: HistoryApi): SpaceSession {
   const stored = { snapshot: value, revision: 0n, exportedRevision: null };
-  const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+  const { spaceSession: session, spaceCards } = openTestSpace(
+    new MemorySpaceBackend([stored]),
+    stored,
+  );
   let view: RenderResult | undefined;
   mountSpace(
-    { id: runtime(value).id, session: session, app: composeApp({ spaceSession: session }) },
+    {
+      id: runtime(value).id,
+      session,
+      app: composeApp({ spaceSession: session }),
+      spaceCards,
+    },
     (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);
@@ -574,57 +579,18 @@ describe('authoring an opened Card', () => {
   });
 });
 
-/** The same Space with a Space Card placed beside the two Markdown Cards (ADR 0068). */
-const withSpaceCard: SpaceSnapshot = spaceSnapshotSchema.parse({
-  ...snapshot,
-  document: {
-    ...snapshot.document,
-    layouts: [
-      {
-        ...snapshot.document.layouts![0]!,
-        positions: {
-          ...snapshot.document.layouts![0]!.positions,
-          [SPACE_CARD_ID]: { x: 600, y: 20, open: false },
-        },
-      },
-    ],
-  },
-  cards: [
-    ...snapshot.cards,
-    { id: SPACE_CARD_ID, document: { title: 'Nested', kind: 'space', spaceId: TARGET_SPACE_ID } },
-  ],
-});
-
-/** What a Layout records for one Card, which is where Open is authored (ADR 0064). */
-const placementOf = (session: SpaceSession, cardId: CardId): LayoutPosition | undefined =>
-  (session.getState().working.document.layouts ?? [])[0]?.positions[cardId];
-
+/*
+ * Opening a Space Card is deliberately not covered here.
+ *
+ * It used to be, as the one kind Opening refused — and that refusal is gone:
+ * Opening is one Layout-owned Edit that asks no question about the Card's kind
+ * (ADR 0064), and a Space Card has something to draw Open, being the Layout
+ * it selects of the Space it references (ADR 0068). The behaviour needs a
+ * *second* stored Space to be about anything, and this file's fixture is one
+ * Space over a backend that holds only it, so the test moved whole to
+ * `space-card-selection.test.tsx` rather than being weakened to fit here.
+ */
 describe('the Card affordance on the graph', () => {
-  /**
-   * Opening is a Layout-owned Edit, and the strategies, the placement and the
-   * projection each read `open` without asking what kind the Card is. A kind
-   * with nothing to draw Open must therefore never reach that state: the Card
-   * would take its Open rect in the placement, displace its `+x`/`+y`
-   * neighbours, and still be drawn Closed with no control to close it.
-   */
-  it('does not Open a Space Card, which has no Open body to draw', async () => {
-    const session = mount(withSpaceCard);
-    const before = placementOf(session, SPACE_CARD_ID);
-
-    fireEvent.keyDown(await screen.findByTestId(`rf__node-${SPACE_CARD_ID}`), { key: 'Enter' });
-
-    // Scoped to the node: selecting the Card also names it in the Sidebar
-    // footer, which is where its own actions menu now hangs off.
-    await waitFor(() =>
-      expect(
-        within(screen.getByTestId(`rf__node-${SPACE_CARD_ID}`)).getByText('Nested'),
-      ).toBeVisible(),
-    );
-    expect(placementOf(session, SPACE_CARD_ID)).toEqual(before);
-    expect(screen.queryByRole('button', { name: 'Close Card Nested' })).not.toBeInTheDocument();
-    await settled(session);
-  });
-
   it('opens the Card on rendered Markdown in place', async () => {
     const session = mount();
 

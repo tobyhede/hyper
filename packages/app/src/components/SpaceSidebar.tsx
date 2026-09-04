@@ -55,6 +55,23 @@ import type { EntityAction, EntityActionGroup, EntityActionOutcome } from '@proj
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringRefusal } from '../space-authoring';
 
+/**
+ * The id of the one entity command whose *outcome* decides the mobile Sheet's
+ * dismissal rather than preceding it (see `onCanvasOutcome` below).
+ *
+ * Exported so the module that builds that command spells it from here instead
+ * of from a second literal that happens to agree. The pairing is invisible at
+ * both ends: a rename on either side compiles, every hand-written command list
+ * in the tests goes on passing, and the only symptom is a Sheet that stops
+ * dismissing below the breakpoint over a canvas that has already changed.
+ *
+ * It is declared with the `entityActions` prop rather than beside the command
+ * because it is a fact about that prop's contract — *whoever* supplies the
+ * commands, this is the id the Sidebar wraps — and because the Sidebar takes
+ * its commands as a prop precisely so it need not name a producer.
+ */
+export const DELETE_LAYOUT_ACTION_ID = 'delete-layout';
+
 export interface SpaceSidebarProps {
   /** The Space's title. The canvas header names what is drawing it (ADR 0053). */
   readonly spaceTitle: string;
@@ -114,6 +131,7 @@ export interface SpaceSidebarProps {
   readonly addCard: {
     readonly onAddCard: () => void;
     readonly onAddAlias: () => void;
+    readonly onAddSpaceCard: () => void;
     readonly disabled?: boolean;
     readonly keyShortcut?: string;
     readonly menuTriggerRef?: Ref<HTMLButtonElement>;
@@ -141,8 +159,17 @@ export interface SpaceSidebarProps {
   readonly selectedCard?:
     | {
         readonly card: Card;
-        /** Delete this Card from the whole Space, returning a refusal to show in place. */
-        readonly onDelete?: (() => string | null) | undefined;
+        /**
+         * Delete this Card from the whole Space, answering a refusal to show in
+         * place.
+         *
+         * Allowed to answer a promise, because one kind of Card genuinely
+         * cannot answer synchronously: a Space Card's deletion is a coordinated
+         * Edit across every Space it takes with it (ADR 0076). Which kind it is
+         * the confirmation reads off the `card` beside this, rather than being
+         * told twice.
+         */
+        readonly onDelete?: (() => string | null | Promise<string | null>) | undefined;
       }
     | undefined;
   /**
@@ -159,17 +186,54 @@ export interface SpaceSidebarProps {
   readonly titleEdit?: SpaceChromeTitleEdit;
 }
 
+/**
+ * What deleting this Card destroys, said before it is confirmed.
+ *
+ * The two sentences are one rule read at two scopes. An ordinary Card is the
+ * Space's own, so the loss is bounded by the Space the author is looking at. A
+ * Space Card owns its target's lifetime together with every other reference to
+ * it, so the same gesture can reach work in Spaces that are not on screen (ADR
+ * 0074) — and V1 has no undo, which is why that is stated rather than merely
+ * true.
+ */
+const DELETES_THE_CARD =
+  'This removes the Card from the Space, every Layout that contains it, and every Edge connected to it.';
+
+const DELETION_DESCRIPTIONS = {
+  markdown: DELETES_THE_CARD,
+  alias: DELETES_THE_CARD,
+  space: `${DELETES_THE_CARD} If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.`,
+  // Exhaustive over the kinds rather than a default plus one exception, so a
+  // fourth kind has to decide what its deletion destroys before it compiles.
+} satisfies Record<Card['kind'], string>;
+
 function DeleteCardControl({
   title,
+  kind,
   onDelete,
 }: {
   readonly title: string;
-  readonly onDelete: () => string | null;
+  readonly kind: Card['kind'];
+  readonly onDelete: () => string | null | Promise<string | null>;
 }) {
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
-    <AlertDialog onOpenChange={(open) => !open && setRefusal(null)}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        // Escape is an exit, and both exits are withheld while a Delete runs —
+        // the two buttons are disabled but Base UI closes on Escape whatever
+        // they are doing. Left alone it would answer into a dialog that had
+        // gone, and a refusal is only cleared on close, so the next opening
+        // would lead with a message about an attempt the author abandoned.
+        if (!next && deleting) return;
+        setOpen(next);
+        if (!next) setRefusal(null);
+      }}
+    >
       <AlertDialogTrigger
         render={<Button variant="destructive" size="compact" className="w-full" />}
       >
@@ -178,10 +242,7 @@ function DeleteCardControl({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Card {title}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This removes the Card from the Space, every Layout that contains it, and every Edge
-            connected to it.
-          </AlertDialogDescription>
+          <AlertDialogDescription>{DELETION_DESCRIPTIONS[kind]}</AlertDialogDescription>
         </AlertDialogHeader>
         {refusal === null ? null : (
           <Alert variant="destructive">
@@ -190,18 +251,47 @@ function DeleteCardControl({
           </Alert>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
+            disabled={deleting}
             onClick={(event) => {
-              const nextRefusal = onDelete();
-              setRefusal(nextRefusal);
               // `preventBaseUIHandler`, not `preventDefault`: Base UI's
               // `mergeProps` runs the primitive's own close handler unless the
               // consumer sets `baseUIHandlerPrevented`, and it never reads
-              // `defaultPrevented`. A refusal has nowhere to be read but this
-              // dialog, so the dialog has to stay.
-              if (nextRefusal !== null) event.preventBaseUIHandler();
+              // `defaultPrevented`. It is set unconditionally now rather than
+              // only for a refusal, because one Card kind answers a promise and
+              // the primitive would have closed the dialog long before the
+              // refusal it might carry arrived. Closing is this component's
+              // either way.
+              event.preventBaseUIHandler();
+              setDeleting(true);
+              // An async function body runs synchronously up to its first
+              // `await`, so `onDelete` is still called on this click — the
+              // synchronous kinds answer synchronously and a caller may assert
+              // on that — while one `catch` covers a throw and a rejection
+              // alike. Both reach it: `complete` throws for a Space that has
+              // stopped loading, and the coordinated Edit a Space Card runs can
+              // reject. An event handler is not something a React error
+              // boundary catches, so a failure left to escape would leave the
+              // running state behind, and both of this dialog's exits are
+              // withheld while it stands.
+              void (async () => {
+                try {
+                  const nextRefusal = await onDelete();
+                  setDeleting(false);
+                  setRefusal(nextRefusal);
+                  // A refusal has nowhere to be read but this dialog, so the
+                  // dialog has to stay.
+                  if (nextRefusal === null) setOpen(false);
+                } catch (failure) {
+                  // Not a refusal, and deliberately not translated into one: a
+                  // refusal code is a stable domain identity (ADR 0057) and
+                  // nothing here answers to one.
+                  setDeleting(false);
+                  setRefusal(failure instanceof Error ? failure.message : String(failure));
+                }
+              })();
             }}
           >
             Delete Card
@@ -450,6 +540,23 @@ export function SpaceSidebar({
   const dismissSheet = () => {
     if (isMobile) setOpenMobile(false);
   };
+  /**
+   * Why the one wrapped menu command *broke*, as against refusing.
+   *
+   * A plain sentence and not an `AuthoringRefusal`, deliberately. The refusal
+   * this Sidebar already renders is a closed union of stable domain identities
+   * (ADR 0057) and a thrown error answers to none of them, so translating one
+   * into a refusal code would be minting a domain fact out of an accident.
+   * `DeleteCardControl` below keeps a thrown message the same way and says so
+   * in the same words.
+   *
+   * It is state here rather than the application's for the reason the failure
+   * exists at all: the Delete runs an Edit, `complete` throws outright for a
+   * Space that has stopped loading, and the throw happens *before* the line
+   * that would have armed the application's own alert. Nothing upstream is
+   * going to report it, and the author pressed the command on this surface.
+   */
+  const [layoutDeletionFailure, setLayoutDeletionFailure] = useState<string | null>(null);
   // Generic in what the command takes and answers alike, so a wrapped command
   // is still the command it wrapped. Every command it wraps is a control whose
   // whole result is on the canvas and that cannot be refused, so the sheet goes
@@ -477,12 +584,32 @@ export function SpaceSidebar({
    * `async` because an `onSelect` may answer with a promise, and awaiting is
    * what makes the two cases one. The synchronous answer this command gives
    * costs a microtask nobody can observe.
+   *
+   * The `catch` covers the third way the command can go, and it is not a
+   * refusal: `complete` throws outright for a Space that has stopped loading,
+   * and it throws *before* the caller's own line that arms the refusal alert,
+   * so an escaping throw left the author with no message, no dismissal
+   * decision, and a Sheet still up over a canvas nobody had said anything
+   * about. A broken command has still less of a canvas result than a refused
+   * one, so it keeps the Sheet for the same reason a refusal does — this time
+   * carrying a sentence of this surface's own.
    */
   const onCanvasOutcome =
     (command: EntityAction['onSelect']) => async (): Promise<EntityActionOutcome> => {
-      const outcome = await command();
-      if (outcome === 'done') dismissSheet();
-      return outcome;
+      // A press supersedes the last one's message before it can add its own,
+      // so the sentence on screen is always about the attempt just made.
+      setLayoutDeletionFailure(null);
+      try {
+        const outcome = await command();
+        if (outcome === 'done') dismissSheet();
+        return outcome;
+      } catch (failure) {
+        setLayoutDeletionFailure(failure instanceof Error ? failure.message : String(failure));
+        // The truthful outcome, which is also what withholds the dismissal.
+        // The item names no words to swap its label for, so this answer is
+        // read for the dismissal alone — the reporting is the alert's.
+        return 'failed';
+      }
     };
   const canvasAwareEntityActions: SpaceSidebarProps['entityActions'] =
     entityActions === undefined
@@ -490,7 +617,7 @@ export function SpaceSidebar({
       : (entity) =>
           entityActions(entity).map((group) =>
             group.map((action) =>
-              action.id === 'delete-layout'
+              action.id === DELETE_LAYOUT_ACTION_ID
                 ? { ...action, onSelect: onCanvasOutcome(action.onSelect) }
                 : action,
             ),
@@ -554,6 +681,7 @@ export function SpaceSidebar({
                 {...addCard}
                 onAddCard={onCanvas(addCard.onAddCard)}
                 onAddAlias={onCanvas(addCard.onAddAlias)}
+                onAddSpaceCard={onCanvas(addCard.onAddSpaceCard)}
               />
             </SidebarGroupContent>
           </SidebarGroup>
@@ -591,6 +719,18 @@ export function SpaceSidebar({
                   <AlertDescription>
                     {describeAuthoringRefusal(createLayout.refusal)}
                   </AlertDescription>
+                </Alert>
+              )}
+              {/* Beside the refusal alert rather than in place of it: this is
+                  where a Layout Edit that did not happen is already read, and
+                  the two are about different attempts. Its own title, because
+                  "unchanged" is what a refusal says and a command that broke
+                  cannot promise even that much. */}
+              {layoutDeletionFailure === null ? null : (
+                <Alert variant="destructive">
+                  <AlertIcon />
+                  <AlertTitle>Layout not deleted</AlertTitle>
+                  <AlertDescription>{layoutDeletionFailure}</AlertDescription>
                 </Alert>
               )}
             </div>
@@ -725,13 +865,14 @@ export function SpaceSidebar({
             {selectedCard.onDelete !== undefined && (
               <DeleteCardControl
                 title={selectedCard.card.title}
+                kind={selectedCard.card.kind}
                 /* `onCanvas` by hand rather than by the helper: only a
                    *completed* Delete has a canvas result to dismiss the sheet
                    for. A refusal keeps the dialog open (`DeleteCardControl`
                    below), and dismissing the sheet under it would take the
                    surface the sentence is on with it. */
-                onDelete={() => {
-                  const refusal = selectedCard.onDelete?.() ?? null;
+                onDelete={async () => {
+                  const refusal = (await selectedCard.onDelete?.()) ?? null;
                   if (refusal === null && isMobile) setOpenMobile(false);
                   return refusal;
                 }}

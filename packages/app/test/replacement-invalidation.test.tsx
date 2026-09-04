@@ -9,9 +9,10 @@ import {
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
-import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
+import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
+import { openTestSpace } from './opened-space';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -122,7 +123,7 @@ async function mountedSpaceApp(): Promise<SpaceSession> {
   const backend = new MemorySpaceBackend([
     { snapshot: REMOTE, revision: 4n, exportedRevision: null },
   ]);
-  const session = openSpaceSession(backend, {
+  const { spaceSession: session, spaceCards } = openTestSpace(backend, {
     snapshot: LOCAL,
     revision: 3n,
     exportedRevision: null,
@@ -130,7 +131,7 @@ async function mountedSpaceApp(): Promise<SpaceSession> {
 
   let view: RenderResult | undefined;
   mountSpace(
-    { id: runtime(LOCAL).id, session: session, app: composeApp({ spaceSession: session }) },
+    { id: runtime(LOCAL).id, session, app: composeApp({ spaceSession: session }), spaceCards },
     (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);

@@ -1,16 +1,70 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { cardDocumentSchema, uuidSchema, type CardId } from '@project/core';
+import {
+  cardDocumentSchema,
+  uuidSchema,
+  type CardDocument,
+  type CardId,
+  type GraphId,
+} from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
+import type { CanvasSpaceCardSelection } from '@project/ui';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { CARD_SIZE } from './card';
 import type { CardResize } from './render-adapter';
 import type { SpaceAuthoring } from './space-authoring';
+import type { SpaceCardTarget, SpaceCardTargetLayout } from './space-card-lifecycle';
+import { NO_SPACE_CARD_TARGETS, type SpaceCardTargets } from './space-card-targets';
 
 type Caret =
   | { readonly cardId: string; readonly field: 'title' }
   | { readonly cardId: string; readonly field: 'body'; readonly openObserved: boolean }
   | null;
+
+/**
+ * The two lists an Open Space Card chooses from, and what a choice writes.
+ *
+ * Built here rather than in the component because the *pairing* is a domain
+ * rule and not a presentation one: the Graphs offered are the selected Layout's
+ * alone, so a Card whose stored Layout has since been deleted offers no
+ * Graphs rather than the previous Layout's (ADR 0040, ADR 0068).
+ */
+const spaceCardSelection = (
+  cardId: CardId,
+  target: SpaceCardTarget,
+  document: Extract<CardDocument, { kind: 'space' }> | undefined,
+  complete: (cardId: CardId, layout: SpaceCardTargetLayout, graphId: GraphId | undefined) => void,
+  disabled: boolean,
+): CanvasSpaceCardSelection => {
+  const selectedLayout = target.layouts.find((layout) => layout.id === document?.layout);
+  const layoutOf = (id: string): SpaceCardTargetLayout | undefined =>
+    target.layouts.find((layout) => layout.id === id);
+  return {
+    disabled,
+    layouts: target.layouts.map(({ id, title }) => ({ id, title })),
+    graphs: (selectedLayout?.graphs ?? []).map(({ id, title }) => ({ id, title })),
+    layoutId: selectedLayout?.id ?? null,
+    graphId: selectedLayout?.graphs.some((graph) => graph.id === document?.graph)
+      ? (document?.graph ?? null)
+      : null,
+    onLayoutChange: (id) => {
+      const layout = layoutOf(id);
+      // The Layout's own Active Graph, and the head of its list only where it
+      // has authored none — which is what an absent `activeGraph` means
+      // (ADR 0026). Resolved against the Layout's Graphs rather than trusted:
+      // the seed has to be a Graph this Layout owns or the aggregate refuses
+      // the Card that names it.
+      if (layout === undefined) return;
+      const active = layout.graphs.find((graph) => graph.id === layout.activeGraph);
+      complete(cardId, layout, (active ?? layout.graphs[0])?.id);
+    },
+    onGraphChange: (id) => {
+      if (selectedLayout === undefined) return;
+      const graph = selectedLayout.graphs.find((candidate) => candidate.id === id);
+      if (graph !== undefined) complete(cardId, selectedLayout, graph.id);
+    },
+  };
+};
 
 export interface CanvasCardAuthoringInput {
   readonly nodes: readonly CardFlowNode[];
@@ -25,6 +79,14 @@ export interface CanvasCardAuthoringInput {
   readonly onSelectCard: (cardId: CardId) => void;
   readonly onBodyEditingChange?: ((editing: boolean) => void) | undefined;
   readonly onTitleEditingChange?: ((editing: boolean) => void) | undefined;
+  /**
+   * What each referenced Space offers a Space Card to select, keyed by target.
+   *
+   * Absent, or missing an entry, means the target has not been read yet — the
+   * Card still draws, without the context and the selectors an Open one carries
+   * (ADR 0068).
+   */
+  readonly spaceCardTargets?: SpaceCardTargets | undefined;
 }
 
 export interface CanvasCardAuthoring {
@@ -52,6 +114,7 @@ export function useCanvasCardAuthoring({
   onSelectCard,
   onBodyEditingChange,
   onTitleEditingChange,
+  spaceCardTargets = NO_SPACE_CARD_TARGETS,
 }: CanvasCardAuthoringInput): CanvasCardAuthoring {
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleCardId = caret?.field === 'title' ? caret.cardId : null;
@@ -117,8 +180,13 @@ export function useCanvasCardAuthoring({
       if (!cardId.success) return 'retained';
       const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId.data);
       if (stored === undefined) return 'retained';
-      if (stored.document.kind !== 'markdown' && stored.document.kind !== 'alias')
-        return 'retained';
+      // Every Card kind Opens, and there is deliberately no kind guard left
+      // here. Opening is one Layout-owned operation (ADR 0064) and each kind
+      // differs only in what its front then draws: Markdown of its own, an
+      // immutable Target's read-only (ADR 0070), or the Layout a Space Card
+      // selects (ADR 0068). The guard this replaced admitted two kinds and
+      // silently retained the third, which is a decision about *content* being
+      // made by the code that authors placement.
       const result = authoring.complete({ kind: 'opened-card', cardId: cardId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
@@ -164,6 +232,34 @@ export function useCanvasCardAuthoring({
         document: parsed.data,
       });
       return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
+    },
+    [authoring, spaceSession],
+  );
+
+  /**
+   * Authoring a Space Card's Layout or Graph selection.
+   *
+   * One operation for both, because they are not independent: a Graph is owned
+   * by the Layout that holds it (ADR 0040), and the aggregate refuses a Card
+   * naming a Graph its Layout does not own. So choosing a Layout re-seeds
+   * the Graph from that Layout rather than leaving the previous one to be
+   * refused at intake, and a Layout with no Graph leaves the selection unwritten
+   * rather than pointing at nothing.
+   *
+   * The target Space reference is untouched here and cannot be reached from the
+   * surface at all: it is chosen once, at creation (ADR 0068), and Space
+   * Authoring refuses a changed one on its own account.
+   */
+  const completeSpaceCardSelection = useCallback(
+    (cardId: CardId, layout: SpaceCardTargetLayout, graphId: GraphId | undefined): void => {
+      const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId);
+      if (stored?.document.kind !== 'space') return;
+      const document: CardDocument = { ...stored.document, layout: layout.id };
+      const parsed = cardDocumentSchema.safeParse(
+        graphId === undefined ? { ...document, graph: undefined } : { ...document, graph: graphId },
+      );
+      if (!parsed.success) return;
+      authoring.complete({ kind: 'edited-card', cardId, document: parsed.data });
     },
     [authoring, spaceSession],
   );
@@ -236,6 +332,31 @@ export function useCanvasCardAuthoring({
             onCancel: () => setCaret(null),
           };
         }
+        if (node.data.kind === 'space') {
+          const stored = working.cards.find((card) => card.id === node.data.cardId);
+          const target =
+            stored?.document.kind === 'space'
+              ? spaceCardTargets.get(stored.document.spaceId)
+              : undefined;
+          if (target !== undefined) {
+            data.spaceTitle = target.title;
+            // Supplied whenever the target has been read, and *disabled* rather
+            // than withheld where it cannot be authored. An absent selection is
+            // how the Card says the target Space has not been read yet, so a
+            // canvas that had merely withdrawn authoring — a creation pane is
+            // up, the Space is presenting, a chrome title is being edited —
+            // would put every Open Space Card on it back to reporting a wait
+            // that had already ended, beside a marker naming the Space it had
+            // just read.
+            data.spaceSelection = spaceCardSelection(
+              node.data.cardId,
+              target,
+              stored?.document.kind === 'space' ? stored.document : undefined,
+              completeSpaceCardSelection,
+              !(cardBelongsToWorkingSpace && canAuthorOnCanvas),
+            );
+          }
+        }
         return { ...node, data };
       }),
     [
@@ -252,6 +373,9 @@ export function useCanvasCardAuthoring({
       editingTitleCardId,
       completeCardTitle,
       editableCardIds,
+      working,
+      spaceCardTargets,
+      completeSpaceCardSelection,
     ],
   );
 

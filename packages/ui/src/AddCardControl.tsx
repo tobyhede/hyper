@@ -7,13 +7,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
-import { AliasIcon, ChevronDownIcon, PlusIcon } from './icons';
+import { AliasIcon, ChevronDownIcon, PlusIcon, SpaceCardIcon } from './icons';
 
 export interface AddCardControlProps {
   /** Create a detached Markdown Card at the visible centre, immediately. */
   readonly onAddCard: () => void;
   /** Open the Alias creation state, which creates nothing until a Target is chosen. */
   readonly onAddAlias: () => void;
+  /** Open the Space Card creation state, which creates nothing until a Space is chosen. */
+  readonly onAddSpaceCard: () => void;
   /** Whether Card authoring is available at all right now. */
   readonly disabled?: boolean;
   /**
@@ -45,19 +47,22 @@ export interface AddCardControlProps {
  * A **split control**, and the split is the design rather than a layout choice.
  * Add Card completes an Edit on one activation — no placement mode, no ghost, no
  * creation draft — so putting it behind a menu would add a step to the common
- * action to make room for the rare one. Add Alias cannot complete on activation,
- * because an Alias without a Target is not a valid Card, so it opens a creation
- * state instead and belongs on the other half.
+ * action to make room for the rare one. The other two kinds cannot complete on
+ * activation: neither an Alias without a Target nor a Space Card without a
+ * Space is a valid Card, so each opens a creation state instead and both belong
+ * on the other half. That is what the menu collects — not "the less common
+ * kinds", but the kinds whose creation is a conversation.
  *
  * The menu is Base UI's, whose keyboard, focus-return and dismissal behaviour
  * this takes as given (docs/agents/ui.md). Nothing here re-implements any of it: the trigger
  * opens on Enter, Space and Arrow keys, the items move under the arrows, and
- * closing returns focus to the trigger — which is what a cancelled Alias
- * creation state relies on having somewhere to go back to.
+ * closing returns focus to the trigger — which is what a cancelled creation
+ * state relies on having somewhere to go back to.
  */
 export function AddCardControl({
   onAddCard,
   onAddAlias,
+  onAddSpaceCard,
   disabled = false,
   keyShortcut,
   menuTriggerRef,
@@ -66,11 +71,15 @@ export function AddCardControl({
    * Whether this close is a chosen item rather than a dismissal.
    *
    * Base UI restores focus to the trigger when the menu closes, which is right for
-   * every close *except* one that opened a surface: the Alias creation state
-   * takes focus onto its Target picker as it mounts, and the menu's default
-   * restore would take it straight back off again. The author would then be
-   * looking at a picker they cannot type into. `finalFocus` declines that
-   * restore for this one close; other closes retain Base UI's default.
+   * every close *except* one that opened a surface: a creation state takes focus
+   * onto its own picker as it mounts, and the menu's default restore would take
+   * it straight back off again. The author would then be looking at a picker
+   * they cannot type into. `finalFocus` declines that restore for this one
+   * close; other closes retain Base UI's default.
+   *
+   * Both creation items set it, for the same reason and with the same one flag:
+   * what the ref records is that *this* close opened a surface, not which item
+   * did it, so a second kind needs no second piece of state.
    */
   const openedASurface = useRef(false);
 
@@ -131,6 +140,20 @@ export function AddCardControl({
                   menu item announce as "Alias Add Alias". */}
               <AliasIcon />
               Add Alias
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              data-testid="add-space-card"
+              onClick={() => {
+                openedASurface.current = true;
+                onAddSpaceCard();
+              }}
+            >
+              {/* The same glyph `CardKindIcon` draws for `kind: 'space'`, so the
+                  kind is recognisable here before it exists and on the Card
+                  afterwards. Bare, as Add Alias above is, and for the same
+                  reason. */}
+              <SpaceCardIcon />
+              Add Space Card
             </DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>

@@ -47,12 +47,20 @@ describe('AddCardControl', () => {
   it('creates a Markdown Card on one activation, without opening the menu', () => {
     const onAddCard = vi.fn();
     const onAddAlias = vi.fn();
-    render(<AddCardControl onAddCard={onAddCard} onAddAlias={onAddAlias} />);
+    const onAddSpaceCard = vi.fn();
+    render(
+      <AddCardControl
+        onAddCard={onAddCard}
+        onAddAlias={onAddAlias}
+        onAddSpaceCard={onAddSpaceCard}
+      />,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
 
     expect(onAddCard).toHaveBeenCalledTimes(1);
     expect(onAddAlias).not.toHaveBeenCalled();
+    expect(onAddSpaceCard).not.toHaveBeenCalled();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
@@ -62,7 +70,14 @@ describe('AddCardControl', () => {
    * A literal here would be this package asserting a binding it cannot see.
    */
   it('announces the shortcut its caller says performs it', () => {
-    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} keyShortcut="C" />);
+    render(
+      <AddCardControl
+        onAddCard={vi.fn()}
+        onAddAlias={vi.fn()}
+        onAddSpaceCard={vi.fn()}
+        keyShortcut="C"
+      />,
+    );
 
     expect(screen.getByRole('button', { name: 'Add Card' })).toHaveAttribute(
       'aria-keyshortcuts',
@@ -75,7 +90,7 @@ describe('AddCardControl', () => {
    * caller never claimed is a promise to a screen reader that nothing keeps.
    */
   it('announces no shortcut where its caller names none', () => {
-    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} />);
+    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} onAddSpaceCard={vi.fn()} />);
 
     expect(screen.getByRole('button', { name: 'Add Card' })).not.toHaveAttribute(
       'aria-keyshortcuts',
@@ -89,7 +104,9 @@ describe('AddCardControl', () => {
   it('reaches Add Alias from the keyboard through the menu', async () => {
     const onAddCard = vi.fn();
     const onAddAlias = vi.fn();
-    render(<AddCardControl onAddCard={onAddCard} onAddAlias={onAddAlias} />);
+    render(
+      <AddCardControl onAddCard={onAddCard} onAddAlias={onAddAlias} onAddSpaceCard={vi.fn()} />,
+    );
 
     const trigger = screen.getByRole('button', { name: 'More Card kinds' });
     fireEvent.keyDown(trigger, { key: 'Enter' });
@@ -108,8 +125,41 @@ describe('AddCardControl', () => {
     expect(onAddCard).not.toHaveBeenCalled();
   });
 
+  /**
+   * A Space Card is the second kind whose creation is a conversation — a Card
+   * referencing no Space is not a valid Card — so it belongs on the menu half
+   * for exactly the reason Add Alias does. Both halves of that claim are
+   * asserted here, because "the item exists" and "the item is not on the
+   * button" are the same statement about the split: the item is absent from the
+   * document until the menu is opened, and the primary half still performs only
+   * Add Card.
+   */
+  it('offers Add Space Card in the menu rather than on the button half', () => {
+    const onAddCard = vi.fn();
+    const onAddAlias = vi.fn();
+    const onAddSpaceCard = vi.fn();
+    render(
+      <AddCardControl
+        onAddCard={onAddCard}
+        onAddAlias={onAddAlias}
+        onAddSpaceCard={onAddSpaceCard}
+      />,
+    );
+
+    expect(screen.queryByTestId('add-space-card')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More Card kinds' }));
+    const item = screen.getByTestId('add-space-card');
+    expect(item).toHaveAccessibleName('Add Space Card');
+    fireEvent.click(item);
+
+    expect(onAddSpaceCard).toHaveBeenCalledTimes(1);
+    expect(onAddCard).not.toHaveBeenCalled();
+    expect(onAddAlias).not.toHaveBeenCalled();
+  });
+
   it('returns focus to its trigger when the menu is dismissed', async () => {
-    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} />);
+    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} onAddSpaceCard={vi.fn()} />);
 
     const trigger = screen.getByRole('button', { name: 'More Card kinds' });
     fireEvent.click(trigger);
@@ -125,7 +175,9 @@ describe('AddCardControl', () => {
    * a control that says yes and does nothing.
    */
   it('withdraws both halves when Card authoring is unavailable', () => {
-    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} disabled />);
+    render(
+      <AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} onAddSpaceCard={vi.fn()} disabled />,
+    );
 
     expect(screen.getByRole('button', { name: 'Add Card' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'More Card kinds' })).toBeDisabled();

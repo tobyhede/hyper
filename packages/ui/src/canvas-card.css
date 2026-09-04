@@ -233,7 +233,12 @@
   outline-offset: 2px;
 }
 
-.canvas-card__alias-of {
+/* The two marker lines: the Alias's Target and the Space Card's referenced
+   Space. One rule for both, because they are the same line — a Card naming
+   something outside itself, drawn quietly under its own Title — and letting
+   them drift apart would teach an author that the two mean different things. */
+.canvas-card__alias-of,
+.canvas-card__space-of {
   margin: 4px 0 0;
   overflow: hidden;
   color: var(--canvas-card-muted);
@@ -241,6 +246,78 @@
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The stand-in while the referenced Space has not been read. Sized and coloured
+   as the marker above it so the Card does not change shape when the selectors
+   arrive in its place. */
+.canvas-card__space-note {
+  margin: 8px 0 0;
+  color: var(--canvas-card-muted);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.canvas-card__space-selectors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Label above field rather than beside it. A Card is narrow and both labels are
+   one short word, so a row would spend the width the titles need on two columns
+   that never fill. */
+.canvas-card__space-selector {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Through the enclosing selector for the reason given on the trigger below:
+   `Label` brings its own equal-specificity type scale. */
+.canvas-card__space-selector .canvas-card__space-selector-label {
+  color: var(--canvas-card-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The trigger's own palette is the toolbar's — dark panel, dark text — and this
+   Card is cream. So it takes the Card's ink and paper, exactly as the rail's
+   controls do, rather than carrying the surrounding theme onto the one surface
+   that is not in it.
+
+   Written through the enclosing selector for the same reason `card__rail-action`
+   is: `SelectTrigger` carries Tailwind utilities of equal specificity, and one
+   class against one class is decided by whichever stylesheet the bundler
+   happened to emit last. */
+.canvas-card__space-selector .canvas-card__space-selector-trigger {
+  width: 100%;
+  min-width: 0;
+  border-color: var(--canvas-card-ink);
+  background: var(--canvas-card-face);
+  color: var(--canvas-card-title);
+  font-size: 12px;
+}
+
+/* The selected title, which is as long as an author's Layout names are and the
+   Card is as wide as a Card. */
+.canvas-card__space-selector .canvas-card__space-selector-trigger > span:first-of-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-card__space-selector .canvas-card__space-selector-trigger:disabled {
+  color: var(--canvas-card-muted);
+}
+
+.canvas-card__space-selector .canvas-card__space-selector-trigger:focus-visible {
+  outline: 2px solid var(--canvas-card-graph);
+  outline-offset: 2px;
 }
 
 /* A Title is the same bottom passenger before, during and after the React Flow

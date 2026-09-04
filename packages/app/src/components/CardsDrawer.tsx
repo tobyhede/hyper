@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react';
-import type { Card, CardId } from '@project/core';
+import type { Card, CardId, UUID } from '@project/core';
 import {
   Button,
   Alert,
@@ -45,6 +45,15 @@ export interface CardsDrawerProps {
   readonly onDragStart: (cardId: CardId) => void;
   readonly onDragEnd?: () => void;
   readonly revealedCardId?: CardId | null;
+  /**
+   * The Title of every Space a Space Card in this list references.
+   *
+   * Supplied rather than derived, for the reason the Alias titles beside it are
+   * derived: an Alias's Target is a Card of *this* Space and `allCards` holds
+   * it, while a Space Card's target is a different Space this surface cannot
+   * read. A Space missing from the map is one the composition has not read yet.
+   */
+  readonly spaceTitleById?: ReadonlyMap<UUID, string>;
 }
 
 const isKindFilter = (value: string): value is KindFilter =>
@@ -54,7 +63,11 @@ const isKindFilter = (value: string): value is KindFilter =>
 const targetTitle = (card: Card, titleById: ReadonlyMap<CardId, string>): string =>
   card.kind === 'alias' ? (titleById.get(card.target) ?? '') : '';
 
-const frontOf = (card: Card, titleById: ReadonlyMap<CardId, string>) => {
+const frontOf = (
+  card: Card,
+  titleById: ReadonlyMap<CardId, string>,
+  spaceTitleById: ReadonlyMap<UUID, string>,
+) => {
   if (card.kind === 'alias')
     return {
       kind: 'alias' as const,
@@ -62,9 +75,19 @@ const frontOf = (card: Card, titleById: ReadonlyMap<CardId, string>) => {
       source: '',
       open: false,
     };
-  if (card.kind === 'space') return { kind: 'space' as const };
+  // Closed, always: this list draws Cards that are *not* on the canvas, so no
+  // entry here carries the Layout's Open state and none offers the selections
+  // an Open Space Card authors.
+  if (card.kind === 'space')
+    return {
+      kind: 'space' as const,
+      spaceTitle: spaceTitleById.get(card.spaceId) ?? '',
+      open: false,
+    };
   return { kind: 'markdown' as const, source: card.body, open: false as const };
 };
+
+const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 
 const searchableText = (card: Card, titleById: ReadonlyMap<CardId, string>): string =>
   card.kind === 'alias' ? `${card.title} ${targetTitle(card, titleById)}` : card.title;
@@ -102,6 +125,7 @@ export function CardsDrawer({
   onDragStart,
   onDragEnd,
   revealedCardId,
+  spaceTitleById,
 }: CardsDrawerProps) {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
@@ -260,7 +284,7 @@ export function CardsDrawer({
                       aria-label={`Add ${card.title} to Layout`}
                     >
                       <CanvasCard
-                        front={frontOf(card, titleById)}
+                        front={frontOf(card, titleById, spaceTitleById ?? NO_SPACE_TITLES)}
                         title={card.title}
                         state="rest"
                         graphColor={FALLBACK_GRAPH_COLOR}

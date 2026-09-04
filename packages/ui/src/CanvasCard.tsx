@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button } from './Button';
 import {
   CardRailAction,
@@ -10,6 +10,8 @@ import { CardContentEditProvider, type CardContentEdit } from './card-content-ed
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { CardRail } from './CardRail';
 import { Card, CardContent, CardTitle } from './components/card';
+import { Label } from './components/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './Select';
 import { AbandonEditIcon, CloseCardIcon, CommitEditIcon, EditIcon, OpenCardIcon } from './icons';
 import {
   MarkdownCardBody,
@@ -63,9 +65,55 @@ export type CanvasCardFront =
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
     }
   | {
-      /** Interim closed treatment; embedding the selected Layout belongs to issue 01. */
       readonly kind: 'space';
+      /** The Title of the Space this Card references. Immutable, and not this Card's own Title. */
+      readonly spaceTitle: string;
+      /** Authored Layout state; a Space Card Opens through the shared Card operation. */
+      readonly open: boolean;
+      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
+      /**
+       * What an Open Space Card offers to author: the target's Layouts, the
+       * Graphs of the selected one, and this Card's own selections. Absent while
+       * the target Space has not been read yet.
+       */
+      readonly selection?: CanvasSpaceCardSelection;
     };
+
+/** One thing a Space Card's selectors can be pointed at, named as an author reads it. */
+export interface CanvasSpaceCardChoice {
+  readonly id: string;
+  readonly title: string;
+}
+
+/**
+ * The two choices an Open Space Card publishes, and what is available to make
+ * them from.
+ *
+ * One interface rather than four loose props, because the four move together:
+ * the Graphs on offer are the selected Layout's, so a caller that changed the
+ * Layout without changing the list beside it would be offering Graphs from a
+ * Layout this Card no longer shows. Which Layouts and Graphs exist is the target
+ * Space's business and neither is derived here.
+ */
+export interface CanvasSpaceCardSelection {
+  readonly layouts: readonly CanvasSpaceCardChoice[];
+  readonly graphs: readonly CanvasSpaceCardChoice[];
+  /** The selected Layout, or `null` where the Card selects none. */
+  readonly layoutId: string | null;
+  readonly graphId: string | null;
+  readonly onLayoutChange: (layoutId: string) => void;
+  readonly onGraphChange: (graphId: string) => void;
+  /**
+   * The selections are read but cannot be changed right now.
+   *
+   * Distinct from an absent selection, which means the target Space has not
+   * been read yet: a canvas that has withdrawn authoring — a creation pane is
+   * up, or the Space is presenting — still knows perfectly well which Layout
+   * and Graph this Card selects, and a Card that said otherwise would be
+   * reporting a wait that had already ended.
+   */
+  readonly disabled?: boolean;
+}
 
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasCardBodyEditor = MarkdownCardBodyEditor;
@@ -195,15 +243,27 @@ export function CanvasCard(props: CanvasCardProps) {
   const { front, title, graphColor, entityActions, state, readOnly = false } = props;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
+  /** The kinds that draw a Markdown document below their Title. */
   const contentFront = front.kind === 'markdown' || front.kind === 'alias' ? front : undefined;
-  const open = contentFront?.open === true;
+  /**
+   * The kinds that carry authored Open/Closed state — every kind but the
+   * creation ghost, which is not a Card yet and so has no Layout to author it
+   * on. It is a wider set than `contentFront` because a Space Card Opens
+   * without having any Markdown of its own to reveal: what it shows when it
+   * opens is its two selectors, drawn in the body rather than above it.
+   */
+  const openableFront = front.kind === 'preview' ? undefined : front;
+  const open = openableFront?.open === true;
   const contentControl = useRef<HTMLDivElement>(null);
   const contentExitDuration = useCallback(
     () => (contentControl.current === null ? 0 : opacityTransitionMs(contentControl.current)),
     [],
   );
-  const contentPresence = usePresence(open, contentExitDuration);
-  const onOpenChange = readOnly ? undefined : contentFront?.onOpenChange;
+  // Follows the *content* front's openness rather than the Card's, so a Space
+  // Card opening and closing does not run a presence machine over a document
+  // that is never mounted.
+  const contentPresence = usePresence(contentFront?.open === true, contentExitDuration);
+  const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
   const onBeginContentEdit = !readOnly && front.kind === 'markdown' ? front.onBeginEdit : undefined;
   /**
    * The edit running inside the Markdown front this Card owns.
@@ -395,6 +455,25 @@ export function CanvasCard(props: CanvasCardProps) {
             {front.aliasOf}
           </p>
         )}
+        {/* The same line for the same reason, and drawn whether the Card is
+            Open or Closed: which Space this Card reaches is a fact about it, not
+            something an author should have to open it to find out. The empty
+            guard is the Alias marker's — a Space whose Title is empty is named
+            by nothing, and a blank line claiming to name it is worse than no
+            line. */}
+        {front.kind === 'space' && front.spaceTitle !== '' && (
+          <p className="canvas-card__space-of" data-testid="space-marker">
+            {front.spaceTitle}
+          </p>
+        )}
+        {/* Below the marker rather than above it: the Space is what these two
+            choices are *about*, so it is read first. Withheld while the Card is
+            read-only for the same reason every other authoring affordance is —
+            a read-only surface draws what the Card shows, not what could be
+            changed about it. */}
+        {front.kind === 'space' && front.open && !readOnly && (
+          <SpaceCardSelectors selection={front.selection} />
+        )}
       </CardContent>
       {/* A sibling of the Title's body rather than a child of it. The body is
           inset so a Title sits off the Card's border; a writing surface brings
@@ -421,6 +500,132 @@ export function CanvasCard(props: CanvasCardProps) {
     <EntityActions groups={entityActions}>{card}</EntityActions>
   ) : (
     card
+  );
+}
+
+interface SpaceCardSelectorsProps {
+  readonly selection: CanvasSpaceCardSelection | undefined;
+}
+
+/**
+ * What an Open Space Card offers to author: which Layout of the referenced
+ * Space it shows, and which Graph of that Layout.
+ *
+ * The absent case is a line of prose and nothing else. A `Spinner` would be a
+ * second thing to look at on a Card whose whole content is two short controls,
+ * and `StatusBusy` brings a `role="status"` with it — a live region announcing
+ * every Space Card on the canvas as it resolves, for a wait the author did not
+ * ask for and cannot act on.
+ */
+function SpaceCardSelectors({ selection }: SpaceCardSelectorsProps) {
+  if (selection === undefined) {
+    return <p className="canvas-card__space-note">Reading the referenced Space…</p>;
+  }
+  return (
+    <div className="canvas-card__space-selectors">
+      <SpaceCardSelector
+        label="Layout"
+        testId="space-card-layout"
+        choices={selection.layouts}
+        chosen={selection.layoutId}
+        disabled={selection.disabled === true}
+        onChoose={selection.onLayoutChange}
+      />
+      <SpaceCardSelector
+        label="Graph"
+        testId="space-card-graph"
+        choices={selection.graphs}
+        chosen={selection.graphId}
+        disabled={selection.disabled === true}
+        onChoose={selection.onGraphChange}
+      />
+    </div>
+  );
+}
+
+interface SpaceCardSelectorProps {
+  readonly label: string;
+  readonly testId: string;
+  readonly choices: readonly CanvasSpaceCardChoice[];
+  readonly chosen: string | null;
+  /** Authoring is withdrawn from this canvas; the selection itself is known. */
+  readonly disabled: boolean;
+  readonly onChoose: (id: string) => void;
+}
+
+/**
+ * One of the two, so the Layout and the Graph cannot drift apart in treatment,
+ * labelling or keyboard behaviour.
+ *
+ * The shared `Select` (ADR 0050), which until now had no consumer: opening,
+ * arrow navigation, type-ahead, the `combobox`/`listbox` pairing and dismissal
+ * are all the primitive's, and none of them is restated here. Three things are
+ * this Card's and are supplied from here rather than pushed into the primitive.
+ *
+ * `nokey` on both halves. React Flow subscribes its live Space-key pan
+ * activation on the document and excludes a target through a `.nokey` ancestor;
+ * a `button` is not one of its own native exclusions, so a trigger sitting on a
+ * canvas Card would pan the canvas instead of opening its list, and the popup —
+ * portalled out of the Card entirely — is outside the canvas's own guard.
+ * `nodrag nopan` are the same pair every other in-Card control carries, so a
+ * press on the trigger does not drag the Card out from under it.
+ *
+ * An empty list disables the trigger rather than opening onto nothing. A Space
+ * with no Graphs is an ordinary thing to reference, and a control that opens
+ * onto an empty list says "look again" where an unavailable one says "there are
+ * none". A canvas that has withdrawn authoring disables it the same way, and
+ * for the reason it still draws the selection at all: which Layout this Card
+ * shows is known, and only changing it is unavailable.
+ *
+ * `SelectValue`'s function child resolves the selected id against this list
+ * rather than leaving Base UI to find the label off a rendered item: the popup
+ * is unmounted while closed, so nothing has registered a label at the moment
+ * the trigger first has to display one. The absent case is text on the trigger
+ * and never an item — Base UI spells an empty controlled selection `null`, and
+ * a Space Card has no clear-selection action, which is why the `null` an
+ * `onValueChange` can carry is ignored here (docs/agents/ui.md).
+ */
+function SpaceCardSelector({
+  label,
+  testId,
+  choices,
+  chosen,
+  disabled,
+  onChoose,
+}: SpaceCardSelectorProps) {
+  const triggerId = useId();
+  return (
+    <div className="canvas-card__space-selector">
+      <Label className="canvas-card__space-selector-label" htmlFor={triggerId}>
+        {label}
+      </Label>
+      <Select
+        value={chosen}
+        onValueChange={(next: string | null) => {
+          if (next !== null) onChoose(next);
+        }}
+      >
+        <SelectTrigger
+          id={triggerId}
+          data-testid={testId}
+          disabled={disabled || choices.length === 0}
+          className="canvas-card__space-selector-trigger nokey nodrag nopan"
+        >
+          <SelectValue>
+            {(value: string | null) =>
+              choices.find((choice) => choice.id === value)?.title ?? `No ${label}`
+            }
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent className="nokey">
+          {choices.map((choice) => (
+            <SelectItem key={choice.id} value={choice.id}>
+              {choice.title}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 

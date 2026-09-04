@@ -67,7 +67,11 @@ const appChrome = (
         onPresent: () => undefined,
         onExitPresenting: () => undefined,
       }}
-      addCard={{ onAddCard: () => undefined, onAddAlias: () => undefined }}
+      addCard={{
+        onAddCard: () => undefined,
+        onAddAlias: () => undefined,
+        onAddSpaceCard: () => undefined,
+      }}
       createLayout={{ refusal: null, onCreate: () => undefined }}
       persistence={{
         control: <PersistenceIndicator state="settled" />,
@@ -670,7 +674,7 @@ describe("the app's canvas delete key", () => {
       // AddCardControl sits beside the Menubar in the real toolbar, outside the
       // flow, with the same document-level exposure MenubarTrigger has.
       const { adapter, session } = mountCanvas(
-        <AddCardControl onAddCard={NO_OP} onAddAlias={NO_OP} />,
+        <AddCardControl onAddCard={NO_OP} onAddAlias={NO_OP} onAddSpaceCard={NO_OP} />,
       );
       act(() => adapter.getState().selectEdge(SUBJECT));
 

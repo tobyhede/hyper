@@ -13,12 +13,16 @@ import {
   SpaceSidebar,
   type SpaceChromeTitleEdit,
   type SpaceSidebarProps,
+  DELETE_LAYOUT_ACTION_ID,
 } from '../src/components/SpaceSidebar';
+import { spaceEntityActions } from '../src/entity-actions';
 
+const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
+const SPACE_CARD_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000030');
 const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 beforeAll(() => {
@@ -98,6 +102,18 @@ const SELECTED_CARD: Card = {
 };
 
 /**
+ * The same footer row over a Space Card, for the confirmations that are about
+ * one: its Delete is a coordinated Edit that answers a promise (ADR 0076), and
+ * that is the whole reason the dialog has a running state to recover from.
+ */
+const SELECTED_SPACE_CARD: Card = {
+  id: CARD_A,
+  title: 'Start here',
+  kind: 'space',
+  spaceId: SPACE_CARD_TARGET_ID,
+};
+
+/**
  * What a Card's menu offers, as a Sidebar test can state it.
  *
  * The real command set is `spaceEntityActions`' and is proved over that module
@@ -127,6 +143,7 @@ const settledProps = (): SpaceSidebarProps => ({
   addCard: {
     onAddCard: vi.fn(),
     onAddAlias: vi.fn(),
+    onAddSpaceCard: vi.fn(),
     keyShortcut: 'C',
     menuTriggerRef: createRef<HTMLButtonElement>(),
   },
@@ -681,7 +698,7 @@ describe('SpaceSidebar', () => {
       (onSelect: EntityAction['onSelect']): NonNullable<SpaceSidebarProps['entityActions']> =>
       (entity) =>
         entity.kind === 'layout'
-          ? [[], [], [{ id: 'delete-layout', label: 'Delete Layout', onSelect }]]
+          ? [[], [], [{ id: DELETE_LAYOUT_ACTION_ID, label: 'Delete Layout', onSelect }]]
           : [];
 
     it('stays open when a Layout deletion is refused', async () => {
@@ -713,6 +730,166 @@ describe('SpaceSidebar', () => {
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
 
       await dismissed();
+    });
+
+    /**
+     * The same rule again, over the menu the application actually offers.
+     *
+     * Every other test in this block states its own command list, which proves
+     * the wrapper and says nothing about what it wraps. The wrapper recognises
+     * one command **by its id**, and `spaceEntityActions` builds that command
+     * somewhere else entirely — `DELETE_LAYOUT_ACTION_ID` is what now holds
+     * the two spellings to one, and this is what holds the two *modules*
+     * together. Written literals on both sides would have gone on compiling
+     * and gone on passing every hand-written list here, and the only symptom
+     * would have been a Sheet that stopped dismissing on a phone over a canvas
+     * that had already changed.
+     */
+    it('dismisses itself for the Delete Layout the application mints', async () => {
+      const onDeleteLayout = vi.fn(() => true);
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        entityActions: spaceEntityActions({
+          spaceId: SPACE_ID,
+          spaceTitle: 'Space',
+          onCopy: () => true,
+          onRename: vi.fn(),
+          onDeleteLayout,
+        }),
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout 1' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+
+      await waitFor(() => expect(onDeleteLayout).toHaveBeenCalledOnce());
+      await dismissed();
+    });
+
+    /**
+     * A third outcome the wrapper has to have an answer for: the command did
+     * not refuse, it broke.
+     *
+     * `complete` throws outright for a Space that has stopped loading, and the
+     * application's Delete Layout runs one — so the throw happens *before* the
+     * line that arms the Sidebar's refusal alert, and no alert of the
+     * application's is coming. Left to propagate it also skipped the dismissal
+     * decision entirely, which is the one thing this surface still owed the
+     * author: a Sheet that stays up, carrying the reason it is still up.
+     */
+    it('reports a Layout deletion that broke, on the surface that asked for it', async () => {
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        entityActions: layoutActions(() => {
+          throw new Error('the working snapshot stopped loading');
+        }),
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout 1' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'the working snapshot stopped loading',
+      );
+      expect(screen.getByTestId('space-title')).toBeVisible();
+    });
+
+    /**
+     * A Delete that never answers is the one outcome the dialog cannot sit on.
+     *
+     * Both exits are withheld while a Delete is running — a Space Card's is a
+     * coordinated Edit across several Spaces (ADR 0076) and confirming it twice
+     * would be a second cascade — so a rejection that left the running state
+     * behind would leave the author with a dialog and no way out of it.
+     */
+    it('recovers both exits when a Delete rejects', async () => {
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        selectedCard: {
+          card: SELECTED_SPACE_CARD,
+          onDelete: () => Promise.reject(new Error('the coordination lost a session')),
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Card Start here' }));
+      const confirmation = await screen.findByRole('alertdialog', {
+        name: 'Delete Card Start here?',
+      });
+      fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete Card' }));
+
+      expect(await within(confirmation).findByRole('alert')).toHaveTextContent(
+        'the coordination lost a session',
+      );
+      expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toBeEnabled();
+      expect(within(confirmation).getByRole('button', { name: 'Delete Card' })).toBeEnabled();
+    });
+
+    /** The synchronous half of the same rule: `complete` throws for a Space that
+        has stopped loading, and an event handler is not something a React error
+        boundary catches — so the throw has nowhere to be read but here. */
+    it('recovers both exits when a Delete throws', async () => {
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        selectedCard: {
+          card: SELECTED_CARD,
+          onDelete: () => {
+            throw new Error('the working snapshot stopped loading');
+          },
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Card Start here' }));
+      const confirmation = await screen.findByRole('alertdialog', {
+        name: 'Delete Card Start here?',
+      });
+      fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete Card' }));
+
+      expect(await within(confirmation).findByRole('alert')).toHaveTextContent(
+        'the working snapshot stopped loading',
+      );
+      expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toBeEnabled();
+    });
+
+    /**
+     * Escape is an exit, and both exits are withheld while a Delete runs.
+     *
+     * Base UI closes an alert dialog on Escape whatever its buttons are doing,
+     * so the running Delete would answer into a dialog that had already gone —
+     * and a refusal is only cleared on close, so it would be sitting there,
+     * describing an attempt the author had abandoned, the next time they opened
+     * it. The creation pane withholds its own dismissal for this reason
+     * (`NOTHING_TO_DISMISS`); so does this.
+     */
+    it('does not close on Escape while a Delete is in flight', async () => {
+      let answer: (refusal: string | null) => void = () => undefined;
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        selectedCard: {
+          card: SELECTED_SPACE_CARD,
+          onDelete: () =>
+            new Promise<string | null>((resolve) => {
+              answer = resolve;
+            }),
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Card Start here' }));
+      const confirmation = await screen.findByRole('alertdialog', {
+        name: 'Delete Card Start here?',
+      });
+      fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete Card' }));
+      fireEvent.keyDown(confirmation, { key: 'Escape' });
+
+      expect(screen.getByRole('alertdialog', { name: 'Delete Card Start here?' })).toBeVisible();
+
+      answer('A Space in this edit has a conflict. Resolve it first.');
+      expect(await within(confirmation).findByRole('alert')).toHaveTextContent(
+        'A Space in this edit has a conflict. Resolve it first.',
+      );
     });
 
     it('dismisses itself when a Graph is activated', async () => {

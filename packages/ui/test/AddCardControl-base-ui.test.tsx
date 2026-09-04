@@ -47,7 +47,13 @@ import { AddCardControl } from '../src/AddCardControl';
 
 describe('AddCardControl menu boundary', () => {
   it('composes the shared DropdownMenu through the Base UI Menu primitive', () => {
-    render(<AddCardControl onAddCard={() => undefined} onAddAlias={() => undefined} />);
+    render(
+      <AddCardControl
+        onAddCard={() => undefined}
+        onAddAlias={() => undefined}
+        onAddSpaceCard={() => undefined}
+      />,
+    );
 
     expect(screen.getByTestId('base-ui-menu-root')).toBeInTheDocument();
   });

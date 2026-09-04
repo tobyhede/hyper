@@ -115,11 +115,6 @@ export const uncataloguedComponents = [
       'Production presentation staged by `space-cards/09` under `stories/review`: issue 11 supplies the application path and promotes it with parity evidence. Its own tabs interaction and mounted-panel behavior are covered by `packages/ui/test/OpenSpaces.test.tsx` meanwhile.',
   },
   {
-    module: 'packages/ui/src/Select.tsx',
-    reason:
-      'Deliberately without a consumer. ADR 0053 deleted the three renderer selectors it drew, and ADR 0050 names `Select` a foundation primitive, so retiring it is a foundation decision rather than a surface one (AGENTS.md). It keeps its own test in `packages/ui/test`.',
-  },
-  {
     module: 'packages/ui/src/Command.tsx',
     reason:
       'Deliberately without a consumer, like `Select` above. It wraps cmdk, which ADR 0050 kept rather than migrating; `CardSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',

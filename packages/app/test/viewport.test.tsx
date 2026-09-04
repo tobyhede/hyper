@@ -2,9 +2,10 @@ import { fireEvent, render, screen, type RenderResult } from '@testing-library/r
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
-import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import { MemorySpaceBackend } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
+import { openTestSpace } from './opened-space';
 
 /**
  * React Flow positions the whole graph with one viewport transform, and derives
@@ -83,7 +84,7 @@ describe('graph viewport', () => {
     const backend = new MemorySpaceBackend([
       { snapshot: remote, revision: 4n, exportedRevision: null },
     ]);
-    const session = openSpaceSession(backend, {
+    const { spaceSession: session, spaceCards } = openTestSpace(backend, {
       snapshot: local,
       revision: 3n,
       exportedRevision: null,
@@ -102,7 +103,7 @@ describe('graph viewport', () => {
 
     let view: RenderResult | undefined;
     mountSpace(
-      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      { id: runtime(local).id, session, app: composeApp({ spaceSession: session }), spaceCards },
       (app) => {
         if (view === undefined) view = render(app);
         else view.rerender(app);

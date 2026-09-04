@@ -7,7 +7,6 @@ import { productDestinationPath } from '@project/http';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
-  openSpaceSession,
   type SpaceSession,
 } from '@project/persistence';
 import { mountSpaceApp } from '../src/SpaceApp';
@@ -15,6 +14,7 @@ import { createBrowserLocation } from '../src/browser-location';
 import { recordingHistory } from './browser-history';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
+import { openTestSpace } from './opened-space';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -110,7 +110,7 @@ describe('Space app conflict recovery', () => {
     const backend = new MemorySpaceBackend(SPACE_ID, [
       { snapshot: remote, revision: 4n, exportedRevision: null },
     ]);
-    const session = openSpaceSession(backend, {
+    const { spaceSession: session, spaceCards } = openTestSpace(backend, {
       snapshot: local,
       revision: 3n,
       exportedRevision: null,
@@ -129,7 +129,12 @@ describe('Space app conflict recovery', () => {
 
     let view: RenderResult | undefined;
     mountSpace(
-      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      {
+        id: runtime(local).id,
+        session,
+        app: composeApp({ spaceSession: session }),
+        spaceCards,
+      },
       (app) => {
         if (view === undefined) view = render(app);
         else view.rerender(app);
@@ -170,11 +175,14 @@ describe('Space app conflict recovery', () => {
         },
       ],
     });
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [], control), {
-      snapshot: local,
-      revision: 3n,
-      exportedRevision: null,
-    });
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [], control),
+      {
+        snapshot: local,
+        revision: 3n,
+        exportedRevision: null,
+      },
+    );
     session.submit(local);
     await new Promise<void>((resolve) => {
       const unsubscribe = session.subscribe(() => {
@@ -186,7 +194,12 @@ describe('Space app conflict recovery', () => {
 
     let view: RenderResult | undefined;
     mountSpace(
-      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      {
+        id: runtime(local).id,
+        session,
+        app: composeApp({ spaceSession: session }),
+        spaceCards,
+      },
       (app) => {
         if (view === undefined) view = render(app);
         else view.rerender(app);
@@ -247,17 +260,25 @@ describe('Space app conflict recovery', () => {
         },
       ],
     });
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [], control), {
-      snapshot: local,
-      revision: 3n,
-      exportedRevision: null,
-    });
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [], control),
+      {
+        snapshot: local,
+        revision: 3n,
+        exportedRevision: null,
+      },
+    );
     session.submit(local);
     await waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
 
     let view: RenderResult | undefined;
     mountSpace(
-      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      {
+        id: runtime(local).id,
+        session,
+        app: composeApp({ spaceSession: session }),
+        spaceCards,
+      },
       (app) => {
         if (view === undefined) view = render(app);
         else view.rerender(app);
@@ -313,17 +334,25 @@ describe('Space app permanent save refusal', () => {
       code: 'invalid-commit',
       message: 'Graph names an absent card',
     });
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [], control), {
-      snapshot: local,
-      revision: 3n,
-      exportedRevision: null,
-    });
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [], control),
+      {
+        snapshot: local,
+        revision: 3n,
+        exportedRevision: null,
+      },
+    );
     session.submit(local);
     await waitFor(() => expect(session.getState().persistence.kind).toBe('rejected'));
 
     let view: RenderResult | undefined;
     mountSpace(
-      { id: runtime(local).id, session: session, app: composeApp({ spaceSession: session }) },
+      {
+        id: runtime(local).id,
+        session,
+        app: composeApp({ spaceSession: session }),
+        spaceCards,
+      },
       (app) => {
         if (view === undefined) view = render(app);
         else view.rerender(app);
@@ -358,14 +387,19 @@ describe('Space app failure reporting', () => {
         })),
       },
     };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
+    const { spaceSession: session, spaceCards } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
       snapshot: addressed,
       revision: 0n,
       exportedRevision: null,
     });
 
     mountSpace(
-      { id: runtime(addressed).id, session: session, app: composeApp({ spaceSession: session }) },
+      {
+        id: runtime(addressed).id,
+        session,
+        app: composeApp({ spaceSession: session }),
+        spaceCards,
+      },
       (app) => render(app),
       {
         selection: LAYOUT_ID,
@@ -403,11 +437,14 @@ describe('Space app failure reporting', () => {
     'reports a rejected clipboard write from $entity $command without unmounting the Space',
     async ({ entity, command }) => {
       const valid = snapshot('Space', 'Card', 10, 20);
-      const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
-        snapshot: valid,
-        revision: 0n,
-        exportedRevision: null,
-      });
+      const { spaceSession: session, spaceCards } = openTestSpace(
+        new MemorySpaceBackend(SPACE_ID),
+        {
+          snapshot: valid,
+          revision: 0n,
+          exportedRevision: null,
+        },
+      );
       const clipboardFailure = new Error('Clipboard permission denied');
       const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
       Object.defineProperty(navigator, 'clipboard', {
@@ -417,7 +454,12 @@ describe('Space app failure reporting', () => {
 
       try {
         mountSpace(
-          { id: runtime(valid).id, session: session, app: composeApp({ spaceSession: session }) },
+          {
+            id: runtime(valid).id,
+            session,
+            app: composeApp({ spaceSession: session }),
+            spaceCards,
+          },
           (app) => render(app),
           {
             selection: LAYOUT_ID,
@@ -469,7 +511,7 @@ describe('Space app failure reporting', () => {
    */
   it('names a working snapshot that stopped loading instead of blanking the page', () => {
     const valid = snapshot('Space', 'Card', 10, 20);
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
+    const { spaceSession: session, spaceCards } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
       snapshot: valid,
       revision: 0n,
       exportedRevision: null,
@@ -488,7 +530,7 @@ describe('Space app failure reporting', () => {
     // was one. What is pinned here is the mount, not the location.
     expect(() =>
       mountSpaceApp(
-        { id: runtime(valid).id, session, app },
+        { id: runtime(valid).id, session, app, spaceCards },
         createBrowserLocation(recordingHistory()),
         (view) => {
           render(view);
@@ -510,14 +552,19 @@ describe('Space app failure reporting', () => {
    */
   it('names a working snapshot that stops loading under a mounted Space app', () => {
     const valid = snapshot('Space', 'Card', 10, 20);
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID), {
+    const { spaceSession: session, spaceCards } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
       snapshot: valid,
       revision: 0n,
       exportedRevision: null,
     });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mountSpace(
-      { id: runtime(valid).id, session: session, app: composeApp({ spaceSession: session }) },
+      {
+        id: runtime(valid).id,
+        session,
+        app: composeApp({ spaceSession: session }),
+        spaceCards,
+      },
       (app) => {
         render(app);
       },
@@ -539,13 +586,17 @@ describe('Space app Cards drawer', () => {
   it('opens once for the client whose working load created the empty Layout', () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 1n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
 
     mountSpace(
       {
         id: runtime(base).id,
         session,
         app: composeApp({ spaceSession: session }),
+        spaceCards,
         initialization: 'created-layout',
       },
       (app) => render(app),
@@ -567,13 +618,17 @@ describe('Space app Cards drawer', () => {
       },
     };
     const stored = { snapshot: empty, revision: 1n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
 
     mountSpace(
       {
         id: runtime(empty).id,
         session,
         app: composeApp({ spaceSession: session }),
+        spaceCards,
         initialization: 'created-layout',
       },
       (app) => render(app),
@@ -591,10 +646,13 @@ describe('Space app Cards drawer', () => {
   it('adds an empty selected Layout and reveals its existing Cards once', () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
 
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
       (app) => render(app),
     );
 
@@ -631,10 +689,13 @@ describe('Space app Cards drawer', () => {
   it('withholds a menu’s Edits until the canvas has a placement to edit', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
 
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
       (app) => render(app),
     );
 
@@ -654,10 +715,13 @@ describe('Space app Cards drawer', () => {
   it('offers Layout rename and delete actions and explains why the last cannot be deleted', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
 
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
       (app) => render(app),
     );
 
@@ -689,10 +753,13 @@ describe('Space app Cards drawer', () => {
   it('clears a Layout management refusal when the canvas selection changes', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
 
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }) },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
       (app) => render(app),
     );
 
@@ -718,13 +785,17 @@ describe('Space app Cards drawer', () => {
       ],
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
 
     mountSpace(
       {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session, selection: LAYOUT_ID }),
+        spaceCards,
       },
       (app) => render(app),
       {
@@ -799,7 +870,10 @@ describe('Space app Cards drawer', () => {
       },
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
     const history = recordingHistory(
       productDestinationPath({ kind: 'layout', spaceId: SPACE_ID, layoutId: LAYOUT_ID }),
     );
@@ -809,6 +883,7 @@ describe('Space app Cards drawer', () => {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session, selection: LAYOUT_ID }),
+        spaceCards,
       },
       (app) => render(app),
       { selection: LAYOUT_ID, cardId: null, graphId: null, presentationCardId: null },
@@ -854,7 +929,10 @@ describe('Space app Cards drawer', () => {
       },
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [stored]), stored);
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
     const history = recordingHistory(
       productDestinationPath({
         kind: 'layout-card',
@@ -869,6 +947,7 @@ describe('Space app Cards drawer', () => {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session, selection: LAYOUT_ID }),
+        spaceCards,
       },
       (app) => render(app),
       {

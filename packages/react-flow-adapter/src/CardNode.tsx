@@ -39,6 +39,7 @@ type MarkdownOperations = Mutable<
   Pick<Extract<CanvasCardFront, { kind: 'markdown' }>, 'onOpenChange' | 'onBeginEdit'>
 >;
 type AliasFront = Mutable<Extract<CanvasCardFront, { kind: 'alias' }>>;
+type SpaceFront = Mutable<Extract<CanvasCardFront, { kind: 'space' }>>;
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -126,8 +127,23 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
     aliasFront.onOpenChange = data.onEditCard;
   }
+  // A Space Card's own front carries nothing it authors: its Title is the
+  // Card's, its content is the target Space's, and the only things on it that
+  // change are the two selections the composition hands down.
+  const spaceFront: SpaceFront = {
+    kind: 'space',
+    // The same convention `aliasOf` uses above: absent means the target did not
+    // resolve, which intake makes unreachable for a stored Card and reachable
+    // for the render between a Card arriving and its target being read.
+    spaceTitle: data.spaceTitle ?? '',
+    open: data.expanded === true,
+  };
+  if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
+    spaceFront.onOpenChange = data.onEditCard;
+  }
+  if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
   const front: CanvasCardFront =
-    data.kind === 'alias' ? aliasFront : data.kind === 'space' ? { kind: 'space' } : markdownFront;
+    data.kind === 'alias' ? aliasFront : data.kind === 'space' ? spaceFront : markdownFront;
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle
