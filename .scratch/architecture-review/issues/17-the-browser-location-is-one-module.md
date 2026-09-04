@@ -1,6 +1,6 @@
 # The browser location is one module
 
-Status: ready-for-agent
+Status: resolved
 Tags: Improvement
 Blocked by: none
 Related: `architecture-review/16` (ADR 0081, which this completes); ADR 0016
@@ -211,6 +211,103 @@ Recorded so none is re-opened.
       stale. ADR 0081's body needs no change.
 - [ ] `pnpm verify` and `pnpm e2e` green, with real output reported. `e2e:ladle`
       is inapplicable unless a story changes; say so rather than omitting it.
+
+## Answer
+
+`packages/app/src/browser-location.ts` holds `HistoryApi` and
+`createBrowserLocation`, built as specified. Two adapters: the `window` one is
+`browserHistory()` in `space.ts`, and the recording one is
+`packages/app/test/browser-history.ts`, whose `popTo` is Back and Forward.
+
+Three things the ticket left open, decided here.
+
+**`follow(app)` reads the addressed Card off the location.** The ticket fixes
+`follow`'s signature at one argument, so the Card could not be handed in — and
+should not be: it is a fact about a location and the Space now shown.
+`follow` therefore runs `destinationRestoration` over the current pathname and
+takes `opening.cardId`, which is the same value `openPath` computed from the
+same pathname a moment earlier. It reports nothing, because the arrival report
+belongs to `popstate` and to startup's own failure. Mount still writes nothing:
+`createApp`'s opening `openGraph` / `openPresentation` notifies, the sync runs,
+and `destinationSync` answers `none` because the location already opens that
+exact position.
+
+**Notification, not an effect's dependency list.** The module subscribes to
+Space Authoring, which republishes on both its collaborators and coalesces an
+Edit's several writes into one publication — the batching the React effect used
+to get for free. A `deciding` depth counter around each operation replaces
+React's batching for the writes the module itself makes, so `popstate` writing
+the Layout, the Graph and the addressed Card is still one decision rather than
+three. Redundant notifications are harmless by construction: `samePosition`
+against the private `syncedPosition` returns before the pathname is even read.
+
+**`createSpaceStartup` takes the adapter as an optional third seam.**
+`test/unit/app-http-startup.test.ts` composes it twelve times in the node
+environment, so a hard-wired `window` made that file unrunnable. It now defaults
+to `browserHistory()` beside the existing `backend` and `newId` defaults — the
+composition root is where all three ambient things are named — and the node test
+supplies the recording one. `createOpenSpaces` still requires it, with no
+default.
+
+**One deliberate behaviour loss.** `titleEdit.onBegin` also
+cleared `destinationNotFound` — a tenth writer the ticket's table does not list.
+Clearing the report is what asks the sync to correct the stale location, so
+losing it means beginning a Layout or Graph rename no longer dismisses a
+"Destination not found" alert or rewrites the dead path. Preserving it needs a
+seventh member on an interface the ticket fixes at six, and beginning a chrome
+title Edit is not a location event; the behaviour arrived untested in
+`96f895d1` as one of nineteen review fixes. Recorded rather than routed around —
+if it is wanted back, it belongs with the chrome title Edit module this ticket
+parks.
+
+Acceptance, each verified:
+
+- `HistoryApi` is five members, required with no default on `createOpenSpaces`
+  and on `createBrowserLocation`.
+- `createBrowserLocation` publishes `addressedCardId` and
+  `destinationNotFound`; `syncedPosition` and `syncedUnresolved` are closure
+  variables with no accessor.
+- `arriveAt` is private; `chooseLayout` and `activateGraph` share
+  `deliberateMove`, and the test "answers the report from an activated Graph
+  without disturbing the render adapter" pins the skipped adapter write against
+  its contrast, "clears the published projection when a choice changes the
+  Layout".
+- `App.tsx` names neither `window.history` nor `window.location`. Its three
+  surviving `window` mentions are the `beforeunload` listener and two comments;
+  the focus queries are untouched.
+- Six rules have node tests in `packages/app/test/browser-location.test.ts` (11
+  tests, no DOM). "StrictMode's double invocation" is modelled as the same
+  position decided a second time, which is the rule underneath it — the module
+  is not re-created by a remount, so the redundant notification is the only form
+  the double invocation now takes.
+- Three mount tests remain: "spends a Layout choice on the injected History
+  API" in `card-authoring.test.tsx`, and in `SpaceApp.test.tsx` the `popTo` half
+  of the addressed-Card reveal and the chrome title draft a Back to another
+  Layout discards. The `pushState` spy is gone, and so are the 23 history
+  assertions behind it.
+- `packages/app/e2e/space-routing.spec.ts` is byte-identical.
+- `destination-coordination.ts` and `destination-opening.ts` are byte-identical.
+- The `app` bullet is corrected in its own commit.
+
+Three test files needed a location that agrees with the `opening` they pass,
+which production gets for free because `openPath` builds both from one pathname:
+the two clipboard tests and the Cards-drawer reveal in `SpaceApp.test.tsx` now
+mount over a `recordingHistory` at the address that names their Card.
+
+Final verification, on this branch rebased onto `main`: `pnpm verify` green —
+171 test files, 2078 passed, 2 skipped. `pnpm e2e` green — 149 passed, no
+flakes. `pnpm e2e:ladle` not run and inapplicable: no component with a story
+changed, and `packages/ui`, `packages/app/stories` and `ladle-e2e` are
+untouched.
+
+The rebase brought `main`'s generalised entity-actions menu, which gives a Graph
+row its own Rename. That is the subject the chrome title draft test uses, and
+the reason it is worth having: a Graph row belongs to the selected Layout, so a
+Back that changes the Layout unmounts the row the draft was begun on. The draft
+is discarded anyway — by `chromeEditingDisabled`, since the arrival clears the
+published projection and `editable` reads `hasCardsOnCanvas` — but only the test
+says so, because the clear that used to be spent on this path went to the Layout
+choice call site with `arriveAt`.
 
 ## Not in scope
 
