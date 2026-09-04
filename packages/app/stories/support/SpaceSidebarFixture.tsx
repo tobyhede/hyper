@@ -18,6 +18,7 @@ import { AppShell } from '@project/ui';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
+import { resolveLayout } from '#src/layout-resolution';
 import { graphColorMap } from '#src/colors';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { createWorkingSpaceReader, snapshotFromSpace } from '#src/snapshot';
@@ -106,13 +107,12 @@ export function SpaceSidebarFixture({
   );
   const readCurrentSpace = currentSpace ?? readEditableSpace;
   const displayedSpace = currentSpace === undefined ? editedSpace : space;
-  const {
-    navigation,
-    state: navigationState,
-    resolveRenderer,
-  } = useStoryNavigation(readCurrentSpace, (composed) => {
-    if (presenting) composed.present();
-  });
+  const { navigation, state: navigationState } = useStoryNavigation(
+    readCurrentSpace,
+    (composed) => {
+      if (presenting) composed.present();
+    },
+  );
   const authoring = useMemo(() => {
     const selected = navigation.getState().selectedRenderer;
     const selectedLayout = readEditableSpace().lookup.layout(selected)?.layout;
@@ -120,11 +120,10 @@ export function SpaceSidebarFixture({
       session: editSession,
       navigation,
       currentSpace: readEditableSpace,
-      resolveRenderer,
       initialPlacement: selectedLayout === undefined ? null : Placement.fromLayout(selectedLayout),
       newId: storyGraphIds(),
     });
-  }, [editSession, navigation, readEditableSpace, resolveRenderer]);
+  }, [editSession, navigation, readEditableSpace]);
   // Where `presenting` is honoured now that Navigation outlives it. Reconciled
   // against the mode rather than applied, so the mount the initializer already
   // presented publishes nothing here, and so a story's own Present button — the
@@ -140,8 +139,7 @@ export function SpaceSidebarFixture({
   // drawing; the header below reads that Layout rather than a title of the
   // fixture's own. The selection, its Active Graph and its mode are all
   // Navigation's published state.
-  const renderer = resolveRenderer(displayedSpace, navigationState.selectedRenderer);
-  const selectedLayout = renderer.resolvedLayout.layout;
+  const selectedLayout = resolveLayout(displayedSpace, navigationState.selectedRenderer).layout;
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
@@ -197,7 +195,7 @@ export function SpaceSidebarFixture({
             onSelect: navigation.selectRenderer,
           }}
           graph={{
-            graphs: renderer.subject.graphs,
+            graphs: selectedLayout.graphs,
             activeGraphId: navigationState.activeGraphId,
             colorByGraphId,
             onActivate: navigation.activateGraph,

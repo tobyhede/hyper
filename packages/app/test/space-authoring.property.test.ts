@@ -1,13 +1,19 @@
 import fc from 'fast-check';
 import { expect, it } from 'vitest';
 
-import { uuidSchema, type Card, type Graph, type Layout, type SpaceSnapshot } from '@project/core';
+import {
+  uuidSchema,
+  type Card,
+  type Graph,
+  type Layout,
+  type LayoutId,
+  type SpaceSnapshot,
+} from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { composeApp } from '../src/compose-app';
 import type { AuthoringCompletion, AuthoringResult } from '../src/space-authoring';
-import type { CanvasRendererId } from '../src/renderer';
 
 /**
  * What every semantic operation owes, whatever order they arrive in.
@@ -218,7 +224,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
   fc.assert(
     fc.property(
       fc.array(operation, { minLength: 1, maxLength: 12 }),
-      fc.constantFrom<CanvasRendererId>(LAYOUT_ID, OTHER_LAYOUT_ID, LAYOUT_ID),
+      fc.constantFrom<LayoutId>(LAYOUT_ID, OTHER_LAYOUT_ID, LAYOUT_ID),
       (operations, renderer) => {
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);

@@ -2,8 +2,8 @@ import type { CardId, SpaceSnapshot } from '@project/core';
 import { resolveProductDestinationInSnapshot, type ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
+import { resolveLayout } from './layout-resolution';
 import { openingGraphId, type NavigationAddress } from './navigation';
-import type { ResolveRenderer } from './renderer';
 
 export type DestinationRestoration =
   | { readonly kind: 'opening'; readonly opening: DestinationOpening }
@@ -47,7 +47,6 @@ export interface DestinationSyncInput {
   readonly snapshot: SpaceSnapshot;
   /** The browser location as it stands now, read by the caller. */
   readonly pathname: string;
-  readonly resolveRenderer: ResolveRenderer;
   /** The position the application is at now. */
   readonly position: AddressedPosition;
   /**
@@ -101,14 +100,10 @@ export const samePosition = (one: AddressedPosition, other: AddressedPosition): 
  * opens whatever its renderer opens on, which is Navigation's own
  * {@link openingGraphId} rather than a second answer written here.
  */
-function openingPosition(
-  space: Space,
-  resolveRenderer: ResolveRenderer,
-  opening: DestinationOpening,
-): AddressedPosition {
+function openingPosition(space: Space, opening: DestinationOpening): AddressedPosition {
   return {
     selectedRenderer: opening.selection,
-    activeGraphId: opening.graphId ?? openingGraphId(resolveRenderer(space, opening.selection)),
+    activeGraphId: opening.graphId ?? openingGraphId(resolveLayout(space, opening.selection)),
     presentingCardId: opening.presentationCardId,
     addressedCardId: opening.cardId,
   };
@@ -138,7 +133,6 @@ function openingPosition(
  */
 function positionDestination(
   space: Space,
-  resolveRenderer: ResolveRenderer,
   position: AddressedPosition,
   opening: DestinationOpening | null,
 ): ProductDestination {
@@ -157,7 +151,7 @@ function positionDestination(
     opening !== null && opening.selection === selectedRenderer && opening.graphId !== null;
   if (
     activeGraphId !== null &&
-    (namesGraph || activeGraphId !== openingGraphId(resolveRenderer(space, selectedRenderer)))
+    (namesGraph || activeGraphId !== openingGraphId(resolveLayout(space, selectedRenderer)))
   ) {
     return {
       kind: 'layout-graph',
@@ -183,19 +177,15 @@ export function destinationSync({
   space,
   snapshot,
   pathname,
-  resolveRenderer,
   position,
   synced,
 }: DestinationSyncInput): DestinationSync {
   const restoration = destinationRestoration(space, snapshot, pathname);
   const opening = restoration.kind === 'opening' ? restoration.opening : null;
-  if (
-    opening !== null &&
-    samePosition(openingPosition(space, resolveRenderer, opening), position)
-  ) {
+  if (opening !== null && samePosition(openingPosition(space, opening), position)) {
     return { kind: 'none' };
   }
-  const destination = positionDestination(space, resolveRenderer, position, opening);
+  const destination = positionDestination(space, position, opening);
   if (!sameAddress(position, synced)) return { kind: 'push', destination };
   if (restoration.kind === 'ignored') return { kind: 'none' };
   return { kind: 'replace', destination };

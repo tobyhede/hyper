@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
 
-import { uuidSchema, type LayoutPosition, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  uuidSchema,
+  type LayoutId,
+  type LayoutPosition,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
@@ -15,7 +21,7 @@ import type {
   EdgeProposal,
   SpaceAuthoring,
 } from '../src/space-authoring';
-import type { CanvasRendererId } from '../src/renderer';
+
 import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -132,7 +138,7 @@ function connections(
  */
 function sessionBackedAdapter(
   snapshot: SpaceSnapshot,
-  renderer: CanvasRendererId,
+  renderer: LayoutId,
   initialPlacement: Placement | null = null,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,

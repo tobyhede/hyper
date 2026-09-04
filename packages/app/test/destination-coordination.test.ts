@@ -10,7 +10,6 @@ import {
 import { productDestinationPath, resolveProductDestinationInSnapshot } from '@project/http';
 import { destinationSync } from '../src/destination-coordination';
 import type { NavigationAddress } from '../src/navigation';
-import { createRendererResolver } from '../src/renderer';
 import { createWorkingSpaceReader } from '../src/snapshot';
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
@@ -72,7 +71,6 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
 });
 
 const space = createWorkingSpaceReader()(snapshot);
-const resolveRenderer = createRendererResolver();
 
 const overview = (activeGraphId: UUID | null = OPENING_GRAPH): NavigationAddress => ({
   selectedRenderer: LAYOUT,
@@ -98,7 +96,6 @@ const sync = (
     space,
     snapshot,
     pathname,
-    resolveRenderer,
     position: { ...address, addressedCardId },
     synced,
   });

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { EdgeTypes } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { GraphEdge, GraphId } from '@project/core';
-import type { LayoutStrategyGraph } from '@project/graph';
+import { Placement, positionedStrategy, type LayoutStrategyGraph } from '@project/graph';
 import { nodeTypes } from '@project/react-flow-adapter';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
@@ -11,7 +11,7 @@ import { canvasProjection } from '#src/canvas-projection';
 import { cardChoiceOf } from '#src/card-choice';
 import type { SelectedEdgeRefusal } from '#src/edge-authoring';
 import { edgeSelectionOf } from '#src/render-adapter';
-import { createRendererResolver, defaultLayout } from '#src/renderer';
+import { requireDefaultLayout, resolveLayout } from '#src/layout-resolution';
 import { AuthorableEdge } from '#components/AuthorableEdge';
 // `#components/*` maps to `src/components/*.tsx`; this seam is a `.ts`, so it
 // comes through `#src/*` instead. Naming the wrong one resolves to nothing and
@@ -47,15 +47,17 @@ const SPACE = authoredSpace;
 const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
 
 /**
- * The renderer the story opens on: the Space's declared default, which is its
+ * The Layout the story opens on: the Space's declared default, which is its
  * first positioned Layout — so the placement comes from authored positions
  * rather than from running elkjs inside a story.
  */
-const RENDERER = createRendererResolver()(SPACE, defaultLayout(SPACE));
+const LAYOUT = resolveLayout(SPACE, requireDefaultLayout(SPACE));
 
-const PENDING = canvasProjection(SPACE, RENDERER);
+const PENDING = canvasProjection(SPACE, LAYOUT);
 
-const ACTIVE_GRAPH: GraphId | null = RENDERER.subject.graphs[0]?.id ?? null;
+const STRATEGY = positionedStrategy(Placement.fromLayout(LAYOUT.layout));
+
+const ACTIVE_GRAPH: GraphId | null = LAYOUT.layout.graphs[0]?.id ?? null;
 
 export interface SelectedEdgeCanvasFixtureProps {
   /**
@@ -87,7 +89,7 @@ export function SelectedEdgeCanvasFixture({
 
   useEffect(() => {
     let live = true;
-    void RENDERER.strategy(PENDING.strategyGraph).then((resolved) => {
+    void STRATEGY(PENDING.strategyGraph).then((resolved) => {
       if (live) setLaidOut(resolved);
     });
     return () => {

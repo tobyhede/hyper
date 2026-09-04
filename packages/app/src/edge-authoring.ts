@@ -10,7 +10,6 @@ import { CARD_SIZE } from './card';
 import type { ConnectionCompletion, ConnectionResult } from './connection-completion';
 import type { CanvasSelection, EdgeSubject, RenderAdapter } from './render-adapter';
 import { sameEdgeSubject, sameSelection } from './render-adapter';
-import type { CanvasRendererId } from './renderer';
 import type {
   AuthoringRefusal,
   EdgeEligibility,
@@ -331,16 +330,6 @@ const anchorCardOf = (draft: EdgeDraft): CardId => {
   return draft.endpoint === 'from' ? draft.edge.to : draft.edge.from;
 };
 
-/**
- * Whether two renderer selections name the same renderer — by value, not by
- * identity.
- *
- * Every completed Edit republishes its selection as a fresh object, so an
- * identity comparison reads "the renderer changed" after an Edit that plainly
- * stayed in the same Layout, and cancels a draft that had nothing to do with it.
- */
-const sameRenderer = (left: CanvasRendererId, right: CanvasRendererId): boolean => left === right;
-
 /** Whether a canvas selection names the thing this draft is about. */
 const selectionMatchesDraft = (selection: CanvasSelection, draft: EdgeDraft): boolean => {
   if (draft.kind === 'pointer-connect') {
@@ -507,7 +496,7 @@ export function createEdgeAuthoring({
     const nowPresenting = state.navigation.mode === 'presenting';
     const contextChanged =
       state.replacementEpoch !== replacementEpoch ||
-      !sameRenderer(state.navigation.selectedRenderer, selectedRenderer) ||
+      state.navigation.selectedRenderer !== selectedRenderer ||
       state.navigation.activeGraphId !== activeGraphId ||
       // Presenting withdraws Edge authoring altogether, so a draft made before
       // it has no context left to complete in. Cancelled rather than merely

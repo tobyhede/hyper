@@ -9,9 +9,9 @@ import {
   DRAWER_WIDTH,
   type EntityActionGroup,
 } from '@project/ui';
-import { type CardId, type GraphId, type LayoutPosition } from '@project/core';
+import { type CardId, type GraphId, type LayoutId, type LayoutPosition } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
-import { graphCardIds } from '@project/graph';
+import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
 import type { OpenSpace } from './open-spaces';
 import { openingPlacement } from './compose-app';
 import type { AuthoringRefusal } from './space-authoring';
@@ -25,7 +25,7 @@ import { canRetreat, navigationAddress } from './navigation';
 import { copyLink } from './clipboard';
 import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
-import type { CanvasRendererId } from './renderer';
+import { layoutCards, resolveLayout } from './layout-resolution';
 import type { DestinationOpening } from './destination-opening';
 import {
   destinationRestoration,
@@ -56,7 +56,6 @@ export const createApp = (
   const {
     readWorkingSpace,
     currentSpace,
-    resolveRenderer,
     navigation,
     authoring,
     adapter: useRenderAdapter,
@@ -138,17 +137,32 @@ export const createApp = (
     const [addedCardToFocus, setAddedCardToFocus] = useState<CardId | null>(null);
     const cardsDrag = useRef<{
       readonly cardId: CardId;
-      readonly rendererId: CanvasRendererId;
+      readonly rendererId: LayoutId;
     } | null>(null);
     const rendererSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
     );
     const renderer = useMemo(
-      () => resolveRenderer(rendererSpace, selectedRenderer),
+      () => resolveLayout(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
     );
-    // Everything the canvas draws, derived once from the Space and the renderer.
+    // The positioned strategy that draws this Layout, built where it is used:
+    // its one consumer is the placement rendering below (ADR 0025, ADR 0041).
+    const strategy = useMemo(
+      () => positionedStrategy(Placement.fromLayout(renderer.layout)),
+      [renderer],
+    );
+    // The Cards this Layout places. Memoized on the same two values the Layout
+    // is: it is the sole dependency of Edge Authoring's Card-title map and its
+    // endpoint choices, and a fresh array per render would rebuild both on every
+    // intermediate drag frame — which is the identity churn
+    // `edge-authoring-react.tsx` says its commands object must not have.
+    const subjectCards = useMemo(
+      () => layoutCards(rendererSpace, renderer.layout),
+      [rendererSpace, renderer],
+    );
+    // Everything the canvas draws, derived once from the Space and the Layout.
     // Memoized on those two alone: the interaction state below changes far more
     // often, and it is `project` that reads it rather than this.
     const projection = useMemo(
@@ -203,13 +217,9 @@ export const createApp = (
      * address in that Layout.
      */
     const contextualCardLink =
-      selectedCard === undefined ||
-      renderer.resolvedLayout.layout.positions[selectedCard.id] !== undefined;
+      selectedCard === undefined || renderer.layout.positions[selectedCard.id] !== undefined;
     const cardsOutsideSelectedLayout = useMemo(
-      () =>
-        rendererSpace.cards.filter(
-          (card) => renderer.resolvedLayout.layout.positions[card.id] === undefined,
-        ),
+      () => rendererSpace.cards.filter((card) => renderer.layout.positions[card.id] === undefined),
       [renderer, rendererSpace.cards],
     );
     // The one condition the toggle's `disabled` and the drawer's own open state
@@ -233,7 +243,7 @@ export const createApp = (
     // revealed once in one Layout and then adopt a different default Layout
     // that omits it, and that is a second reveal rather than a repeat.
     const revealedAddressRef = useRef<{
-      readonly renderer: CanvasRendererId;
+      readonly renderer: LayoutId;
       readonly cardId: CardId;
     } | null>(null);
     useEffect(() => {
@@ -260,7 +270,7 @@ export const createApp = (
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
-      renderer.strategy,
+      strategy,
       resizeDraft?.placement ?? authoredPositions,
     );
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
@@ -328,9 +338,7 @@ export const createApp = (
     } | null>(null);
     const chromeEditingDisabled =
       !editable || presenting || creatingAlias || editingCardBody || editingCardTitle;
-    const cardIsOpen = Object.values(renderer.resolvedLayout.layout.positions).some(
-      (at) => at?.open === true,
-    );
+    const cardIsOpen = Object.values(renderer.layout.positions).some((at) => at?.open === true);
 
     /**
      * Delete Card is withdrawn wherever Add Card is, and for one reason more.
@@ -459,7 +467,7 @@ export const createApp = (
       // also what asks the sync effect below to correct the location the report
       // was about, which is why the report is one of that effect's dependencies.
       setDestinationNotFound(false);
-      const resolved = resolveRenderer(currentSpace(), opening.selection);
+      const resolved = resolveLayout(currentSpace(), opening.selection);
       const changesRenderer = navigation.getState().selectedRenderer !== opening.selection;
       if (opening.graphId === null) navigation.selectRenderer(opening.selection);
       else if (opening.presentationCardId === null) {
@@ -486,7 +494,7 @@ export const createApp = (
      * the sync effect below decides from (ADR 0081).
      */
     const selectCanvasRenderer = useCallback(
-      (selection: CanvasRendererId) => {
+      (selection: LayoutId) => {
         setAddressedCardId(null);
         installDestinationOpening({
           selection,
@@ -587,7 +595,6 @@ export const createApp = (
         space: currentSpace(),
         snapshot: spaceSession.getState().working,
         pathname: window.location.pathname,
-        resolveRenderer,
         position,
         synced: previous,
       });
@@ -873,7 +880,7 @@ export const createApp = (
         spaceTitle={rendererSpace.title}
         canvas={{
           layouts: rendererSpace.layouts,
-          selected: renderer.resolvedLayout.layout,
+          selected: renderer.layout,
           onSelect: selectCanvasRenderer,
         }}
         graph={{
@@ -1009,7 +1016,7 @@ export const createApp = (
         insetEnd={cardsDrawerOpen ? DRAWER_WIDTH : undefined}
         header={
           <>
-            <SelectedCanvasRenderer layout={renderer.resolvedLayout.layout} titleEdit={titleEdit} />
+            <SelectedCanvasRenderer layout={renderer.layout} titleEdit={titleEdit} />
             {/* Trigger and panel are one component: only the trigger renders
                 here, the drawer portalling its popup over the canvas. That is
                 what stops the toggle's `disabled` and the surface it names from
@@ -1110,7 +1117,7 @@ export const createApp = (
                 selection={selection}
                 onSelectCard={selectCard}
                 onSelectEdge={selectEdge}
-                subjectCards={renderer.subject.cards}
+                subjectCards={subjectCards}
                 newCardTitle={newCardTitle}
                 onAddCard={addCard}
                 onAddExistingCard={dropExistingCard}
