@@ -451,6 +451,12 @@ export const createApp = (
         ? (layoutId) => {
             const result = authoring.complete({ kind: 'deleted-layout', layoutId });
             setLayoutManagementRefusal(result.kind === 'refused' ? result.refusal : null);
+            // Answered rather than swallowed, because the refusal set above is
+            // rendered *in the Sidebar* — and below its breakpoint that is a
+            // Sheet over the canvas. The Sidebar dismisses the Sheet on a menu
+            // command that did what its label said, so a Delete that did not
+            // has to say so or the alert it just armed goes off screen unread.
+            return result.kind === 'completed';
           }
         : null,
     });

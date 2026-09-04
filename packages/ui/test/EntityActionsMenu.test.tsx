@@ -35,8 +35,7 @@ afterAll(() => vi.unstubAllGlobals());
 const copyCommand = (onSelect: EntityAction['onSelect']): EntityAction => ({
   id: 'copy-link',
   label: 'Copy link',
-  confirmation: 'Copied',
-  failure: 'Not copied',
+  report: { done: 'Copied', failed: 'Not copied' },
   onSelect,
 });
 

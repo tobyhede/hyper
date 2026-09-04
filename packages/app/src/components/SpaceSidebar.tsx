@@ -51,7 +51,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from '@project/ui';
-import type { EntityActionGroup } from '@project/ui';
+import type { EntityAction, EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringRefusal } from '../space-authoring';
 
@@ -439,21 +439,50 @@ export function SpaceSidebar({
 }: SpaceSidebarProps) {
   // Below the primitive's breakpoint this whole surface is a modal Sheet drawn
   // *over* the canvas, with a focus trap and everything behind it inert. Every
-  // command here acts on the canvas, so every one of them dismisses the sheet
-  // first: Add Card and Add Alias open an editor that otherwise cannot take
-  // focus at all, and the rest would leave the author looking at the sidebar
-  // instead of the result. Above the breakpoint the sidebar is beside the canvas
-  // and there is nothing to dismiss.
+  // command here acts on the canvas, so every one of them dismisses the sheet:
+  // Add Card and Add Alias open an editor that otherwise cannot take focus at
+  // all, and the rest would leave the author looking at the sidebar instead of
+  // the result. A command that can be *refused* dismisses it only once it has
+  // done something, because the refusal is reported on this surface — the two
+  // wrappers below are that difference. Above the breakpoint the sidebar is
+  // beside the canvas and there is nothing to dismiss.
   const { isMobile, setOpenMobile } = useSidebar();
-  // Generic in what the command answers as well as in what it takes: a menu
-  // command answers whether it did what its label said, and a wrapper that
-  // swallowed that answer would put every wrapped command back to reporting on
-  // having been pressed. Commands that answer nothing are unaffected.
+  const dismissSheet = () => {
+    if (isMobile) setOpenMobile(false);
+  };
+  // Generic in what the command takes and answers alike, so a wrapped command
+  // is still the command it wrapped. Every command it wraps is a control whose
+  // whole result is on the canvas and that cannot be refused, so the sheet goes
+  // first and nothing is waited for.
   const onCanvas =
     <Args extends readonly unknown[], Result>(command: (...args: Args) => Result) =>
     (...args: Args): Result => {
-      if (isMobile) setOpenMobile(false);
+      dismissSheet();
       return command(...args);
+    };
+  /**
+   * The menu's version of `onCanvas`, with the order inverted: run the command,
+   * and dismiss the sheet only for the outcome that leaves something on the
+   * canvas to look at.
+   *
+   * The inversion is the whole point. `delete-layout` is the one wrapped
+   * command an Edit can **refuse** — the last Layout cannot go — and a refused
+   * Layout Edit is reported in this Sidebar's own alert, which below this
+   * breakpoint is on the sheet. Dismissing first took that surface away with
+   * the sentence still on it, and the reader was told nothing. `DeleteCardControl`
+   * below already closes only on a Delete that happened, for the same reason;
+   * this is that rule where the outcome arrives as an `EntityActionOutcome`
+   * rather than as a refusal string.
+   *
+   * `async` because an `onSelect` may answer with a promise, and awaiting is
+   * what makes the two cases one. The synchronous answer this command gives
+   * costs a microtask nobody can observe.
+   */
+  const onCanvasOutcome =
+    (command: EntityAction['onSelect']) => async (): Promise<EntityActionOutcome> => {
+      const outcome = await command();
+      if (outcome === 'done') dismissSheet();
+      return outcome;
     };
   const canvasAwareEntityActions: SpaceSidebarProps['entityActions'] =
     entityActions === undefined
@@ -462,7 +491,7 @@ export function SpaceSidebar({
           entityActions(entity).map((group) =>
             group.map((action) =>
               action.id === 'delete-layout'
-                ? { ...action, onSelect: onCanvas(action.onSelect) }
+                ? { ...action, onSelect: onCanvasOutcome(action.onSelect) }
                 : action,
             ),
           );

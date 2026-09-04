@@ -62,6 +62,7 @@ export type {
   EntityAction,
   EntityActionGroup,
   EntityActionOutcome,
+  EntityActionReport,
   EntityActionsProps,
   EntityActionsTriggerProps,
 } from './EntityActionsMenu';

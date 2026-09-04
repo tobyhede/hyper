@@ -40,6 +40,30 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  */
 export type EntityActionOutcome = 'done' | 'failed';
 
+/**
+ * The words an item reports with, one for each way its command can go.
+ *
+ * **Both or neither**, which is why this is one field rather than two optional
+ * ones. What the item shows is the word for whichever outcome the command
+ * answered, and holding the menu open to show it is decided *before* the answer
+ * arrives — so an item that named only one word could be held open over the
+ * outcome it had nothing to say about, and sit there under its unchanged label
+ * with no report to show and no timer to take one away. Pairing them means the
+ * menu is held open exactly when there is a word coming, either way it goes.
+ *
+ * Keyed by the outcome itself so the two cannot drift apart: `done` is what the
+ * label becomes once the command **has run** — "Copied", and once it has run
+ * rather than once it has been pressed, since the swap waits on what `onSelect`
+ * answers. `failed` is what it becomes instead when the command answers that it
+ * did not, "Not copied".
+ *
+ * The menu is where a failure has to be legible, not only in whatever standing
+ * notice the application also renders: below the Sidebar's breakpoint that
+ * surface is a Sheet drawn *over* the shell, so a report pinned under the header
+ * is behind it and a reader on a phone never sees it.
+ */
+export type EntityActionReport = Readonly<Record<EntityActionOutcome, string>>;
+
 /** How a trigger takes the treatment of the cluster it sits in. */
 type TriggerRender = ComponentProps<typeof DropdownMenuTrigger>['render'];
 
@@ -62,23 +86,10 @@ export interface EntityAction {
    */
   readonly description?: string | undefined;
   /**
-   * What the item's own label becomes once the command has run — "Copied".
-   *
-   * Once it **has run**, not once it has been pressed: the swap waits on what
-   * `onSelect` answers, so a command that reports a failure never claims to
-   * have succeeded first.
+   * The words this item reports its outcome with, or absent for a command that
+   * says nothing and simply closes the menu.
    */
-  readonly confirmation?: string | undefined;
-  /**
-   * What the label becomes instead when the command answers `failed` — "Not
-   * copied".
-   *
-   * The menu is where a failure has to be legible, not only in whatever
-   * standing notice the application also renders: below the Sidebar's
-   * breakpoint that surface is a Sheet drawn *over* the shell, so a report
-   * pinned under the header is behind it and a reader on a phone never sees it.
-   */
-  readonly failure?: string | undefined;
+  readonly report?: EntityActionReport | undefined;
   /**
    * The glyph drawn in the item's leading column — `<CopyIcon />` for an
    * address, `<EditIcon />` for a rename.
@@ -127,13 +138,8 @@ interface ActionReport {
   readonly word: string;
 }
 
-/** The word a finished command reports, or nothing when it has none to report. */
-const reported = (action: EntityAction, outcome: EntityActionOutcome): string | undefined =>
-  outcome === 'failed' ? action.failure : action.confirmation;
-
 /** Whether an item has anything to say after the press, either way it goes. */
-const reports = (action: EntityAction): boolean =>
-  action.confirmation !== undefined || action.failure !== undefined;
+const reports = (action: EntityAction): boolean => action.report !== undefined;
 
 /**
  * What an item shows in place of its label once its command has answered, and
@@ -163,15 +169,14 @@ function useConfirmation() {
 
   const fire = useCallback((action: EntityAction) => {
     const outcome = action.onSelect();
-    if (!reports(action)) return;
+    // Read once, before the await: an item that names its words has one for
+    // every outcome, so past this line there is always a word to show and the
+    // menu the press held open is never held over nothing.
+    const words = action.report;
+    if (words === undefined) return;
     void Promise.resolve(outcome).then((answered) => {
-      const word = reported(action, answered);
       window.clearTimeout(clearTimer.current);
-      if (word === undefined) {
-        setReport(null);
-        return;
-      }
-      setReport({ id: action.id, word });
+      setReport({ id: action.id, word: words[answered] });
       clearTimer.current = window.setTimeout(() => setReport(null), 1600);
     });
   }, []);

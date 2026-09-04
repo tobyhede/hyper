@@ -49,8 +49,18 @@ export interface SpaceEntityActionsOptions {
    */
   readonly onRename:
     ((subject: SpaceChromeTitleSubject, title: string, returnFocus: () => void) => void) | null;
-  /** Deletes the Layout, or `null` while no Layout Edit may run. */
-  readonly onDeleteLayout: ((layoutId: LayoutId) => void) | null;
+  /**
+   * Deletes the Layout, answering whether it went, or `null` while no Layout
+   * Edit may run.
+   *
+   * The answer is not decoration: the Sidebar dismisses its mobile Sheet for a
+   * command that did what its label said, and the refusal a refused deletion
+   * produces is rendered *on that Sheet*. A callback that swallowed its outcome
+   * left the item answering `done` either way, which took the surface the
+   * refusal was about to be printed on away with it. Same shape and same reason
+   * as `onCopy` above.
+   */
+  readonly onDeleteLayout: ((layoutId: LayoutId) => boolean) | null;
 }
 
 /**
@@ -90,8 +100,7 @@ const copy = (
   id,
   label,
   description,
-  confirmation: 'Copied',
-  failure: NOT_COPIED,
+  report: { done: 'Copied', failed: NOT_COPIED },
   icon: <CopyIcon />,
   // The item reports on the copy, so the copy is what is waited for. `async`
   // rather than a `then` chain because the answer is the return value here —
@@ -199,13 +208,12 @@ export function spaceEntityActions({
                 label: 'Delete Layout',
                 icon: <DeleteIcon />,
                 variant: 'destructive',
-                // The Edit reports through the Sidebar's own refusal alert, and
-                // this item carries no confirmation to swap, so `done` is all
-                // there is to say here.
-                onSelect: () => {
-                  onDeleteLayout(layoutId);
-                  return 'done';
-                },
+                // The Edit's prose report is the Sidebar's own refusal alert,
+                // and this item carries no words of its own to swap — so what
+                // the outcome is read for is not the label. It is what tells
+                // the Sidebar whether the Delete had a canvas result to dismiss
+                // its mobile Sheet for, and a refusal renders on that Sheet.
+                onSelect: (): EntityActionOutcome => (onDeleteLayout(layoutId) ? 'done' : 'failed'),
               },
             ],
       ];

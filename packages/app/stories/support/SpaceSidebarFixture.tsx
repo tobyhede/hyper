@@ -217,9 +217,7 @@ export function SpaceSidebarFixture({
           chromeTitleEdit.onBegin(subject, title, 'sidebar', returnFocus)
       : null,
     onDeleteLayout: editsAvailable
-      ? (layoutId) => {
-          authoring.complete({ kind: 'deleted-layout', layoutId });
-        }
+      ? (layoutId) => authoring.complete({ kind: 'deleted-layout', layoutId }).kind === 'completed'
       : null,
   });
 

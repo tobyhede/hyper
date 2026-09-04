@@ -81,7 +81,7 @@ describe('spaceEntityActions', () => {
     },
   ])('never says canonical or contextual in $name’s menu', ({ entity }) => {
     const written = commands(build()(entity))
-      .flatMap((action) => [action.label, action.description ?? '', action.confirmation ?? ''])
+      .flatMap((action) => [action.label, action.description ?? '', action.report?.done ?? ''])
       .join(' ')
       .toLowerCase();
 
@@ -122,6 +122,23 @@ describe('spaceEntityActions', () => {
     });
 
     expect(labels(groups)).toEqual(['Copy link']);
+  });
+
+  /**
+   * What the Delete answers, which is not a nicety: the Sidebar dismisses its
+   * mobile Sheet on a command that did what its label said, and the refusal a
+   * refused deletion produces renders *on that Sheet*. An item that answered
+   * `done` either way took the surface its own refusal was about to be printed
+   * on away with it, and the reader was told nothing.
+   */
+  it.each([
+    { outcome: 'done', deleted: true, name: 'the Layout was deleted' },
+    { outcome: 'failed', deleted: false, name: 'the Edit was refused' },
+  ])('answers $outcome when $name', async ({ outcome, deleted }) => {
+    const groups = build({ onDeleteLayout: () => deleted })({ kind: 'layout', layout: LAYOUT });
+    const action = commands(groups).find((candidate) => candidate.id === 'delete-layout');
+
+    expect(await action?.onSelect()).toBe(outcome);
   });
 
   /**
@@ -190,7 +207,7 @@ describe('spaceEntityActions', () => {
 
     expect(copies).toHaveLength(2);
     for (const action of copies) {
-      expect(action.confirmation).toBe('Copied');
+      expect(action.report?.done).toBe('Copied');
       expect(action.description).toBeTypeOf('string');
       expect(action.icon).toBeDefined();
     }

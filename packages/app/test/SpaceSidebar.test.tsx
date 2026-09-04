@@ -668,6 +668,53 @@ describe('SpaceSidebar', () => {
       expect(screen.getByTestId('space-title')).toBeVisible();
     });
 
+    /**
+     * A Layout's Delete is the one menu command with a canvas result, so it is
+     * the one the sheet is dismissed for — but only once there is a result.
+     *
+     * The same rule the refused Card Delete above follows, and for the same
+     * reason: the Sidebar renders a refused Layout Edit in its own alert, and
+     * below this breakpoint that alert is on the Sheet. Dismissing the Sheet
+     * first takes the only surface the reader could have been told on.
+     */
+    const layoutActions =
+      (onSelect: EntityAction['onSelect']): NonNullable<SpaceSidebarProps['entityActions']> =>
+      (entity) =>
+        entity.kind === 'layout'
+          ? [[], [], [{ id: 'delete-layout', label: 'Delete Layout', onSelect }]]
+          : [];
+
+    it('stays open when a Layout deletion is refused', async () => {
+      const onSelect = vi.fn(() => 'failed' as const);
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        entityActions: layoutActions(onSelect),
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout 1' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+
+      // Waited for rather than asserted on the spot: the dismissal this
+      // withholds is decided on what the command answers, which is a microtask
+      // away even when the command answers synchronously.
+      await waitFor(() => expect(onSelect).toHaveBeenCalledOnce());
+      expect(screen.getByTestId('space-title')).toBeVisible();
+    });
+
+    it('dismisses itself when a Layout is deleted', async () => {
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        entityActions: layoutActions(() => 'done'),
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout 1' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+
+      await dismissed();
+    });
+
     it('dismisses itself when a Graph is activated', async () => {
       const base = settledProps();
       const props: SpaceSidebarProps = {
@@ -698,13 +745,24 @@ describe('SpaceSidebar', () => {
      * that confirmation is on away with it.
      */
     it('stays open while a copy command confirms in place', async () => {
-      const onSelect = vi.fn();
+      const onSelect = vi.fn(() => 'done' as const);
       const props: SpaceSidebarProps = {
         ...settledProps(),
         selectedCard: { card: SELECTED_CARD },
         entityActions: (entity) =>
           entity.kind === 'card'
-            ? [[], [{ id: 'copy-link', label: 'Copy link', confirmation: 'Copied', onSelect }], []]
+            ? [
+                [],
+                [
+                  {
+                    id: 'copy-link',
+                    label: 'Copy link',
+                    report: { done: 'Copied', failed: 'Not copied' },
+                    onSelect,
+                  },
+                ],
+                [],
+              ]
             : [],
       };
       openSheet(props);
