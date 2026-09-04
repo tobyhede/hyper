@@ -235,11 +235,40 @@ exact position.
 **Notification, not an effect's dependency list.** The module subscribes to
 Space Authoring, which republishes on both its collaborators and coalesces an
 Edit's several writes into one publication — the batching the React effect used
-to get for free. A `deciding` depth counter around each operation replaces
-React's batching for the writes the module itself makes, so `popstate` writing
-the Layout, the Graph and the addressed Card is still one decision rather than
-three. Redundant notifications are harmless by construction: `samePosition`
-against the private `syncedPosition` returns before the pathname is even read.
+to get for free.
+
+The module does **not** replace that batching. Each operation writes the whole
+of its own state *before* it moves a collaborator, so a notification raised
+part-way through already sees the settled position and decides what the
+operation's own `settle` would decide; the second decision is then a no-op,
+because `sync` skips a position it has recorded and `publish` skips a state that
+has not changed. That is the functional-core rule `AGENTS.md` already asks for,
+and it is why no window around an operation is needed.
+
+The ordering is load-bearing rather than incidental, and `restore` is where it
+bites: the restored Card is known the moment the restoration resolves, and
+setting it after `arriveAt` would notify against a position still carrying the
+Card the reader is leaving — taking a history entry over the one the browser has
+just navigated to, which is the entry ADR 0081's `none` exists to refuse.
+
+A depth counter around each operation was written first and does work: it
+suppresses the mid-operation notification, so the ordering stops mattering. It
+was replaced because of what it cost in evidence rather than in lines. Four
+runs, each of the thirteen tests, settled it:
+
+| Module | Ordering | Result |
+| --- | --- | --- |
+| `settle` | Card before `arriveAt` | 13 passed |
+| `settle` | Card after `arriveAt` | **1 failed** — the Back test |
+| `settle` | `follow` ignores a second composition | **1 failed** — the follow test |
+| depth counter | Card after `arriveAt` | 13 passed |
+
+The last row is the argument. With the counter in place a wrong ordering is
+invisible, so nothing in the suite could fail if a later operation got it wrong;
+without it, the rule is stated in one comment and pinned by one test that does
+fail. The counter's robustness was real and is the thing given up: it covered
+any ordering mistake in any operation, where the rule now covers the operations
+that have a test.
 
 **`createSpaceStartup` takes the adapter as an optional third seam.**
 `test/unit/app-http-startup.test.ts` composes it twelve times in the node

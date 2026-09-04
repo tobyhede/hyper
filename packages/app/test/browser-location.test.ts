@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type GraphId, type LayoutId, type SpaceSnapshot } from '@project/core';
+import {
+  uuidSchema,
+  type CardId,
+  type GraphId,
+  type LayoutId,
+  type SpaceSnapshot,
+} from '@project/core';
 import { productDestinationPath } from '@project/http';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { createBrowserLocation } from '../src/browser-location';
@@ -105,6 +111,9 @@ const presentationPath = productDestinationPath({
   graphId: GRAPH_ID,
   cardId: CARD_A,
 });
+
+const cardPath = (layoutId: LayoutId, cardId: CardId): string =>
+  productDestinationPath({ kind: 'layout-card', spaceId: SPACE_ID, layoutId, cardId });
 
 const deadPath = layoutPath(MISSING_LAYOUT_ID);
 
@@ -286,6 +295,58 @@ describe('the browser location', () => {
     expect(location.href({ kind: 'layout', spaceId: SPACE_ID, layoutId: OTHER_LAYOUT_ID })).toBe(
       new URL(layoutPath(OTHER_LAYOUT_ID), history.href()).href,
     );
+    location.dispose();
+  });
+
+  /**
+   * The Back that lands somewhere real, which every other Back here does not.
+   *
+   * It is the one path that both moves Navigation and names a Card, so it is
+   * where the order of the two matters: the Card is known the moment the
+   * restoration resolves, and moving Navigation before recording it would
+   * notify against a position still carrying the Card the reader is leaving.
+   * The sync that notification triggers would then see an address that moved
+   * and take an entry over the one the browser has just navigated to — which is
+   * the entry ADR 0081's `none` outcome exists to refuse.
+   */
+  it('restores a Back onto a resolvable Card location without earning an entry', () => {
+    const app = compose();
+    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const location = createBrowserLocation(history);
+    location.follow(app);
+    location.chooseLayout(OTHER_LAYOUT_ID);
+    expect(history.writes).toEqual([{ method: 'push', path: layoutPath(OTHER_LAYOUT_ID) }]);
+
+    history.popTo(cardPath(LAYOUT_ID, CARD_B));
+
+    expect(app.navigation.getState().selectedLayoutId).toBe(LAYOUT_ID);
+    expect(location.getState().addressedCardId).toBe(CARD_B);
+    expect(location.getState().destinationNotFound).toBe(false);
+    expect(history.writes).toEqual([{ method: 'push', path: layoutPath(OTHER_LAYOUT_ID) }]);
+    location.dispose();
+  });
+
+  /**
+   * One history stack, so one followed composition — the reason this module is
+   * the session's and not each Space's.
+   *
+   * Following a second one re-points every later operation at it, and leaves
+   * the first where it was. Without that, two open Spaces would each hold the
+   * position they last synced to and disagree about the one address bar.
+   */
+  it('sends a later operation to the composition it followed last', () => {
+    const first = compose();
+    const second = compose();
+    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const location = createBrowserLocation(history);
+
+    location.follow(first);
+    location.follow(second);
+    location.chooseLayout(OTHER_LAYOUT_ID);
+
+    expect(second.navigation.getState().selectedLayoutId).toBe(OTHER_LAYOUT_ID);
+    expect(first.navigation.getState().selectedLayoutId).toBe(LAYOUT_ID);
+    expect(history.writes).toEqual([{ method: 'push', path: layoutPath(OTHER_LAYOUT_ID) }]);
     location.dispose();
   });
 
