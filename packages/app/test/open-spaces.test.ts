@@ -487,6 +487,71 @@ describe('Open Spaces', () => {
     expect(seen).toEqual([]);
   });
 
+  it('accepts the baseline for a participant the conflict never named', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    // The conflict names the cascade's target only. Meta is a participant
+    // because the same edit removes its Space Card, but the repository never
+    // complained about it, so it has no remote snapshot of its own. The named
+    // Space carries a revision of its own so that Meta keeping 1n below is
+    // evidence it held its own baseline rather than adopting the reported one.
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [{ spaceId: OTHER_ID, current: { ...loaded(OTHER_ID, 'Remote'), revision: 9n } }],
+    });
+    const { openSpaces } = setup(control);
+    const meta = await openSpaces.open(META_ID);
+    await openSpaces.open(OTHER_ID);
+    // What Meta is working on before the cascade. Whether this is also what is
+    // *stored* is the claim under test, so it is not named for the conclusion.
+    const beforeCascade = meta.session.getState().working;
+
+    await openSpaces.spaceCards.delete({
+      containingSpaceId: META_ID,
+      cardId: META_SPACE_CARD_ID,
+    });
+    await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('conflicted'));
+    expect(meta.session.getState().working.cards.map((card) => card.id)).not.toContain(
+      META_SPACE_CARD_ID,
+    );
+    const before = meta.app.authoring.getState().replacementEpoch;
+
+    // Reload is reachable here precisely because the baseline is what is
+    // stored: the cascade never committed, so accepting it puts the Space Card
+    // the edit removed back.
+    expect(meta.app.authoring.acceptStoredSpace()).toBeNull();
+
+    expect(meta.session.getState()).toMatchObject({
+      working: beforeCascade,
+      acknowledgedRevision: 1n,
+      persistence: { kind: 'settled' },
+    });
+    expect(meta.session.getState().working.cards.map((card) => card.id)).toContain(
+      META_SPACE_CARD_ID,
+    );
+    expect(meta.app.authoring.getState().replacementEpoch).toBe(before + 1);
+  });
+
+  it('has no stored side to accept for a Space the conflict reported gone', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [{ spaceId: OTHER_ID, current: undefined }],
+    });
+    const { openSpaces } = setup(control);
+    const other = await openSpaces.open(OTHER_ID);
+    other.session.submit(edit(other.session.getState().working));
+    await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('conflicted'));
+    const before = other.app.authoring.getState();
+
+    // Keeping local work is this one's recovery — it re-commits as a create —
+    // so accepting answers with the reason and changes nothing.
+    expect(other.app.authoring.acceptStoredSpace()).toBe(
+      'This Space was deleted while the coordinated edit was saving. Keep your local version to restore it.',
+    );
+    expect(other.app.authoring.getState().replacementEpoch).toBe(before.replacementEpoch);
+    expect(other.session.getState().persistence.kind).toBe('conflicted');
+  });
+
   it('never closes the permanent Meta Space', async () => {
     const { openSpaces } = setup();
     const meta = await openSpaces.open(META_ID);
