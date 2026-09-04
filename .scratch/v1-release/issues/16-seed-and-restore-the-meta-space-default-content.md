@@ -7,8 +7,7 @@ content is ordinary authored state after creation: authors may edit or delete
 it, and later loads never repair or reseed it.
 
 **Blocked by:** 01 — Establish the Meta Space lifecycle; `space-cards/01` — Open
-and edit a Space Card in place; `alias-cards/06` — Open an Alias on its Target
-content read-only.
+and edit a Space Card in place.
 
 **Status:** ready-for-agent
 Tags: release/v1

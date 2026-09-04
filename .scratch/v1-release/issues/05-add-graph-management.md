@@ -13,6 +13,8 @@ Sidebar and finish the selected-Edge lifecycle.
 - [ ] Graph colour is used consistently by Edges, handles and presentation chrome.
 - [ ] Edge selection exposes reconnect and delete controls after both creation and
       reconnection.
-- [ ] Desktop and narrow-screen workflows have keyboard, pointer, application and
-      Ladle evidence.
+- [ ] The Graph and Edge controls this ticket owns have desktop and narrow-screen
+      keyboard, pointer, application and Ladle evidence. The complete V1 workflow
+      across every command surface is `v1-release/06`'s, and it is blocked by
+      this ticket.
 

@@ -9,7 +9,7 @@ Assignee: agent
 ## Question
 
 Assemble the resolved decisions into one decision-complete implementation
-handoff: the End-to-end boundary, dependency graph and critical path, parallel
+handoff: the End-to-end boundary, dependency graph and critical subgraph, parallel
 work, feedback scope-control rule, complete V1 acceptance matrix, proof owners,
 documentation obligations and tag checklist. Link existing implementation
 tickets rather than duplicating their build instructions. Does any unresolved
@@ -43,59 +43,41 @@ View/Space View contract.
 
 ### Executable dependency graph
 
-1. **Settle shared seams.** Build
-   [architecture 12](../../architecture-review/issues/12-make-meta-lifecycle-one-deep-module.md)
-   and
-   [architecture 14](../../architecture-review/issues/14-deepen-open-spaces-composition.md).
-   Run [architecture 13](../../architecture-review/issues/13-concentrate-aggregate-commit-semantics.md)
-   as the mandatory diagnostic: refactor only if its differential test exposes
-   drift. Complete
-   [`layout-only-v1/03`](../../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md)
-   here — `layout-only-v1/01` and `02` are built, and both
-   [V1/08](08-round-trip-multi-space-import-and-export.md) and
-   [Space Card reference authoring](../../entity-url-addressability/issues/07-author-a-space-card-reference.md)
-   are blocked on it. In parallel, complete
-   [Alias Opening](../../alias-cards/issues/06-open-alias-shows-target-content-read-only.md),
-   [V1/02](02-complete-the-cards-view.md), [V1/17](17-preserve-structured-aggregate-refusals.md)
-   and [V1/18](18-restore-aggregate-http-wire-policy-proof.md).
-2. **Complete aggregate-facing capabilities.** Once their individual seam
-   blockers clear, run [V1/01](01-establish-the-meta-space-lifecycle.md),
-   [V1/08](08-round-trip-multi-space-import-and-export.md) and
-   [Space Card reference/lifetime authoring](../../entity-url-addressability/issues/07-author-a-space-card-reference.md)
-   in parallel.
-3. **Join Spaces into the application.** Build
-   [in-place Space Card Opening](../../space-cards/issues/01-render-a-space-card-as-a-sub-flow.md)
-   and the [tracked multi-Space fixture](../../space-cards/issues/10-extend-the-dev-fixture-to-linked-spaces.md),
-   then build
-   [Enter and independent Opening](../../entity-url-addressability/issues/08-enter-and-independently-open-a-space-card.md)
-   through architecture 14's Open Spaces owner, with
-   [`layout-only-v1/04`](../../layout-only-v1/issues/04-make-space-cards-select-initialized-layouts.md)
-   settling the initialised-Layout selection a Space Card stores.
-4. **Compose the checkpoint product.** Complete the unified Card-kind surface in
-   [V1/03](03-complete-card-lifecycle-controls.md) and canonical Default Content
-   and reset in [V1/16](16-seed-and-restore-the-meta-space-default-content.md).
-5. **Close End-to-end.** Resolve required desktop evidence/accessibility gaps,
-   resolve architecture 13 with either agreement evidence or its required drift
-   refactor, then run [V1/19](19-prove-the-clean-clone-end-to-end-rehearsal.md).
-   Its successful recorded clean-clone journey completes the untagged
-   checkpoint.
-6. **Classify observed feedback.** Apply ticket 13. Accepted blocker or
+`pnpm roadmap` derives the dependency graph and the critical subgraph from the
+implementation tickets' own `Blocked by` fields. It is the authority for what is
+blocked, what is pickable and in what order the work to End-to-end falls, and
+[ticket 12](12-decide-the-v1-critical-path.md) says what each wave of that order
+is for. This handoff no longer restates either in prose: the prose copies
+disagreed with the tool and with each other, and only the tool is regenerated
+when a ticket's blockers change. Run it, and read ticket 12 beside it.
+
+What the tool does not say, and this handoff does:
+
+1. **Reach End-to-end.** Build the tickets `pnpm roadmap` reports as unblocked,
+   in the order it reports, until
+   [V1/03](03-complete-card-lifecycle-controls.md)'s unified Card-kind surface
+   and [V1/16](16-seed-and-restore-the-meta-space-default-content.md)'s
+   canonical Default Content and reset compose the checkpoint product. Then
+   resolve required desktop evidence and accessibility gaps and run
+   [V1/19](19-prove-the-clean-clone-end-to-end-rehearsal.md); its successful
+   recorded clean-clone journey completes the untagged checkpoint.
+2. **Classify observed feedback.** Apply ticket 13. Accepted blocker or
    correction work returns to its real owner, updates the Definition of Done and
-   critical path where required, and reruns affected proof. Non-blocking work is
+   the sequence where required, and reruns affected proof. Non-blocking work is
    recorded beyond V1.
-7. **Finish the V1 product.** Complete [Graph management](05-add-graph-management.md),
+3. **Finish the V1 product.** Complete [Graph management](05-add-graph-management.md),
    [replacement-discard acknowledgement](../../interaction-draft-invalidation/issues/04-acknowledge-markdown-prose-discarded-by-replacement.md)
    and [V1 product design](06-finalise-v1-product-design.md), including
    responsive surfaces and Ladle/application parity.
-8. **Prove and tag.** Execute [V1/07](07-prove-the-v1-release.md) under ticket
+4. **Prove and tag.** Execute [V1/07](07-prove-the-v1-release.md) under ticket
    14's matrix, rehearsal, defect and go/no-go contract. V1/07 owns final
    observed narrow-screen usability after V1/06; V1/19 remains the earlier
    desktop checkpoint evidence.
 
-The critical spine remains Layout-only → shared seams → Meta/aggregate/Space
-Card lifetime → Opening/Open Spaces/fixture → Default Content and unified
-controls → End-to-end rehearsal → classified corrections → full Layout/Graph
-management and product finish → final proof and tag.
+Step 2 is the one item outside the ticket graph: ticket 13 classifies observed
+feedback rather than waiting on anything. Steps 1, 3 and 4 name tracked
+`release/v1` tickets the tool already orders — they are grouped here by purpose,
+not derived independently of it.
 
 ### Acceptance and proof ownership
 
@@ -163,10 +145,11 @@ executable or observed proof of product behavior.
 
 No known release-contract or product-scope decision remains between the
 repository and `v1.0.0`. The Layout-only baseline is landed and reconciled, so
-`layout-only-v1/01` and `02` are built and `03` and `04` remain; architecture
-13 may conditionally promote a refactor when its diagnostic runs, and End-to-end
-feedback may create corrections through ticket 13. These are decided
-contingencies and implementation work, not open design questions.
+`layout-only-v1/01` and `02` are built and `03` and `04` remain; architecture 13
+has since run its diagnostic, found the two adapters agree and promoted no
+refactor, so that contingency is closed; and End-to-end feedback may still
+create corrections through ticket 13. These are decided contingencies and
+implementation work, not open design questions.
 
 Exact Default Content prose and final visual treatment remain bounded
 implementation choices under their existing acceptance criteria. A genuinely

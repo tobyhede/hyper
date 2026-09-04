@@ -16,9 +16,11 @@ Layout creates an empty Layout instead of copying a resolved placement.
 Add Layout and the rename, select and delete surface; the Layout independence and
 reload criteria below moved there unchanged.
 
-- [ ] Rename, select and delete operate on one Layout with clear empty and refusal
-      states.
-- [ ] Deleting a Layout does not delete Cards from the Space.
-- [ ] Each Layout retains independent membership, placement, Open state, Open Size,
-      Graphs and Active Graph through reload.
-- [ ] Desktop and narrow-screen workflows have application and Ladle evidence.
+Transferred, not open — each is owned and tracked there now:
+
+- Rename, select and delete operate on one Layout with clear empty and refusal
+  states.
+- Deleting a Layout does not delete Cards from the Space.
+- Each Layout retains independent membership, placement, Open state, Open Size,
+  Graphs and Active Graph through reload.
+- Desktop and narrow-screen workflows have application and Ladle evidence.
