@@ -61,6 +61,7 @@ export { EntityActions, EntityActionsTrigger } from './EntityActionsMenu';
 export type {
   EntityAction,
   EntityActionGroup,
+  EntityActionOutcome,
   EntityActionsProps,
   EntityActionsTriggerProps,
 } from './EntityActionsMenu';

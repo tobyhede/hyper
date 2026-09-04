@@ -6,6 +6,7 @@ import {
   EditIcon,
   type EntityAction,
   type EntityActionGroup,
+  type EntityActionOutcome,
 } from '@project/ui';
 import type { SpaceChromeTitleSubject, SpaceEntity } from './components/SpaceSidebar';
 
@@ -27,8 +28,16 @@ export interface SpaceEntityActionsOptions {
   readonly spaceId: UUID;
   /** Named in the Space's own destination sentence. */
   readonly spaceTitle: string;
-  /** Puts one address on the clipboard. */
-  readonly onCopy: (destination: ProductDestination) => void;
+  /**
+   * Puts one address on the clipboard, answering whether it got there.
+   *
+   * The answer is what the menu item reports, which is why this is not a plain
+   * `void`: a browser that refuses clipboard access refuses it a microtask
+   * after the press, so an item that reported on the press said "Copied" over a
+   * link nobody could paste. A caller that cannot fail — a fixture recording
+   * the destination — answers `true`.
+   */
+  readonly onCopy: (destination: ProductDestination) => boolean | Promise<boolean>;
   /**
    * Begins the entity's inline rename, or `null` while no rename may begin.
    *
@@ -53,9 +62,23 @@ export interface SpaceEntityActionsOptions {
  * it does not — and **"Copy permanent link" is offered only when it differs**.
  * Neither label says "canonical" or "contextual"; those words stay in the code
  * and out of the product.
+ *
+ * The `space` branch below is the one place this rule is not followed, and it
+ * says why there.
  */
 const COPY_LINK = 'Copy link';
 const COPY_PERMANENT_LINK = 'Copy permanent link';
+
+/**
+ * What a copy command's own label says when the clipboard refused it.
+ *
+ * The application also pins "Link not copied" under the header, and that notice
+ * is not enough on its own: below the Sidebar's breakpoint the menu is inside a
+ * Sheet drawn over the area the notice renders in, so the item the reader just
+ * pressed is the only place they can be told. Same two words as the notice's
+ * title, minus the subject the item already names.
+ */
+const NOT_COPIED = 'Not copied';
 
 const copy = (
   id: string,
@@ -68,8 +91,14 @@ const copy = (
   label,
   description,
   confirmation: 'Copied',
+  failure: NOT_COPIED,
   icon: <CopyIcon />,
-  onSelect: () => onCopy(destination),
+  // The item reports on the copy, so the copy is what is waited for. `async`
+  // rather than a `then` chain because the answer is the return value here —
+  // fire-and-forget past a `then` is exactly what let the label swap before the
+  // clipboard had answered.
+  onSelect: async (): Promise<EntityActionOutcome> =>
+    (await onCopy(destination)) ? 'done' : 'failed',
 });
 
 /**
@@ -109,15 +138,31 @@ export function spaceEntityActions({
             id: 'rename',
             label: 'Rename',
             icon: <EditIcon />,
-            onSelect: () => onRename(subject, title, focusRow(attribute, subject.id)),
+            // `done` unconditionally: opening an editor is the whole command,
+            // and whether the rename it begins is then accepted is the
+            // editor's report to make, not this item's.
+            onSelect: () => {
+              onRename(subject, title, focusRow(attribute, subject.id));
+              return 'done';
+            },
           },
         ];
 
   return (entity) => {
     if (entity.kind === 'space') {
       // No Rename: the application has no Space rename affordance, and a menu
-      // is not the place to invent one. No second address either — a Space has
-      // exactly one, so there is nothing for "permanent" to differ from.
+      // is not the place to invent one.
+      //
+      // One address, and it is the Space's **own** — the one place this module
+      // departs from the rule above, so it is written down rather than left to
+      // be discovered. An address that reproduces what is on screen does exist:
+      // the drawing Layout's. Copying that here would hand a recipient the
+      // Collection the reader is looking at, and would give this menu the
+      // second form ("Copy permanent link") it has never had. It would also
+      // stop the Space's link meaning the Space. Which of the two a Space title
+      // means is a product decision `.scratch/link-ux` has not taken, so the
+      // behaviour stands and the item's own sentence says plainly where it
+      // lands rather than implying the screen.
       return [
         [],
         [
@@ -154,7 +199,13 @@ export function spaceEntityActions({
                 label: 'Delete Layout',
                 icon: <DeleteIcon />,
                 variant: 'destructive',
-                onSelect: () => onDeleteLayout(layoutId),
+                // The Edit reports through the Sidebar's own refusal alert, and
+                // this item carries no confirmation to swap, so `done` is all
+                // there is to say here.
+                onSelect: () => {
+                  onDeleteLayout(layoutId);
+                  return 'done';
+                },
               },
             ],
       ];

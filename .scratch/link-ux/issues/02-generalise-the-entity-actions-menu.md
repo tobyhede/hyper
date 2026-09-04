@@ -1,6 +1,6 @@
 # 02 — The entity-actions menu is general now: reicon it, and put the links back in it
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **What to build:** Finish the production wiring issue 01 left open, and reconcile the menu's presentation with what it actually became. Four things, one change: a glyph that says "options" rather than "link"; the Copy link / Copy permanent link commands added to the menu for every entity that has an address; a per-item icon on `EntityAction`; and a design pass over the item layout now that a group can hold a rename, a destructive command and two addresses side by side.
 
@@ -93,10 +93,20 @@ Two prototype commands were **dropped rather than implemented**, and each for th
 
 Deleting the `cardLinks` copy buttons left the selected Card with no menu to hang off — `SpaceEntity` had `space`, `layout` and `graph`, and the rail is out of scope. So `SpaceEntity` gained a `card` arm and the Sidebar footer now names the selected Card as a row of its own, carrying the same trailing icon and right click every other entity row carries. Delete Card stays exactly as it was, beneath that row: it owns a confirmation dialog a menu item cannot host, and the ticket says to keep it.
 
-### Known limitation, not fixed here
+### The known limitation the review closed
 
-`EntityActionsMenu` fires its confirmation synchronously, so a copy whose clipboard write is then refused still swaps the label to "Copied" while the refusal appears in the notice area. That is the component's existing design and predates this change; making the confirmation await a result is a change to `EntityAction`'s contract and belongs in its own ticket.
+This ticket shipped with `EntityActionsMenu` firing its confirmation synchronously, and recorded that as a limitation belonging in its own ticket: a copy whose clipboard write was then refused still swapped the label to "Copied" while the refusal appeared in the notice area. Review found it, and it was fixed here rather than deferred, because the mobile change above is what turns it from cosmetic into silence — a copy no longer dismisses the Sheet, and the notice area the refusal is reported in sits behind that Sheet, so on a phone the false "Copied" was the only thing a reader got.
+
+`EntityAction.onSelect` now answers an `EntityActionOutcome` (`'done' | 'failed'`, or a promise of one) and the label swap awaits it. A failure shows `EntityAction.failure` — "Not copied" — in place of the label, in the menu the command was pressed in, and `closeOnClick` holds the menu open for a failure as it does for a confirmation. `packages/ui/test/EntityActionsMenu.test.tsx` and `SpaceApp.test.tsx` hold both halves, each written red first.
+
+The same review also claimed the confirmation's live region is `aria-hidden` while the menu is open. **It is not**, and the test comment asserting it was the false claim. Base UI's `markOthers` collects every `[aria-live]` element and keeps it and its ancestors out of the set it hides, precisely so a region outside a modal popup still announces; and the dropdown path is not modal at all, since `MenuPopup` passes `modal: isContextMenu`. The comment has been rewritten and the third-party guarantee pinned by a test rather than asserted in prose.
 
 ### Unresolved
 
 Nothing in the ticket was left undone. `packages/app/package.json` gained one explicit subpath import — `"#src/entity-actions": "./src/entity-actions.tsx"` — because `#src/*` maps to `./src/*.ts` alone and the new module is `.tsx`. An array fallback (`["./src/*.ts", "./src/*.tsx"]`) typechecks but Vite does not resolve it, so the exact key is the portable form.
+
+### Open decision, from review: what the Space title's "Copy link" means
+
+`entity-actions.tsx` states the rule that "Copy link" is whichever address reproduces what is on screen, and the `space` branch does not follow it: it answers `{ kind: 'space', spaceId }`, which resolves to `defaultLayout`. So a reader on Collection 2 copies a link that opens the recipient on Collection 1. The address that would satisfy the rule does exist — the drawing Layout's — which makes the branch's original justification ("a Space has exactly one, so there is nothing for *permanent* to differ from") simply false. That comment has been corrected in place.
+
+What remains is a product question neither issue 01 nor this one settled: **does the Space title's "Copy link" mean the Space, or the Space as currently drawn?** The second reading also gives the Space a genuine second address, and so puts a "Copy permanent link" item in a menu that has never had one. Behaviour is unchanged pending that decision, and it is not in this ticket's scope.

@@ -445,11 +445,15 @@ export function SpaceSidebar({
   // instead of the result. Above the breakpoint the sidebar is beside the canvas
   // and there is nothing to dismiss.
   const { isMobile, setOpenMobile } = useSidebar();
+  // Generic in what the command answers as well as in what it takes: a menu
+  // command answers whether it did what its label said, and a wrapper that
+  // swallowed that answer would put every wrapped command back to reporting on
+  // having been pressed. Commands that answer nothing are unaffected.
   const onCanvas =
-    <Args extends readonly unknown[]>(command: (...args: Args) => void) =>
-    (...args: Args): void => {
+    <Args extends readonly unknown[], Result>(command: (...args: Args) => Result) =>
+    (...args: Args): Result => {
       if (isMobile) setOpenMobile(false);
-      command(...args);
+      return command(...args);
     };
   const canvasAwareEntityActions: SpaceSidebarProps['entityActions'] =
     entityActions === undefined

@@ -108,7 +108,12 @@ export const CardRail: Story = () => {
   const actions = spaceEntityActions({
     spaceId: authoredSpace.id,
     spaceTitle: authoredSpace.title,
-    onCopy: (destination) => record(`Copied → ${productDestinationPath(destination)}`),
+    onCopy: (destination) => {
+      record(`Copied → ${productDestinationPath(destination)}`);
+      // Logging cannot fail; the item confirms as it does over a clipboard that
+      // accepted the link.
+      return true;
+    },
     onRename: null,
     onDeleteLayout: null,
   });

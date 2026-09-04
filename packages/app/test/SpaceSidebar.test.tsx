@@ -2,7 +2,12 @@ import { createRef, useState, type ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Card, type Layout } from '@project/core';
-import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
+import {
+  PersistenceIndicator,
+  SidebarProvider,
+  SidebarTrigger,
+  type EntityAction,
+} from '@project/ui';
 import {
   SelectedLayoutName,
   SpaceSidebar,
@@ -100,7 +105,7 @@ const SELECTED_CARD: Card = {
  * entity the menu can be hung off at all.
  */
 const cardActions =
-  (onSelect: () => void): NonNullable<SpaceSidebarProps['entityActions']> =>
+  (onSelect: EntityAction['onSelect']): NonNullable<SpaceSidebarProps['entityActions']> =>
   (entity) =>
     entity.kind === 'card' ? [[], [{ id: 'copy-link', label: 'Copy link', onSelect }], []] : [];
 

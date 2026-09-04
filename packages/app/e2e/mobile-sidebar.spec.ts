@@ -140,10 +140,24 @@ test('a copy command confirms in the open mobile sidebar rather than closing it'
   await openMobileSidebar(page);
   await page.getByRole('button', { name: 'Actions for Card A' }).click({ delay: 120 });
   const menu = page.getByRole('menu');
-  await menu.getByRole('menuitem', { name: /^Copy link/ }).click();
 
-  await expect(menu.getByRole('menuitem', { name: 'Copied' })).toBeVisible();
-  await expect(sheet(page)).toHaveCount(1);
+  // The confirmation is a label swap the menu holds for a moment and then puts
+  // back, so the wait for it is armed *before* the press that starts it. An
+  // `expect` written after the click does not look until that command's round
+  // trip has returned, and a swap already reverted by then is not a retryable
+  // miss — the matcher polls an element that will never come back and fails on
+  // its own timeout. Waiting from before the press makes the assertion a
+  // question about whether the confirmation happened rather than about how long
+  // it was held, which is what keeps it honest if that duration changes.
+  await Promise.all([
+    menu.getByRole('menuitem', { name: 'Copied' }).waitFor(),
+    menu.getByRole('menuitem', { name: /^Copy link/ }).click(),
+  ]);
+
+  // `toBeVisible`, not the `toHaveCount` this file uses to say a sheet has gone:
+  // the point being made is that the sheet is still *shown*, which is what
+  // `openMobileSidebar` asserts to say it arrived.
+  await expect(sheet(page)).toBeVisible();
 });
 
 test('Present from the mobile sidebar leaves the presentation reachable', async ({ page }) => {

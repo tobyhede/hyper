@@ -49,10 +49,18 @@ const copied = (
   label: string,
 ): ProductDestination | 'no such command' | 'copied nothing' => {
   const captured: ProductDestination[] = [];
-  const actions = build({ onCopy: (chosen) => void captured.push(chosen) })(entity);
+  const actions = build({
+    onCopy: (chosen) => {
+      captured.push(chosen);
+      return true;
+    },
+  })(entity);
   const action = commands(actions).find((candidate) => candidate.label === label);
   if (action === undefined) return 'no such command';
-  action.onSelect();
+  // The command is awaited nowhere here: what is being read is which
+  // destination it hands `onCopy`, and that happens on the call. What it
+  // answers afterwards is `EntityActionsMenu`'s business and is proved there.
+  void action.onSelect();
   return captured[0] ?? 'copied nothing';
 };
 
@@ -193,7 +201,9 @@ describe('spaceEntityActions', () => {
 
     commands(build({ onRename })({ kind: 'graph', graph: GRAPH, layout: LAYOUT }))
       .filter((action) => action.id === 'rename')
-      .forEach((action) => action.onSelect());
+      .forEach((action) => {
+        void action.onSelect();
+      });
 
     expect(onRename).toHaveBeenCalledOnce();
     expect(onRename.mock.calls[0]?.[0]).toEqual({ kind: 'graph', id: GRAPH_ID });

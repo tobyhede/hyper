@@ -44,9 +44,12 @@ import { authoredSnapshot, authoredSpace, editedSnapshot, storyGraphIds } from '
  * menu item copies is what a Ladle spec should be able to press, and a label of
  * the harness's own choosing would only prove the harness.
  */
-const recordCopy = (destination: ProductDestination): void => {
+const recordCopy = (destination: ProductDestination): boolean => {
   document.body.dataset['copyCommand'] = destination.kind;
   document.body.dataset['copyPath'] = productDestinationPath(destination);
+  // Recording cannot fail, so the story draws the confirmation the application
+  // draws when the clipboard accepts the link.
+  return true;
 };
 
 export interface SpaceSidebarFixtureProps {
@@ -193,12 +196,18 @@ export function SpaceSidebarFixture({
   // The production builder, over the fixture's own Space, with the two side
   // effects replaced: a copy records the destination it would have written and
   // a rename runs the real chrome title edit above, which is the Sidebar's own.
-  // Both Edits are behind one condition, as they are in `App.tsx`: a Layout
-  // rename begins the chrome title edit `chromeTitleEdit.disabled` withdraws,
-  // and Delete Layout goes with it rather than standing alone in a menu whose
-  // other Edit cannot run. Copying is in front of it — an address is a fact
-  // about the entity rather than a change to it.
-  const editsAvailable = chromeTitleEdit.disabled !== true;
+  // Both Edits are behind one condition, and it is `App.tsx`'s whole condition
+  // rather than the first half of it. A Layout rename begins the chrome title
+  // edit `chromeTitleEdit.disabled` withdraws, and Delete Layout goes with it
+  // rather than standing alone in a menu whose other Edit cannot run — that is
+  // the first term. The second is `titleEdit === null`, production's
+  // `spaceChromeEdit === null`: while a rename is already running, no row's
+  // menu offers a second start to it. Reading only the first drew a menu in the
+  // catalogue that the application does not have, which is the one thing a
+  // story owing an application proof must not do (ADR 0052). Copying is in
+  // front of both — an address is a fact about the entity rather than a change
+  // to it.
+  const editsAvailable = chromeTitleEdit.disabled !== true && titleEdit === null;
   const productionEntityActions = spaceEntityActions({
     spaceId: displayedSpace.id,
     spaceTitle: displayedSpace.title,

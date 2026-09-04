@@ -378,13 +378,18 @@ describe('Space app failure reporting', () => {
 
   /**
    * Every copy command is a menu item now, so the refusal is reported from
-   * inside an open menu rather than from a standing button.
+   * inside an open menu rather than from a standing button — and reported
+   * twice, because the two reports do not reach the same reader. The shell's
+   * alert is the standing one; the item's own label is the only one visible on
+   * a phone, where the Sidebar is a Sheet drawn over the area that alert
+   * renders in.
    *
-   * Asserted by text rather than by `role="alert"`: Base UI's menu is modal by
-   * default, so while the popup is open the notice behind it is `aria-hidden`
-   * and out of the accessibility tree the role query reads. The report is still
-   * on screen, which is what this is about — the alternative would be closing
-   * the menu first and testing a different moment than the one that broke.
+   * Asserted through `role="alert"`, because the notice really is in the
+   * accessibility tree while this menu is open: Base UI's dropdown menu is
+   * **not** modal — `MenuPopup` passes `modal: isContextMenu` — so it hides
+   * nothing outside the popup. (Its context-menu sibling is modal and does hide
+   * the background, which is the other half of why the failure has to be
+   * legible in the menu itself.)
    */
   it.each([
     { entity: 'Actions for Card Card', command: /^Copy link/ },
@@ -422,9 +427,16 @@ describe('Space app failure reporting', () => {
         fireEvent.click(await screen.findByRole('button', { name: entity }));
         fireEvent.click(await screen.findByRole('menuitem', { name: command }));
 
-        expect(await screen.findByText('Link not copied')).toBeInTheDocument();
-        expect(screen.getByText('The browser refused clipboard access.')).toBeInTheDocument();
+        const alert = await screen.findByRole('alert');
+        expect(alert).toHaveTextContent('Link not copied');
+        expect(alert).toHaveTextContent('The browser refused clipboard access.');
         expect(screen.getByText('Space')).toBeInTheDocument();
+
+        // The command did not do what its label says, so the item does not say
+        // it did. It reads the failure instead, in the one place a reader who
+        // cannot see the alert behind the Sheet is looking.
+        expect(await screen.findByRole('menuitem', { name: /^Not copied/ })).toBeVisible();
+        expect(screen.queryByRole('menuitem', { name: /^Copied/ })).not.toBeInTheDocument();
       } finally {
         if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
         else Object.defineProperty(navigator, 'clipboard', previousClipboard);

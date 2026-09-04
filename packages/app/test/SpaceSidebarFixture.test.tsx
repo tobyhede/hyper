@@ -156,4 +156,42 @@ describe('the Space Sidebar story fixture', () => {
     const row = await screen.findByRole('button', { name: subject.renamed });
     expect(row.closest('li')).toHaveFocus();
   });
+
+  /**
+   * The fixture's Edits are behind production's condition, not a shorter one.
+   *
+   * `App.tsx` withdraws Rename and Delete Layout on two terms — the chrome
+   * title edit being disabled, *and* no chrome title edit already running — so
+   * a menu never offers a second start to the Edit already holding the caret.
+   * The fixture read the first term only, which is exactly the kind of
+   * divergence ADR 0052 has a story owe an application proof for: a menu in the
+   * catalogue offering a command the application withholds is worse evidence
+   * than no story.
+   *
+   * Observed on a *different* row, because the row being renamed withholds its
+   * whole trigger anyway (`EntityActionsRow`), so it could never have shown the
+   * difference.
+   */
+  it('withholds Rename from every row while a rename is already running', async () => {
+    render(<SpaceSidebarFixture />);
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Collection 1' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    const title = await screen.findByRole('textbox', { name: 'Layout name' });
+
+    // Blanked, so that opening the second menu cannot end the first Edit
+    // underneath the assertion. `InlineTitleEditor` completes on blur, and a
+    // blur is exactly what a popup taking focus produces — but a blank title is
+    // refused, and a refused completion keeps the editor up with the caret in
+    // it. The rename this is about is live either way; what the blank buys is
+    // that it is *still* live at the moment the menu is read.
+    fireEvent.change(title, { target: { value: '' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Graph Long' }));
+
+    // Copying stays: an address is a fact about the entity rather than an Edit,
+    // so it is in front of this condition in production too.
+    expect(await screen.findByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Layout name' })).toBeVisible();
+    expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
+  });
 });

@@ -125,11 +125,25 @@ export const createApp = (
       },
       [],
     );
-    const copyProductDestination = useCallback((destination: ProductDestination) => {
-      const path = productDestinationPath(destination);
-      setClipboardFailure(null);
-      void copyLink(new URL(path, window.location.href).href).then(setClipboardFailure);
-    }, []);
+    /**
+     * Copy one address, answering whether it reached the clipboard.
+     *
+     * The answer is what a menu item reports on. This was fire-and-forget past
+     * a `then`, so the press and the outcome were two moments and the item
+     * swapped its label at the first one — "Copied" over a link the browser had
+     * refused, with the refusal rendering as an alert the reader might not even
+     * be able to see (the Sidebar is a Sheet over that area on a phone).
+     */
+    const copyProductDestination = useCallback(
+      async (destination: ProductDestination): Promise<boolean> => {
+        const path = productDestinationPath(destination);
+        setClipboardFailure(null);
+        const failure = await copyLink(new URL(path, window.location.href).href);
+        setClipboardFailure(failure);
+        return failure === null;
+      },
+      [],
+    );
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const [cardsDrawerOpen, setCardsDrawerOpen] = useState(initialization === 'created-layout');
@@ -1105,7 +1119,10 @@ export const createApp = (
               onExit={exitPresenting}
               onCopyLink={() => {
                 if (activeGraphId === null || activeCardId === null) return;
-                copyProductDestination({
+                // `void`: presenting chrome's Copy link is a plain button with
+                // no label to swap, so it has nothing to do with the outcome
+                // beyond the alert `copyProductDestination` already renders.
+                void copyProductDestination({
                   kind: 'presentation',
                   spaceId: renderedSpace.id,
                   layoutId: selectedLayoutId,
