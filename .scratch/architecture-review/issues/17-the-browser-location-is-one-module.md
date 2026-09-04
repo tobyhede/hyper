@@ -251,25 +251,6 @@ setting it after `arriveAt` would notify against a position still carrying the
 Card the reader is leaving — taking a history entry over the one the browser has
 just navigated to, which is the entry ADR 0081's `none` exists to refuse.
 
-A depth counter around each operation was written first and does work: it
-suppresses the mid-operation notification, so the ordering stops mattering. It
-was replaced because of what it cost in evidence rather than in lines. Four
-runs, each of the thirteen tests, settled it:
-
-| Module | Ordering | Result |
-| --- | --- | --- |
-| `settle` | Card before `arriveAt` | 13 passed |
-| `settle` | Card after `arriveAt` | **1 failed** — the Back test |
-| `settle` | `follow` ignores a second composition | **1 failed** — the follow test |
-| depth counter | Card after `arriveAt` | 13 passed |
-
-The last row is the argument. With the counter in place a wrong ordering is
-invisible, so nothing in the suite could fail if a later operation got it wrong;
-without it, the rule is stated in one comment and pinned by one test that does
-fail. The counter's robustness was real and is the thing given up: it covered
-any ordering mistake in any operation, where the rule now covers the operations
-that have a test.
-
 **`createSpaceStartup` takes the adapter as an optional third seam.**
 `test/unit/app-http-startup.test.ts` composes it twelve times in the node
 environment, so a hard-wired `window` made that file unrunnable. It now defaults
@@ -329,15 +310,6 @@ flakes. `pnpm e2e:ladle` not run and inapplicable: no component with a story
 changed, and `packages/ui`, `packages/app/stories` and `ladle-e2e` are
 untouched.
 
-The rebase brought `main`'s generalised entity-actions menu, which gives a Graph
-row its own Rename. That is the subject the chrome title draft test uses, and
-the reason it is worth having: a Graph row belongs to the selected Layout, so a
-Back that changes the Layout unmounts the row the draft was begun on. The draft
-is discarded anyway — by `chromeEditingDisabled`, since the arrival clears the
-published projection and `editable` reads `hasCardsOnCanvas` — but only the test
-says so, because the clear that used to be spent on this path went to the Layout
-choice call site with `arriveAt`.
-
 ## Not in scope
 
 - **The chrome title Edit draft.** `setSpaceChromeEdit(null)` stays a call-site
@@ -355,3 +327,38 @@ choice call site with `arriveAt`.
   derivation chain, the projection pipeline, presenting wiring, persistence
   chrome and the JSX. That is a defensible composition root and is not what this
   ticket is measured against.
+
+## Comments
+
+Two amendments made after this ticket resolved, kept out of `## Answer` so the
+decision above stays the decision that was taken.
+
+**The depth counter went, and the ordering is what replaced it.** A counter
+around each operation was written first and does work: it suppresses the
+mid-operation notification, so the ordering stops mattering. It was replaced
+because of what it cost in evidence rather than in lines. Four runs, each of the
+thirteen tests, settled it:
+
+| Module | Ordering | Result |
+| --- | --- | --- |
+| `settle` | Card before `arriveAt` | 13 passed |
+| `settle` | Card after `arriveAt` | **1 failed** — the Back test |
+| `settle` | `follow` ignores a second composition | **1 failed** — the follow test |
+| depth counter | Card after `arriveAt` | 13 passed |
+
+The last row is the argument. With the counter in place a wrong ordering is
+invisible, so nothing in the suite could fail if a later operation got it wrong;
+without it, the rule is stated in one comment and pinned by one test that does
+fail. The counter's robustness was real and is the thing given up: it covered
+any ordering mistake in any operation, where the rule now covers the operations
+that have a test.
+
+**The rebase onto `main` changed what the chrome title draft test can reach.**
+`main`'s generalised entity-actions menu gives a Graph row its own Rename, which
+is the subject that test now uses, and the reason it is worth having: a Graph
+row belongs to the selected Layout, so a Back that changes the Layout unmounts
+the row the draft was begun on. The draft is discarded anyway — by
+`chromeEditingDisabled`, since the arrival clears the published projection and
+`editable` reads `hasCardsOnCanvas` — but only the test says so, because the
+clear that used to be spent on this path went to the Layout choice call site
+with `arriveAt`.
