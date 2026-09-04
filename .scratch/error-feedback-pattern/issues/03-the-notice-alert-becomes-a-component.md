@@ -24,12 +24,12 @@ hand-assemble `Alert` / `AlertIcon` / `AlertTitle` / `AlertDescription`:
 
 | site | icon |
 | --- | --- |
-| `App.tsx:1052` Link not copied | yes |
-| `App.tsx:1059` Destination not found | yes |
-| `SpaceSidebar.tsx:543` Layout unchanged | yes |
+| `App.tsx:860` Link not copied | yes |
+| `App.tsx:867` Destination not found | yes |
+| `SpaceSidebar.tsx:588` Layout unchanged | yes |
 | `PersistenceControl.tsx:151` Changes not saved | yes |
 | `CardsDrawer.tsx:187` Card not added | no |
-| `SpaceSidebar.tsx:181` Card not deleted | no |
+| `SpaceSidebar.tsx:187` Card not deleted | no |
 | `PersistenceControl.tsx:193` Unable to reload | no |
 | `PersistenceControl.tsx:229` Reason | no |
 

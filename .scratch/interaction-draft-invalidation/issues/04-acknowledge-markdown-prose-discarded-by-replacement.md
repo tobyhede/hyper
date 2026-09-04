@@ -20,7 +20,7 @@ It is drawn by `CanvasCard`, which is its only consumer that offers an editor,
 and reached through `CardNode` — so the draft lives **inside** the canvas
 subtree, and both of the mechanisms that already discard the canvas's own drafts
 reach it. Measured against a staged draft, each is independently sufficient:
-deleting the `key={authoringState.replacementEpoch}` at `packages/app/src/App.tsx:1102`
+deleting the `key={authoringState.replacementEpoch}` at `packages/app/src/App.tsx:910`
 leaves the discard intact, so does disabling the render adapter's epoch reset at
 `packages/app/src/render-adapter.ts:633-644`, and only removing **both** lets the
 editor and the typed prose survive over the accepted Space's Card. That is the
@@ -36,7 +36,7 @@ registry.
 The draft survives everything that disposes of the other title drafts. ADR 0064
 gives this editor no commit on blur — four exits and no more, `Mod-Enter`,
 `Escape`, Save and Cancel, and "a click elsewhere leaves the draft and the editor
-up" (`docs/adr/0064-opening-a-card-expands-it-in-place.md:39-40`, `:103`). So the
+up" (`docs/adr/0064-opening-a-card-expands-it-in-place.md:39-41`, `:103`). So the
 modal `AlertDialog` carrying Accept remote takes focus without ending it: with
 the dialog up, the editor is still mounted, the prose is still on screen and the
 working Space still holds the unedited body. That is the difference from the
@@ -66,7 +66,7 @@ The decisive fact arrived after the audit and is not in the Context above:
 the only bump is `:1433`). So of the two buttons the conflict dialog offers,
 Reload destroys the draft and Keep local and retry preserves it, and the author
 is choosing between them with nothing to say which is which. `acceptStoredSpace`
-has exactly one trigger — `App.tsx:961`, that dialog — so a sentence there
+has exactly one trigger — `App.tsx:787`, that dialog — so a sentence there
 covers every reachable case.
 
 An after-the-fact status line was the other candidate and is rejected: the
@@ -96,7 +96,7 @@ arrives too late to act on.
 ## Direction
 
 The discard stays exactly where it is. Both mechanisms that perform it — the
-canvas key at `packages/app/src/App.tsx:1102` and the render adapter's epoch
+canvas key at `packages/app/src/App.tsx:910` and the render adapter's epoch
 reset at `packages/app/src/render-adapter.ts:633-644` — are untouched, and so is
 ADR 0042's rule that interaction-local owners discard on the epoch. Nothing new
 observes the epoch.
@@ -110,7 +110,12 @@ than it is; a dialog with no safe dismissal is not the place for a paragraph.
 `CONFLICT_DESCRIPTIONS` is keyed by `ConflictRecovery`, and only the `reload` arm
 is in question. `revert` reloads too and carries the same cost; decide it in the
 same edit rather than leaving the two arms disagreeing about whether the warning
-is worth giving. `none` offers no Reload and needs nothing.
+is worth giving. `none` still draws Reload — `ConflictControl`'s footer renders
+both buttons unconditionally and `recovery` only selects the description
+(`packages/app/src/components/PersistenceControl.tsx:190`, `:198-209`) — but it
+needs nothing, because with no stored snapshot `acceptStoredSpace` returns its
+own sentence at `packages/app/src/space-authoring.ts:1418` before reaching the
+epoch bump at `:1433`, so that arm discards no draft.
 
 **This no longer depends on the notice channel.** An earlier revision of this
 ticket paired it with
@@ -177,7 +182,7 @@ the tree rather than left to drift further. What changed and why:
 
 This is the third round of citation drift on this effort; `76b8f708` re-measured
 issue `02`'s references for the same reason. Every file:line above was read at
-`e31eaa68`.
+`5bbb6f17`.
 
 ### 2026-09-04 — related effort filed
 
@@ -189,10 +194,11 @@ pattern, normalise where a refusal stops being an identity and starts being a
 sentence, and give the notice channel the component the blocking channel already
 has.
 
-This ticket's status is unchanged and stays `ready-for-human`: the
-acknowledgement decision is still unmade, and nothing in that effort makes it.
-What that effort changes is only the cost of implementing whatever is decided
-here.
+This ticket's status is unchanged by that effort, and was `ready-for-human` when
+this was written: the acknowledgement decision was still unmade, and nothing in
+that effort makes it. (Superseded later the same day by "decision taken" below,
+which made it and moved the status to `ready-for-agent`.) What that effort
+changes is only the cost of implementing whatever is decided here.
 
 ### 2026-09-04 — decision taken
 

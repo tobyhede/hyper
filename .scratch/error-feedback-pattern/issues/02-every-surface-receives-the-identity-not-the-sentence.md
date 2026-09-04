@@ -3,8 +3,8 @@
 Status: ready-for-agent
 
 Blocked by: nothing. `01-bring-persistence-onto-the-refusal-pattern.md` owns the
-fourth prose site, `acceptStoredSpace`, because that one *originates* the
-sentence and needs new codes minted for it. The three here only describe too
+fifth prose site, `acceptStoredSpace`, because that one *originates* the
+sentence and needs new codes minted for it. The four here only describe too
 early and mint nothing, so the two tickets are independent and either may land
 first. Together they retire the last operation in the tree that answers a
 refusal as `string`.
@@ -20,22 +20,27 @@ The tree has that boundary in two places, and which one a call site uses is
 arbitrary.
 
 `SpaceSidebar` takes both contracts in one props type. `createLayout.refusal` is
-an `AuthoringRefusal` (`packages/app/src/components/SpaceSidebar.tsx:119`) and
-the component describes it itself (`:547`). `cardLinks.onDelete` answers
-`() => string | null` (`:138`) — a sentence someone else already wrote — and the
-component stores and renders it as opaque text (`:163`, `:183`). Two rules, one
-file, same kind of thing.
+an `AuthoringRefusal` (`packages/app/src/components/SpaceSidebar.tsx:124`) and
+the component describes it itself (`:592`). `selectedCard.onDelete` answers
+`() => string | null` (`:145`) — a sentence someone else already wrote — and the
+component stores and renders it as opaque text (`:169`, `:189`). `titleEdit` is
+the second instance of the same pairing: `error` is a `string | null` (`:233`)
+and `onComplete` answers one (`:243`), both filled by `App.tsx:384-395`'s
+`completeSpaceChromeTitle`, which calls `describeAuthoringRefusal` at `:390` and
+hands the sidebar the finished sentence. Two rules, one file, same kind of thing
+— and twice over, because both prose members sit in that props type beside the
+structured `createLayout.refusal`.
 
-The other three on the prose side:
+The other two on the prose side:
 
 - `CardsDrawer` holds `useState<string | null>` for its Add refusal
   (`packages/app/src/components/CardsDrawer.tsx:108`, rendered `:189`).
-- `SpaceSidebar`'s `onDelete` chain at `:699` forwards the sidebar's string
+- `SpaceSidebar`'s `onDelete` chain at `:733` forwards the sidebar's string
   upward through `OpenSpaceSidebars`.
 
-A fourth site, `App.tsx:961`'s `onAcceptRemote`, is the same defect but not the
+A fifth site, `App.tsx:787`'s `onAcceptRemote`, is the same defect but not the
 same change: `acceptStoredSpace` writes its sentences itself
-(`space-authoring.ts:1416`, `:1420`) rather than describing a code someone else
+(`space-authoring.ts:1418`, `:1422`) rather than describing a code someone else
 produced, so giving it an identity means minting codes. That is `01`'s, and
 `ConflictControl` (`PersistenceControl.tsx:178`, `:195`) moves with it.
 
@@ -72,14 +77,16 @@ a second exhaustive record saying `form` twenty-four times.
 
 ## Acceptance
 
-- [ ] The three sites here answer a structured refusal or `null`: `onDelete`,
-      its `OpenSpaceSidebars` chain, and the Cards drawer's Add.
+- [ ] The four sites here answer a structured refusal or `null`: `onDelete`,
+      its `OpenSpaceSidebars` chain, `titleEdit`'s `error` and `onComplete`, and
+      the Cards drawer's Add.
 - [ ] `describeAuthoringRefusal` is the only function in the tree that produces
       a refusal sentence, and a test or lint holds that. With `01` landed this
       is exhaustive; alone it leaves `acceptStoredSpace` as the one exception,
       which the check should name rather than silently permit.
 - [ ] Every channel is where it was: the drawer's inline `Alert`, the delete
-      dialog's `Alert`, the conflict dialog's `Alert`, the sidebar's `Alert`.
-      This change is invisible on screen.
+      dialog's `Alert`, the conflict dialog's `Alert`, the sidebar's `Alert`,
+      and `InlineTitleEditor`'s `FieldError`. This change is invisible on
+      screen.
 - [ ] `pnpm verify` and `pnpm e2e` pass. `pnpm e2e:ladle` applies too —
       `SpaceSidebar` and `CardsDrawer` both have stories.

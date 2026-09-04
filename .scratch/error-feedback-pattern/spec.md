@@ -33,10 +33,13 @@ it**, in three ways:
 2. It shows wire prose to the author. `retryable-failure` and
    `permanent-failure` carry a stable `code` *and* a `message`
    (`packages/persistence/src/backend.ts:53-63`); the UI renders the message
-   (`PersistenceControl.tsx:154`, `:90`), which `packages/http/src/backend.ts:182,206,211`
-   fills from `problem.detail`. Their seven codes have no copy table at all.
+   (`PersistenceControl.tsx:154`, `:90`), which every arm of
+   `packages/http/src/backend.ts` fills from the wire — `:182`, `:188`, `:199`,
+   `:206`, `:211` and `:217` from `problem.detail`, and the catch arms (`:147`,
+   `:153`, `:158`) from a thrown `Error` or a transport-owned literal. Their
+   seven codes have no copy table at all.
 3. `acceptStoredSpace` returns hand-written English *from inside Space
-   Authoring* (`space-authoring.ts:1416`, `:1420`) — prose crossing the seam
+   Authoring* (`space-authoring.ts:1418`, `:1422`) — prose crossing the seam
    ADR 0057 is about.
 
 So extracting persistence as the template would propagate the violation. The
@@ -66,8 +69,8 @@ convention rather than a mechanism.
    the seven transport codes, no `problem.detail` on screen, codes rather than
    sentences out of `acceptStoredSpace`.
 2. `issues/02` — every surface receives the identity, not the sentence. Four
-   call sites take a pre-described `string` today and two of them sit in the
-   same props type as a structured sibling.
+   call sites take a pre-described `string` today — `01` owns the fifth — and
+   three of them sit in the same props type as a structured sibling.
 3. `issues/03` — the notice `Alert` becomes a component, the way
    `StatusFailure` already is. Closes the `AlertIcon` inconsistency by
    construction and gives the title voice one place to be decided.
@@ -103,6 +106,7 @@ stale. Correcting it belongs with `01`, which is the change that makes the
 ## Status
 
 - `01` — `ready-for-agent`. No open questions.
-- `02` — `ready-for-agent`, blocked by `01` for the `acceptStoredSpace` arm only.
+- `02` — `ready-for-agent`, blocked by nothing. `01` owns the `acceptStoredSpace`
+  arm, which `02` does not touch, so either may land first.
 - `03` — `ready-for-agent` as of 2026-09-04; its title-voice decision is taken
   and recorded in the ticket.
