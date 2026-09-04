@@ -3,7 +3,7 @@ import { uuidSchema, type Card, type Graph, type Layout } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { EntityActionGroup } from '@project/ui';
 import { spaceEntityActions } from '../src/entity-actions';
-import type { SpaceEntity } from '../src/components/SpaceSidebar';
+import { DELETE_LAYOUT_ACTION_ID, type SpaceEntity } from '../src/components/SpaceSidebar';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -101,7 +101,7 @@ describe('spaceEntityActions', () => {
     const groups = build()(entity);
 
     expect(labels(groups)).toEqual(['Rename', 'Copy link', 'Delete Layout']);
-    expect(commands(groups).find((action) => action.id === 'delete-layout')?.variant).toBe(
+    expect(commands(groups).find((action) => action.id === DELETE_LAYOUT_ACTION_ID)?.variant).toBe(
       'destructive',
     );
     expect(copied(entity, 'Copy link')).toEqual({
@@ -136,7 +136,7 @@ describe('spaceEntityActions', () => {
     { outcome: 'failed', deleted: false, name: 'the Edit was refused' },
   ])('answers $outcome when $name', async ({ outcome, deleted }) => {
     const groups = build({ onDeleteLayout: () => deleted })({ kind: 'layout', layout: LAYOUT });
-    const action = commands(groups).find((candidate) => candidate.id === 'delete-layout');
+    const action = commands(groups).find((candidate) => candidate.id === DELETE_LAYOUT_ACTION_ID);
 
     expect(await action?.onSelect()).toBe(outcome);
   });

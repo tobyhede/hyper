@@ -60,9 +60,17 @@ test(
 /**
  * The Space's own title carries the menu too, and offers exactly one command.
  *
- * A Space has one address, so there is nothing for a permanent link to differ
- * from, and production has no Space rename — both are absent rather than shown
- * and refused.
+ * The one item is the Space's **own** address, and that is a departure rather
+ * than the rule: a second address does exist — the drawing Layout's, which is
+ * what reproduces the screen and what every other row here copies. The Space
+ * row deliberately does not offer it, because copying it would stop the
+ * Space's link meaning the Space. Which of the two a Space title means is a
+ * product decision `.scratch/link-ux` has not taken, so this test holds the
+ * behaviour that stands and not a claim that no second address is possible;
+ * `entity-actions.tsx` carries the same reasoning beside the item itself.
+ *
+ * No rename either, and that one is not open: production has no Space rename
+ * affordance, so it is absent rather than shown and refused.
  */
 test('the Space title offers its one address and no rename', async ({ page }) => {
   await page.goto('/?story=space--space--settled&mode=preview');

@@ -8,7 +8,11 @@ import {
   type EntityActionGroup,
   type EntityActionOutcome,
 } from '@project/ui';
-import type { SpaceChromeTitleSubject, SpaceEntity } from './components/SpaceSidebar';
+import {
+  DELETE_LAYOUT_ACTION_ID,
+  type SpaceChromeTitleSubject,
+  type SpaceEntity,
+} from './components/SpaceSidebar';
 
 /**
  * What every entity in the Space Sidebar offers, built once.
@@ -204,7 +208,11 @@ export function spaceEntityActions({
           ? []
           : [
               {
-                id: 'delete-layout',
+                // Imported rather than written: the Sidebar recognises this
+                // one id to decide its mobile dismissal on the outcome below
+                // instead of before it, and the constant is where that
+                // pairing is stated.
+                id: DELETE_LAYOUT_ACTION_ID,
                 label: 'Delete Layout',
                 icon: <DeleteIcon />,
                 variant: 'destructive',
