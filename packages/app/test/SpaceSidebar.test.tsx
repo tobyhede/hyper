@@ -1,11 +1,10 @@
 import { createRef, useState, type ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID, uuidSchema } from '@project/core';
+import { uuidSchema, type Layout } from '@project/core';
 import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
-import type { CanvasRenderer } from '../src/canvas-renderers';
 import {
-  SelectedCanvasRenderer,
+  SelectedLayoutName,
   SpaceSidebar,
   type SpaceChromeTitleEdit,
   type SpaceSidebarProps,
@@ -15,6 +14,7 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
+const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 beforeAll(() => {
   vi.stubGlobal('PointerEvent', MouseEvent);
@@ -65,28 +65,30 @@ const stubViewport = (mobile: boolean): void => {
 const draw = (element: ReactElement) => render(<SidebarProvider>{element}</SidebarProvider>);
 
 /**
- * The rows, written out here rather than derived from a Space.
+ * The Layouts, written out here rather than loaded from a Space.
  *
- * `canvasRenderers` owns the derivation and `canvas-renderers.test.ts` owns testing
- * it. What is left for this file is what the sidebar *draws*, and a test of a
- * list should not need a Space to state it. They are named constants so a test
- * can say which row it expects pressed by naming the same value it listed —
- * which is convenience here, not the contract: the sidebar matches by
- * `canvasRendererKey`, and the test below hands it an equal row it never listed.
+ * What is left for this file is what the sidebar *draws*, and a test of a list
+ * should not need a Space to state it. They are named constants so a test can
+ * say which row it expects pressed by naming the same value it listed — which
+ * is convenience here, not the contract: the sidebar matches by **Layout id**,
+ * and the test below hands it an equal Layout it never listed.
  */
-const FLOW: CanvasRenderer = { kind: 'computed', selection: FLOW_SPACE_VIEW_ID, title: 'Flow' };
-const GRID: CanvasRenderer = { kind: 'computed', selection: GRID_SPACE_VIEW_ID, title: 'Grid' };
-const LAYOUT: CanvasRenderer = {
-  kind: 'authored',
-  selection: LAYOUT_ID,
-  title: 'Layout 1',
-};
+const layout = (id: typeof LAYOUT_ID, title: string): Layout => ({
+  id,
+  title,
+  kind: 'positioned',
+  positions: {},
+  graphs: [],
+});
+const LAYOUT_ONE = layout(LAYOUT_ID, 'Layout 1');
+const LAYOUT_TWO = layout(OTHER_LAYOUT_ID, 'Layout 2');
+const LAYOUT = layout(LAYOUT_ID, 'Layout 1');
 
 const settledProps = (): SpaceSidebarProps => ({
   spaceTitle: 'Space',
   canvas: {
-    renderers: { computed: [FLOW, GRID], authored: [] },
-    current: FLOW,
+    layouts: [LAYOUT_ONE, LAYOUT_TWO],
+    selected: LAYOUT_ONE,
     onSelect: vi.fn(),
   },
   graph: {
@@ -113,11 +115,11 @@ const settledProps = (): SpaceSidebarProps => ({
 
 const withLayout = (props: SpaceSidebarProps): SpaceSidebarProps => ({
   ...props,
-  canvas: { ...props.canvas, renderers: { ...props.canvas.renderers, authored: [LAYOUT] } },
+  canvas: { ...props.canvas, layouts: [LAYOUT] },
 });
 
 describe('SpaceSidebar', () => {
-  it('coordinates one Layout draft between its active row and Space View label', () => {
+  it('coordinates one Layout draft between its active row and Layout label', () => {
     function Fixture() {
       const [edit, setEdit] = useState<{ draft: string; error: string | null } | null>(null);
       const titleEdit: SpaceChromeTitleEdit = {
@@ -140,7 +142,7 @@ describe('SpaceSidebar', () => {
       return (
         <>
           <SpaceSidebar {...props} titleEdit={titleEdit} />
-          <SelectedCanvasRenderer renderer={LAYOUT} titleEdit={titleEdit} />
+          <SelectedLayoutName layout={LAYOUT} titleEdit={titleEdit} />
         </>
       );
     }
@@ -153,19 +155,19 @@ describe('SpaceSidebar', () => {
     // One draft, so the header mirrors it rather than offering a second way in:
     // beginning again from the header would reset the draft to the committed
     // title and discard what has been typed.
-    expect(screen.queryByRole('button', { name: /^Edit Space View/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Edit Layout/ })).not.toBeInTheDocument();
     fireEvent.change(row, { target: { value: '' } });
     fireEvent.keyDown(row, { key: 'Enter' });
     expect(screen.getByRole('alert')).toHaveTextContent('A Layout title is required.');
   });
 
   /**
-   * A covered Sidebar is located by `data-renderer`, because an open pane marks
+   * A covered Sidebar is located by `data-layout`, because an open pane marks
    * the root `inert` and the row leaves the accessibility tree
    * (`docs/agents/ui.md`). A row that sheds that hook while its own rename is
    * live is unreachable by role and by attribute at the same time.
    */
-  it('keeps a renderer row addressable while its rename is live', () => {
+  it('keeps a Layout row addressable while its rename is live', () => {
     function Fixture() {
       const [draft, setDraft] = useState<string | null>(null);
       const titleEdit: SpaceChromeTitleEdit = {
@@ -186,16 +188,16 @@ describe('SpaceSidebar', () => {
     }
 
     draw(<Fixture />);
-    const before = screen.getAllByTestId('canvas-renderer').length;
+    const before = screen.getAllByTestId('layout-row').length;
     fireEvent.click(screen.getByRole('button', { name: 'Layout 1', pressed: true }));
 
     expect(screen.getByRole('textbox', { name: 'Layout name' })).toBeVisible();
-    expect(screen.getAllByTestId('canvas-renderer')).toHaveLength(before);
-    expect(document.querySelector(`[data-renderer="${LAYOUT_ID}"]`)).toBeInTheDocument();
+    expect(screen.getAllByTestId('layout-row')).toHaveLength(before);
+    expect(document.querySelector(`[data-layout="${LAYOUT_ID}"]`)).toBeInTheDocument();
   });
 
-  it('names the Space View as plain text when no title edit is offered', () => {
-    draw(<SelectedCanvasRenderer renderer={LAYOUT} />);
+  it('names the Layout as plain text when no title edit is offered', () => {
+    draw(<SelectedLayoutName layout={LAYOUT} />);
 
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout 1');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -206,7 +208,10 @@ describe('SpaceSidebar', () => {
     draw(<SpaceSidebar {...props} />);
 
     expect(screen.getByTestId('space-title')).toHaveTextContent(/^Space$/);
-    expect(screen.getByRole('button', { name: 'Flow' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Layout 1' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     expect(screen.getByRole('button', { name: 'Present' })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
@@ -227,26 +232,8 @@ describe('SpaceSidebar', () => {
     unmount();
 
     const authored = withLayout(settledProps());
-    draw(<SpaceSidebar {...authored} canvas={{ ...authored.canvas, current: LAYOUT }} />);
+    draw(<SpaceSidebar {...authored} canvas={{ ...authored.canvas, selected: LAYOUT }} />);
     expect(screen.getByRole('button', { name: 'Add Layout' })).toBeVisible();
-  });
-
-  it('keeps a refused Add Layout explanation beside the command', () => {
-    draw(
-      <SpaceSidebar
-        {...settledProps()}
-        createLayout={{
-          refusal: { code: 'placement-pending' },
-          onCreate: vi.fn(),
-        }}
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: 'Flow', pressed: true })).toBeVisible();
-    expect(screen.getByRole('alert')).toHaveTextContent('Layout unchanged');
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'This view has not finished placing its Cards, so there is nowhere to write yet.',
-    );
   });
 
   it("opens a row's entity-actions menu from its trailing icon, not only from a right click", async () => {
@@ -260,7 +247,7 @@ describe('SpaceSidebar', () => {
     // The icon is a real tab stop and the only path that does not need a
     // pointer, so it is the one that has to work: ADR 0052's parity aside, the
     // right click is explicitly an accelerator over it (`.scratch/link-ux`).
-    const trigger = screen.getByRole('button', { name: 'Actions for Space View Layout 1' });
+    const trigger = screen.getByRole('button', { name: 'Actions for Layout Layout 1' });
     fireEvent.click(trigger);
 
     const item = await screen.findByRole('menuitem', { name: 'Copy link' });
@@ -276,7 +263,7 @@ describe('SpaceSidebar', () => {
     draw(<SpaceSidebar {...props} />);
 
     expect(
-      screen.queryByRole('button', { name: 'Actions for Space View Layout 1' }),
+      screen.queryByRole('button', { name: 'Actions for Layout Layout 1' }),
     ).not.toBeInTheDocument();
     expect(document.querySelector('[data-slot="entity-actions"]')).not.toBeInTheDocument();
   });
@@ -297,7 +284,7 @@ describe('SpaceSidebar', () => {
     const base = withLayout(settledProps());
     const props: SpaceSidebarProps = {
       ...base,
-      canvas: { ...base.canvas, current: LAYOUT },
+      canvas: { ...base.canvas, selected: LAYOUT },
       titleEdit,
       entityActions: () => [[{ id: 'rename', label: 'Rename', onSelect: vi.fn() }]],
     };
@@ -320,7 +307,7 @@ describe('SpaceSidebar', () => {
     draw(<SpaceSidebar {...props} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy link to Start here' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Copy link in this Space View' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link in this Layout' }));
 
     expect(props.cardLinks?.onCopyCanonical).toHaveBeenCalledOnce();
     expect(props.cardLinks?.onCopyContextual).toHaveBeenCalledOnce();
@@ -360,73 +347,62 @@ describe('SpaceSidebar', () => {
   });
 
   /**
-   * The whole of ADR 0053's first claim, asserted as one state: every computed
-   * View and every authored Layout is a row of one list, exactly one is pressed,
-   * and no row anywhere says `None`.
+   * Every authored Layout is a row of one list, exactly one is pressed, and no
+   * row says `None`.
    */
-  it('draws one exclusive canvas choice over Views and Layouts', () => {
-    const base = withLayout(settledProps());
+  it('draws one exclusive canvas choice over Layouts', () => {
+    const base = settledProps();
     const props: SpaceSidebarProps = {
       ...base,
-      canvas: { ...base.canvas, current: LAYOUT },
+      canvas: { ...base.canvas, selected: LAYOUT },
     };
     draw(<SpaceSidebar {...props} />);
 
     const pressed = screen
-      .getAllByTestId('canvas-renderer')
-      .filter((renderer) => renderer.getAttribute('aria-pressed') === 'true');
+      .getAllByTestId('layout-row')
+      .filter((row) => row.getAttribute('aria-pressed') === 'true');
     expect(pressed).toHaveLength(1);
     expect(pressed[0]).toHaveTextContent('Layout 1');
-    expect(screen.getByRole('button', { name: 'Flow' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Layout 2' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
     expect(screen.queryByText('None')).not.toBeInTheDocument();
   });
 
   /**
-   * The pressed row is decided by the one identity rule, not by object identity.
+   * The pressed row is decided by Layout id, not by object identity.
    *
-   * `canvasRenderers` mints a fresh authored row per call, so a caller listing
-   * from one call and taking its current row from a second hands in two equal
-   * values that are not the same object — see `canvas-renderers.test.ts`. A
-   * `===` test drew that as a Layout list with nothing pressed: no throw, and
-   * nothing in the type to catch it. `canvasRendererKey` is the rule the row
-   * keys and `data-renderer` already carry, so the sidebar now asks the one
+   * A caller that lists one Space's Layouts and takes its selected Layout from
+   * a second value of equal shape hands in two Layouts that are equal and not
+   * the same object. A `===` test drew that as a Layout list with nothing
+   * pressed: no throw, and nothing in the type to catch it. The id is what the
+   * row keys and `data-layout` already carry, so the sidebar asks the one
    * question it answers everywhere else.
    */
-  it('presses an equal row that a second derivation built', () => {
+  it('presses an equal Layout that a second value described', () => {
     const base = withLayout(settledProps());
-    const rebuilt: CanvasRenderer = {
-      kind: 'authored',
-      selection: LAYOUT_ID,
-      title: 'Layout 1',
-    };
+    const rebuilt = layout(LAYOUT_ID, 'Layout 1');
     expect(rebuilt).not.toBe(LAYOUT);
 
-    draw(<SpaceSidebar {...base} canvas={{ ...base.canvas, current: rebuilt }} />);
+    draw(<SpaceSidebar {...base} canvas={{ ...base.canvas, selected: rebuilt }} />);
 
     const pressed = screen
-      .getAllByTestId('canvas-renderer')
-      .filter((renderer) => renderer.getAttribute('aria-pressed') === 'true');
+      .getAllByTestId('layout-row')
+      .filter((row) => row.getAttribute('aria-pressed') === 'true');
     expect(pressed).toHaveLength(1);
-    expect(pressed[0]).toHaveAttribute('data-renderer', LAYOUT_ID);
+    expect(pressed[0]).toHaveAttribute('data-layout', LAYOUT_ID);
   });
 
   it('forwards the selection', () => {
-    const props = withLayout(settledProps());
+    const props = settledProps();
     draw(<SpaceSidebar {...props} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
-    expect(props.canvas.onSelect).toHaveBeenCalledWith(GRID_SPACE_VIEW_ID);
+    fireEvent.click(screen.getByRole('button', { name: 'Layout 2' }));
+    expect(props.canvas.onSelect).toHaveBeenCalledWith(OTHER_LAYOUT_ID);
 
     fireEvent.click(screen.getByRole('button', { name: 'Layout 1' }));
     expect(props.canvas.onSelect).toHaveBeenCalledWith(LAYOUT_ID);
-  });
-
-  /** A Space authors its first Layout by editing a View (ADR 0025), so this is how it opens. */
-  it('says a Space owns no Layout yet rather than offering an empty value', () => {
-    draw(<SpaceSidebar {...settledProps()} />);
-
-    expect(screen.getByTestId('no-authored-layouts')).toBeVisible();
-    expect(screen.getByTestId('no-graphs')).toBeVisible();
   });
 
   it('activates a Graph and colours its glyph from the resolved colour', () => {
@@ -449,7 +425,7 @@ describe('SpaceSidebar', () => {
     expect(props.graph.onActivate).toHaveBeenCalledWith(GRAPH_ID);
   });
 
-  it('offers distinct canonical and Space View copy commands for the Active Graph', () => {
+  it('offers distinct canonical and Layout copy commands for the Active Graph', () => {
     const base = settledProps();
     const props: SpaceSidebarProps = {
       ...base,
@@ -466,21 +442,13 @@ describe('SpaceSidebar', () => {
     draw(<SpaceSidebar {...props} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy link to Authored' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Copy link to Authored in this Space View' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link to Authored in this Layout' }));
 
     expect(props.graph.links?.onCopyCanonical).toHaveBeenCalledWith(GRAPH_ID);
     expect(props.graph.links?.onCopyContextual).toHaveBeenCalledWith(GRAPH_ID);
   });
 
-  /**
-   * A Layout is created with its initial Active Graph empty (ADR 0040), so this
-   * is the state every conversion out of a View leaves behind until the author
-   * draws an Edge. `graphStartCard` has no answer for it, so `present()` would
-   * return having changed nothing — the control must say so rather than accept a
-   * click and do nothing.
-   */
+  /** An empty Active Graph cannot begin presenting. */
   it('cannot present an active Graph that holds no Edges', () => {
     const base = settledProps();
     const props: SpaceSidebarProps = {
@@ -690,7 +658,7 @@ describe('SpaceSidebar', () => {
       },
       {
         name: 'the contextual Card link is copied',
-        button: 'Copy link in this Space View',
+        button: 'Copy link in this Layout',
         callback: 'contextual' as const,
       },
     ])('dismisses itself when $name', async ({ button, callback }) => {
@@ -723,7 +691,7 @@ describe('SpaceSidebar', () => {
       },
       {
         name: 'the contextual Graph link is copied',
-        button: 'Copy link to Graph 1 in this Space View',
+        button: 'Copy link to Graph 1 in this Layout',
         callback: 'contextual' as const,
       },
     ])('dismisses itself when $name', async ({ button, callback }) => {
@@ -790,8 +758,8 @@ describe('SpaceSidebar', () => {
       </SidebarProvider>,
     );
     const saving = screen.getByRole('button', { name: 'Saving changes' });
-    for (const renderer of screen.getAllByTestId('canvas-renderer')) {
-      expect(renderer).not.toContainElement(saving);
+    for (const row of screen.getAllByTestId('layout-row')) {
+      expect(row).not.toContainElement(saving);
     }
   });
 });

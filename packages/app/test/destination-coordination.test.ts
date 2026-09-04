@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FLOW_SPACE_VIEW_ID,
   encodeCompactUuid,
   spaceSnapshotSchema,
   uuidSchema,
@@ -11,7 +10,6 @@ import {
 import { productDestinationPath, resolveProductDestinationInSnapshot } from '@project/http';
 import { destinationSync } from '../src/destination-coordination';
 import type { NavigationAddress } from '../src/navigation';
-import { createRendererResolver } from '../src/renderer';
 import { createWorkingSpaceReader } from '../src/snapshot';
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
@@ -24,6 +22,9 @@ const CARD_OFF_LAYOUT = uuid('00000000-0000-4000-8000-000000000004');
 const LAYOUT = uuid('00000000-0000-4000-8000-000000000010');
 const OPENING_GRAPH = uuid('00000000-0000-4000-8000-000000000020');
 const OTHER_GRAPH = uuid('00000000-0000-4000-8000-000000000021');
+/** A second Layout, so a selection can move to a Layout no location names. */
+const OTHER_LAYOUT = uuid('00000000-0000-4000-8000-000000000011');
+const OTHER_LAYOUT_GRAPH = uuid('00000000-0000-4000-8000-000000000022');
 
 /**
  * One Layout owning two Graphs, only one of which it opens on.
@@ -37,7 +38,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    defaultRenderer: LAYOUT,
+    defaultLayout: LAYOUT,
     layouts: [
       {
         id: LAYOUT,
@@ -53,6 +54,13 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         ],
         activeGraph: OPENING_GRAPH,
       },
+      {
+        id: OTHER_LAYOUT,
+        title: 'Other Layout',
+        kind: 'positioned',
+        positions: { [CARD_A]: { x: 0, y: 0, open: false } },
+        graphs: [{ id: OTHER_LAYOUT_GRAPH, title: 'Other Layout Graph', edges: [] }],
+      },
     ],
   },
   cards: [
@@ -63,18 +71,15 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
 });
 
 const space = createWorkingSpaceReader()(snapshot);
-const resolveRenderer = createRendererResolver({
-  newGraphId: () => uuid('00000000-0000-4000-8000-0000000000ff'),
-});
 
 const overview = (activeGraphId: UUID | null = OPENING_GRAPH): NavigationAddress => ({
-  selectedRenderer: LAYOUT,
+  selectedLayoutId: LAYOUT,
   activeGraphId,
   presentingCardId: null,
 });
 
 const presenting = (cardId: CardId, activeGraphId: UUID = OPENING_GRAPH): NavigationAddress => ({
-  selectedRenderer: LAYOUT,
+  selectedLayoutId: LAYOUT,
   activeGraphId,
   presentingCardId: cardId,
 });
@@ -91,7 +96,6 @@ const sync = (
     space,
     snapshot,
     pathname,
-    resolveRenderer,
     position: { ...address, addressedCardId },
     synced,
   });
@@ -131,9 +135,9 @@ describe('what the browser should do about an address', () => {
     expect(sync(view, overview(OTHER_GRAPH), overview())).toEqual({
       kind: 'push',
       destination: {
-        kind: 'space-view-graph',
+        kind: 'layout-graph',
         spaceId: SPACE_ID,
-        spaceViewId: LAYOUT,
+        layoutId: LAYOUT,
         graphId: OTHER_GRAPH,
       },
     });
@@ -145,7 +149,7 @@ describe('what the browser should do about an address', () => {
       destination: {
         kind: 'presentation',
         spaceId: SPACE_ID,
-        spaceViewId: LAYOUT,
+        layoutId: LAYOUT,
         graphId: OPENING_GRAPH,
         cardId: CARD_A,
       },
@@ -154,7 +158,7 @@ describe('what the browser should do about an address', () => {
 
   /**
    * The rule `adoptedRendererDestination` carried, generalised: a location that
-   * is *more* specific than the address, in the same Space View, is left as
+   * is *more* specific than the address, in the same Layout, is left as
    * specific as it was rather than widened.
    */
   it('keeps the Graph a location already names when a presentation ends', () => {
@@ -163,9 +167,9 @@ describe('what the browser should do about an address', () => {
     expect(sync(point, overview(), presenting(CARD_A))).toEqual({
       kind: 'push',
       destination: {
-        kind: 'space-view-graph',
+        kind: 'layout-graph',
         spaceId: SPACE_ID,
-        spaceViewId: LAYOUT,
+        layoutId: LAYOUT,
         graphId: OPENING_GRAPH,
       },
     });
@@ -186,16 +190,16 @@ describe('what the browser should do about an address', () => {
     expect(sync(point, overview(), presenting(CARD_A), CARD_A)).toEqual({
       kind: 'push',
       destination: {
-        kind: 'space-view-graph',
+        kind: 'layout-graph',
         spaceId: SPACE_ID,
-        spaceViewId: LAYOUT,
+        layoutId: LAYOUT,
         graphId: OPENING_GRAPH,
       },
     });
   });
 
   /**
-   * The canonical Card URL is the Card's identity and names no Space View; the
+   * The canonical Card URL is the Card's identity and names no Layout; the
    * contextual one names both. Nothing here may rewrite the first into the
    * second — the reader holding a canonical link would find it silently
    * narrowed to the context they happened to be in.
@@ -206,9 +210,9 @@ describe('what the browser should do about an address', () => {
     expect(sync(canonical, overview(OTHER_GRAPH), overview(), CARD_A)).toEqual({
       kind: 'push',
       destination: {
-        kind: 'space-view-graph',
+        kind: 'layout-graph',
         spaceId: SPACE_ID,
-        spaceViewId: LAYOUT,
+        layoutId: LAYOUT,
         graphId: OTHER_GRAPH,
       },
     });
@@ -219,7 +223,7 @@ describe('what the browser should do about an address', () => {
    *
    * A Card the Layout omits has a canonical URL and no contextual one: the
    * resolver refuses `/views/<layout>/cards/<card>` and the host answers 404.
-   * Addressing that Card *within* the Space View would therefore write a
+   * Addressing that Card *within* the Layout would therefore write a
    * location that reloads into nothing.
    */
   it('answers no destination this Space refuses to resolve', () => {
@@ -236,11 +240,11 @@ describe('what the browser should do about an address', () => {
   });
 
   it('replaces, without a history entry, when the location still names a Card the address has dropped', () => {
-    // Choosing the current Space View row again: Navigation republishes the same
+    // Choosing the current Layout row again: Navigation republishes the same
     // address, and the Card the location names is no longer addressed.
     expect(sync(`${view}/cards/${encodeCompactUuid(CARD_A)}`, overview(), overview())).toEqual({
       kind: 'replace',
-      destination: { kind: 'space-view', spaceId: SPACE_ID, spaceViewId: LAYOUT },
+      destination: { kind: 'layout', spaceId: SPACE_ID, layoutId: LAYOUT },
     });
   });
 
@@ -249,24 +253,24 @@ describe('what the browser should do about an address', () => {
 
     expect(sync(`${view}/graphs/${encodeCompactUuid(missing)}`, overview(), overview())).toEqual({
       kind: 'replace',
-      destination: { kind: 'space-view', spaceId: SPACE_ID, spaceViewId: LAYOUT },
+      destination: { kind: 'layout', spaceId: SPACE_ID, layoutId: LAYOUT },
     });
   });
 
-  it('addresses the Space View a Computed View selection opens on', () => {
+  it('addresses the Layout a selection has moved to', () => {
     expect(
       sync(
         view,
         {
-          selectedRenderer: FLOW_SPACE_VIEW_ID,
-          activeGraphId: OPENING_GRAPH,
+          selectedLayoutId: OTHER_LAYOUT,
+          activeGraphId: OTHER_LAYOUT_GRAPH,
           presentingCardId: null,
         },
         overview(),
       ),
     ).toEqual({
       kind: 'push',
-      destination: { kind: 'space-view', spaceId: SPACE_ID, spaceViewId: FLOW_SPACE_VIEW_ID },
+      destination: { kind: 'layout', spaceId: SPACE_ID, layoutId: OTHER_LAYOUT },
     });
   });
 });

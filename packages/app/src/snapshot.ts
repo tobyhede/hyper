@@ -54,7 +54,7 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => {
     title: space.title,
   };
   if (space.layouts.length > 0) document.layouts = [...space.layouts];
-  if (space.defaultRenderer !== undefined) document.defaultRenderer = space.defaultRenderer;
+  if (space.defaultLayout !== undefined) document.defaultLayout = space.defaultLayout;
   return {
     id: space.id,
     document,
@@ -171,7 +171,7 @@ export const updatePositionedLayout = (
     document: {
       ...base.document,
       layouts,
-      defaultRenderer: layoutId,
+      defaultLayout: layoutId,
     },
   };
 };

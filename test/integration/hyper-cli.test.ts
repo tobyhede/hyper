@@ -224,8 +224,8 @@ describe('hyper CLI', () => {
     expect(created.title).toBe('New space');
     const stored = await repository.loadSpace(created.id);
     // A new Space begins complete: its Card is already placed in an authored
-    // default Layout owning one empty Active Graph (ADR 0080). Every id in it is
-    // minted, so the shape is asserted against the ones that arrived.
+    // default Layout with one empty Active Graph (ADR 0079, ADR 0080). Every id
+    // in it is minted, so the shape is asserted against the ones that arrived.
     const layout = stored?.snapshot.document.layouts?.[0];
     if (layout === undefined) throw new Error('Expected the new space to arrive with its Layout');
     const graph = layout.graphs[0];
@@ -248,7 +248,7 @@ describe('hyper CLI', () => {
               activeGraph: graph.id,
             },
           ],
-          defaultRenderer: layout.id,
+          defaultLayout: layout.id,
         },
         cards: [
           {

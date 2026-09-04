@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  COMPUTED_VIEW_IDS,
-  FLOW_SPACE_VIEW_ID,
-  GRID_SPACE_VIEW_ID,
-  cardFrontmatterSchema,
-  cardSchema,
-  isComputedViewId,
-  spaceFileSchema,
-  uuidSchema,
-} from '../src/index';
+import { cardFrontmatterSchema, cardSchema, spaceFileSchema } from '../src/index';
 
 const MAIN = {
   id: '00000000-0000-4000-8000-000000000004',
@@ -102,16 +93,31 @@ describe('space file schema', () => {
     expect(file.layouts?.[0]?.graphs).toHaveLength(1);
   });
 
+  it('rejects an undeclared key rather than opening on a Layout its author did not name', () => {
+    // What answers the opening selection ADR 0079 renamed. Stripped, a file
+    // still carrying the old spelling reaches `workingSpace`, which adopts
+    // `layouts[0]` and commits it — the author's stated Layout silently
+    // replaced and then written back.
+    //
+    // The key below is arbitrary on purpose. Rejection is by policy and not by
+    // name, so neither the schema nor this test spells the retired one; a test
+    // that did would be the codebase carrying knowledge of a shape that cannot
+    // reach it, which is what ADR 0056 forbids.
+    const result = spaceFileSchema.safeParse({
+      ...validSpaceFile,
+      undeclaredKey: '00000000-0000-4000-8000-000000000010',
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('holds no cards — a card exists because its file does (ADR 0020)', () => {
-    // The same treatment a top-level `edges` array gets: an older file still
-    // parses, and the array is dropped rather than honoured, so nothing can
+    // Strict, so the array is refused rather than dropped, and nothing can
     // half-load from it.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       cards: [{ id: '00000000-0000-4000-8000-000000000002', title: 'A', content: 'cards/a.md' }],
     });
-    expect(result.success).toBe(true);
-    expect(result.success && 'cards' in result.data).toBe(false);
+    expect(result.success).toBe(false);
   });
 
   it('rejects version 2, which put the graphs beside the layouts instead of in them', () => {
@@ -151,15 +157,15 @@ describe('space file schema', () => {
           graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
         },
       ],
-      defaultRenderer: 'working',
+      defaultLayout: 'working',
     });
     expect(result.success).toBe(false);
   });
 
-  it('drops a top-level edges array, which graphs replaced', () => {
+  it('rejects a top-level edges array, which graphs replaced', () => {
     // ADR 0007 deleted the structural layer beside graphs; a graph's own `edges`
     // (ADR 0032) are a different thing that happens to share the word. An older
-    // file carrying the old array still parses, and the array is ignored.
+    // file carrying the old array is refused rather than read past.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       edges: [
@@ -170,8 +176,7 @@ describe('space file schema', () => {
         },
       ],
     });
-    expect(result.success).toBe(true);
-    expect(result.success && 'edges' in result.data).toBe(false);
+    expect(result.success).toBe(false);
   });
 
   it('accepts a space file with no layouts — a new space has no structure yet', () => {
@@ -298,13 +303,13 @@ describe('card frontmatter schema', () => {
     expect('body' in alias).toBe(false);
   });
 
-  it('parses a Space Card with optional Space View and Graph selections', () => {
+  it('parses a Space Card with optional Layout and Graph selections', () => {
     const selected = cardFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000006',
       title: 'Nested space',
       kind: 'space',
       spaceId: '00000000-0000-4000-8000-000000000007',
-      spaceView: '00000000-0000-4000-8000-000000000008',
+      layout: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
     });
     const inherited = cardFrontmatterSchema.parse({
@@ -316,27 +321,12 @@ describe('card frontmatter schema', () => {
 
     expect(selected).toMatchObject({
       kind: 'space',
-      spaceView: '00000000-0000-4000-8000-000000000008',
+      layout: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
     });
-    expect(inherited).not.toHaveProperty('spaceView');
+    expect(inherited).not.toHaveProperty('layout');
     expect(inherited).not.toHaveProperty('graph');
   });
-
-  it.each([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID] as const)(
-    'parses a Space Card selecting the computed %s Space View',
-    (spaceView) => {
-      const card = cardFrontmatterSchema.parse({
-        id: '00000000-0000-4000-8000-000000000006',
-        title: 'Nested space',
-        kind: 'space',
-        spaceId: '00000000-0000-4000-8000-000000000007',
-        spaceView,
-      });
-
-      expect(card).toMatchObject({ kind: 'space', spaceView });
-    },
-  );
 
   it('rejects an alias with no target', () => {
     expect(
@@ -365,7 +355,7 @@ describe('space file layouts', () => {
     const { layouts: _layouts, ...withoutLayouts } = validSpaceFile;
     const file = spaceFileSchema.parse(withoutLayouts);
     expect(file.layouts).toBeUndefined();
-    expect(file.defaultRenderer).toBeUndefined();
+    expect(file.defaultLayout).toBeUndefined();
   });
 
   it('parses a positioned layout and its positions', () => {
@@ -521,28 +511,16 @@ describe('space file layouts', () => {
     expect(file.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000099');
   });
 
-  it('accepts defaultRenderer as a durable Space View id', () => {
+  it('accepts defaultLayout as a durable Layout id', () => {
     // Shape only: whether the name resolves is a reference check, since it needs
     // the declared layouts in view.
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      defaultRenderer: '00000000-0000-4000-8000-000000000010',
+      defaultLayout: '00000000-0000-4000-8000-000000000010',
     });
-    expect(file.defaultRenderer).toBe('00000000-0000-4000-8000-000000000010');
-    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultRenderer: 'flow' }).success).toBe(
+    expect(file.defaultLayout).toBe('00000000-0000-4000-8000-000000000010');
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultLayout: 'flow' }).success).toBe(
       false,
     );
-  });
-});
-
-describe('Computed View ids', () => {
-  it('names the automatic views a space can open in without declaring one', () => {
-    expect([...COMPUTED_VIEW_IDS]).toEqual([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID]);
-  });
-
-  it('recognises exactly those names', () => {
-    expect(isComputedViewId(FLOW_SPACE_VIEW_ID)).toBe(true);
-    expect(isComputedViewId(GRID_SPACE_VIEW_ID)).toBe(true);
-    expect(isComputedViewId(uuidSchema.parse('00000000-0000-4000-8000-000000000010'))).toBe(false);
   });
 });

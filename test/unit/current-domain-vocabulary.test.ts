@@ -30,6 +30,15 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
  */
 const ENTITY = ['R', 'oute'].join('');
 const TRAVERSAL = ['W', 'alk'].join('');
+// Separated by a space *or a hyphen*: the retired terms were also written as
+// compound adjectives, and a guard that knew only the spaced form left the
+// hyphenated one as the spelling the sweep could hide in — which is exactly
+// where one survived, in a parity claim, until this line widened.
+const RETIRED_CANVAS_TERMS = new RegExp(
+  `${['Computed', 'View'].join('[ -]')}|${['Algorithmic', 'View'].join('[ -]')}|${['Space', 'View'].join('[ -]')}`,
+  'i',
+);
+const RETIRED_OPENING_FIELD = ['default', 'Renderer'].join('');
 
 const lower = ENTITY.toLowerCase();
 const upper = ENTITY.toUpperCase();
@@ -247,6 +256,26 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
   it('keeps no exemption that has stopped earning itself', () => {
     expectEachExemptionEarned(QUALIFIED_FILES, RETIRED_COMPOUND);
   });
+
+  it('finds no retired canvas vocabulary in live files', () => {
+    const found = scannableFiles().flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_CANVAS_TERMS).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no retired opening field in live files', () => {
+    const found = scannableFiles().flatMap((file) => {
+      const source = readTracked(file);
+      return source?.includes(RETIRED_OPENING_FIELD) === true ? [file] : [];
+    });
+
+    expect(found).toEqual([]);
+  });
 });
 
 /**
@@ -342,11 +371,18 @@ describe('the vocabulary that guard reads', () => {
 
 /**
  * ADR 0055's rename is the same event as ADR 0041's and earns the same guard.
- * Three names each called the canvas renderer after a different interaction or
- * surface — the act of selecting one, the control that offered the choice, and
- * the header that showed which one won — so every new presentation invited a
- * fourth. The renderer's identity is `CanvasRendererId` now and the aggregate
- * around it is `CanvasRenderers`.
+ * Three names each called what draws the canvas after a different interaction
+ * or surface — the act of selecting one, the control that offered the choice,
+ * and the header that showed which one won — so every new presentation invited
+ * a fourth.
+ *
+ * ADR 0079 then settled the noun itself: an authored **Layout** is the only
+ * thing that draws the canvas, and the render-layer word that stood between a
+ * Layout id and the Layout it names went with the module it named. Its identity
+ * is `LayoutId` in `@project/core` now, resolution is `resolveLayout`, and the
+ * Sidebar takes the Space's Layouts rather than a row type derived for it.
+ * Every spelling that indirection was written in is retired below, so it cannot
+ * grow back under a name a reader would have to follow to recognise.
  *
  * The persisted key that moved with them is deliberately **not** read here.
  * ADR 0054 rolls the unreleased prototype forward, and issue `04` foreclosed
@@ -360,6 +396,12 @@ describe('the vocabulary that guard reads', () => {
  * authority for the sidebar, still pointing the next agent at a deleted module
  * and a renamed prop. `docs-agents-citation-accuracy.test.ts` reads code→doc
  * quotations and has nothing to say about a document naming code that is gone.
+ *
+ * **The bare render-layer word is not read, and cannot be.** React Flow ships
+ * `EdgeLabelRenderer` and a `react-flow__renderer` class, `SpaceAppRenderer`
+ * genuinely renders a React element, and a Markdown renderer is a renderer.
+ * What is read is each spelling the retired indirection was actually written
+ * in — the same shape rule ADR 0041 uses, for the same reason.
  */
 const RETIRED_RENDERER_NAMES = [
   // The type, and the key function that was built on its name.
@@ -371,32 +413,57 @@ const RETIRED_RENDERER_NAMES = [
   ['canvas', '-choice'],
   // The reference error whose kind named a field the format no longer has.
   ['unresolved-default', '-view'],
+  // ADR 0079: the aggregate the resolver answered, and the subject inside it.
+  ['Resolved', 'Renderer'],
+  ['Renderer', 'Subject'],
+  ['Renderer', 'Invariant'],
+  // The resolver, its factory and its injected function type.
+  ['resolve', 'Renderer'],
+  ['Resolve', 'Renderer'],
+  ['createRenderer', 'Resolver'],
+  // The row type the Sidebar took, its collection, its module and its builder.
+  ['Canvas', 'Renderer'],
+  ['canvas', 'Renderers'],
+  ['canvas', '-renderers'],
+  ['canvasRenderer', 'Key'],
+  ['current', 'Renderer'],
+  // Navigation's field and the two operations that moved between Layouts.
+  ['selected', 'Renderer'],
+  ['select', 'Renderer'],
+  ['continueIn', 'Renderer'],
+  // The DOM hooks the Layout row carried.
+  ['data-', 'renderer'],
+  ['canvas', '-renderer'],
 ].map((parts) => parts.join(''));
 
 /**
- * The one retired name that is a *prefix* of a current one: the header
- * component kept its name and gained the renderer noun, so this alone is read as
- * a whole identifier. Every other name above is read as a prefix on purpose —
- * that is what makes one entry cover the key function built on a retired type's
- * name as well as the type itself.
+ * The header component's name, retired twice over.
+ *
+ * It was read as a **whole identifier** while the longer name that extended it
+ * was current: the component kept this prefix and gained the render-layer noun,
+ * so a prefix read would have reported its own replacement. ADR 0079 retired
+ * that longer name too — the header takes a Layout and is named for one — so
+ * the whole-identifier rule goes with it and this is read as a prefix like
+ * every other name above. That is what now makes one entry cover both.
  *
  * Joined here rather than written out, in this file's established idiom, and the
  * prose above says which names these are without spelling one: no retired name
  * appears literally, so the scan reads this file like every other tracked one
  * instead of excluding the file that talks about them.
  */
-const RETIRED_SELECTED_CANVAS = ['Selected', 'Canvas'].join('');
+const RETIRED_SELECTED_CANVAS = ['Selected', 'Canvas', 'Renderer'].join('');
 
 /**
  * The field the aggregate stopped carrying when the two questions were split.
  *
- * `CanvasRenderers` is every row the canvas can draw; which one is current is
- * `currentRenderer`'s separate answer over an id. A reader sent to this field is
- * sent to one that does not exist — which is what `docs/agents/ui.md` went on
- * doing after the split, in the same bullet the rename above had already been
- * corrected in. Nothing was reading for it: the retired *names* were gone, so
- * every scan here was green while the read-before-touching document still
- * described a shape the code had left.
+ * The list of rows and which one was current became two answers rather than one
+ * value with a field, so a reader sent to this field is sent to one that does
+ * not exist — which is what `docs/agents/ui.md` went on doing after the split,
+ * in the same bullet the rename above had already been corrected in. Nothing
+ * was reading for it: the retired *names* were gone, so every scan here was
+ * green while the read-before-touching document still described a shape the
+ * code had left. Both the list and the separate answer are themselves retired
+ * now, and the entries above hold them.
  *
  * Named rather than listed above because it is the one entry the self-test has
  * to write out, and because the two spellings differ: the scan needs the dot
@@ -408,7 +475,7 @@ const RETIRED_AGGREGATE_FIELD = ['renderers', '.selected'].join('');
 const RETIRED_RENDERER_NAME = new RegExp(
   [
     ...RETIRED_RENDERER_NAMES.map((name) => `\\b${name}`),
-    `\\b${RETIRED_SELECTED_CANVAS}(?![A-Za-z])`,
+    `\\b${RETIRED_SELECTED_CANVAS}`,
     `\\b${RETIRED_AGGREGATE_FIELD.replace('.', '\\.')}`,
   ].join('|'),
 );
@@ -443,7 +510,7 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
     // for the same reason every retired name here is: written out, the fixture
     // would be a hit this scan reports against its own file.
     const retired = [
-      `takes the row naming the current renderer (\`${RETIRED_AGGREGATE_FIELD}\`)`,
+      `takes the row naming the current canvas (\`${RETIRED_AGGREGATE_FIELD}\`)`,
       `whether \`${RETIRED_AGGREGATE_FIELD}\` is computed or authored`,
     ];
 
@@ -452,18 +519,51 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
     }
   });
 
-  it('stays silent on the current names the retired ones are prefixes of', () => {
-    // The guard has to survive the names that replaced these. The header
-    // component is the one that would otherwise report its own replacement.
+  /**
+   * The indirection ADR 0079 removed, in the shapes it was written in.
+   *
+   * These lines were the *silent* half of this block until that work landed:
+   * they were the current names, and what they proved was that the entries above
+   * them did not over-match their own replacements. Retiring them inverts them,
+   * which is the whole change — the same fixture text, asserted the other way.
+   * A rename that leaves a line in the silent arm has retired nothing.
+   *
+   * Composed from the two constants where one exists, for this file's usual
+   * reason; the rest are assembled here rather than written out, so this file
+   * still reads like every other tracked one under its own scan.
+   */
+  it('reports every spelling the Layout indirection was written in', () => {
+    const aggregate = ['Resolved', 'Renderer'].join('');
+    const row = ['Canvas', 'Renderer'].join('');
+    const retired = [
+      `export function ${RETIRED_SELECTED_CANVAS}({ ${['renderer'].join('')} }: { readonly ${['renderer'].join('')}: ${row} }) {`,
+      `import type { ${row}s, ${row} } from '../${['canvas', '-renderers'].join('')}';`,
+      `const key = ${['canvasRenderer', 'Key'].join('')}(selected);`,
+      `const current = ${['current', 'Renderer'].join('')}(renderers, navigationState.${['selected', 'Renderer'].join('')});`,
+      `const ${['resolve', 'Renderer'].join('')} = ${['createRenderer', 'Resolver'].join('')}();`,
+      `function openedState(selection: ${row}Id, view: ${aggregate}) {`,
+      `<button ${['data-', 'renderer'].join('')}={layout.id} data-testid="${['canvas', '-renderer'].join('')}" />`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_RENDERER_NAME.test(line), line).toBe(true);
+    }
+  });
+
+  it('stays silent on the names that replaced them, and on the foreign ones', () => {
+    // What the scan must not report: the vocabulary this rename arrived at, and
+    // three names that are not ours to sweep — React Flow's edge-label renderer
+    // and its own class, and the function type that renders a React element.
     const kept = [
-      `export function ${RETIRED_SELECTED_CANVAS}Renderer({ renderer }: { readonly renderer: CanvasRenderer }) {`,
-      `import type { CanvasRenderers, CanvasRenderer } from '../canvas-renderers';`,
-      `const key = canvasRendererKey(selected);`,
-      `expect(errors[0]?.kind).toBe('unresolved-default-renderer');`,
-      // The two questions, asked separately — the list, and the row that is
-      // current — which is the shape the retired field entry must not report.
-      `const current = currentRenderer(renderers, navigationState.selectedRenderer);`,
-      `<RendererGroup renderers={canvas.renderers.authored} selected={canvas.current} />`,
+      `export function SelectedLayoutName({ layout }: { readonly layout: Layout }) {`,
+      `import { resolveLayout, layoutCards } from '../layout-resolution';`,
+      `const selected = layouts.find((layout) => layout.id === selectedLayoutId);`,
+      `<button data-layout={layout.id} data-testid="layout-row" />`,
+      `navigation.selectLayout(layoutId); navigation.continueInLayout(layoutId, graphId);`,
+      `expect(errors[0]?.kind).toBe('unresolved-default-layout');`,
+      `import { EdgeLabelRenderer } from '@xyflow/react';`,
+      `element.className = 'react-flow__renderer';`,
+      `export type SpaceAppRenderer = (element: ReactElement) => void;`,
     ];
 
     for (const line of kept) {

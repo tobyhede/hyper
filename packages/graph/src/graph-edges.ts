@@ -5,10 +5,7 @@ import type { GraphEdge } from '@project/core';
  *
  * A Graph *is* a set of Edges the author draws (ADR 0032): cycles and self-Edges
  * are legal structure, and the one thing that is not is the exact same pair
- * twice in one Graph. That rule is asked in two places — intake refuses a
- * document holding it, and ADR 0045's conversion boundary refuses a View that
- * returns it — and it is computed here so the two cannot come to disagree about
- * what "the same Edge" means while each keeps its own way of saying so.
+ * twice in one Graph. Intake uses this operation to identify every duplicate.
  */
 
 /**

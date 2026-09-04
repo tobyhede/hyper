@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
-import { loadSpace, type Space } from '@project/graph';
+import { uuidSchema, type LayoutId } from '@project/core';
+import { loadSpace, Placement, positionedStrategy, type Space } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
 import { GRAPH_PALETTE } from '../src/colors';
-import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
-
-/** One composed resolver; nothing here converts, so its identity source is never used. */
-const resolveRenderer = createRendererResolver({
-  newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
-});
+import { resolveLayout } from '../src/layout-resolution';
 import { cardFile } from './card-files';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -22,6 +17,7 @@ const CARDS = [cardFile(CARD_A), cardFile(CARD_B)];
 
 const DRAWN = { id: DRAWN_GRAPH, title: 'Drawn', edges: [{ from: CARD_A, to: CARD_B }] };
 const OTHER = { id: OTHER_GRAPH, title: 'Other', edges: [{ from: CARD_B, to: CARD_A }] };
+const EMPTY = { id: DRAWN_GRAPH, title: 'Empty', edges: [] };
 
 /**
  * An authored Layout over both Cards, owning the Graphs it is handed.
@@ -49,22 +45,31 @@ const AT_REST: CanvasInteraction = {
 
 function spaceWith(extra: Record<string, unknown> = {}): Space {
   const result = loadSpace(
-    { version: 1, id: '00000000-0000-4000-8000-000000000001', title: 'T', ...extra },
+    {
+      version: 1,
+      id: '00000000-0000-4000-8000-000000000001',
+      title: 'T',
+      defaultLayout: LAYOUT,
+      layouts: [layoutOwning(EMPTY)],
+      ...extra,
+    },
     CARDS,
   );
   if (!result.ok) throw new Error(result.errors.map((e) => e.message).join(', '));
   return result.space;
 }
 
-/** Arrange through the view's own strategy, so a test sees what the app renders. */
+/** Arrange through the Layout's own strategy, so a test sees what the app renders. */
 async function projectThrough(
   space: Space,
   interaction: CanvasInteraction = AT_REST,
-  selection?: CanvasRendererId,
+  selection?: LayoutId,
 ) {
-  const view = resolveRenderer(space, selection);
-  const projection = canvasProjection(space, view);
-  const laidOut = await view.strategy(projection.strategyGraph);
+  const resolved = resolveLayout(space, selection);
+  const projection = canvasProjection(space, resolved);
+  const laidOut = await positionedStrategy(Placement.fromLayout(resolved.layout))(
+    projection.strategyGraph,
+  );
   return { ...projection, ...projection.project(laidOut, interaction) };
 }
 
@@ -77,17 +82,15 @@ function handledGraphIds(nodes: readonly CardFlowNode[]): string[] {
 }
 
 describe('canvasProjection', () => {
-  it('marks Computed View Cards read-only and authored Layout Cards editable', async () => {
+  it('marks authored Layout Cards editable', async () => {
     const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
 
-    const computed = await projectThrough(space);
     const authored = await projectThrough(space, AT_REST, LAYOUT);
 
-    expect(computed.nodes.map((node) => node.data.readOnly)).toEqual([true, true]);
     expect(authored.nodes.map((node) => node.data.readOnly)).toEqual([false, false]);
   });
 
-  it('projects every Space Card when the Space has no Graphs', async () => {
+  it('projects every Layout Card when its Graph is empty', async () => {
     const { nodes } = await projectThrough(spaceWith());
 
     expect(nodes.map((node) => node.id).sort()).toEqual([CARD_A, CARD_B]);
@@ -146,16 +149,6 @@ describe('canvasProjection', () => {
     expect(byId[CARD_B]?.showContent).toBe(false);
   });
 
-  it('drops routed Edge geometry once a Card has been dragged out of the placement', async () => {
-    const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
-
-    const settled = await projectThrough(space);
-    const dragged = await projectThrough(space, { ...AT_REST, moved: true });
-
-    expect(settled.edges[0]?.data?.['points']).toBeDefined();
-    expect(dragged.edges[0]?.data?.['points']).toBeUndefined();
-  });
-
   it('draws every Graph a selected Layout owns', async () => {
     const space = spaceWith({ layouts: [layoutOwning(DRAWN, OTHER)] });
 
@@ -179,13 +172,15 @@ describe('canvasProjection', () => {
       },
     };
     const space = spaceWith({ layouts: [layout] });
-    const renderer = resolveRenderer(space, LAYOUT);
-    const projection = canvasProjection(space, renderer);
+    const resolved = resolveLayout(space, LAYOUT);
+    const projection = canvasProjection(space, resolved);
     const strategyCard = projection.strategyGraph.cards.find(({ id }) => id === CARD_A);
 
     expect(strategyCard).toMatchObject({ width: 560, height: 420 });
 
-    const laidOut = await renderer.strategy(projection.strategyGraph);
+    const laidOut = await positionedStrategy(Placement.fromLayout(resolved.layout))(
+      projection.strategyGraph,
+    );
     const node = projection.project(laidOut, AT_REST).nodes.find(({ id }) => id === CARD_A);
     expect(node).toMatchObject({ width: 560, height: 420, data: { expanded: true } });
   });

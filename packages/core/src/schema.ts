@@ -58,7 +58,7 @@ export const spaceCardFrontmatterSchema = z.object({
   title: z.string().min(1),
   kind: z.literal('space'),
   spaceId: idSchema,
-  spaceView: uuidSchema.optional(),
+  layout: uuidSchema.optional(),
   graph: idSchema.optional(),
 });
 
@@ -143,11 +143,11 @@ export const graphSchema = z.object({
   /**
    * Possibly none. A graph *is* its edges, but it is no longer minted by
    * drawing one: creating a layout creates its initial empty active graph in
-   * the same edit (ADR 0040), and the Flow view converts by returning exactly
-   * that — one fresh graph holding no edges (ADR 0045). Deleting a graph's last
-   * edge leaves the same shape, and graph management may not delete the graph
-   * itself to avoid it. The superseded rule read ADR 0033's connect gesture as
-   * the only way a graph came into being, which ADR 0040 replaced.
+   * the same edit (ADR 0040), and Add Layout produces exactly that — one fresh
+   * graph holding no edges (ADR 0079). Deleting a graph's last edge leaves the
+   * same shape, and graph management may not delete the graph itself to avoid
+   * it. The superseded rule read ADR 0033's connect gesture as the only way a
+   * graph came into being, which ADR 0040 replaced.
    *
    * A card may appear as the `from` of several edges (a fork) and the `to` of
    * several (a merge); nothing here constrains that.
@@ -188,7 +188,7 @@ export const cardPlacementSchema = z.discriminatedUnion('open', [
  * id is unique across the *space* (ADR 0045), because the flatten a
  * space-subject view draws keys colour, handles and activation on the id alone.
  *
- * **Strict, unlike every other object here.** Under the version 2 shape this
+ * **Strict**, as the space file itself is. Under the version 2 shape this
  * key held a filter — an array of graph ids naming the graphs the layout drew.
  * Reading one of those as an owned collection would be a type error, but a
  * *stripped* one would read a file that said "draw only these" as a layout with
@@ -239,49 +239,6 @@ export const layoutSchema = z.preprocess(
   z.discriminatedUnion('kind', [positionedLayoutSchema]),
 );
 
-/** Durable identities of the Computed Views supplied by the application. */
-export const FLOW_SPACE_VIEW_ID = uuidSchema.parse('2e84c9f4-63bb-4e26-8f32-3c2a5ef6b001');
-export const GRID_SPACE_VIEW_ID = uuidSchema.parse('2e84c9f4-63bb-4e26-8f32-3c2a5ef6b002');
-
-/**
- * Computed View identity is independent of product naming. These ids are
- * application constants, available in every Space, and share the same
- * namespace as authored Layout ids (ADR 0068).
- *
- * A tuple rather than a widened array, so its *length* is part of its type and
- * {@link PerComputedView} can hold a consumer's registry to it.
- */
-export const COMPUTED_VIEW_IDS = Object.freeze([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID] as const);
-
-/**
- * One value per element of a tuple, and exactly as many.
- *
- * The tuple is a parameter and not `typeof COMPUTED_VIEW_IDS` written inline,
- * because a mapped type only maps a tuple to a tuple when its source is a naked
- * type parameter. Spelled inline it maps `keyof` an array instead — `length`,
- * `toString` and the rest — and the arity this exists for is lost.
- */
-type PerElement<Tuple extends readonly unknown[], Value> = {
-  readonly [Index in keyof Tuple]: Value;
-};
-
-/**
- * One value per Computed View, in the order the ids are declared above.
- *
- * What a consumer's registry is declared as, so that adding a Computed View
- * here fails to compile everywhere that owes an answer for one — the guarantee
- * `satisfies Record<BuiltInViewId, …>` gave while a View was named by a string
- * literal, and lost when identity became a UUID. A UUID is not a type-level
- * key, so what a type can still hold a registry to is how *many* Views there
- * are; each entry still writes its id out, where a reader sees which View it
- * answers for.
- */
-export type PerComputedView<Value> = PerElement<typeof COMPUTED_VIEW_IDS, Value>;
-
-export function isComputedViewId(id: z.infer<typeof uuidSchema>): boolean {
-  return COMPUTED_VIEW_IDS.includes(id);
-}
-
 /**
  * The **first-public** space document version.
  *
@@ -307,8 +264,23 @@ export const SPACE_FILE_VERSION = 1;
  * It holds **structure and nothing else** (ADR 0020): cards are not listed here,
  * because a card exists by virtue of its file existing. `loadSpace` takes the
  * card files alongside this.
+ *
+ * **Strict**, for the reason `positionedLayoutSchema` is. A stripped key is a
+ * question answered silently: a top-level `cards` or `edges` array (ADR 0020,
+ * ADR 0007) half-describes a space nothing loads from, and a file still
+ * spelling the opening selection the way ADR 0079 renamed it reaches
+ * `workingSpace`, which adopts `layouts[0]` and commits it — the Layout its
+ * author named replaced by one they did not, and then persisted. Rejecting
+ * says so instead.
+ *
+ * This is a policy and not a compatibility path, which is what lets it answer
+ * a renamed key at all: it declines every key it does not declare, so it never
+ * names a retired one and carries no knowledge of a shape that cannot reach it
+ * (ADR 0056). `.omit()` and `.extend()` carry the mode, so the stored
+ * document, the snapshot and the import variant decline one too — the same
+ * answer at every door.
  */
-export const spaceFileSchema = z.object({
+const spaceFileObjectSchema = z.strictObject({
   version: z.literal(SPACE_FILE_VERSION),
   /**
    * What names this space. Required today; ADR 0019 makes ids optional and
@@ -327,12 +299,14 @@ export const spaceFileSchema = z.object({
    * space *is*: it renders and it cannot be presented (ADR 0015).
    */
   layouts: z.array(layoutSchema).optional(),
-  /** A declared Layout's id or an available Computed View's durable id. */
-  defaultRenderer: uuidSchema.optional(),
+  /** The durable opening selection, naming one declared Layout. */
+  defaultLayout: uuidSchema.optional(),
 });
 
+export const spaceFileSchema = spaceFileObjectSchema;
+
 /** The JSONB document stored beside a space's relational UUID. */
-export const spaceDocumentSchema = spaceFileSchema.omit({ id: true });
+export const spaceDocumentSchema = spaceFileObjectSchema.omit({ id: true });
 
 /** The JSONB document stored beside a card's relational UUID. */
 export const markdownCardDocumentSchema = markdownCardSchema.omit({ id: true });
@@ -366,10 +340,12 @@ const importLayoutSchema = z.preprocess(
   z.discriminatedUnion('kind', [importPositionedLayoutSchema]),
 );
 
-export const importSpaceFileSchema = spaceFileSchema.extend({
+const importSpaceFileObjectSchema = spaceFileObjectSchema.extend({
   id: uuidSchema.optional(),
   layouts: z.array(importLayoutSchema).optional(),
 });
+
+export const importSpaceFileSchema = importSpaceFileObjectSchema;
 
 /**
  * The only shape in which entity ids may be absent. References remain UUIDs:
@@ -377,6 +353,6 @@ export const importSpaceFileSchema = spaceFileSchema.extend({
  */
 export const importSpaceSchema = z.object({
   id: uuidSchema.optional(),
-  document: importSpaceFileSchema.omit({ id: true }),
+  document: importSpaceFileObjectSchema.omit({ id: true }),
   cards: z.array(z.object({ id: uuidSchema.optional(), document: cardDocumentSchema })),
 });

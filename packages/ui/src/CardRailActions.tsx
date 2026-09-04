@@ -63,7 +63,7 @@ const GROUP_LAYOUT = 'inline-flex items-center gap-1';
  * **Shared** commands belong to every Card whatever it is: Open and Close are
  * Card-level under ADR 0064, and a Space Card is as closable as a Markdown one.
  * **Kind** commands belong to one kind of Card and mean nothing on another:
- * Edit, Save and Cancel are the Markdown front's, and choosing a Space View or
+ * Edit, Save and Cancel are the Markdown front's, and choosing a Layout or
  * entering a Space would be a Space Card's.
  *
  * The two are drawn the same — same box, same glyph vocabulary, one rail and

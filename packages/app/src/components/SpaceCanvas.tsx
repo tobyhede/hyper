@@ -58,11 +58,11 @@ const ARIA_LABEL_CONFIG = {
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
 
-/** A Computed View keeps Cards readable without advertising authored gestures. */
-const READ_ONLY_ARIA_LABEL_CONFIG = {
+/** A pending placement keeps Cards readable without advertising authored gestures. */
+const PENDING_ARIA_LABEL_CONFIG = {
   ...ARIA_LABEL_CONFIG,
-  'node.a11yDescription.default': 'This Card is read-only in a Computed View.',
-  'node.a11yDescription.keyboardDisabled': 'This Card is read-only in a Computed View.',
+  'node.a11yDescription.default': 'This Card is unavailable while placement is pending.',
+  'node.a11yDescription.keyboardDisabled': 'This Card is unavailable while placement is pending.',
 } as const;
 
 /**
@@ -108,7 +108,7 @@ const NOT_A_CANVAS_COMMAND =
  *
  * Answered from the projection rather than from the DOM id alone, which is what
  * keeps a second canvas's node — a story, a catalogue page — from naming a Card
- * this renderer is not drawing.
+ * this Layout is not drawing.
  */
 const focusedCard = (target: Element, nodes: readonly CardFlowNode[]): CardId | null => {
   const element = target.closest<HTMLElement>('.react-flow__node[data-id]');
@@ -126,9 +126,7 @@ export interface SpaceCanvasProps {
   activeCardId: string | null;
   presenting: boolean;
   /**
-   * Whether the selected renderer may be authored and its placement is ready.
-   * Computed Views pass `false`; authored Layouts pass `true` after placement.
-   * This is derived renderer state, not an edit mode to toggle or synchronize.
+   * Whether the selected Layout's placement is ready for authoring.
    */
   editable: boolean;
   /**
@@ -152,8 +150,8 @@ export interface SpaceCanvasProps {
   selection: CanvasSelection;
   onSelectCard: (cardId: CardId) => void;
   onSelectEdge: (subject: EdgeSubject) => void;
-  /** The Cards this renderer's subject holds — what an Edge picker may offer. */
-  subjectCards: readonly Card[];
+  /** The Cards this Layout places — what an Edge picker may offer. */
+  placedCards: readonly Card[];
   /** Exact neutral title shown by the transient empty-drop preview. */
   newCardTitle: string;
   /**
@@ -207,7 +205,7 @@ export function SpaceCanvas({
   selection,
   onSelectCard,
   onSelectEdge,
-  subjectCards,
+  placedCards,
   newCardTitle,
   onAddCard,
   onAddExistingCard,
@@ -274,7 +272,7 @@ export function SpaceCanvas({
     selection,
     activeGraphId,
     graphs,
-    subjectCards,
+    placedCards,
     newCardTitle,
     enabled: canAuthorOnCanvas,
     onSelectCard,
@@ -589,7 +587,7 @@ export function SpaceCanvas({
       // the presented-Card connection `editing.spec.ts` has always asserted. An
       // expression nothing reads is not a decision that was made.
       nodesConnectable={canConnectOnCanvas}
-      ariaLabelConfig={editable ? ARIA_LABEL_CONFIG : READ_ONLY_ARIA_LABEL_CONFIG}
+      ariaLabelConfig={editable ? ARIA_LABEL_CONFIG : PENDING_ARIA_LABEL_CONFIG}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the
       // authoring handles refuse via `isConnectableEnd` and the graph ports via

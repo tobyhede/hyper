@@ -28,7 +28,7 @@ export const SEEDED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000
  * Seed the opened Space with a single positioned Layout, then read it back.
  *
  * What it buys a test is an app that opens in an authored Layout rather than an
- * Algorithmic View. This goes through the same HTTP boundary the browser uses
+ * default Layout. This goes through the same HTTP boundary the browser uses
  * rather than reaching past it, so the seeded revision is one the app will
  * actually observe — hence the read-back: the caller asserts against the
  * revision the commit produced.
@@ -67,7 +67,7 @@ export async function seedPositionedLayout(
           graphs: [{ id: SEEDED_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
       ],
-      defaultRenderer: SEEDED_LAYOUT_ID,
+      defaultLayout: SEEDED_LAYOUT_ID,
     },
   };
   const commitResponse = await page.request.post('/api/spaces', {

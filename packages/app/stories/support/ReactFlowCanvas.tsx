@@ -9,22 +9,17 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import type { CardId, GraphId } from '@project/core';
+import { Placement, positionedStrategy } from '@project/graph';
 import { nodeTypes, edgeTypes, ZoomSlider, type CardFlowNode } from '@project/react-flow-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '#src/camera';
 import { canvasProjection, type CanvasInteraction } from '#src/canvas-projection';
 import { CARD_SIZE, cardSizeVars } from '#src/card';
-import { createRendererResolver } from '#src/renderer';
+import { resolveLayout } from '#src/layout-resolution';
 import { cardIds, graphIds, layoutId, space } from './fixture';
 
-const resolveRenderer = createRendererResolver({
-  // A selected Layout never converts, so the resolver cannot call this. It is
-  // still a real UUID because the resolver's interface deliberately accepts no
-  // story-specific partial adapter.
-  newGraphId: () => graphIds.short,
-});
-const renderer = resolveRenderer(space, layoutId);
-const pending = canvasProjection(space, renderer);
-const laidOut = renderer.strategy(pending.strategyGraph);
+const resolved = resolveLayout(space, layoutId);
+const pending = canvasProjection(space, resolved);
+const laidOut = positionedStrategy(Placement.fromLayout(resolved.layout))(pending.strategyGraph);
 
 const interaction = (
   activeGraphId: GraphId | null,

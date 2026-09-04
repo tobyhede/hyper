@@ -56,6 +56,7 @@ export type Layout = z.infer<typeof layoutSchema>;
 
 export type CardId = Card['id'];
 export type GraphId = Graph['id'];
+export type LayoutId = Layout['id'];
 
 /**
  * The on-disk shape of a space — what `loadSpace` reads and what a writer emits

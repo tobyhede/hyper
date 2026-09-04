@@ -239,7 +239,7 @@ const openFrame = { width: 480, height: 360 };
 
 const openMarkdown = `## Placement is authored
 
-A **Layout** owns explicit Card rects. The strategy only supplies a computed View.
+A **Layout** owns explicit Card rects. A strategy only computes placement.
 
 - Open in place
 - Edit the source

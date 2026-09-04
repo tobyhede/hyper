@@ -63,7 +63,7 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
           activeGraph: graphId,
         },
       ],
-      defaultRenderer: layoutId,
+      defaultLayout: layoutId,
     },
     cardFiles: [{ path: `cards/${card.id}.md`, text: serializeCardFile(card) }],
   };

@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
-import { FLOW_SPACE_VIEW_ID, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type LayoutId, type SpaceSnapshot, type UUID } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
@@ -12,9 +12,9 @@ import {
   type DropTarget,
   type ElementDropTarget,
 } from '../src/edge-authoring';
-import type { CanvasRendererId } from '../src/renderer';
+
 import { CARD_SIZE } from '../src/card';
-import { mintingGraphIds, mintingIds } from './minting';
+import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
 
 /**
@@ -34,8 +34,9 @@ const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const THIRD_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
-const MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
@@ -78,22 +79,28 @@ const positionedSnapshot: SpaceSnapshot = {
           { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
         ],
       },
+      {
+        id: OTHER_LAYOUT_ID,
+        title: 'Layout 2',
+        kind: 'positioned',
+        positions: { [CARD_C]: { x: 0, y: 0, open: false } },
+        graphs: [{ id: THIRD_GRAPH_ID, title: 'Third', edges: [] }],
+      },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
 };
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  renderer: CanvasRendererId = LAYOUT_ID,
+  layoutId: LayoutId = LAYOUT_ID,
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const { navigation, authoring, adapter, edgeAuthoring } = composeApp({
     spaceSession: session,
-    selection: renderer,
-    newGraphId: mintingGraphIds(MINTED_GRAPH),
+    selection: layoutId,
     newId,
     initialPlacement: Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: false }],
@@ -291,11 +298,11 @@ describe('deleting an Edge', () => {
  * it is *about*; an unrelated completed Edit leaves it standing.
  */
 describe('draft invalidation', () => {
-  it('cancels the draft when the selected renderer changes', () => {
+  it('cancels the draft when the selected Layout changes', () => {
     const { edges, navigation } = open();
     edges.beginPointerConnect(CARD_A);
 
-    navigation.selectRenderer(FLOW_SPACE_VIEW_ID);
+    navigation.selectLayout(OTHER_LAYOUT_ID);
 
     expect(edges.getState().draft).toBeNull();
   });
@@ -331,7 +338,6 @@ describe('draft invalidation', () => {
     const { authoring, edgeAuthoring: edges } = composeApp({
       spaceSession: session,
       selection: LAYOUT_ID,
-      newGraphId: mintingGraphIds(MINTED_GRAPH),
       initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20, open: false }],
         [CARD_B, { x: 300, y: 40, open: false }],
@@ -377,8 +383,8 @@ describe('draft invalidation', () => {
       ({ navigation }: ReturnType<typeof open>) => navigation.activateGraph(OTHER_GRAPH_ID),
     ],
     [
-      'the renderer changes',
-      ({ navigation }: ReturnType<typeof open>) => navigation.selectRenderer(FLOW_SPACE_VIEW_ID),
+      'the Layout changes',
+      ({ navigation }: ReturnType<typeof open>) => navigation.selectLayout(OTHER_LAYOUT_ID),
     ],
   ])('clears a refusal left by a finished gesture when %s', (_name, change) => {
     const opened = open();

@@ -105,15 +105,6 @@ export const createSpaceHost = (repository: SpaceRepository): SpaceHostApplicati
         return problem('invalid-request', 'Use a valid product URL.', accept);
       case 'unresolved':
         return problem('not-found', 'Choose a product destination that exists.', accept);
-      // The stored document names one Space View twice and neither claim wins
-      // (ADR 0069), so the address is unanswerable for a reason that is ours
-      // and not the request's — which is what a 500 says.
-      case 'collision':
-        return problem(
-          'internal-error',
-          `Space View identity collision for ${resolution.spaceViewId}.`,
-          accept,
-        );
     }
   };
   return Object.assign(api, { resolveProductRequest });

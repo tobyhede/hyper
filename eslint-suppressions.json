@@ -39,27 +39,7 @@
       "count": 2
     }
   },
-  "packages/app/test/canvas-renderers.test.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "packages/app/test/fixture-placement.test.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "packages/app/test/render-adapter.test.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "packages/app/test/renderer.property.test.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
-    }
-  },
-  "packages/app/test/renderer.test.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1
     }

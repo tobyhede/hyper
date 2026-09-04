@@ -2,8 +2,8 @@ import type { CardId, SpaceSnapshot } from '@project/core';
 import { resolveProductDestinationInSnapshot, type ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
+import { resolveLayout } from './layout-resolution';
 import { openingGraphId, type NavigationAddress } from './navigation';
-import type { ResolveRenderer } from './renderer';
 
 export type DestinationRestoration =
   | { readonly kind: 'opening'; readonly opening: DestinationOpening }
@@ -47,7 +47,6 @@ export interface DestinationSyncInput {
   readonly snapshot: SpaceSnapshot;
   /** The browser location as it stands now, read by the caller. */
   readonly pathname: string;
-  readonly resolveRenderer: ResolveRenderer;
   /** The position the application is at now. */
   readonly position: AddressedPosition;
   /**
@@ -79,7 +78,7 @@ export interface AddressedPosition extends NavigationAddress {
 }
 
 const sameAddress = (one: NavigationAddress, other: NavigationAddress): boolean =>
-  one.selectedRenderer === other.selectedRenderer &&
+  one.selectedLayoutId === other.selectedLayoutId &&
   one.activeGraphId === other.activeGraphId &&
   one.presentingCardId === other.presentingCardId;
 
@@ -98,17 +97,13 @@ export const samePosition = (one: AddressedPosition, other: AddressedPosition): 
  * `installDestinationOpening` decides it.
  *
  * A location that names no Graph does not leave the Active Graph unknown: it
- * opens whatever its renderer opens on, which is Navigation's own
+ * opens whatever its Layout opens on, which is Navigation's own
  * {@link openingGraphId} rather than a second answer written here.
  */
-function openingPosition(
-  space: Space,
-  resolveRenderer: ResolveRenderer,
-  opening: DestinationOpening,
-): AddressedPosition {
+function openingPosition(space: Space, opening: DestinationOpening): AddressedPosition {
   return {
-    selectedRenderer: opening.selection,
-    activeGraphId: opening.graphId ?? openingGraphId(resolveRenderer(space, opening.selection)),
+    selectedLayoutId: opening.selection,
+    activeGraphId: opening.graphId ?? openingGraphId(resolveLayout(space, opening.selection)),
     presentingCardId: opening.presentationCardId,
     addressedCardId: opening.cardId,
   };
@@ -123,50 +118,49 @@ function openingPosition(
  * something it moves to, so writing one would answer a URL no operation asked
  * for: the canonical spelling silently narrowed into its contextual form, the
  * Active Graph dropped out of the address it names nothing of, and, for a Card
- * the Space View omits, a location this Space's own resolver refuses. The Card
+ * the Layout omits, a location this Space's own resolver refuses. The Card
  * still decides {@link samePosition}, which is how a restored Card location is
  * recognised as already open.
  *
  * Two rules decide whether the URL names the Active Graph. It must, when the
- * renderer would open on some other Graph — a Space View URL that reopens a
+ * Layout would open on some other Graph — a Layout URL that reopens a
  * different Graph does not name this position at all. It also keeps naming one
- * the location already named in this same Space View: leaving a presentation
+ * the location already named in this same Layout: leaving a presentation
  * returns to the Graph the presentation URL spelled out, and widening it to the
- * bare Space View would throw away specificity the reader is holding. That
- * second rule is the surviving half of `adoptedRendererDestination` — do not
- * widen a URL that already names something inside this Space View.
+ * bare Layout would throw away specificity the reader is holding. That
+ * second rule is the surviving half of `adoptedLayoutDestination` — do not
+ * widen a URL that already names something inside this Layout.
  */
 function positionDestination(
   space: Space,
-  resolveRenderer: ResolveRenderer,
   position: AddressedPosition,
   opening: DestinationOpening | null,
 ): ProductDestination {
   const spaceId = space.id;
-  const { selectedRenderer, activeGraphId, presentingCardId } = position;
+  const { selectedLayoutId, activeGraphId, presentingCardId } = position;
   if (presentingCardId !== null && activeGraphId !== null) {
     return {
       kind: 'presentation',
       spaceId,
-      spaceViewId: selectedRenderer,
+      layoutId: selectedLayoutId,
       graphId: activeGraphId,
       cardId: presentingCardId,
     };
   }
   const namesGraph =
-    opening !== null && opening.selection === selectedRenderer && opening.graphId !== null;
+    opening !== null && opening.selection === selectedLayoutId && opening.graphId !== null;
   if (
     activeGraphId !== null &&
-    (namesGraph || activeGraphId !== openingGraphId(resolveRenderer(space, selectedRenderer)))
+    (namesGraph || activeGraphId !== openingGraphId(resolveLayout(space, selectedLayoutId)))
   ) {
     return {
-      kind: 'space-view-graph',
+      kind: 'layout-graph',
       spaceId,
-      spaceViewId: selectedRenderer,
+      layoutId: selectedLayoutId,
       graphId: activeGraphId,
     };
   }
-  return { kind: 'space-view', spaceId, spaceViewId: selectedRenderer };
+  return { kind: 'layout', spaceId, layoutId: selectedLayoutId };
 }
 
 /**
@@ -183,19 +177,15 @@ export function destinationSync({
   space,
   snapshot,
   pathname,
-  resolveRenderer,
   position,
   synced,
 }: DestinationSyncInput): DestinationSync {
   const restoration = destinationRestoration(space, snapshot, pathname);
   const opening = restoration.kind === 'opening' ? restoration.opening : null;
-  if (
-    opening !== null &&
-    samePosition(openingPosition(space, resolveRenderer, opening), position)
-  ) {
+  if (opening !== null && samePosition(openingPosition(space, opening), position)) {
     return { kind: 'none' };
   }
-  const destination = positionDestination(space, resolveRenderer, position, opening);
+  const destination = positionDestination(space, position, opening);
   if (!sameAddress(position, synced)) return { kind: 'push', destination };
   if (restoration.kind === 'ignored') return { kind: 'none' };
   return { kind: 'replace', destination };

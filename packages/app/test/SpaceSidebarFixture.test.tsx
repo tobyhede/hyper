@@ -29,7 +29,7 @@ afterAll(() => vi.unstubAllGlobals());
 
 /**
  * The story fixture composes **production** Navigation, so the state a Ladle
- * spec clicks its way into is Navigation's own: the selected renderer, the
+ * spec clicks its way into is Navigation's own: the selected Layout, the
  * Active Graph and the mode (ADR 0052, ADR 0053).
  *
  * That instance has to outlive a re-render. It was held in a `useMemo` keyed on
@@ -40,7 +40,7 @@ afterAll(() => vi.unstubAllGlobals());
  * navigated to.
  */
 describe('the Space Sidebar story fixture', () => {
-  it('keeps the renderer a story selected when a prop changes under it', () => {
+  it('keeps the Layout a story selected when a prop changes under it', () => {
     const { rerender } = render(<SpaceSidebarFixture />);
     fireEvent.click(screen.getByRole('button', { name: 'Collection 2' }));
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Collection 2');
@@ -75,12 +75,12 @@ describe('the Space Sidebar story fixture', () => {
    * whichever Space the fixture is handed *now*.
    *
    * Navigation resolves every selection against `currentSpace()` — that is what
-   * stops it naming a renderer the Space does not hold — so an instance that
+   * stops it naming a Layout the Space does not hold — so an instance that
    * outlives the prop it was built from must not have closed over the reader
    * that answered at mount. The row is drawn either way, because the sidebar's
    * list is derived from the prop directly; it is the click that would resolve
    * `Collection 3` against a Space with two Layouts and throw
-   * `resolveRenderer`'s own refusal.
+   * `resolveLayout`'s own refusal.
    *
    * `RetryableSpaceSidebarFixture` is the case in the catalogue: its Space
    * changes under the story when the session's submission lands. It supplies a

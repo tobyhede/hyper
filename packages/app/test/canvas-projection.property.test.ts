@@ -1,14 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { loadSpace, type CardFile } from '@project/graph';
+import { loadSpace, Placement, positionedStrategy, type CardFile } from '@project/graph';
 import { canvasProjection } from '../src/canvas-projection';
-import { createRendererResolver } from '../src/renderer';
-
-/** One composed resolver; nothing here converts, so its identity source is never used. */
-const resolveRenderer = createRendererResolver({
-  newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
-});
+import { resolveLayout } from '../src/layout-resolution';
 import { cardFile } from './card-files';
 
 /**
@@ -82,12 +77,13 @@ async function projectThroughLayout(generated: { file: unknown; cardFiles: CardF
   const result = loadSpace(generated.file, generated.cardFiles);
   if (!result.ok) throw new Error(`generated space should load: ${JSON.stringify(result.errors)}`);
 
-  const renderer = resolveRenderer(result.space, LAYOUT_ID);
-  if (renderer.kind !== 'layout') throw new Error('expected a Layout renderer');
-  const projection = canvasProjection(result.space, renderer);
-  const laidOut = await renderer.strategy(projection.strategyGraph);
+  const resolved = resolveLayout(result.space, LAYOUT_ID);
+  const projection = canvasProjection(result.space, resolved);
+  const laidOut = await positionedStrategy(Placement.fromLayout(resolved.layout))(
+    projection.strategyGraph,
+  );
   return projection.project(laidOut, {
-    activeGraphId: renderer.resolvedLayout.activeGraph.id,
+    activeGraphId: resolved.activeGraph.id,
     activeCardId: null,
     selectedCardId: null,
     presenting: false,

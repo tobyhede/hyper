@@ -1,16 +1,14 @@
 # Hyper
 
-Graph-native technical content. Cards of content live in spatial Layouts; authors connect them into curated directed Graphs and offer different Space Views onto them. This glossary is the shared language for that domain — it holds no implementation detail (file formats, storage, and rendering libraries are out of scope here), with one exception noted at the end.
-
-**ADR 0079 — decided, not built:** Computed Views, the union term Space View and the persisted `defaultRenderer` selection leave V1. An authored Layout becomes the only selectable and addressable canvas context, Add Layout creates an *empty* Layout rather than capturing a placement, and first working load initializes a layoutless Space. **Nothing below has changed yet** — the terms here are the vocabulary the code still uses, and they are what `.scratch/layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md` retires. Do not build new work onto the Computed View contract.
+Graph-native technical content. Cards of content live in spatial Layouts; authors connect them into curated directed Graphs and offer different Layouts onto them. This glossary is the shared language for that domain — it holds no implementation detail (file formats, storage, and rendering libraries are out of scope here), with one exception noted at the end.
 
 ## The space
 
 **Space**:
-The whole authored world, and the top-level of the domain model: Cards organised into spatial Layouts, with each Layout carrying the Graphs authored across its Cards. Everything else — Cards, Layouts and their Graphs — belongs within a Space; Computed Views are supplied for it. Spaces may reference one another through Space Cards, and whichever Space is loaded independently is the root of that navigation context — loading a Space changes what you are navigating, never what owns it.
+The whole authored world, and the top-level of the domain model: Cards organised into spatial Layouts, with each Layout carrying the Graphs authored across its Cards. Everything else — Cards, Layouts and their Graphs — belongs within a Space. Spaces may reference one another through Space Cards, and whichever Space is loaded independently is the root of that navigation context — loading a Space changes what you are navigating, never what owns it.
 _Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable thing — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph, workspace (used loosely for the loaded Space and for the app chrome around it — say Space, or Sidebar/canvas for the chrome).
 
-A **new space** is one Card and no authored Layout — not an empty canvas (ADR 0018, ADR 0025, ADR 0068). No Layout is also no Graphs, since a Layout is the only thing that owns one, so a new space renders through a Computed View and cannot yet be presented; the Layout arrives when the space is first edited, not when it is minted and not when it is opened. One Card is the starting state, not a permanent minimum: deliberate deletion may later leave the Space with no Cards.
+A **new space** is one Card in one centered Layout with one empty Graph — not an empty canvas (ADR 0018, ADR 0079). One Card is the starting state, not a permanent minimum: deliberate deletion may later leave the Space with no Cards.
 
 **Entry Space**:
 The one Space the application opens when no Space has been named. Entry is application-level context rather than a kind or property of Space; any Space loaded independently is the root of its own navigation context. This is what exists: a mutable repository-level flag that `hyper entry` changes (ADR 0069).
@@ -21,7 +19,7 @@ The one permanent Space, at the root of Space Card ownership. No Space Card crea
 _Avoid_: root Space, home Space, default Space, Space directory.
 
 **Id**:
-The durable UUID that names a referenceable thing — a Space, Card, Space View, or Graph. It is the entity's only identifier and is unique within that entity's scope: Space, Card and Computed View ids are global, while Layout and Graph ids are unique within their owning Space. Card ids are aggregate-global because a complete Meta-rooted aggregate indexes Cards across independently stored Spaces; a Graph belongs to one Layout but its id is unique across the whole Space, because a Computed View drawing every Graph flattened across Layouts keys colour, handles and activation on that id alone (ADR 0045). Different entity kinds may carry the same UUID, and Layout or Graph ids scoped to one Space may be reused in another, with one exception: Computed Views and Layouts share the Space View id namespace and may not collide for a Space. References carry the id directly in the scope that resolves it rather than pairing it with a second authored or machine-facing name.
+The durable UUID that names a referenceable thing — a Space, Card, Layout, or Graph. It is the entity's only identifier and is unique within that entity's scope: Space and Card ids are global, while Layout and Graph ids are unique within their owning Space. Card ids are aggregate-global because a complete Meta-rooted aggregate indexes Cards across independently stored Spaces; a Graph belongs to one Layout but its id is unique across the whole Space. Different entity kinds may carry the same UUID, and Layout or Graph ids scoped to one Space may be reused in another. References carry the id directly in the scope that resolves it rather than pairing it with a second authored or machine-facing name.
 
 An author need not supply one when introducing an entity. Anything accepted into Hyper receives an id before it becomes part of a Space; once assigned, changing it is a real edit because every reference names it.
 _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id with a "durable" one.
@@ -37,7 +35,7 @@ A card is one of three kinds, and the kind is what its content is: **Markdown** 
 _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a table, a diagram or code, not only writing), body (works for markdown, but a space card's content is a graph).
 
 **Space Card**:
-A card of kind **space**: a reference to another Space, shown through the target's selected Space View and Graph. The Space reference is immutable but the selections are authored on the Card; many Space Cards may show the same Space differently. The Space Cards referencing a Space own its lifetime together: deleting one leaves the target alive while another reference remains, and deleting the last one deletes the target and every Space below it that nothing else references (ADR 0074). Space Card references may converge but may not form a cycle.
+A card of kind **space**: a reference to another Space, shown through the target's selected Layout and Graph. The Space reference is immutable but the selections are authored on the Card; many Space Cards may show the same Space differently. The Space Cards referencing a Space own its lifetime together: deleting one leaves the target alive while another reference remains, and deleting the last one deletes the target and every Space below it that nothing else references (ADR 0074). Space Card references may converge but may not form a cycle.
 _Avoid_: subspace, portal, link, nested space (as a second name for the same thing — it is a Space, full stop).
 
 **Alias**:
@@ -67,11 +65,11 @@ _Avoid_: link, connection, transition, arrow, step, relationship.
 **Active Graph**:
 The one Graph selected in the current Layout — drawn emphasized, and the Graph an author's new Edges join. There is one concept here, not two: a Graph is active, and highlighting is how that is shown. A Layout may name which Graph opens active; failing that it is the Layout's first Graph. Changing it is a deliberate act, never a side effect of drawing or reading.
 
-Activating is not itself an edit — it touches no Card and no Graph. Which Graph is active may become the authored selection when an Edit records the surrounding Layout. On a Computed View, where no Layout is selected, emphasis is the whole of it; authoring begins only after Create Layout captures the View.
+Activating is not itself an edit — it touches no Card and no Graph. Which Graph is active may become the authored selection when an Edit records the surrounding Layout.
 _Avoid_: selected Graph and current Graph as a second concept alongside this one, focus, mode.
 
 **Authoring**:
-Interacting with a Space in a way that may change its authored Cards, Graphs, or Layouts. Authoring includes attempts that produce no change; only a successful authoring interaction produces an **Edit**. Navigating a Space View, activating a Graph, selecting a Card or an Edge, and presenting are not authoring because they do not change the Space. **Opening a Card is authoring**, because which Cards are open is a property of the Layout (ADR 0064) — it was not, while opening drew a Card on a surface over the canvas and left nothing behind.
+Interacting with a Space in a way that may change its authored Cards, Graphs, or Layouts. Authoring includes attempts that produce no change; only a successful authoring interaction produces an **Edit**. Navigating a Layout, activating a Graph, selecting a Card or an Edge, and presenting are not authoring because they do not change the Space. **Opening a Card is authoring**, because which Cards are open is a property of the Layout (ADR 0064) — it was not, while opening drew a Card on a surface over the canvas and left nothing behind.
 
 **Interaction draft**:
 A transient value owned by the surface conducting an unfinished authoring interaction — a title field's changed text, a picker's unconfirmed target, React Flow's connection or drag attempt, an armed destructive control's confirmation state. None of these is part of the Space or an Edit waiting to be persisted, so cancelling discards the draft and needs no compensating Edit.
@@ -91,33 +89,21 @@ None of the three is an error. A refusal is an anticipated outcome of attempting
 _Avoid_: error, failure, exception (all reserved for a broken invariant or a thrown/reported defect — never for one of the three outcomes), validation error.
 
 **Replacement epoch**:
-Which generation of the working Space a piece of local work was made against. Replacing the working Space wholesale — accepting the stored Space is the only thing that does it — advances the epoch once, as part of the same transition that installs the replacement. Nothing else advances it: retrying, keeping local work, a change in persistence status, choosing another Space View, and completing an Edit all leave it where it is.
+Which epoch of the working Space a piece of local work was made against. Replacing the working Space wholesale — accepting the stored Space is the only thing that does it — advances the epoch once, as part of the same transition that installs the replacement. Nothing else advances it: retrying, keeping local work, a change in persistence status, choosing another Layout, and completing an Edit all leave it where it is.
 
 It is invalidation rather than a registry. Nothing learns which fields, pickers, drags or armed controls are open; each owner remembers the epoch its work was made under, or is keyed by it, and discards that work itself once the epoch no longer matches. Completed work is covered as well as Interaction drafts: an authoring operation that completed but is still waiting its turn behind an earlier one names identities and positions read from the Space it was derived from, so an epoch that has moved on means that work is discarded rather than applied to the Space that replaced it. Discarding it produces no Edit and is not a refusal the author asked for.
 _Avoid_: revision (that is what a stored Space is versioned by, and the two move for unrelated reasons), version, generation, session, dirty flag, cancellation registry, and _opening_ (the code's superseded name for this counter, and already the word for bringing a Card up).
 
-## Space Views and Layouts
-
-**Space View**:
-One way of seeing a Space's Cards. A Space View is either a Computed View the application supplies or a Layout the author wrote; both share one identity namespace, and the distinction between them is not part of how someone chooses or addresses one.
-_Avoid_: View alone, canvas renderer, screen, page, panel, mode.
-
-**Computed View**:
-An application-supplied, read-only Space View that carries no authored Space state. It receives a subject of Cards and Graphs and uses an automatic Layout strategy. Create Layout explicitly captures what it shows as a new Layout without retaining a relationship to the Computed View.
-
-A Computed View's Id is stable independently of its mutable product name and is the same in every Space for which the application supplies it. Different subjects do not make named kinds of Computed View: Grid, Flow, sorts and future trees or clusters are simply different ways of seeing Cards.
-_Avoid_: Algorithmic View, built-in View, layout, arrangement, algorithm.
+## Layouts
 
 **Layout**:
-A card-to-rect map the author wrote — which of a Space's Cards are in the Layout, where they sit, their Open/Closed state, and the Open Size each remembers. It belongs to the Space and is part of what the Space is. A Space may hold several Layouts, and may hold none. Membership, position, Open/Closed state and Open Size are properties of the Layout, never of the Card: the same Card may be absent from one Layout, sit at different coordinates in others, and be Open at different sizes in each. A Layout may not name Cards the Space does not have.
-
-A Layout is the authored kind of **Space View**; the computed kind is not a layout at all but a **Computed View** using an automatic layout strategy (ADR 0014). Create Layout turns the selected Computed View into a Layout by returning the Cards and positions already on screen along with one or more Graphs, so nothing moves at the moment it happens. Every Graph it returns carries a new identity owned by the new Layout, so no conversion can leave two Layouts owning one Graph (ADR 0045).
+A card-to-rect map the author wrote — which of a Space's Cards are in the Layout, where they sit, their Open/Closed state, and the Open Size each remembers. It belongs to the Space and is part of what the Space is. A working Space always has at least one Layout and may hold several. Membership, position, Open/Closed state and Open Size are properties of the Layout, never of the Card: the same Card may be absent from one Layout, sit at different coordinates in others, and be Open at different sizes in each. A Layout may not name Cards the Space does not have.
 
 A Layout owns a non-empty ordered collection of Graphs over its Cards. Several Graphs may share Cards within that Layout. A Layout may also name which of its Graphs opens active; otherwise its first Graph opens active.
-_Avoid_: Computed View, placement as a synonym (a Layout *holds* a placement, and adds an identity, a title and its owned Graphs), diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
+_Avoid_: View, placement as a synonym (a Layout *holds* a placement, and adds an identity, a title and its owned Graphs), diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
 
 **Placement**:
-The card-to-rect map itself — which Cards are present, where they sit, whether each is **Open** or **Closed**, and its remembered **Open Size**, and nothing more. A **Layout** is the authored thing a Space holds; the placement is the map inside it. Every Closed Card has the same **Closed Size** by domain rule, so that fixed size is not authored alongside each Card. Placement is also what an automatic **layout strategy** computes and what the positioned strategy reads, and it is the same value in both directions: Create Layout copies the computed placement into the new Layout, which is the crossing ADR 0025 describes.
+The card-to-rect map itself — which Cards are present, where they sit, whether each is **Open** or **Closed**, and its remembered **Open Size**, and nothing more. A **Layout** is the authored thing a Space holds; the placement is the map inside it. Every Closed Card has the same **Closed Size** by domain rule, so that fixed size is not authored alongside each Card. Placement is also what an automatic **layout strategy** computes and what the positioned strategy reads.
 
 A Layout's placement is **sparse** relative to the Space, and omission is meaningful: a Card the map leaves out is not in that Layout and is not rendered there. Adding an existing Card to a Layout writes its position. Removing it from the Layout removes that entry and the incident Edges the Layout owns without deleting the Card from the Space. Omission is never the origin.
 
@@ -129,13 +115,12 @@ This is not the placement layer ADR 0004 rejected. That was an entity sitting *b
 _Avoid_: arrangement (ADR 0005 — applying a strategy produces no separate entity), layer.
 
 **Layout strategy**:
-A named strategy for arranging a space's cards — how they are organised and positioned. Which cards it arranges is the Space View's choice, not the strategy's.
+A named strategy for arranging a space's cards — how they are organised and positioned. Which cards it arranges is the Layout's choice, not the strategy's.
 
-A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from the Cards and Graphs alone — a grid, Cards ordered by name, a tree, a cluster map, a Graph-driven placement — so it needs nothing from the Space and carries no authored data. The positioned strategy reads a **Layout**. Every Layout has a strategy that renders it; not every strategy has a Layout behind it.
+A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from Cards and Graphs alone — a grid, Cards ordered by name, a tree, a cluster map, a Graph-driven placement — so it needs no authored positions and carries no authored data. Automatic strategies are non-addressable application capabilities. The positioned strategy reads a **Layout**, and it is the strategy V1 uses to render selectable Layouts.
 
 No strategy is the primary one. A space is arranged by whichever the author or the application chose, the set of them grows, and any particular graph-layout engine is one member of it rather than the thing layout means.
 
-An automatic strategy has nowhere to record where an author put a Card, so a Computed View is read-only. The explicit Create Layout command **converts** it: the positions the strategy computed are copied into a new Layout. That crossing — computed positions becoming authored — is the only one between them; attempted authoring never triggers or replays it.
 _Avoid_: arrangement (applying a strategy produces no separate entity — the cards themselves carry the positions), algorithm, engine.
 
 **Cards View**:
@@ -147,7 +132,7 @@ Projecting a space into the repository-friendly form an author can review, commi
 _Avoid_: saving, publishing, syncing.
 
 **Opening**:
-Bringing a single card's content up **on the Card itself**, by growing it where it already sits. A Markdown Card opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias opens on its own Title and its immutable Target's content read-only, while the Target Card must be opened explicitly to author that content. A Space Card opens on the Space View it selects. Opening is not presenting — the canvas it happens on is still the thing being worked in — and Open Markdown content reads through the same renderer used while presenting.
+Bringing a single card's content up **on the Card itself**, by growing it where it already sits. A Markdown Card opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias opens on its own Title and its immutable Target's content read-only, while the Target Card must be opened explicitly to author that content. A Space Card opens on the Layout it selects. Opening is not presenting — the canvas it happens on is still the thing being worked in — and Open Markdown content reads through the same renderer used while presenting.
 
 A Card is **Open** or **Closed**, and that state is a property of the **Layout**, not of the Card and not of the viewer: opening a Card is an Edit, it survives a reload, and any number of a Layout's Cards may be Open at once. Every Closed Card has the fixed Card size. Every Open Card has an **Open Size**: the concrete dimensions authored when it first Opens and changed by Resize. Close preserves the Open Size, so reopening returns to it. Resizing is a Card capability, not behavior supplied by a Card kind; a kind decides what its Open Card contains.
 
@@ -155,15 +140,15 @@ Putting a caret in one of an Open Card's fields is a separate gesture from Openi
 _Avoid_: Expanded and expansion as state beside Open and Opening, preview, popup, modal, dialog, drill-down, view mode and edit mode for content Opening (which has one surface, the Card).
 
 **Entering**:
-Crossing into the Space a Space Card references, so that Space takes the canvas and brings its own command surface. Entering is not Opening: Opening draws the target's Space View inside the Card and leaves the containing Space on the canvas, while Entering replaces what is being worked in. An entered Space is edited exactly as one opened directly is. It begins on the Space View and Graph its Space Card selects, and changing either while inside is navigation rather than an Edit — the Space Card and the target Space both keep their authored selections. **Exit** is the one action that closes an entered Space. It waits on an in-flight commit and refuses for `failed` and `conflicted`, each of which names a recovery — Retry, or Accept remote and Resolve; it warns and permits Exit for `rejected`, where the work is certainly lost and there is no recovery to name.
+Crossing into the Space a Space Card references, so that Space takes the canvas and brings its own command surface. Entering is not Opening: Opening draws the target's Layout inside the Card and leaves the containing Space on the canvas, while Entering replaces what is being worked in. An entered Space is edited exactly as one opened directly is. It begins on the Layout and Graph its Space Card selects, and changing either while inside is navigation rather than an Edit — the Space Card and the target Space both keep their authored selections. **Exit** is the one action that closes an entered Space. It waits on an in-flight commit and refuses for `failed` and `conflicted`, each of which names a recovery — Retry, or Accept remote and Resolve; it warns and permits Exit for `rejected`, where the work is certainly lost and there is no recovery to name.
 _Avoid_: drilling in, zooming in, descending, push and pop, navigating into (as a name for the action — Entering is the name).
 
 **Open Spaces**:
-The Spaces open at once in one session, and the surface that draws them beside the Space Sidebar. Each entry names one Space. Selecting an entry switches to that Space and closes nothing, and an entry remembers nothing about how it was reached, so closing one Space never closes another. Every open Space keeps its own live Space View and Graph selection for as long as it is open. An entry may mark a Space that has stopped saving.
+The Spaces open at once in one session, and the surface that draws them beside the Space Sidebar. Each entry names one Space. Selecting an entry switches to that Space and closes nothing, and an entry remembers nothing about how it was reached, so closing one Space never closes another. Every open Space keeps its own live Layout and Graph selection for as long as it is open. An entry may mark a Space that has stopped saving.
 _Avoid_: rail (that is a Card's toolbar), tab (that is a browser's), stack (the model in which selecting an outer Space closes everything inside it, considered and rejected), breadcrumb, depth.
 
 **Presenting**:
-Traversing a Graph through a Space View for an audience, drawn close enough that one Card fills the screen. At the Active Card, the presenter follows one of the Active Graph's outgoing Edges, including the applicable cross-Space Edges carried through Space Cards. A Graph that is a line traverses as a line; a Graph that forks offers a choice. There is no separate artefact and no second surface — a presentation is not a thing a Graph is turned into, it is a way of moving through one.
+Traversing a Graph through a Layout for an audience, drawn close enough that one Card fills the screen. At the Active Card, the presenter follows one of the Active Graph's outgoing Edges, including the applicable cross-Space Edges carried through Space Cards. A Graph that is a line traverses as a line; a Graph that forks offers a choice. There is no separate artefact and no second surface — a presentation is not a thing a Graph is turned into, it is a way of moving through one.
 _Avoid_: deck, slide, step, slideshow, playback, present mode (that is a mode name, not the thing).
 
 **Graph navigation**:

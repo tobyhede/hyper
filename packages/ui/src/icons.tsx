@@ -4,7 +4,6 @@ import {
   CircleAlert,
   CornerDownRight,
   FileText,
-  Grid2x2,
   Link,
   Maximize,
   Maximize2,
@@ -18,19 +17,12 @@ import {
   Search,
   Square,
   SquareSquare,
-  Workflow,
   X,
 } from 'lucide-react';
 import type { ComponentProps } from 'react';
 
 type CardActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
-
-/** The computed View that draws Cards and every Graph in the Space. */
-export const FlowIcon = () => <Workflow size={16} />;
-
-/** The computed View that arranges Cards in a regular grid. */
-export const GridIcon = () => <Grid2x2 size={16} />;
 
 /** An authored Layout: the Cards a Space placed, and the Graphs over them. */
 export const LayoutIcon = () => <PanelsTopLeft size={16} />;

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FLOW_SPACE_VIEW_ID } from '@project/core';
+import { uuidSchema } from '@project/core';
 import { loadSpace, type CardFile } from '@project/graph';
 import fixtureJson from '../fixture/space.json';
 import exampleJson from '../example/space.json';
+
+const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
 
 /**
  * The two spaces on disk, loaded exactly as authored.
@@ -38,12 +40,8 @@ describe.each([
   // The fixture is two disconnected collections sharing no cards, so it splits
   // into two Layouts; the example is one connected collection, so its three
   // Graphs are owned by one.
-  [
-    'fixture',
-    fixtureJson,
-    { cards: 10, layouts: 2, graphs: 4, defaultRenderer: FLOW_SPACE_VIEW_ID },
-  ],
-  ['example', exampleJson, { cards: 7, layouts: 1, graphs: 3, defaultRenderer: undefined }],
+  ['fixture', fixtureJson, { cards: 10, layouts: 2, graphs: 4, defaultLayout: LAYOUT_ID }],
+  ['example', exampleJson, { cards: 7, layouts: 1, graphs: 3, defaultLayout: undefined }],
 ])('%s/', (name, json, expected) => {
   it('loads as a version 1 Space whose Layouts own every Graph, and opens in Flow', () => {
     const result = loadSpace(json, cardFiles(name));
@@ -53,7 +51,7 @@ describe.each([
     // `space.graphs` is the flatten across those Layouts, never a stored
     // collection beside them (ADR 0045).
     expect(result.space.graphs).toHaveLength(expected.graphs);
-    expect(result.space.defaultRenderer).toBe(expected.defaultRenderer);
+    expect(result.space.defaultLayout).toBe(expected.defaultLayout);
   });
 
   it("each Layout's position keys are exactly the Cards its own Graphs connect", () => {

@@ -118,43 +118,42 @@ function sidebarActions(
       [openInNewTab('space-new-tab', destination, record)],
     ];
   }
-  if (entity.kind === 'space-view') {
-    const { renderer } = entity;
+  if (entity.kind === 'layout') {
+    const { layout } = entity;
     const destination: ProductDestination = {
-      kind: 'space-view',
+      kind: 'layout',
       spaceId,
-      spaceViewId: renderer.selection,
+      layoutId: layout.id,
     };
     return [
-      // A Computed View has no stored title to rename; an authored Layout does.
-      renderer.kind === 'authored' ? [rename('view-rename', renderer.title, record)] : [],
+      [rename('layout-rename', layout.title, record)],
       [
         copy(
-          'view-link',
+          'layout-link',
           'Copy link',
-          `Opens ${renderer.title} exactly as it draws now`,
+          `Opens ${layout.title} exactly as it draws now`,
           destination,
           record,
         ),
       ],
-      [openInNewTab('view-new-tab', destination, record)],
+      [openInNewTab('layout-new-tab', destination, record)],
     ];
   }
-  const { graph, renderer } = entity;
+  const { graph, layout } = entity;
   return [
     [rename('graph-rename', graph.title, record)],
     [
       copy(
         'graph-here',
         'Copy link',
-        `Opens ${graph.title} inside the Space View drawing now`,
-        { kind: 'space-view-graph', spaceId, spaceViewId: renderer.selection, graphId: graph.id },
+        `Opens ${graph.title} inside the Layout drawing now`,
+        { kind: 'layout-graph', spaceId, layoutId: layout.id, graphId: graph.id },
         record,
       ),
       copy(
         'graph-permanent',
         'Copy permanent link',
-        `Always opens ${graph.title}, in whichever Space View draws it`,
+        `Always opens ${graph.title}, in whichever Layout draws it`,
         { kind: 'graph', spaceId, graphId: graph.id },
         record,
       ),
@@ -207,8 +206,8 @@ export const Sidebar: Story = () => {
   return (
     <div className="flex h-screen flex-col">
       <PrototypeBanner>
-        Right-click any Space View, Graph or the Space title — or press the link icon that appears
-        on it — for the same menu.
+        Right-click any Layout, Graph or the Space title — or press the link icon that appears on it
+        — for the same menu.
       </PrototypeBanner>
       <div className="min-h-0 flex-1">
         <ApplicationChromeFixture
@@ -239,8 +238,8 @@ Sidebar.meta = { iframed: true };
 export const CardRail: Story = () => {
   const { log, record } = useActivityLog();
   const spaceId = authoredSpace.id;
-  const spaceViewId = authoredSpace.layouts[0]?.id;
-  if (spaceViewId === undefined) throw new Error('CardRail fixture requires an authored Layout');
+  const layoutId = authoredSpace.layouts[0]?.id;
+  if (layoutId === undefined) throw new Error('CardRail fixture requires an authored Layout');
   const cards = authoredSpace.cards.slice(0, 4);
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -270,11 +269,11 @@ export const CardRail: Story = () => {
                     copy(
                       `${card.id}-here`,
                       'Copy link',
-                      `Opens ${card.title} inside the Space View drawing now`,
+                      `Opens ${card.title} inside the Layout drawing now`,
                       {
-                        kind: 'space-view-card',
+                        kind: 'layout-card',
                         spaceId,
-                        spaceViewId,
+                        layoutId,
                         cardId: card.id,
                       },
                       record,

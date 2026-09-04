@@ -29,7 +29,7 @@ import {
  * Both are loaded at module scope, so a literal that stops parsing takes the
  * story down with a message instead of rendering something subtly wrong.
  *
- * Each also **declares where it opens**, so `defaultRenderer` answers that for a
+ * Each also **declares where it opens**, so `defaultLayout` answers that for a
  * story exactly as it does for the app. The fixture used to decide it — "the
  * first Layout, else Flow" — which is the state translation ADR 0052's negative
  * names. `story-spaces.test.ts` holds the declaration and what the Ladle specs
@@ -76,10 +76,10 @@ const COLLECTION_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
  * Deriving them is the point: a palette edit reaches the story, and the story
  * cannot claim a colour production would not give it.
  *
- * **It names `defaultRenderer`**, which the tracked e2e fixture deliberately does
+ * **It names `defaultLayout`**, which the tracked e2e fixture deliberately does
  * not: that one exists to prove a Space declaring Layouts still arrives in Flow,
  * and this one exists to draw a sidebar with a Layout pressed. Declaring it is
- * how the story gets that from `defaultRenderer` instead of from a rule the
+ * how the story gets that from `defaultLayout` instead of from a rule the
  * harness keeps.
  *
  * Exported alongside the {@link authoredSpace} it loads into, because a story
@@ -92,7 +92,7 @@ export const authoredSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Space',
-    defaultRenderer: COLLECTION_ONE,
+    defaultLayout: COLLECTION_ONE,
     layouts: [
       {
         id: COLLECTION_ONE,
@@ -150,7 +150,7 @@ export const authoredSnapshot: SpaceSnapshot = {
  */
 export const sparseAuthoredSnapshot: SpaceSnapshot = {
   ...authoredSnapshot,
-  document: { ...authoredSnapshot.document, defaultRenderer: COLLECTION_TWO },
+  document: { ...authoredSnapshot.document, defaultLayout: COLLECTION_TWO },
 };
 
 export const authoredSpace: Space = loaded(loadSpaceSnapshot(authoredSnapshot));
@@ -258,7 +258,7 @@ export const storyGraphIds = (): (() => GraphId) => {
  * several outgoing Edges, and there is no such Card anywhere in the tracked
  * fixtures — the E2E fixture's Graphs are deliberately all lines too.
  *
- * Each **declares where it opens**, so `defaultRenderer` and ADR 0026's Active
+ * Each **declares where it opens**, so `defaultLayout` and ADR 0026's Active
  * Graph rule answer for a story exactly as they do for the app: the Layout named
  * here owns one Graph, and a Layout that names no `activeGraph` opens on the
  * first it owns. A story therefore calls `present()` and nothing else to be
@@ -294,7 +294,7 @@ export const traversalSpace: Space = loaded(
     document: {
       version: 1,
       title: 'Traversal',
-      defaultRenderer: TRAVERSAL_LAYOUT,
+      defaultLayout: TRAVERSAL_LAYOUT,
       layouts: [
         {
           id: TRAVERSAL_LAYOUT,
@@ -345,7 +345,7 @@ export const deepDiveSpace: Space = loaded(
     document: {
       version: 1,
       title: 'Deep dive',
-      defaultRenderer: DEEP_DIVE_LAYOUT,
+      defaultLayout: DEEP_DIVE_LAYOUT,
       layouts: [
         {
           id: DEEP_DIVE_LAYOUT,

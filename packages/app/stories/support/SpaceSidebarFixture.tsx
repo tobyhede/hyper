@@ -18,14 +18,14 @@ import { AppShell } from '@project/ui';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
-import { canvasRenderers, currentRenderer } from '#src/canvas-renderers';
+import { resolveLayout } from '#src/layout-resolution';
 import { graphColorMap } from '#src/colors';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { createWorkingSpaceReader, snapshotFromSpace } from '#src/snapshot';
 import { createSpaceAuthoring } from '#src/space-authoring';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import {
-  SelectedCanvasRenderer,
+  SelectedLayoutName,
   SpaceSidebar,
   type SpaceChromeTitleEdit,
   type SpaceChromeTitleSubject,
@@ -49,7 +49,7 @@ export interface SpaceSidebarFixtureProps {
   readonly onRetry?: () => void;
   /** Real AppShell canvas content supplied by a story-specific fixture. */
   readonly children?: ReactNode;
-  /** Story-specific controls beside the real selected-renderer header. */
+  /** Story-specific controls beside the real selected-Layout header. */
   readonly headerActions?: ReactNode;
   /** Whether this fixture supplies the selected Card's URL commands. */
   readonly showCardLinks?: boolean;
@@ -107,25 +107,23 @@ export function SpaceSidebarFixture({
   );
   const readCurrentSpace = currentSpace ?? readEditableSpace;
   const displayedSpace = currentSpace === undefined ? editedSpace : space;
-  const {
-    navigation,
-    state: navigationState,
-    resolveRenderer,
-  } = useStoryNavigation(readCurrentSpace, (composed) => {
-    if (presenting) composed.present();
-  });
+  const { navigation, state: navigationState } = useStoryNavigation(
+    readCurrentSpace,
+    (composed) => {
+      if (presenting) composed.present();
+    },
+  );
   const authoring = useMemo(() => {
-    const selected = navigation.getState().selectedRenderer;
+    const selected = navigation.getState().selectedLayoutId;
     const selectedLayout = readEditableSpace().lookup.layout(selected)?.layout;
     return createSpaceAuthoring({
       session: editSession,
       navigation,
       currentSpace: readEditableSpace,
-      resolveRenderer,
       initialPlacement: selectedLayout === undefined ? null : Placement.fromLayout(selectedLayout),
       newId: storyGraphIds(),
     });
-  }, [editSession, navigation, readEditableSpace, resolveRenderer]);
+  }, [editSession, navigation, readEditableSpace]);
   // Where `presenting` is honoured now that Navigation outlives it. Reconciled
   // against the mode rather than applied, so the mount the initializer already
   // presented publishes nothing here, and so a story's own Present button — the
@@ -137,13 +135,11 @@ export function SpaceSidebarFixture({
     else navigation.exitPresenting();
   }, [navigation, presenting]);
   const addCardMenu = useRef<HTMLButtonElement>(null);
-  // One module answers which canvas renderers exist and which is current, and
-  // the header below reads the row it named rather than a title of the
-  // fixture's own. The selected renderer, its Active Graph and its mode are all
+  // The Space answers which Layouts exist and the resolver answers which one is
+  // drawing; the header below reads that Layout rather than a title of the
+  // fixture's own. The selection, its Active Graph and its mode are all
   // Navigation's published state.
-  const renderers = canvasRenderers(displayedSpace);
-  const current = currentRenderer(renderers, navigationState.selectedRenderer);
-  const renderer = resolveRenderer(displayedSpace, navigationState.selectedRenderer);
+  const selectedLayout = resolveLayout(displayedSpace, navigationState.selectedLayoutId).layout;
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
@@ -193,9 +189,13 @@ export function SpaceSidebarFixture({
       sidebar={
         <SpaceSidebar
           spaceTitle={displayedSpace.title}
-          canvas={{ renderers, current, onSelect: navigation.selectRenderer }}
+          canvas={{
+            layouts: displayedSpace.layouts,
+            selected: selectedLayout,
+            onSelect: navigation.selectLayout,
+          }}
           graph={{
-            graphs: renderer.subject.graphs,
+            graphs: selectedLayout.graphs,
             activeGraphId: navigationState.activeGraphId,
             colorByGraphId,
             onActivate: navigation.activateGraph,
@@ -210,7 +210,7 @@ export function SpaceSidebarFixture({
             disabled: authoringDisabled,
             keyShortcut: 'C',
             menuTriggerRef: addCardMenu,
-            hidden: current.kind === 'computed',
+            hidden: false,
           }}
           createLayout={
             createLayout ?? {
@@ -247,7 +247,7 @@ export function SpaceSidebarFixture({
       }
       header={
         <>
-          <SelectedCanvasRenderer renderer={current} titleEdit={chromeTitleEdit} />
+          <SelectedLayoutName layout={selectedLayout} titleEdit={chromeTitleEdit} />
           {headerActions}
         </>
       }
@@ -276,7 +276,7 @@ export function SpaceSidebarFixture({
  * copy of it and would reparse on every publication. The reader caches on
  * snapshot identity, and a session replaces `working` only when a submission
  * does, so the two states this story passes through cost two parses and hand
- * `canvasRenderers` a stable `Space` in between.
+ * `resolveLayout` a stable `Space` in between.
  */
 export function RetryableSpaceSidebarFixture() {
   const session = useMemo(() => {

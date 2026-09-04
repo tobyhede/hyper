@@ -1,4 +1,4 @@
-import { FLOW_SPACE_VIEW_ID, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { createSpaceHttpApp, HttpSpaceBackend, productDestinationPath } from '@project/http';
 import { MemorySpaceBackend } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
@@ -130,21 +130,41 @@ describe('HTTP space startup composition', () => {
     );
   });
 
-  it('opens a resolved Space View from one backend load', async () => {
-    const loaded = { snapshot: snapshot(), revision: 0n, exportedRevision: null };
+  it('opens a resolved Layout from one backend load', async () => {
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          defaultLayout: LAYOUT_ID,
+          layouts: [
+            {
+              id: LAYOUT_ID,
+              title: 'Layout 1',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+            },
+          ],
+        },
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
     const backend = new MemorySpaceBackend([loaded]);
     const loadSpace = vi.spyOn(backend, 'loadSpace');
     const startup = createSpaceStartup(backend);
 
     const result = await startup.resolve(
       productDestinationPath({
-        kind: 'space-view',
+        kind: 'layout',
         spaceId: SPACE_ID,
-        spaceViewId: FLOW_SPACE_VIEW_ID,
+        layoutId: LAYOUT_ID,
       }),
     );
 
-    expect(result.opening?.selection).toBe(FLOW_SPACE_VIEW_ID);
+    expect(result.opening?.selection).toBe(LAYOUT_ID);
     expect(result.opened.app.currentSpace().id).toBe(SPACE_ID);
     expect(loadSpace).toHaveBeenCalledOnce();
     expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
@@ -164,46 +184,6 @@ describe('HTTP space startup composition', () => {
     expect(loadSpace).toHaveBeenCalledTimes(2);
     expect(loadSpace).toHaveBeenNthCalledWith(1, SPACE_ID);
     expect(loadSpace).toHaveBeenNthCalledWith(2, SPACE_ID);
-  });
-
-  /**
-   * A stored Layout carrying a Computed View's id. Intake rejects it, so the
-   * only way here is a document that reached storage some other way — and the
-   * address then names two Space Views with no rule to choose between them (ADR
-   * 0069). Startup says so rather than opening one of them.
-   */
-  it('refuses a Space View a Computed View and a Layout both claim', async () => {
-    const loaded = {
-      snapshot: {
-        ...snapshot(),
-        document: {
-          version: 1 as const,
-          title: 'Stored space',
-          layouts: [
-            {
-              id: FLOW_SPACE_VIEW_ID,
-              title: 'Layout',
-              kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
-              graphs: [],
-            },
-          ],
-        },
-      },
-      revision: 0n,
-      exportedRevision: null,
-    };
-    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
-
-    await expect(
-      startup.resolve(
-        productDestinationPath({
-          kind: 'space-view',
-          spaceId: SPACE_ID,
-          spaceViewId: FLOW_SPACE_VIEW_ID,
-        }),
-      ),
-    ).rejects.toThrow('The product URL names two Space Views.');
   });
 
   it('opens a canonical Graph in its owning Layout as navigation context', async () => {
@@ -277,7 +257,7 @@ describe('HTTP space startup composition', () => {
       productDestinationPath({
         kind: 'presentation',
         spaceId: SPACE_ID,
-        spaceViewId: LAYOUT_ID,
+        layoutId: LAYOUT_ID,
         graphId: GRAPH_ID,
         cardId: OTHER_CARD_ID,
       }),
@@ -288,7 +268,7 @@ describe('HTTP space startup composition', () => {
     expect(result.opening?.presentationCardId).toBe(OTHER_CARD_ID);
   });
 
-  it('opens a contextual Card in its named Space View without authoring it open', async () => {
+  it('opens a contextual Card in its named Layout without authoring it open', async () => {
     const layoutId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
     const loaded = {
       snapshot: {
@@ -320,9 +300,9 @@ describe('HTTP space startup composition', () => {
 
     const result = await startup.resolve(
       productDestinationPath({
-        kind: 'space-view-card',
+        kind: 'layout-card',
         spaceId: SPACE_ID,
-        spaceViewId: layoutId,
+        layoutId: layoutId,
         cardId: CARD_ID,
       }),
     );
@@ -343,7 +323,7 @@ describe('HTTP space startup composition', () => {
         document: {
           version: 1 as const,
           title: 'Stored space',
-          defaultRenderer: layoutId,
+          defaultLayout: layoutId,
           layouts: [
             {
               id: layoutId,

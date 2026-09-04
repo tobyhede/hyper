@@ -8,17 +8,15 @@ import {
   type InternalNode,
 } from '@xyflow/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { FLOW_SPACE_VIEW_ID, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
 import { inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
-import type { CanvasRenderer } from '../src/canvas-renderers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import { edgeSelectionOf } from '../src/render-adapter';
 import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
-import { mintingGraphIds } from './minting';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
 import { SpaceSidebar } from '../src/components/SpaceSidebar';
@@ -40,20 +38,25 @@ const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-/** Named, never reached: this composition opens on a Layout, so nothing converts. */
-const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
+const LAYOUT_ONE_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
 /** The one row this chrome draws, named so `selected` can be that very value. */
-const FLOW: CanvasRenderer = { kind: 'computed', selection: FLOW_SPACE_VIEW_ID, title: 'Flow' };
+const LAYOUT_ONE: Layout = {
+  id: LAYOUT_ID,
+  title: 'Layout 1',
+  kind: 'positioned',
+  positions: {},
+  graphs: [{ id: LAYOUT_ONE_GRAPH_ID, title: 'Main', edges: [] }],
+};
 /** The real app chrome, composed as `App` composes it, outside the canvas. */
 const appChrome = (
   <SidebarProvider>
     <SpaceSidebar
       spaceTitle="Space"
       canvas={{
-        renderers: { computed: [FLOW], authored: [] },
-        current: FLOW,
+        layouts: [LAYOUT_ONE],
+        selected: LAYOUT_ONE,
         onSelect: () => undefined,
       }}
       graph={{
@@ -99,7 +102,7 @@ const snapshot: SpaceSnapshot = {
         ],
       },
     ],
-    defaultRenderer: LAYOUT_ID,
+    defaultLayout: LAYOUT_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -190,7 +193,7 @@ const EDGES = [
  * `graphs: z.array(graphSchema).min(1)` (`core/src/schema.ts`, asserted by
  * `core/test/persistence-schema.test.ts`), `ResolvedLayout.activeGraph`
  * resolves named-or-first and is never null, Navigation writes only an Active
- * Graph the selected renderer's subject holds, and Graph deletion refuses the
+ * Graph the selected Layout owns, and Graph deletion refuses the
  * last one (`layout-must-keep-graph`).
  *
  * So the stand-in is what exercises the channel at all, and the alternative —
@@ -203,7 +206,7 @@ function compose({
   selection = LAYOUT_ID,
 }: {
   connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
-  /** Which renderer opens. A Computed View is what refuses a Layout-only Edit. */
+  /** Which Layout opens. */
   selection?: typeof LAYOUT_ID | undefined;
 } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -211,7 +214,6 @@ function compose({
   const composed = composeApp({
     spaceSession: session,
     selection,
-    newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
     initialPlacement: Placement.fromEntries([
       [CARD_A, { x: 0, y: 0, open: false }],
       [CARD_B, { x: 400, y: 0, open: false }],
@@ -357,7 +359,7 @@ function CanvasHarness({
       selection={selection}
       onSelectCard={adapter.getState().selectCard}
       onSelectEdge={adapter.getState().selectEdge}
-      subjectCards={currentSpace().cards}
+      placedCards={currentSpace().cards}
       newCardTitle="Card 4"
       onAddCard={() => undefined}
       onAddExistingCard={() => undefined}
@@ -493,7 +495,7 @@ describe('the Edge toolbar', () => {
         selection: { kind: 'edge', ...SUBJECT },
         activeGraphId: GRAPH_ID,
         graphs: composed.currentSpace().graphs,
-        subjectCards: composed.currentSpace().cards,
+        placedCards: composed.currentSpace().cards,
         newCardTitle: 'Card 4',
         enabled: true,
         onSelectCard: NO_OP,
@@ -588,25 +590,6 @@ describe("the app's canvas delete key", () => {
   });
 
   /**
-   * A refused removal is announced rather than swallowed.
-   *
-   * `removed-card-from-layout` is Layout-only, so a Computed View refuses it
-   * outright — and the key has already been consumed by the time the refusal
-   * comes back. Issue 03 asked for "the same refusals" the Sidebar routes, and
-   * the copy for this one is already written; nothing reached it.
-   */
-  it.each(DELETE_KEYS)('announces the refusal when %s cannot remove the Card', async (key) => {
-    const { adapter } = mountCanvas(null, { selection: FLOW_SPACE_VIEW_ID });
-    act(() => adapter.getState().selectCard(CARD_A));
-
-    fireEvent.keyDown(canvasElement(), { key });
-
-    expect(await screen.findByTestId('canvas-command-refusal')).toHaveTextContent(
-      'Create a Layout from this Computed View before editing.',
-    );
-  });
-
-  /**
    * The same two exclusions the `C` binding spells out, for the same reasons: a
    * command runs once per press, and a modifier makes the key somebody else's.
    */
@@ -676,7 +659,7 @@ describe("the app's canvas delete key", () => {
     const { adapter, session } = mountCanvas(appChrome);
     act(() => adapter.getState().selectEdge(SUBJECT));
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Flow' }), { key });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Layout 1' }), { key });
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
@@ -875,7 +858,7 @@ const surface = (composed: ReturnType<typeof compose>) =>
         selection: { kind: 'edge', ...SUBJECT },
         activeGraphId: GRAPH_ID,
         graphs: composed.currentSpace().graphs,
-        subjectCards: composed.currentSpace().cards,
+        placedCards: composed.currentSpace().cards,
         newCardTitle: 'Card 4',
         enabled: true,
         onSelectCard: NO_OP,
@@ -1304,7 +1287,7 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
+          placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: true,
           onSelectCard: NO_OP,
@@ -1333,7 +1316,7 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
+          placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: true,
           onSelectCard: NO_OP,
@@ -1368,7 +1351,7 @@ describe('the React Flow properties', () => {
           selection: { kind: 'edge', graphId: GRAPH_ID, edge: EDGE },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
+          placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: true,
           onSelectCard: NO_OP,
@@ -1401,7 +1384,7 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
+          placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: false,
           onSelectCard: NO_OP,

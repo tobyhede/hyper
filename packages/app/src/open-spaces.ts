@@ -1,4 +1,4 @@
-import type { UUID } from '@project/core';
+import type { LayoutId, UUID } from '@project/core';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { resolveProductDestination } from '@project/http';
 import {
@@ -13,7 +13,6 @@ import {
 } from '@project/persistence';
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
-import type { CanvasRendererId } from './renderer';
 
 export interface OpenSpace {
   readonly id: UUID;
@@ -49,12 +48,12 @@ export interface OpenSpaces {
   readonly getState: () => OpenSpacesState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;
-  readonly open: (spaceId: UUID, selection?: CanvasRendererId) => Promise<OpenSpace>;
+  readonly open: (spaceId: UUID, selection?: LayoutId) => Promise<OpenSpace>;
   readonly openPath: (pathname: string) => Promise<{
     readonly opened: OpenSpace;
     readonly opening?: DestinationOpening;
   }>;
-  readonly enter: (spaceId: UUID, selection?: CanvasRendererId) => Promise<OpenSpace>;
+  readonly enter: (spaceId: UUID, selection?: LayoutId) => Promise<OpenSpace>;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
   readonly close: (
     spaceId: UUID,
@@ -186,10 +185,7 @@ export function createOpenSpaces({
     observable.publish({ activeSpaceId, entries: [...state.entries, entry] });
   };
 
-  const buildLoaded = (
-    { loaded }: ValidatedLoadedSpace,
-    selection?: CanvasRendererId,
-  ): OpenSpace => {
+  const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: LayoutId): OpenSpace => {
     const spaceId = loaded.snapshot.id;
     // A session the registry already holds keeps the snapshot it was opened on
     // and discards this one, so anything read off `loaded` afterwards describes
@@ -211,7 +207,7 @@ export function createOpenSpaces({
 
   const composeValidated = async (
     validated: ValidatedLoadedSpace,
-    selection?: CanvasRendererId,
+    selection?: LayoutId,
   ): Promise<OpenSpace> => {
     const { loaded } = validated;
     const spaceId = loaded.snapshot.id;
@@ -224,7 +220,7 @@ export function createOpenSpaces({
     return opening;
   };
 
-  const compose = async (spaceId: UUID, selection?: CanvasRendererId): Promise<OpenSpace> => {
+  const compose = async (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> => {
     await closing.get(spaceId);
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
@@ -259,7 +255,7 @@ export function createOpenSpaces({
     return target;
   };
 
-  const open = async (spaceId: UUID, selection?: CanvasRendererId): Promise<OpenSpace> => {
+  const open = async (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> => {
     // Numbered before the Space is loaded, not after: composition is itself a
     // wait, and a request made first must not be superseded by one made second
     // merely because the second Space was already in hand.
@@ -292,7 +288,6 @@ export function createOpenSpaces({
     if (resolution.kind === 'outside') throw new Error('The URL is outside product addressing.');
     if (resolution.kind === 'malformed') throw new Error('The product URL is malformed.');
     if (resolution.kind === 'unresolved') throw new Error('The product URL does not resolve.');
-    if (resolution.kind === 'collision') throw new Error('The product URL names two Space Views.');
     const validated = validateLoadedSpace(resolution.loaded);
     const destination = destinationOpening(validated.space, resolution.destination);
     const opened = await activateAfterLeavingSettles(
@@ -301,9 +296,9 @@ export function createOpenSpaces({
     );
     // A Space already open keeps the selection it is being worked in, so the
     // URL's is only a proposal. Report the one that holds: a caller opening the
-    // named Graph does so against the selected Space View, and the two
-    // disagreeing is how a Graph lands on a Space View nobody named.
-    const selection = opened.app.navigation.getState().selectedRenderer;
+    // named Graph does so against the selected Layout, and the two disagreeing
+    // is how a Graph lands on a Layout nobody named.
+    const selection = opened.app.navigation.getState().selectedLayoutId;
     const opening: DestinationOpening =
       selection === destination.selection ? destination : { ...destination, selection };
     return { opened, opening };

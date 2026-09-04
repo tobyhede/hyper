@@ -3,11 +3,8 @@ import type { Graph, SpaceSnapshot } from '@project/core';
 /**
  * The neutral titles the app mints for structure the author did not name.
  *
- * It sits in its own module because two collaborators mint them and neither may
- * import the other: a View names the Graph it returns on conversion (ADR 0045),
- * and Space Authoring names the Layout and the Card an Edit creates. Putting the
- * rule beside either one would make `renderer.ts` and `space-authoring.ts`
- * circular.
+ * It sits in its own module so every authoring operation shares one numbering
+ * rule for Cards, Layouts and Graphs.
  *
  * Three named operations rather than one helper taking a prefix. What a caller
  * knows is *what it is naming*; the `<Prefix> N` arithmetic and the prefix
@@ -45,19 +42,14 @@ export const nextCardTitle = (snapshot: SpaceSnapshot): string =>
     snapshot.cards.map((card) => card.document.title),
   );
 
-/** What an Edit calls the Layout a converted View produces (ADR 0025). */
+/** What an Edit calls the next Layout it creates. */
 export const nextLayoutTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
     'Layout',
     (snapshot.document.layouts ?? []).map((layout) => layout.title),
   );
 
-/**
- * What a View calls a Graph it returns on conversion (ADR 0045).
- *
- * Numbered above the Graphs it was showing rather than above every Graph in the
- * Space, because the subject is what the author can see.
- */
+/** What an Edit calls the next Graph in the supplied collection. */
 export const nextGraphTitle = (graphs: readonly Graph[]): string =>
   nextNumberedTitle(
     'Graph',
