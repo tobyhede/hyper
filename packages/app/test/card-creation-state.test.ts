@@ -36,14 +36,18 @@ const choosing = (choices: CardCreationChoices = spaceChoices): CardCreationStat
   );
 
 /**
- * The asynchronous shell over recorded dispatches, so no React tree is needed.
+ * One mounted Card creation module, driven through its own operations.
+ *
+ * The module owns its current state, so a test drives it rather than seeding a
+ * state and recording the dispatches a shell would have made: what the
+ * synchronous-admission rule is about is precisely what a collaborator sees
+ * when it reenters, and a recorded dispatch list cannot say.
  *
  * The continuation is recorded rather than composed: what this file is about is
  * *which* continuation each ending earns, and the module that holds one is
  * proved on its own terms in `continuation.test.ts`.
  */
-const shell = (state: CardCreationState, seams: Partial<CardCreationSeams> = {}) => {
-  const dispatched: CardCreationAction[] = [];
+const shell = (seams: Partial<CardCreationSeams> = {}) => {
   const requested: PendingContinuation[] = [];
   const continuation: Continuation = {
     getState: () => ({ pending: null }),
@@ -52,14 +56,27 @@ const shell = (state: CardCreationState, seams: Partial<CardCreationSeams> = {})
     take: () => undefined,
     dispose: () => undefined,
   };
-  const creation = createCardCreation(state, (action) => dispatched.push(action), {
+  const creation = createCardCreation({
     readChoices: () => ({ choices: aliasChoices, listing: null }),
     submit: () => ({ kind: 'none' }),
     reportBreak: () => undefined,
     continuation,
     ...seams,
   });
-  return { creation, dispatched, requested };
+  const published: CardCreationState[] = [];
+  creation.subscribe(() => published.push(creation.getState()));
+  return { creation, requested, published };
+};
+
+/** A module whose pane is already open on `choices`, opened through admission. */
+const openedOn = (
+  choices: CardCreationChoices = spaceChoices,
+  seams: Partial<CardCreationSeams> = {},
+) => {
+  const driven = shell({ readChoices: () => ({ choices, listing: null }), ...seams });
+  driven.creation.open(choices.kind);
+  driven.published.length = 0;
+  return driven;
 };
 
 const RETURN_TO_ADD_CARD: PendingContinuation = {
@@ -101,28 +118,6 @@ describe('the Card creation pane', () => {
     );
     expect(state.pane.status === 'choosing' && state.pane.choices.kind).toBe('alias');
     expect(state.opening).toBe(1);
-  });
-
-  /**
-   * The shell declines to open over an open pane, but the rule is the state
-   * machine's: enforcing it only in a closure over the state as it was read
-   * leaves two dispatches from one render able to count two openings, and a
-   * read then answers an opening that no longer exists.
-   */
-  it('counts one opening for an open request the pane is already answering', () => {
-    const twice = reduce(
-      CARD_CREATION_CLOSED,
-      { type: 'open', kind: 'space' },
-      { type: 'open', kind: 'space' },
-    );
-    expect(twice.opening).toBe(1);
-
-    const filled = reduce(twice, {
-      type: 'choices',
-      opening: 1,
-      read: { choices: spaceChoices, listing: null },
-    });
-    expect(filled.pane.status === 'choosing' && filled.pane.choices).toEqual(spaceChoices);
   });
 });
 
@@ -195,14 +190,6 @@ describe('a create in flight', () => {
 
   it('cannot be busy with no pane to disable', () => {
     expect(reduce(CARD_CREATION_CLOSED, { type: 'submitting' }).pane.status).toBe('closed');
-  });
-
-  it('begins no second attempt while one is running', () => {
-    const submit = vi.fn((): CardCreationOutcome => ({ kind: 'none' }));
-    const { creation, dispatched } = shell(reduce(choosing(), { type: 'submitting' }), { submit });
-    creation.submit({ kind: 'space', targetSpaceId: null, title: 'Recap' });
-    expect(submit).not.toHaveBeenCalled();
-    expect(dispatched).toEqual([]);
   });
 });
 
@@ -302,16 +289,16 @@ describe('where the creation continues', () => {
   const ALIAS = { kind: 'alias', target: CARD_ID, title: '' } as const;
 
   it('returns to Add Card when the pane is cancelled', () => {
-    const { creation, dispatched, requested } = shell(choosing());
+    const { creation, requested } = openedOn();
 
     creation.cancel();
 
-    expect(dispatched).toEqual([{ type: 'cancel' }]);
+    expect(creation.getState().pane.status).toBe('closed');
     expect(requested).toEqual([RETURN_TO_ADD_CARD]);
   });
 
   it('names the created Card when one was created', () => {
-    const { creation, requested } = shell(choosing(aliasChoices), {
+    const { creation, requested } = openedOn(aliasChoices, {
       submit: () => ({ kind: 'created', cardId: CARD_ID }),
     });
 
@@ -328,7 +315,7 @@ describe('where the creation continues', () => {
    * is nothing left to name and the author goes back to the control.
    */
   it('returns to Add Card when the creation left no Card to continue at', async () => {
-    const { creation, requested } = shell(choosing(), {
+    const { creation, requested } = openedOn(spaceChoices, {
       submit: () => Promise.resolve({ kind: 'created', cardId: null }),
     });
 
@@ -340,18 +327,16 @@ describe('where the creation continues', () => {
   });
 
   it('owes nothing when presenting takes the pane away', () => {
-    const { creation, dispatched, requested } = shell(choosing());
+    const { creation, requested } = openedOn();
 
     creation.withdraw();
 
-    expect(dispatched).toEqual([{ type: 'presenting' }]);
+    expect(creation.getState().pane.status).toBe('closed');
     expect(requested).toEqual([]);
   });
 
   it('owes nothing when the attempt did nothing', () => {
-    const { creation, requested } = shell(choosing(aliasChoices), {
-      submit: () => ({ kind: 'none' }),
-    });
+    const { creation, requested } = openedOn(aliasChoices, { submit: () => ({ kind: 'none' }) });
 
     creation.submit(ALIAS);
 
@@ -359,7 +344,7 @@ describe('where the creation continues', () => {
   });
 
   it('owes nothing when the attempt was refused', () => {
-    const { creation, requested } = shell(choosing(aliasChoices), {
+    const { creation, requested } = openedOn(aliasChoices, {
       submit: () => ({ kind: 'refused', errors: { fields: {}, form: 'No.' } }),
     });
 
@@ -370,11 +355,14 @@ describe('where the creation continues', () => {
 
   /** Cancel is refused while an Edit runs, so it owes nothing either. */
   it('owes nothing for a cancel the pane refuses', () => {
-    const { creation, dispatched, requested } = shell(reduce(choosing(), { type: 'submitting' }));
+    const { creation, requested } = openedOn(spaceChoices, {
+      submit: () => new Promise<CardCreationOutcome>(() => undefined),
+    });
+    creation.submit({ kind: 'space', targetSpaceId: null, title: 'Recap' });
 
     creation.cancel();
 
-    expect(dispatched).toEqual([]);
+    expect(creation.getState().pane.status).toBe('submitting');
     expect(requested).toEqual([]);
   });
 });
@@ -382,71 +370,76 @@ describe('where the creation continues', () => {
 describe('the asynchronous shell', () => {
   it('fills a synchronous choices read without ever going busy', () => {
     const read: CardCreationRead = { choices: aliasChoices, listing: null };
-    const { creation, dispatched } = shell(CARD_CREATION_CLOSED, { readChoices: () => read });
+    const { creation, published } = shell({ readChoices: () => read });
     creation.open('alias');
-    expect(dispatched).toEqual([
-      { type: 'open', kind: 'alias' },
-      { type: 'choices', opening: 1, read },
-    ]);
+    expect(creation.getState().pane).toEqual({
+      status: 'choosing',
+      choices: aliasChoices,
+      listing: null,
+      refusal: null,
+    });
+    expect(published.map(({ pane }) => pane.status)).not.toContain('submitting');
   });
 
   it('answers an asynchronous read against the opening it was made for', async () => {
     const read: CardCreationRead = { choices: spaceChoices, listing: null };
-    const { creation, dispatched } = shell(CARD_CREATION_CLOSED, {
-      readChoices: () => Promise.resolve(read),
-    });
+    const { creation } = shell({ readChoices: () => Promise.resolve(read) });
     creation.open('space');
     await Promise.resolve();
-    expect(dispatched).toEqual([
-      { type: 'open', kind: 'space' },
-      { type: 'choices', opening: 1, read },
-    ]);
+    const { pane } = creation.getState();
+    expect(pane.status === 'choosing' && pane.choices).toEqual(spaceChoices);
   });
 
   it('opens nothing over a pane that is already open', () => {
-    const { creation, dispatched } = shell(choosing());
+    const readChoices = vi.fn((): CardCreationRead => ({ choices: spaceChoices, listing: null }));
+    const { creation } = shell({ readChoices });
+    creation.open('space');
+
     creation.open('alias');
-    expect(dispatched).toEqual([]);
+
+    expect(readChoices).toHaveBeenCalledTimes(1);
+    const { pane } = creation.getState();
+    expect(pane.status === 'choosing' && pane.choices.kind).toBe('space');
   });
 
   /**
-   * The guard above reads the render's state, so it cannot see a pane this same
-   * shell opened a moment ago. The reducer is what makes the second gesture
-   * harmless: were it to open a second time, the opening would advance past the
-   * read both calls were made for and the pane would sit on `pending` with
-   * Create disabled and Cancel its only exit.
+   * Admission is installed before the read starts, so the second gesture is
+   * refused rather than merely harmless: were it to open again, the opening
+   * would advance past the read both calls were made for and the pane would sit
+   * on `pending` with Create disabled and Cancel its only exit.
    */
   it('fills the pane when one gesture opens it twice before a render', () => {
     const read: CardCreationRead = { choices: spaceChoices, listing: null };
-    const { creation, dispatched } = shell(CARD_CREATION_CLOSED, { readChoices: () => read });
+    const { creation } = shell({ readChoices: () => read });
     creation.open('space');
     creation.open('space');
-    const state = dispatched.reduce(cardCreationReducer, CARD_CREATION_CLOSED);
-    expect(state.pane.status === 'choosing' && state.pane.choices).toEqual(spaceChoices);
+    const { pane } = creation.getState();
+    expect(pane.status === 'choosing' && pane.choices).toEqual(spaceChoices);
   });
 
   it('goes busy only for a submit that is actually asynchronous', () => {
-    const { creation, dispatched } = shell(choosing(aliasChoices), {
-      submit: () => ({ kind: 'none' }),
-    });
+    const { creation, published } = openedOn(aliasChoices, { submit: () => ({ kind: 'none' }) });
     creation.submit({ kind: 'alias', target: CARD_ID, title: '' });
-    expect(dispatched).toEqual([{ type: 'settled', outcome: { kind: 'none' } }]);
+    expect(published.map(({ pane }) => pane.status)).toEqual(['choosing']);
   });
 
   it('goes busy for the whole of an asynchronous submit', async () => {
-    const outcome: CardCreationOutcome = { kind: 'none' };
-    const { creation, dispatched } = shell(choosing(), { submit: () => Promise.resolve(outcome) });
+    const attempt = Promise.withResolvers<CardCreationOutcome>();
+    const { creation } = openedOn(spaceChoices, { submit: () => attempt.promise });
     creation.submit({ kind: 'space', targetSpaceId: SPACE_ID, title: 'Recap' });
-    expect(dispatched).toEqual([{ type: 'submitting' }]);
+    expect(creation.getState().pane.status).toBe('submitting');
+
+    attempt.resolve({ kind: 'none' });
+    await attempt.promise;
     await Promise.resolve();
-    await Promise.resolve();
-    expect(dispatched).toEqual([{ type: 'submitting' }, { type: 'settled', outcome }]);
+
+    expect(creation.getState().pane.status).toBe('choosing');
   });
 
   it('gives the pane its exits back when a submit rejects, and says what broke', async () => {
     const failure = new Error('the session has gone');
     const reportBreak = vi.fn();
-    const { creation, dispatched } = shell(choosing(), {
+    const { creation } = openedOn(spaceChoices, {
       submit: () => Promise.reject(failure),
       reportBreak,
     });
@@ -454,96 +447,154 @@ describe('the asynchronous shell', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(reportBreak).toHaveBeenCalledWith(failure);
-    const settled = dispatched[1];
-    expect(settled?.type === 'settled' && settled.outcome).toEqual({
-      kind: 'refused',
-      errors: { fields: {}, form: 'This Card was not created: the session has gone' },
-    });
-  });
-
-  /**
-   * A diagnostic is never the failure path of the work it describes.
-   *
-   * The recovery this module owes on every one of these paths is a *dispatch*,
-   * and each sits behind the report. A sink that threw would take the dispatch
-   * with it: the pane stays `submitting` with Create, Cancel and Escape all
-   * disabled and nothing left to end it, or stays on a list that says it is
-   * still being read. The reporter is injected and required with no default
-   * (ADR 0016), so it is exactly the collaborator this module cannot vouch for
-   * — `createNonThrowingReporter` is the repository's answer and it is applied
-   * here rather than trusted of whoever composed this.
-   */
-  describe('a reporter that throws', () => {
-    const broken = (): never => {
-      throw new Error('the sink is broken');
-    };
-
-    it('still settles an attempt that rejected', async () => {
-      const { creation, dispatched } = shell(choosing(), {
-        submit: () => Promise.reject(new Error('the session has gone')),
-        reportBreak: broken,
-      });
-      creation.submit({ kind: 'space', targetSpaceId: null, title: 'Recap' });
-      await Promise.resolve();
-      await Promise.resolve();
-      const settled = dispatched[1];
-      expect(settled?.type === 'settled' && settled.outcome).toEqual({
-        kind: 'refused',
-        errors: { fields: {}, form: 'This Card was not created: the session has gone' },
-      });
-    });
-
-    it('still answers a choices read that rejected', async () => {
-      const { creation, dispatched } = shell(CARD_CREATION_CLOSED, {
-        readChoices: () => Promise.reject(new Error('the repository is unreachable')),
-        reportBreak: broken,
-      });
-      creation.open('space');
-      await Promise.resolve();
-      await Promise.resolve();
-      const filled = dispatched[1];
-      expect(filled?.type === 'choices' && filled.read.choices).toEqual({
-        kind: 'space',
-        targets: { kind: 'unreadable' },
-      });
-    });
-
-    it('does not escape into the event handler that submitted', () => {
-      const { creation, dispatched } = shell(choosing(), {
-        submit: broken,
-        reportBreak: broken,
-      });
-
-      expect(() =>
-        creation.submit({ kind: 'space', targetSpaceId: null, title: 'Recap' }),
-      ).not.toThrow();
-
-      expect(dispatched[0]?.type).toBe('settled');
+    const { pane } = creation.getState();
+    expect(pane.status === 'choosing' && pane.refusal).toEqual({
+      fields: {},
+      form: 'This Card was not created: the session has gone',
     });
   });
 
   it('answers a choices read that rejects with an unreadable list, not a waiting one', async () => {
     const failure = new Error('the repository is unreachable');
     const reportBreak = vi.fn();
-    const { creation, dispatched } = shell(CARD_CREATION_CLOSED, {
-      readChoices: () => Promise.reject(failure),
-      reportBreak,
-    });
+    const { creation } = shell({ readChoices: () => Promise.reject(failure), reportBreak });
     creation.open('space');
     await Promise.resolve();
     await Promise.resolve();
     expect(reportBreak).toHaveBeenCalledWith(failure);
-    const filled = dispatched[1];
+    const { pane } = creation.getState();
     // `pending` withholds Create and says the read is still running, so a
     // failure answered with it would leave the author waiting on a read that
     // is over.
-    expect(filled?.type === 'choices' && filled.read).toEqual({
-      choices: { kind: 'space', targets: { kind: 'unreadable' } },
-      // A read that failed attempted no Edit, so it does not say one failed.
-      listing: {
-        fields: {},
-        form: 'The choices for this Card could not be read: the repository is unreachable',
-      },
+    expect(pane.status === 'choosing' && pane.choices).toEqual({
+      kind: 'space',
+      targets: { kind: 'unreadable' },
     });
+    // A read that failed attempted no Edit, so it does not say one failed.
+    expect(pane.status === 'choosing' && pane.listing).toEqual({
+      fields: {},
+      form: 'The choices for this Card could not be read: the repository is unreachable',
+    });
+  });
+});
+
+/**
+ * Admission is installed before the collaborator runs, and before React renders.
+ *
+ * The shell used to guard on the state of the render it was built for, so a
+ * seam that reentered synchronously — an Edit whose observers call back into
+ * this surface — was admitted a second time against a pane that had already
+ * moved. These hold that shut at the module.
+ */
+describe('admission before the collaborator runs', () => {
+  const ALIAS = { kind: 'alias', target: CARD_ID, title: '' } as const;
+  const SPACE = { kind: 'space', targetSpaceId: null, title: 'Recap' } as const;
+
+  it('installs admission before notifying an observer that opens another kind', () => {
+    const readChoices = vi.fn((kind: 'alias' | 'space'): CardCreationRead => ({
+      choices: kind === 'alias' ? aliasChoices : spaceChoices,
+      listing: null,
+    }));
+    const { creation } = shell({ readChoices });
+    const unsubscribe = creation.subscribe(() => creation.open('space'));
+
+    creation.open('alias');
+    unsubscribe();
+
+    expect(readChoices).toHaveBeenCalledTimes(1);
+    expect(creation.getState().pane).toMatchObject({ choices: aliasChoices });
+  });
+
+  it('admits the attempt before its collaborator can reenter', () => {
+    const submit = vi.fn((): CardCreationOutcome => {
+      if (submit.mock.calls.length === 1) {
+        creation.submit(ALIAS);
+        creation.cancel();
+      }
+      return { kind: 'created', cardId: CARD_ID };
+    });
+    const { creation, requested } = openedOn(aliasChoices, { submit });
+
+    creation.submit(ALIAS);
+
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(requested).toEqual([
+      { target: { kind: 'card', cardId: CARD_ID }, select: true, then: 'rename' },
+    ]);
+  });
+
+  it('starts no attempt when closed', () => {
+    const submit = vi.fn((): CardCreationOutcome => ({ kind: 'none' }));
+    const { creation } = shell({ submit });
+
+    creation.submit(SPACE);
+
+    expect(submit).not.toHaveBeenCalled();
+    expect(creation.getState().pane.status).toBe('closed');
+  });
+
+  it('admits one asynchronous attempt and blocks dismissal until it settles', async () => {
+    const attempt = Promise.withResolvers<CardCreationOutcome>();
+    const submit = vi.fn(() => attempt.promise);
+    const { creation, requested } = openedOn(spaceChoices, { submit });
+
+    creation.submit(SPACE);
+    creation.submit(SPACE);
+    creation.cancel();
+    creation.withdraw();
+
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(creation.getState().pane.status).toBe('submitting');
+    expect(requested).toEqual([]);
+
+    attempt.resolve({ kind: 'refused', errors: { fields: { title: 'Required.' } } });
+    await attempt.promise;
+    await Promise.resolve();
+    expect(creation.getState().pane).toMatchObject({
+      status: 'choosing',
+      refusal: { fields: { title: 'Required.' } },
+    });
+    creation.cancel();
+    expect(creation.getState().pane.status).toBe('closed');
+  });
+
+  it('admits a retry immediately after a synchronous refusal', () => {
+    const submit = vi
+      .fn<CardCreationSeams['submit']>()
+      .mockReturnValueOnce({ kind: 'refused', errors: { fields: { title: 'Required.' } } })
+      .mockReturnValueOnce({ kind: 'created', cardId: CARD_ID });
+    const { creation } = openedOn(aliasChoices, { submit });
+
+    creation.submit(ALIAS);
+    expect(creation.getState().pane).toMatchObject({
+      status: 'choosing',
+      refusal: { fields: { title: 'Required.' } },
+    });
+
+    creation.submit(ALIAS);
+
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(creation.getState().pane.status).toBe('closed');
+  });
+
+  it('admits no second attempt after synchronous creation', () => {
+    const submit = vi.fn((): CardCreationOutcome => ({ kind: 'created', cardId: CARD_ID }));
+    const { creation } = openedOn(aliasChoices, { submit });
+
+    creation.submit(ALIAS);
+    creation.submit(ALIAS);
+
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(creation.getState().pane.status).toBe('closed');
+  });
+
+  it('never publishes busy controls for synchronous creation', () => {
+    const { creation, published } = openedOn(aliasChoices, {
+      submit: () => ({ kind: 'created', cardId: CARD_ID }),
+    });
+
+    creation.submit(ALIAS);
+
+    expect(published.map(({ pane }) => pane.status)).toEqual(['closed']);
   });
 });

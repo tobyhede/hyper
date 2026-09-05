@@ -1,6 +1,7 @@
 import type { Card, CardId, UUID } from '@project/core';
 import {
   createNonThrowingReporter,
+  createObservableState,
   type ObserverErrorReporter,
   type SpaceSummary,
 } from '@project/persistence';
@@ -24,15 +25,9 @@ import type { Continuation, PendingContinuation } from './continuation';
  * offering, so mutual exclusion is structural rather than an argument about the
  * shape of the Add Card menu.
  *
- * **A reducer rather than an observable-state module.** `edge-authoring.ts` is
- * the other shape this package uses, and it is a store because React Flow asks
- * it synchronous questions mid-gesture, because its operations answer values to
- * their callers, and because it invalidates itself from two collaborator
- * subscriptions. None of that is true here: nothing asks this module a question
- * during a gesture, no operation answers one, and its single external fact —
- * presenting — reaches it as an ordinary dispatch. So the transitions are a
- * pure function, driven in a node test with no React tree, and
- * {@link createCardCreation} is the thin asynchronous shell over it.
+ * The module owns current state so admission takes effect before a collaborator
+ * runs, without waiting for React to render. The pure reducer remains the one
+ * transition rule; the observable only installs and publishes its answer.
  */
 
 export type CardCreationKind = 'alias' | 'space';
@@ -247,11 +242,11 @@ export function cardCreationReducer(
 ): CardCreationState {
   switch (action.type) {
     case 'open':
-      // One pane, and this is where that is true: the shell's own guard reads
-      // the render's state, so two gestures in one tick both see a closed pane.
-      // Opening twice would advance the opening past the read each of them made
-      // — both carry the first — leaving the pane on its empty initial choices
-      // with nothing left to fill it.
+      // One pane, and this is where that is true; the same transition also
+      // decides whether the shell may start a choices read. Opening twice would
+      // advance the opening past the read each attempt made — both carry the
+      // first — leaving the pane on its empty initial choices with nothing left
+      // to fill it.
       if (state.pane.status !== 'closed') return state;
       return {
         pane: {
@@ -391,6 +386,8 @@ export interface CardCreationSeams {
 }
 
 export interface CardCreation {
+  readonly getState: () => CardCreationState;
+  readonly subscribe: (listener: () => void) => () => void;
   readonly open: (kind: CardCreationKind) => void;
   readonly submit: (input: CardCreationInput) => void;
   readonly cancel: () => void;
@@ -402,21 +399,34 @@ export interface CardCreation {
 }
 
 /**
- * The asynchronous shell over the reducer.
+ * Card creation owns admission, transitions and asynchronous recovery.
  *
- * It takes the current state rather than reading one, because every guard here
- * is the reducer's rule restated at the point a seam would otherwise be called
- * for nothing — and a shell that held its own copy would be a second answer to
- * where the pane is.
+ * The module holds current state rather than taking a render's, so admission
+ * takes effect before a collaborator runs and without waiting for React to
+ * render: even a synchronous Edit can reenter through its own observers, and a
+ * shell that read the state it was constructed with would admit the second
+ * attempt. The pure reducer remains the one transition rule; the observable
+ * only installs and publishes its answer.
  */
-export function createCardCreation(
-  state: CardCreationState,
-  dispatch: (action: CardCreationAction) => void,
-  { readChoices, submit, reportBreak, continuation }: CardCreationSeams,
-): CardCreation {
-  // The opening this call is about to become, so a read answers the pane it was
-  // made for and not whichever one is on screen when it settles.
-  const opening = state.opening + 1;
+export function createCardCreation({
+  readChoices,
+  submit,
+  reportBreak,
+  continuation,
+}: CardCreationSeams): CardCreation {
+  const observable = createObservableState(CARD_CREATION_CLOSED, reportBreak);
+  const transition = (action: CardCreationAction): CardCreationState | null => {
+    const state = observable.getState();
+    const next = cardCreationReducer(state, action);
+    if (next === state) return null;
+    observable.install(next);
+    return next;
+  };
+  const dispatch = (action: CardCreationAction): CardCreationState | null => {
+    const next = transition(action);
+    if (next !== null) observable.notify();
+    return next;
+  };
   /**
    * The sink, made incapable of interrupting the work it describes.
    *
@@ -452,10 +462,14 @@ export function createCardCreation(
   };
 
   return {
+    getState: observable.getState,
+    subscribe: observable.subscribe,
     open: (kind) => {
-      if (state.pane.status !== 'closed') return;
-      dispatch({ type: 'open', kind });
-      const answer = (read: CardCreationRead): void => dispatch({ type: 'choices', opening, read });
+      const opened = dispatch({ type: 'open', kind });
+      if (opened === null) return;
+      const answer = (read: CardCreationRead): void => {
+        dispatch({ type: 'choices', opening: opened.opening, read });
+      };
       try {
         const read = readChoices(kind);
         if (read instanceof Promise) {
@@ -474,7 +488,9 @@ export function createCardCreation(
     },
 
     submit: (input) => {
-      if (state.pane.status !== 'choosing') return;
+      // Admission precedes the collaborator: even a synchronous Edit can
+      // reenter through its observers. Publish busy only if it returns a promise.
+      if (transition({ type: 'submitting' }) === null) return;
       let outcome: CardCreationOutcome | Promise<CardCreationOutcome>;
       try {
         outcome = submit(input);
@@ -489,13 +505,12 @@ export function createCardCreation(
         settle(outcome);
         return;
       }
-      dispatch({ type: 'submitting' });
+      observable.notify();
       void outcome.then(settle, broke);
     },
 
     cancel: () => {
-      if (state.pane.status !== 'choosing') return;
-      dispatch({ type: 'cancel' });
+      if (dispatch({ type: 'cancel' }) === null) return;
       continuation.request(RETURN_TO_ADD_CARD);
     },
     // Presenting is the one close that owes nothing: the author asked for a

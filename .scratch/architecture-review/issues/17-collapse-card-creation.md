@@ -208,3 +208,28 @@ anything in the authored world — the same reason *projection* is deliberately
 absent from that document, and `test/unit/current-domain-vocabulary.test.ts`
 gives every term added there real weight. It belongs in `docs/agents/ui.md`
 beside the other surface conventions.
+
+## Answer
+
+Card creation now owns one authoritative state behind a private pure reducer,
+installed and published through `createObservableState`. The React adapter
+mounts the module and reads it through `useSyncExternalStore`. Admission installs
+the next state before invoking a collaborator, so repeated opens cannot start a
+second read and repeated or reentrant submits cannot begin another attempt. A
+synchronous completion publishes only its settled state; an asynchronous one
+publishes `submitting` until it settles. Refusals permit immediate retry.
+
+This completes the branch's consolidation while correcting its interim choice
+to pass render-captured state into the asynchronous shell. The module remains
+local to the mounting surface; App supplies the two memoized kind seams and the
+composition's reporter. No additional composition dependency was needed.
+
+`card-creation-state.test.ts` keeps driving the reducer directly for the
+transition rules, and its shell half now drives the module through its own
+operations rather than recording the dispatches an injected `dispatch` was
+handed — which is the only way to observe what a reentrant collaborator sees.
+The repeated-open and reentrant-submit regressions both failed before their
+fixes. The existing application tests retain pane, naming and focus evidence.
+
+Continuation policy beyond this creation module remains the separate follow-up
+described in the source; Add Card remains outside this change.
