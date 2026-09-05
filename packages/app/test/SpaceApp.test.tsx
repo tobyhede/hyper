@@ -148,6 +148,49 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
   expect(initial.app.navigation.getState().mode).toBe('presenting');
 });
 
+/** The `data-state` of the shell sidebar the named Space's own chrome draws. */
+const sidebarStateOf = (spaceTitle: string): string | null => {
+  const title = [...document.querySelectorAll('[data-testid="space-title"]')].find(
+    (element) => element.textContent === spaceTitle,
+  );
+  if (title === undefined) throw new Error(`no Sidebar names the Space ${spaceTitle}`);
+  return title.closest('[data-slot="sidebar"]')?.getAttribute('data-state') ?? null;
+};
+
+/**
+ * The sibling of the Escape claim above, for the shell's own global key.
+ *
+ * Every open Space keeps its shell mounted, so `Ctrl/Cmd-B` on `window` reaches
+ * as many `SidebarProvider`s as there are Spaces. Only the Space on the canvas
+ * is being looked at, so only its sidebar answers the press.
+ */
+it('leaves a hidden Space sidebar alone when the active Space receives Cmd/Ctrl+B', async () => {
+  const first = snapshot('First Space', 'First Card', 0, 0);
+  const second = { ...snapshot('Second Space', 'Second Card', 0, 0), id: newUuid() };
+  const backend = new MemorySpaceBackend(
+    SPACE_ID,
+    [first, second].map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
+  );
+  const spaces = createOpenSpaces({
+    backend,
+    metaSpaceId: SPACE_ID,
+    newId: newUuid,
+    history: recordingHistory(),
+  });
+  const initial = await spaces.open(SPACE_ID);
+  render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+  await act(async () => {
+    await spaces.open(second.id);
+  });
+  expect(sidebarStateOf('First Space')).toBe('expanded');
+  expect(sidebarStateOf('Second Space')).toBe('expanded');
+
+  fireEvent.keyDown(document.body, { key: 'b', ctrlKey: true });
+
+  expect(sidebarStateOf('Second Space')).toBe('collapsed');
+  expect(sidebarStateOf('First Space')).toBe('expanded');
+});
+
 describe('Space app conflict recovery', () => {
   it('replaces the visible runtime and editor placement when remote state is accepted', async () => {
     const local = snapshot('Local space', 'Local card', 10, 20);

@@ -309,6 +309,23 @@ export function createBrowserLocation(
       },
       () => {
         if (request !== restorationRequest || history.pathname() !== pathname) return;
+        // One rejection refuses two different things, and only one of them is a
+        // destination that failed to resolve. A location outside product
+        // addressing refuses to open because it is not an address of ours: the
+        // application did not write it and it names no position to be wrong
+        // about, so it is left alone here exactly as {@link restoreFollowed}
+        // leaves the `ignored` it classifies the same pathname as.
+        const app = followed;
+        if (
+          app !== null &&
+          destinationRestoration(
+            app.currentSpace(),
+            app.authoring.getState().session.working,
+            pathname,
+          ).kind === 'ignored'
+        ) {
+          return;
+        }
         destinationNotFound = true;
         publish();
       },

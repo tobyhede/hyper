@@ -67,6 +67,34 @@ describe('Sidebar', () => {
     expect(report).toHaveBeenLastCalledWith(true);
   });
 
+  /**
+   * The shortcut is a *window* listener, and every open Space keeps its shell
+   * mounted (`OpenSpaces` panels are `keepMounted`), so one press reaches every
+   * provider in the session. Toggling the hidden ones changes chrome the reader
+   * is not looking at — the same rule the presenting keys already hold, where
+   * an inactive Space keeps its traversal mounted without receiving global keys.
+   */
+  it('withholds the global Cmd/Ctrl+B from a provider that is not the active surface', () => {
+    const activeReport = vi.fn();
+    const hiddenReport = vi.fn();
+
+    render(
+      <>
+        <SidebarProvider defaultOpen>
+          <StateProbe report={activeReport} />
+        </SidebarProvider>
+        <SidebarProvider defaultOpen active={false}>
+          <StateProbe report={hiddenReport} />
+        </SidebarProvider>
+      </>,
+    );
+
+    fireEvent.keyDown(document.body, { key: 'b', ctrlKey: true });
+
+    expect(activeReport).toHaveBeenLastCalledWith(false);
+    expect(hiddenReport).toHaveBeenLastCalledWith(true);
+  });
+
   it('forwards mobile sidebar props to the Sheet DOM and exposes a close button', async () => {
     stubViewport(true);
     render(
