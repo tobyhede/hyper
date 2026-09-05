@@ -1,4 +1,5 @@
 import {
+  newUuid,
   uuidSchema,
   type CardPlacement,
   type CardId,
@@ -206,9 +207,12 @@ export const editedSnapshot: SpaceSnapshot = {
  *
  * It mints fresh ids on every page load, and nothing reads one: no story and no
  * Ladle spec names a Card, a Layout or a Graph of this Space by id, only the
- * `Layout 1` and `Graph 1` titles `newSpace()` mints for them.
+ * `Layout 1` and `Graph 1` titles `newSpace()` mints for them. The ambient
+ * generator is named here rather than inside `newSpace`, which takes its
+ * identity source like every other minting operation (ADR 0016); this fixture
+ * is the composition root that supplies it.
  */
-const minted = newSpace();
+const minted = newSpace(newUuid);
 export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.cardFiles));
 
 /**

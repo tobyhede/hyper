@@ -1,7 +1,6 @@
 import { uuidSchema, type UUID } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
 import {
   establishMetaSpace,
   openDatabaseSelection,
@@ -31,13 +30,6 @@ const mintingIds = (...ids: readonly [UUID, ...UUID[]]): (() => UUID) => {
     return id;
   };
 };
-
-/** Stored state that no Meta identity names — an invariant failure, not an empty repository. */
-class MetalessSpaceRepository extends MemorySpaceRepository {
-  override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
-    return Promise.reject(new Error('Stored Spaces exist without a Meta Space'));
-  }
-}
 
 const storedSpace = (
   revision: bigint,
@@ -148,8 +140,14 @@ describe('establishMetaSpace', () => {
   });
 
   it('fails explicitly on stored Spaces that no Meta identity names', async () => {
-    const repository = new MetalessSpaceRepository([storedSpace(4n)]);
+    const repository = MemorySpaceRepository.withoutMetaIdentity([storedSpace(4n)]);
 
+    // Asked of the adapter first, because the refusal is the adapter's: a
+    // subclass overriding `loadAggregate` proved only that startup forwards
+    // whatever it is handed, and left the branch that decides it unexecuted.
+    await expect(repository.loadAggregate()).rejects.toThrow(
+      'Stored Spaces exist without a Meta Space',
+    );
     await expect(establishMetaSpace(repository, mintingIds(OTHER_SPACE_ID))).rejects.toThrow(
       'Stored Spaces exist without a Meta Space',
     );

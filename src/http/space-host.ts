@@ -85,25 +85,40 @@ export const createSpaceHost = (
       if (!reads) return methodNotAllowed(accept);
       // Opening the application without another destination opens the Meta
       // Space, and an uninitialized repository is initialized here rather than
-      // redirected to nothing. Contradictory stored Meta state — Spaces without
-      // Meta, or an aggregate that fails complete intake — is an invariant
-      // failure, so it is reported as one instead of being papered over with a
-      // redirect or a guess at which Space was meant.
+      // redirected to nothing. A failure to establish it is reported as an
+      // answer instead of being papered over with a redirect or a guess at
+      // which Space was meant.
       let metaSpaceId: UUID;
       try {
         metaSpaceId = await establishMetaSpace(repository, newId);
       } catch (error) {
-        // The reason travels in the answer. The repository raises this as an
-        // ordinary `Error`, and anything else reaching here is a fault the
-        // caller cannot act on either way.
-        const detail =
-          error instanceof Error ? error.message : 'Stored Meta state is inconsistent.';
-        return problem('internal-error', detail, accept);
+        // What failed is not something this can tell. Contradictory stored Meta
+        // state — Spaces without Meta, or an aggregate that fails complete
+        // intake — and a database that is simply unreachable both arrive here as
+        // an ordinary `Error`, so classifying them would mean reading the
+        // message, and the wire behaviour would turn on prose. Neither is
+        // claimed, and the answer is the one `@project/http` already gives for a
+        // request failure it cannot classify: the catalogued title with `Try the
+        // request again later.` as its detail.
+        //
+        // A transient outage would be better answered by the 503
+        // `persistence-unavailable` `GET /api/aggregate` gives for this very
+        // throw, and telling the two apart is worth doing — but that wants the
+        // repository raising an identifiable invariant error rather than a host
+        // matching on text, and `ProductResponse`'s closed status set does not
+        // admit 503.
+        //
+        // The reason travels to the operator rather than in the answer. The
+        // detail is fixed prose like every other one here, so whatever a driver
+        // put in its message is not served to an unauthenticated client.
+        console.error('Failed to establish the Meta Space', error);
+        return problem('internal-error', 'Try the request again later.', accept);
       }
-      // The document is not read to prove it is there. `metaSpaceId` is the id
-      // the repository state names under its restraining foreign key, so it
-      // names a Space that exists — and the redirect target's first act is to
-      // load that very Space anyway, which is where a Space that vanished
+      // No second read proves the Space is there. Establishment has already read
+      // and validated every stored document to answer at all, and `metaSpaceId`
+      // is the id the repository state names under its restraining foreign key,
+      // so it names a Space that exists — and the redirect target's first act is
+      // to load that very Space anyway, which is where a Space that vanished
       // between the two would be answered exactly as any other missing Space is.
       return {
         status: 302,

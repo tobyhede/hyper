@@ -1,5 +1,5 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
-import { initializeSpace, parseCardFile } from '@project/graph';
+import { newSpace, parseCardFile } from '@project/graph';
 import type { AggregateInput } from '../persistence/space-repository';
 
 /**
@@ -14,11 +14,17 @@ import type { AggregateInput } from '../persistence/space-repository';
  * already goes through the one lifecycle operation rather than through a
  * second Space-creation path.
  *
+ * `newSpace` is *called* rather than transcribed: writing the same two titles
+ * out again made a second definition of the starting state, so renaming the
+ * seed Card moved every other provisioning path and left a freshly initialized
+ * repository behind. All this adds is the on-disk-to-stored translation, which
+ * is a shape difference and not a content decision.
+ *
  * It mints ordinary authored state: nothing here is protected, repaired or
  * added again once a repository is initialized.
  */
 export const defaultContentAggregate = (newId: () => UUID): AggregateInput => {
-  const minted = initializeSpace({ title: 'Card 1', newId });
+  const minted = newSpace(newId);
   const cards = minted.cardFiles.map((file) => {
     const parsed = parseCardFile(file);
     if (!parsed.ok) throw new Error(parsed.errors.map(({ message }) => message).join('\n'));
@@ -26,6 +32,6 @@ export const defaultContentAggregate = (newId: () => UUID): AggregateInput => {
     return { id, document };
   });
   const { id, ...document } = minted.file;
-  const meta: SpaceSnapshot = { id, document: { ...document, title: 'New space' }, cards };
+  const meta: SpaceSnapshot = { id, document, cards };
   return { metaSpaceId: meta.id, spaces: [meta] };
 };

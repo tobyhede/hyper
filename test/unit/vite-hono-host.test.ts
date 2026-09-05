@@ -191,7 +191,7 @@ describe('Vite Hono host', () => {
     await expect(response.text()).resolves.toBe('<main>Vite application</main>');
   });
 
-  it('redirects root to the compact Meta Space URL without reading its document', async () => {
+  it('redirects root to the compact Meta Space URL without a second read of it', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceRepository = new MemorySpaceRepository([stored], SPACE_ID);
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
@@ -201,10 +201,13 @@ describe('Vite Hono host', () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
-    // The redirect target's first act is to load this Space, and the id came
-    // from the repository state that names it under a restraining foreign key —
-    // so loading it here to prove it exists is a read the answer never
-    // depended on.
+    // Not a cheap single lookup: establishment reads and validates every stored
+    // document through `loadAggregate`, under the Meta identity write lock. What
+    // this pins is that nothing is read *again* through the resource loader —
+    // the redirect target's first act is to load this Space, and the id came
+    // from the repository state that names it under a restraining foreign key,
+    // so loading it here to prove it exists is a read the answer never depended
+    // on.
     expect(loadSpace).not.toHaveBeenCalled();
   });
 
@@ -262,29 +265,48 @@ describe('Vite Hono host', () => {
     expect(ids).toHaveLength(0);
   });
 
-  it('answers contradictory stored Meta state as an explicit failure', async () => {
-    class MetalessSpaceRepository extends MemorySpaceRepository {
-      override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
-        return Promise.reject(new Error('Stored Spaces exist without a Meta Space'));
+  it.each([
+    ['contradictory stored Meta state', 'Stored Spaces exist without a Meta Space'],
+    ['an unreachable database', 'connect ECONNREFUSED 127.0.0.1:5432'],
+  ])(
+    'answers %s as an explicit failure that keeps the reason out of the response',
+    async (_case, message) => {
+      class FailingSpaceRepository extends MemorySpaceRepository {
+        override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
+          return Promise.reject(new Error(message));
+        }
       }
-    }
-    const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const { host } = await startHost(
-      createSpaceHost(new MetalessSpaceRepository([stored]), newUuid),
-    );
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const stored = { snapshot, revision: 0n, exportedRevision: null };
+      const { host } = await startHost(
+        createSpaceHost(new FailingSpaceRepository([stored]), newUuid),
+      );
 
-    const response = await fetch(`${host.url}/`, {
-      redirect: 'manual',
-      headers: { Accept: 'application/problem+json' },
-    });
+      const response = await fetch(`${host.url}/`, {
+        redirect: 'manual',
+        headers: { Accept: 'application/problem+json' },
+      });
 
-    expect(response.status).toBe(500);
-    expect(response.headers.get('location')).toBeNull();
-    expect(decodeProblemDetails(await response.json())).toMatchObject({
-      status: 500,
-      detail: 'Stored Spaces exist without a Meta Space',
-    });
-  });
+      // The two are indistinguishable to the host — both arrive as an ordinary
+      // `Error` out of `loadAggregate` — so neither is claimed. In particular a
+      // driver's own message is not served to the client, and an outage is not
+      // reported as the permanent invariant failure it may not be.
+      expect(response.status).toBe(500);
+      expect(response.headers.get('location')).toBeNull();
+      const body = await response.text();
+      expect(body).not.toContain(message);
+      expect(decodeProblemDetails(JSON.parse(body))).toMatchObject({
+        status: 500,
+        title: 'Internal server error',
+        detail: 'Try the request again later.',
+      });
+      // The reason still travels, to the operator rather than the client.
+      expect(logged).toHaveBeenCalledWith(
+        'Failed to establish the Meta Space',
+        expect.objectContaining({ message }),
+      );
+    },
+  );
 
   it('answers malformed and unresolved Space URLs before Vite fallback', async () => {
     const hostApp = createSpaceHost(new MemorySpaceRepository(), newUuid);
@@ -724,5 +746,40 @@ describe('Vite Hono host', () => {
       200,
     );
     expect(commitAttempts).toBe(0);
+  });
+});
+
+describe('Database HTTP runtime', () => {
+  it('composes an application when the repository cannot be reached', async () => {
+    // The host promise this runtime feeds is created once and memoized for the
+    // life of the process (`installMiddleware` above), and a rejection is
+    // therefore permanent: every later request on every path is handed to
+    // `next(error)` and gets the generic error page instead of the answer the
+    // application has for it — including after the database comes back. So
+    // establishment failing is reported and composition continues; the root
+    // address answers the same failure per request.
+    const url = process.env['DATABASE_URL'];
+    // Port 1 refuses immediately, and it is set before the runtime is imported
+    // because `src/prisma/db.ts` reads the variable once, at module scope.
+    // `dotenv` does not override an existing value, so a developer's `.env`
+    // cannot decide this test.
+    process.env['DATABASE_URL'] = 'postgresql://hyper:hyper@127.0.0.1:1/hyper';
+    let reported: unknown;
+    vi.spyOn(console, 'error').mockImplementation((message: unknown, error: unknown) => {
+      if (message === 'Failed to establish the Meta Space at startup') reported = error;
+    });
+    try {
+      const { createApp } = await import('../../src/http/postgres-http-runtime');
+
+      const application = await createApp();
+
+      expect(typeof application.resolveProductRequest).toBe('function');
+      // The reason is not swallowed, only kept out of the way of composition.
+      expect(reported).toBeInstanceOf(Error);
+      expect(reported instanceof Error ? reported.message : '').toContain('ECONNREFUSED');
+    } finally {
+      if (url === undefined) delete process.env['DATABASE_URL'];
+      else process.env['DATABASE_URL'] = url;
+    }
   });
 });
