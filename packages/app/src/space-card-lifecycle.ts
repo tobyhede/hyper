@@ -1,4 +1,4 @@
-import { loadSpaceSnapshot } from '@project/graph';
+import { loadSpaceSnapshot, type Space } from '@project/graph';
 import type {
   SpaceBackend,
   SpaceCardLifecycle,
@@ -15,36 +15,14 @@ export type {
   SpaceCardLifecycleResult,
 } from '@project/persistence';
 
-/** One Graph a Space Card may show, named the way its Card's selector draws it. */
-export interface SpaceCardTargetGraph {
-  readonly id: GraphId;
-  readonly title: string;
-}
-
-/** One Layout a Space Card may show, with the Graphs that Layout owns (ADR 0040). */
+/** The target's choices; rendering uses its live Space's production projection. */
 export interface SpaceCardTargetLayout {
   readonly id: UUID;
   readonly title: string;
-  readonly graphs: readonly SpaceCardTargetGraph[];
-  /**
-   * The Layout's own Active Graph, where it has authored one (ADR 0026).
-   *
-   * Carried because a Card pointed at this Layout has to seed a Graph from it,
-   * and the Layout has already answered which one is current. Dropping it here
-   * would leave the surface to invent an answer the Layout disagrees with.
-   */
+  readonly graphs: readonly { readonly id: GraphId; readonly title: string }[];
   readonly activeGraph?: GraphId;
 }
 
-/**
- * A target Space as the Cards referencing it see it.
- *
- * Deliberately not a `Space`. A Space Card selects a Layout and a Graph and
- * shows a Title, and that is the whole of what its surface can do with the
- * Space it points at — handing the validated aggregate over instead would put a
- * second Space's Cards, lookup and renderer within reach of a containing
- * Space's canvas, which is exactly the boundary a Space Card is.
- */
 export interface SpaceCardTarget {
   readonly id: UUID;
   readonly title: string;
@@ -93,11 +71,8 @@ const targetLayout = (layout: Layout): SpaceCardTargetLayout => {
   const read = {
     id: layout.id,
     title: layout.title,
-    graphs: layout.graphs.map((graph) => ({ id: graph.id, title: graph.title })),
+    graphs: layout.graphs.map(({ id, title }) => ({ id, title })),
   };
-  // Absent where the Layout authored none, which is the distinction the seed
-  // reads: ADR 0026 makes an absent Active Graph mean the first, and a key
-  // carrying `undefined` would say the Layout had answered.
   return layout.activeGraph === undefined ? read : { ...read, activeGraph: layout.activeGraph };
 };
 
@@ -119,11 +94,15 @@ export function createSpaceCardLifecycle({
       if (snapshot === undefined) return undefined;
       const loaded = loadSpaceSnapshot(snapshot);
       if (!loaded.ok) return undefined;
-      return {
-        id: loaded.space.id,
-        title: loaded.space.title,
-        layouts: loaded.space.layouts.map(targetLayout),
-      };
+      return spaceCardTarget(loaded.space);
     },
+  };
+}
+
+export function spaceCardTarget(space: Space): SpaceCardTarget {
+  return {
+    id: space.id,
+    title: space.title,
+    layouts: space.layouts.map(targetLayout),
   };
 }

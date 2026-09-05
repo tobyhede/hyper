@@ -1,6 +1,11 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { spaceSnapshotSchema, uuidSchema, type CardId } from '@project/core';
+import {
+  SPACE_CARD_MIN_OPEN_SIZE,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type CardId,
+} from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CARD_SIZE } from '../src/card';
@@ -13,6 +18,8 @@ const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
 const snapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
@@ -27,6 +34,7 @@ const snapshot = spaceSnapshotSchema.parse({
         positions: {
           [CARD_ID]: { x: 0, y: 0, open: false },
           [ALIAS_ID]: { x: 300, y: 0, open: false },
+          [SPACE_CARD_ID]: { x: 600, y: 0, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -36,6 +44,10 @@ const snapshot = spaceSnapshotSchema.parse({
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
     { id: ALIAS_ID, document: { title: 'Return', kind: 'alias', target: CARD_ID } },
+    {
+      id: SPACE_CARD_ID,
+      document: { title: 'Architecture', kind: 'space', spaceId: TARGET_SPACE_ID },
+    },
   ],
 });
 
@@ -61,7 +73,7 @@ const snapshotWithoutCard = spaceSnapshotSchema.parse({
 const node = (
   expanded: boolean,
   cardId = CARD_ID,
-  kind: 'markdown' | 'alias' = 'markdown',
+  kind: 'markdown' | 'alias' | 'space' = 'markdown',
 ): CardFlowNode => ({
   id: cardId,
   type: 'card',
@@ -96,7 +108,7 @@ interface HookProps {
 
 const mountAuthoring = (
   onBodyEditingChange?: (editing: boolean) => void,
-  projectedKind: 'markdown' | 'alias' = 'markdown',
+  projectedKind: 'markdown' | 'alias' | 'space' = 'markdown',
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
@@ -126,7 +138,7 @@ const mountAuthoring = (
       initialProps,
     },
   );
-  return { ...hook, spaceSession };
+  return { ...hook, spaceSession, authoring, adapter };
 };
 
 const onlyNode = (nodes: readonly CardFlowNode[]): CardFlowNode => {
@@ -294,6 +306,72 @@ describe('canvas Card authoring', () => {
     });
     expect(onlyNode(result.current.nodes).data.bodyEditor).toBeDefined();
   });
+
+  /**
+   * An Open Space Card's floor is its own, and taller than every other Card's.
+   *
+   * ADR 0068's embedded Layout is painted over the Card, so the Card's own
+   * passengers hold a fixed footer under a fixed rail and `.canvas-card` hides
+   * what will not fit. At the collapsed floor every other Card resizes to, a
+   * Space Card's Graph selector is simply cut off — so the capability carries
+   * `SPACE_CARD_MIN_OPEN_SIZE`, which is the inset plus the smallest Card the
+   * embedded Layout could hold.
+   */
+  it('allows a Space Card resize to reach Close while flooring an ordinary Open proposal above its footer', () => {
+    const { result, rerender, authoring, adapter, spaceSession } = mountAuthoring(
+      undefined,
+      'space',
+    );
+    act(() => {
+      authoring.complete({ kind: 'opened-card', cardId: SPACE_CARD_ID });
+    });
+    rerender({
+      expanded: true,
+      enabled: true,
+      presenting: false,
+      nameOnCreation: null,
+      cardId: SPACE_CARD_ID,
+    });
+
+    const space = onlyNode(result.current.nodes);
+    expect(space.data.resize?.minWidth).toBe(CARD_SIZE.width);
+    expect(space.data.resize?.minHeight).toBe(CARD_SIZE.height);
+    act(() => {
+      space.data.resize?.onResizeStart();
+      space.data.resize?.onResize({ width: 280, height: 220 });
+    });
+    expect(adapter.getState().resizeDraft?.size).toEqual(SPACE_CARD_MIN_OPEN_SIZE);
+    const remembered =
+      spaceSession.getState().working.document.layouts?.[0]?.positions[SPACE_CARD_ID];
+    act(() => {
+      space.data.resize?.onResize(CARD_SIZE);
+      space.data.resize?.onResizeEnd();
+    });
+    expect(spaceSession.getState().working.document.layouts?.[0]?.positions[SPACE_CARD_ID]).toEqual(
+      {
+        ...remembered,
+        open: false,
+      },
+    );
+  });
+
+  it.each(['markdown', 'alias'] as const)(
+    'floors an Open %s Card resize at the collapsed size',
+    (kind) => {
+      const { result, rerender } = mountAuthoring(undefined, kind);
+      rerender({
+        expanded: true,
+        enabled: true,
+        presenting: false,
+        nameOnCreation: null,
+        cardId: kind === 'alias' ? ALIAS_ID : CARD_ID,
+      });
+
+      const card = onlyNode(result.current.nodes);
+      expect(card.data.resize?.minWidth).toBe(CARD_SIZE.width);
+      expect(card.data.resize?.minHeight).toBe(CARD_SIZE.height);
+    },
+  );
 
   it.each(['markdown', 'alias'] as const)(
     'withholds every authoring control from a projected %s Card absent from the working Space',

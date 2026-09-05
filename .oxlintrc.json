@@ -372,6 +372,7 @@
         "packages/app/src/placement-rendering.ts",
         "packages/app/src/startup.tsx",
         "packages/app/src/SpaceApp.tsx",
+        "packages/app/src/components/SpaceAppFailure.tsx",
         "packages/app/src/SpaceSelection.tsx",
         "packages/app/test/render-adapter.test.ts",
         "packages/app/test/space-authoring.test.ts",

@@ -36,14 +36,9 @@
  */
 export const uncataloguedComponents = [
   {
-    module: 'packages/app/src/App.tsx',
-    reason:
-      'Composition root. It wires Navigation, Space Authoring, the render adapter and every surface below into one tree; it has no visual state of its own, and a story of it would be the application rather than a catalogue entry.',
-  },
-  {
     module: 'packages/app/src/SpaceApp.tsx',
     reason:
-      "Composition root, and an error boundary. What it draws when it catches is catalogued — `operational-feedback-space-app-failure` renders the boundary's own failure panel — and the rest of it is the session wiring around App.",
+      'Isolated single-Space mounting adapter. The shared error boundary and managed application are catalogued through the embedded Layout story.',
   },
   {
     module: 'packages/app/src/main.tsx',
@@ -55,44 +50,9 @@ export const uncataloguedComponents = [
       'Startup composition. It renders one opened outcome by mounting the application, while `operational-feedback-startup-failure` catalogues its failure panel.',
   },
   {
-    module: 'packages/app/src/edge-authoring-react.tsx',
-    reason:
-      'The canvas-wide Edge gesture layer: React Flow connection callbacks and the pointer-refusal announcement, bound to a live `ReactFlow` instance. Its rendered surfaces are catalogued through `Components/Selected Edge Controls` and reviewed on a real canvas in `Review/Selected Edge On Canvas`; the gesture layer itself has no state a story can hold still.',
-  },
-  {
-    module: 'packages/app/src/components/SpaceCanvas.tsx',
-    reason:
-      'The `ReactFlow` instance itself — nodes, edges, viewport, gestures. Stories that need a real canvas build their own instance from the same production projection (`GraphHudFixture`, `SelectedEdgeCanvasFixture`, `ReactFlowCanvas`) rather than mounting the application-wired one, which would carry the session with it.',
-  },
-  {
     module: 'packages/app/src/components/OpenSpaceSidebars.tsx',
     reason:
       'Production composition staged by `space-cards/09` under `stories/review`: issue 11 supplies the application path and promotes it with parity evidence. Until then a stable story would claim production reachability the application does not have.',
-  },
-  {
-    module: 'packages/app/src/components/AuthorableEdge.tsx',
-    reason:
-      'Debt with an owner. It is rendered on a real canvas by `Review/Selected Edge On Canvas`, which carries no parity claim on purpose — the Edge line, its colour and its reconnection affordance have no stable story yet. Promoting that review story is the remaining Edge work, and it is blocked on the reconnected-Edge selection defect recorded in `findings/reconnected-edge-loses-its-selection.md`.',
-  },
-  {
-    module: 'packages/app/src/components/NewCardPreview.tsx',
-    reason:
-      'Reachable only mid-gesture: the ghost Card drawn while an Edge drag is held over empty canvas. There is no coherent production boundary that holds it still — the preview exists only for the duration of a pointer gesture the harness would have to fake — so ADR 0052 keeps it out of the stable catalogue rather than admitting a facsimile.',
-  },
-  {
-    module: 'packages/app/src/components/CanvasCentre.tsx',
-    reason:
-      'Camera behaviour, not appearance: it centres the viewport and renders nothing. Covered by `packages/app/test/CanvasCentre.test.tsx`.',
-  },
-  {
-    module: 'packages/app/src/components/CanvasContinuation.tsx',
-    reason:
-      'Where a completed Edit leaves the author, on the canvas: it resolves a continuation against the projection React Flow is drawing, moves the camera for a Card arrived at by URL, and renders nothing. Covered by `packages/app/test/continuation.test.ts` for the rules and by the canvas assertions in `edge-authoring-react.test.tsx` and `card-creation.test.tsx` for the spend. It replaced `CardDestinationFocus.tsx`, which was here for the same reason.',
-  },
-  {
-    module: 'packages/app/src/components/cameras.tsx',
-    reason:
-      'Camera behaviour, not appearance: `fitView` calls for presenting and overview, rendering nothing. Covered by `packages/app/test/cameras.test.tsx` and by the camera assertions in `presenting.spec.ts`.',
   },
   {
     module: 'packages/react-flow-adapter/src/CardNode.tsx',
@@ -100,29 +60,9 @@ export const uncataloguedComponents = [
       "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-card-hover-reveals-actions-and-handles-together` mounts the real `CardNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",
   },
   {
-    module: 'packages/react-flow-adapter/src/RoutedEdge.tsx',
-    reason:
-      "The Edge line itself — ELK's routed polyline, with a bezier fallback where a strategy places no routing. It reaches the screen only through `AuthorableEdge`, so it is uncatalogued for exactly that reason and lands with it.",
-  },
-  {
-    module: 'packages/react-flow-adapter/src/GraphConnectionLine.tsx',
-    reason:
-      'The line React Flow draws between the pointer and its origin during a connection drag. Like the new-Card preview above, it exists only for the duration of a gesture and has no still state to render.',
-  },
-  {
-    module: 'packages/ui/src/OpenSpaces.tsx',
-    reason:
-      'Production presentation staged by `space-cards/09` under `stories/review`: issue 11 supplies the application path and promotes it with parity evidence. Its own tabs interaction and mounted-panel behavior are covered by `packages/ui/test/OpenSpaces.test.tsx` meanwhile.',
-  },
-  {
     module: 'packages/ui/src/Command.tsx',
     reason:
       'Deliberately without a consumer, like `Select` above. It wraps cmdk, which ADR 0050 kept rather than migrating; `CardSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
-  },
-  {
-    module: 'packages/ui/src/components/tabs.tsx',
-    reason:
-      "Consumed by `OpenSpaces`, which `space-cards/09` stages under `stories/review` until issue 11 supplies an application path and stable parity evidence. Its direct tests still hold the Base UI wrapper's vertical roving tabindex and `keepMounted` behavior independently of that composition.",
   },
   {
     module: 'packages/ui/src/components/empty.tsx',

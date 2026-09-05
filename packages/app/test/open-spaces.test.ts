@@ -96,6 +96,7 @@ const loaded = (id: UUID, title: string) => ({
 });
 
 const setup = (control?: MemorySpaceBackendTestControl, newId: () => UUID = () => CARD_ID) => {
+  const history = recordingHistory();
   const backend = new MemorySpaceBackend(
     META_ID,
     [loaded(META_ID, 'Meta'), loaded(OTHER_ID, 'Other')],
@@ -103,11 +104,12 @@ const setup = (control?: MemorySpaceBackendTestControl, newId: () => UUID = () =
   );
   return {
     backend,
+    history,
     openSpaces: createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
       newId,
-      history: recordingHistory(),
+      history,
     }),
   };
 };
@@ -124,6 +126,40 @@ const edit = (space: SpaceSnapshot): SpaceSnapshot => ({
 });
 
 describe('Open Spaces', () => {
+  it('authors the embedded Layout while preserving the full canvas selection', async () => {
+    const { openSpaces } = setup();
+    const target = await openSpaces.open(OTHER_ID, SECOND_LAYOUT_ID);
+    const before = target.session.getState().working;
+    expect(
+      target.app.authoring.completeInLayout(LAYOUT_ID, {
+        kind: 'opened-card',
+        cardId: OTHER_CARD_ID,
+      }).kind,
+    ).toBe('completed');
+    const after = target.session.getState().working;
+    expect(
+      after.document.layouts?.find((layout) => layout.id === LAYOUT_ID)?.positions[OTHER_CARD_ID]
+        ?.open,
+    ).toBe(true);
+    expect(after.document.layouts?.find((layout) => layout.id === SECOND_LAYOUT_ID)).toEqual(
+      before.document.layouts?.find((layout) => layout.id === SECOND_LAYOUT_ID),
+    );
+    expect(target.app.navigation.getState().selectedLayoutId).toBe(SECOND_LAYOUT_ID);
+    expect(after.document.defaultLayout).toBe(before.document.defaultLayout);
+  });
+
+  it('opens an embedded target in the shared entry without leaving the containing Space', async () => {
+    const { openSpaces } = setup();
+    const containing = await openSpaces.open(META_ID);
+    const target = await openSpaces.embed(OTHER_ID);
+
+    expect(openSpaces.getState().activeSpaceId).toBe(containing.id);
+    expect(openSpaces.entry(OTHER_ID)).toBe(target);
+    expect(await openSpaces.embed(OTHER_ID)).toBe(target);
+    expect(await openSpaces.enter(OTHER_ID)).toBe(target);
+    expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+  });
+
   it('opens and composes one live entry per Space id even when openings race', async () => {
     const { backend, openSpaces } = setup();
     const loadSpace = vi.spyOn(backend, 'loadSpace');
@@ -457,6 +493,44 @@ describe('Open Spaces', () => {
     release();
     await opening;
     expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
+  });
+
+  it('restores another open Space on Back and Forward without writing history', async () => {
+    const { openSpaces, history } = setup();
+    await openSpaces.open(META_ID);
+    const metaPath = productDestinationPath({
+      kind: 'layout',
+      spaceId: META_ID,
+      layoutId: META_LAYOUT_ID,
+    });
+    const other = await openSpaces.open(OTHER_ID);
+    const otherPath = history.pathname();
+    other.app.navigation.selectLayout(SECOND_LAYOUT_ID);
+    const writes = [...history.writes];
+
+    history.popTo(metaPath);
+    await vi.waitFor(() => expect(openSpaces.getState().activeSpaceId).toBe(META_ID));
+    expect(history.writes).toEqual(writes);
+
+    history.popTo(otherPath);
+    await vi.waitFor(() => expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID));
+    expect(other.app.navigation.getState().selectedLayoutId).toBe(LAYOUT_ID);
+    expect(history.writes).toEqual(writes);
+  });
+
+  it('reopens a closed Space from browser history without adding an entry', async () => {
+    const { openSpaces, history } = setup();
+    await openSpaces.open(META_ID);
+    const original = await openSpaces.open(OTHER_ID);
+    const path = history.pathname();
+    await openSpaces.close(OTHER_ID);
+    const writes = [...history.writes];
+
+    history.popTo(path);
+
+    await vi.waitFor(() => expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID));
+    expect(openSpaces.entry(OTHER_ID)).not.toBe(original);
+    expect(history.writes).toEqual(writes);
   });
 
   it('reports the selection an already-open Space actually kept', async () => {

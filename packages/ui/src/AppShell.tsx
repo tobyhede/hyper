@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/sidebar';
 
 export interface AppShellProps {
+  sidebarWidth?: string | undefined;
   /** The application's own `Sidebar`: the persistent command surface (ADR 0053). */
   sidebar: ReactNode;
   /** What the canvas header says beside the sidebar trigger — the current canvas. */
@@ -35,9 +36,18 @@ export interface AppShellProps {
  * Space title: the sidebar header names the Space and this names what is
  * drawing it (ADR 0053).
  */
-export function AppShell({ sidebar, header, notice, insetEnd, children }: AppShellProps) {
+export function AppShell({
+  sidebar,
+  header,
+  notice,
+  insetEnd,
+  sidebarWidth,
+  children,
+}: AppShellProps) {
+  const style =
+    sidebarWidth === undefined ? undefined : { width: '100%', '--sidebar-width': sidebarWidth };
   return (
-    <SidebarProvider className="shell">
+    <SidebarProvider className="shell" style={style}>
       {sidebar}
       <SidebarInset className="min-h-0">
         <header className="shell__header">
