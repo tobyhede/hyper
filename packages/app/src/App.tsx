@@ -93,8 +93,14 @@ export const createApp = (
    * is shown to the author and then discarded.
    */
   const readReferenceableSpaces = async (): Promise<CardCreationRead> => {
+    // Outside the `try`, because this reads the working snapshot rather than
+    // the repository: `currentSpace` throws for a snapshot that fails intake,
+    // and catching that here would word it as a stored-Spaces read that was
+    // never attempted. Left to reject, it takes the same arm the Alias pane's
+    // own `currentSpace` read takes, so one failure is said one way.
+    const containingSpaceId = currentSpace().id;
     try {
-      const spaces = await spaceCards.referenceableSpaces(currentSpace().id);
+      const spaces = await spaceCards.referenceableSpaces(containingSpaceId);
       return { choices: { kind: 'space', targets: { kind: 'read', spaces } }, listing: null };
     } catch (failure) {
       reportBreak(failure);

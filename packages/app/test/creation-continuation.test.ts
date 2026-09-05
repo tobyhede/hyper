@@ -32,7 +32,7 @@ describe('Card creation continuation', () => {
     expect(continuation.getState().request).toBeNull();
     expect(continuation.getState().namingCardId).toBeNull();
   });
-  it('selects a Space Card and returns focus to the menu once it is available', () => {
+  it('selects a Space Card and returns focus to the menu once the pane has closed', () => {
     const effects: string[] = [];
     const continuation = createCreationContinuation({
       selectCard: () => effects.push('select'),
@@ -47,12 +47,34 @@ describe('Card creation continuation', () => {
       canName: false,
       canFocusAddCard: true,
     };
-    continuation.resume({ ...ready, canFocusAddCard: false });
+    continuation.resume({ ...ready, paneOpen: true });
     expect(effects).toEqual([]);
     continuation.resume(ready);
     continuation.request(request);
     continuation.resume(ready);
     expect(effects).toEqual(['select', 'focus']);
+    expect(continuation.getState()).toEqual({ request: null, namingCardId: null });
+  });
+
+  it('selects a created Space Card even where no Add Card control can take focus', () => {
+    const effects: string[] = [];
+    const continuation = createCreationContinuation({
+      selectCard: () => effects.push('select'),
+      focusAddCard: () => effects.push('focus'),
+      reportObserverError: vi.fn(),
+    });
+    continuation.request({ kind: 'created', cardKind: 'space', cardId: CARD_ID });
+    // Below the Sidebar breakpoint the sheet is dismissed before the pane opens,
+    // so the Add Card trigger is unmounted for the whole gesture. Selection is
+    // not the menu's to wait for, and a request retained here is spent at an
+    // unrelated later render.
+    continuation.resume({
+      paneOpen: false,
+      cards: [{ id: CARD_ID }],
+      canName: false,
+      canFocusAddCard: false,
+    });
+    expect(effects).toEqual(['select']);
     expect(continuation.getState()).toEqual({ request: null, namingCardId: null });
   });
 

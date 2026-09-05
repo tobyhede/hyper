@@ -69,10 +69,15 @@ export function createCreationContinuation({
         state.notify();
         return;
       }
-      if (!surface.canFocusAddCard) return;
+      // Selection and focus are separate destinations, so an absent menu holds
+      // up neither. Waiting for one here left a Space Card created below the
+      // Sidebar breakpoint unselected — the sheet is dismissed before the pane
+      // opens, so the trigger is unmounted for the whole gesture — and left the
+      // request to be spent at whatever later render happened to run this,
+      // taking focus long after the gesture it was answering.
       state.install({ request: null, namingCardId: null });
       if (cardId !== null) selectCard(cardId);
-      focusAddCard();
+      if (surface.canFocusAddCard) focusAddCard();
       state.notify();
     },
     named: (cardId: string): void => {

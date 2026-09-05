@@ -168,8 +168,13 @@ export function useCanvasCardAuthoring({
   }
 
   const [lastCreatedCardId, setLastCreatedCardId] = useState<string | null>(null);
+  // The null arm first: this hook re-renders on every intermediate drag frame,
+  // and nothing is being named on almost all of them.
   const namingReady =
-    canAuthorOnCanvas && !bodyEditing && nodes.some(({ id }) => id === nameOnCreation);
+    nameOnCreation !== null &&
+    canAuthorOnCanvas &&
+    !bodyEditing &&
+    nodes.some(({ id }) => id === nameOnCreation);
   if (lastCreatedCardId !== nameOnCreation && (nameOnCreation === null || namingReady)) {
     setLastCreatedCardId(nameOnCreation);
     if (nameOnCreation !== null) setCaret({ cardId: nameOnCreation, field: 'title' });
