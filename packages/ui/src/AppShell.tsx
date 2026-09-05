@@ -25,6 +25,15 @@ export interface AppShellProps {
    * means nothing overlays and the main area is full-bleed.
    */
   insetEnd?: string | undefined;
+  /**
+   * Whether this shell is the one on screen.
+   *
+   * A session mounts one shell per open Space and shows one of them, so the
+   * sidebar's `Ctrl/Cmd-B` — a `window` listener — would otherwise toggle the
+   * sidebars of Spaces nobody is looking at. Omitted means there is only this
+   * one and it is showing.
+   */
+  active?: boolean | undefined;
   children: ReactNode;
 }
 
@@ -42,12 +51,13 @@ export function AppShell({
   notice,
   insetEnd,
   sidebarWidth,
+  active = true,
   children,
 }: AppShellProps) {
   const style =
     sidebarWidth === undefined ? undefined : { width: '100%', '--sidebar-width': sidebarWidth };
   return (
-    <SidebarProvider className="shell" style={style}>
+    <SidebarProvider className="shell" style={style} active={active}>
       {sidebar}
       <SidebarInset className="min-h-0">
         <header className="shell__header">

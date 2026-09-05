@@ -407,6 +407,57 @@ describe('the Layout an Open Space Card draws', () => {
     expect(within(embeddedNode(DRAWN_B)).queryByRole('button', { name: /Edit Card/ })).toBeNull();
   });
 
+  /**
+   * Delete answers a retained read the way Enter and F2 do.
+   *
+   * The canvas tells assistive technology that backspace or delete removes the
+   * focused Card from its Layout, and the read-only drawing left behind by Exit
+   * is still focusable. The other two Card commands aimed at that drawing —
+   * `onEditCard` and `onBeginTitleEditing` — reopen the target's session so the
+   * next press acts; the deletion command consumed the key and answered
+   * nothing, so the press did not remove the Card, did not reopen the target and
+   * left no sentence behind either.
+   */
+  it('reopens the retained embedding when Delete is aimed at its read-only Card', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      layout: SELECTED_LAYOUT_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [meta, value, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+    );
+    const spaces = createOpenSpaces({
+      backend,
+      metaSpaceId: META_ID,
+      newId: newUuid,
+      history: recordingHistory(),
+    });
+    const initial = await spaces.open(HOME_ID);
+    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_B)).not.toBeNull());
+    await act(async () => {
+      await spaces.close(TARGET_ID);
+    });
+    expect(spaces.entry(TARGET_ID)).toBeUndefined();
+    fireEvent.keyDown(embeddedNode(DRAWN_B), { key: 'Delete', bubbles: true });
+    await waitFor(() => expect(spaces.entry(TARGET_ID)).not.toBeUndefined());
+    // The press reopens the target and removes nothing — neither the read-only
+    // Card from the target Layout nor the containing Space Card it is drawn in.
+    expect(
+      spaces
+        .entry(TARGET_ID)
+        ?.session.getState()
+        .working.document.layouts?.find((layout) => layout.id === SELECTED_LAYOUT_ID)?.positions,
+    ).toHaveProperty(DRAWN_B);
+    expect(initial.session.getState().working.cards.some((card) => card.id === SPACE_CARD_ID)).toBe(
+      true,
+    );
+  });
+
   it('protects every containing Space Card while a nested target owns the editor', async () => {
     const thirdId = uuidSchema.parse('00000000-0000-4000-8000-000000000030');
     const thirdLayout = uuidSchema.parse('00000000-0000-4000-8000-000000000031');

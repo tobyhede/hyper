@@ -992,6 +992,10 @@ export const createApp = (
         sidebarWidth={
           (spaces?.getState().entries.length ?? 0) > 1 ? 'calc(16rem - 36px)' : undefined
         }
+        // Every open Space keeps its shell mounted, and the sidebar's
+        // `Ctrl/Cmd-B` is a `window` listener: the same reason the Presenting
+        // keys above are bound only while this Space is the one on the canvas.
+        active={active}
         sidebar={sidebar}
         // The drawer overlays the end edge of the main area, and the canvas, the
         // Graph key and a standing notice are all pinned to that same edge. The

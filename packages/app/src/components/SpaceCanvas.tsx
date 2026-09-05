@@ -453,7 +453,17 @@ export function SpaceCanvas({
           {
             ...value,
             changeNodes: () => undefined,
-            removeCard: () => null,
+            // The three Card commands aimed at a retained read answer it the
+            // same way: reopen the target's session so the next press acts.
+            // The canvas still announces that delete removes the focused Card
+            // from its Layout, and this drawing is still focusable, so an
+            // answer of `null` alone consumed the key and did nothing at all.
+            // There is no refusal to report either — the target is not open,
+            // which is a state this press ends rather than a refused Edit.
+            removeCard: () => {
+              void resumeEmbedded(request.spaceId);
+              return null;
+            },
             nodes: value.nodes.map((node): CardFlowNode => ({
               ...clipEmbeddedNode(node, request.bounds),
               draggable: false,

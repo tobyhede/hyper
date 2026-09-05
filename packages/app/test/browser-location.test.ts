@@ -177,6 +177,49 @@ describe('the browser location', () => {
   });
 
   /**
+   * Restoring through Open Spaces refuses two different things with the same
+   * rejection, and only one of them is a destination that failed to resolve.
+   *
+   * A pathname outside product addressing is refused because it is not an
+   * address of ours at all — the same answer the followed Space's own
+   * restoration gives it, which is `ignored` and is left alone. Reporting it
+   * puts a not-found in front of a reader standing on a location this
+   * application never wrote and names no position to be wrong about.
+   */
+  it('leaves a Back onto a location outside product addressing alone', async () => {
+    const app = compose();
+    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const refusal = Promise.reject(new Error('The URL is outside product addressing.'));
+    const settled = refusal.catch(() => undefined);
+    const location = createBrowserLocation(history, undefined, () => refusal);
+    location.follow(app);
+
+    history.popTo('/not-a-product-url');
+    await settled;
+
+    expect(location.getState().destinationNotFound).toBe(false);
+    expect(history.writes).toEqual([]);
+    location.dispose();
+  });
+
+  /** The half that must survive the one above: a dead product address reports. */
+  it('reports a Back onto a dead address the Space could not be opened for', async () => {
+    const app = compose();
+    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const refusal = Promise.reject(new Error('The product URL does not resolve.'));
+    const settled = refusal.catch(() => undefined);
+    const location = createBrowserLocation(history, undefined, () => refusal);
+    location.follow(app);
+
+    history.popTo(deadPath);
+    await settled;
+
+    expect(location.getState().destinationNotFound).toBe(true);
+    expect(history.writes).toEqual([]);
+    location.dispose();
+  });
+
+  /**
    * A cleared report and a corrected location are one thing, not two.
    *
    * The choice is the Layout already selected, so the position does not move
