@@ -406,6 +406,31 @@ describe('Add Alias', () => {
   });
 
   /**
+   * The created Alias is where the author continues, exactly as after Add Card.
+   *
+   * Both creations end at the Card they made, with its name editor open on it,
+   * and both reach that through the one continuation `card-creation.ts`
+   * publishes. Asserted here because the editor now arrives on the render
+   * after the pane closes rather than in the same commit, and because a Space
+   * Card takes the other branch — its title was typed on the pane, so it
+   * returns to Add Card with nothing to name.
+   */
+  it('opens the created Alias’s name editor, on the Alias', async () => {
+    const session = mount();
+    await openAliasCreation();
+
+    fireEvent.change(screen.getByTestId('new-alias-title'), { target: { value: 'Recap' } });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target' }), { key: 'ArrowDown' });
+    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
+
+    const input = await screen.findByRole('textbox', { name: 'Card title' });
+    expect(input).toHaveValue('Recap');
+    expect(input).toHaveFocus();
+    expect(screen.queryByTestId('new-alias')).not.toBeInTheDocument();
+    await settled(session);
+  });
+
+  /**
    * An Alias needs a Card that owns its content, and a Space may not have one.
    *
    * The message is cmdk's own empty affordance rather than a paragraph beside

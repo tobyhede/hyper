@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { uuidSchema, type UUID } from '@project/core';
-import type { SpaceSummary } from '@project/persistence';
 import {
   Button,
   Field,
@@ -18,7 +17,8 @@ import {
 } from '@project/ui';
 import { CardPane } from './CardPane';
 import { paneInitialFocus } from './pane-focus';
-import { presentNewSpaceCardRefusal, type SpaceCardRefusal } from '../authoring-refusal';
+import type { CardCreationRefusalErrors } from '../authoring-refusal';
+import type { SpaceCardTargetListing } from '../card-creation';
 
 /**
  * The one value that is not a Space id: create a Space rather than reference
@@ -34,48 +34,6 @@ const NEW_SPACE = 'new';
 /** Escape and the backdrop while an Edit runs, which is the one time they do nothing. */
 const NOTHING_TO_DISMISS = (): void => undefined;
 
-/**
- * The Spaces this Card may reference, and why there may be none to offer.
- *
- * A list rather than an array, because an empty array cannot say which of three
- * things it means. The read happens when the pane opens, so "nothing to offer"
- * is a repository with no other Space, a read still in flight, or a read that
- * failed — and the first is the only one in which the author has seen what is
- * stored. Creating a Space against either of the other two makes a duplicate of
- * a Space they meant to reference, and a Space Card is never retargeted
- * (ADR 0068), so the mistake is not one the pane can offer to undo afterwards.
- *
- * `pending` and `unreadable` are held apart rather than folded into one
- * "unavailable", because they are said differently: a wait is an ordinary wait
- * and reporting it as a failure would cry wolf on every opening, while a failed
- * read is the caller's refusal and keeps the sentence the coordination uses.
- */
-export type SpaceCardTargetListing =
-  | { readonly kind: 'pending' }
-  | { readonly kind: 'read'; readonly spaces: readonly SpaceSummary[] }
-  | { readonly kind: 'unreadable' };
-
-/**
- * Why the last attempt produced no Card, or nothing yet has been attempted.
- *
- * Two arms rather than one message, because only one of them is an answer. A
- * refusal is composed by the coordination and knows a cycle from an unreadable
- * repository, so `presentNewSpaceCardRefusal` can put it beside the Target that
- * corrects it. A break is not an answer: the lifecycle refuses for everything it
- * can name, so a rejection means an invariant it does not name has gone and
- * there is nothing to correct — only what threw, said as it was thrown.
- * Deliberately not translated into a refusal code, because a refusal code is a
- * stable domain identity (ADR 0057) and nothing here answers to one; this is
- * the reasoning `DeleteCardControl` follows for the same class of failure.
- *
- * One value rather than two nullable props so the two cannot both stand: one
- * press of Create has one outcome, and a pane carrying a refusal beside a break
- * would say a single attempt had failed twice.
- */
-export type SpaceCardAttemptFailure =
-  | { readonly kind: 'refused'; readonly refusal: SpaceCardRefusal }
-  | { readonly kind: 'broke'; readonly message: string };
-
 export interface NewSpaceCardProps {
   /**
    * Every Space this Card may reference — the containing Space is already
@@ -83,8 +41,15 @@ export interface NewSpaceCardProps {
    * list to choose from.
    */
   readonly targets: SpaceCardTargetListing;
-  /** Why the last attempt produced no Card, or `null`. */
-  readonly failure: SpaceCardAttemptFailure | null;
+  /**
+   * Why the last attempt produced no Card, already placed on the fields this
+   * pane owns, or `null`.
+   *
+   * Presented by the seam that produced it rather than here (ADR 0057): the two
+   * kinds of creation pane refuse in two different vocabularies, and one
+   * translated placement is what lets them share one state machine.
+   */
+  readonly refusal: CardCreationRefusalErrors | null;
   /** Whether a coordinated Edit from this pane is still in flight. */
   readonly busy: boolean;
   /**
@@ -97,12 +62,12 @@ export interface NewSpaceCardProps {
   readonly onCreate: (targetSpaceId: UUID | null, title: string) => void;
   readonly onCancel: () => void;
   /**
-   * The failure above describes an attempt, and editing either field begins a
+   * The refusal above describes an attempt, and editing either field begins a
    * different one — so the message stops describing anything on screen and is
-   * withdrawn. Announced rather than cleared here because the failure is the
+   * withdrawn. Announced rather than cleared here because the refusal is the
    * caller's state: this pane knows *when* it went stale and never what it said.
    */
-  readonly onFailureStale: () => void;
+  readonly onRefusalStale: () => void;
 }
 
 /**
@@ -127,7 +92,7 @@ export interface NewSpaceCardProps {
  * been read. "A new Space" is on offer from the first frame and is a complete
  * answer on its own, so without that the author can title the Card and create a
  * Space before the list has said the Space they wanted is already stored — the
- * duplicate the failure message exists to prevent, made against a list that had
+ * duplicate the unreadable-list message exists to prevent, made against a list that had
  * simply not landed yet.
  *
  * The kind is fixed from the outset. This is not a Markdown Card that will later
@@ -144,25 +109,17 @@ export interface NewSpaceCardProps {
  */
 export function NewSpaceCard({
   targets,
-  failure,
+  refusal,
   busy,
   onCreate,
   onCancel,
-  onFailureStale,
+  onRefusalStale,
 }: NewSpaceCardProps) {
   const [title, setTitle] = useState('');
   const [target, setTarget] = useState<string>(NEW_SPACE);
-  const errors = failure?.kind === 'refused' ? presentNewSpaceCardRefusal(failure.refusal) : null;
-  const titleError = errors?.fields.title ?? null;
-  const targetError = errors?.fields.target ?? null;
-  // What a break says is this pane's sentence rather than the caller's: the
-  // caller has an exception and knows nothing about the Card that was not
-  // created, and a bare `Error` message standing alone in the form channel
-  // reads as debris beside the whole sentences the refusals put there.
-  const formError =
-    failure?.kind === 'broke'
-      ? `This Space Card was not created: ${failure.message}`
-      : (errors?.form ?? null);
+  const titleError = refusal?.fields.title ?? null;
+  const targetError = refusal?.fields.target ?? null;
+  const formError = refusal?.form ?? null;
   const named = title.trim().length > 0;
   const spaces = targets.kind === 'read' ? targets.spaces : [];
   // A read list and nothing else. An empty one is an answer — this is the only
@@ -196,7 +153,7 @@ export function NewSpaceCard({
       {/* One `onChange` for both fields rather than two handlers, because React
           bubbles change through its own tree. Editing either field is the same
           fact — the refused attempt is over. */}
-      <div className="card-pane__editor" onChange={failure === null ? undefined : onFailureStale}>
+      <div className="card-pane__editor" onChange={refusal === null ? undefined : onRefusalStale}>
         <FieldGroup className="card-pane__fields">
           {/* The kind is stated rather than offered, because a Card keeps the
               kind it was created with. */}
@@ -229,7 +186,7 @@ export function NewSpaceCard({
                 // selected, because creating one is itself a row.
                 if (value === null) return;
                 setTarget(value);
-                if (failure !== null) onFailureStale();
+                if (refusal !== null) onRefusalStale();
               }}
             >
               <SelectTrigger
@@ -264,7 +221,7 @@ export function NewSpaceCard({
             )}
             <FieldError id="new-space-card-target-error">{targetError}</FieldError>
           </Field>
-          {failure === null && (
+          {refusal === null && (
             <FieldDescription className="card-pane__hint">
               A new Space begins with one Markdown Card. Referencing an existing Space adds a second
               way to reach it, and never a copy.

@@ -367,6 +367,7 @@
       // `SpaceAuthoringDependencies.reportObserverError` (ADR 0016's
       // composition-time injection seam).
       "files": [
+        "packages/app/src/authoring-refusal.ts",
         "packages/app/src/navigation.ts",
         "packages/app/src/placement-rendering.ts",
         "packages/app/src/startup.tsx",
