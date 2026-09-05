@@ -120,6 +120,18 @@ export interface ComposedApp extends AppCore {
   readonly authoring: SpaceAuthoring;
   readonly adapter: RenderAdapter;
   readonly edgeAuthoring: EdgeAuthoring;
+  /**
+   * The sink this composition was given, resolved.
+   *
+   * Published because a surface can own a seam that requires one — Card
+   * creation's `reportBreak` does, with no default, for the reason ADR 0016
+   * gives — and a component that answers that requirement with a
+   * `console.error` of its own puts the ambient reporter back behind the
+   * composer that supplied a real one. What the collaborators receive is
+   * unchanged: they still take the caller's optional and keep their own
+   * console defaults, which is what names *them* in production.
+   */
+  readonly reportObserverError: ObserverErrorReporter;
 }
 
 /**
@@ -189,5 +201,12 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     connections: (connections ?? createConnectionCompletion)({ adapter, authoring }),
     reportObserverError,
   });
-  return { ...core, authoring, adapter, edgeAuthoring };
+  return {
+    ...core,
+    authoring,
+    adapter,
+    edgeAuthoring,
+    reportObserverError:
+      reportObserverError ?? console.error.bind(console, 'The composed Space failed'),
+  };
 }
