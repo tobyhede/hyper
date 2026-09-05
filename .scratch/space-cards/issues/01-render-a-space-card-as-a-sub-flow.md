@@ -48,9 +48,16 @@ read as a clipped, readonly drawing; editing it again reopens the session.
 ## Geometry
 
 Partial Cards and Edges clip to the containing region instead of disappearing
-when they no longer fit wholly. Numeric child bounds constrain dragging without
-React Flow’s `extent: parent` minimum preventing the containing Card from
-shrinking past its children or reaching the Close magnet. Nested content clips against every ancestor.
+when they no longer fit wholly. Numeric child bounds constrain what a gesture
+*proposes* rather than where a Card is drawn: React Flow’s `extent` is applied
+on every render, so any extent — numeric or `parent` — would move an authored
+Card that no longer fits instead of clipping it, and would drag children inward
+as the containing Card shrinks rather than revealing less of them. Constraining
+the proposal keeps the containing Card free to shrink past its children and to
+reach the Close magnet. Nested content clips against every ancestor. Embedding
+stops when a Layout already crossed on the containing path recurs, so a mutual
+pair of Space Cards — which single-Space intake accepts, refusing only a Card
+targeting its own Space — draws one return hop rather than nesting without end.
 Clipping updates after Exit when the containing Card is resized. A Space Card
 first opens at 960×720; remembered authored Open Size still wins. Ordinary
 resize proposals preserve room for the selectors, while the Closed Size magnet

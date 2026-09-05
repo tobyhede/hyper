@@ -23,6 +23,28 @@ export interface EmbeddedLayoutRequest {
   readonly bounds?: EmbeddedBounds;
 }
 
+/**
+ * Hold a gesture proposal inside the containing Card.
+ *
+ * Deliberately *not* React Flow's `extent`. A numeric extent is applied by
+ * `adoptUserNodes`, which runs on every render and not only on a drag, so an
+ * extent narrower than the authored placement redraws the Layout: a Card
+ * authored beyond the containing bounds would be moved to the edge while
+ * `clipEmbeddedNode` still clips from where it was authored, and shrinking the
+ * containing Card would shift its children rather than reveal less of them. A
+ * Card that no longer fits is clipped (ADR 0068); only what a pointer or key
+ * *proposes* is constrained, and that is this function's job.
+ */
+export function constrainEmbeddedPosition(
+  position: LayoutPosition,
+  parent: { readonly width?: number | undefined; readonly height?: number | undefined },
+): LayoutPosition {
+  return {
+    x: Math.min(Math.max(position.x, 0), parent.width ?? 0),
+    y: Math.min(Math.max(position.y, 0), parent.height ?? 0),
+  };
+}
+
 /** Reclip a retained read as its containing Card changes size, without opening a session. */
 export function clipEmbeddedNode(node: CardFlowNode, bounds: EmbeddedBounds): CardFlowNode {
   const top = Math.max(0, bounds.top - node.position.y);
@@ -50,12 +72,6 @@ export function embeddedLayout({
         ...node,
         id: embeddedNodeId(parent.id, node.id),
         parentId: parent.id,
-        // Coordinate bounds constrain child gestures without making the parent
-        // resizer refuse to clip its children or reach the Close magnet.
-        extent: [
-          [0, 0],
-          [parent.width ?? 0, parent.height ?? 0],
-        ],
         position,
         connectable: false,
         data: { ...node.data, connectionAuthoringEnabled: false },
