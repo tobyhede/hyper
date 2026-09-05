@@ -54,6 +54,7 @@ import {
 import type { EntityAction, EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringRefusal } from '../space-authoring';
+import { failureMessage } from '../failure-message';
 
 /**
  * The id of the one entity command whose *outcome* decides the mobile Sheet's
@@ -288,7 +289,7 @@ function DeleteCardControl({
                   // refusal code is a stable domain identity (ADR 0057) and
                   // nothing here answers to one.
                   setDeleting(false);
-                  setRefusal(failure instanceof Error ? failure.message : String(failure));
+                  setRefusal(failureMessage(failure));
                 }
               })();
             }}
@@ -605,7 +606,7 @@ export function SpaceSidebar({
         if (outcome === 'done') dismissSheet();
         return outcome;
       } catch (failure) {
-        setLayoutDeletionFailure(failure instanceof Error ? failure.message : String(failure));
+        setLayoutDeletionFailure(failureMessage(failure));
         // The truthful outcome, which is also what withholds the dismissal.
         // The item names no words to swap its label for, so this answer is
         // read for the dismissal alone — the reporting is the alert's.

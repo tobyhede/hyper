@@ -1,6 +1,7 @@
 import type { SpaceAggregateError } from '@project/graph';
 import type { AuthoringRefusal, EdgeEndpoint } from './space-authoring';
 import type { SpaceCardLifecycleResult } from './space-card-lifecycle';
+import { failureMessage } from './failure-message';
 
 /** Why a coordinated Space Card lifecycle operation refused (ADR 0076). */
 export type SpaceCardRefusal = Extract<SpaceCardLifecycleResult, { kind: 'refused' }>['refusal'];
@@ -327,13 +328,14 @@ export const presentNewSpaceCardRefusal = (refusal: SpaceCardRefusal): CardCreat
  * The rejection is `unknown` because a `throw` can carry anything, and that is
  * the caught-error boundary the parsing rules exempt — named here rather than
  * written at the parameter, the way `ObserverErrorReporter` names its own.
+ * What it says is `failureMessage`'s; what it means is written here.
  */
 export type CardCreationBreak = (failure: unknown) => CardCreationRefusalErrors;
 
 /** @see CardCreationBreak */
 export const presentCardCreationBreak: CardCreationBreak = (failure) => ({
   fields: {},
-  form: `This Card was not created: ${failure instanceof Error ? failure.message : String(failure)}`,
+  form: `This Card was not created: ${failureMessage(failure)}`,
 });
 
 /**
@@ -345,5 +347,5 @@ export const presentCardCreationBreak: CardCreationBreak = (failure) => ({
  */
 export const presentCardChoicesBreak: CardCreationBreak = (failure) => ({
   fields: {},
-  form: `The choices for this Card could not be read: ${failure instanceof Error ? failure.message : String(failure)}`,
+  form: `The choices for this Card could not be read: ${failureMessage(failure)}`,
 });

@@ -4,16 +4,13 @@ import { SpaceAppFailureView } from './components/SpaceAppFailureView';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace } from './open-spaces';
 import type { DestinationOpening } from './destination-opening';
+import { failureMessage } from './failure-message';
 
 export type SpaceAppRenderer = (app: ReactElement) => void;
 
 interface SpaceAppFailureState {
   readonly message: string | null;
 }
-
-/** What a failure says, whichever of the two paths below caught it. */
-const failureMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 /**
  * Reports what broke rather than letting it take the page down.
