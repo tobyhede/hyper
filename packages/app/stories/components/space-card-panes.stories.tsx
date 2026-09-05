@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
 import { uuidSchema } from '@project/core';
-import { NewSpaceCard, type SpaceCardTargetListing } from '#components/NewSpaceCard';
+import { NewSpaceCard } from '#components/NewSpaceCard';
+import { presentNewSpaceCardRefusal } from '#src/authoring-refusal';
+import type { SpaceCardTargetListing } from '#src/card-creation';
 import { CatalogueSection } from '../support/Catalogue';
 import '../support/inventory.css';
 
@@ -72,7 +74,7 @@ export const NewSpaceCardPane: Story = () => {
       {created === null ? (
         <NewSpaceCard
           targets={EXISTING_SPACES}
-          failure={null}
+          refusal={null}
           busy={false}
           onCreate={(target, title) =>
             setCreated(
@@ -82,7 +84,7 @@ export const NewSpaceCardPane: Story = () => {
             )
           }
           onCancel={() => setCreated('Cancelled, creating nothing.')}
-          onFailureStale={() => undefined}
+          onRefusalStale={() => undefined}
         />
       ) : (
         <p>{created}</p>
@@ -108,24 +110,21 @@ export const NewSpaceCardPaneRefused: Story = () => (
   >
     <NewSpaceCard
       targets={EXISTING_SPACES}
-      failure={{
-        kind: 'refused',
-        refusal: {
-          code: 'aggregate-refused',
-          errors: [
-            {
-              kind: 'space-card-reference-cycle',
-              spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000201'),
-              cardId: uuidSchema.parse('00000000-0000-4000-8000-000000000203'),
-              targetSpaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000202'),
-            },
-          ],
-        },
-      }}
+      refusal={presentNewSpaceCardRefusal({
+        code: 'aggregate-refused',
+        errors: [
+          {
+            kind: 'space-card-reference-cycle',
+            spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000201'),
+            cardId: uuidSchema.parse('00000000-0000-4000-8000-000000000203'),
+            targetSpaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000202'),
+          },
+        ],
+      })}
       busy={false}
       onCreate={() => undefined}
       onCancel={() => undefined}
-      onFailureStale={() => undefined}
+      onRefusalStale={() => undefined}
     />
   </PaneSheet>
 );

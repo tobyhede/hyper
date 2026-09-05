@@ -465,24 +465,6 @@ describe('Add Space Card', () => {
  * the running state disables both of this pane's exits.
  */
 describe('a coordination that broke rather than refused', () => {
-  it('gives the pane its exits back when a create rejects', async () => {
-    // The rejection is reported, since nothing else would say what broke.
-    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const { session } = mount(other, {
-      create: () => Promise.reject(new Error('the coordination lost a session')),
-    });
-    await openSpaceCardCreation();
-
-    createNamed('Architecture');
-
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled());
-    expect(screen.getByTestId('new-space-card-create')).toBeEnabled();
-    expect(screen.getByTestId('new-space-card')).toBeVisible();
-    expect(reported).toHaveBeenCalled();
-    reported.mockRestore();
-    await settled(session);
-  });
-
   /**
    * The exits come back, and so does a sentence saying why they are needed.
    *
@@ -493,8 +475,14 @@ describe('a coordination that broke rather than refused', () => {
    * said in the pane's form channel, untranslated, exactly as `DeleteCardControl`
    * says it: a refusal code is a stable domain identity (ADR 0057) and nothing
    * here answers to one.
+   *
+   * The one app-level test of a rejection. The transitions behind it — the
+   * exits coming back, a dismissal refused while the Edit runs, a failed
+   * listing — are `card-creation-state.test.ts`'s, driven with no React tree; this
+   * proves the pane reaches that module and draws what it answers.
    */
   it('says what broke when a create rejects', async () => {
+    // The rejection is reported too, since nothing else would say what broke.
     const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { session } = mount(other, {
       create: () => Promise.reject(new Error('the coordination lost a session')),
@@ -504,50 +492,11 @@ describe('a coordination that broke rather than refused', () => {
     createNamed('Architecture');
 
     expect(
-      await screen.findByText('This Space Card was not created: the coordination lost a session'),
+      await screen.findByText('This Card was not created: the coordination lost a session'),
     ).toBeVisible();
     expect(screen.getByTestId('new-space-card')).toBeVisible();
     expect(reported).toHaveBeenCalled();
     reported.mockRestore();
-    await settled(session);
-  });
-
-  /**
-   * The pane says Escape creates nothing, so while an Edit is in flight it may
-   * not close: the Edit would complete against a pane the author was told had
-   * abandoned it, and the busy state it left behind would disable the next one.
-   */
-  it('does not close on Escape while a create is in flight', async () => {
-    // Never settled, which is the whole of the state under test: the pane is
-    // busy for the rest of the test and nothing lands against an unmounted tree.
-    const { session } = mount(other, { create: () => new Promise<never>(() => undefined) });
-    await openSpaceCardCreation();
-
-    createNamed('Architecture');
-    fireEvent.keyDown(screen.getByTestId('new-space-card-title'), { key: 'Escape' });
-
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled());
-    expect(screen.getByTestId('new-space-card')).toBeVisible();
-    await settled(session);
-  });
-
-  /**
-   * A listing that failed is not an empty repository, and offering only "A new
-   * Space" would say it was — leaving the author to create a duplicate of a
-   * Space they meant to reference.
-   */
-  it('says the stored Spaces could not be read rather than offering none', async () => {
-    const { session } = mount(other, {
-      referenceableSpaces: () => Promise.reject(new Error('the transport timed out')),
-    });
-
-    await openSpaceCardCreation();
-
-    expect(
-      await screen.findByText(
-        'The stored Spaces could not be read, so this edit was not attempted.',
-      ),
-    ).toBeVisible();
     await settled(session);
   });
 
@@ -663,10 +612,10 @@ describe('a coordination that broke rather than refused', () => {
  * wait and says so, and only a listing that failed is a refusal.
  *
  * "Created nothing" is asserted through Cancel rather than only through the
- * Card count: `createSpaceCard` disables both exits synchronously before it
- * awaits, so a still-enabled Cancel is the evidence that no coordinated Edit
- * was begun at all, where a count read straight after a click would pass
- * against one that had merely not landed yet.
+ * Card count: the pane withholds Create until the listing has been read, so a
+ * still-enabled Cancel is the evidence that no coordinated Edit was begun at
+ * all — the pane never goes busy — where a count read straight after a click
+ * would pass against one that had merely not landed yet.
  */
 describe('creating before the target list has been seen', () => {
   /** Never settles, which is the whole of the state under test. */
