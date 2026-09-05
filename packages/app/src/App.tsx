@@ -10,6 +10,7 @@ import {
 } from '@project/ui';
 import { type CardId, type LayoutId, type LayoutPosition, type UUID } from '@project/core';
 import type { ProductDestination } from '@project/http';
+import { createNonThrowingReporter } from '@project/persistence';
 import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace } from './open-spaces';
@@ -68,8 +69,18 @@ export const createApp = (
     authoring,
     adapter: useRenderAdapter,
     edgeAuthoring,
-    reportObserverError: reportBreak,
+    reportObserverError,
   } = composition;
+  /**
+   * The composed sink, guarded at this point of use.
+   *
+   * `readReferenceableSpaces` below reports and *then* answers, so a sink that
+   * threw would leave the pane on a list that says it is still being read. The
+   * repository wraps where it consumes rather than where it publishes —
+   * `createObservableState` does the same with the sink it is handed — so the
+   * guard is here rather than on `ComposedApp`.
+   */
+  const reportBreak = createNonThrowingReporter(reportObserverError);
   /**
    * The Spaces a Space Card may reference, or the fact that they could not be
    * read.

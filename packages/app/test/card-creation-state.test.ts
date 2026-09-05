@@ -306,6 +306,67 @@ describe('the asynchronous shell', () => {
     });
   });
 
+  /**
+   * A diagnostic is never the failure path of the work it describes.
+   *
+   * The recovery this module owes on every one of these paths is a *dispatch*,
+   * and each sits behind the report. A sink that threw would take the dispatch
+   * with it: the pane stays `submitting` with Create, Cancel and Escape all
+   * disabled and nothing left to end it, or stays on a list that says it is
+   * still being read. The reporter is injected and required with no default
+   * (ADR 0016), so it is exactly the collaborator this module cannot vouch for
+   * — `createNonThrowingReporter` is the repository's answer and it is applied
+   * here rather than trusted of whoever composed this.
+   */
+  describe('a reporter that throws', () => {
+    const broken = (): never => {
+      throw new Error('the sink is broken');
+    };
+
+    it('still settles an attempt that rejected', async () => {
+      const { creation, dispatched } = shell(choosing(), {
+        submit: () => Promise.reject(new Error('the session has gone')),
+        reportBreak: broken,
+      });
+      creation.submit({ kind: 'space', targetSpaceId: null, title: 'Recap' });
+      await Promise.resolve();
+      await Promise.resolve();
+      const settled = dispatched[1];
+      expect(settled?.type === 'settled' && settled.outcome).toEqual({
+        kind: 'refused',
+        errors: { fields: {}, form: 'This Card was not created: the session has gone' },
+      });
+    });
+
+    it('still answers a choices read that rejected', async () => {
+      const { creation, dispatched } = shell(CARD_CREATION_CLOSED, {
+        readChoices: () => Promise.reject(new Error('the repository is unreachable')),
+        reportBreak: broken,
+      });
+      creation.open('space');
+      await Promise.resolve();
+      await Promise.resolve();
+      const filled = dispatched[1];
+      expect(filled?.type === 'choices' && filled.read.choices).toEqual({
+        kind: 'space',
+        targets: { kind: 'unreadable' },
+      });
+    });
+
+    it('does not escape into the event handler that submitted', () => {
+      const { creation, dispatched } = shell(choosing(), {
+        submit: broken,
+        reportBreak: broken,
+      });
+
+      expect(() =>
+        creation.submit({ kind: 'space', targetSpaceId: null, title: 'Recap' }),
+      ).not.toThrow();
+
+      expect(dispatched[0]?.type).toBe('settled');
+    });
+  });
+
   it('answers a choices read that rejects with an unreadable list, not a waiting one', async () => {
     const failure = new Error('the repository is unreachable');
     const reportBreak = vi.fn();

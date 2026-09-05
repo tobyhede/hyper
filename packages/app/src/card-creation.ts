@@ -1,5 +1,9 @@
 import type { Card, CardId, UUID } from '@project/core';
-import type { ObserverErrorReporter, SpaceSummary } from '@project/persistence';
+import {
+  createNonThrowingReporter,
+  type ObserverErrorReporter,
+  type SpaceSummary,
+} from '@project/persistence';
 import {
   presentCardChoicesBreak,
   presentCardCreationBreak,
@@ -356,11 +360,24 @@ export interface CardCreation {
 export function createCardCreation(
   state: CardCreationState,
   dispatch: (action: CardCreationAction) => void,
-  { readChoices, submit, reportBreak: report }: CardCreationSeams,
+  { readChoices, submit, reportBreak }: CardCreationSeams,
 ): CardCreation {
   // The opening this call is about to become, so a read answers the pane it was
   // made for and not whichever one is on screen when it settles.
   const opening = state.opening + 1;
+  /**
+   * The sink, made incapable of interrupting the work it describes.
+   *
+   * Every recovery below is a dispatch that sits *after* a report: the pane
+   * leaves `submitting`, or the list stops saying it is still being read. A
+   * sink that threw would take that dispatch with it and strand the pane with
+   * Create, Cancel and Escape all disabled and nothing left to end it — and on
+   * the synchronous arms it would escape into the event handler that submitted
+   * instead. The reporter is injected and required with no default (ADR 0016),
+   * so it is the one collaborator here this module cannot vouch for; wrapping
+   * is what makes the guarantee this module's rather than its composer's.
+   */
+  const report = createNonThrowingReporter(reportBreak);
 
   const broke: ObserverErrorReporter = (failure) => {
     report(failure);
