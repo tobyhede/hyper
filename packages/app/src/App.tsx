@@ -37,6 +37,7 @@ import { layoutCards, resolveLayout } from './layout-resolution';
 import type { DestinationOpening } from './destination-opening';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
+import { renameReturn } from './continuation';
 import { CanvasContinuation } from './components/CanvasContinuation';
 import { ChromeContinuation } from './components/ChromeContinuation';
 import { CardsDrawer } from './components/CardsDrawer';
@@ -593,14 +594,7 @@ export const createApp = (
        */
       onReturnFocus: () => {
         if (spaceChromeEdit === null) return;
-        continuation.request({
-          target:
-            spaceChromeEdit.surface === 'header'
-              ? { kind: 'control', name: 'layout-header' }
-              : { kind: 'sidebar-row', entity: spaceChromeEdit.subject },
-          select: false,
-          then: 'focus',
-        });
+        continuation.request(renameReturn(spaceChromeEdit.surface, spaceChromeEdit.subject));
       },
     };
 
@@ -806,6 +800,27 @@ export const createApp = (
     useEffect(() => {
       if (presenting) cardCreation.withdraw();
     }, [presenting, cardCreation]);
+    /**
+     * A replacement takes a creation pane away too (ADR 0042).
+     *
+     * Reachable under the modal: a conflict draws its `AlertDialog` over
+     * everything, so Accept stored Space is pressable with the pane up. The
+     * pane's choices are read once per opening, so one left standing would go
+     * on offering Cards from the Space that is gone and refuse every one of
+     * them against a row still on screen.
+     *
+     * A transition read during render rather than an effect, the way
+     * `canvas-card-authoring.ts` reads `nameOnCreation`: `cardCreation` is a
+     * new object on every dispatch, so an effect would need either the epoch
+     * alone as its dependency — the one `exhaustive-deps` suppression in the
+     * repository — or the operations, which would close the pane the render
+     * after it opened.
+     */
+    const [replacedAt, setReplacedAt] = useState(authoringState.replacementEpoch);
+    if (replacedAt !== authoringState.replacementEpoch) {
+      setReplacedAt(authoringState.replacementEpoch);
+      cardCreation.discard();
+    }
     /**
      * The Card whose inline Title editor a creation opens.
      *

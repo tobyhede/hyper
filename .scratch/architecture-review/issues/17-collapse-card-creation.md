@@ -1,6 +1,6 @@
 # Collapse Card creation into one module
 
-Status: ready-for-agent
+Status: resolved
 Tags: release/v1, Improvement
 Blocked by: none — `entity-url-addressability/07` delivered the second creation surface
 Related: `entity-url-addressability/07`; `architecture-review/14`;
@@ -112,11 +112,12 @@ So this module publishes **one** value, in 19's vocabulary:
 - a successful creation requests
   `{ target: { kind: 'card', cardId }, select: true, then: 'rename' }`.
 
-19 is blocked by this ticket, so `continuation.ts` does not exist yet. Declare the
-value on this module's own state under the name `continuation` with that shape,
-and let 19 lift it out — a rename and a delete, rather than a redesign. The
-adapter still feeds a `rename` into App's existing `createdCardId`, which stays
-where it is: Add Card sets it too, and Add Card is out of scope.
+This was written while 19 was blocked by this ticket, and said to declare the
+value on this module's own state under the name `continuation` so that 19 could
+lift it out. **Both landed in the same pass instead**, so there is no local
+one-shot to lift: `continuation.ts` exists and `createCardCreation` takes a
+`Continuation` as a composition seam. Do not declare a second one beside it —
+Card creation would then have two owners disagreeing about what is owed.
 
 **Refusals are presented at the seam.** `submit` answers an already-presented
 `{ fields, form }` rather than a raw refusal, so the module is not generic over

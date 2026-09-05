@@ -22,7 +22,7 @@ import { AppShell } from '@project/ui';
 import { resolveLayout } from '#src/layout-resolution';
 import { graphColorMap } from '#src/colors';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
-import { createContinuation } from '#src/continuation';
+import { createContinuation, renameReturn } from '#src/continuation';
 import { spaceEntityActions } from '#src/entity-actions';
 import { createWorkingSpaceReader, snapshotFromSpace } from '#src/snapshot';
 import { createSpaceAuthoring } from '#src/space-authoring';
@@ -151,6 +151,11 @@ export function SpaceSidebarFixture({
   // Where a rename returns the caret, composed the way `composeApp` composes
   // it — one instance for this fixture's Authoring, spent by the one adapter.
   const continuation = useMemo(() => createContinuation({ authoring }), [authoring]);
+  // Composed for one `authoring`, and released with it: without this a remount
+  // — or a change to any of `authoring`'s own dependencies — leaves the
+  // previous continuation subscribed to a Space Authoring no live component
+  // reads. `open-spaces.ts` is where production releases the same seam.
+  useEffect(() => () => continuation.dispose(), [continuation]);
   // Where `presenting` is honoured now that Navigation outlives it. Reconciled
   // against the mode rather than applied, so the mount the initializer already
   // presented publishes nothing here, and so a story's own Present button — the
@@ -199,14 +204,7 @@ export function SpaceSidebarFixture({
     // the fixture.
     onReturnFocus: () => {
       if (titleEdit === null) return;
-      continuation.request({
-        target:
-          titleEdit.surface === 'header'
-            ? { kind: 'control', name: 'layout-header' }
-            : { kind: 'sidebar-row', entity: titleEdit.subject },
-        select: false,
-        then: 'focus',
-      });
+      continuation.request(renameReturn(titleEdit.surface, titleEdit.subject));
     },
   };
 

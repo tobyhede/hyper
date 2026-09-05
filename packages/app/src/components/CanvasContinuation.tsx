@@ -9,8 +9,12 @@ import { edgeSelectionOf, sameEdgeSubject, type EdgeSubject } from '../render-ad
  *
  * Mounted inside `ReactFlowProvider`, because `reveal` needs `fitView` and
  * because resolving an Edge subject to an element means knowing React Flow's
- * edge ids. It owns `card | edge | canvas` and is the only place in the
- * repository that calls `.focus()` for them.
+ * edge ids. It owns `card | edge | canvas` and is the only place a *continuation*
+ * is focused. It is not quite the only `.focus()` for these subjects:
+ * `repairFocus` in `edge-authoring-react.tsx` still puts the caret back on the
+ * canvas after React Flow's native Edge Escape blurs it, which is a repair to
+ * that library's own handler rather than a continuation, and was left where it
+ * is deliberately.
  *
  * **It cannot also be the chrome adapter.** The provider is conditional on
  * there being Cards on the canvas, so an adapter inside it would never spend a

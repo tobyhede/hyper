@@ -123,6 +123,25 @@ const NONE: ContinuationState = { pending: null };
 export const staysOwed = ({ target }: PendingContinuation): boolean =>
   target.kind === 'card' || target.kind === 'edge';
 
+/**
+ * Where a chrome title rename returns the caret, from the surface it began on.
+ *
+ * Here rather than at each wiring, because production and the Ladle fixture
+ * both answer it and a third rename surface would otherwise be added to one and
+ * not the other — at which point the fixture stops proving production.
+ */
+export const renameReturn = (
+  surface: 'sidebar' | 'header',
+  entity: SpaceChromeTitleSubject,
+): PendingContinuation => ({
+  target:
+    surface === 'header'
+      ? { kind: 'control', name: 'layout-header' }
+      : { kind: 'sidebar-row', entity },
+  select: false,
+  then: 'focus',
+});
+
 export function createContinuation({
   authoring,
   reportObserverError = (error) => console.error('Continuation observer failed', error),

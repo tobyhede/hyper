@@ -167,11 +167,17 @@ currently hard-codes in a comment:
 
 - an `edge` target that resolves to nothing **stays owed** — the projection
   carrying a completed Edit arrives a strategy later;
-- a `card` target with `then: 'reveal'` or `'rename'` **stays owed** until the
-  node is in the live projection, for the same reason;
-- a `card` target with `then: 'focus'` and a `canvas` target **fall through** —
-  they are already drawn, so unresolvable means gone for good;
-- a chrome target **falls through**.
+- **every** `card` target **stays owed** until the node is drawn, for the same
+  reason. This corrects what this ticket first said, which was that only
+  `then: 'reveal'` and `'rename'` wait and a `then: 'focus'` card falls through.
+  Add to Layout is a `focus` whose target arrives a projection later exactly as
+  a creation does — it is why the mechanism this replaces polled the live
+  projection — so keying the wait on `then` would drop it. The two card targets
+  that name something already drawn (a cancelled Edge draft's anchor, a deleted
+  Edge's source) resolve on the first render either way. `staysOwed` therefore
+  reads the target kind and not `then`;
+- a `canvas` target and a chrome target **fall through** — both are drawn
+  already, so unresolvable means gone for good.
 
 Fall-through means the canvas fallback for canvas targets, and nothing for chrome.
 

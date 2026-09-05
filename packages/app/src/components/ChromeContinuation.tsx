@@ -43,6 +43,11 @@ export function ChromeContinuation({ continuation }: { readonly continuation: Co
     // while the pane is up, and the render that publishes this is the render
     // that closes it.
     continuation.take();
+    // `then` is read rather than assumed. Every chrome continuation asks for
+    // `focus` today, and a `reveal` has no meaning off the canvas — but the
+    // module's four values are one type for both adapters, so an arm this
+    // cannot honour is spent quietly instead of silently taking the caret.
+    if (pending.then !== 'focus') return;
     elementOf(target)?.focus();
   }, [pending, continuation]);
 

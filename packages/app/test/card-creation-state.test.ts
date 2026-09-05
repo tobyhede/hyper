@@ -122,6 +122,23 @@ describe('a create in flight', () => {
     expect(state.pane.status).toBe('submitting');
   });
 
+  /**
+   * A replacement discards every open Interaction draft (ADR 0042), and this
+   * pane is one. It matters more since the choices became a snapshot read once
+   * per opening: a pane left standing over a replaced Space goes on offering
+   * Cards from the Space that is gone, and choosing one is refused with
+   * `alias-target-not-found` against a row still on screen.
+   */
+  it('closes the pane when the Space is replaced', () => {
+    const state = reduce(choosing(aliasChoices), { type: 'replaced' });
+    expect(state.pane.status).toBe('closed');
+  });
+
+  it('does not close the pane when a replacement lands while a create is in flight', () => {
+    const state = reduce(choosing(), { type: 'submitting' }, { type: 'replaced' });
+    expect(state.pane.status).toBe('submitting');
+  });
+
   it('cannot be busy with no pane to disable', () => {
     expect(reduce(CARD_CREATION_CLOSED, { type: 'submitting' }).pane.status).toBe('closed');
   });

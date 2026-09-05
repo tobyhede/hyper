@@ -147,7 +147,9 @@ export type CardCreationAction =
   /** The author edited a field, so the refused attempt is over. */
   | { readonly type: 'refusal-stale' }
   | { readonly type: 'cancel' }
-  | { readonly type: 'presenting' };
+  | { readonly type: 'presenting' }
+  /** The working Space was replaced, so what the pane is offering is gone. */
+  | { readonly type: 'replaced' };
 
 export const CARD_CREATION_CLOSED: CardCreationState = {
   pane: { status: 'closed' },
@@ -265,6 +267,17 @@ export function cardCreationReducer(
       // way: the author asked for a presentation, not for a control.
       if (state.pane.status !== 'choosing') return state;
       return { ...state, pane: { status: 'closed' } };
+
+    case 'replaced':
+      // A replacement discards every open Interaction draft (ADR 0042), and
+      // this pane is one — its choices are a snapshot read once per opening, so
+      // a pane left standing would go on offering Cards from the Space that is
+      // gone and refuse every one of them. It waits on an Edit in flight for
+      // the same reason `presenting` does, and owes nothing either way: the
+      // continuation this would have asked for is discarded by the very epoch
+      // that sent this.
+      if (state.pane.status !== 'choosing') return state;
+      return { ...state, pane: { status: 'closed' } };
   }
 }
 
@@ -313,6 +326,8 @@ export interface CardCreation {
   readonly cancel: () => void;
   /** Presenting has started, so this surface goes, creating nothing. */
   readonly withdraw: () => void;
+  /** The working Space was replaced, so this surface goes, creating nothing. */
+  readonly discard: () => void;
   readonly refusalStale: () => void;
 }
 
@@ -403,6 +418,10 @@ export function createCardCreation(
     // Presenting is the one close that owes nothing: the author asked for a
     // presentation, not for a control.
     withdraw: () => dispatch({ type: 'presenting' }),
+    // The same close for the same reason: the pane is offering a Space that is
+    // gone, and the epoch that replaced it has already discarded whatever
+    // continuation was owed.
+    discard: () => dispatch({ type: 'replaced' }),
     refusalStale: () => dispatch({ type: 'refusal-stale' }),
   };
 }
