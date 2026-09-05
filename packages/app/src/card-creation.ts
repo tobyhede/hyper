@@ -1,6 +1,7 @@
 import type { Card, CardId, UUID } from '@project/core';
 import {
   createNonThrowingReporter,
+  createObservableState,
   type ObserverErrorReporter,
   type SpaceSummary,
 } from '@project/persistence';
@@ -23,15 +24,9 @@ import {
  * offering, so mutual exclusion is structural rather than an argument about the
  * shape of the Add Card menu.
  *
- * **A reducer rather than an observable-state module.** `edge-authoring.ts` is
- * the other shape this package uses, and it is a store because React Flow asks
- * it synchronous questions mid-gesture, because its operations answer values to
- * their callers, and because it invalidates itself from two collaborator
- * subscriptions. None of that is true here: nothing asks this module a question
- * during a gesture, no operation answers one, and its single external fact —
- * presenting — reaches it as an ordinary dispatch. So the transitions are a
- * pure function, driven in a node test with no React tree, and
- * {@link createCardCreation} is the thin asynchronous shell over it.
+ * The module owns current state so admission takes effect before a collaborator
+ * runs, without waiting for React to render. The pure reducer remains the one
+ * transition rule; the observable only installs and publishes its answer.
  */
 
 export type CardCreationKind = 'alias' | 'space';
@@ -165,7 +160,7 @@ export interface CardCreationState {
   readonly continuation: CardCreationContinuation | null;
 }
 
-export type CardCreationAction =
+type CardCreationAction =
   | { readonly type: 'open'; readonly kind: CardCreationKind }
   | { readonly type: 'choices'; readonly opening: number; readonly read: CardCreationRead }
   | { readonly type: 'submitting' }
@@ -177,7 +172,7 @@ export type CardCreationAction =
   /** An adapter has spent the pending continuation. */
   | { readonly type: 'continued' };
 
-export const CARD_CREATION_CLOSED: CardCreationState = {
+const CARD_CREATION_CLOSED: CardCreationState = {
   pane: { status: 'closed' },
   opening: 0,
   continuation: null,
@@ -227,17 +222,13 @@ const unreadableChoices = (kind: CardCreationKind): CardCreationChoices =>
     ? { kind: 'alias', targets: [] }
     : { kind: 'space', targets: { kind: 'unreadable' } };
 
-export function cardCreationReducer(
+function cardCreationReducer(
   state: CardCreationState,
   action: CardCreationAction,
 ): CardCreationState {
   switch (action.type) {
     case 'open':
-      // Mutual exclusion is this module's rule, so it is enforced where the
-      // state is and not only in the shell's closure over the state it read.
-      // Two dispatches from one render would otherwise count two openings
-      // while both reads answer the first, and the pane would fill from
-      // neither.
+      // The same transition decides whether the shell may start a choices read.
       if (state.pane.status !== 'closed') return state;
       return {
         pane: {
@@ -340,6 +331,8 @@ export interface CardCreationSeams {
 }
 
 export interface CardCreation {
+  readonly getState: () => CardCreationState;
+  readonly subscribe: (listener: () => void) => () => void;
   readonly open: (kind: CardCreationKind) => void;
   readonly submit: (input: CardCreationInput) => void;
   readonly cancel: () => void;
@@ -349,22 +342,25 @@ export interface CardCreation {
   readonly continued: () => void;
 }
 
-/**
- * The asynchronous shell over the reducer.
- *
- * It takes the current state rather than reading one, because every guard here
- * is the reducer's rule restated at the point a seam would otherwise be called
- * for nothing — and a shell that held its own copy would be a second answer to
- * where the pane is.
- */
-export function createCardCreation(
-  state: CardCreationState,
-  dispatch: (action: CardCreationAction) => void,
-  { readChoices, submit, reportBreak }: CardCreationSeams,
-): CardCreation {
-  // The opening this call is about to become, so a read answers the pane it was
-  // made for and not whichever one is on screen when it settles.
-  const opening = state.opening + 1;
+/** Card creation owns admission, transitions and asynchronous recovery. */
+export function createCardCreation({
+  readChoices,
+  submit,
+  reportBreak,
+}: CardCreationSeams): CardCreation {
+  const observable = createObservableState(CARD_CREATION_CLOSED, reportBreak);
+  const transition = (action: CardCreationAction): CardCreationState | null => {
+    const state = observable.getState();
+    const next = cardCreationReducer(state, action);
+    if (next === state) return null;
+    observable.install(next);
+    return next;
+  };
+  const dispatch = (action: CardCreationAction): CardCreationState | null => {
+    const next = transition(action);
+    if (next !== null) observable.notify();
+    return next;
+  };
   /**
    * The sink, made incapable of interrupting the work it describes.
    *
@@ -388,10 +384,14 @@ export function createCardCreation(
   };
 
   return {
+    getState: observable.getState,
+    subscribe: observable.subscribe,
     open: (kind) => {
-      if (state.pane.status !== 'closed') return;
-      dispatch({ type: 'open', kind });
-      const answer = (read: CardCreationRead): void => dispatch({ type: 'choices', opening, read });
+      const opened = dispatch({ type: 'open', kind });
+      if (opened === null) return;
+      const answer = (read: CardCreationRead): void => {
+        dispatch({ type: 'choices', opening: opened.opening, read });
+      };
       try {
         const read = readChoices(kind);
         if (read instanceof Promise) {
@@ -410,7 +410,9 @@ export function createCardCreation(
     },
 
     submit: (input) => {
-      if (state.pane.status !== 'choosing') return;
+      // Admission precedes the collaborator: even a synchronous Edit can
+      // reenter through its observers. Publish busy only if it returns a promise.
+      if (transition({ type: 'submitting' }) === null) return;
       let outcome: CardCreationOutcome | Promise<CardCreationOutcome>;
       try {
         outcome = submit(input);
@@ -425,7 +427,7 @@ export function createCardCreation(
         dispatch({ type: 'settled', outcome });
         return;
       }
-      dispatch({ type: 'submitting' });
+      observable.notify();
       void outcome.then((settled) => dispatch({ type: 'settled', outcome: settled }), broke);
     },
 

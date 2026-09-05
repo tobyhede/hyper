@@ -288,6 +288,11 @@ export const createApp = (
           : spaceCards.link({ ...input, targetSpaceId }));
         if (result.kind === 'refused')
           return { kind: 'refused', errors: presentNewSpaceCardRefusal(result.refusal) };
+        // Named rather than narrowed to "not refused", the way `createAlias`
+        // names its own arms: a lifecycle that changed nothing made no Card, so
+        // closing the pane on it would return the author to Add Card believing
+        // one exists. Not reachable from `create` or `link` today.
+        if (result.kind === 'unchanged') return { kind: 'none' };
         const created = spaceSession.getState().working.cards.find(({ id }) => !before.has(id));
         if (created !== undefined) useRenderAdapter.getState().selectCard(created.id);
         // `null` rather than the Card just selected: there is nothing to

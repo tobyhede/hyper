@@ -533,6 +533,28 @@ describe('a coordination that broke rather than refused', () => {
   });
 
   /**
+   * A lifecycle that changed nothing did not create a Card.
+   *
+   * `SpaceCardLifecycleResult` has three arms and only `refused` says a field
+   * is wrong, so an `unchanged` answered as a creation would close the pane and
+   * return the author to Add Card believing a Space Card exists that was never
+   * made. Named the way `createAlias` names its own arms, so the compiler asks
+   * again the day a fourth joins the union.
+   */
+  it('leaves the pane open when the lifecycle answers unchanged', async () => {
+    const { session } = mount(other, { create: () => Promise.resolve({ kind: 'unchanged' }) });
+
+    await openSpaceCardCreation();
+    chooseTarget('A new Space');
+    createNamed('Architecture');
+
+    await waitFor(() => expect(screen.getByTestId('new-space-card-create')).toBeEnabled());
+    expect(screen.getByRole('dialog', { name: 'New Space Card' })).toBeVisible();
+    expect(spaceCardsOf(session)).toHaveLength(0);
+    await settled(session);
+  });
+
+  /**
    * A read that rejected is reported too, and it is the one failure on this
    * pane that was not: the seam answers an unreadable list rather than
    * rejecting, so the shell's own reporting arm never runs and the transport
