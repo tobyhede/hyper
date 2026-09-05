@@ -639,7 +639,7 @@ describe('a coordination that broke rather than refused', () => {
    * it to and the Add Card trigger is where it belongs, exactly as after a
    * cancellation.
    */
-  it('returns focus to the Add Card menu after creating a Space Card', async () => {
+  it('selects the Space Card while returning focus to the Add Card menu', async () => {
     const { session } = mount();
     await openSpaceCardCreation();
 
@@ -649,6 +649,11 @@ describe('a coordination that broke rather than refused', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'More Card kinds' })).toHaveFocus(),
     );
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+    const card = screen.getByRole('heading', { name: 'Architecture' }).closest('.react-flow__node');
+    if (card === null) throw new Error('The created Space Card is not drawn.');
+    fireEvent.keyDown(card, { key: 'F2' });
+    expect(await screen.findByRole('textbox', { name: 'Card title' })).toHaveValue('Architecture');
     await settled(session);
   });
 

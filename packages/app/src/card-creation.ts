@@ -1,3 +1,4 @@
+import type { CreationContinuationRequest } from './creation-continuation';
 import type { Card, CardId, UUID } from '@project/core';
 import {
   createNonThrowingReporter,
@@ -67,27 +68,6 @@ export type CardCreationInput =
   | { readonly kind: 'space'; readonly targetSpaceId: UUID | null; readonly title: string };
 
 /**
- * Where an Edit continues, published for whoever can reach the target.
- *
- * Declared here under `architecture-review/19`'s vocabulary and its exact
- * shape, so that ticket lifts it into `continuation.ts` by a rename and a
- * delete rather than by a redesign. Two axes rather than one flat intent list,
- * because a creation is select *and* rename while a cancelled pane is focus
- * with no selection move.
- */
-export type ContinuationTarget =
-  | { readonly kind: 'card'; readonly cardId: CardId }
-  | { readonly kind: 'control'; readonly name: 'add-card' };
-
-export interface CardCreationContinuation {
-  readonly target: ContinuationTarget;
-  /** Whether the canvas selection moves to this target. */
-  readonly select: boolean;
-  /** What happens once it is reached. */
-  readonly then: 'focus' | 'rename';
-}
-
-/**
  * What one creation attempt came to.
  *
  * Three outcomes rather than the four arms `AuthoringResult` has, because the
@@ -102,10 +82,8 @@ export interface CardCreationContinuation {
 export type CardCreationOutcome =
   | { readonly kind: 'refused'; readonly errors: CardCreationRefusalErrors }
   /**
-   * The Card exists. `cardId` is the Card to continue at, or `null` for a
-   * creation that leaves none — a Space Card's lifecycle answers a completed
-   * Edit and not the identity it minted (ADR 0076), and its title was typed on
-   * the pane before the Edit ran, so there is nothing left to name.
+   * The identity created by the completed Edit, when available. The recipient
+   * decides selection and focus from the Card kind; submit adapters only create.
    */
   | { readonly kind: 'created'; readonly cardId: CardId | null }
   | { readonly kind: 'none' };
@@ -157,7 +135,7 @@ export interface CardCreationState {
    */
   readonly opening: number;
   /** Where the finished gesture leaves the author, until an adapter spends it. */
-  readonly continuation: CardCreationContinuation | null;
+  readonly continuation: CreationContinuationRequest | null;
 }
 
 type CardCreationAction =
@@ -177,26 +155,6 @@ const CARD_CREATION_CLOSED: CardCreationState = {
   opening: 0,
   continuation: null,
 };
-
-/**
- * Where focus goes when a pane closes leaving no Card to continue at.
- *
- * Cancellation and a Space Card creation take the same one: the author is
- * returned to the control the menu was opened from, which is where a closing
- * menu puts them anyway.
- */
-const RETURN_TO_ADD_CARD: CardCreationContinuation = {
-  target: { kind: 'control', name: 'add-card' },
-  select: false,
-  then: 'focus',
-};
-
-/** Where a creation that minted a Card continues: on it, named. */
-const nameCreatedCard = (cardId: CardId): CardCreationContinuation => ({
-  target: { kind: 'card', cardId },
-  select: true,
-  then: 'rename',
-});
 
 /**
  * What a pane offers before its read has answered.
@@ -278,7 +236,7 @@ function cardCreationReducer(
       return {
         ...state,
         pane: { status: 'closed' },
-        continuation: cardId === null ? RETURN_TO_ADD_CARD : nameCreatedCard(cardId),
+        continuation: { kind: 'created', cardKind: choices.kind, cardId },
       };
     }
 
@@ -291,7 +249,7 @@ function cardCreationReducer(
       // mounted, so closing here would abandon it through a route the pane
       // itself refuses.
       if (state.pane.status !== 'choosing') return state;
-      return { ...state, pane: { status: 'closed' }, continuation: RETURN_TO_ADD_CARD };
+      return { ...state, pane: { status: 'closed' }, continuation: { kind: 'cancelled' } };
 
     case 'presenting':
       // Presenting waits for a coordinated Edit already in flight; its

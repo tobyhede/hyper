@@ -97,6 +97,8 @@ interface HookProps {
 const mountAuthoring = (
   onBodyEditingChange?: (editing: boolean) => void,
   projectedKind: 'markdown' | 'alias' = 'markdown',
+  initialName: string | null = null,
+  onCreationNamed?: (cardId: string) => void,
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
@@ -105,7 +107,7 @@ const mountAuthoring = (
     expanded: false,
     enabled: true,
     presenting: false,
-    nameOnCreation: null,
+    nameOnCreation: initialName,
     cardId: CARD_ID,
   };
   const hook = renderHook(
@@ -116,6 +118,7 @@ const mountAuthoring = (
         presenting,
         enabled,
         nameOnCreation,
+        onCreationNamed,
         authoring,
         spaceSession,
         cardResize: adapter.getState().cardResize,
@@ -384,5 +387,11 @@ describe('canvas Card authoring', () => {
       cardId: CARD_ID,
     });
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeUndefined();
+  });
+  it('accepts naming on the first mount and acknowledges the installed title editor', () => {
+    const accepted = vi.fn();
+    const { result } = mountAuthoring(undefined, 'markdown', CARD_ID, accepted);
+    expect(onlyNode(result.current.nodes).data.titleEditor).toBeDefined();
+    expect(accepted).toHaveBeenCalledWith(CARD_ID);
   });
 });

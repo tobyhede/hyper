@@ -30,9 +30,7 @@ const creationWith = (seams: Partial<CardCreationSeams> = {}) =>
   });
 
 const RETURN_TO_ADD_CARD = {
-  target: { kind: 'control', name: 'add-card' },
-  select: false,
-  then: 'focus',
+  kind: 'cancelled',
 };
 
 describe('the Card creation pane', () => {
@@ -122,9 +120,9 @@ describe('a creation attempt', () => {
     creation.submit(aliasInput);
     expect(submit).toHaveBeenCalledTimes(1);
     expect(creation.getState().continuation).toEqual({
-      target: { kind: 'card', cardId: CARD_ID },
-      select: true,
-      then: 'rename',
+      kind: 'created',
+      cardKind: 'alias',
+      cardId: CARD_ID,
     });
   });
 
@@ -259,18 +257,18 @@ describe('where creation continues', () => {
     expect(changed).not.toHaveBeenCalled();
   });
 
-  it('selects and names a created Alias', () => {
+  it('hands the created Alias to continuation', () => {
     const creation = creationWith({ submit: () => ({ kind: 'created', cardId: CARD_ID }) });
     creation.open('alias');
     creation.submit(aliasInput);
     expect(creation.getState().continuation).toEqual({
-      target: { kind: 'card', cardId: CARD_ID },
-      select: true,
-      then: 'rename',
+      kind: 'created',
+      cardKind: 'alias',
+      cardId: CARD_ID,
     });
   });
 
-  it('returns to Add Card after Space Card creation', async () => {
+  it('hands completed Space Card creation to continuation', async () => {
     const creation = creationWith({
       submit: () => Promise.resolve({ kind: 'created', cardId: null }),
     });
@@ -278,7 +276,11 @@ describe('where creation continues', () => {
     creation.submit(spaceInput);
     await Promise.resolve();
     expect(creation.getState().pane.status).toBe('closed');
-    expect(creation.getState().continuation).toEqual(RETURN_TO_ADD_CARD);
+    expect(creation.getState().continuation).toEqual({
+      kind: 'created',
+      cardKind: 'space',
+      cardId: null,
+    });
   });
 
   it('owes no focus when presenting withdraws the pane', () => {

@@ -188,5 +188,5 @@ replacing tests that separately recorded dispatches or drove the reducer. The
 repeated-open and reentrant-submit regressions both failed before their fixes.
 The existing application tests retain pane, naming and focus evidence.
 
-Continuation policy beyond this creation module remains the separate follow-up
-described in the source; Add Card remains outside this change.
+Continuation policy beyond this creation module is resolved separately in
+`19-concentrate-card-creation-continuation.md`, including immediate Add Card.

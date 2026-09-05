@@ -73,6 +73,7 @@ export interface CanvasCardAuthoringInput {
   /** Whether the canvas is uncovered by a modal authoring surface. */
   readonly enabled: boolean;
   readonly nameOnCreation: string | null;
+  readonly onCreationNamed?: ((cardId: string) => void) | undefined;
   readonly authoring: SpaceAuthoring;
   readonly spaceSession: SpaceSession;
   readonly cardResize: CardResize;
@@ -108,6 +109,7 @@ export function useCanvasCardAuthoring({
   presenting,
   enabled,
   nameOnCreation,
+  onCreationNamed,
   authoring,
   spaceSession,
   cardResize,
@@ -165,13 +167,20 @@ export function useCanvasCardAuthoring({
     if (!canAuthorOnCanvas && caret?.field === 'title') setCaret(null);
   }
 
-  const [lastCreatedCardId, setLastCreatedCardId] = useState(nameOnCreation);
-  if (lastCreatedCardId !== nameOnCreation) {
+  const [lastCreatedCardId, setLastCreatedCardId] = useState<string | null>(null);
+  const namingReady =
+    canAuthorOnCanvas && !bodyEditing && nodes.some(({ id }) => id === nameOnCreation);
+  if (lastCreatedCardId !== nameOnCreation && (nameOnCreation === null || namingReady)) {
     setLastCreatedCardId(nameOnCreation);
-    if (nameOnCreation !== null && !bodyEditing) {
-      setCaret({ cardId: nameOnCreation, field: 'title' });
-    }
+    if (nameOnCreation !== null) setCaret({ cardId: nameOnCreation, field: 'title' });
   }
+  // Acknowledgement follows the render that installed the editor. Clearing the
+  // request then prevents a later canvas remount from replaying completed naming.
+  useEffect(() => {
+    if (nameOnCreation !== null && editingTitleCardId === nameOnCreation) {
+      onCreationNamed?.(nameOnCreation);
+    }
+  }, [nameOnCreation, editingTitleCardId, onCreationNamed]);
 
   const openCard = useCallback(
     (cardIdInput: string): 'completed' | 'retained' => {

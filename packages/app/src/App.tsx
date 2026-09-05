@@ -25,6 +25,7 @@ import {
   presentNewSpaceCardRefusal,
 } from './authoring-refusal';
 import { useCardCreation } from './card-creation-react';
+import { createCreationContinuation } from './creation-continuation';
 import type {
   CardCreationInput,
   CardCreationOutcome,
@@ -182,8 +183,15 @@ export const createApp = (
       },
       [],
     );
-    /** The Card a completed creation asks the canvas to open its name editor on. */
-    const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
+    const addCardMenu = useRef<HTMLButtonElement>(null);
+    const [continuation] = useState(() =>
+      createCreationContinuation({
+        selectCard: (cardId) => useRenderAdapter.getState().selectCard(cardId),
+        focusAddCard: () => addCardMenu.current?.focus(),
+        reportObserverError,
+      }),
+    );
+    const continuationState = useSyncExternalStore(continuation.subscribe, continuation.getState);
     const [cardsDrawerOpen, setCardsDrawerOpen] = useState(initialization === 'created-layout');
     const [addedCardToFocus, setAddedCardToFocus] = useState<CardId | null>(null);
     const cardsDrag = useRef<{
@@ -255,12 +263,8 @@ export const createApp = (
     /**
      * Making a Space Card: one coordinated Edit across Spaces (ADR 0076).
      *
-     * There is no naming continuation. The lifecycle answers `completed` and
-     * nothing else, so the created Card has no id to select from the result,
-     * and it needs none: the title was typed on the pane before the Edit ran,
-     * which is why this pane has a title field where Add Card has an inline
-     * editor. So it continues the way a cancelled pane does, at Add Card,
-     * rather than leaving focus on `<body>` when the modal unmounts.
+     * The adapter answers the created identity; continuation owns selection
+     * and the return to Add Card, since the title was authored in the pane.
      *
      * The Cards the Space held before the Edit are what recognise the one it
      * added: the Edit is atomic and installs every participant at once, so
@@ -294,11 +298,7 @@ export const createApp = (
         // one exists. Not reachable from `create` or `link` today.
         if (result.kind === 'unchanged') return { kind: 'none' };
         const created = spaceSession.getState().working.cards.find(({ id }) => !before.has(id));
-        if (created !== undefined) useRenderAdapter.getState().selectCard(created.id);
-        // `null` rather than the Card just selected: there is nothing to
-        // continue *at*, because the title was typed on the pane before the
-        // Edit ran, so the author goes back to Add Card.
-        return { kind: 'created', cardId: null };
+        return { kind: 'created', cardId: created?.id ?? null };
       },
       [],
     );
@@ -787,22 +787,13 @@ export const createApp = (
       // Selected as well as named: the storyboard's created Card is the selected
       // one, so continued authoring — a connection, a second Card — carries on
       // from it.
-      useRenderAdapter.getState().selectCard(created.createdCardId);
-      setCreatedCardId(created.createdCardId);
-    }, []);
+      continuation.request({
+        kind: 'created',
+        cardKind: 'markdown',
+        cardId: created.createdCardId,
+      });
+    }, [continuation]);
 
-    /**
-     * The control a cancelled creation goes back to.
-     *
-     * Radix's own destination when a menu closes, arriving here by the same
-     * reasoning rather than as a second opinion. It has to wait for the render
-     * that closes the pane: the control is disabled while the pane is open —
-     * one authoring surface at a time — and a disabled button cannot take
-     * focus, so restoring inside the handler silently does nothing and leaves
-     * focus on `<body>`. The button is only disabled and never unmounted, so
-     * the ref still holds it when the wait ends.
-     */
-    const addCardMenu = useRef<HTMLButtonElement>(null);
     /**
      * Presenting takes a creation pane away, creating nothing.
      *
@@ -820,30 +811,29 @@ export const createApp = (
     useEffect(() => {
       if (presenting) cardCreation.withdraw();
     }, [presenting, cardCreation]);
-    /**
-     * Where the finished creation leaves the author.
-     *
-     * The two continuations this surface can own, spent once each. Both wait
-     * for a render with no pane over them, which for the Add Card control is
-     * what makes a disabled button focusable again, and for a created Card is
-     * what puts the modal out of the way of the editor about to open on it.
-     * `architecture-review/19` lifts this into one module with the five other
-     * implementations of the same rule.
-     */
-    const creationContinuation = cardCreation.state.continuation;
+    // Transfer completed gestures once; all delivery policy lives in continuation.
     useEffect(() => {
-      if (creationContinuation === null || creatingCard) return;
-      const { target, select } = creationContinuation;
-      // The storyboard's created Card is the selected one, so continued
-      // authoring — a connection, a second Card — carries on from it.
-      if (select && target.kind === 'card') useRenderAdapter.getState().selectCard(target.cardId);
-      if (creationContinuation.then === 'rename' && target.kind === 'card') {
-        setCreatedCardId(target.cardId);
-      } else if (target.kind === 'control') {
-        addCardMenu.current?.focus();
+      if (cardCreation.state.continuation !== null) {
+        continuation.request(cardCreation.state.continuation);
+        cardCreation.continued();
       }
-      cardCreation.continued();
-    }, [creationContinuation, creatingCard, cardCreation]);
+      continuation.resume({
+        paneOpen: creatingCard,
+        cards: liveProjection?.nodes ?? [],
+        canName: editable && !presenting && !editingCardBody && spaceChromeEdit === null,
+        canFocusAddCard: addCardMenu.current !== null && !addCardMenu.current.disabled,
+      });
+    }, [
+      cardCreation,
+      continuation,
+      continuationState,
+      creatingCard,
+      liveProjection,
+      editable,
+      presenting,
+      editingCardBody,
+      spaceChromeEdit,
+    ]);
 
     // Scans every title in the Space, so it must not re-run on every drag
     // frame — `projection` (and this component) re-renders on each
@@ -1104,7 +1094,8 @@ export const createApp = (
                 newCardTitle={newCardTitle}
                 onAddCard={addCard}
                 onAddExistingCard={dropExistingCard}
-                nameOnCreation={createdCardId}
+                nameOnCreation={continuationState.namingCardId}
+                onCreationNamed={continuation.named}
                 authoring={authoring}
                 spaceSession={spaceSession}
                 onBodyEditingChange={setEditingCardBody}

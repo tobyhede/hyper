@@ -162,15 +162,9 @@ export interface SpaceCanvasProps {
   onAddCard: () => void;
   /** Complete an external Cards View drop at an authored top-left anchor. */
   onAddExistingCard: (cardId: CardId, anchor: { readonly x: number; readonly y: number }) => void;
-  /**
-   * The Card a completed creation asks to be named, or `null`.
-   *
-   * The identity, not a flag: each creation mints a fresh one, so a *change* is
-   * what says a Card has just been created — which is how the naming
-   * continuation survives being a prop rather than a command. A remount takes
-   * nothing with it, because the initial state is whatever arrives with it.
-   */
+  /** Pending naming, retained until the canvas installs its editor. */
   nameOnCreation: string | null;
+  onCreationNamed?: ((cardId: string) => void) | undefined;
   authoring: SpaceAuthoring;
   spaceSession: SpaceSession;
   /**
@@ -213,6 +207,7 @@ export function SpaceCanvas({
   onAddCard,
   onAddExistingCard,
   nameOnCreation,
+  onCreationNamed,
   authoring,
   spaceSession,
   onBodyEditingChange,
@@ -260,6 +255,7 @@ export function SpaceCanvas({
     presenting,
     enabled: titleEditingEnabled,
     nameOnCreation,
+    onCreationNamed,
     authoring,
     spaceSession,
     cardResize,
