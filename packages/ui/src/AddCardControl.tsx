@@ -1,4 +1,4 @@
-import { useRef, type Ref } from 'react';
+import { useRef } from 'react';
 import { Button } from './Button';
 import {
   DropdownMenu,
@@ -28,17 +28,6 @@ export interface AddCardControlProps {
    * and no way to notice breaking when the key moves.
    */
   readonly keyShortcut?: string;
-  /**
-   * The menu trigger, offered so a caller can put focus back on it.
-   *
-   * `finalFocus` below declines Base UI's own restore for the close that opens
-   * a surface, which leaves the surface's owner holding the other half:
-   * cancelling it has to return focus here, and only that owner knows when the
-   * pane is gone and this button is enabled again. Named rather than forwarded
-   * from the root, because it is this half of a split control — the half the
-   * menu was opened from — and not the pair.
-   */
-  readonly menuTriggerRef?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -65,7 +54,6 @@ export function AddCardControl({
   onAddSpaceCard,
   disabled = false,
   keyShortcut,
-  menuTriggerRef,
 }: AddCardControlProps) {
   /**
    * Whether this close is a chosen item rather than a dismissal.
@@ -104,8 +92,13 @@ export function AddCardControl({
           open, and its Alias action may open a surface that takes focus. */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger
-          ref={menuTriggerRef}
           data-testid="add-card-menu"
+          // Where a cancelled creation pane returns the caret. An address
+          // rather than a ref the application holds: the module that decides
+          // where an Edit continues has no framework and cannot name one, and
+          // this control is only ever disabled — never unmounted — while the
+          // pane that will return to it is up.
+          data-continuation-control="add-card"
           // The glyph is `aria-hidden`, so this is the trigger's only
           // accessible name rather than a refinement of visible text.
           aria-label="More Card kinds"

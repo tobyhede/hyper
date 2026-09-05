@@ -37,7 +37,8 @@ import { layoutCards, resolveLayout } from './layout-resolution';
 import type { DestinationOpening } from './destination-opening';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
-import { CardDestinationFocus } from './components/CardDestinationFocus';
+import { CanvasContinuation } from './components/CanvasContinuation';
+import { ChromeContinuation } from './components/ChromeContinuation';
 import { CardsDrawer } from './components/CardsDrawer';
 import { NewAlias } from './components/NewAlias';
 import { NewSpaceCard } from './components/NewSpaceCard';
@@ -62,6 +63,7 @@ export const createApp = (
     navigation,
     authoring,
     adapter: useRenderAdapter,
+    continuation,
     edgeAuthoring,
   } = composition;
   const openingGraphId = opening?.graphId ?? null;
@@ -102,8 +104,20 @@ export const createApp = (
     // left behind.
     useEffect(() => {
       const adapter = useRenderAdapter.getState();
-      if (addressedCardId === null) adapter.clearSelection();
-      else adapter.selectCard(addressedCardId);
+      if (addressedCardId === null) {
+        adapter.clearSelection();
+        return;
+      }
+      adapter.selectCard(addressedCardId);
+      // Centred and focused once its projection exists — the one member that
+      // touches the camera, because a Card arrived at by URL is somewhere the
+      // reader has never been. The wait is the canvas adapter's, which is what
+      // replaced the component that polled the live projection for it.
+      continuation.request({
+        target: { kind: 'card', cardId: addressedCardId },
+        select: false,
+        then: 'reveal',
+      });
     }, [addressedCardId, selectedLayoutId]);
     /**
      * Whether a Card's content edit is running, reported up by the canvas.
@@ -143,10 +157,7 @@ export const createApp = (
       },
       [],
     );
-    /** The Card a completed creation asks the canvas to open its name editor on. */
-    const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const [cardsDrawerOpen, setCardsDrawerOpen] = useState(initialization === 'created-layout');
-    const [addedCardToFocus, setAddedCardToFocus] = useState<CardId | null>(null);
     const cardsDrag = useRef<{
       readonly cardId: CardId;
       readonly layoutId: LayoutId;
@@ -302,6 +313,7 @@ export const createApp = (
               ),
         submit: (input) => (input.kind === 'alias' ? createAlias(input) : createSpaceCard(input)),
         reportBreak: (failure) => console.error('The Card creation failed', failure),
+        continuation,
       }),
       [createAlias, createSpaceCard],
     );
@@ -480,17 +492,6 @@ export const createApp = (
     }, [projected, syncProjection]);
 
     const liveProjection = useRenderAdapter((s) => s.projection);
-    useEffect(() => {
-      if (
-        addedCardToFocus === null ||
-        !liveProjection?.nodes.some(({ id }) => id === addedCardToFocus)
-      )
-        return;
-      document
-        .querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(addedCardToFocus)}"]`)
-        ?.focus();
-      setAddedCardToFocus(null);
-    }, [addedCardToFocus, liveProjection]);
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
     const cardResize = useRenderAdapter((s) => s.cardResize);
@@ -512,7 +513,6 @@ export const createApp = (
       readonly draft: string;
       readonly error: string | null;
       readonly surface: 'sidebar' | 'header';
-      readonly returnFocus: () => void;
     } | null>(null);
     const chromeEditingDisabled =
       !editable || presenting || creatingCard || editingCardBody || editingCardTitle;
@@ -573,15 +573,35 @@ export const createApp = (
       draft: spaceChromeEdit?.draft ?? '',
       error: spaceChromeEdit?.error ?? null,
       disabled: chromeEditingDisabled,
-      onBegin: (subject, title, surface, returnFocus) =>
-        setSpaceChromeEdit({ subject, draft: title, error: null, surface, returnFocus }),
+      onBegin: (subject, title, surface) =>
+        setSpaceChromeEdit({ subject, draft: title, error: null, surface }),
       onDraftChange: (draft) =>
         setSpaceChromeEdit((current) => (current === null ? null : { ...current, draft })),
       onErrorChange: (error) =>
         setSpaceChromeEdit((current) => (current === null ? null : { ...current, error })),
       onComplete: completeSpaceChromeTitle,
       onCancel: () => setSpaceChromeEdit(null),
-      onReturnFocus: () => spaceChromeEdit?.returnFocus(),
+      /**
+       * Where a chrome rename returns the caret.
+       *
+       * The surface it was begun from decides, and both answers are addresses
+       * rather than elements: the editor calls this from inside its own key
+       * handler, before React has swapped the row's editing branch back, so
+       * there is no focusable element to have held on to — which is what the
+       * captured DOM closure on this state used to be, and why it needed the
+       * `.closest('li')` walk it carried to its call site.
+       */
+      onReturnFocus: () => {
+        if (spaceChromeEdit === null) return;
+        continuation.request({
+          target:
+            spaceChromeEdit.surface === 'header'
+              ? { kind: 'control', name: 'layout-header' }
+              : { kind: 'sidebar-row', entity: spaceChromeEdit.subject },
+          select: false,
+          then: 'focus',
+        });
+      },
     };
 
     /**
@@ -611,9 +631,9 @@ export const createApp = (
       spaceTitle: renderedSpace.title,
       onCopy: copyProductDestination,
       onRename: entityEditsAvailable
-        ? (subject, title, returnFocus) => {
+        ? (subject, title) => {
             setLayoutManagementRefusal(null);
-            titleEdit.onBegin(subject, title, 'sidebar', returnFocus);
+            titleEdit.onBegin(subject, title, 'sidebar');
           }
         : null,
       onDeleteLayout: entityEditsAvailable
@@ -699,7 +719,16 @@ export const createApp = (
         if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
         if (result.kind !== 'completed') return null;
         useRenderAdapter.getState().selectCard(cardId);
-        if (focus) setAddedCardToFocus(cardId);
+        // The Card is not drawn yet — the projection carrying this Edit arrives
+        // a strategy later — so the continuation waits for it rather than this
+        // component polling the live projection, which is what it used to do.
+        if (focus) {
+          continuation.request({
+            target: { kind: 'card', cardId },
+            select: false,
+            then: 'focus',
+          });
+        }
         return null;
       },
       [],
@@ -751,23 +780,15 @@ export const createApp = (
       if (created.createdCardId === undefined) return;
       // Selected as well as named: the storyboard's created Card is the selected
       // one, so continued authoring — a connection, a second Card — carries on
-      // from it.
-      useRenderAdapter.getState().selectCard(created.createdCardId);
-      setCreatedCardId(created.createdCardId);
+      // from it. Both are the one continuation, spent when the projection that
+      // draws the Card arrives.
+      continuation.request({
+        target: { kind: 'card', cardId: created.createdCardId },
+        select: true,
+        then: 'rename',
+      });
     }, []);
 
-    /**
-     * The control a cancelled creation goes back to.
-     *
-     * Radix's own destination when a menu closes, arriving here by the same
-     * reasoning rather than as a second opinion. It has to wait for the render
-     * that closes the pane: the control is disabled while the pane is open —
-     * one authoring surface at a time — and a disabled button cannot take
-     * focus, so restoring inside the handler silently does nothing and leaves
-     * focus on `<body>`. The button is only disabled and never unmounted, so
-     * the ref still holds it when the wait ends.
-     */
-    const addCardMenu = useRef<HTMLButtonElement>(null);
     /**
      * Presenting takes a creation pane away, creating nothing.
      *
@@ -786,29 +807,21 @@ export const createApp = (
       if (presenting) cardCreation.withdraw();
     }, [presenting, cardCreation]);
     /**
-     * Where the finished creation leaves the author.
+     * The Card whose inline Title editor a creation opens.
      *
-     * The two continuations this surface can own, spent once each. Both wait
-     * for a render with no pane over them, which for the Add Card control is
-     * what makes a disabled button focusable again, and for a created Card is
-     * what puts the modal out of the way of the editor about to open on it.
-     * `architecture-review/19` lifts this into one module with the five other
-     * implementations of the same rule.
+     * `rename` reaches `CanvasCard` as a prop rather than through the module:
+     * `@project/ui` owns that editor and depends only on `core`, so it cannot
+     * import this — and it should not. A component refocusing its own control
+     * after its own edit is genuine locality.
      */
-    const creationContinuation = cardCreation.state.continuation;
-    useEffect(() => {
-      if (creationContinuation === null || creatingCard) return;
-      const { target, select } = creationContinuation;
-      // The storyboard's created Card is the selected one, so continued
-      // authoring — a connection, a second Card — carries on from it.
-      if (select && target.kind === 'card') useRenderAdapter.getState().selectCard(target.cardId);
-      if (creationContinuation.then === 'rename' && target.kind === 'card') {
-        setCreatedCardId(target.cardId);
-      } else if (target.kind === 'control') {
-        addCardMenu.current?.focus();
-      }
-      cardCreation.continued();
-    }, [creationContinuation, creatingCard, cardCreation]);
+    const pendingContinuation = useSyncExternalStore(
+      continuation.subscribe,
+      continuation.getState,
+    ).pending;
+    const nameOnCreation =
+      pendingContinuation?.then === 'rename' && pendingContinuation.target.kind === 'card'
+        ? pendingContinuation.target.cardId
+        : null;
 
     // Scans every title in the Space, so it must not re-run on every drag
     // frame — `projection` (and this component) re-renders on each
@@ -862,7 +875,6 @@ export const createApp = (
           // naming it exists to begin.
           disabled: presenting || creatingCard || editingCardBody || spaceChromeEdit !== null,
           keyShortcut: ADD_CARD_KEY,
-          menuTriggerRef: addCardMenu,
           hidden: presenting,
         }}
         createLayout={{
@@ -1014,6 +1026,7 @@ export const createApp = (
           </>
         }
       >
+        <ChromeContinuation continuation={continuation} />
         {/* One child, not a row: the Cards drawer portals over this rather than
             sitting beside it, so a toggle that says nothing about the Layout no
             longer re-flows the canvas and re-measures every Card on it. */}
@@ -1028,12 +1041,16 @@ export const createApp = (
                   the replacement epoch — the getter it reports describes the
                   viewport, which a replaced Space does not invalidate. */}
               <CanvasCentre report={reportVisibleCentre} />
-              <CardDestinationFocus
-                cardId={addressedCardId}
-                ready={
-                  addressedCardId !== null &&
-                  (liveProjection?.nodes.some(({ id }) => id === addressedCardId) ?? false)
-                }
+              {/* The canvas half of where an Edit continues. Inside the
+                  provider because `reveal` moves the camera and because an Edge
+                  subject becomes an element only through the projection React
+                  Flow is drawing. Its chrome half is mounted at the root, since
+                  this subtree is conditional on there being Cards at all. */}
+              <CanvasContinuation
+                continuation={continuation}
+                edges={liveProjection?.edges ?? []}
+                onSelectCard={selectCard}
+                onSelectEdge={selectEdge}
               />
               <SpaceCanvas
                 // Keyed on the replacement epoch, so accepting the stored Space
@@ -1069,7 +1086,7 @@ export const createApp = (
                 newCardTitle={newCardTitle}
                 onAddCard={addCard}
                 onAddExistingCard={dropExistingCard}
-                nameOnCreation={createdCardId}
+                nameOnCreation={nameOnCreation}
                 authoring={authoring}
                 spaceSession={spaceSession}
                 onBodyEditingChange={setEditingCardBody}

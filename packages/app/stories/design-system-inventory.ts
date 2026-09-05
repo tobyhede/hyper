@@ -85,9 +85,9 @@ export const uncataloguedComponents = [
       'Camera behaviour, not appearance: it centres the viewport and renders nothing. Covered by `packages/app/test/CanvasCentre.test.tsx`.',
   },
   {
-    module: 'packages/app/src/components/CardDestinationFocus.tsx',
+    module: 'packages/app/src/components/CanvasContinuation.tsx',
     reason:
-      'URL-to-camera coordination inside React Flow. It renders nothing and is covered through browser routing behavior.',
+      'Where a completed Edit leaves the author, on the canvas: it resolves a continuation against the projection React Flow is drawing, moves the camera for a Card arrived at by URL, and renders nothing. Covered by `packages/app/test/continuation.test.ts` for the rules and by the canvas assertions in `edge-authoring-react.test.tsx` and `card-creation.test.tsx` for the spend. It replaced `CardDestinationFocus.tsx`, which was here for the same reason.',
   },
   {
     module: 'packages/app/src/components/cameras.tsx',

@@ -280,7 +280,6 @@ export function SpaceCanvas({
     placedCards,
     newCardTitle,
     enabled: canAuthorOnCanvas,
-    onSelectCard,
     onSelectEdge,
   });
 

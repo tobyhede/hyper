@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { Space } from '@project/graph';
 import { AppShell } from '@project/ui';
 import { resolveLayout } from '#src/layout-resolution';
@@ -12,7 +12,6 @@ import { authoredSpace, deepDiveSpace, traversalSpace } from './spaces';
 function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
   const readSpace = useCallback(() => space, [space]);
   const { navigation, state } = useStoryNavigation(readSpace);
-  const addCardMenu = useRef<HTMLButtonElement>(null);
   const resolved = useMemo(
     () => resolveLayout(space, state.selectedLayoutId),
     [space, state.selectedLayoutId],
@@ -38,7 +37,6 @@ function useOpenSpace(space: Space, status?: OpenSpaceSidebar['status']) {
       onAddAlias: () => undefined,
       onAddSpaceCard: () => undefined,
       keyShortcut: 'C',
-      menuTriggerRef: addCardMenu,
     },
     createLayout: { refusal: null, onCreate: () => undefined },
     persistence: {

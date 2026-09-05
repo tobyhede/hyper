@@ -17,6 +17,7 @@ import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import { edgeSelectionOf } from '../src/render-adapter';
 import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
+import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
 import { SpaceSidebar } from '../src/components/SpaceSidebar';
@@ -333,6 +334,7 @@ function DeleteWhenCommitted({ armed }: { readonly armed: boolean }) {
 function CanvasHarness({
   adapter,
   edgeAuthoring,
+  continuation,
   currentSpace,
   authoring,
   session,
@@ -340,7 +342,7 @@ function CanvasHarness({
   presenting,
 }: Pick<
   ReturnType<typeof compose>,
-  'adapter' | 'edgeAuthoring' | 'currentSpace' | 'authoring' | 'session'
+  'adapter' | 'edgeAuthoring' | 'continuation' | 'currentSpace' | 'authoring' | 'session'
 > & {
   /** A modal pane is open over the graph — what `App` reports as no title editing. */
   readonly covered: boolean;
@@ -349,38 +351,50 @@ function CanvasHarness({
   const projection = adapter((state) => state.projection);
   const selection = adapter((state) => state.selection);
   return (
-    <SpaceCanvas
-      nodes={projection?.nodes ?? []}
-      edges={projection?.edges ?? []}
-      projectedNodes={null}
-      activeCardId={null}
-      presenting={presenting}
-      editable={true}
-      titleEditingEnabled={!covered}
-      onNodesChange={adapter.getState().changeNodes}
-      onEdgesChange={adapter.getState().changeEdges}
-      edgeAuthoring={edgeAuthoring}
-      selection={selection}
-      onSelectCard={adapter.getState().selectCard}
-      onSelectEdge={adapter.getState().selectEdge}
-      placedCards={currentSpace().cards}
-      newCardTitle="Card 4"
-      onAddCard={() => undefined}
-      onAddExistingCard={() => undefined}
-      nameOnCreation={null}
-      authoring={authoring}
-      spaceSession={session}
-      cardResize={{
-        beginResize: () => undefined,
-        previewResize: () => undefined,
-        finishResize: () => undefined,
-        cancelResize: () => undefined,
-      }}
-      graphs={currentSpace().graphs}
-      colorByGraphId={{}}
-      activeGraphId={GRAPH_ID}
-      activeGraphCardIds={new Set([CARD_A, CARD_B])}
-    />
+    <>
+      {/* Production's own adapter, because where a completed Edge Edit leaves
+          the author is now this module's claim and not Edge Authoring's: it
+          publishes a continuation, and this is what resolves one against the
+          projection React Flow has drawn. */}
+      <CanvasContinuation
+        continuation={continuation}
+        edges={projection?.edges ?? []}
+        onSelectCard={adapter.getState().selectCard}
+        onSelectEdge={adapter.getState().selectEdge}
+      />
+      <SpaceCanvas
+        nodes={projection?.nodes ?? []}
+        edges={projection?.edges ?? []}
+        projectedNodes={null}
+        activeCardId={null}
+        presenting={presenting}
+        editable={true}
+        titleEditingEnabled={!covered}
+        onNodesChange={adapter.getState().changeNodes}
+        onEdgesChange={adapter.getState().changeEdges}
+        edgeAuthoring={edgeAuthoring}
+        selection={selection}
+        onSelectCard={adapter.getState().selectCard}
+        onSelectEdge={adapter.getState().selectEdge}
+        placedCards={currentSpace().cards}
+        newCardTitle="Card 4"
+        onAddCard={() => undefined}
+        onAddExistingCard={() => undefined}
+        nameOnCreation={null}
+        authoring={authoring}
+        spaceSession={session}
+        cardResize={{
+          beginResize: () => undefined,
+          previewResize: () => undefined,
+          finishResize: () => undefined,
+          cancelResize: () => undefined,
+        }}
+        graphs={currentSpace().graphs}
+        colorByGraphId={{}}
+        activeGraphId={GRAPH_ID}
+        activeGraphCardIds={new Set([CARD_A, CARD_B])}
+      />
+    </>
   );
 }
 
@@ -502,7 +516,6 @@ describe('the Edge toolbar', () => {
         placedCards: composed.currentSpace().cards,
         newCardTitle: 'Card 4',
         enabled: true,
-        onSelectCard: NO_OP,
         onSelectEdge: NO_OP,
       });
       return <>{surface.provide(children)}</>;
@@ -865,7 +878,6 @@ const surface = (composed: ReturnType<typeof compose>) =>
         placedCards: composed.currentSpace().cards,
         newCardTitle: 'Card 4',
         enabled: true,
-        onSelectCard: NO_OP,
         onSelectEdge: NO_OP,
       }),
     { wrapper: ({ children }) => <ReactFlowProvider>{children}</ReactFlowProvider> },
@@ -1205,21 +1217,25 @@ describe('what a reconnect release decides', () => {
 });
 
 /**
- * A focus request for an Edge has to outlive the render that made it.
+ * The one claim the canvas adapter owns: it calls `.focus()` on the element the
+ * pending continuation resolves to, once that element is drawn.
  *
- * The request is published synchronously with the Edit, but the projection
- * carrying the reconnected Edge arrives a strategy later — so resolving it
- * against the projection on screen at that moment finds nothing and falls back
- * to the canvas, landing focus anywhere but the "Edited Edge" the matrix names.
+ * Which continuations stay owed is `continuation.test.ts`'s, in the node
+ * environment. What only a tree can show is the resolution itself — a domain
+ * subject becoming a React Flow element — and the timing that makes it worth
+ * having: an Edge continuation is published synchronously with the Edit, but
+ * the projection carrying the reconnected Edge arrives a strategy later, so an
+ * adapter that spent it on the render that received it would land focus
+ * anywhere but the "Edited Edge" the matrix names.
  */
-describe('focusing an Edge a completed Edit has just produced', () => {
+describe('spending a continuation on the canvas', () => {
   const RECONNECTED = { graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_C } } as const;
   const reconnectedFlowEdge = flowEdge(`${GRAPH_ID}::0`, GRAPH_ID, CARD_A, CARD_C);
 
-  it('waits for the projection that draws it rather than falling back to the canvas', () => {
-    // The real canvas, because resolving the request is a DOM lookup: the
+  it('focuses the Edge on the projection that draws it, not the one before', () => {
+    // The real canvas, because resolving the continuation is a DOM lookup: the
     // element only exists once React Flow has drawn the Edge.
-    const { edgeAuthoring, adapter } = mountCanvas();
+    const { edgeAuthoring, adapter, continuation } = mountCanvas();
     document.body.focus();
 
     act(() => {
@@ -1228,26 +1244,34 @@ describe('focusing an Edge a completed Edit has just produced', () => {
     });
 
     // The Edit has completed, but the projection still holds the Edge as it
-    // was — so the request is still owed rather than spent on the canvas.
-    expect(edgeAuthoring.getState().focusRequest).toEqual({ kind: 'edge', ...RECONNECTED });
+    // was — so the continuation is still owed rather than spent on the canvas.
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'edge', ...RECONNECTED },
+      select: false,
+      then: 'focus',
+    });
 
     act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
 
-    expect(edgeAuthoring.getState().focusRequest).toBeNull();
+    expect(continuation.getState().pending).toBeNull();
     expect(document.activeElement).toBe(
       document.querySelector(`.react-flow__edge[data-id="${GRAPH_ID}::0"]`),
     );
   });
 
-  /** A Card or the canvas resolves immediately, so neither is ever left owed. */
-  it('spends a Card request on the render that receives it', () => {
-    const { edgeAuthoring } = mountCanvas();
+  /** A Card already on the canvas resolves on the render that receives it. */
+  it('focuses a Card that is already drawn without waiting', () => {
+    const { edgeAuthoring, continuation } = mountCanvas();
+    document.body.focus();
 
     act(() => {
       edgeAuthoring.deleteEdge(SUBJECT);
     });
 
-    expect(edgeAuthoring.getState().focusRequest).toBeNull();
+    expect(continuation.getState().pending).toBeNull();
+    expect(document.activeElement).toBe(
+      document.querySelector(`.react-flow__node[data-id="${CARD_A}"]`),
+    );
   });
 });
 
@@ -1294,7 +1318,6 @@ describe('the React Flow properties', () => {
           placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: true,
-          onSelectCard: NO_OP,
           onSelectEdge: NO_OP,
         }),
       {
@@ -1323,7 +1346,6 @@ describe('the React Flow properties', () => {
           placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: true,
-          onSelectCard: NO_OP,
           onSelectEdge: NO_OP,
         }),
       { wrapper: ({ children }) => <ReactFlowProvider>{children}</ReactFlowProvider> },
@@ -1358,7 +1380,6 @@ describe('the React Flow properties', () => {
           placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: true,
-          onSelectCard: NO_OP,
           onSelectEdge: NO_OP,
         }),
       { wrapper: ({ children }) => <ReactFlowProvider>{children}</ReactFlowProvider> },
@@ -1391,7 +1412,6 @@ describe('the React Flow properties', () => {
           placedCards: composed.currentSpace().cards,
           newCardTitle: 'Card 4',
           enabled: false,
-          onSelectCard: NO_OP,
           onSelectEdge: NO_OP,
         }),
       { wrapper: ({ children }) => <ReactFlowProvider>{children}</ReactFlowProvider> },

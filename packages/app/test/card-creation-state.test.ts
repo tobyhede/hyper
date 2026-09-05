@@ -11,6 +11,7 @@ import {
   type CardCreationSeams,
   type CardCreationState,
 } from '../src/card-creation';
+import type { Continuation, PendingContinuation } from '../src/continuation';
 
 const CARD_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -33,16 +34,37 @@ const choosing = (choices: CardCreationChoices = spaceChoices): CardCreationStat
     { type: 'choices', opening: 1, read: { choices, listing: null } },
   );
 
-/** The asynchronous shell over recorded dispatches, so no React tree is needed. */
+/**
+ * The asynchronous shell over recorded dispatches, so no React tree is needed.
+ *
+ * The continuation is recorded rather than composed: what this file is about is
+ * *which* continuation each ending earns, and the module that holds one is
+ * proved on its own terms in `continuation.test.ts`.
+ */
 const shell = (state: CardCreationState, seams: Partial<CardCreationSeams> = {}) => {
   const dispatched: CardCreationAction[] = [];
+  const requested: PendingContinuation[] = [];
+  const continuation: Continuation = {
+    getState: () => ({ pending: null }),
+    subscribe: () => () => undefined,
+    request: (pending) => requested.push(pending),
+    take: () => undefined,
+    dispose: () => undefined,
+  };
   const creation = createCardCreation(state, (action) => dispatched.push(action), {
     readChoices: () => ({ choices: aliasChoices, listing: null }),
     submit: () => ({ kind: 'none' }),
     reportBreak: () => undefined,
+    continuation,
     ...seams,
   });
-  return { creation, dispatched };
+  return { creation, dispatched, requested };
+};
+
+const RETURN_TO_ADD_CARD: PendingContinuation = {
+  target: { kind: 'control', name: 'add-card' },
+  select: false,
+  then: 'focus',
 };
 
 describe('the Card creation pane', () => {
@@ -93,7 +115,6 @@ describe('a create in flight', () => {
   it('does not close the pane while a create is in flight', () => {
     const state = reduce(choosing(), { type: 'submitting' }, { type: 'cancel' });
     expect(state.pane.status).toBe('submitting');
-    expect(state.continuation).toBeNull();
   });
 
   it('does not close the pane when presenting starts while a create is in flight', () => {
@@ -164,57 +185,83 @@ describe('a choices read that failed', () => {
 });
 
 describe('where the creation continues', () => {
+  const ALIAS = { kind: 'alias', target: CARD_ID, title: '' } as const;
+
   it('returns to Add Card when the pane is cancelled', () => {
-    const state = reduce(choosing(), { type: 'cancel' });
-    expect(state.pane.status).toBe('closed');
-    expect(state.continuation).toEqual({
-      target: { kind: 'control', name: 'add-card' },
-      select: false,
-      then: 'focus',
-    });
+    const { creation, dispatched, requested } = shell(choosing());
+
+    creation.cancel();
+
+    expect(dispatched).toEqual([{ type: 'cancel' }]);
+    expect(requested).toEqual([RETURN_TO_ADD_CARD]);
   });
 
   it('names the created Card when one was created', () => {
-    const state = reduce(choosing(aliasChoices), {
-      type: 'settled',
-      outcome: { kind: 'created', cardId: CARD_ID },
+    const { creation, requested } = shell(choosing(aliasChoices), {
+      submit: () => ({ kind: 'created', cardId: CARD_ID }),
     });
-    expect(state.pane.status).toBe('closed');
-    expect(state.continuation).toEqual({
-      target: { kind: 'card', cardId: CARD_ID },
-      select: true,
-      then: 'rename',
-    });
+
+    creation.submit(ALIAS);
+
+    expect(requested).toEqual([
+      { target: { kind: 'card', cardId: CARD_ID }, select: true, then: 'rename' },
+    ]);
   });
 
-  it('returns to Add Card when the creation left no Card to continue at', () => {
-    const state = reduce(choosing(), {
-      type: 'settled',
-      outcome: { kind: 'created', cardId: null },
+  /**
+   * A Space Card's lifecycle answers a completed Edit and not the identity it
+   * minted, and its title was typed on the pane before the Edit ran — so there
+   * is nothing left to name and the author goes back to the control.
+   */
+  it('returns to Add Card when the creation left no Card to continue at', async () => {
+    const { creation, requested } = shell(choosing(), {
+      submit: () => Promise.resolve({ kind: 'created', cardId: null }),
     });
-    expect(state.pane.status).toBe('closed');
-    expect(state.continuation).toEqual({
-      target: { kind: 'control', name: 'add-card' },
-      select: false,
-      then: 'focus',
-    });
-  });
 
-  it('is spent once', () => {
-    const cancelled = reduce(choosing(), { type: 'cancel' });
-    expect(reduce(cancelled, { type: 'continued' }).continuation).toBeNull();
+    creation.submit({ kind: 'space', targetSpaceId: SPACE_ID, title: 'Recap' });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(requested).toEqual([RETURN_TO_ADD_CARD]);
   });
 
   it('owes nothing when presenting takes the pane away', () => {
-    const state = reduce(choosing(), { type: 'presenting' });
-    expect(state.pane.status).toBe('closed');
-    expect(state.continuation).toBeNull();
+    const { creation, dispatched, requested } = shell(choosing());
+
+    creation.withdraw();
+
+    expect(dispatched).toEqual([{ type: 'presenting' }]);
+    expect(requested).toEqual([]);
   });
 
-  it('stays open, owing nothing, when the attempt did nothing', () => {
-    const state = reduce(choosing(aliasChoices), { type: 'settled', outcome: { kind: 'none' } });
-    expect(state.pane.status).toBe('choosing');
-    expect(state.continuation).toBeNull();
+  it('owes nothing when the attempt did nothing', () => {
+    const { creation, requested } = shell(choosing(aliasChoices), {
+      submit: () => ({ kind: 'none' }),
+    });
+
+    creation.submit(ALIAS);
+
+    expect(requested).toEqual([]);
+  });
+
+  it('owes nothing when the attempt was refused', () => {
+    const { creation, requested } = shell(choosing(aliasChoices), {
+      submit: () => ({ kind: 'refused', errors: { fields: {}, form: 'No.' } }),
+    });
+
+    creation.submit(ALIAS);
+
+    expect(requested).toEqual([]);
+  });
+
+  /** Cancel is refused while an Edit runs, so it owes nothing either. */
+  it('owes nothing for a cancel the pane refuses', () => {
+    const { creation, dispatched, requested } = shell(reduce(choosing(), { type: 'submitting' }));
+
+    creation.cancel();
+
+    expect(dispatched).toEqual([]);
+    expect(requested).toEqual([]);
   });
 });
 

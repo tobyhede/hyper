@@ -47,12 +47,11 @@ export interface SpaceEntityActionsOptions {
    *
    * `null` rather than a disabled item: Rename here is a second path to the
    * very chrome title edit that a live Card title editor withdraws, so while it
-   * cannot run there is nothing to offer. It takes the focus the row should get
-   * back, because who owns the caret afterwards is the Sidebar's business and
-   * not this module's.
+   * cannot run there is nothing to offer. Where the caret goes afterwards is
+   * not an argument here any more — the rename names its own continuation, and
+   * one adapter resolves every Sidebar row (`continuation.ts`).
    */
-  readonly onRename:
-    ((subject: SpaceChromeTitleSubject, title: string, returnFocus: () => void) => void) | null;
+  readonly onRename: ((subject: SpaceChromeTitleSubject, title: string) => void) | null;
   /**
    * Deletes the Layout, answering whether it went, or `null` while no Layout
    * Edit may run.
@@ -114,24 +113,6 @@ const copy = (
     (await onCopy(destination)) ? 'done' : 'failed',
 });
 
-/**
- * Focus the Sidebar row a rename was begun from.
- *
- * By the row's own addressing attribute rather than by a captured element: the
- * menu item that begins the rename is inside a popup that is gone by the time
- * the editor commits, so there is no element left to have held on to.
- *
- * The **row**, and not the addressed element: a row draws its title as a button
- * and its live rename as a `div`, both carrying the attribute, and this runs
- * from inside the editor's key handler — before React has swapped the editing
- * branch back — so the element the attribute finds is the unfocusable one.
- * The `<li>` around it is what survives the swap, which is why the click path
- * into the same rename focuses it too.
- */
-const focusRow = (attribute: string, id: string) => () => {
-  document.querySelector<HTMLElement>(`[${attribute}="${id}"]`)?.closest('li')?.focus();
-};
-
 export function spaceEntityActions({
   spaceId,
   spaceTitle,
@@ -139,11 +120,7 @@ export function spaceEntityActions({
   onRename,
   onDeleteLayout,
 }: SpaceEntityActionsOptions): (entity: SpaceEntity) => readonly EntityActionGroup[] {
-  const renameAction = (
-    subject: SpaceChromeTitleSubject,
-    title: string,
-    attribute: string,
-  ): EntityActionGroup =>
+  const renameAction = (subject: SpaceChromeTitleSubject, title: string): EntityActionGroup =>
     onRename === null
       ? []
       : [
@@ -155,7 +132,7 @@ export function spaceEntityActions({
             // and whether the rename it begins is then accepted is the
             // editor's report to make, not this item's.
             onSelect: () => {
-              onRename(subject, title, focusRow(attribute, subject.id));
+              onRename(subject, title);
               return 'done';
             },
           },
@@ -194,7 +171,7 @@ export function spaceEntityActions({
     if (entity.kind === 'layout') {
       const { id: layoutId, title } = entity.layout;
       return [
-        renameAction({ kind: 'layout', id: layoutId }, title, 'data-layout'),
+        renameAction({ kind: 'layout', id: layoutId }, title),
         [
           copy(
             'copy-link',
@@ -232,7 +209,7 @@ export function spaceEntityActions({
       // within-Layout address and both link forms are always offered here.
       const { graph, layout } = entity;
       return [
-        renameAction({ kind: 'graph', id: graph.id }, graph.title, 'data-graph-id'),
+        renameAction({ kind: 'graph', id: graph.id }, graph.title),
         [
           copy(
             'copy-link',

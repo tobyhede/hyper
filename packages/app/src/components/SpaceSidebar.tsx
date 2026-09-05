@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type Ref } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   type Card,
   type Graph,
@@ -134,7 +134,6 @@ export interface SpaceSidebarProps {
     readonly onAddSpaceCard: () => void;
     readonly disabled?: boolean;
     readonly keyShortcut?: string;
-    readonly menuTriggerRef?: Ref<HTMLButtonElement>;
     readonly hidden?: boolean;
   };
   readonly createLayout: {
@@ -326,12 +325,19 @@ export interface SpaceChromeTitleEdit {
     subject: SpaceChromeTitleSubject,
     title: string,
     surface: 'sidebar' | 'header',
-    returnFocus: () => void,
   ) => void;
   readonly onDraftChange: (draft: string) => void;
   readonly onErrorChange: (error: string | null) => void;
   readonly onComplete: (subject: SpaceChromeTitleSubject, title: string) => string | null;
   readonly onCancel: () => void;
+  /**
+   * Ask for the caret back where this rename was begun.
+   *
+   * The caller answers with a continuation rather than a captured element: this
+   * fires from inside the editor's own key handler, before React has swapped
+   * the row's branch back, so the element the row is addressed by is the
+   * unfocusable one at the moment it is asked (`continuation.ts`).
+   */
   readonly onReturnFocus: () => void;
 }
 
@@ -382,15 +388,16 @@ function LayoutRows({
             >
               {isEditing ? (
                 // The row keeps its addressing hooks while its own rename is
-                // live: an open pane marks the root `inert`, so `data-layout`
-                // is how a covered Sidebar is reached at all (docs/agents/ui.md).
+                // live: an open pane marks the root `inert`, so `data-layout-id`
+                // is how a covered Sidebar is reached at all (docs/agents/ui.md),
+                // and it is what returns the caret here afterwards.
                 // `aria-pressed` is not carried across — this branch renders a
                 // `div`, and pressed state on a non-button is not a thing to say.
                 <SidebarMenuButton
                   render={<div />}
                   isActive={active}
                   data-testid="layout-row"
-                  data-layout={layoutId}
+                  data-layout-id={layoutId}
                 >
                   <LayoutIcon />
                   <InlineTitleEditor
@@ -414,16 +421,10 @@ function LayoutRows({
                   isActive={active}
                   aria-pressed={active}
                   data-testid="layout-row"
-                  data-layout={layoutId}
-                  onClick={(event) => {
+                  data-layout-id={layoutId}
+                  onClick={() => {
                     if (active && titleEdit !== undefined && titleEdit.disabled !== true) {
-                      const row = event.currentTarget.closest('li');
-                      titleEdit.onBegin(
-                        { kind: 'layout', id: layoutId },
-                        layout.title,
-                        'sidebar',
-                        () => row?.focus(),
-                      );
+                      titleEdit.onBegin({ kind: 'layout', id: layoutId }, layout.title, 'sidebar');
                     } else {
                       onSelect(layoutId);
                     }
@@ -802,18 +803,16 @@ export function SpaceSidebar({
                             aria-pressed={active}
                             data-testid="graph-choice"
                             data-graph-id={candidate.id}
-                            onClick={(event) => {
+                            onClick={() => {
                               if (
                                 active &&
                                 titleEdit !== undefined &&
                                 titleEdit.disabled !== true
                               ) {
-                                const row = event.currentTarget.closest('li');
                                 titleEdit.onBegin(
                                   { kind: 'graph', id: candidate.id },
                                   candidate.title,
                                   'sidebar',
-                                  () => row?.focus(),
                                 );
                               } else {
                                 onCanvas(graph.onActivate)(candidate.id);
@@ -909,7 +908,15 @@ export function SelectedLayoutName({
   const isEditing = sameEdit && titleEdit?.surface === 'header';
   const shownTitle = sameEdit ? (titleEdit?.draft ?? layout.title) : layout.title;
   return (
-    <div data-testid="selected-canvas" className="flex min-w-0" tabIndex={-1}>
+    // `data-continuation-control` is how a rename begun here gets the caret
+    // back: the header is not a row and has no entity id of its own to be found
+    // by, and `tabIndex={-1}` is what makes this box the thing focus lands on.
+    <div
+      data-testid="selected-canvas"
+      data-continuation-control="layout-header"
+      className="flex min-w-0"
+      tabIndex={-1}
+    >
       {isEditing ? (
         <InlineTitleEditor
           title={layout.title}
@@ -945,12 +952,9 @@ export function SelectedLayoutName({
           variant="ghost"
           size="compact"
           aria-label={`Edit Layout ${shownTitle}`}
-          onClick={(event) => {
-            const header = event.currentTarget.parentElement;
-            titleEdit.onBegin({ kind: 'layout', id: layoutId }, layout.title, 'header', () =>
-              header?.focus(),
-            );
-          }}
+          onClick={() =>
+            titleEdit.onBegin({ kind: 'layout', id: layoutId }, layout.title, 'header')
+          }
         >
           {shownTitle}
         </Button>

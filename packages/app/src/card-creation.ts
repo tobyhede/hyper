@@ -5,6 +5,7 @@ import {
   presentCardCreationBreak,
   type CardCreationRefusalErrors,
 } from './authoring-refusal';
+import type { Continuation, PendingContinuation } from './continuation';
 
 /**
  * Creating a Card from a pane, as one state machine.
@@ -66,27 +67,6 @@ export interface CardCreationRead {
 export type CardCreationInput =
   | { readonly kind: 'alias'; readonly target: CardId; readonly title: string }
   | { readonly kind: 'space'; readonly targetSpaceId: UUID | null; readonly title: string };
-
-/**
- * Where an Edit continues, published for whoever can reach the target.
- *
- * Declared here under `architecture-review/19`'s vocabulary and its exact
- * shape, so that ticket lifts it into `continuation.ts` by a rename and a
- * delete rather than by a redesign. Two axes rather than one flat intent list,
- * because a creation is select *and* rename while a cancelled pane is focus
- * with no selection move.
- */
-export type ContinuationTarget =
-  | { readonly kind: 'card'; readonly cardId: CardId }
-  | { readonly kind: 'control'; readonly name: 'add-card' };
-
-export interface CardCreationContinuation {
-  readonly target: ContinuationTarget;
-  /** Whether the canvas selection moves to this target. */
-  readonly select: boolean;
-  /** What happens once it is reached. */
-  readonly then: 'focus' | 'rename';
-}
 
 /**
  * What one creation attempt came to.
@@ -157,8 +137,6 @@ export interface CardCreationState {
    * replaces prevented with a captured `current` flag in its cleanup.
    */
   readonly opening: number;
-  /** Where the finished gesture leaves the author, until an adapter spends it. */
-  readonly continuation: CardCreationContinuation | null;
 }
 
 export type CardCreationAction =
@@ -169,14 +147,11 @@ export type CardCreationAction =
   /** The author edited a field, so the refused attempt is over. */
   | { readonly type: 'refusal-stale' }
   | { readonly type: 'cancel' }
-  | { readonly type: 'presenting' }
-  /** An adapter has spent the pending continuation. */
-  | { readonly type: 'continued' };
+  | { readonly type: 'presenting' };
 
 export const CARD_CREATION_CLOSED: CardCreationState = {
   pane: { status: 'closed' },
   opening: 0,
-  continuation: null,
 };
 
 /**
@@ -186,14 +161,14 @@ export const CARD_CREATION_CLOSED: CardCreationState = {
  * returned to the control the menu was opened from, which is where a closing
  * menu puts them anyway.
  */
-const RETURN_TO_ADD_CARD: CardCreationContinuation = {
+const RETURN_TO_ADD_CARD: PendingContinuation = {
   target: { kind: 'control', name: 'add-card' },
   select: false,
   then: 'focus',
 };
 
-/** Where a creation that minted a Card continues: on it, named. */
-const nameCreatedCard = (cardId: CardId): CardCreationContinuation => ({
+/** Where a creation that minted a Card continues: on it, selected and named. */
+const nameCreatedCard = (cardId: CardId): PendingContinuation => ({
   target: { kind: 'card', cardId },
   select: true,
   then: 'rename',
@@ -237,9 +212,6 @@ export function cardCreationReducer(
           refusal: null,
         },
         opening: state.opening + 1,
-        // A continuation owed from an earlier gesture is not this opening's to
-        // discard. Its adapter waits for a pane-free render either way.
-        continuation: state.continuation,
       };
 
     case 'choices': {
@@ -273,12 +245,7 @@ export function cardCreationReducer(
       if (action.outcome.kind === 'none') {
         return { ...state, pane: { status: 'choosing', choices, listing, refusal: null } };
       }
-      const { cardId } = action.outcome;
-      return {
-        ...state,
-        pane: { status: 'closed' },
-        continuation: cardId === null ? RETURN_TO_ADD_CARD : nameCreatedCard(cardId),
-      };
+      return { ...state, pane: { status: 'closed' } };
     }
 
     case 'refusal-stale':
@@ -290,7 +257,7 @@ export function cardCreationReducer(
       // mounted, so closing here would abandon it through a route the pane
       // itself refuses.
       if (state.pane.status !== 'choosing') return state;
-      return { ...state, pane: { status: 'closed' }, continuation: RETURN_TO_ADD_CARD };
+      return { ...state, pane: { status: 'closed' } };
 
     case 'presenting':
       // Presenting waits for a coordinated Edit already in flight; its
@@ -298,9 +265,6 @@ export function cardCreationReducer(
       // way: the author asked for a presentation, not for a control.
       if (state.pane.status !== 'choosing') return state;
       return { ...state, pane: { status: 'closed' } };
-
-    case 'continued':
-      return state.continuation === null ? state : { ...state, continuation: null };
   }
 }
 
@@ -327,6 +291,20 @@ export interface CardCreationSeams {
    * invisible `console.error` behind whichever surface composed this.
    */
   readonly reportBreak: ObserverErrorReporter;
+  /**
+   * Where the finished pane leaves the author (`continuation.ts`).
+   *
+   * The module still decides *which* continuation a creation earns — that is
+   * the pane's own rule, and its two answers are the consts above — but it no
+   * longer holds the answer as a one-shot of its own for a caller to spend.
+   *
+   * Requested from this shell rather than from the reducer, which must stay
+   * pure. The one thing that could make a shell's captured state wrong here is
+   * a pane that closed under a running Edit, and the reducer forbids exactly
+   * that: `cancel` and `presenting` both require `choosing`, so a `submitting`
+   * pane is still open when its outcome arrives.
+   */
+  readonly continuation: Continuation;
 }
 
 export interface CardCreation {
@@ -336,7 +314,6 @@ export interface CardCreation {
   /** Presenting has started, so this surface goes, creating nothing. */
   readonly withdraw: () => void;
   readonly refusalStale: () => void;
-  readonly continued: () => void;
 }
 
 /**
@@ -350,18 +327,30 @@ export interface CardCreation {
 export function createCardCreation(
   state: CardCreationState,
   dispatch: (action: CardCreationAction) => void,
-  { readChoices, submit, reportBreak: report }: CardCreationSeams,
+  { readChoices, submit, reportBreak: report, continuation }: CardCreationSeams,
 ): CardCreation {
   // The opening this call is about to become, so a read answers the pane it was
   // made for and not whichever one is on screen when it settles.
   const opening = state.opening + 1;
 
+  /**
+   * Install the outcome, then say where the author goes.
+   *
+   * In that order and never the reverse: the pane's authoritative state is
+   * this module's, and the continuation is a notification about a pane that has
+   * already closed.
+   */
+  const settle = (outcome: CardCreationOutcome): void => {
+    dispatch({ type: 'settled', outcome });
+    if (outcome.kind !== 'created') return;
+    continuation.request(
+      outcome.cardId === null ? RETURN_TO_ADD_CARD : nameCreatedCard(outcome.cardId),
+    );
+  };
+
   const broke: ObserverErrorReporter = (failure) => {
     report(failure);
-    dispatch({
-      type: 'settled',
-      outcome: { kind: 'refused', errors: presentCardCreationBreak(failure) },
-    });
+    settle({ kind: 'refused', errors: presentCardCreationBreak(failure) });
   };
 
   return {
@@ -399,16 +388,21 @@ export function createCardCreation(
       // event loop. An Alias's completed Edit is over before anything could
       // render the disabled controls, and the pane never flickers through them.
       if (!(outcome instanceof Promise)) {
-        dispatch({ type: 'settled', outcome });
+        settle(outcome);
         return;
       }
       dispatch({ type: 'submitting' });
-      void outcome.then((settled) => dispatch({ type: 'settled', outcome: settled }), broke);
+      void outcome.then(settle, broke);
     },
 
-    cancel: () => dispatch({ type: 'cancel' }),
+    cancel: () => {
+      if (state.pane.status !== 'choosing') return;
+      dispatch({ type: 'cancel' });
+      continuation.request(RETURN_TO_ADD_CARD);
+    },
+    // Presenting is the one close that owes nothing: the author asked for a
+    // presentation, not for a control.
     withdraw: () => dispatch({ type: 'presenting' }),
     refusalStale: () => dispatch({ type: 'refusal-stale' }),
-    continued: () => dispatch({ type: 'continued' }),
   };
 }
