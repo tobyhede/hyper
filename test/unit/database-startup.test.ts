@@ -85,7 +85,7 @@ describe('defaultContentAggregate', () => {
 describe('openDatabaseSelection', () => {
   it('opens the space selected by its UUID', async () => {
     const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space');
-    const repository = new MemorySpaceRepository([storedSpace(4n), selected]);
+    const repository = new MemorySpaceRepository([storedSpace(4n), selected], SPACE_ID);
 
     const result = await openDatabaseSelection(repository, OTHER_SPACE_ID);
 
@@ -95,7 +95,7 @@ describe('openDatabaseSelection', () => {
   it('rejects a selected UUID that disappeared without falling back to another space', async () => {
     const remaining = storedSpace(0n);
     const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space');
-    const repository = new MemorySpaceRepository([remaining, selected]);
+    const repository = new MemorySpaceRepository([remaining, selected], SPACE_ID);
     await repository.importSpaces([remaining.snapshot], 'truncate');
 
     await expect(openDatabaseSelection(repository, OTHER_SPACE_ID)).rejects.toThrow(OTHER_SPACE_ID);

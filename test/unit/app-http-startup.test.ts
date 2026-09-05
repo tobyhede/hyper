@@ -41,9 +41,10 @@ const metaReferencingOther = (): SpaceSnapshot => ({
   ],
 });
 
-const startupFor = (...snapshots: SpaceSnapshot[]) => {
+const startupFor = (metaSpaceId: UUID, ...snapshots: SpaceSnapshot[]) => {
   const repository = new E2eMemorySpaceRepository(
     snapshots.map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
+    metaSpaceId,
   );
   const app = createSpaceHttpApp(repository);
   return startupOver(
@@ -75,7 +76,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('opens the Space named by the compact product-route id through HTTP', async () => {
-    const startup = startupFor(snapshot());
+    const startup = startupFor(SPACE_ID, snapshot());
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
@@ -87,7 +88,10 @@ describe('HTTP space startup composition', () => {
   });
 
   it('fails when the product-route id no longer resolves', async () => {
-    const startup = startupFor(snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'));
+    const startup = startupFor(
+      OTHER_SPACE_ID,
+      snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'),
+    );
 
     await expect(
       startup.resolve(productDestinationPath({ kind: 'space', spaceId: SPACE_ID })),
@@ -96,6 +100,7 @@ describe('HTTP space startup composition', () => {
 
   it('opens the exact named Space when several are stored', async () => {
     const startup = startupFor(
+      SPACE_ID,
       metaReferencingOther(),
       snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'),
     );
@@ -135,7 +140,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('rejects a malformed compact product-route id', async () => {
-    const startup = startupFor(snapshot());
+    const startup = startupFor(SPACE_ID, snapshot());
 
     await expect(startup.resolve('/spaces/not-a-compact-uuid')).rejects.toThrow(
       'The product URL is malformed.',

@@ -81,9 +81,24 @@ export class MemorySpaceRepository implements SpaceRepository {
   readonly #spaces = new Map<UUID, LoadedSpace>();
   #metaSpaceId: UUID | undefined;
 
+  /**
+   * Either an uninitialized repository — no Spaces and no Meta identity — or
+   * stored Spaces under the Meta identity the fixture *names*. There is no
+   * third shape, because "these Spaces, and whichever one happens to be first
+   * is Meta" is the ordering inference ADR 0078 refuses every adapter, and a
+   * double that takes it decides an aggregate's validity by array position:
+   * seeded the other way round, the same two Spaces leave the one Meta does not
+   * reach unreferenced, and `loadAggregate` refuses what it accepted before.
+   *
+   * The overloads are what make the omission unwriteable rather than merely
+   * discouraged; `withoutMetaIdentity` below is the one deliberate way to reach
+   * the broken state, and it is named.
+   */
+  constructor();
+  constructor(spaces: readonly LoadedSpace[], metaSpaceId: UUID);
   constructor(spaces: readonly LoadedSpace[] = [], metaSpaceId?: UUID) {
     for (const space of spaces) this.#spaces.set(space.snapshot.id, clone(space));
-    this.#metaSpaceId = metaSpaceId ?? spaces[0]?.snapshot.id;
+    this.#metaSpaceId = metaSpaceId;
   }
 
   /**
@@ -102,8 +117,8 @@ export class MemorySpaceRepository implements SpaceRepository {
    * refuse it, and this is what lets the memory one be asked.
    */
   static withoutMetaIdentity(spaces: readonly LoadedSpace[]): MemorySpaceRepository {
-    const repository = new MemorySpaceRepository(spaces);
-    repository.#metaSpaceId = undefined;
+    const repository = new MemorySpaceRepository();
+    for (const space of spaces) repository.#spaces.set(space.snapshot.id, clone(space));
     return repository;
   }
 

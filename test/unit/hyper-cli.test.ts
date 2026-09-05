@@ -151,7 +151,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     const exitCode = await runHyper(['export', SPACE_ID, destination], {
-      repository: new MemorySpaceRepository([storedSpace]),
+      repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: output.io,
       newId: newUuid,
     });
@@ -183,7 +183,7 @@ describe('runHyper', () => {
 
     await expect(
       runHyper(args, {
-        repository: new MemorySpaceRepository([storedSpace]),
+        repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
         io: output.io,
         newId: newUuid,
       }),
@@ -203,7 +203,7 @@ describe('runHyper', () => {
     await writeFile(join(destination, 'cards', 'nested', 'keep.md'), 'keep nested\n');
 
     const exitCode = await runHyper(['export', SPACE_ID, destination], {
-      repository: new MemorySpaceRepository([storedSpace]),
+      repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: captureIo().io,
       newId: newUuid,
     });
@@ -225,7 +225,7 @@ describe('runHyper', () => {
     const parent = await makeTemporaryDirectory();
     const destination = join(parent, 'exported');
     const revision = 9_007_199_254_740_993n;
-    const repository = new MemorySpaceRepository([{ ...storedSpace, revision }]);
+    const repository = new MemorySpaceRepository([{ ...storedSpace, revision }], SPACE_ID);
 
     await expect(
       runHyper(['export', SPACE_ID, destination], {
@@ -246,7 +246,7 @@ describe('runHyper', () => {
     await mkdir(destination);
     await writeFile(join(destination, 'space.json'), 'previous space\n');
     await writeFile(join(destination, 'cards'), 'not a directory\n');
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
     await expect(
@@ -271,7 +271,7 @@ describe('runHyper', () => {
     await writeFile(join(external, 'space.json'), 'external space\n');
     await writeFile(join(external, 'cards', 'external.md'), 'external card\n');
     await symlink(external, destination);
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
     await expect(
@@ -299,7 +299,7 @@ describe('runHyper', () => {
     await writeFile(join(destination, 'notes.txt'), 'keep root\n');
     await writeFile(join(externalCards, 'external.md'), 'external card\n');
     await symlink(externalCards, join(destination, 'cards'));
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
     await expect(
@@ -329,7 +329,7 @@ describe('runHyper', () => {
     await writeFile(join(destination, 'space.json'), 'previous space\n');
     await writeFile(external, 'external card\n');
     await symlink(external, join(destination, 'cards', `${CARD_ID}.md`));
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
     await expect(
@@ -351,7 +351,7 @@ describe('runHyper', () => {
 
   it('marks the projected revision when a newer edit commits during export', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const markExported = repository.markExported.bind(repository);
     repository.markExported = async (id, revision) => {
       const changed: SpaceSnapshot = {
@@ -442,7 +442,10 @@ describe('runHyper', () => {
 
     await expect(
       runHyper(['export', SPACE_ID, destination], {
-        repository: new MemorySpaceRepository([{ snapshot, revision: 7n, exportedRevision: null }]),
+        repository: new MemorySpaceRepository(
+          [{ snapshot, revision: 7n, exportedRevision: null }],
+          SPACE_ID,
+        ),
         io: captureIo().io,
         newId: newUuid,
       }),
@@ -481,7 +484,7 @@ describe('runHyper', () => {
 
     await expect(
       runHyper(['export', SPACE_ID, destination], {
-        repository: new MemorySpaceRepository([reordered]),
+        repository: new MemorySpaceRepository([reordered], SPACE_ID),
         io: captureIo().io,
         newId: newUuid,
       }),
@@ -513,7 +516,7 @@ describe('runHyper', () => {
 
     await expect(
       runHyper(['export', SPACE_ID, destination], {
-        repository: new MemorySpaceRepository([withMixedLineEndings]),
+        repository: new MemorySpaceRepository([withMixedLineEndings], SPACE_ID),
         io: captureIo().io,
         newId: newUuid,
       }),
@@ -585,7 +588,7 @@ describe('runHyper', () => {
   it('imports a UUID into the existing catalog', async () => {
     const directory = await writeValidSpace(OTHER_SPACE_ID, 'Fresh imported talk');
     const output = captureIo();
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
     const exitCode = await runHyper([directory], { repository, io: output.io, newId: newUuid });
 
@@ -604,7 +607,7 @@ describe('runHyper', () => {
   it('dangerously truncates existing spaces when importing a path', async () => {
     const directory = await writeValidSpace(OTHER_SPACE_ID, 'Replacement talk');
     const output = captureIo();
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
     const exitCode = await runHyper([directory, '--dangerous-truncate'], {
       repository,
@@ -634,7 +637,7 @@ describe('runHyper', () => {
       JSON.stringify({ version: 1, id: THIRD_SPACE_ID, title: 'Second imported' }),
     );
     const output = captureIo();
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
     const exitCode = await runHyper([collection], {
       repository,
@@ -965,7 +968,7 @@ describe('runCliMain', () => {
     };
 
     const exitCode = await runCliMain(['--bogus'], {
-      repository: new MemorySpaceRepository([storedSpace]),
+      repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io,
       newId: newUuid,
       close: () => {
@@ -984,7 +987,7 @@ describe('runCliMain', () => {
     let closed = false;
 
     const exitCode = await runCliMain(['--bogus'], {
-      repository: new MemorySpaceRepository([storedSpace]),
+      repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       newId: newUuid,
       io: {
         stdout: () => undefined,

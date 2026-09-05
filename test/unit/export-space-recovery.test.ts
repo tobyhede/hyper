@@ -98,7 +98,7 @@ describe('canonical export recovery cleanup', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     await mkdir(destination);
     await writeFile(join(destination, 'space.json'), 'previous space\n');
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
     await expect(exportSpace(repository, SPACE_ID, destination)).resolves.toMatchObject({
       revision: 7n,
@@ -115,7 +115,7 @@ describe('canonical export recovery cleanup', () => {
   it('reports a completed export when its staging directory cannot be removed afterward', async () => {
     cleanupFailure.kind = 'staging';
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
     await expect(exportSpace(repository, SPACE_ID, destination)).resolves.toMatchObject({
       revision: 7n,
@@ -134,7 +134,7 @@ describe('canonical export recovery cleanup', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     await mkdir(destination);
     await writeFile(join(destination, 'space.json'), 'previous space\n');
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     cleanupFailure.replacementWrite = true;
 
     await expect(exportSpace(repository, SPACE_ID, destination)).rejects.toMatchObject({

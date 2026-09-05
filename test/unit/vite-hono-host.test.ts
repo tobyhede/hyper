@@ -279,7 +279,7 @@ describe('Vite Hono host', () => {
       const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const stored = { snapshot, revision: 0n, exportedRevision: null };
       const { host } = await startHost(
-        createSpaceHost(new FailingSpaceRepository([stored]), newUuid),
+        createSpaceHost(new FailingSpaceRepository([stored], SPACE_ID), newUuid),
       );
 
       const response = await fetch(`${host.url}/`, {
@@ -350,7 +350,7 @@ describe('Vite Hono host', () => {
 
   it('lets an existing canonical Space URL reach the SPA fallback', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const hostApp = createSpaceHost(new MemorySpaceRepository([stored]), newUuid);
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID), newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.setHeader('Content-Type', 'text/html');
       response.end('<main>Canonical Space</main>');
@@ -364,7 +364,7 @@ describe('Vite Hono host', () => {
 
   it('answers a removed canvas identity as not found', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const spaceRepository = new MemorySpaceRepository([stored]);
+    const spaceRepository = new MemorySpaceRepository([stored], SPACE_ID);
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
     const hostApp = createSpaceHost(spaceRepository, newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
