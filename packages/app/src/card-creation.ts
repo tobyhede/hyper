@@ -229,6 +229,12 @@ export function cardCreationReducer(
 ): CardCreationState {
   switch (action.type) {
     case 'open':
+      // Mutual exclusion is this module's rule, so it is enforced where the
+      // state is and not only in the shell's closure over the state it read.
+      // Two dispatches from one render would otherwise count two openings
+      // while both reads answer the first, and the pane would fill from
+      // neither.
+      if (state.pane.status !== 'closed') return state;
       return {
         pane: {
           status: 'choosing',

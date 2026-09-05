@@ -70,7 +70,29 @@ describe('the Card creation pane', () => {
       { type: 'open', kind: 'alias' },
       { type: 'open', kind: 'space' },
     );
-    expect(state.pane.status === 'choosing' && state.pane.choices.kind).toBe('space');
+    expect(state.pane.status === 'choosing' && state.pane.choices.kind).toBe('alias');
+  });
+
+  /**
+   * The shell declines to open over an open pane, but the rule is the state
+   * machine's: enforcing it only in a closure over the state as it was read
+   * leaves two dispatches from one render able to count two openings, and a
+   * read then answers an opening that no longer exists.
+   */
+  it('counts one opening for an open request the pane is already answering', () => {
+    const twice = reduce(
+      CARD_CREATION_CLOSED,
+      { type: 'open', kind: 'space' },
+      { type: 'open', kind: 'space' },
+    );
+    expect(twice.opening).toBe(1);
+
+    const filled = reduce(twice, {
+      type: 'choices',
+      opening: 1,
+      read: { choices: spaceChoices, listing: null },
+    });
+    expect(filled.pane.status === 'choosing' && filled.pane.choices).toEqual(spaceChoices);
   });
 });
 
