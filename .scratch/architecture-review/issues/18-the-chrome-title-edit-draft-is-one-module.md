@@ -3,7 +3,10 @@
 Status: needs-triage
 Tags: Improvement
 Blocked by: none
-Related: `architecture-review/17` (which parked this and named the one behaviour
+Related: `architecture-review/19` (it removes `returnFocus` from `onBegin`, from
+the `spaceChromeEdit` state and from `onReturnFocus`, so this ticket inherits a
+three-argument interface and one fewer stored value);
+`architecture-review/17` (which parked this and named the one behaviour
 it cost); ADR 0042 (a replacement discards every open Interaction draft)
 
 Surfaced by: the 4 September 2026 architecture review, candidate
@@ -69,6 +72,14 @@ without help.
 - **Whether `chromeEditingDisabled` moves with it.** It is the draft's own
   precondition, and it reads `editable`, `presenting`, `creatingAlias`,
   `editingCardBody` and `editingCardTitle` — five terms App owns.
+- **Nothing about focus return.** `architecture-review/19` takes it: `returnFocus`
+  is a continuation, and today it is a captured DOM closure stored on React state
+  (`App.tsx:380`, `:442`) and invoked through `onReturnFocus` (`:449`) at three
+  `InlineTitleEditor` wirings. 19 replaces all of it with a request naming the
+  Sidebar row or the header control, so `onBegin` arrives here at three
+  arguments and `spaceChromeEdit` at four fields — `subject`, `surface`,
+  `draft`, `error`. `surface` is what decides which of the two the caret returns
+  to, so it is not one of the three the closure took the place of. Settled, not open — listed so this ticket does not re-solve it.
 - **Whether the withdrawal matrix is this module's.** `architecture-review/17`
   lists "the disablement matrix" as a separate candidate. The two overlap at
   `:738`, `:752`, `:774` and `:926`, and settling one without the other risks

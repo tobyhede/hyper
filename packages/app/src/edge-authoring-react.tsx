@@ -30,11 +30,9 @@ import {
   newCardDrop,
   type ElementDropTarget,
   type EdgeAuthoring,
-  type FocusRequest,
 } from './edge-authoring';
 import {
   edgeSelectionOf,
-  sameEdgeSubject,
   sameSelection,
   type CanvasSelection,
   type EdgeSubject,
@@ -119,7 +117,6 @@ export interface EdgeAuthoringInput {
    * positioned strategy resolves asynchronously.
    */
   readonly enabled: boolean;
-  readonly onSelectCard: (cardId: CardId) => void;
   readonly onSelectEdge: (subject: EdgeSubject) => void;
 }
 
@@ -176,7 +173,6 @@ export function useEdgeAuthoring({
   placedCards,
   newCardTitle,
   enabled,
-  onSelectCard,
   onSelectEdge,
 }: EdgeAuthoringInput): EdgeAuthoringSurface {
   const state = useSyncExternalStore(authoring.subscribe, authoring.getState);
@@ -331,18 +327,19 @@ export function useEdgeAuthoring({
           );
         }
       }
-      const continuation = latest.current.authoring.endPointerDrag();
+      // The Card a completed connection reached is published as a continuation
+      // rather than selected here. **The frame this used to defer by is gone
+      // with it**: it existed because selecting during the release would be
+      // undone by the selection changes the release itself produces, and the
+      // spend no longer happens inside `onConnectEnd` at all — the gesture
+      // posts, and `CanvasContinuation` spends on a later render, after React
+      // has committed the release.
+      latest.current.authoring.endPointerDrag();
       setModifierHeld(false);
       setPointerOver('off-canvas');
       connecting.current = false;
-      // After React Flow has settled its own gesture: selecting a Card during
-      // the release would be undone by the selection changes the release itself
-      // produces.
-      if (continuation !== null) {
-        requestAnimationFrame(() => onSelectCard(continuation));
-      }
     },
-    [screenToFlowPosition, acceptsEmptyDrop, onSelectCard],
+    [screenToFlowPosition, acceptsEmptyDrop],
   );
 
   const handleMouseMove = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
@@ -474,56 +471,6 @@ export function useEdgeAuthoring({
       document.querySelector<HTMLElement>('.react-flow')?.focus();
     });
   }, []);
-
-  /**
-   * The element a focus request names, resolved against the projection now on
-   * screen — the only place a domain subject becomes a React Flow id.
-   *
-   * A request that names nothing drawn falls through to the canvas, which is the
-   * point of having a fallback at all: an Edit can remove the very thing focus
-   * was owed to between the request and this effect running.
-   */
-  const focusTargetOf = useCallback(
-    (request: FocusRequest): HTMLElement | null => {
-      if (request.kind === 'canvas') return null;
-      if (request.kind === 'card') {
-        return document.querySelector<HTMLElement>(
-          `.react-flow__node[data-id="${CSS.escape(request.cardId)}"]`,
-        );
-      }
-      const drawn = edges.find((edge) => {
-        const subject = edgeSelectionOf(edge);
-        return subject !== null && sameEdgeSubject(subject, request);
-      });
-      return drawn === undefined
-        ? null
-        : document.querySelector<HTMLElement>(
-            `.react-flow__edge[data-id="${CSS.escape(drawn.id)}"]`,
-          );
-    },
-    [edges],
-  );
-
-  const focusRequest = state.focusRequest;
-  useEffect(() => {
-    if (focusRequest === null) return;
-    const target = focusTargetOf(focusRequest);
-    // **An Edge request outlives the render that made it.** It is published
-    // synchronously with the Edit, but the projection carrying the Edge that
-    // Edit produced arrives a strategy later — so a request that resolves to
-    // nothing *yet* stays owed rather than being spent on the canvas fallback.
-    // `focusTargetOf` closes over `edges`, so the next projection re-runs this.
-    //
-    // Only Edges wait. A Card and the canvas are already drawn, so for them an
-    // unresolvable request means the element is gone for good, and falling back
-    // is the answer rather than a wait with no end.
-    if (target === null && focusRequest.kind === 'edge') return;
-    authoring.takeFocusRequest();
-    // Only when the completed projection has left focus nowhere. An author who
-    // has already moved to another control keeps it.
-    if (document.activeElement !== document.body) return;
-    (target ?? document.querySelector<HTMLElement>('.react-flow'))?.focus();
-  }, [focusRequest, authoring, focusTargetOf]);
 
   const cardTitles = useMemo(
     () => new Map(placedCards.map((card) => [card.id, card.title])),

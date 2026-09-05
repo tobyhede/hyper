@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Card } from '@project/core';
 import { NewAlias } from '../src/components/NewAlias';
+import { presentNewAliasRefusal } from '../src/authoring-refusal';
 
 /**
  * The Alias creation pane on its own, for the one thing the full-app tests
@@ -48,7 +49,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal={{ code: 'alias-target-not-found', targetId: TARGET_ID }}
+        refusal={presentNewAliasRefusal({ code: 'alias-target-not-found', targetId: TARGET_ID })}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={staleRefusal}
@@ -66,7 +67,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal={{ code: 'alias-target-not-found', targetId: TARGET_ID }}
+        refusal={presentNewAliasRefusal({ code: 'alias-target-not-found', targetId: TARGET_ID })}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={staleRefusal}
@@ -82,7 +83,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal={{ code: 'alias-target-not-found', targetId: TARGET_ID }}
+        refusal={presentNewAliasRefusal({ code: 'alias-target-not-found', targetId: TARGET_ID })}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={() => undefined}
@@ -102,7 +103,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={[]}
-        refusal={{ code: 'alias-target-not-found', targetId: TARGET_ID }}
+        refusal={presentNewAliasRefusal({ code: 'alias-target-not-found', targetId: TARGET_ID })}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={() => undefined}
@@ -119,7 +120,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal={{ code: 'card-title-required' }}
+        refusal={presentNewAliasRefusal({ code: 'card-title-required' })}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={() => undefined}
@@ -145,7 +146,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal={{ code: 'layout-not-found' }}
+        refusal={presentNewAliasRefusal({ code: 'layout-not-found' })}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={() => undefined}

@@ -94,7 +94,7 @@ interface Harness {
  * also exercising the Edge lifecycle. Its own behaviour is covered by
  * `edge-authoring.test.ts` and `edge-authoring-react.test.tsx`.
  */
-const IDLE_EDGE_STATE = { draft: null, refusal: null, focusRequest: null } as const;
+const IDLE_EDGE_STATE = { draft: null, refusal: null } as const;
 
 function inertEdgeAuthoring(): EdgeAuthoring {
   return {
@@ -108,15 +108,14 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     }),
     accepts: () => false,
     beginPointerConnect: () => undefined,
-    connect: () => null,
-    createConnectedCard: () => null,
-    endPointerDrag: () => null,
+    connect: () => undefined,
+    createConnectedCard: () => undefined,
+    endPointerDrag: () => undefined,
     beginPointerReconnect: () => undefined,
     openEdgeEditor: () => undefined,
     reconnect: () => false,
     deleteEdge: () => false,
     cancelDraft: () => undefined,
-    takeFocusRequest: () => null,
     dispose: () => undefined,
   };
 }

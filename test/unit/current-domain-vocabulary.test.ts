@@ -558,7 +558,7 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
       `export function SelectedLayoutName({ layout }: { readonly layout: Layout }) {`,
       `import { resolveLayout, layoutCards } from '../layout-resolution';`,
       `const selected = layouts.find((layout) => layout.id === selectedLayoutId);`,
-      `<button data-layout={layout.id} data-testid="layout-row" />`,
+      `<button data-layout-id={layout.id} data-testid="layout-row" />`,
       `navigation.selectLayout(layoutId); navigation.continueInLayout(layoutId, graphId);`,
       `expect(errors[0]?.kind).toBe('unresolved-default-layout');`,
       `import { EdgeLabelRenderer } from '@xyflow/react';`,

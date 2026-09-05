@@ -22,9 +22,11 @@ import { AppShell } from '@project/ui';
 import { resolveLayout } from '#src/layout-resolution';
 import { graphColorMap } from '#src/colors';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
+import { createContinuation, renameReturn } from '#src/continuation';
 import { spaceEntityActions } from '#src/entity-actions';
 import { createWorkingSpaceReader, snapshotFromSpace } from '#src/snapshot';
 import { createSpaceAuthoring } from '#src/space-authoring';
+import { ChromeContinuation } from '#components/ChromeContinuation';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import {
   SelectedLayoutName,
@@ -112,7 +114,6 @@ export function SpaceSidebarFixture({
     readonly draft: string;
     readonly error: string | null;
     readonly surface: 'sidebar' | 'header';
-    readonly returnFocus: () => void;
   } | null>(null);
   const editSession = useMemo(() => {
     const snapshot = snapshotFromSpace(space);
@@ -147,6 +148,14 @@ export function SpaceSidebarFixture({
       newId: storyGraphIds(),
     });
   }, [editSession, navigation, readEditableSpace]);
+  // Where a rename returns the caret, composed the way `composeApp` composes
+  // it — one instance for this fixture's Authoring, spent by the one adapter.
+  const continuation = useMemo(() => createContinuation({ authoring }), [authoring]);
+  // Composed for one `authoring`, and released with it: without this a remount
+  // — or a change to any of `authoring`'s own dependencies — leaves the
+  // previous continuation subscribed to a Space Authoring no live component
+  // reads. `open-spaces.ts` is where production releases the same seam.
+  useEffect(() => () => continuation.dispose(), [continuation]);
   // Where `presenting` is honoured now that Navigation outlives it. Reconciled
   // against the mode rather than applied, so the mount the initializer already
   // presented publishes nothing here, and so a story's own Present button — the
@@ -157,7 +166,6 @@ export function SpaceSidebarFixture({
     if (presenting) navigation.present();
     else navigation.exitPresenting();
   }, [navigation, presenting]);
-  const addCardMenu = useRef<HTMLButtonElement>(null);
   // The Space answers which Layouts exist and the resolver answers which one is
   // drawing; the header below reads that Layout rather than a title of the
   // fixture's own. The selection, its Active Graph and its mode are all
@@ -174,8 +182,8 @@ export function SpaceSidebarFixture({
     draft: titleEdit?.draft ?? '',
     error: titleEdit?.error ?? null,
     disabled: authoringDisabled || presenting,
-    onBegin: (subject, title, surface, returnFocus) =>
-      setTitleEdit({ subject, draft: title, error: null, surface, returnFocus }),
+    onBegin: (subject, title, surface) =>
+      setTitleEdit({ subject, draft: title, error: null, surface }),
     onDraftChange: (draft) =>
       setTitleEdit((current) => (current === null ? null : { ...current, draft })),
     onErrorChange: (error) =>
@@ -190,7 +198,14 @@ export function SpaceSidebarFixture({
       return null;
     },
     onCancel: () => setTitleEdit(null),
-    onReturnFocus: () => titleEdit?.returnFocus(),
+    // Production's own answer, through production's own module: the row is
+    // named rather than held, and `ChromeContinuation` below is what resolves
+    // it. A fixture that focused an element of its own here would be proving
+    // the fixture.
+    onReturnFocus: () => {
+      if (titleEdit === null) return;
+      continuation.request(renameReturn(titleEdit.surface, titleEdit.subject));
+    },
   };
 
   // The production builder, over the fixture's own Space, with the two side
@@ -213,8 +228,7 @@ export function SpaceSidebarFixture({
     spaceTitle: displayedSpace.title,
     onCopy: recordCopy,
     onRename: editsAvailable
-      ? (subject, title, returnFocus) =>
-          chromeTitleEdit.onBegin(subject, title, 'sidebar', returnFocus)
+      ? (subject, title) => chromeTitleEdit.onBegin(subject, title, 'sidebar')
       : null,
     onDeleteLayout: editsAvailable
       ? (layoutId) => authoring.complete({ kind: 'deleted-layout', layoutId }).kind === 'completed'
@@ -246,7 +260,6 @@ export function SpaceSidebarFixture({
             onAddSpaceCard: () => undefined,
             disabled: authoringDisabled,
             keyShortcut: 'C',
-            menuTriggerRef: addCardMenu,
             hidden: false,
           }}
           createLayout={
@@ -284,6 +297,7 @@ export function SpaceSidebarFixture({
       }
       notice={<PersistenceNotice persistence={persistence} onRetry={onRetry} />}
     >
+      <ChromeContinuation continuation={continuation} />
       {children ?? <div data-testid="space-canvas-stand-in" />}
     </AppShell>
   );

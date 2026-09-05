@@ -135,10 +135,17 @@ const titleAndTargetPlacements = {
   'layout-active-graph-required': form,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | 'target' | null>>;
 
-export type NewAliasRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
+/**
+ * Error placement for a creation pane, which owns Title and Target.
+ *
+ * One type for both kinds of creation. It is `card-creation.ts`'s refusal
+ * type, which is what lets that module hold one state machine rather than one
+ * generic over two refusal unions.
+ */
+export type CardCreationRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
 
 /** Error placement for Alias creation, which owns Title and Target. */
-export const presentNewAliasRefusal = (refusal: AuthoringRefusal): NewAliasRefusalErrors =>
+export const presentNewAliasRefusal = (refusal: AuthoringRefusal): CardCreationRefusalErrors =>
   presentRefusal(refusal, titleAndTargetPlacements);
 
 /**
@@ -302,7 +309,41 @@ export const describeSpaceCardRefusal = (refusal: SpaceCardRefusal): string => {
  * describe the containing Space or the repository, which no row in that list
  * would fix.
  */
-export const presentNewSpaceCardRefusal = (refusal: SpaceCardRefusal): NewAliasRefusalErrors =>
+export const presentNewSpaceCardRefusal = (refusal: SpaceCardRefusal): CardCreationRefusalErrors =>
   refusal.code === 'aggregate-refused'
     ? { fields: { target: describeSpaceCardRefusal(refusal) } }
     : { fields: {}, form: describeSpaceCardRefusal(refusal) };
+
+/**
+ * What a rejected creation says, on the channel a refusal with no field takes.
+ *
+ * A rejection is not a refusal: the lifecycle refuses for everything it can
+ * name, so reaching here means an invariant broke and there is no field to
+ * correct. The sentence is written from what threw rather than from a refusal
+ * code invented to carry it, because a refusal code is a stable domain identity
+ * (ADR 0057) and this is not one. It lives here rather than on the pane so that
+ * `authoring-refusal.ts` remains the only place a creation's prose is written.
+ *
+ * The rejection is `unknown` because a `throw` can carry anything, and that is
+ * the caught-error boundary the parsing rules exempt — named here rather than
+ * written at the parameter, the way `ObserverErrorReporter` names its own.
+ */
+export type CardCreationBreak = (failure: unknown) => CardCreationRefusalErrors;
+
+/** @see CardCreationBreak */
+export const presentCardCreationBreak: CardCreationBreak = (failure) => ({
+  fields: {},
+  form: `This Card was not created: ${failure instanceof Error ? failure.message : String(failure)}`,
+});
+
+/**
+ * What a choices read that threw says, rather than what a creation says.
+ *
+ * A read that failed attempted no Edit, so `presentCardCreationBreak`'s
+ * sentence would be false on this path. Both stay here for the reason the one
+ * above gives: a creation's prose is written in this module or nowhere.
+ */
+export const presentCardChoicesBreak: CardCreationBreak = (failure) => ({
+  fields: {},
+  form: `The choices for this Card could not be read: ${failure instanceof Error ? failure.message : String(failure)}`,
+});

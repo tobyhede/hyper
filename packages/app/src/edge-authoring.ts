@@ -8,6 +8,7 @@ import {
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CARD_SIZE } from './card';
 import type { ConnectionCompletion, ConnectionResult } from './connection-completion';
+import type { Continuation, ContinuationTarget } from './continuation';
 import type { CanvasSelection, EdgeSubject, RenderAdapter } from './render-adapter';
 import { sameEdgeSubject, sameSelection } from './render-adapter';
 import type {
@@ -231,18 +232,6 @@ export type SelectedEdgeRefusal = Extract<
 export const selectedEdgeRefusalOf = (refusal: EdgeRefusal | null): SelectedEdgeRefusal | null =>
   refusal?.kind === 'reconnection' || refusal?.kind === 'deletion' ? refusal : null;
 
-/**
- * Where focus goes once the projection carrying a completed Edit has rendered.
- *
- * The Edge is named by subject rather than by React Flow's edge id, like every
- * other Edge reference here — the React layer resolves it against the projection
- * it is about to draw, which is the only place that mapping exists.
- */
-export type FocusRequest =
-  | { readonly kind: 'card'; readonly cardId: CardId }
-  | ({ readonly kind: 'edge' } & EdgeSubject)
-  | { readonly kind: 'canvas' };
-
 export interface EdgeAuthoringState {
   readonly draft: EdgeDraft | null;
   /**
@@ -251,14 +240,6 @@ export interface EdgeAuthoringState {
    * refusal stand together so the author can correct what they aimed at.
    */
   readonly refusal: EdgeRefusal | null;
-  /**
-   * A focus move Hyper owes the author, consumed once by the React layer.
-   *
-   * React Flow supplies focus for everything it draws; this covers only the case
-   * it cannot — the completed projection removed the element that had focus, so
-   * there is nothing left to restore it to.
-   */
-  readonly focusRequest: FocusRequest | null;
 }
 
 export interface EdgeAuthoring {
@@ -270,29 +251,30 @@ export interface EdgeAuthoring {
   readonly accepts: (proposal: EdgeProposal) => boolean;
 
   readonly beginPointerConnect: (from: CardId) => void;
-  /** One completed React Flow connection. Answers the Card to continue at. */
-  readonly connect: (
-    from: CardId,
-    to: CardId,
-    projected: readonly CardFlowNode[] | null,
-  ) => CardId | null;
+  /** One completed React Flow connection. */
+  readonly connect: (from: CardId, to: CardId, projected: readonly CardFlowNode[] | null) => void;
   /** An Option/Alt empty drop: author the Card and the Edge that reaches it. */
   readonly createConnectedCard: (
     from: CardId,
     position: LayoutPosition,
     projected: readonly CardFlowNode[] | null,
-  ) => CardId | null;
+  ) => void;
   /**
-   * End whichever pointer drag was in flight, and hand back the Card to continue
-   * at — the target of a completed connection, or `null` for anything else.
+   * End whichever pointer drag was in flight, requesting the continuation a
+   * completed connection earns — the Card it reached, selected.
    *
    * One operation for both pointer drafts because a drag ends the same way
    * whatever it was doing: **the draft goes and the refusal stays.** A refusal
    * normally retains its draft so the author can correct the proposal, but a
    * finished drag leaves no surface to correct — the sentence is the whole of
    * what they are told, and cancelling would take it away with the draft.
+   *
+   * The Card is held until the drag ends rather than answered to the caller: it
+   * used to be a return value the two connecting operations passed up and their
+   * call sites discarded, which is the second continuation channel
+   * `continuation.ts` replaced.
    */
-  readonly endPointerDrag: () => CardId | null;
+  readonly endPointerDrag: () => void;
 
   readonly beginPointerReconnect: (subject: EdgeSubject, endpoint: EdgeEndpoint) => void;
   readonly openEdgeEditor: (subject: EdgeSubject) => void;
@@ -301,8 +283,6 @@ export interface EdgeAuthoring {
   readonly deleteEdge: (subject: EdgeSubject) => boolean;
   /** Cancel the topmost Edge surface, producing no Edit. */
   readonly cancelDraft: () => void;
-  /** Take the pending focus move, leaving none behind. */
-  readonly takeFocusRequest: () => FocusRequest | null;
   readonly dispose: () => void;
 }
 
@@ -310,10 +290,12 @@ export interface EdgeAuthoringDependencies {
   readonly authoring: SpaceAuthoring;
   readonly adapter: RenderAdapter;
   readonly connections: ConnectionCompletion;
+  /** Where every focus move this lifecycle owes the author is published. */
+  readonly continuation: Continuation;
   readonly reportObserverError?: ObserverErrorReporter | undefined;
 }
 
-const IDLE: EdgeAuthoringState = { draft: null, refusal: null, focusRequest: null };
+const IDLE: EdgeAuthoringState = { draft: null, refusal: null };
 
 /** The channel a finished pointer gesture leaves its refusal on. */
 const gestureRefusal = (refusal: AuthoringRefusal): EdgeRefusal => ({ kind: 'gesture', refusal });
@@ -345,6 +327,7 @@ export function createEdgeAuthoring({
   authoring,
   adapter,
   connections,
+  continuation,
   reportObserverError = (error) => console.error('EdgeAuthoring observer failed', error),
 }: EdgeAuthoringDependencies): EdgeAuthoring {
   const observable: ObservableState<EdgeAuthoringState> = createObservableState(
@@ -450,7 +433,7 @@ export function createEdgeAuthoring({
   };
 
   /** The Card a finished pointer connection continues at, held across the drag's end. */
-  let pendingContinuation: CardId | null = null;
+  let continueAt: CardId | null = null;
 
   /**
    * Take what a connection attempt came to, and say what the author sees.
@@ -478,12 +461,20 @@ export function createEdgeAuthoring({
   /**
    * Hold the Card a pointer connection continues at until its drag ends.
    */
-  const holdForDrag = (cardId: CardId | null): CardId | null => {
-    if (cardId !== null) pendingContinuation = cardId;
-    return cardId;
+  const holdForDrag = (cardId: CardId | null): void => {
+    if (cardId !== null) continueAt = cardId;
   };
 
-  const requestFocus = (focusRequest: FocusRequest): void => publish({ focusRequest });
+  /**
+   * Ask the author be put back on the thing this Edit left them with.
+   *
+   * One line, because where an Edit continues is one module now
+   * (`continuation.ts`): this lifecycle says what it owes and an adapter that
+   * can reach the target spends it, instead of publishing a one-shot of its own
+   * for the React layer to resolve, wait on and clear.
+   */
+  const requestFocus = (target: ContinuationTarget): void =>
+    continuation.request({ target, select: false, then: 'focus' });
 
   // Invalidation. The draft is cancelled by anything that changes what it is
   // about, and by nothing else — an unrelated completed Edit leaves it standing.
@@ -521,7 +512,8 @@ export function createEdgeAuthoring({
     if (contextChanged || !subjectSurvives(draft)) {
       // The element the draft was about may have been what held focus, so the
       // author is left somewhere real rather than on `body`.
-      publish({ draft: null, refusal: null, focusRequest: { kind: 'canvas' } });
+      publish({ draft: null, refusal: null });
+      requestFocus({ kind: 'canvas' });
     }
   });
 
@@ -585,13 +577,22 @@ export function createEdgeAuthoring({
       ),
 
     endPointerDrag: () => {
-      const continuation = pendingContinuation;
-      pendingContinuation = null;
+      const reached = continueAt;
+      continueAt = null;
       const { draft } = observable.getState();
       if (draft?.kind === 'pointer-connect' || draft?.kind === 'pointer-reconnect') {
         publish({ draft: null });
       }
-      return continuation;
+      // The storyboard's connected Card is the selected one, so continued
+      // authoring carries on from it — and there is nothing to do *there*, which
+      // is the whole reason `select` is an axis of its own.
+      if (reached !== null) {
+        continuation.request({
+          target: { kind: 'card', cardId: reached },
+          select: true,
+          then: 'nothing',
+        });
+      }
     },
 
     // Destructured rather than spread: the caller usually holds an
@@ -662,17 +663,8 @@ export function createEdgeAuthoring({
     cancelDraft: () => {
       const { draft } = observable.getState();
       if (draft === null) return;
-      publish({
-        draft: null,
-        refusal: null,
-        focusRequest: { kind: 'card', cardId: anchorCardOf(draft) },
-      });
-    },
-
-    takeFocusRequest: () => {
-      const { focusRequest } = observable.getState();
-      if (focusRequest !== null) publish({ focusRequest: null });
-      return focusRequest;
+      publish({ draft: null, refusal: null });
+      requestFocus({ kind: 'card', cardId: anchorCardOf(draft) });
     },
 
     dispose: () => {

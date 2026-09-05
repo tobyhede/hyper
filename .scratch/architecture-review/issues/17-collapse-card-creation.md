@@ -1,9 +1,11 @@
 # Collapse Card creation into one module
 
-Status: ready-for-agent
-Tags: Improvement
+Status: resolved
+Tags: release/v1, Improvement
 Blocked by: none — `entity-url-addressability/07` delivered the second creation surface
-Related: `entity-url-addressability/07`; `architecture-review/14`
+Related: `entity-url-addressability/07`; `architecture-review/14`;
+`architecture-review/19` (blocked by this ticket, and it changes what the two
+one-shots below should be — read that section before building them)
 
 Surfaced by: the 4 September 2026 architecture review of
 `07-author-a-space-card-reference`, candidate "Collapse Card creation into one
@@ -91,14 +93,31 @@ uses for `onDelete`.
 - `none` — stay open, nothing happened. This is where Alias's `queued` and
   `unchanged` land, which is what they do today.
 
-**Two one-shots on the state, consumed once by the React adapter**, as
-`EdgeAuthoring` already does with `focusRequest`:
+**One continuation, not two one-shots.** This ticket originally specified
+`focusRequest` and `continueAt` as separate one-shots on the state, following
+`EdgeAuthoring`'s `focusRequest`. **Do not build them that way.**
 
-- `focusRequest` — replaces the `restoringAddCardFocus` ref and its effect, so
-  the rule "closing restores focus to Add Card" lives in the module that closes.
-- `continueAt` — the created Card. The adapter feeds it into App's existing
-  `createdCardId`, which stays where it is: Add Card sets it too, and Add Card is
-  out of scope.
+`architecture-review/19` establishes that those are the same thing seen twice: a
+completed gesture owes the author a subject plus something that happens there,
+and Edge Authoring already emits it on both channels — `focusRequest` on its
+state, and the `CardId | null` return that `connection-completion.ts:110` calls
+`continueAt`. Building two one-shots here writes for a third time the shape 19
+deletes.
+
+So this module publishes **one** value, in 19's vocabulary:
+
+- closing the pane requests
+  `{ target: { kind: 'control', name: 'add-card' }, select: false, then: 'focus' }`,
+  replacing the `restoringAddCardFocus` ref and its effect;
+- a successful creation requests
+  `{ target: { kind: 'card', cardId }, select: true, then: 'rename' }`.
+
+This was written while 19 was blocked by this ticket, and said to declare the
+value on this module's own state under the name `continuation` so that 19 could
+lift it out. **Both landed in the same pass instead**, so there is no local
+one-shot to lift: `continuation.ts` exists and `createCardCreation` takes a
+`Continuation` as a composition seam. Do not declare a second one beside it —
+Card creation would then have two owners disagreeing about what is owed.
 
 **Refusals are presented at the seam.** `submit` answers an already-presented
 `{ fields, form }` rather than a raw refusal, so the module is not generic over

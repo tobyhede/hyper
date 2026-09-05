@@ -415,8 +415,12 @@ export function createOpenSpaces({
     const entries = state.entries.filter(({ id }) => id !== spaceId);
     const activeSpaceId =
       state.activeSpaceId === spaceId ? (entries[0]?.id ?? null) : state.activeSpaceId;
-    // The composition goes with the session the registry has just stopped owning.
+    // The composition goes with the session the registry has just stopped
+    // owning. Each collaborator is released by name rather than relying on
+    // `authoring.dispose` clearing the subscriber set the others registered in:
+    // that is true today and is an ordering nothing here states or tests.
     target.app.edgeAuthoring.dispose();
+    target.app.continuation.dispose();
     target.app.authoring.dispose();
     retired.add(target);
     compositions.delete(spaceId);

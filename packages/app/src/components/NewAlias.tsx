@@ -13,25 +13,24 @@ import {
 } from '@project/ui';
 import { CardPane } from './CardPane';
 import { paneInitialFocus } from './pane-focus';
-import { presentNewAliasRefusal } from '../authoring-refusal';
-import type { AuthoringRefusal } from '../space-authoring';
+import type { CardCreationRefusalErrors } from '../authoring-refusal';
 
 export interface NewAliasProps {
   /** Every Card an Alias may name: the non-Alias Cards of this Space (ADR 0009). */
   readonly targets: readonly Card[];
   /**
-   * Why the Space refused the Alias this pane tried to create, or `null`.
+   * Why the Space refused the Alias this pane tried to create, already placed
+   * on the fields this pane owns, or `null`.
    *
-   * The whole refusal union rather than the four codes creation can actually
-   * raise. The narrowed type read as documentation and worked as an obligation:
-   * the caller had to prove a refusal was one of the four before it could be
-   * handed over, which it did by comparing strings and throwing — a crash
-   * inside a React event handler, taking the canvas down, the day a fifth
-   * became reachable. Every code has a placement here instead, so the pane can
-   * accept whatever it is given and the reachable set stays a fact about
-   * Authoring rather than a list two modules keep in step by hand.
+   * A placement rather than a refusal code, for two reasons. The pane accepts
+   * whatever it is given, so the reachable set stays a fact about Authoring
+   * rather than a list two modules keep in step by hand — the narrowed type
+   * this replaced was an obligation the caller discharged by comparing strings
+   * and throwing, which is a crash inside a React event handler. And the two
+   * creation panes refuse in two different vocabularies, so one translated
+   * placement is what lets them share one state machine (ADR 0057).
    */
-  readonly refusal: AuthoringRefusal | null;
+  readonly refusal: CardCreationRefusalErrors | null;
   /**
    * Create the Alias on the chosen Target, with the title exactly as typed —
    * the empty string included, because an empty title is what tells Authoring
@@ -74,9 +73,9 @@ export interface NewAliasProps {
  */
 export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale }: NewAliasProps) {
   const [title, setTitle] = useState('');
-  const errors = refusal === null ? { fields: {} } : presentNewAliasRefusal(refusal);
-  const titleError = errors.fields.title ?? null;
-  const targetError = errors.fields.target ?? null;
+  const titleError = refusal?.fields.title ?? null;
+  const targetError = refusal?.fields.target ?? null;
+  const formError = refusal?.form ?? null;
 
   return (
     <CardPane ariaLabel="New Alias" testId="new-alias" onDismiss={onCancel}>
@@ -143,8 +142,8 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
             </FieldDescription>
           )}
         </FieldGroup>
-        {errors.form !== undefined && (
-          <FieldError className="card-pane__field-error">{errors.form}</FieldError>
+        {formError !== null && (
+          <FieldError className="card-pane__field-error">{formError}</FieldError>
         )}
         <div className="card-pane__actions">
           <Button type="button" variant="secondary" onClick={onCancel}>

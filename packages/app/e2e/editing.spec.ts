@@ -1924,6 +1924,14 @@ test('a second connection drawn in the same session resolves its handles', async
   await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '4');
   await settled(page);
+  // The Card the connection reached is the selected one, which is what the
+  // chain above is named for and what the continuation `endPointerDrag`
+  // requests is owed. Asserted rather than assumed, and *after* the barrier:
+  // the deferral that used to hold this selection past React Flow's own
+  // release handling is gone, so a selection installed and then undone by the
+  // release is exactly the failure this has to catch — which it cannot do
+  // while React Flow is still settling the gesture that would undo it.
+  await expect(e).toHaveClass(/selected/);
 
   await connectHandles(
     page,

@@ -98,7 +98,7 @@ function open(
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-  const { navigation, authoring, adapter, edgeAuthoring } = composeApp({
+  const { navigation, authoring, adapter, continuation, edgeAuthoring } = composeApp({
     spaceSession: session,
     selection: layoutId,
     newId,
@@ -109,7 +109,7 @@ function open(
     ]),
   });
   adapter.getState().syncProjection(PROJECTED, []);
-  return { session, navigation, authoring, adapter, edges: edgeAuthoring };
+  return { session, navigation, authoring, adapter, continuation, edges: edgeAuthoring };
 }
 
 const graphsOf = (snapshot: SpaceSnapshot) =>
@@ -139,24 +139,34 @@ describe('the one Edge interaction draft', () => {
   });
 
   it('cancels the draft and asks for focus back at the Card the author was on', () => {
-    const { edges } = open();
+    const { edges, continuation } = open();
     edges.beginPointerConnect(CARD_A);
 
     edges.cancelDraft();
 
     expect(edges.getState().draft).toBeNull();
-    expect(edges.takeFocusRequest()).toEqual({ kind: 'card', cardId: CARD_A });
-    // Taken once: a second read finds nothing to do.
-    expect(edges.takeFocusRequest()).toBeNull();
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'card', cardId: CARD_A },
+      select: false,
+      then: 'focus',
+    });
+    // Spent once, by whichever adapter can reach it: this module publishes the
+    // request and never clears it.
+    continuation.take();
+    expect(continuation.getState().pending).toBeNull();
   });
 
   it('returns focus to the unmoved endpoint when a reconnection is cancelled', () => {
-    const { edges } = open();
+    const { edges, continuation } = open();
     edges.beginPointerReconnect(SUBJECT, 'to');
 
     edges.cancelDraft();
 
-    expect(edges.takeFocusRequest()).toEqual({ kind: 'card', cardId: CARD_A });
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'card', cardId: CARD_A },
+      select: false,
+      then: 'focus',
+    });
   });
 });
 
@@ -218,7 +228,7 @@ describe('a refused proposal', () => {
    * `body`. Re-selecting is what keeps the author on the Edge they just edited.
    */
   it('keeps the reconnected Edge selected and asks for focus on it', () => {
-    const { edges, adapter } = open();
+    const { edges, adapter, continuation } = open();
     adapter.getState().selectEdge(SUBJECT);
     edges.openEdgeEditor(SUBJECT);
 
@@ -226,7 +236,11 @@ describe('a refused proposal', () => {
 
     const reconnected = { graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_C } };
     expect(adapter.getState().selection).toEqual({ kind: 'edge', ...reconnected });
-    expect(edges.takeFocusRequest()).toEqual({ kind: 'edge', ...reconnected });
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'edge', ...reconnected },
+      select: false,
+      then: 'focus',
+    });
   });
 
   /** An endpoint dragged back where it started edited nothing, so nothing moves. */
@@ -255,12 +269,16 @@ describe('a refused proposal', () => {
 
 describe('deleting an Edge', () => {
   it('removes it from its Graph and asks for focus at the source Card', () => {
-    const { edges, session } = open();
+    const { edges, session, continuation } = open();
 
     expect(edges.deleteEdge(SUBJECT)).toBe(true);
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([]);
-    expect(edges.takeFocusRequest()).toEqual({ kind: 'card', cardId: CARD_A });
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'card', cardId: CARD_A },
+      select: false,
+      then: 'focus',
+    });
   });
 
   it('keeps the Edge and retains the refusal on the selected-Edge channel', () => {
@@ -475,25 +493,34 @@ describe('draft invalidation', () => {
 });
 
 describe('completing a pointer connection', () => {
-  it('authors the Edge and hands back the Card to continue at', () => {
-    const { edges, session } = open();
+  it('authors the Edge and continues at the Card it reached', () => {
+    const { edges, session, continuation } = open();
     edges.beginPointerConnect(CARD_B);
 
-    expect(edges.connect(CARD_B, CARD_C, PROJECTED)).toBe(CARD_C);
+    edges.connect(CARD_B, CARD_C, PROJECTED);
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
       EDGE,
       { from: CARD_B, to: CARD_C },
     ]);
-    expect(edges.endPointerDrag()).toBe(CARD_C);
+    // Held until the drag ends, and published as one continuation then: the
+    // Card is selected and there is nothing to do there, which is why `select`
+    // and `then` are separate axes.
+    expect(continuation.getState().pending).toBeNull();
+    edges.endPointerDrag();
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'card', cardId: CARD_C },
+      select: true,
+      then: 'nothing',
+    });
   });
 
   it('reports the refusal and continues at nobody when Authoring declines', () => {
-    const { edges, session } = open();
+    const { edges, session, continuation } = open();
     const before = session.getState().working;
     edges.beginPointerConnect(CARD_A);
 
-    expect(edges.connect(CARD_A, CARD_B, PROJECTED)).toBeNull();
+    edges.connect(CARD_A, CARD_B, PROJECTED);
 
     expect(session.getState().working).toBe(before);
     // The canvas announcement channel: this gesture's drag is over by the time
@@ -502,7 +529,8 @@ describe('completing a pointer connection', () => {
       kind: 'gesture',
       refusal: { code: 'edge-already-exists' },
     });
-    expect(edges.endPointerDrag()).toBeNull();
+    edges.endPointerDrag();
+    expect(continuation.getState().pending).toBeNull();
   });
 
   /**
@@ -516,7 +544,7 @@ describe('completing a pointer connection', () => {
     edges.connect(CARD_A, CARD_B, null);
     expect(edges.getState().refusal).not.toBeNull();
 
-    expect(edges.connect(CARD_A, CARD_C, null)).toBe(CARD_C);
+    edges.connect(CARD_A, CARD_C, null);
 
     expect(edges.getState().refusal).toBeNull();
   });

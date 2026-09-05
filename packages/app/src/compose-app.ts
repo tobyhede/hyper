@@ -2,6 +2,7 @@ import { newUuid, type LayoutId, type SpaceSnapshot, type UUID } from '@project/
 import { Placement, type ResolvedLayout, type Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
+import { createContinuation, type Continuation } from './continuation';
 import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
 import { createNavigation, type Navigation } from './navigation';
 import { createRenderAdapter, type RenderAdapter } from './render-adapter';
@@ -119,6 +120,14 @@ export interface AppCore {
 export interface ComposedApp extends AppCore {
   readonly authoring: SpaceAuthoring;
   readonly adapter: RenderAdapter;
+  /**
+   * Where the finished Edit leaves the author.
+   *
+   * Composed before Edge Authoring because Edge Authoring publishes into it,
+   * and answered here because the two React adapters that spend it mount on
+   * opposite sides of `ReactFlowProvider` and each needs the same instance.
+   */
+  readonly continuation: Continuation;
   readonly edgeAuthoring: EdgeAuthoring;
 }
 
@@ -180,6 +189,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     reportObserverError,
   });
   const adapter = createRenderAdapter(authoring);
+  const continuation = createContinuation({ authoring, reportObserverError });
   // The Edge lifecycle, composed once beside the two collaborators it consumes.
   // It owns neither: the render adapter stays authoritative for the projection
   // and the canvas selection, Space Authoring for eligibility and every Edit.
@@ -187,7 +197,8 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     authoring,
     adapter,
     connections: (connections ?? createConnectionCompletion)({ adapter, authoring }),
+    continuation,
     reportObserverError,
   });
-  return { ...core, authoring, adapter, edgeAuthoring };
+  return { ...core, authoring, adapter, continuation, edgeAuthoring };
 }

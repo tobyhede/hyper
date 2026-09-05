@@ -1,4 +1,4 @@
-import { createRef, useState, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Card, type Layout } from '@project/core';
@@ -145,7 +145,6 @@ const settledProps = (): SpaceSidebarProps => ({
     onAddAlias: vi.fn(),
     onAddSpaceCard: vi.fn(),
     keyShortcut: 'C',
-    menuTriggerRef: createRef<HTMLButtonElement>(),
   },
   createLayout: { refusal: null, onCreate: vi.fn() },
   persistence: {
@@ -204,7 +203,7 @@ describe('SpaceSidebar', () => {
   });
 
   /**
-   * A covered Sidebar is located by `data-layout`, because an open pane marks
+   * A covered Sidebar is located by `data-layout-id`, because an open pane marks
    * the root `inert` and the row leaves the accessibility tree
    * (`docs/agents/ui.md`). A row that sheds that hook while its own rename is
    * live is unreachable by role and by attribute at the same time.
@@ -235,7 +234,7 @@ describe('SpaceSidebar', () => {
 
     expect(screen.getByRole('textbox', { name: 'Layout name' })).toBeVisible();
     expect(screen.getAllByTestId('layout-row')).toHaveLength(before);
-    expect(document.querySelector(`[data-layout="${LAYOUT_ID}"]`)).toBeInTheDocument();
+    expect(document.querySelector(`[data-layout-id="${LAYOUT_ID}"]`)).toBeInTheDocument();
   });
 
   it('names the Layout as plain text when no title edit is offered', () => {
@@ -429,7 +428,7 @@ describe('SpaceSidebar', () => {
    * a second value of equal shape hands in two Layouts that are equal and not
    * the same object. A `===` test drew that as a Layout list with nothing
    * pressed: no throw, and nothing in the type to catch it. The id is what the
-   * row keys and `data-layout` already carry, so the sidebar asks the one
+   * row keys and `data-layout-id` already carry, so the sidebar asks the one
    * question it answers everywhere else.
    */
   it('presses an equal Layout that a second value described', () => {
@@ -443,7 +442,7 @@ describe('SpaceSidebar', () => {
       .getAllByTestId('layout-row')
       .filter((row) => row.getAttribute('aria-pressed') === 'true');
     expect(pressed).toHaveLength(1);
-    expect(pressed[0]).toHaveAttribute('data-layout', LAYOUT_ID);
+    expect(pressed[0]).toHaveAttribute('data-layout-id', LAYOUT_ID);
   });
 
   it('forwards the selection', () => {
