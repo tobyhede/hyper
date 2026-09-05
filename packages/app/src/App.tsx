@@ -25,7 +25,12 @@ import {
 } from './authoring-refusal';
 import { useCardCreation } from './card-creation-react';
 import { cardCreationMessage } from './card-creation';
-import type { CardCreationInput, CardCreationOutcome, CardCreationSeams } from './card-creation';
+import type {
+  CardCreationInput,
+  CardCreationOutcome,
+  CardCreationRead,
+  CardCreationSeams,
+} from './card-creation';
 import { useSpaceCardTargets } from './space-card-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
@@ -87,7 +92,30 @@ export const createApp = (
     adapter: useRenderAdapter,
     continuation,
     edgeAuthoring,
+    reportObserverError: reportBreak,
   } = composition;
+  /**
+   * The Spaces a Space Card may reference, or the fact that they could not be
+   * read.
+   *
+   * Answers rather than rejects, which is what lets the pane word the failure
+   * the way the coordination words it. That also means the shell's own
+   * reporting arm never runs for this path, so the rejection is reported here
+   * — without it, a transport failure is the one failure on this pane that
+   * is shown to the author and then discarded.
+   */
+  const readReferenceableSpaces = async (): Promise<CardCreationRead> => {
+    try {
+      const spaces = await spaceCards.referenceableSpaces(currentSpace().id);
+      return { choices: { kind: 'space', targets: { kind: 'read', spaces } }, listing: null };
+    } catch (failure) {
+      reportBreak(failure);
+      return {
+        choices: { kind: 'space', targets: { kind: 'unreadable' } },
+        listing: presentNewSpaceCardRefusal({ code: 'persistence-read-failed' }),
+      };
+    }
+  };
   const openingGraphId = opening?.graphId ?? null;
   const openingPresentationCardId = opening?.presentationCardId ?? null;
   if (openingGraphId !== null && openingPresentationCardId !== null) {
@@ -343,18 +371,9 @@ export const createApp = (
                 },
                 listing: null,
               }
-            : spaceCards.referenceableSpaces(currentSpace().id).then(
-                (spaces) => ({
-                  choices: { kind: 'space', targets: { kind: 'read', spaces } },
-                  listing: null,
-                }),
-                () => ({
-                  choices: { kind: 'space', targets: { kind: 'unreadable' } },
-                  listing: presentNewSpaceCardRefusal({ code: 'persistence-read-failed' }),
-                }),
-              ),
+            : readReferenceableSpaces(),
         submit: (input) => (input.kind === 'alias' ? createAlias(input) : createSpaceCard(input)),
-        reportBreak: (failure) => console.error('The Card creation failed', failure),
+        reportBreak,
         continuation,
       }),
       [createAlias, createSpaceCard],
