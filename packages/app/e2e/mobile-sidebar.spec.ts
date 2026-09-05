@@ -37,14 +37,17 @@ const sheet = (page: Page) => sidebar(page);
  * item on a popup that has gone. That was reproducible at 7 failures in 20 with
  * four workers, and the flake CI reported on `mobile-sidebar.spec.ts:133`.
  *
- * Opacity is the read because it is the last of the two animated properties to
- * arrive — the offset rounds to its resting value a frame or two before it.
+ * Waiting on the element's own animations is the fact rather than a guess at a
+ * duration or a read of one property: the promise settles when every animation
+ * the Sheet is running has finished, whichever of them arrives last.
  */
 async function openMobileSidebar(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
   await expect(sheet(page)).toHaveAttribute('data-mobile', 'true');
   await expect(sheet(page)).toBeVisible();
-  await expect(sheet(page)).toHaveCSS('opacity', '1');
+  await sheet(page).evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
 }
 
 test(
