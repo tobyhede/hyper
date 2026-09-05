@@ -294,19 +294,28 @@ export function SpaceCanvas({
       session: SpaceSession;
       origin: LayoutPosition;
       clip: EmbeddedBounds | null;
+      /** The Layouts already crossed to reach this parent, newest last. */
+      path: ReadonlySet<string>;
     }[] = nodes.map((parent) => ({
       parent,
       session: spaceSession,
       origin: { x: 0, y: 0 },
       clip: null,
+      path: new Set<string>(),
     }));
     for (const item of queue) {
-      const { parent, session, origin, clip } = item;
+      const { parent, session, origin, clip, path } = item;
       if (parent.data.kind !== 'space' || parent.data.expanded !== true) continue;
       const document = session
         .getState()
         .working.cards.find((card) => card.id === parent.data.cardId)?.document;
       if (document?.kind !== 'space' || document.layout === undefined) continue;
+      // A Layout already on this path would embed itself. Single-Space intake
+      // refuses only a Card targeting its own Space, so a mutual pair reaches
+      // here validated and would otherwise nest one level deeper per commit.
+      const crossing = `${document.spaceId}:${document.layout}`;
+      if (path.has(crossing)) continue;
+      const crossed = new Set(path).add(crossing);
       const absolute = { x: origin.x + parent.position.x, y: origin.y + parent.position.y };
       const intersection = {
         left: Math.max(absolute.x + SPACE_CARD_EMBED_INSET.left, clip?.left ?? -Infinity),
@@ -342,6 +351,7 @@ export function SpaceCanvas({
             session: published.entry.session,
             origin: absolute,
             clip: intersection,
+            path: crossed,
           });
       }
     }

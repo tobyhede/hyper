@@ -6,7 +6,7 @@ import type { CardFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection } from '../canvas-projection';
 import { useCanvasCardAuthoring } from '../canvas-card-authoring';
 import { createEmbeddedAuthoring } from '../embedded-authoring';
-import { embeddedLayout, type EmbeddedBounds } from '../embedded-layout';
+import { constrainEmbeddedPosition, embeddedLayout, type EmbeddedBounds } from '../embedded-layout';
 import type { OpenSpace } from '../open-spaces';
 import { usePlacementRendering } from '../placement-rendering';
 import { useSpaceCardTargets } from '../space-card-targets';
@@ -134,11 +134,14 @@ export function EmbeddedLayoutAuthoring({
           const id = localIds.get(change.id);
           if (id === undefined) return [];
           if (change.type === 'position' && change.position !== undefined) {
+            // The containing bounds constrain what a gesture proposes, never
+            // where an authored Card is drawn (`constrainEmbeddedPosition`).
+            const held = constrainEmbeddedPosition(change.position, parent);
             return [
               {
                 ...change,
                 id,
-                position: { x: change.position.x - offset.x, y: change.position.y - offset.y },
+                position: { x: held.x - offset.x, y: held.y - offset.y },
               },
             ];
           }

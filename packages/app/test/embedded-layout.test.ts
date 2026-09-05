@@ -3,7 +3,7 @@ import { spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection } from '../src/canvas-projection';
-import { embeddedLayout, embeddedNodeId } from '../src/embedded-layout';
+import { constrainEmbeddedPosition, embeddedLayout, embeddedNodeId } from '../src/embedded-layout';
 import { resolveLayout } from '../src/layout-resolution';
 
 const id = (value: number) =>
@@ -94,10 +94,6 @@ describe('an embedded production projection', () => {
     expect(drawn.nodes.find((node) => node.data.cardId === B)).toMatchObject({
       id: embeddedNodeId(PARENT, B),
       parentId: PARENT,
-      extent: [
-        [0, 0],
-        [1000, 1000],
-      ],
       position: { x: 416, y: 42 },
       draggable: true,
       selectable: true,
@@ -108,6 +104,26 @@ describe('an embedded production projection', () => {
       x: 400,
       y: 0,
     });
+  });
+
+  it('draws a Card beyond the containing bounds where it was authored, clipped rather than moved', async () => {
+    // React Flow applies a numeric `extent` in `adoptUserNodes`, which is
+    // rendering and not only dragging, so an extent narrower than the authored
+    // placement silently redraws the Layout. Clipping is what a Card that no
+    // longer fits gets; the containing bounds constrain gesture proposals
+    // instead (`constrainEmbeddedPosition`).
+    const { drawn } = await draw(false, 400, 400);
+    const beyond = drawn.nodes.find((node) => node.data.cardId === B);
+    expect(beyond?.position).toEqual({ x: 416, y: 42 });
+    expect(beyond?.extent).toBeUndefined();
+    expect(beyond?.style?.clipPath).toBe('inset(0px 292px 0px 0px)');
+  });
+
+  it('constrains a gesture proposal to the containing bounds', () => {
+    const bounds = { width: 700, height: 500 };
+    expect(constrainEmbeddedPosition({ x: 600, y: 40 }, bounds)).toEqual({ x: 600, y: 40 });
+    expect(constrainEmbeddedPosition({ x: 900, y: 640 }, bounds)).toEqual({ x: 700, y: 500 });
+    expect(constrainEmbeddedPosition({ x: -30, y: -8 }, bounds)).toEqual({ x: 0, y: 0 });
   });
 
   it('clips a partial Card instead of removing it when the containing Card gets smaller', async () => {

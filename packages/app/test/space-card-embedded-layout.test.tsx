@@ -513,6 +513,81 @@ describe('the Layout an Open Space Card draws', () => {
     );
   });
 
+  it('stops embedding a Space Card whose Layout is already on the containing path', async () => {
+    // Home embeds the target, and the target embeds Home back. Neither Card is
+    // a self-reference, so single-Space intake accepts both (`validate.ts` only
+    // refuses `card.spaceId === space.id`); nothing but this guard stops the
+    // pair nesting one level deeper on every commit.
+    const mutualTarget = spaceSnapshotSchema.parse({
+      ...target,
+      cards: target.cards.map((card) =>
+        card.id === DRAWN_B
+          ? {
+              ...card,
+              document: {
+                title: 'Back to Home',
+                kind: 'space',
+                spaceId: HOME_ID,
+                layout: HOME_LAYOUT_ID,
+                graph: HOME_GRAPH_ID,
+              },
+            }
+          : card,
+      ),
+      document: {
+        ...target.document,
+        layouts: target.document.layouts?.map((layout) =>
+          layout.id !== SELECTED_LAYOUT_ID
+            ? layout
+            : {
+                ...layout,
+                positions: {
+                  ...layout.positions,
+                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
+                },
+              },
+        ),
+      },
+    });
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      layout: SELECTED_LAYOUT_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [meta, value, mutualTarget].map((snapshot) => ({
+        snapshot,
+        revision: 0n,
+        exportedRevision: null,
+      })),
+    );
+    const spaces = createOpenSpaces({
+      backend,
+      metaSpaceId: META_ID,
+      newId: newUuid,
+      history: recordingHistory(),
+    });
+    const initial = await spaces.open(HOME_ID);
+    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    const query = (id: string): Element | null =>
+      document.querySelector(`.react-flow__node[data-id="${id}"]`);
+    // Home drawn inside the target, one hop back — that much is ordinary nesting.
+    const returned = embeddedNodeId(embeddedNodeId(SPACE_CARD_ID, DRAWN_B), SPACE_CARD_ID);
+    // The second crossing of `TARGET:SELECTED_LAYOUT` is the cycle. Without the
+    // guard each settle adds another level, so this loop never stops growing.
+    const repeated = embeddedNodeId(returned, DRAWN_A);
+    for (let settle = 0; settle < 12; settle += 1) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+    expect(query(returned)).not.toBeNull();
+    expect(query(repeated)).toBeNull();
+  }, 20000);
+
   it('edits the target through the Open Card without changing the containing Space', async () => {
     const value = home({
       title: 'Elsewhere',
