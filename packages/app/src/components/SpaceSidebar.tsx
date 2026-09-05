@@ -73,6 +73,7 @@ import type { AuthoringRefusal } from '../space-authoring';
 export const DELETE_LAYOUT_ACTION_ID = 'delete-layout';
 
 export interface SpaceSidebarProps {
+  readonly sessionActions?: ReactNode;
   /** The Space's title. The canvas header names what is drawing it (ADR 0053). */
   readonly spaceTitle: string;
   /**
@@ -516,6 +517,7 @@ function NothingYet({ children, testId }: { readonly children: string; readonly 
  * carries only the trigger that reopens this and the name of what is drawing.
  */
 export function SpaceSidebar({
+  sessionActions,
   spaceTitle,
   canvas,
   graph,
@@ -833,6 +835,7 @@ export function SpaceSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="nokey">
+        {sessionActions}
         {selectedCard !== undefined && (
           <div className="grid gap-1">
             {/* The selected Card as a row of its own, so its addresses hang off

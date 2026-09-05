@@ -81,7 +81,7 @@ export function OpenSpaces({ entries, activeId, onSelect }: OpenSpacesProps) {
           ))}
         </TabsList>
       )}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 [transform:translateX(0)]">
         {entries.map((entry) => (
           <TabsContent key={entry.id} value={entry.id} keepMounted className="h-full">
             {entry.content}

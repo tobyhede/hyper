@@ -19,6 +19,7 @@ import {
 import { describeAggregateRefusal } from '../authoring-refusal';
 
 export interface PersistenceControlProps {
+  readonly active?: boolean;
   readonly persistence: SpaceSessionState['persistence'];
   readonly onAcceptRemote: () => string | null;
   readonly onKeepLocal: () => void;
@@ -70,10 +71,12 @@ const rejectionIdentity = ({ failure }: Rejection): string =>
  * attribute that touch never shows.
  */
 export function PersistenceControl({
+  active = true,
   persistence,
   onAcceptRemote,
   onKeepLocal,
 }: PersistenceControlProps) {
+  if (!active) return null;
   if (persistence.kind === 'conflicted') {
     return (
       <ConflictControl

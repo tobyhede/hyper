@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
@@ -12,11 +13,21 @@ import {
   Background,
   ReactFlow,
   type Edge,
+  type ReactFlowProps,
   type OnEdgesChange,
   type OnNodesChange,
   useReactFlow,
 } from '@xyflow/react';
-import { uuidSchema, type Card, type CardId, type Graph, type GraphId } from '@project/core';
+import {
+  SPACE_CARD_EMBED_INSET,
+  uuidSchema,
+  type LayoutPosition,
+  type LayoutId,
+  type Card,
+  type CardId,
+  type Graph,
+  type GraphId,
+} from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import {
   nodeTypes,
@@ -37,6 +48,13 @@ import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { CARD_SIZE } from '../card';
 import { CARD_DRAG_TYPE } from './CardsDrawer';
 import { OverviewCamera, PresentingCamera } from './cameras';
+import type { OpenSpace } from '../open-spaces';
+import { clipEmbeddedNode, embeddedClipId, type EmbeddedBounds } from '../embedded-layout';
+import { useOpenSpaces } from '../open-spaces-context';
+import { EmbeddedLayoutAuthoring, type EmbeddedPublication } from './EmbeddedLayoutAuthoring';
+
+const EMPTY_ENTRIES = [] as const;
+const emptySubscription = () => () => undefined;
 
 /**
  * What the graph tells assistive technology it can do.
@@ -254,21 +272,218 @@ export function SpaceCanvas({
    * commands as well as its spatial gestures. The Card controls and Edge
    * lifecycle agree here, and `edge-authoring-react.test.tsx` holds them to it.
    */
+
+  const spaces = useOpenSpaces();
+  const getEntries = useCallback(() => spaces?.getState().entries ?? EMPTY_ENTRIES, [spaces]);
+  const entries = useSyncExternalStore(spaces?.subscribe ?? emptySubscription, getEntries);
+  const [embeddedPublications, setEmbeddedPublications] = useState<
+    ReadonlyMap<string, EmbeddedPublication>
+  >(new Map());
+  const embeddedRequests = useMemo(() => {
+    const requests: {
+      parent: CardFlowNode;
+      spaceId: CardId;
+      layoutId: LayoutId;
+      graphId: GraphId | null;
+      entry: OpenSpace | undefined;
+      absolute: LayoutPosition;
+      bounds: EmbeddedBounds;
+    }[] = [];
+    const queue: {
+      parent: CardFlowNode;
+      session: SpaceSession;
+      origin: LayoutPosition;
+      clip: EmbeddedBounds | null;
+      /** The Layouts already crossed to reach this parent, newest last. */
+      path: ReadonlySet<string>;
+    }[] = nodes.map((parent) => ({
+      parent,
+      session: spaceSession,
+      origin: { x: 0, y: 0 },
+      clip: null,
+      path: new Set<string>(),
+    }));
+    for (const item of queue) {
+      const { parent, session, origin, clip, path } = item;
+      if (parent.data.kind !== 'space' || parent.data.expanded !== true) continue;
+      const document = session
+        .getState()
+        .working.cards.find((card) => card.id === parent.data.cardId)?.document;
+      if (document?.kind !== 'space' || document.layout === undefined) continue;
+      // A Layout already on this path would embed itself. Single-Space intake
+      // refuses only a Card targeting its own Space, so a mutual pair reaches
+      // here validated and would otherwise nest one level deeper per commit.
+      const crossing = `${document.spaceId}:${document.layout}`;
+      if (path.has(crossing)) continue;
+      const crossed = new Set(path).add(crossing);
+      const absolute = { x: origin.x + parent.position.x, y: origin.y + parent.position.y };
+      const intersection = {
+        left: Math.max(absolute.x + SPACE_CARD_EMBED_INSET.left, clip?.left ?? -Infinity),
+        top: Math.max(absolute.y + SPACE_CARD_EMBED_INSET.top, clip?.top ?? -Infinity),
+        right: Math.min(
+          absolute.x + (parent.width ?? 0) - SPACE_CARD_EMBED_INSET.right,
+          clip?.right ?? Infinity,
+        ),
+        bottom: Math.min(
+          absolute.y + (parent.height ?? 0) - SPACE_CARD_EMBED_INSET.bottom,
+          clip?.bottom ?? Infinity,
+        ),
+      };
+      requests.push({
+        parent,
+        spaceId: document.spaceId,
+        layoutId: document.layout,
+        graphId: document.graph ?? null,
+        entry: entries.find((entry) => entry.id === document.spaceId),
+        absolute,
+        bounds: {
+          left: intersection.left - absolute.x,
+          top: intersection.top - absolute.y,
+          right: intersection.right - absolute.x,
+          bottom: intersection.bottom - absolute.y,
+        },
+      });
+      const published = embeddedPublications.get(parent.id);
+      if (published?.layoutId === document.layout) {
+        for (const child of published.nodes)
+          queue.push({
+            parent: child,
+            session: published.entry.session,
+            origin: absolute,
+            clip: intersection,
+            path: crossed,
+          });
+      }
+    }
+    return requests;
+  }, [nodes, spaceSession, entries, embeddedPublications]);
+  const editingEmbeddingIds = new Set(
+    embeddedRequests.flatMap((request) => {
+      const value = embeddedPublications.get(request.parent.id);
+      return value !== undefined &&
+        request.entry === value.entry &&
+        value.layoutId === request.layoutId &&
+        (value.bodyEditing || value.titleEditing)
+        ? [request.parent.id]
+        : [];
+    }),
+  );
   const cardAuthoring = useCanvasCardAuthoring({
     nodes,
     editable,
     presenting,
-    enabled: titleEditingEnabled,
+    enabled: titleEditingEnabled && editingEmbeddingIds.size === 0,
     nameOnCreation,
     authoring,
     spaceSession,
     cardResize,
     onSelectCard,
-    onBodyEditingChange,
-    onTitleEditingChange,
     spaceCardTargets,
   });
   const { bodyEditing, canAuthorOnCanvas, openCard: onOpenCard, beginTitleEditing } = cardAuthoring;
+
+  const embeddedBodyEditing = embeddedRequests.some(
+    (request) =>
+      editingEmbeddingIds.has(request.parent.id) &&
+      embeddedPublications.get(request.parent.id)?.bodyEditing === true,
+  );
+  const embeddedTitleEditing = embeddedRequests.some(
+    (request) =>
+      editingEmbeddingIds.has(request.parent.id) &&
+      embeddedPublications.get(request.parent.id)?.titleEditing === true,
+  );
+  useEffect(() => {
+    onBodyEditingChange?.(bodyEditing || embeddedBodyEditing);
+  }, [bodyEditing, embeddedBodyEditing, onBodyEditingChange]);
+  useEffect(() => {
+    onTitleEditingChange?.(cardAuthoring.titleEditing || embeddedTitleEditing);
+    return () => onTitleEditingChange?.(false);
+  }, [cardAuthoring.titleEditing, embeddedTitleEditing, onTitleEditingChange]);
+  const requested = useRef(new Set<string>());
+  const [embeddedFailure, setEmbeddedFailure] = useState<string | null>(null);
+  const resumeEmbedded = useCallback(
+    async (spaceId: CardId) => {
+      try {
+        await spaces?.embed(spaceId);
+        setEmbeddedFailure(null);
+      } catch (error) {
+        setEmbeddedFailure(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [spaces],
+  );
+  useEffect(() => {
+    const visible = new Map(
+      embeddedRequests.map((request) => [
+        `${request.parent.id}:${request.layoutId}:${request.graphId ?? ''}`,
+        request,
+      ]),
+    );
+    for (const id of requested.current) if (!visible.has(id)) requested.current.delete(id);
+    for (const [id, request] of visible) {
+      if (spaces === null || requested.current.has(id)) continue;
+      requested.current.add(id);
+      void (async () => {
+        try {
+          await spaces.embed(request.spaceId);
+          setEmbeddedFailure(null);
+        } catch (error) {
+          requested.current.delete(id);
+          setEmbeddedFailure(error instanceof Error ? error.message : String(error));
+        }
+      })();
+    }
+  }, [spaces, embeddedRequests]);
+  const publishEmbedded = useCallback((id: string, value: EmbeddedPublication | null) => {
+    setEmbeddedPublications((previous) => {
+      if (previous.get(id) === value || (value === null && !previous.has(id))) return previous;
+      const next = new Map(previous);
+      if (value === null) next.delete(id);
+      else next.set(id, value);
+      return next;
+    });
+  }, []);
+  const liveEmbeddings = useMemo(
+    () =>
+      embeddedRequests.flatMap((request) => {
+        const value = embeddedPublications.get(request.parent.id);
+        if (value?.layoutId !== request.layoutId) return [];
+        if (request.entry === value.entry) return [value];
+        return [
+          {
+            ...value,
+            changeNodes: () => undefined,
+            // The three Card commands aimed at a retained read answer it the
+            // same way: reopen the target's session so the next press acts.
+            // The canvas still announces that delete removes the focused Card
+            // from its Layout, and this drawing is still focusable, so an
+            // answer of `null` alone consumed the key and did nothing at all.
+            // There is no refusal to report either — the target is not open,
+            // which is a state this press ends rather than a refused Edit.
+            removeCard: () => {
+              void resumeEmbedded(request.spaceId);
+              return null;
+            },
+            nodes: value.nodes.map((node): CardFlowNode => ({
+              ...clipEmbeddedNode(node, request.bounds),
+              draggable: false,
+              data: {
+                ...node.data,
+                readOnly: true,
+                onEditCard: () => {
+                  void resumeEmbedded(request.spaceId);
+                  return 'retained';
+                },
+                onBeginTitleEditing: () => {
+                  void resumeEmbedded(request.spaceId);
+                },
+              },
+            })),
+          },
+        ];
+      }),
+    [embeddedRequests, embeddedPublications, resumeEmbedded],
+  );
 
   const edgeSurface = useEdgeAuthoring({
     authoring: edgeAuthoring,
@@ -316,7 +531,11 @@ export function SpaceCanvas({
         const cardId = card.dataset['id'];
         if (cardId === undefined) return;
         event.preventDefault();
-        onOpenCard(cardId);
+        const embedded = liveEmbeddings
+          .flatMap((value) => value.nodes)
+          .find((node) => node.id === cardId);
+        if (embedded === undefined) onOpenCard(cardId);
+        else embedded.data.onEditCard?.(true);
         return;
       }
       // `C` adds a Card, and it is the only unmodified authoring shortcut there
@@ -347,7 +566,7 @@ export function SpaceCanvas({
       event.preventDefault();
       onAddCard();
     },
-    [presenting, onOpenCard, canAuthorOnCanvas, bodyEditing, onAddCard],
+    [presenting, onOpenCard, canAuthorOnCanvas, bodyEditing, onAddCard, liveEmbeddings],
   );
 
   // `F2` renames the selected Card, and this is the *only* handler that answers
@@ -363,6 +582,12 @@ export function SpaceCanvas({
       if (event.target instanceof Element && event.target.closest(NOT_A_CANVAS_COMMAND) !== null) {
         return;
       }
+      const embedded = liveEmbeddings.flatMap((value) => value.nodes).find((node) => node.selected);
+      if (embedded !== undefined) {
+        event.preventDefault();
+        embedded.data.onBeginTitleEditing?.();
+        return;
+      }
       const selected = nodes.find((node) => node.selected);
       if (selected === undefined) return;
       event.preventDefault();
@@ -370,13 +595,38 @@ export function SpaceCanvas({
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, [canAuthorOnCanvas, bodyEditing, nodes, beginTitleEditing]);
+  }, [canAuthorOnCanvas, bodyEditing, nodes, beginTitleEditing, liveEmbeddings]);
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
   // that depended on the object would be rebuilt every time.
   const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = cardAuthoring.nodes;
+  /**
+   * The canvas React Flow draws: this Space's Cards, then the Layouts its
+   * Open Space Cards embed (ADR 0068).
+   *
+   * Concatenated here and nowhere earlier. React Flow requires a parent to be
+   * declared before its children, which appending satisfies for free; and every
+   * rule above — deletion, the title-editing selection, focus, Edge authoring —
+   * is written over this Space's own Cards, so an embedded node mixed into
+   * `editableNodes` would put another Space's Card inside each of them.
+   */
+  const canvasNodes = useMemo(
+    () => [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)],
+    [editableNodes, liveEmbeddings],
+  );
+  const canvasEdges = useMemo(
+    () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],
+    [edgeSurface.edges, liveEmbeddings],
+  );
+  const changeCanvasNodes: OnNodesChange<CardFlowNode> = useCallback(
+    (changes) => {
+      onNodesChange(changes);
+      for (const value of liveEmbeddings) value.changeNodes(changes);
+    },
+    [onNodesChange, liveEmbeddings],
+  );
   const canvasRef = useRef<HTMLDivElement>(null);
 
   /**
@@ -402,6 +652,7 @@ export function SpaceCanvas({
   }
 
   const latestDeletion = useRef({
+    embedded: liveEmbeddings,
     authoring,
     bodyEditing,
     canAuthorOnCanvas,
@@ -415,6 +666,7 @@ export function SpaceCanvas({
   // act on the previous selection or refusal state.
   useLayoutEffect(() => {
     latestDeletion.current = {
+      embedded: liveEmbeddings,
       authoring,
       bodyEditing,
       canAuthorOnCanvas,
@@ -423,7 +675,16 @@ export function SpaceCanvas({
       nodes,
       selection,
     };
-  }, [authoring, bodyEditing, canAuthorOnCanvas, deleteEdges, edgeSurface.edges, nodes, selection]);
+  }, [
+    authoring,
+    bodyEditing,
+    canAuthorOnCanvas,
+    deleteEdges,
+    edgeSurface.edges,
+    nodes,
+    selection,
+    liveEmbeddings,
+  ]);
 
   useEffect(() => {
     const deleteSelection = (event: KeyboardEvent): void => {
@@ -442,6 +703,19 @@ export function SpaceCanvas({
       if (canvasRef.current?.contains(event.target) !== true) return;
       const current = latestDeletion.current;
       if (!current.canAuthorOnCanvas || current.bodyEditing) return;
+      const focusedNodeId = event.target.closest<HTMLElement>('.react-flow__node[data-id]')
+        ?.dataset['id'];
+      const embedded = current.embedded.find((value) =>
+        value.nodes.some(
+          (node) => node.id === focusedNodeId || (focusedNodeId === undefined && node.selected),
+        ),
+      );
+      const embeddedId = focusedNodeId ?? embedded?.nodes.find((node) => node.selected)?.id;
+      if (embedded !== undefined && embeddedId !== undefined) {
+        event.preventDefault();
+        setCommandRefusal(embedded.removeCard(embeddedId));
+        return;
+      }
       // The Card the key was *aimed at* wins over the one selected before it.
       // React Flow never selects a node on focus — its `onFocus` only auto-pans
       // — and only the Edge half of this canvas bridges the two, so a Tab to
@@ -526,14 +800,27 @@ export function SpaceCanvas({
     [canAuthorOnCanvas, onAddExistingCard, screenToFlowPosition],
   );
 
+  const embeddedEvents = useMemo(() => {
+    const props: Pick<ReactFlowProps<CardFlowNode>, 'onNodeClick'> = {};
+    if (!presenting) {
+      props.onNodeClick = (_event, node) => {
+        const request = embeddedRequests.find((candidate) => candidate.parent.id === node.parentId);
+        if (request !== undefined && request.entry === undefined)
+          void resumeEmbedded(request.spaceId);
+      };
+    }
+    return props;
+  }, [presenting, embeddedRequests, resumeEmbedded]);
+
   return edgeSurface.provide(
     <ReactFlow
       ref={canvasRef}
-      nodes={editableNodes}
-      edges={edgeSurface.edges}
+      nodes={canvasNodes}
+      edges={canvasEdges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeSurface.edgeTypes}
-      onNodesChange={onNodesChange}
+      onNodesChange={changeCanvasNodes}
+      {...embeddedEvents}
       onEdgesChange={onEdgesChange}
       // Edge Authoring's own properties, named one by one rather than spread, so
       // no property order below can silently replace one of its handlers.
@@ -605,6 +892,46 @@ export function SpaceCanvas({
       maxZoom={MAX_ZOOM}
     >
       <Background gap={24} />
+      <svg aria-hidden="true" width={0} height={0}>
+        <defs>
+          {embeddedRequests.map(({ parent, absolute, bounds }) => (
+            <clipPath key={parent.id} id={embeddedClipId(parent.id)} clipPathUnits="userSpaceOnUse">
+              <rect
+                x={absolute.x + bounds.left}
+                y={absolute.y + bounds.top}
+                width={Math.max(0, bounds.right - bounds.left)}
+                height={Math.max(0, bounds.bottom - bounds.top)}
+              />
+            </clipPath>
+          ))}
+        </defs>
+      </svg>
+      {embeddedRequests.map((request) =>
+        request.entry === undefined ? null : (
+          <EmbeddedLayoutAuthoring
+            key={`${request.parent.id}:${request.layoutId}`}
+            parent={request.parent}
+            entry={request.entry}
+            layoutId={request.layoutId}
+            graphId={request.graphId}
+            enabled={
+              editable &&
+              titleEditingEnabled &&
+              !presenting &&
+              !bodyEditing &&
+              !cardAuthoring.titleEditing &&
+              (editingEmbeddingIds.size === 0 || editingEmbeddingIds.has(request.parent.id))
+            }
+            bounds={request.bounds}
+            publish={publishEmbedded}
+          />
+        ),
+      )}
+      {embeddedFailure === null ? null : (
+        <span role="alert" className="canvas-refusal">
+          {embeddedFailure}
+        </span>
+      )}
       {/*
         The sentence a refused canvas command leaves behind. Placed and styled
         exactly like Edge Authoring's `gesture` refusal, because it is the same

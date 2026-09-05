@@ -3,6 +3,7 @@ import {
   type CardId,
   COLLAPSED_CARD_SIZE,
   DEFAULT_OPEN_SIZE,
+  DEFAULT_SPACE_CARD_OPEN_SIZE,
   type Graph,
   type GraphEdge,
   type GraphId,
@@ -281,6 +282,11 @@ export interface SpaceAuthoring {
    */
   readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
+  /** Complete an embedded Card gesture without moving this Space's Navigation. */
+  readonly completeInLayout: (
+    layoutId: UUID,
+    completion: EmbeddedCardCompletion,
+  ) => AuthoringResult;
   readonly retryPersistence: () => void;
   /**
    * Commit the newest local work against the revision the conflict named,
@@ -360,7 +366,21 @@ const refuse = (refusal: AuthoringRefusal): DerivedCompletion => ({ kind: 'refus
 interface ReportedCompletion {
   readonly completion: AuthoringCompletion;
   readonly placement: Placement | null;
+  readonly embeddedLayoutId?: UUID | undefined;
 }
+
+export type EmbeddedCardCompletion = Extract<
+  AuthoringCompletion,
+  {
+    kind:
+      | 'opened-card'
+      | 'closed-card'
+      | 'resized-card'
+      | 'edited-card'
+      | 'settled-card-movement'
+      | 'removed-card-from-layout';
+  }
+>;
 
 /** A `ReportedCompletion` waiting behind the Edit that was installing when it arrived. */
 interface QueuedCompletion extends ReportedCompletion {
@@ -883,8 +903,9 @@ export function createSpaceAuthoring({
   const deriveCompletedEdit = ({
     completion,
     placement: reportedPlacement,
+    embeddedLayoutId,
   }: ReportedCompletion): DerivedCompletion => {
-    const selection = navigation.getState().selectedLayoutId;
+    const selection = embeddedLayoutId ?? navigation.getState().selectedLayoutId;
     if (completion.kind === 'created-layout') {
       const snapshot = session.getState().working;
       const layoutId = newId();
@@ -1043,7 +1064,11 @@ export function createSpaceAuthoring({
       completedPlacement = Placement.place(completedPlacement, completion.cardId, {
         ...at,
         open: true,
-        openSize: at.openSize ?? DEFAULT_OPEN_SIZE,
+        openSize:
+          at.openSize ??
+          (space.lookup.card(completion.cardId)?.kind === 'space'
+            ? DEFAULT_SPACE_CARD_OPEN_SIZE
+            : DEFAULT_OPEN_SIZE),
       });
     } else if (completion.kind === 'closed-card') {
       const at = completedPlacement.get(completion.cardId);
@@ -1173,7 +1198,10 @@ export function createSpaceAuthoring({
     const { layout } = resolved;
     layoutTitle = layout.title;
     ownedGraphs = layout.graphs;
-    activeGraphId = navigationState.activeGraphId;
+    activeGraphId =
+      embeddedLayoutId === undefined
+        ? navigationState.activeGraphId
+        : (layout.activeGraph ?? layout.graphs[0]?.id ?? null);
     if (completion.kind === 'renamed-layout') {
       // Addressed by id, exactly as Rename Graph is (ADR 0040). The Sidebar row
       // and the canvas header coordinate one draft on this id, so a rename that
@@ -1376,7 +1404,24 @@ export function createSpaceAuthoring({
     // interface share one vocabulary rather than translating between two.
     if (derived.kind !== 'completed') return derived;
     const { createdCardId, createdGraphId } = derived.edit;
-    installCompletedEdit(derived.edit);
+    if (reported.embeddedLayoutId === undefined) {
+      installCompletedEdit(derived.edit);
+    } else {
+      const previous = session.getState().working;
+      const snapshot = {
+        ...derived.edit.snapshot,
+        document: {
+          ...derived.edit.snapshot.document,
+          defaultLayout: previous.document.defaultLayout,
+        },
+      };
+      installTogether(() => {
+        session.submit(snapshot);
+        if (navigation.getState().selectedLayoutId === reported.embeddedLayoutId) {
+          install(derived.edit.placement);
+        }
+      });
+    }
     const created: { createdCardId?: CardId; createdGraphId?: GraphId } = {};
     if (createdCardId !== undefined) created.createdCardId = createdCardId;
     if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
@@ -1385,23 +1430,31 @@ export function createSpaceAuthoring({
 
   let completing = false;
   const queued: QueuedCompletion[] = [];
-  const complete = (completion: AuthoringCompletion): AuthoringResult => {
+  const complete = (completion: AuthoringCompletion, embeddedLayoutId?: UUID): AuthoringResult => {
     // A pointer gesture reports where React Flow has drawn the Cards, and that
     // report is merged under `Placement.next`'s rules. Every other operation is
     // written into the placement already installed — there is no second source
     // of geometry for a rename or a deletion to disagree with.
+    const embeddedLayout =
+      embeddedLayoutId === undefined ? undefined : currentSpace().lookup.layout(embeddedLayoutId);
+    if (embeddedLayoutId !== undefined && embeddedLayout === undefined) {
+      return { kind: 'refused', refusal: { code: 'layout-not-found' } };
+    }
+    const base =
+      embeddedLayout === undefined ? placement : Placement.fromLayout(embeddedLayout.layout);
     const completedPlacement =
       'rendered' in completion
         ? Placement.next(
-            mergeBase(),
+            embeddedLayout === undefined ? mergeBase() : base,
             completion.rendered,
             completion.kind === 'settled-card-movement' ? completion.placed : [],
           )
-        : placement;
-    install(completedPlacement);
+        : base;
+    if (embeddedLayoutId === undefined) install(completedPlacement);
     const reported: ReportedCompletion = {
       completion,
       placement: completedPlacement,
+      embeddedLayoutId,
     };
     if (completing) {
       queued.push({ ...reported, replacementEpoch });
@@ -1522,6 +1575,7 @@ export function createSpaceAuthoring({
     replacePlacement: install,
     edgeEligibility,
     complete,
+    completeInLayout: (layoutId, completion) => complete(completion, layoutId),
     retryPersistence: session.retry,
     // Read at the moment the author asks, never captured earlier. `session`
     // ignores the call outside a conflict, so there is nothing to check here.

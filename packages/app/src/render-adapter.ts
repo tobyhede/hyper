@@ -387,7 +387,17 @@ function selecting(
   };
 }
 
-export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
+export type RenderAdapterAuthoring = Pick<
+  SpaceAuthoring,
+  | 'authoredPlacement'
+  | 'complete'
+  | 'reportRendered'
+  | 'replacePlacement'
+  | 'getState'
+  | 'subscribe'
+>;
+
+export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAdapter {
   const adapter = create<RenderAdapterState>((set, get) => ({
     projection: null,
     dragOrigins: new Map(),

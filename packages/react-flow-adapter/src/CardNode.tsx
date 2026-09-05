@@ -423,8 +423,12 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         `position` on the handle itself, so the four sides are unaffected by the
         order they are declared in. `CardNode.test.tsx` pins the ordering.
       */}
-      {!data.readOnly && AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
-      {!data.readOnly && AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
+      {!data.readOnly &&
+        data.connectionAuthoringEnabled !== false &&
+        AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
+      {!data.readOnly &&
+        data.connectionAuthoringEnabled !== false &&
+        AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
       {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>
   );

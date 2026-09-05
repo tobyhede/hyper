@@ -66,6 +66,9 @@ function authoringSpy({ refusing, authoredPlacement = null }: AuthoringCapabilit
   const completions: unknown[] = [];
   let adapter: RenderAdapter | null = null;
   const authoring: SpaceAuthoring = {
+    completeInLayout: () => {
+      throw new Error('Embedded authoring is outside this adapter test.');
+    },
     // SAFETY: `getState` is never read by these tests — the spy only needs to
     // satisfy `SpaceAuthoring`'s shape, not implement a real state.
     getState: () => ({}) as never,
