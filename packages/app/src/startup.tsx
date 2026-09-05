@@ -1,6 +1,7 @@
 import { StrictMode, type ReactNode } from 'react';
 import type { BrowserLocation } from './browser-location';
-import type { OpenSpace } from './open-spaces';
+import type { OpenSpace, OpenSpaces } from './open-spaces';
+import { OpenSpacesApplication } from './components/OpenSpacesApplication';
 import type { DestinationOpening } from './destination-opening';
 import { mountSpaceApp } from './SpaceApp';
 import { StartupFailure } from './components/StartupFailure';
@@ -12,6 +13,7 @@ export interface ApplicationRoot {
 export interface OpenedApplicationStartup {
   kind: 'opened';
   opened: OpenSpace;
+  spaces?: OpenSpaces;
   /** The session's one browser location, already following the opened Space. */
   browserLocation: BrowserLocation;
   opening?: DestinationOpening | undefined;
@@ -51,6 +53,18 @@ export const startApplication = async (
 ): Promise<void> => {
   try {
     const startup = await resolveStartup();
+    if (startup.spaces !== undefined) {
+      root.render(
+        <StrictMode>
+          <OpenSpacesApplication
+            spaces={startup.spaces}
+            initial={startup.opened}
+            opening={startup.opening}
+          />
+        </StrictMode>,
+      );
+      return;
+    }
     renderOpenedSpace(root, startup.opened, startup.browserLocation, startup.opening);
   } catch (error) {
     renderStartupError(root, error);

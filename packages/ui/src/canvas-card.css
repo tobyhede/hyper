@@ -320,6 +320,24 @@
   outline-offset: 2px;
 }
 
+/* An Open Space Card draws the Layout it selects (ADR 0068), and that view
+   is React Flow sub-flow nodes painted *over* this Card rather than DOM inside
+   it — so nothing here can lay out around them, and the room they get has to be
+   a number both sides agree on. The Card's own passengers take a footer of
+   exactly `SPACE_CARD_FOOTER_HEIGHT`, leaving the region above it for the view.
+   `packages/ui/test/canvas-card-embedded-layout.test.ts` holds this rule and that
+   constant to the same number.
+
+   `flex: none` with `margin-top: auto` rather than the `flex: 1` the body
+   normally takes: bottom-aligning the content of a body that fills the Card
+   leaves the free region above it a different size on every Card, which is the
+   one thing a projection reading a constant cannot survive. */
+.canvas-card[data-kind='space'][data-expanded='true'] .canvas-card__body {
+  height: 176px;
+  flex: none;
+  margin-top: auto;
+}
+
 /* A Title is the same bottom passenger before, during and after the React Flow
    wrapper moves. Opening adds the content surface above it; it never switches
    the Title's layout in the middle of that motion. Both kinds that draw content

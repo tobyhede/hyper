@@ -48,6 +48,8 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
+import { useOpenSpaces } from './open-spaces-context';
+import { ExitSpaceControl } from './components/ExitSpaceControl';
 import {
   SelectedLayoutName,
   SpaceSidebar,
@@ -81,6 +83,9 @@ export const createApp = (
   }
 
   function App() {
+    const spaces = useOpenSpaces();
+    const active =
+      spaces === null || spaces.getState().activeSpaceId === spaceSession.getState().working.id;
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
     const sessionState = authoringState.session;
     const navigationState = authoringState.navigation;
@@ -847,8 +852,8 @@ export const createApp = (
       () => new Map([...spaceCardTargets].map(([id, target]) => [id, target.title])),
       [spaceCardTargets],
     );
-    // Global Traversal commands are bound only while presenting.
-    usePresentingKeys(presenting, {
+    // Inactive Spaces keep their traversal mounted without receiving global keys.
+    usePresentingKeys(active && presenting, {
       advance,
       retreat,
       selectBranch,
@@ -857,6 +862,7 @@ export const createApp = (
 
     const sidebar = (
       <SpaceSidebar
+        sessionActions={<ExitSpaceControl spaceId={renderedSpace.id} />}
         spaceTitle={renderedSpace.title}
         canvas={{
           layouts: renderedSpace.layouts,
@@ -917,6 +923,7 @@ export const createApp = (
         persistence={{
           control: (
             <PersistenceControl
+              active={active}
               persistence={sessionState.persistence}
               onAcceptRemote={authoring.acceptStoredSpace}
               onKeepLocal={authoring.keepLocalWork}
@@ -978,6 +985,9 @@ export const createApp = (
 
     return (
       <AppShell
+        sidebarWidth={
+          (spaces?.getState().entries.length ?? 0) > 1 ? 'calc(16rem - 36px)' : undefined
+        }
         sidebar={sidebar}
         // The drawer overlays the end edge of the main area, and the canvas, the
         // Graph key and a standing notice are all pinned to that same edge. The
@@ -1085,7 +1095,7 @@ export const createApp = (
                 // The toolbar's Add Card already reads the pair; this read only
                 // the opened Card, so `C` and the inline title editor stayed
                 // live behind an open Alias creation pane.
-                titleEditingEnabled={!creatingCard && spaceChromeEdit === null}
+                titleEditingEnabled={active && !creatingCard && spaceChromeEdit === null}
                 onNodesChange={changeNodes}
                 onEdgesChange={changeEdges}
                 edgeAuthoring={edgeAuthoring}

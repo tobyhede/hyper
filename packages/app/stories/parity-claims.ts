@@ -449,6 +449,20 @@ export const parityClaims: readonly ParityClaim[] = [
       'The themed canvas control continuously zooms with its slider, zooms with its buttons and fits the real React Flow viewport.',
   },
   {
+    id: 'open-space-card-draws-its-selected-layout',
+    storyFile: 'surfaces/space-card-embedded-layout.stories.tsx',
+    storyExport: 'SelectedLayout',
+    claim:
+      "An Open Space Card draws the Layout it selects — the target Space's own Cards and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Card's own rect.",
+  },
+  {
+    id: 'embedded-layout-cards-author-target',
+    storyFile: 'surfaces/space-card-embedded-layout.stories.tsx',
+    storyExport: 'SelectedLayout',
+    claim:
+      'Editing a Card inside an Open Space Card authors its target Space and updates both canvases; cross-Space connection handles remain unavailable.',
+  },
+  {
     id: 'graph-hud-and-sidebar-agree-on-the-active-graph',
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',

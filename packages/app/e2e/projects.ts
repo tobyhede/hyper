@@ -31,7 +31,10 @@ export const NEW_SPACE_PROJECT = 'new-space';
  * the base so no worker index can reach it — a rule arithmetic enforces, rather
  * than a gap that holds only until someone raises `--workers`.
  */
-export const E2E_PORT_BASE = 5300;
+export const E2E_PORT_BASE = Number(process.env['HYPER_E2E_PORT_BASE'] ?? 5300);
+if (!Number.isInteger(E2E_PORT_BASE) || E2E_PORT_BASE < 5300 || E2E_PORT_BASE > 64000) {
+  throw new Error('HYPER_E2E_PORT_BASE must be an integer between 5300 and 64000.');
+}
 
 /**
  * Vite's dependency optimizer mutates its cache while a cold host starts. The

@@ -59,6 +59,8 @@ export type CardNodeData = {
   title: string;
   /** Whether the Card's reusable component must withhold authoring affordances. */
   readOnly: boolean;
+  /** An embedded Space boundary offers no connection-authoring controls. */
+  connectionAuthoringEnabled?: boolean;
   /**
    * What kind of Card this is, drawn as a persistent glyph on the Front.
    *

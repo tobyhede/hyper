@@ -81,10 +81,13 @@ export interface RejectedExitConfirmation {
 }
 
 export interface OpenSpaces {
+  readonly metaSpaceId: UUID;
   readonly getState: () => OpenSpacesState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;
   readonly open: (spaceId: UUID, selection?: LayoutId) => Promise<OpenSpace>;
+  /** Keep the containing canvas active while opening a target for embedded editing. */
+  readonly embed: (spaceId: UUID) => Promise<OpenSpace>;
   readonly openPath: (pathname: string) => Promise<{
     readonly opened: OpenSpace;
     readonly opening?: DestinationOpening;
@@ -158,7 +161,9 @@ export function createOpenSpaces({
     report,
   );
   const compositions = new Map<UUID, Promise<OpenSpace>>();
-  const browserLocation = createBrowserLocation(history, report);
+  const browserLocation = createBrowserLocation(history, report, async (pathname) => {
+    await openPath(pathname);
+  });
 
   /**
    * Hand the browser's location whichever composition is now on the canvas.
@@ -180,8 +185,10 @@ export function createOpenSpaces({
       return;
     }
     if (active.app === followed) return;
+    const switching = followed !== null;
     followed = active.app;
-    browserLocation.follow(active.app);
+    if (switching) browserLocation.activate(active.app);
+    else browserLocation.follow(active.app);
   };
 
   /**
@@ -310,6 +317,11 @@ export function createOpenSpaces({
       app: composeApp({ spaceSession: session, selection, newId, reportObserverError: report }),
       spaceCards,
     };
+    session.subscribe(() => {
+      const state = observable.getState();
+      if (!state.entries.some((entry) => entry.session === session)) return;
+      observable.publish({ ...state, entries: [...state.entries] });
+    });
     if (reused || loaded.initialization !== 'created-layout') return opened;
     return { ...opened, initialization: 'created-layout' };
   };
@@ -396,6 +408,18 @@ export function createOpenSpaces({
    */
   const enter = (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> =>
     activate(spaceId, selection, observable.getState().activeSpaceId);
+
+  /**
+   * Open a target for embedded editing without taking the canvas off the Space
+   * that embeds it, which is still a crossing: the target hangs off the Space
+   * whose Card reached it.
+   */
+  const embed = async (spaceId: UUID): Promise<OpenSpace> => {
+    const target = await compose(spaceId);
+    const active = observable.getState().activeSpaceId;
+    include(target, active ?? target.id, active);
+    return target;
+  };
 
   const openPath: OpenSpaces['openPath'] = async (pathname) => {
     const { request, abandon } = beginActivation();
@@ -543,10 +567,12 @@ export function createOpenSpaces({
   };
 
   return {
+    metaSpaceId,
     getState: observable.getState,
     subscribe: observable.subscribe,
     entry: (spaceId) => observable.getState().entries.find(({ id }) => id === spaceId),
     open,
+    embed,
     openPath,
     enter,
     switchTo,
