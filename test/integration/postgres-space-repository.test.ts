@@ -35,8 +35,6 @@ spaceRepositoryContract('PostgresSpaceRepository', async () => {
   await clearHyperContent();
   const repository = new PostgresSpaceRepository(db);
   const harness: SpaceRepository = {
-    entrySpaceId: () => repository.entrySpaceId(),
-    setEntrySpace: (id) => repository.setEntrySpace(id),
     listSpaces: () => repository.listSpaces(),
     loadSpace: (id) => repository.loadSpace(id),
     loadAggregate: () => repository.loadAggregate(),

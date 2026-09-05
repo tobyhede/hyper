@@ -598,35 +598,15 @@ const replaceAllSpaces = async (orm: Orm, input: AggregateInput): Promise<Loaded
  * The singleton row is what `commit` and `loadAggregate` lock and read, and the
  * migration deliberately creates the table empty — a migration has no Space to
  * name. So the paths that first put a Space in the repository are what
- * establish it: bootstrap and administrative import both go through these, the
- * way `MemorySpaceRepository` does. Choosing the Meta Space properly, and
- * retiring the Entry flag it stands in for here, is `v1-release/01`.
+ * establish it: `initializeAggregate` is the one that does so deliberately, and
+ * the compatibility importer does so incidentally, the way
+ * `MemorySpaceRepository` does.
  */
 export class PostgresSpaceRepository implements SpaceRepository {
   readonly #database: typeof db;
 
   constructor(database: typeof db = db) {
     this.#database = database;
-  }
-
-  async entrySpaceId(): Promise<UUID | undefined> {
-    const entry = await this.#database.orm.public.Space.where({ entry: true }).first();
-    return entry === null ? undefined : uuidSchema.parse(entry.id);
-  }
-
-  async setEntrySpace(id: UUID): Promise<void> {
-    await this.#database.transaction(async ({ orm }) => {
-      const selected = await orm.public.Space.where({ id }).first();
-      if (selected === null) throw new Error(`Space ${id} does not exist`);
-      if (selected.entry === true) return;
-
-      const previous = await orm.public.Space.where({ entry: true }).first();
-      if (previous !== null) {
-        await orm.public.Space.where({ id: previous.id }).update({ entry: null });
-      }
-      const updated = await orm.public.Space.where({ id }).update({ entry: true });
-      if (updated === null) throw new Error(`Space ${id} disappeared while becoming Entry Space`);
-    });
   }
 
   async listSpaces(): Promise<readonly SpaceSummary[]> {

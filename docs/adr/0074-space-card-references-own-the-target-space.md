@@ -1,9 +1,9 @@
 # Space Card references own the target Space
 
 Status: accepted
-Refines: 0068
+Refines: 0068, 0069
 Refined by: 0076, 0077
-Related: 0001, 0018, 0058, 0060, 0069
+Related: 0001, 0018, 0058, 0060, 0078
 
 The Space Cards that reference a Space own its lifetime, and they own it
 together. A Space referenced by two Space Cards survives the deletion of either
@@ -63,6 +63,23 @@ destructive Card action states whether it affects one Layout or the whole
 Space, and asks first wherever authored work would be lost.
 
 ## Meta Space and the built Entry Space
+
+**The rest of this section is out of date, and is kept as the record of what
+was true when this decision was accepted.** Meta Space is built and the Entry
+Space is retired. Meta identity is singleton repository state, established once
+by the server-side repository's `initializeAggregate` operation and never moved
+(ADR 0077, ADR 0078); opening the application without another destination opens
+the Meta Space's canonical URL, and contradictory stored Meta state fails
+explicitly rather than being repaired or guessed at.
+`.scratch/v1-release/issues/01` landed that lifecycle and removed the Entry
+Space with it: the `spaces.entry` column, the `setEntrySpace` repository
+operation and the `hyper entry` command are all gone, and `CONTEXT.md` now
+lists Entry Space under Meta Space's `_Avoid_` rather than defining it. Do not
+reimplement any of them, and read ADR 0069's `entrySpaceId` paragraph as
+retired for the same reason. What is *not* yet built is ADR 0077's generated
+Default Content: `defaultContentAggregate` currently mints the ordinary
+one-Card new Space (ADR 0018) as the Meta Space, and
+`.scratch/v1-release/issues/16` replaces that body.
 
 Meta Space is not built. What exists is the **Entry Space**: a mutable
 repository-level flag naming the Space `/` redirects to, which `hyper entry`

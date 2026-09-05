@@ -1,9 +1,11 @@
+import type { UUID } from '@project/core';
 import { runHyper, type CliIo } from './run';
 import type { SpaceRepository } from '../persistence/space-repository';
 
 interface CliMainDependencies {
   repository: SpaceRepository;
   io: CliIo;
+  newId: () => UUID;
   close(): Promise<void>;
 }
 

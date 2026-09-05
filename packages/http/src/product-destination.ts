@@ -226,7 +226,7 @@ export const resolveProductDestination = async (
  *
  * A closed set of statuses rather than `number`, because the set is the
  * contract ADR 0069 states for a direct request: a temporary redirect to the
- * Entry Space, a bad request for an address that cannot be read at all, a
+ * Meta Space, a bad request for an address that cannot be read at all, a
  * not-found for one that reads and names nothing, a method rejection for a
  * request that is not a read, and an internal error for a stored document whose
  * Layout identities collide.

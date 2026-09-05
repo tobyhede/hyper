@@ -1,8 +1,7 @@
-import type { ImportSpace, UUID } from '@project/core';
-import { newSpace, parseCardFile } from '@project/graph';
-import { requireImportedSpaces } from '../import/import-space';
+import type { UUID } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import type { SpaceRepository } from '../persistence/space-repository';
+import { defaultContentAggregate } from './default-content';
 
 export interface OpenedDatabaseStartup {
   kind: 'opened';
@@ -21,45 +20,36 @@ export const openDatabaseSelection = async (
   return { kind: 'opened', space: loaded };
 };
 
-const createNewSpaceImport = (): ImportSpace => {
-  const minted = newSpace();
-  const cards = minted.cardFiles.map((file) => {
-    const parsed = parseCardFile(file);
-    if (!parsed.ok) {
-      throw new Error(parsed.errors.map(({ message }) => message).join('\n'));
-    }
-    const { id, ...document } = parsed.card;
-    return { id, document };
-  });
-  const { id: _persistenceOwnedId, ...document } = minted.file;
-  return { document, cards };
-};
+/**
+ * Answer the repository's one permanent Meta identity, establishing it from
+ * Default Content only when the repository has none.
+ *
+ * `initializeAggregate` is the whole of establishment (ADR 0078): there is no
+ * second Space-creation path here, and an already-initialized repository is
+ * left exactly as it is — `existing` and `already-initialized` both answer with
+ * the stored Meta identity rather than reseeding. Contradictory stored state —
+ * Spaces without Meta, or an aggregate that fails complete intake — is an
+ * invariant failure the repository raises and this deliberately does not catch.
+ */
+export const establishMetaSpace = async (
+  repository: SpaceRepository,
+  newId: () => UUID,
+): Promise<UUID> => {
+  const loaded = await repository.loadAggregate();
+  if (loaded.kind === 'loaded') return loaded.aggregate.metaSpaceId;
 
-/** Establish the normal first Space only when the repository is empty. */
-export const bootstrapEmptyDatabase = async (repository: SpaceRepository): Promise<void> => {
-  const catalog = await repository.listSpaces();
-  if (catalog.length > 0) return;
-
-  const imported = requireImportedSpaces(
-    await repository.importSpaces([createNewSpaceImport()], 'insert'),
-  );
-  const [created] = imported;
-  if (created === undefined || imported.length !== 1) {
-    throw new Error(`New-space import returned ${imported.length} spaces`);
+  const initialized = await repository.initializeAggregate(defaultContentAggregate(newId));
+  if (initialized.kind === 'aggregate-refused') {
+    throw new Error(
+      `Default Content is not a valid aggregate: ${initialized.errors.map(({ kind }) => kind).join(', ')}`,
+    );
   }
-
-  await repository.setEntrySpace(created.snapshot.id);
+  return initialized.aggregate.metaSpaceId;
 };
 
-/** Resolve the configured Entry Space; the database catalog only determines whether bootstrap is necessary. */
+/** Open the Meta Space, initializing the repository first when it has none. */
 export const resolveDatabaseStartup = async (
   repository: SpaceRepository,
-): Promise<DatabaseStartupResult> => {
-  const entrySpaceId = await repository.entrySpaceId();
-  if (entrySpaceId !== undefined) return openDatabaseSelection(repository, entrySpaceId);
-
-  await bootstrapEmptyDatabase(repository);
-  const configured = await repository.entrySpaceId();
-  if (configured === undefined) throw new Error('The database has no configured Entry Space');
-  return openDatabaseSelection(repository, configured);
-};
+  newId: () => UUID,
+): Promise<DatabaseStartupResult> =>
+  openDatabaseSelection(repository, await establishMetaSpace(repository, newId));

@@ -97,7 +97,7 @@ afterEach(async () => {
 describe('canonical export', () => {
   it('emits a version 1 space file whose Graphs are nested under the Layouts that own them', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
     await exportSpace(repository, SPACE_ID, destination);
 
@@ -209,8 +209,8 @@ describe('canonical export', () => {
     const first = join(await makeTemporaryDirectory(), 'exported');
     const second = join(await makeTemporaryDirectory(), 'exported');
 
-    await exportSpace(new MemorySpaceRepository([storedSpace]), SPACE_ID, first);
-    await exportSpace(new MemorySpaceRepository([shuffledStoredSpace]), SPACE_ID, second);
+    await exportSpace(new MemorySpaceRepository([storedSpace], SPACE_ID), SPACE_ID, first);
+    await exportSpace(new MemorySpaceRepository([shuffledStoredSpace], SPACE_ID), SPACE_ID, second);
 
     await expect(readFile(join(first, 'space.json'), 'utf8')).resolves.toBe(
       await readFile(join(second, 'space.json'), 'utf8'),
@@ -267,7 +267,7 @@ describe('canonical export', () => {
 
   it('writes every Open Size width before height, however it was stored', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const repository = new MemorySpaceRepository([storedSpaceWithOpenSizes]);
+    const repository = new MemorySpaceRepository([storedSpaceWithOpenSizes], SPACE_ID);
 
     await exportSpace(repository, SPACE_ID, destination);
 
@@ -303,7 +303,7 @@ describe('canonical export', () => {
    * author actually repeats.
    */
   it('re-exports over its own output without changing a byte', async () => {
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const destination = join(await makeTemporaryDirectory(), 'exported');
 
     await exportSpace(repository, SPACE_ID, destination);
@@ -315,7 +315,7 @@ describe('canonical export', () => {
 
   it('exports a directory that imports back as the Space it came from', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const repository = new MemorySpaceRepository([storedSpace]);
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
     await exportSpace(repository, SPACE_ID, destination);
 

@@ -1,4 +1,4 @@
-import { newUuid, SPACE_FILE_VERSION, type Card, type SpaceFile, type UUID } from '@project/core';
+import { SPACE_FILE_VERSION, type Card, type SpaceFile, type UUID } from '@project/core';
 import { serializeCardFile, type CardFile } from './card-file';
 
 /**
@@ -79,6 +79,15 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
   };
 }
 
-export function newSpace(): NewSpace {
-  return initializeSpace({ title: NEW_SPACE_TITLE, newId: newUuid });
+/**
+ * The default new Space: `Card 1` in `New space`.
+ *
+ * It takes `newId` for the same reason {@link initializeSpace} does (ADR 0016)
+ * — the four identities it mints are the caller's to control — and because
+ * closing over the ambient generator is what made `defaultContentAggregate`
+ * transcribe this function rather than call it. It calls it now, so the
+ * starting state has one definition rather than two that agree by inspection.
+ */
+export function newSpace(newId: () => UUID): NewSpace {
+  return initializeSpace({ title: NEW_SPACE_TITLE, newId });
 }

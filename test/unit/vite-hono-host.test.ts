@@ -6,9 +6,10 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { connect } from 'node:net';
-import { encodeCompactUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { encodeCompactUuid, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import {
+  decodeLoadedSpace,
   decodeProblemDetails,
   encodeCommitRequest,
   type SpaceResourceRepository,
@@ -18,8 +19,11 @@ import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
 
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const MINTED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -187,24 +191,125 @@ describe('Vite Hono host', () => {
     await expect(response.text()).resolves.toBe('<main>Vite application</main>');
   });
 
-  it('redirects root to the compact Entry Space URL without reading its document', async () => {
+  it('redirects root to the compact Meta Space URL without a second read of it', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceRepository = new MemorySpaceRepository([stored], SPACE_ID);
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
-    const { host } = await startHost(createSpaceHost(spaceRepository));
+    const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
 
     const response = await fetch(`${host.url}/`, { redirect: 'manual' });
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
-    // The redirect target's first act is to load this Space, and the id came
-    // from the row that holds it — so loading it here to prove it exists is a
-    // read the answer never depended on.
+    // Not a cheap single lookup: establishment reads and validates every stored
+    // document through `loadAggregate`, under the Meta identity write lock. What
+    // this pins is that nothing is read *again* through the resource loader —
+    // the redirect target's first act is to load this Space, and the id came
+    // from the repository state that names it under a restraining foreign key,
+    // so loading it here to prove it exists is a read the answer never depended
+    // on.
     expect(loadSpace).not.toHaveBeenCalled();
   });
 
+  it('initializes an uninitialized repository at root and redirects to the Meta Space', async () => {
+    const spaceRepository = new MemorySpaceRepository();
+    const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
+
+    const response = await fetch(`${host.url}/`, { redirect: 'manual' });
+
+    const loaded = await spaceRepository.loadAggregate();
+    if (loaded.kind !== 'loaded') throw new Error('Root did not initialize the repository');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      `/spaces/${encodeCompactUuid(loaded.aggregate.metaSpaceId)}`,
+    );
+
+    // A second arrival reads the Meta Space established by the first rather
+    // than seeding a second one over it.
+    const again = await fetch(`${host.url}/`, { redirect: 'manual' });
+    expect(again.headers.get('location')).toBe(response.headers.get('location'));
+    await expect(spaceRepository.listSpaces()).resolves.toHaveLength(1);
+  });
+
+  it('mints working-load initialization from the identity source it was composed with', async () => {
+    // The host's `newId` reaches both things it composes that mint, not just
+    // the root address. A stored layoutless Space is durably initialized on
+    // first working load (ADR 0079), and that Layout and Graph are the ones
+    // this composition named — not the ambient generator's, which is what
+    // `createSpaceHttpApp`'s own default would have supplied.
+    const ids = [MINTED_LAYOUT_ID, MINTED_GRAPH_ID];
+    const spaceRepository = new MemorySpaceRepository(
+      [{ snapshot, revision: 0n, exportedRevision: null }],
+      SPACE_ID,
+    );
+    const hostApp = createSpaceHost(spaceRepository, () => {
+      const id = ids.shift();
+      if (id === undefined) throw new Error('The working-space loader minted more ids than named');
+      return id;
+    });
+    const { host } = await startHost(hostApp);
+
+    const response = await fetch(`${host.url}/api/spaces/${SPACE_ID}`);
+
+    expect(response.status).toBe(200);
+    expect(decodeLoadedSpace(await response.json()).snapshot.document).toMatchObject({
+      defaultLayout: MINTED_LAYOUT_ID,
+      layouts: [
+        {
+          id: MINTED_LAYOUT_ID,
+          graphs: [{ id: MINTED_GRAPH_ID }],
+          activeGraph: MINTED_GRAPH_ID,
+        },
+      ],
+    });
+    expect(ids).toHaveLength(0);
+  });
+
+  it.each([
+    ['contradictory stored Meta state', 'Stored Spaces exist without a Meta Space'],
+    ['an unreachable database', 'connect ECONNREFUSED 127.0.0.1:5432'],
+  ])(
+    'answers %s as an explicit failure that keeps the reason out of the response',
+    async (_case, message) => {
+      class FailingSpaceRepository extends MemorySpaceRepository {
+        override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
+          return Promise.reject(new Error(message));
+        }
+      }
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const stored = { snapshot, revision: 0n, exportedRevision: null };
+      const { host } = await startHost(
+        createSpaceHost(new FailingSpaceRepository([stored], SPACE_ID), newUuid),
+      );
+
+      const response = await fetch(`${host.url}/`, {
+        redirect: 'manual',
+        headers: { Accept: 'application/problem+json' },
+      });
+
+      // The two are indistinguishable to the host — both arrive as an ordinary
+      // `Error` out of `loadAggregate` — so neither is claimed. In particular a
+      // driver's own message is not served to the client, and an outage is not
+      // reported as the permanent invariant failure it may not be.
+      expect(response.status).toBe(500);
+      expect(response.headers.get('location')).toBeNull();
+      const body = await response.text();
+      expect(body).not.toContain(message);
+      expect(decodeProblemDetails(JSON.parse(body))).toMatchObject({
+        status: 500,
+        title: 'Internal server error',
+        detail: 'Try the request again later.',
+      });
+      // The reason still travels, to the operator rather than the client.
+      expect(logged).toHaveBeenCalledWith(
+        'Failed to establish the Meta Space',
+        expect.objectContaining({ message }),
+      );
+    },
+  );
+
   it('answers malformed and unresolved Space URLs before Vite fallback', async () => {
-    const hostApp = createSpaceHost(new MemorySpaceRepository());
+    const hostApp = createSpaceHost(new MemorySpaceRepository(), newUuid);
     const { host } = await startHost(hostApp);
 
     await expect(
@@ -213,11 +318,10 @@ describe('Vite Hono host', () => {
     await expect(
       fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`).then((value) => value.status),
     ).resolves.toBe(404);
-    await expect(fetch(`${host.url}/`).then((value) => value.status)).resolves.toBe(404);
   });
 
   it('serves product failures as Problem Details or a browser error surface', async () => {
-    const { host } = await startHost(createSpaceHost(new MemorySpaceRepository()));
+    const { host } = await startHost(createSpaceHost(new MemorySpaceRepository(), newUuid));
     const path = `/spaces/${encodeCompactUuid(SPACE_ID)}`;
 
     const protocol = await fetch(`${host.url}${path}`, {
@@ -246,7 +350,7 @@ describe('Vite Hono host', () => {
 
   it('lets an existing canonical Space URL reach the SPA fallback', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const hostApp = createSpaceHost(new MemorySpaceRepository([stored]));
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID), newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.setHeader('Content-Type', 'text/html');
       response.end('<main>Canonical Space</main>');
@@ -260,9 +364,9 @@ describe('Vite Hono host', () => {
 
   it('answers a removed canvas identity as not found', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const spaceRepository = new MemorySpaceRepository([stored]);
+    const spaceRepository = new MemorySpaceRepository([stored], SPACE_ID);
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
-    const hostApp = createSpaceHost(spaceRepository);
+    const hostApp = createSpaceHost(spaceRepository, newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.end('<main>Application</main>');
     });
@@ -279,7 +383,7 @@ describe('Vite Hono host', () => {
   it('leaves a path outside product addressing to the SPA fallback without loading', async () => {
     const spaceRepository = new MemorySpaceRepository();
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
-    const hostApp = createSpaceHost(spaceRepository);
+    const hostApp = createSpaceHost(spaceRepository, newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.end('<main>Outside product addressing</main>');
     });
@@ -293,7 +397,7 @@ describe('Vite Hono host', () => {
 
   it('resolves HEAD like GET while sending no product response body', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID));
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored], SPACE_ID), newUuid);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.statusCode = 200;
       response.end('<main>Vite fallback</main>');
@@ -336,10 +440,13 @@ describe('Vite Hono host', () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceRepository = new MemorySpaceRepository([stored], SPACE_ID);
     const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
-    const { host } = await startHost(createSpaceHost(spaceRepository), (_request, response) => {
-      response.setHeader('Content-Type', 'text/html');
-      response.end('<main>Vite fallback</main>');
-    });
+    const { host } = await startHost(
+      createSpaceHost(spaceRepository, newUuid),
+      (_request, response) => {
+        response.setHeader('Content-Type', 'text/html');
+        response.end('<main>Vite fallback</main>');
+      },
+    );
 
     const posted = await fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`, {
       method: 'POST',
@@ -639,5 +746,40 @@ describe('Vite Hono host', () => {
       200,
     );
     expect(commitAttempts).toBe(0);
+  });
+});
+
+describe('Database HTTP runtime', () => {
+  it('composes an application when the repository cannot be reached', async () => {
+    // The host promise this runtime feeds is created once and memoized for the
+    // life of the process (`installMiddleware` above), and a rejection is
+    // therefore permanent: every later request on every path is handed to
+    // `next(error)` and gets the generic error page instead of the answer the
+    // application has for it — including after the database comes back. So
+    // establishment failing is reported and composition continues; the root
+    // address answers the same failure per request.
+    const url = process.env['DATABASE_URL'];
+    // Port 1 refuses immediately, and it is set before the runtime is imported
+    // because `src/prisma/db.ts` reads the variable once, at module scope.
+    // `dotenv` does not override an existing value, so a developer's `.env`
+    // cannot decide this test.
+    process.env['DATABASE_URL'] = 'postgresql://hyper:hyper@127.0.0.1:1/hyper';
+    let reported: unknown;
+    vi.spyOn(console, 'error').mockImplementation((message: unknown, error: unknown) => {
+      if (message === 'Failed to establish the Meta Space at startup') reported = error;
+    });
+    try {
+      const { createApp } = await import('../../src/http/postgres-http-runtime');
+
+      const application = await createApp();
+
+      expect(typeof application.resolveProductRequest).toBe('function');
+      // The reason is not swallowed, only kept out of the way of composition.
+      expect(reported).toBeInstanceOf(Error);
+      expect(reported instanceof Error ? reported.message : '').toContain('ECONNREFUSED');
+    } finally {
+      if (url === undefined) delete process.env['DATABASE_URL'];
+      else process.env['DATABASE_URL'] = url;
+    }
   });
 });

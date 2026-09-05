@@ -12,7 +12,9 @@ import {
   problemCatalogue,
   type HyperProblemCode,
 } from '@project/persistence';
+import type { UUID } from '@project/core';
 import type { SpaceRepository } from '../persistence/space-repository';
+import { establishMetaSpace } from '../startup/database-startup';
 
 export type SpaceHostApplication = SpaceHttpApp & ProductRequestResolver;
 
@@ -54,9 +56,25 @@ const methodNotAllowed = (accept?: string): ProductResponse => {
   return { ...response, headers: { ...response.headers, allow: PRODUCT_METHODS } };
 };
 
-/** Compose API resources and the product paths the HTTP host owns before SPA fallback. */
-export const createSpaceHost = (repository: SpaceRepository): SpaceHostApplication => {
-  const api = createSpaceHttpApp(repository);
+/**
+ * Compose API resources and the product paths the HTTP host owns before SPA
+ * fallback.
+ *
+ * `newId` is the composition-owned identity source (ADR 0016), and it is the
+ * host's only one. Two things the host composes mint: the root address
+ * establishes the Meta Space when the repository has none, and the API tree's
+ * working-space loader durably initializes a stored layoutless Space on first
+ * load (ADR 0079). So it is forwarded to `createSpaceHttpApp` rather than left
+ * to that function's own default, which would reinstate the ambient generator
+ * for the second of them behind this composition's back — a host handed a
+ * deterministic minter would then be deterministic at the root and random on
+ * load.
+ */
+export const createSpaceHost = (
+  repository: SpaceRepository,
+  newId: () => UUID,
+): SpaceHostApplication => {
+  const api = createSpaceHttpApp(repository, { newId });
   const resolveProductRequest = async (
     pathname: string,
     method: string,
@@ -65,17 +83,46 @@ export const createSpaceHost = (repository: SpaceRepository): SpaceHostApplicati
     const reads = method === 'GET' || method === 'HEAD';
     if (pathname === '/') {
       if (!reads) return methodNotAllowed(accept);
-      const entrySpaceId = await repository.entrySpaceId();
-      if (entrySpaceId === undefined)
-        return problem('not-found', 'Choose an Entry Space that exists.', accept);
-      // The document is not read to prove it is there. `entrySpaceId` is the id
-      // of the row carrying the Entry Space flag, so it names a Space that
-      // exists — and the redirect target's first act is to load that very Space
-      // anyway, which is where a Space that vanished between the two would be
-      // answered exactly as any other missing Space is.
+      // Opening the application without another destination opens the Meta
+      // Space, and an uninitialized repository is initialized here rather than
+      // redirected to nothing. A failure to establish it is reported as an
+      // answer instead of being papered over with a redirect or a guess at
+      // which Space was meant.
+      let metaSpaceId: UUID;
+      try {
+        metaSpaceId = await establishMetaSpace(repository, newId);
+      } catch (error) {
+        // What failed is not something this can tell. Contradictory stored Meta
+        // state — Spaces without Meta, or an aggregate that fails complete
+        // intake — and a database that is simply unreachable both arrive here as
+        // an ordinary `Error`, so classifying them would mean reading the
+        // message, and the wire behaviour would turn on prose. Neither is
+        // claimed, and the answer is the one `@project/http` already gives for a
+        // request failure it cannot classify: the catalogued title with `Try the
+        // request again later.` as its detail.
+        //
+        // A transient outage would be better answered by the 503
+        // `persistence-unavailable` `GET /api/aggregate` gives for this very
+        // throw, and telling the two apart is worth doing — but that wants the
+        // repository raising an identifiable invariant error rather than a host
+        // matching on text, and `ProductResponse`'s closed status set does not
+        // admit 503.
+        //
+        // The reason travels to the operator rather than in the answer. The
+        // detail is fixed prose like every other one here, so whatever a driver
+        // put in its message is not served to an unauthenticated client.
+        console.error('Failed to establish the Meta Space', error);
+        return problem('internal-error', 'Try the request again later.', accept);
+      }
+      // No second read proves the Space is there. Establishment has already read
+      // and validated every stored document to answer at all, and `metaSpaceId`
+      // is the id the repository state names under its restraining foreign key,
+      // so it names a Space that exists — and the redirect target's first act is
+      // to load that very Space anyway, which is where a Space that vanished
+      // between the two would be answered exactly as any other missing Space is.
       return {
         status: 302,
-        headers: { location: productDestinationPath({ kind: 'space', spaceId: entrySpaceId }) },
+        headers: { location: productDestinationPath({ kind: 'space', spaceId: metaSpaceId }) },
       };
     }
 

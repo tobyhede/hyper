@@ -1,7 +1,7 @@
 # The Meta Space starts from one replaceable default aggregate
 
 Status: accepted
-Refines: 0054, 0056, 0074
+Refines: 0054, 0056, 0069, 0074
 
 On first repository initialization, Hyper creates the permanent Meta Space from
 one deterministic aggregate containing concise examples of the V1 Card kinds.

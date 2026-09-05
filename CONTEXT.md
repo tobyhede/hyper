@@ -10,13 +10,11 @@ _Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger
 
 A **new space** is one Card in one centered Layout with one empty Graph — not an empty canvas (ADR 0018, ADR 0079). One Card is the starting state, not a permanent minimum: deliberate deletion may later leave the Space with no Cards.
 
-**Entry Space**:
-The one Space the application opens when no Space has been named. Entry is application-level context rather than a kind or property of Space; any Space loaded independently is the root of its own navigation context. This is what exists: a mutable repository-level flag that `hyper entry` changes (ADR 0069).
-_Avoid_: Root Space as a special kind, home Space, default Space.
-
 **Meta Space**:
-The one permanent Space, at the root of Space Card ownership. No Space Card creates it and no deletion reaches it, so it is the only Space that need not be referenced to survive (ADR 0074). Every ordinary Space is created by creating its first Space Card and deleted by deleting its last, which is what makes every Space operation a Card operation. **Not built**: the Entry Space above is the current implementation, and `.scratch/v1-release/issues/01` replaces it with this.
-_Avoid_: root Space, home Space, default Space, Space directory.
+The one permanent Space, at the root of Space Card ownership. No Space Card creates it and no deletion reaches it, so it is the only Space that need not be referenced to survive (ADR 0074). Every ordinary Space is created by creating its first Space Card and deleted by deleting its last, which is what makes every Space operation a Card operation.
+
+Its identity is repository state rather than a kind or property of Space, and there is one of it per repository: first initialization establishes it and nothing later moves it, so no Space becomes or stops being Meta by being flagged, ordered, counted or referenced (ADR 0077, ADR 0078). Opening the application without another destination opens the Meta Space's canonical URL; a repository that has none is initialized before anything is served, and stored state the Meta identity contradicts fails explicitly rather than being repaired or guessed at. Any Space loaded independently is still the root of its own navigation context — Meta is where navigation starts, not what owns the Space you are in.
+_Avoid_: root Space, home Space, default Space, Space directory, Entry Space (a mutable per-repository flag, retired with the lifecycle above).
 
 **Id**:
 The durable UUID that names a referenceable thing — a Space, Card, Layout, or Graph. It is the entity's only identifier and is unique within that entity's scope: Space and Card ids are global, while Layout and Graph ids are unique within their owning Space. Card ids are aggregate-global because a complete Meta-rooted aggregate indexes Cards across independently stored Spaces; a Graph belongs to one Layout but its id is unique across the whole Space. Different entity kinds may carry the same UUID, and Layout or Graph ids scoped to one Space may be reused in another. References carry the id directly in the scope that resolves it rather than pairing it with a second authored or machine-facing name.

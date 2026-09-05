@@ -44,7 +44,7 @@ const installClipboard = async (page: Page): Promise<void> => {
   });
 };
 
-test('root redirects to and opens the canonical Entry Space URL', async ({ page }) => {
+test('root redirects to and opens the canonical Meta Space URL', async ({ page }) => {
   const response = await page.goto('/');
 
   expect(response?.status()).toBe(200);

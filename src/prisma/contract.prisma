@@ -13,7 +13,6 @@ model Space {
   updatedAt        temporal.updatedAt() @map("updated_at")
   cards            Card[]
   repositoryStates RepositoryState[]
-  entry             Boolean? @unique
 
   @@map("spaces")
 }

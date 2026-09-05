@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { spaceFileSchema, uuidSchema } from '@project/core';
+import { newUuid, spaceFileSchema, uuidSchema } from '@project/core';
 import { initializeSpace, loadSpace, newSpace } from '../src/index';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -9,11 +9,11 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 describe('newSpace', () => {
   it('is a real space file, not something that only nearly parses', () => {
-    expect(spaceFileSchema.safeParse(newSpace().file).success).toBe(true);
+    expect(spaceFileSchema.safeParse(newSpace(newUuid).file).success).toBe(true);
   });
 
   it('loads, which is the only proof it is a space at all (ADR 0010)', () => {
-    const { file, cardFiles } = newSpace();
+    const { file, cardFiles } = newSpace(newUuid);
     const result = loadSpace(file, cardFiles);
 
     expect(result.ok).toBe(true);
@@ -24,7 +24,7 @@ describe('newSpace', () => {
   });
 
   it('begins neutral Card numbering at Card 1 with an empty body (ADR 0018, ADR 0020)', () => {
-    const { file, cardFiles } = newSpace();
+    const { file, cardFiles } = newSpace(newUuid);
     const result = loadSpace(file, cardFiles);
     if (!result.ok) throw new Error('should load');
 
@@ -35,7 +35,7 @@ describe('newSpace', () => {
   });
 
   it('starts complete with its first Card at the canonical centred position', () => {
-    const { file, cardFiles } = newSpace();
+    const { file, cardFiles } = newSpace(newUuid);
     const result = loadSpace(file, cardFiles);
     if (!result.ok) throw new Error('should load');
 
@@ -48,8 +48,8 @@ describe('newSpace', () => {
   });
 
   it('mints fresh UUID identity for each new space and its first card', () => {
-    const first = newSpace();
-    const second = newSpace();
+    const first = newSpace(newUuid);
+    const second = newSpace(newUuid);
 
     expect(first.file.id).not.toBe(second.file.id);
     expect(first.cardFiles[0]?.text).not.toBe(second.cardFiles[0]?.text);
@@ -57,14 +57,14 @@ describe('newSpace', () => {
   });
 
   it('puts the card in `cards/`, named for its id', () => {
-    const { cardFiles } = newSpace();
+    const { cardFiles } = newSpace(newUuid);
     expect(cardFiles).toHaveLength(1);
     expect(cardFiles[0]!.path).toMatch(/^cards\/[0-9a-f-]{36}\.md$/);
   });
 
   it('is a fresh value each time, so one space cannot mutate another', () => {
-    expect(newSpace()).not.toBe(newSpace());
-    expect(newSpace().cardFiles).not.toBe(newSpace().cardFiles);
+    expect(newSpace(newUuid)).not.toBe(newSpace(newUuid));
+    expect(newSpace(newUuid).cardFiles).not.toBe(newSpace(newUuid).cardFiles);
   });
 });
 

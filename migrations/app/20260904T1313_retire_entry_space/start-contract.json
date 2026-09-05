@@ -161,6 +161,13 @@
                   "kind": "scalar"
                 }
               },
+              "entry": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "exportedRevision": {
                 "nullable": true,
                 "type": {
@@ -229,6 +236,9 @@
                 },
                 "document": {
                   "column": "document"
+                },
+                "entry": {
+                  "column": "entry"
                 },
                 "exportedRevision": {
                   "column": "exported_revision"
@@ -395,6 +405,11 @@
                   "nativeType": "jsonb",
                   "nullable": false
                 },
+                "entry": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": true
+                },
                 "exported_revision": {
                   "codecId": "pg/int8@1",
                   "nativeType": "int8",
@@ -432,7 +447,13 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "entry"
+                  ]
+                }
+              ]
             }
           }
         },
@@ -440,7 +461,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:d00492dbc7fcb2ed490d375e80e2ed696e7a97515475431060e1d6927a3a191f",
+    "storageHash": "sha256:8bd4ae05bc57e60ecf2f92ff1a179bf972ff06e13466439449fc5dd41fe62a5f",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
