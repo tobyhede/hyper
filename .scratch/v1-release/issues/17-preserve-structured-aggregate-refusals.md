@@ -3,6 +3,9 @@
 Status: ready-for-agent
 Tags: release/v1
 Blocked by: none — its refusal transport is independent of renderer vocabulary
+Related: `v1-release/21`, which this unblocks. The root address must tell a
+broken invariant from a database that is down, and today both arrive as an
+ordinary `Error` (`src/http/space-host.ts`). Review `21` when this lands.
 
 **What to build:** Preserve every aggregate refusal's stable identity and
 location through coordinated session state and the application feedback surface
