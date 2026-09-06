@@ -20,10 +20,31 @@ test.use({ viewport: { width: 390, height: 844 } });
 /** The same surface as the desktop one, drawn through the primitive's Sheet. */
 const sheet = (page: Page) => sidebar(page);
 
+/**
+ * Open the Sheet and wait for it to have *stopped arriving*.
+ *
+ * `toBeVisible` is satisfied by the first frame of the entry transition — the
+ * Sheet is in the DOM with a box at that point, at `opacity: 0` and still some
+ * 40px off its resting edge — and it then slides and fades for another ~230ms.
+ * Playwright's own stability check is not enough on its own here: it compares
+ * two consecutive frames, and under load two samples straddle a frame the
+ * animation did not advance in, which reads as still.
+ *
+ * A press that lands mid-transition is what the wait exists for. A plain
+ * button survives one, but a *menu* trigger does not: the menu opens on the
+ * press and is dismissed again about 120ms later, on the release — leaving the
+ * trigger focused, no menu, and a test that waits out its whole timeout for an
+ * item on a popup that has gone. That was reproducible at 7 failures in 20 with
+ * four workers, and the flake CI reported on `mobile-sidebar.spec.ts:133`.
+ *
+ * Opacity is the read because it is the last of the two animated properties to
+ * arrive — the offset rounds to its resting value a frame or two before it.
+ */
 async function openMobileSidebar(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
   await expect(sheet(page)).toHaveAttribute('data-mobile', 'true');
   await expect(sheet(page)).toBeVisible();
+  await expect(sheet(page)).toHaveCSS('opacity', '1');
 }
 
 test(

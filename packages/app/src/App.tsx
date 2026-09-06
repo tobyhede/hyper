@@ -24,6 +24,7 @@ import {
   presentNewSpaceCardRefusal,
 } from './authoring-refusal';
 import { useCardCreation } from './card-creation-react';
+import { cardCreationMessage } from './card-creation';
 import type { CardCreationInput, CardCreationOutcome, CardCreationSeams } from './card-creation';
 import { useSpaceCardTargets } from './space-card-targets';
 import { usePlacementRendering } from './placement-rendering';
@@ -331,14 +332,9 @@ export const createApp = (
      */
     const creatingCard = creationPane.status !== 'closed';
     // A refusal describes the attempt; a failed listing describes the list. The
-    // pane draws whichever is current on one channel, and only the module knows
-    // that a keystroke ends the first and not the second.
-    const creationRefusal =
-      creationPane.status === 'closed'
-        ? null
-        : creationPane.status === 'submitting'
-          ? creationPane.listing
-          : (creationPane.refusal ?? creationPane.listing);
+    // pane draws whichever is current on one channel, and which that is belongs
+    // to the module that owns the arms.
+    const creationRefusal = cardCreationMessage(creationPane);
 
     const selectedLayout = useMemo(
       () => resolveLayout(renderedSpace, selectedLayoutId),

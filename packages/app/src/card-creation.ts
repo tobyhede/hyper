@@ -124,7 +124,21 @@ export type CardCreationPane =
       /** Why the last attempt produced no Card, or `null`. */
       readonly refusal: CardCreationRefusalErrors | null;
     } & CardCreationOpen)
-  | ({ readonly status: 'submitting' } & CardCreationOpen);
+  | ({
+      readonly status: 'submitting';
+      /**
+       * Whether this pane is gone the moment its Edit is over.
+       *
+       * A replacement lands on a busy pane and cannot close it — the Edit
+       * completes whether or not the surface that began it is still mounted —
+       * so it is recorded here and spent by `settled`. Without it the wait is
+       * indistinguishable from forgetting: the epoch that discarded the pane is
+       * read once, during a render, and a `refused` or `none` ending would
+       * return the author to `choosing` holding choices read from the Space
+       * that is gone.
+       */
+      readonly discarded: boolean;
+    } & CardCreationOpen);
 
 export interface CardCreationState {
   readonly pane: CardCreationPane;
@@ -200,12 +214,41 @@ const unreadableChoices = (kind: CardCreationKind): CardCreationChoices =>
     ? { kind: 'alias', targets: [] }
     : { kind: 'space', targets: { kind: 'unreadable' } };
 
+/**
+ * The one message an open pane draws, whichever channel it is on.
+ *
+ * Here rather than at the surface, because which of the two wins is a fact
+ * about the arms of {@link CardCreationPane}: a refusal describes the attempt
+ * the author just made and a failed listing describes the list, and only this
+ * module knows that a keystroke ends the first and nothing ends the second.
+ * Written as a ternary at the call site, a fourth arm would compile and draw
+ * the wrong one.
+ */
+export const cardCreationMessage = (pane: CardCreationPane): CardCreationRefusalErrors | null => {
+  switch (pane.status) {
+    case 'closed':
+      return null;
+    // A running attempt has no refusal of its own — the one it began on is over
+    // — but nothing typed makes a failed listing readable, so that stays.
+    case 'submitting':
+      return pane.listing;
+    case 'choosing':
+      return pane.refusal ?? pane.listing;
+  }
+};
+
 export function cardCreationReducer(
   state: CardCreationState,
   action: CardCreationAction,
 ): CardCreationState {
   switch (action.type) {
     case 'open':
+      // One pane, and this is where that is true: the shell's own guard reads
+      // the render's state, so two gestures in one tick both see a closed pane.
+      // Opening twice would advance the opening past the read each of them made
+      // — both carry the first — leaving the pane on its empty initial choices
+      // with nothing left to fill it.
+      if (state.pane.status !== 'closed') return state;
       return {
         pane: {
           status: 'choosing',
@@ -224,7 +267,7 @@ export function cardCreationReducer(
       const pane: CardCreationPane =
         state.pane.status === 'choosing'
           ? { status: 'choosing', choices, listing, refusal: state.pane.refusal }
-          : { status: 'submitting', choices, listing };
+          : { status: 'submitting', choices, listing, discarded: state.pane.discarded };
       return { ...state, pane };
     }
 
@@ -232,11 +275,21 @@ export function cardCreationReducer(
       if (state.pane.status !== 'choosing') return state;
       return {
         ...state,
-        pane: { status: 'submitting', choices: state.pane.choices, listing: state.pane.listing },
+        pane: {
+          status: 'submitting',
+          choices: state.pane.choices,
+          listing: state.pane.listing,
+          discarded: false,
+        },
       };
 
     case 'settled': {
       if (state.pane.status === 'closed') return state;
+      // A pane a replacement discarded was only ever waiting for its Edit to
+      // be over, so every ending closes it — including the two that would
+      // otherwise reopen it on choices read from the Space that is gone.
+      if (state.pane.status === 'submitting' && state.pane.discarded)
+        return { ...state, pane: { status: 'closed' } };
       const { choices, listing } = state.pane;
       if (action.outcome.kind === 'refused') {
         return {
@@ -272,10 +325,18 @@ export function cardCreationReducer(
       // A replacement discards every open Interaction draft (ADR 0042), and
       // this pane is one — its choices are a snapshot read once per opening, so
       // a pane left standing would go on offering Cards from the Space that is
-      // gone and refuse every one of them. It waits on an Edit in flight for
-      // the same reason `presenting` does, and owes nothing either way: the
+      // gone and refuse every one of them. It owes nothing either way: the
       // continuation this would have asked for is discarded by the very epoch
       // that sent this.
+      //
+      // A busy pane waits, for the reason `cancel` and `presenting` do, but it
+      // records the discard rather than dropping it. `presenting` needs no such
+      // field because `App` re-applies it from an effect that depends on the
+      // operations, which are a new object on every dispatch; the epoch behind
+      // this one is read during a render and consumed there, so nothing would
+      // ever send it again.
+      if (state.pane.status === 'submitting')
+        return { ...state, pane: { ...state.pane, discarded: true } };
       if (state.pane.status !== 'choosing') return state;
       return { ...state, pane: { status: 'closed' } };
   }
@@ -314,8 +375,13 @@ export interface CardCreationSeams {
    * Requested from this shell rather than from the reducer, which must stay
    * pure. The one thing that could make a shell's captured state wrong here is
    * a pane that closed under a running Edit, and the reducer forbids exactly
-   * that: `cancel` and `presenting` both require `choosing`, so a `submitting`
-   * pane is still open when its outcome arrives.
+   * that: `cancel`, `presenting` and `replaced` all leave a `submitting` pane
+   * standing, so it is still open when its outcome arrives.
+   *
+   * A replacement is the one ending this asks for that the author will not see:
+   * a Card created into a Space that has since gone is named by a continuation
+   * the canvas can never resolve, so it waits — harmlessly, the Card being
+   * nowhere on it — until the next request replaces it.
    */
   readonly continuation: Continuation;
 }

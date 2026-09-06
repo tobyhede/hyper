@@ -358,7 +358,9 @@
       // narrowing to begin with. Renaming every one of these to the rule's
       // literal exempted name (`cause`) was considered and rejected: most of
       // them are the error being reported, not a wrapped cause, and inventing
-      // a name to dodge a linter is worse than a scoped exception. Two are
+      // a name to dodge a linter is worse than a scoped exception.
+      // `failure-message.ts` is that narrowing itself, extracted so the five
+      // copies of it became one. Two are
       // genuine external contracts, not our own seam: `SpaceApp.tsx`'s
       // `getDerivedStateFromError` overrides React's own lifecycle method
       // signature, and `space-authoring.test.ts`'s
@@ -368,6 +370,7 @@
       // composition-time injection seam).
       "files": [
         "packages/app/src/authoring-refusal.ts",
+        "packages/app/src/failure-message.ts",
         "packages/app/src/navigation.ts",
         "packages/app/src/placement-rendering.ts",
         "packages/app/src/startup.tsx",

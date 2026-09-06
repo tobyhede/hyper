@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
   CARD_CREATION_CLOSED,
+  cardCreationMessage,
   cardCreationReducer,
   createCardCreation,
   type CardCreationAction,
@@ -86,13 +87,20 @@ describe('the Card creation pane', () => {
     });
   });
 
+  /**
+   * The pane that stands is the first one, not the last: a second `open` has no
+   * read behind it — the shell refuses to make one over an open pane — so
+   * letting it through would replace a filled pane with an empty one nothing
+   * would ever fill.
+   */
   it('cannot offer both kinds at once', () => {
     const state = reduce(
       CARD_CREATION_CLOSED,
       { type: 'open', kind: 'alias' },
       { type: 'open', kind: 'space' },
     );
-    expect(state.pane.status === 'choosing' && state.pane.choices.kind).toBe('space');
+    expect(state.pane.status === 'choosing' && state.pane.choices.kind).toBe('alias');
+    expect(state.opening).toBe(1);
   });
 });
 
@@ -139,6 +147,30 @@ describe('a create in flight', () => {
     expect(state.pane.status).toBe('submitting');
   });
 
+  /**
+   * The other half of the rule above: waiting is not the same as forgetting.
+   *
+   * The wait is only for the Edit to finish, so every ending closes the pane a
+   * replacement discarded — including the two that would otherwise reopen it
+   * on `choosing`, holding choices read from the Space that is gone.
+   */
+  it.each([
+    ['refused', { kind: 'refused', errors: { fields: {}, form: 'No.' } }],
+    ['created', { kind: 'created', cardId: CARD_ID }],
+    ['none', { kind: 'none' }],
+  ] as const)(
+    'closes the discarded pane when the create it waited on is %s',
+    (_ending, outcome) => {
+      const state = reduce(
+        choosing(),
+        { type: 'submitting' },
+        { type: 'replaced' },
+        { type: 'settled', outcome },
+      );
+      expect(state.pane.status).toBe('closed');
+    },
+  );
+
   it('cannot be busy with no pane to disable', () => {
     expect(reduce(CARD_CREATION_CLOSED, { type: 'submitting' }).pane.status).toBe('closed');
   });
@@ -149,6 +181,49 @@ describe('a create in flight', () => {
     creation.submit({ kind: 'space', targetSpaceId: null, title: 'Recap' });
     expect(submit).not.toHaveBeenCalled();
     expect(dispatched).toEqual([]);
+  });
+});
+
+describe('the one message an open pane draws', () => {
+  const listing = UNREADABLE.listing;
+  const refusal = { fields: { title: 'A Card needs a Title.' } };
+
+  it('says nothing when there is no pane', () => {
+    expect(cardCreationMessage(CARD_CREATION_CLOSED.pane)).toBeNull();
+  });
+
+  it('prefers the refused attempt to the failed listing while the pane is editable', () => {
+    const state = reduce(
+      CARD_CREATION_CLOSED,
+      { type: 'open', kind: 'space' },
+      { type: 'choices', opening: 1, read: UNREADABLE },
+      { type: 'submitting' },
+      { type: 'settled', outcome: { kind: 'refused', errors: refusal } },
+    );
+    expect(cardCreationMessage(state.pane)).toEqual(refusal);
+  });
+
+  it('falls back to the failed listing when no attempt was refused', () => {
+    const state = reduce(
+      CARD_CREATION_CLOSED,
+      { type: 'open', kind: 'space' },
+      { type: 'choices', opening: 1, read: UNREADABLE },
+    );
+    expect(cardCreationMessage(state.pane)).toEqual(listing);
+  });
+
+  /**
+   * A running attempt has no refusal of its own to draw — the one it began on
+   * is over — but nothing typed makes a failed listing readable, so that stays.
+   */
+  it('draws only the failed listing while an attempt runs', () => {
+    const state = reduce(
+      CARD_CREATION_CLOSED,
+      { type: 'open', kind: 'space' },
+      { type: 'choices', opening: 1, read: UNREADABLE },
+      { type: 'submitting' },
+    );
+    expect(cardCreationMessage(state.pane)).toEqual(listing);
   });
 });
 
@@ -310,6 +385,22 @@ describe('the asynchronous shell', () => {
     const { creation, dispatched } = shell(choosing());
     creation.open('alias');
     expect(dispatched).toEqual([]);
+  });
+
+  /**
+   * The guard above reads the render's state, so it cannot see a pane this same
+   * shell opened a moment ago. The reducer is what makes the second gesture
+   * harmless: were it to open a second time, the opening would advance past the
+   * read both calls were made for and the pane would sit on `pending` with
+   * Create disabled and Cancel its only exit.
+   */
+  it('fills the pane when one gesture opens it twice before a render', () => {
+    const read: CardCreationRead = { choices: spaceChoices, listing: null };
+    const { creation, dispatched } = shell(CARD_CREATION_CLOSED, { readChoices: () => read });
+    creation.open('space');
+    creation.open('space');
+    const state = dispatched.reduce(cardCreationReducer, CARD_CREATION_CLOSED);
+    expect(state.pane.status === 'choosing' && state.pane.choices).toEqual(spaceChoices);
   });
 
   it('goes busy only for a submit that is actually asynchronous', () => {

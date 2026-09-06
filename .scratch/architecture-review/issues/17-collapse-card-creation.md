@@ -11,6 +11,28 @@ Surfaced by: the 4 September 2026 architecture review of
 `07-author-a-space-card-reference`, candidate "Collapse Card creation into one
 module". Validated against that branch at `675a0e53`.
 
+## Built differently in two places
+
+Both sections below stand as written except for these, which the build departed
+from deliberately. Read them first.
+
+**A reducer, not an observable-state module composed in `compose-app.ts`.**
+"Direction" asks for framework-free state behind `createObservableState`, read
+through one `useSyncExternalStore`, and "Composition" asks that `composeApp`
+gain `spaceCards`. Neither was built. `edge-authoring.ts` is a store for three
+reasons — React Flow asks it synchronous questions mid-gesture, its operations
+answer values to their callers, and it invalidates itself from two collaborator
+subscriptions — and none of the three is true here: nothing asks this module a
+question during a gesture, no operation answers one, and its external facts
+arrive as ordinary dispatches. So the transitions are a pure
+`cardCreationReducer`, `createCardCreation` is a thin asynchronous shell over
+it, and `useCardCreation` is `useReducer` plus one memo. The reason the ticket
+wanted composition — a test driving a transition with no React tree — is
+delivered in full by `packages/app/test/card-creation-state.test.ts`, so nothing
+was added to `compose-app.ts` and `spaceCards` stays on the `OpenSpace` entry;
+the two seams are memoized by `App` and passed to the hook. Recorded in
+`docs/agents/ui.md`.
+
 ## The problem
 
 Creating a Card from a pane has no interface. `App.tsx` holds it as loose state:
