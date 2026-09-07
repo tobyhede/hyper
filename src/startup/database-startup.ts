@@ -82,17 +82,34 @@ export const retryMetaSpaceEstablishment = async (
   wait: (milliseconds: number) => Promise<void>,
   report: (cause: unknown) => void,
 ): Promise<UUID | undefined> => {
+  let consecutiveInvariantFailures = 0;
   for (let attempt = 0; attempt < META_SPACE_RETRY_ATTEMPTS; attempt += 1) {
     await wait(META_SPACE_RETRY_DELAY_MS);
     try {
       return await establishMetaSpace(repository, newId);
     } catch (error) {
       report(error);
-      // Waiting does not cure contradictory stored state: the next attempt
-      // reads the same documents and fails the same way. Only an unreachable
-      // database is worth trying again for, and the two are told apart by type
-      // rather than by matching message prose.
-      if (error instanceof AggregateInvariantError) return undefined;
+      if (!(error instanceof AggregateInvariantError)) {
+        consecutiveInvariantFailures = 0;
+        continue;
+      }
+      // Waiting does not cure contradictory stored state, so this is where the
+      // retry stops — but not on the first one, because one is also what a
+      // healthy repository looks like for an instant. `loadAggregate` runs at
+      // READ COMMITTED and reads in two statements: `lockMetaIdentity` finds no
+      // Meta row, then `loadEverySpace` reads Spaces under a fresh snapshot, so
+      // a rival host committing `replaceAllSpaces` between the two is reported
+      // as Spaces without Meta. Two hosts against one fresh database is the
+      // ordinary way to see it — a dev server and `test:integration:postgres`.
+      //
+      // A second consecutive one is what separates the two: the interleaving
+      // is over by the next read, and stored state that is genuinely broken
+      // fails the same way every time. A different failure in between says
+      // nothing about stored state, so it resets the count rather than
+      // confirming it. Repairing the race itself is the repository's problem
+      // and not this loop's.
+      consecutiveInvariantFailures += 1;
+      if (consecutiveInvariantFailures === 2) return undefined;
     }
   }
   return undefined;

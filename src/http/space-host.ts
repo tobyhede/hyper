@@ -108,8 +108,14 @@ export const createSpaceHost = (
         // — Spaces without Meta, or an aggregate that fails complete intake —
         // is a defect this deployment carries and no retry cures, so it stays
         // the 500 it has always been. Anything else is the database being
-        // unreachable, which is temporary, and 503 is what
-        // `GET /api/aggregate` already answers for the same throw.
+        // unreachable, which is temporary, and 503 says so.
+        //
+        // `GET /api/aggregate` answers 503 for the unreachable arm too, and the
+        // two halves agree there and only there: that handler answers 503 for
+        // *every* throw out of `loadAggregate`, an invariant violation included,
+        // because it classifies nothing (`packages/http/src/index.ts`). So it is
+        // not the precedent for this branch — it is the half that still cannot
+        // say a stored aggregate is broken, and fixing it is not this ticket's.
         return error instanceof AggregateInvariantError
           ? problem('internal-error', 'Stored repository state is not usable.', accept)
           : problem('persistence-unavailable', 'Try the request again later.', accept);

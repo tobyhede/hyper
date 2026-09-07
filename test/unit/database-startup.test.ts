@@ -185,6 +185,39 @@ class UnreachableRepository extends MemorySpaceRepository {
   }
 }
 
+/**
+ * A repository that looks contradictory for one read and healthy after it.
+ *
+ * The READ COMMITTED interleaving in `PostgresSpaceRepository.loadAggregate`,
+ * with the timing taken out: a rival host committed its Meta row between this
+ * one's two statements, and the read after that sees both halves.
+ */
+class RacingRepository extends MemorySpaceRepository {
+  #raced = false;
+
+  override loadAggregate(): Promise<AggregateLoadResult> {
+    if (this.#raced) return super.loadAggregate();
+    this.#raced = true;
+    return Promise.reject(new AggregateInvariantError('Stored Spaces exist without a Meta Space'));
+  }
+}
+
+/** One racing read, then an outage, then another racing read. */
+class AlternatingRepository extends MemorySpaceRepository {
+  #reads = 0;
+
+  override loadAggregate(): Promise<AggregateLoadResult> {
+    this.#reads += 1;
+    if (this.#reads === 1 || this.#reads === 3) {
+      return Promise.reject(
+        new AggregateInvariantError('Stored Spaces exist without a Meta Space'),
+      );
+    }
+    if (this.#reads === 2) return Promise.reject(new Error('connect ECONNREFUSED 127.0.0.1:5432'));
+    return super.loadAggregate();
+  }
+}
+
 /** A `wait` that records what it was asked for instead of spending it. */
 const recordingWait = (waits: number[]) => (milliseconds: number) => {
   waits.push(milliseconds);
@@ -238,7 +271,7 @@ describe('retryMetaSpaceEstablishment', () => {
     await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 
-  it('stops at contradictory stored state, which waiting cannot cure', async () => {
+  it('stops at contradictory stored state that a second read confirms', async () => {
     const repository = MemorySpaceRepository.withoutMetaIdentity([storedSpace(4n)]);
     const waits: number[] = [];
     const reported: unknown[] = [];
@@ -250,13 +283,61 @@ describe('retryMetaSpaceEstablishment', () => {
       (error) => reported.push(error),
     );
 
-    // One attempt, not twelve: the next read would find the same documents and
-    // fail the same way, and the identifiable error is what says so.
+    // Two attempts, not twelve: the second read finds the same documents and
+    // fails the same way, and the identifiable error is what says so.
     expect(metaSpaceId).toBeUndefined();
-    expect(waits).toEqual([META_SPACE_RETRY_DELAY_MS]);
-    expect(reported).toEqual([expect.any(AggregateInvariantError)]);
+    expect(waits).toEqual([META_SPACE_RETRY_DELAY_MS, META_SPACE_RETRY_DELAY_MS]);
+    expect(reported).toEqual([
+      expect.any(AggregateInvariantError),
+      expect.any(AggregateInvariantError),
+    ]);
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Existing space' },
+    ]);
+  });
+
+  it('keeps trying through one invariant failure, which can be a healthy race', async () => {
+    // `loadAggregate` reads the Meta identity and the Spaces in two statements
+    // under READ COMMITTED, so a rival host committing between them makes a
+    // healthy repository look contradictory for exactly one read. The next read
+    // sees both halves, which is why one of these is not a verdict.
+    const repository = new RacingRepository();
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(
+      repository,
+      mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID),
+      recordingWait(waits),
+      (error) => reported.push(error),
+    );
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    expect(waits).toEqual([META_SPACE_RETRY_DELAY_MS, META_SPACE_RETRY_DELAY_MS]);
+    expect(reported).toEqual([expect.any(AggregateInvariantError)]);
+  });
+
+  it('counts invariant failures consecutively, so an outage between them resets', async () => {
+    // One invariant read, then the database goes away, then another invariant
+    // read. Three failures and two of them invariant, but never twice running:
+    // a failure that says nothing about stored state cannot help confirm it.
+    const repository = new AlternatingRepository();
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(
+      repository,
+      mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID),
+      recordingWait(waits),
+      (error) => reported.push(error),
+    );
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    expect(waits).toHaveLength(4);
+    expect(reported).toEqual([
+      expect.any(AggregateInvariantError),
+      expect.any(Error),
+      expect.any(AggregateInvariantError),
     ]);
   });
 });

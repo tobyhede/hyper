@@ -800,7 +800,17 @@ describe('Database HTTP runtime', () => {
     try {
       const { createApp } = await import('../../src/http/postgres-http-runtime');
 
-      const application = await createApp();
+      // A `wait` that never settles, so the bounded retry this failure schedules
+      // is parked rather than spending twelve real timers, twelve real
+      // connection attempts and twelve `console.error` lines minutes after this
+      // file has finished — into some other file's output, since the spy above
+      // is long restored by then. What the loop does once it runs is proved
+      // against a recording `wait` in `database-startup.test.ts`.
+      //
+      // The reporter is left at its default on purpose: the first attempt's
+      // failure goes through it, so this is also where the runtime's own stderr
+      // line is proved to exist.
+      const application = await createApp(() => new Promise<void>(() => undefined));
 
       expect(typeof application.resolveProductRequest).toBe('function');
       // The reason is not swallowed, only kept out of the way of composition.
