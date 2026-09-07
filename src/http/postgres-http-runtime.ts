@@ -10,20 +10,35 @@ const reportEstablishmentFailure = (cause: unknown): void => {
 };
 
 /**
+ * What this runtime can be handed instead of the two ambient things it
+ * otherwise names, a timer and stderr (ADR 0016, ADR 0081).
+ *
+ * Both are optional and both defaults are the composition rather than a
+ * fallback: omitting one is how every real caller composes this, and a test
+ * supplies one to compose the runtime without a process behind it.
+ */
+export interface PostgresHttpRuntimeOptions {
+  wait?: (milliseconds: number) => Promise<void>;
+  report?: (cause: unknown) => void;
+}
+
+/**
  * Compose the normal database runtime before exposing browser-safe HTTP
  * resources.
  *
- * `wait` and `report` are the two ambient things this composition names — a
- * timer and stderr — and they are arguments so a test can compose the runtime
- * without either (ADR 0016, ADR 0081). Their defaults are the composition, not
- * a fallback a caller may forget to override: the Vite plugin calls this with
- * whatever `runtimeOptions` holds, which for this runtime is nothing.
+ * One options object rather than two positional arguments, because the first
+ * position is not this module's to spend: the Vite host hands whichever runtime
+ * module it loaded exactly one argument, its configured `runtimeOptions`
+ * (`packages/app/vite-space-http-plugin.ts`), so that position belongs to the
+ * contract both runtimes implement. Taking it for a collaborator of this one
+ * left the two runtimes disagreeing about what the same argument means, with
+ * nothing to typecheck the disagreement — harmless only while every path that
+ * reaches this module happens to configure no options at all.
  */
-export const createApp = async (
-  wait: (milliseconds: number) => Promise<void> = (milliseconds) =>
-    sleep(milliseconds, undefined, { ref: false }),
-  report: (cause: unknown) => void = reportEstablishmentFailure,
-): Promise<SpaceHostApplication> => {
+export const createApp = async ({
+  wait = (milliseconds) => sleep(milliseconds, undefined, { ref: false }),
+  report = reportEstablishmentFailure,
+}: PostgresHttpRuntimeOptions = {}): Promise<SpaceHostApplication> => {
   const repository = new PostgresSpaceRepository(db);
   // The browser cannot initialize a repository, so the server does it before
   // any document is served: `uninitialized` reaching `packages/app` is broken

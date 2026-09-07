@@ -810,7 +810,7 @@ describe('Database HTTP runtime', () => {
       // The reporter is left at its default on purpose: the first attempt's
       // failure goes through it, so this is also where the runtime's own stderr
       // line is proved to exist.
-      const application = await createApp(() => new Promise<void>(() => undefined));
+      const application = await createApp({ wait: () => new Promise<void>(() => undefined) });
 
       expect(typeof application.resolveProductRequest).toBe('function');
       // The reason is not swallowed, only kept out of the way of composition.
