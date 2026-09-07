@@ -156,10 +156,17 @@ The reported reproduction — `curl -I` against a freshly migrated database — 
 not occur, for the reason given above. The mechanism is real; only the stated
 path was wrong.
 
-### The related follow-up, which is not this ticket
+### The follow-up that turned out to be this ticket
 
-`src/http/space-host.ts` answers every failure of `establishMetaSpace` with one
-fixed detail, because a broken invariant and an unreachable database both arrive
-as an ordinary `Error`. Classifying them would make the wire behaviour depend on
-message prose. That work is ticket 17's, and it is a precondition for option C
-rather than a part of this decision.
+`src/http/space-host.ts` answered every failure of `establishMetaSpace` with one
+fixed detail, because a broken invariant and an unreachable database both arrived
+as an ordinary `Error`. Classifying them would have made the wire behaviour
+depend on message prose.
+
+This paragraph used to assign that work to ticket 17 and call it a precondition
+for option C. Both halves were wrong, and the audit above corrects them: ticket
+17 is about a returned refusal and would never have given `loadAggregate` an
+identifiable throw. The classification is this ticket's, and it is built —
+`AggregateInvariantError` is raised by both implementations of the seam, and the
+root address answers a permanent defect with 500 and an unreachable database
+with 503.
