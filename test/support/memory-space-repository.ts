@@ -8,13 +8,14 @@ import type {
   SpaceCommit,
   SpaceSummary,
 } from '@project/persistence';
-import type {
-  AggregateInput,
-  ImportMode,
-  InitializeAggregateResult,
-  ReplaceAggregateResult,
-  RepositoryImportResult,
-  SpaceRepository,
+import {
+  AggregateInvariantError,
+  type AggregateInput,
+  type ImportMode,
+  type InitializeAggregateResult,
+  type ReplaceAggregateResult,
+  type RepositoryImportResult,
+  type SpaceRepository,
 } from '../../src/persistence/space-repository';
 import { classifyInitializedAggregate } from '../../src/persistence/aggregate-lifecycle';
 
@@ -138,14 +139,19 @@ export class MemorySpaceRepository implements SpaceRepository {
   loadAggregate(): Promise<AggregateLoadResult> {
     if (this.#metaSpaceId === undefined) {
       if (this.#spaces.size === 0) return Promise.resolve({ kind: 'uninitialized' });
-      return Promise.reject(new Error('Stored Spaces exist without a Meta Space'));
+      return Promise.reject(
+        new AggregateInvariantError('Stored Spaces exist without a Meta Space'),
+      );
     }
     const aggregate = loadedAggregate(this.#metaSpaceId, this.#spaces.values());
     const intake = loadSpaceAggregate({
       metaSpaceId: aggregate.metaSpaceId,
       snapshots: aggregate.spaces.map(({ snapshot }) => snapshot),
     });
-    if (!intake.ok) return Promise.reject(new Error('Stored aggregate violates Meta invariants'));
+    if (!intake.ok)
+      return Promise.reject(
+        new AggregateInvariantError('Stored aggregate violates Meta invariants'),
+      );
     return Promise.resolve({ kind: 'loaded', aggregate });
   }
 
@@ -154,7 +160,9 @@ export class MemorySpaceRepository implements SpaceRepository {
     if (!intake.ok) return Promise.resolve({ kind: 'aggregate-refused', errors: intake.errors });
     if (this.#metaSpaceId !== undefined || this.#spaces.size > 0) {
       if (this.#metaSpaceId === undefined) {
-        return Promise.reject(new Error('Stored Spaces exist without a Meta Space'));
+        return Promise.reject(
+          new AggregateInvariantError('Stored Spaces exist without a Meta Space'),
+        );
       }
       const existing = loadedAggregate(this.#metaSpaceId, this.#spaces.values());
       return Promise.resolve(classifyInitializedAggregate(input, existing));
@@ -177,7 +185,7 @@ export class MemorySpaceRepository implements SpaceRepository {
     if (!intake.ok) return Promise.resolve({ kind: 'aggregate-refused', errors: intake.errors });
     if (this.#metaSpaceId === undefined) {
       if (this.#spaces.size > 0)
-        return Promise.reject(new Error('Stored Spaces exist without Meta'));
+        return Promise.reject(new AggregateInvariantError('Stored Spaces exist without Meta'));
       return Promise.resolve({ kind: 'uninitialized' });
     }
     if (this.#metaSpaceId !== expectedMetaSpaceId) {

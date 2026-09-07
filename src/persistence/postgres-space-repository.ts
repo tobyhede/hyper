@@ -22,13 +22,14 @@ import type {
 } from '@project/persistence';
 import { db } from '../prisma/db';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
-import type {
-  AggregateInput,
-  ImportMode,
-  InitializeAggregateResult,
-  ReplaceAggregateResult,
-  RepositoryImportResult,
-  SpaceRepository,
+import {
+  AggregateInvariantError,
+  type AggregateInput,
+  type ImportMode,
+  type InitializeAggregateResult,
+  type ReplaceAggregateResult,
+  type RepositoryImportResult,
+  type SpaceRepository,
 } from './space-repository';
 
 type Orm = typeof db.orm;
@@ -573,7 +574,7 @@ const authoritativeAggregate = async (orm: Orm, metaSpaceId: UUID): Promise<Load
     metaSpaceId,
     snapshots: spaces.map(({ snapshot }) => snapshot),
   });
-  if (!intake.ok) throw new Error('Stored aggregate violates Meta invariants');
+  if (!intake.ok) throw new AggregateInvariantError('Stored aggregate violates Meta invariants');
   return { metaSpaceId, spaces };
 };
 
@@ -627,7 +628,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
       const metaSpaceId = await lockMetaIdentity(orm);
       if (metaSpaceId === undefined) {
         if ((await loadEverySpace(orm)).length === 0) return { kind: 'uninitialized' };
-        throw new Error('Stored Spaces exist without a Meta Space');
+        throw new AggregateInvariantError('Stored Spaces exist without a Meta Space');
       }
       return { kind: 'loaded', aggregate: await authoritativeAggregate(orm, metaSpaceId) };
     });
@@ -649,7 +650,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
           );
         }
         if ((await loadEverySpace(orm)).length > 0) {
-          throw new Error('Stored Spaces exist without a Meta Space');
+          throw new AggregateInvariantError('Stored Spaces exist without a Meta Space');
         }
         return { kind: 'initialized', aggregate: await replaceAllSpaces(orm, input) };
       });
@@ -684,7 +685,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
         const metaSpaceId = await lockMetaIdentity(orm);
         if (metaSpaceId === undefined) {
           if ((await loadEverySpace(orm)).length > 0)
-            throw new Error('Stored Spaces exist without Meta');
+            throw new AggregateInvariantError('Stored Spaces exist without Meta');
           return { kind: 'uninitialized' };
         }
         if (metaSpaceId !== expectedMetaSpaceId) {

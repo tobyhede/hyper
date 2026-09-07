@@ -10,11 +10,11 @@ import {
 import {
   encodeProblemDetails,
   problemCatalogue,
+  type AggregateLoadResult,
   type HyperProblemCode,
 } from '@project/persistence';
 import type { UUID } from '@project/core';
-import type { SpaceRepository } from '../persistence/space-repository';
-import { establishMetaSpace } from '../startup/database-startup';
+import { AggregateInvariantError, type SpaceRepository } from '../persistence/space-repository';
 
 export type SpaceHostApplication = SpaceHttpApp & ProductRequestResolver;
 
@@ -24,7 +24,11 @@ const escapeHtml = (value: string): string =>
 const problem = (
   code: Extract<
     HyperProblemCode,
-    'invalid-request' | 'not-found' | 'method-not-allowed' | 'internal-error'
+    | 'invalid-request'
+    | 'not-found'
+    | 'method-not-allowed'
+    | 'persistence-unavailable'
+    | 'internal-error'
   >,
   detail: string,
   accept?: string,
@@ -61,14 +65,17 @@ const methodNotAllowed = (accept?: string): ProductResponse => {
  * fallback.
  *
  * `newId` is the composition-owned identity source (ADR 0016), and it is the
- * host's only one. Two things the host composes mint: the root address
- * establishes the Meta Space when the repository has none, and the API tree's
+ * host's only one. One thing the host composes mints: the API tree's
  * working-space loader durably initializes a stored layoutless Space on first
  * load (ADR 0079). So it is forwarded to `createSpaceHttpApp` rather than left
  * to that function's own default, which would reinstate the ambient generator
- * for the second of them behind this composition's back — a host handed a
- * deterministic minter would then be deterministic at the root and random on
- * load.
+ * behind this composition's back — a host handed a deterministic minter would
+ * then be random on load.
+ *
+ * The root address mints nothing. It used to establish the Meta Space when the
+ * repository had none, which made two safe methods create durable authored
+ * state; establishment is start-up's alone now, and start-up retries it
+ * (`src/http/postgres-http-runtime.ts`).
  */
 export const createSpaceHost = (
   repository: SpaceRepository,
@@ -84,45 +91,55 @@ export const createSpaceHost = (
     if (pathname === '/') {
       if (!reads) return methodNotAllowed(accept);
       // Opening the application without another destination opens the Meta
-      // Space, and an uninitialized repository is initialized here rather than
-      // redirected to nothing. A failure to establish it is reported as an
-      // answer instead of being papered over with a redirect or a guess at
-      // which Space was meant.
-      let metaSpaceId: UUID;
+      // Space, and reading is the whole of it. `GET` and `HEAD` are both safe
+      // methods, so neither may create durable authored state — this used to
+      // establish the Meta Space here, minting four identities and writing two
+      // rows for a request that promised to change nothing.
+      let loaded: AggregateLoadResult;
       try {
-        metaSpaceId = await establishMetaSpace(repository, newId);
+        loaded = await repository.loadAggregate();
       } catch (error) {
-        // What failed is not something this can tell. Contradictory stored Meta
-        // state — Spaces without Meta, or an aggregate that fails complete
-        // intake — and a database that is simply unreachable both arrive here as
-        // an ordinary `Error`, so classifying them would mean reading the
-        // message, and the wire behaviour would turn on prose. Neither is
-        // claimed, and the answer is the one `@project/http` already gives for a
-        // request failure it cannot classify: the catalogued title with `Try the
-        // request again later.` as its detail.
-        //
-        // A transient outage would be better answered by the 503
-        // `persistence-unavailable` `GET /api/aggregate` gives for this very
-        // throw, and telling the two apart is worth doing — but that wants the
-        // repository raising an identifiable invariant error rather than a host
-        // matching on text, and `ProductResponse`'s closed status set does not
-        // admit 503.
-        //
         // The reason travels to the operator rather than in the answer. The
         // detail is fixed prose like every other one here, so whatever a driver
         // put in its message is not served to an unauthenticated client.
-        console.error('Failed to establish the Meta Space', error);
-        return problem('internal-error', 'Try the request again later.', accept);
+        console.error('Failed to read the Meta Space', error);
+        // Two unrelated failures, told apart by type rather than by matching
+        // message prose (`AggregateInvariantError`). Contradictory stored state
+        // — Spaces without Meta, or an aggregate that fails complete intake —
+        // is a defect this deployment carries and no retry cures, so it stays
+        // the 500 it has always been. Anything else is the database being
+        // unreachable, which is temporary, and 503 is what
+        // `GET /api/aggregate` already answers for the same throw.
+        return error instanceof AggregateInvariantError
+          ? problem('internal-error', 'Stored repository state is not usable.', accept)
+          : problem('persistence-unavailable', 'Try the request again later.', accept);
       }
-      // No second read proves the Space is there. Establishment has already read
-      // and validated every stored document to answer at all, and `metaSpaceId`
-      // is the id the repository state names under its restraining foreign key,
-      // so it names a Space that exists — and the redirect target's first act is
-      // to load that very Space anyway, which is where a Space that vanished
-      // between the two would be answered exactly as any other missing Space is.
+      if (loaded.kind === 'uninitialized') {
+        // Healthy, and nothing to redirect to yet. 503 because it is the only
+        // one of these that claims something true: 404 says the root is missing
+        // when it is not, 500 says a defect where there is none, and 302 needs
+        // a Space id that does not exist. `Try the request again later.` is
+        // literal here rather than a hedge — a host reaches this state only by
+        // failing to establish at start-up, and start-up keeps trying, so the
+        // condition is transient by construction and the retry rather than the
+        // request is what ends it.
+        return problem('persistence-unavailable', 'Try the request again later.', accept);
+      }
+      // No second read proves the Space is there. Reading the aggregate has
+      // already read and validated every stored document to answer at all, and
+      // its Meta identity is the id the repository state names under its
+      // restraining foreign key, so it names a Space that exists — and the
+      // redirect target's first act is to load that very Space anyway, which is
+      // where a Space that vanished between the two would be answered exactly
+      // as any other missing Space is.
       return {
         status: 302,
-        headers: { location: productDestinationPath({ kind: 'space', spaceId: metaSpaceId }) },
+        headers: {
+          location: productDestinationPath({
+            kind: 'space',
+            spaceId: loaded.aggregate.metaSpaceId,
+          }),
+        },
       };
     }
 

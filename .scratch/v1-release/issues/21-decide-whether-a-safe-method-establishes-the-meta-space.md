@@ -2,9 +2,9 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: `v1-release/17` — option D needs identifiable repository refusals
-before the root address can tell a broken invariant from a database that is
-down.
+Blocked by: none. This ticket was briefly marked as blocked by `v1-release/17`.
+That mark was wrong and an audit removed it — see "Why ticket 17 does not
+unblock this" below. The classification work is this ticket's own.
 
 **Decided:** Option D. The root address must not write. Establishment moves out
 of the request path, and `createApp` retries it. See "Decision" below for the
@@ -91,29 +91,60 @@ Why not the others:
 - Remove the `establishMetaSpace` call from the root branch of
   `resolveProductRequest` (`src/http/space-host.ts`). The root address reads
   the aggregate and redirects. It never writes.
-- Answer the uninitialized and unreachable cases from that read. This is what
-  ticket 17 unblocks: a bare `Error` cannot be classified, and the wire
-  behaviour must not turn on message prose.
+- Give the repository an identifiable invariant error. Today `loadAggregate`
+  and `initializeAggregate` throw a bare `Error` for broken stored state, which
+  is indistinguishable by type from a database that is down. The file already
+  has the pattern — `SnapshotValidationError`, `DuplicateIdentityError`,
+  `CardOwnershipError`, `StaleSpaceRevisionError`. Add one more beside them, in
+  a module both the repository and `src/http/space-host.ts` can import.
+  - Postgres sites: `src/persistence/postgres-space-repository.ts:576, 630,
+    652, 687`.
+  - Memory double: `test/support/memory-space-repository.ts:141, 148, 157`,
+    which rejects with the same prose. The two implementations must agree, or
+    a memory-backed test proves nothing about the database.
+- Answer the uninitialized and the unreachable cases from that read, each with
+  its own status. The wire behaviour must not turn on message prose.
 - Add 503 to `ProductResponse`'s closed status set
   (`packages/http/src/product-destination.ts`), with its reason in the doc
   comment beside the other five. `GET /api/aggregate` already answers 503
   `persistence-unavailable` for this same throw
-  (`packages/http/src/index.ts`), so the product half stops being the only
-  half that cannot say it.
+  (`packages/http/src/index.ts:387`), so the product half stops being the only
+  half that can say it.
+
+  Read that handler before citing it. It answers 503 for *every* throw, an
+  invariant violation included. It does not classify either. An earlier draft
+  of this ticket cited it as already doing the right thing; it does not. Fixing
+  it is not in scope here, but do not copy it.
 - Retry establishment in `createApp` (`src/http/postgres-http-runtime.ts`).
   Keep the existing rule that a failure is not fatal to composition: the host
   promise is awaited once and memoized, so a rejection is permanent.
 
 ## Acceptance
 
-- [ ] No safe method creates durable authored state. `HEAD /` and `GET /`
+- [x] No safe method creates durable authored state. `HEAD /` and `GET /`
       both only read.
-- [ ] A host whose start-up establishment failed still recovers once the
+- [x] A host whose start-up establishment failed still recovers once the
       database returns, without a request causing the write.
-- [ ] The root address distinguishes a broken invariant from an unreachable
+- [x] The root address distinguishes a broken invariant from an unreachable
       database, and answers each with its own status.
-- [ ] `ProductResponse` states the reason for every status it admits.
+- [x] `ProductResponse` states the reason for every status it admits.
 - [ ] `pnpm verify` and `pnpm e2e` pass.
+
+## Why ticket 17 does not unblock this
+
+Two audits, 6 September 2026. Ticket 17 and this ticket describe two different
+mechanisms.
+
+- Ticket 17's refusal is a **returned value**. `loadSpaceAggregate` finds a
+  topology problem in an attempted write and the caller receives
+  `{ kind: 'aggregate-refused', errors }` as an ordinary result. Every one of
+  ticket 17's six criteria is written about that path.
+- This ticket needs a **thrown** error classified. Nothing in ticket 17's
+  criteria gives `loadAggregate` an identifiable throw. An agent could satisfy
+  every box in ticket 17 and leave the bare `Error` exactly as it is.
+- The sentence linking the two lives in ticket 17's framing, not its
+  acceptance. The framing was taken at face value when this ticket was written
+  and is corrected here.
 
 ## Comments
 

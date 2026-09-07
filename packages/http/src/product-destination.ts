@@ -228,11 +228,14 @@ export const resolveProductDestination = async (
  * contract ADR 0069 states for a direct request: a temporary redirect to the
  * Meta Space, a bad request for an address that cannot be read at all, a
  * not-found for one that reads and names nothing, a method rejection for a
- * request that is not a read, and an internal error for a stored document whose
+ * request that is not a read, a service-unavailable for a repository the host
+ * cannot reach or that has no Meta Space yet — the second because establishing
+ * one belongs to start-up rather than to a safe method, so the answer says
+ * `later` and means it — and an internal error for a stored document whose
  * Layout identities collide.
  */
 export interface ProductResponse {
-  readonly status: 302 | 400 | 404 | 405 | 500;
+  readonly status: 302 | 400 | 404 | 405 | 500 | 503;
   readonly headers?: Readonly<Record<string, string>>;
   readonly body?: string;
 }

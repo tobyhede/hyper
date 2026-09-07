@@ -1,11 +1,15 @@
 import { uuidSchema, type UUID } from '@project/core';
-import type { LoadedSpace } from '@project/persistence';
+import type { AggregateLoadResult, LoadedSpace } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
 import {
   establishMetaSpace,
+  META_SPACE_RETRY_ATTEMPTS,
+  META_SPACE_RETRY_DELAY_MS,
   openDatabaseSelection,
   resolveDatabaseStartup,
+  retryMetaSpaceEstablishment,
 } from '../../src/startup/database-startup';
+import { AggregateInvariantError } from '../../src/persistence/space-repository';
 import { defaultContentAggregate } from '../../src/startup/default-content';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
@@ -151,6 +155,106 @@ describe('establishMetaSpace', () => {
     await expect(establishMetaSpace(repository, mintingIds(OTHER_SPACE_ID))).rejects.toThrow(
       'Stored Spaces exist without a Meta Space',
     );
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: SPACE_ID, title: 'Existing space' },
+    ]);
+  });
+});
+
+/**
+ * A repository the database is unreachable behind, for the first `failures`
+ * reads of it.
+ *
+ * The one thing a retry is for. `loadAggregate` is where establishment reaches
+ * the database first, so failing it there is the whole outage: nothing is
+ * minted and nothing is written, which is what makes "the retry established it"
+ * a claim about the retry rather than about a half-written repository.
+ */
+class UnreachableRepository extends MemorySpaceRepository {
+  #failures: number;
+
+  constructor(failures: number) {
+    super();
+    this.#failures = failures;
+  }
+
+  override loadAggregate(): Promise<AggregateLoadResult> {
+    if (this.#failures === 0) return super.loadAggregate();
+    this.#failures -= 1;
+    return Promise.reject(new Error('connect ECONNREFUSED 127.0.0.1:5432'));
+  }
+}
+
+/** A `wait` that records what it was asked for instead of spending it. */
+const recordingWait = (waits: number[]) => (milliseconds: number) => {
+  waits.push(milliseconds);
+  return Promise.resolve();
+};
+
+describe('retryMetaSpaceEstablishment', () => {
+  it('establishes the Meta Space once the database comes back', async () => {
+    const repository = new UnreachableRepository(2);
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(
+      repository,
+      // Four ids and no more: the failing attempts never reach a mint, so an
+      // exhausted minter here would mean a retry that wrote something it should
+      // not have.
+      mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID),
+      recordingWait(waits),
+      (error) => reported.push(error),
+    );
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    expect(waits).toEqual([
+      META_SPACE_RETRY_DELAY_MS,
+      META_SPACE_RETRY_DELAY_MS,
+      META_SPACE_RETRY_DELAY_MS,
+    ]);
+    expect(reported).toHaveLength(2);
+    await expect(repository.loadAggregate()).resolves.toMatchObject({
+      kind: 'loaded',
+      aggregate: { metaSpaceId: SPACE_ID },
+    });
+  });
+
+  it('gives up after the bound, leaving the repository as it found it', async () => {
+    const repository = new UnreachableRepository(Number.MAX_SAFE_INTEGER);
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(
+      repository,
+      mintingIds(SPACE_ID),
+      recordingWait(waits),
+      (error) => reported.push(error),
+    );
+
+    expect(metaSpaceId).toBeUndefined();
+    expect(waits).toHaveLength(META_SPACE_RETRY_ATTEMPTS);
+    expect(reported).toHaveLength(META_SPACE_RETRY_ATTEMPTS);
+    await expect(repository.listSpaces()).resolves.toEqual([]);
+  });
+
+  it('stops at contradictory stored state, which waiting cannot cure', async () => {
+    const repository = MemorySpaceRepository.withoutMetaIdentity([storedSpace(4n)]);
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(
+      repository,
+      mintingIds(OTHER_SPACE_ID),
+      recordingWait(waits),
+      (error) => reported.push(error),
+    );
+
+    // One attempt, not twelve: the next read would find the same documents and
+    // fail the same way, and the identifiable error is what says so.
+    expect(metaSpaceId).toBeUndefined();
+    expect(waits).toEqual([META_SPACE_RETRY_DELAY_MS]);
+    expect(reported).toEqual([expect.any(AggregateInvariantError)]);
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Existing space' },
     ]);
