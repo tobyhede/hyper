@@ -41,6 +41,7 @@ const OFFERED_VALUES = [
   'buildLayoutStrategyGraph',
   'buildGraphRenderEdges',
   'filterHandlesByGraphs',
+  'graphRenderEdgeId',
   'gridStrategy',
   'inHandleId',
   'initializeSpace',

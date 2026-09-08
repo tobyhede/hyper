@@ -254,6 +254,76 @@ describe('filterHandlesByGraphs', () => {
 describe('buildGraphRenderEdges', () => {
   const edges = buildGraphRenderEdges(space);
 
+  /**
+   * **The invariant the id format now leans on, asserted rather than assumed.**
+   *
+   * The position-keyed id it replaced was collision-proof by construction; this
+   * one is unique only because a Graph cannot hold the same pair twice (ADR
+   * 0032). What holds that up is intake's `duplicate-graph-edge` and Space
+   * Authoring's `edge-already-exists`, neither of which lives here — so relaxing
+   * either would mint the same id twice with nothing in this package noticing.
+   * A duplicate id is a duplicate React key, and one Edge's selection change
+   * resolving to the other in the render adapter's `changeEdges` fold.
+   *
+   * Two Graphs sharing a pair is the case worth pinning, because it is legal:
+   * `Main` and `Quick` both run between the same Cards here, and only the Graph
+   * prefix separates them.
+   */
+  it('mints one distinct id per authored edge across every graph', () => {
+    const ids = edges.map((edge) => edge.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    const shared = loadSpace(
+      {
+        version: 1,
+        id: uuid('00000000-0000-4000-8000-000000000001'),
+        title: 'Test',
+        layouts: [
+          {
+            id: uuid('00000000-0000-4000-8000-000000000022'),
+            title: 'Working',
+            positions: {
+              [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0, open: false },
+              [uuid('00000000-0000-4000-8000-000000000003')]: { x: 320, y: 0, open: false },
+            },
+            graphs: [
+              {
+                id: uuid('00000000-0000-4000-8000-000000000004'),
+                title: 'Main',
+                edges: [
+                  {
+                    from: uuid('00000000-0000-4000-8000-000000000002'),
+                    to: uuid('00000000-0000-4000-8000-000000000003'),
+                  },
+                ],
+              },
+              {
+                id: uuid('00000000-0000-4000-8000-000000000031'),
+                title: 'Quick',
+                edges: [
+                  {
+                    from: uuid('00000000-0000-4000-8000-000000000002'),
+                    to: uuid('00000000-0000-4000-8000-000000000003'),
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      [
+        cardFile(uuid('00000000-0000-4000-8000-000000000002')),
+        cardFile(uuid('00000000-0000-4000-8000-000000000003')),
+      ],
+    );
+    expect(shared.ok).toBe(true);
+    if (!shared.ok) return;
+
+    const sharedIds = buildGraphRenderEdges(shared.space).map((edge) => edge.id);
+    expect(sharedIds).toHaveLength(2);
+    expect(new Set(sharedIds).size).toBe(2);
+  });
+
   it('produces one edge per authored edge, connected via graph ports', () => {
     expect(edges).toHaveLength(3);
     expect(edges).toContainEqual({

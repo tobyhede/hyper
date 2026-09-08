@@ -9,7 +9,7 @@ import {
 } from '@xyflow/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
-import { inHandleId, outHandleId, Placement } from '@project/graph';
+import { graphRenderEdgeId, inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
@@ -36,6 +36,7 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const CARD_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -170,12 +171,18 @@ function cardNode(id: string, x: number, title: string): CardFlowNode {
 const NODES = [cardNode(CARD_A, 0, 'A'), cardNode(CARD_B, 400, 'B'), cardNode(CARD_C, 800, 'C')];
 
 /**
- * One projected Edge, with the id minted the way `buildGraphRenderEdges` mints
- * it: from the Graph and the two endpoints, so a replaced Edge is a new element
- * rather than the previous one under a reused id.
+ * One projected Edge, with the id minted by the thing that mints it in
+ * production: from the Graph and the two endpoints, so a replaced Edge is a new
+ * element rather than the previous one under a reused id. Spelling the format
+ * out here instead would leave this fixture green against a shape
+ * `buildGraphRenderEdges` no longer produces — which is the divergence between
+ * two ideas of an Edge's identity that the format exists to end.
  */
 const flowEdge = (graphId: string, from: string, to: string): Edge => ({
-  id: `${graphId}::${from}::${to}`,
+  id: graphRenderEdgeId(uuidSchema.parse(graphId), {
+    from: uuidSchema.parse(from),
+    to: uuidSchema.parse(to),
+  }),
   type: 'routed',
   source: from,
   target: to,
@@ -360,7 +367,6 @@ function CanvasHarness({
           projection React Flow has drawn. */}
       <CanvasContinuation
         continuation={continuation}
-        edges={projection?.edges ?? []}
         onSelectCard={adapter.getState().selectCard}
         onSelectEdge={adapter.getState().selectEdge}
       />
@@ -1294,7 +1300,57 @@ describe('spending a continuation on the canvas', () => {
     // Asserted after the continuation has been spent, because focus landing is
     // the event that could take the selection with it.
     expect(continuation.getState().pending).toBeNull();
+    // Both halves, because "not only focused" is a claim about the pair: the
+    // defect this pins had the focus half true on its own, and a test that
+    // leaves that half to a sibling stops naming what it holds the moment the
+    // sibling moves.
+    expect(document.activeElement).toBe(
+      document.querySelector(`.react-flow__edge[data-id="${reconnectedFlowEdge.id}"]`),
+    );
     expect(adapter.getState().selection).toEqual({ kind: 'edge', ...RECONNECTED });
+  });
+
+  /**
+   * **The other kind `staysOwed` waits for, on the same schedule.**
+   *
+   * A card target is resolved by `data-id` against the DOM, so it needs the
+   * commit that draws just as much as an Edge does — React Flow syncs the
+   * `nodes` prop into its own store from an effect and draws from that.
+   *
+   * **`mergeProjected` is what makes that a claim of its own rather than one
+   * the Edge arm answers by accident.** `syncProjection` copies the Edge list
+   * (`edges: [...edges]`), so every publication through it moves the Edge
+   * subscription whether or not an Edge changed. `mergeProjected` spreads the
+   * projection and replaces only `nodes` — it is the path a create-and-connect
+   * takes, where Authoring has just minted a Card and the projection carrying
+   * it arrives with the Edges untouched. `decorated` memoises on that same
+   * reference, so React Flow's store keeps the edges it has and the drawn nodes
+   * are the only thing that moves. Without the node subscription the spend
+   * waits on whatever unrelated render happens along — and on nothing at all if
+   * none does, which is a caret left on `document.body` and, for `reveal`, a
+   * camera that never arrives.
+   */
+  it('focuses a Card on the projection that draws it, not the one before', () => {
+    const { adapter, continuation } = mountCanvas();
+    document.body.focus();
+
+    act(() =>
+      continuation.request({
+        target: { kind: 'card', cardId: CARD_D },
+        select: false,
+        then: 'focus',
+      }),
+    );
+
+    // Owed rather than spent: the canvas is not drawing this Card yet.
+    expect(continuation.getState().pending).not.toBeNull();
+
+    act(() => adapter.getState().mergeProjected([...NODES, cardNode(CARD_D, 1200, 'D')]));
+
+    expect(continuation.getState().pending).toBeNull();
+    expect(document.activeElement).toBe(
+      document.querySelector(`.react-flow__node[data-id="${CARD_D}"]`),
+    );
   });
 
   /** A Card already on the canvas resolves on the render that receives it. */

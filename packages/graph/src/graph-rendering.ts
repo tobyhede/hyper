@@ -1,4 +1,4 @@
-import type { CardId, GraphId } from '@project/core';
+import type { CardId, GraphEdge, GraphId } from '@project/core';
 import type { Space } from './space';
 
 /**
@@ -48,6 +48,19 @@ export interface GraphRenderEdge {
 
 export const outHandleId = (graphId: GraphId): string => `${graphId}::out`;
 export const inHandleId = (graphId: GraphId): string => `${graphId}::in`;
+
+/**
+ * The render layer's id for one authored edge: the Graph and the two endpoints.
+ *
+ * Named and offered for the same reason `inHandleId` and `outHandleId` are — it
+ * owns the format, and a second producer of it is the defect. A test that
+ * stands a projected Edge up by hand mints its id here rather than spelling the
+ * separator out, so changing the format moves those fixtures with it instead of
+ * leaving them green against a shape nothing mints any more. That is the
+ * failure this very format was introduced to end, one layer up.
+ */
+export const graphRenderEdgeId = (graphId: GraphId, edge: GraphEdge): string =>
+  `${graphId}::${edge.from}::${edge.to}`;
 
 /** Map each card id to the in/out ports contributed by the graphs through it. */
 export function buildCardHandles(space: Space): Map<CardId, CardHandleSet> {
@@ -182,7 +195,7 @@ export function buildGraphRenderEdges(space: Space): GraphRenderEdge[] {
   for (const graph of space.graphs) {
     for (const edge of graph.edges) {
       edges.push({
-        id: `${graph.id}::${edge.from}::${edge.to}`,
+        id: graphRenderEdgeId(graph.id, edge),
         graphId: graph.id,
         source: edge.from,
         target: edge.to,

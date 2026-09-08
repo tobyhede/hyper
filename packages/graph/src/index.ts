@@ -74,11 +74,15 @@ export { positionedStrategy } from './positioned';
 // Graph not yet incident to a Card, so it needs the format for an id nothing
 // here has built yet — one module owns it, and that is what makes the
 // prohibition on owner-qualifying a Graph reference checkable by reading one.
+// `graphRenderEdgeId` is here on the same grounds and no others: a test outside
+// this package that stands a projected Edge up by hand was spelling the format
+// out, which is the second producer the rule above forbids.
 export {
   buildCardHandles,
   buildGraphRenderEdges,
   filterHandlesByGraphs,
   graphCardIds,
+  graphRenderEdgeId,
   inHandleId,
   outHandleId,
 } from './graph-rendering';

@@ -1059,7 +1059,6 @@ export const createApp = (
                   this subtree is conditional on there being Cards at all. */}
               <CanvasContinuation
                 continuation={continuation}
-                edges={liveProjection?.edges ?? []}
                 onSelectCard={selectCard}
                 onSelectEdge={selectEdge}
               />

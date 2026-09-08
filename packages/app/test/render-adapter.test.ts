@@ -8,7 +8,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { Placement } from '@project/graph';
+import { graphRenderEdgeId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { mintingIds } from './minting';
@@ -35,13 +35,14 @@ const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006')
 const PROJECTED = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
 
 /**
- * One projected Graph Edge, in the shape `projectGraphEdges` builds: the id is
- * the Graph and the Edge's two endpoints, which is the same triple the Edge
- * subject is compared by, and `data.graphId` is what the adapter reads to
- * recover the domain Edge behind it.
+ * One projected Graph Edge, in the shape `projectGraphEdges` builds: the id
+ * comes from the minter production uses, so it is the Graph and the Edge's two
+ * endpoints — the same triple the Edge subject is compared by — and
+ * `data.graphId` is what the adapter reads to recover the domain Edge behind
+ * it.
  */
 const EDGE: Edge = {
-  id: `${GRAPH_ID}::${CARD_A}::${CARD_B}`,
+  id: graphRenderEdgeId(GRAPH_ID, { from: CARD_A, to: CARD_B }),
   source: CARD_A,
   target: CARD_B,
   data: { graphId: GRAPH_ID },
@@ -403,9 +404,13 @@ describe('render adapter', () => {
     store.getState().syncProjection(PROJECTED, [EDGE]);
     store.getState().selectCard(uuidSchema.parse(CARD_A));
 
-    store
-      .getState()
-      .changeEdges([{ type: 'select', id: `${GRAPH_ID}::${CARD_A}::${CARD_C}`, selected: false }]);
+    store.getState().changeEdges([
+      {
+        type: 'select',
+        id: graphRenderEdgeId(GRAPH_ID, { from: CARD_A, to: CARD_C }),
+        selected: false,
+      },
+    ]);
 
     expect(store.getState().selection).toEqual({ kind: 'card', cardId: CARD_A });
   });
