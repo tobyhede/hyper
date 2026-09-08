@@ -9,6 +9,7 @@ import { connect } from 'node:net';
 import { encodeCompactUuid, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import {
+  AggregateInvariantError,
   decodeLoadedSpace,
   decodeProblemDetails,
   encodeCommitRequest,
@@ -19,10 +20,7 @@ import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
-import {
-  AggregateInvariantError,
-  type SpaceRepository,
-} from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
 
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const MINTED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
@@ -243,14 +241,77 @@ describe('Vite Hono host', () => {
     });
 
     // 503 rather than a status that claims something untrue: the root is not
-    // missing, nothing is broken, and there is no Space id to redirect to. The
-    // condition ends when start-up's retry establishes the Meta Space, so
-    // `later` is literal.
+    // missing, nothing is broken, and there is no Space id to redirect to.
+    //
+    // An unreachable database is answered 503 too, since no other status in the
+    // set is true of this state either. The detail is what tells the two apart,
+    // and it is the only thing that does — a client that acts on the difference
+    // reads this, so it is pinned here.
     expect(decodeProblemDetails(JSON.parse(await response.text()))).toMatchObject({
       status: 503,
       title: 'Persistence unavailable',
-      detail: 'Try the request again later.',
+      detail: 'No Meta Space has been established yet.',
     });
+  });
+
+  // One `AggregateInvariantError` is not proof of broken stored state. It is
+  // also what a healthy repository shows for an instant: `loadAggregate` reads
+  // the Meta identity and the Spaces in two statements under READ COMMITTED, so
+  // a rival host committing between them reports Spaces without Meta. The retry
+  // loop already required two consecutive ones for exactly this reason; the wire
+  // path drew a permanent 500 from the first, so a browser landing in that
+  // window was told the database was broken when a reload would have worked.
+  it('reads again before calling one invariant failure a verdict', async () => {
+    class RacingRepository extends MemorySpaceRepository {
+      reads = 0;
+
+      override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
+        this.reads += 1;
+        if (this.reads === 1) {
+          return Promise.reject(new AggregateInvariantError('Stored Spaces exist without Meta'));
+        }
+        return super.loadAggregate();
+      }
+    }
+    const spaceRepository = new RacingRepository(
+      [{ snapshot, revision: 0n, exportedRevision: null }],
+      SPACE_ID,
+    );
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
+
+    const response = await fetch(`${host.url}/`, { redirect: 'manual' });
+
+    expect(spaceRepository.reads).toBe(2);
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
+    logged.mockRestore();
+  });
+
+  it('calls it a verdict when the second read fails the same way', async () => {
+    class BrokenRepository extends MemorySpaceRepository {
+      reads = 0;
+
+      override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
+        this.reads += 1;
+        return Promise.reject(new AggregateInvariantError('Stored Spaces exist without Meta'));
+      }
+    }
+    const spaceRepository = new BrokenRepository();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
+
+    const response = await fetch(`${host.url}/`, {
+      redirect: 'manual',
+      headers: { Accept: 'application/problem+json' },
+    });
+
+    expect(spaceRepository.reads).toBe(2);
+    expect(decodeProblemDetails(JSON.parse(await response.text()))).toMatchObject({
+      status: 500,
+      detail: 'Stored repository state is not usable.',
+    });
+    logged.mockRestore();
   });
 
   it('mints working-load initialization from the identity source it was composed with', async () => {

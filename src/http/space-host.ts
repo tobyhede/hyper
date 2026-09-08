@@ -10,11 +10,12 @@ import {
 import {
   encodeProblemDetails,
   problemCatalogue,
+  isAggregateInvariant,
   type AggregateLoadResult,
   type HyperProblemCode,
 } from '@project/persistence';
 import type { UUID } from '@project/core';
-import { AggregateInvariantError, type SpaceRepository } from '../persistence/space-repository';
+import type { SpaceRepository } from '../persistence/space-repository';
 
 export type SpaceHostApplication = SpaceHttpApp & ProductRequestResolver;
 
@@ -61,6 +62,32 @@ const methodNotAllowed = (accept?: string): ProductResponse => {
 };
 
 /**
+ * Read the aggregate, and read it again before letting one invariant failure
+ * stand as the answer.
+ *
+ * One `AggregateInvariantError` is not proof of broken stored state. It is also
+ * what a healthy repository shows for an instant: `loadAggregate` runs at READ
+ * COMMITTED and reads in two statements, so a rival host committing between them
+ * is reported as Spaces without Meta. Two hosts against one fresh database is
+ * the ordinary way to see it — a dev server and `test:integration:postgres`.
+ *
+ * Start-up's retry already required two consecutive failures for exactly this
+ * reason (`src/startup/database-startup.ts`). Drawing a permanent 500 from the
+ * first left the two halves classifying the same error differently, and told a
+ * browser its database was broken when a reload would have redirected. The
+ * second read costs a full aggregate read, and only on a path that has already
+ * failed one.
+ */
+const readAggregate = async (repository: SpaceRepository): Promise<AggregateLoadResult> => {
+  try {
+    return await repository.loadAggregate();
+  } catch (error) {
+    if (!isAggregateInvariant(error)) throw error;
+    return await repository.loadAggregate();
+  }
+};
+
+/**
  * Compose API resources and the product paths the HTTP host owns before SPA
  * fallback.
  *
@@ -97,18 +124,19 @@ export const createSpaceHost = (
       // rows for a request that promised to change nothing.
       let loaded: AggregateLoadResult;
       try {
-        loaded = await repository.loadAggregate();
+        loaded = await readAggregate(repository);
       } catch (error) {
         // The reason travels to the operator rather than in the answer. The
         // detail is fixed prose like every other one here, so whatever a driver
         // put in its message is not served to an unauthenticated client.
         console.error('Failed to read the Meta Space', error);
         // Two unrelated failures, told apart by type rather than by matching
-        // message prose (`AggregateInvariantError`). Contradictory stored state
-        // — Spaces without Meta, or an aggregate that fails complete intake —
-        // is a defect this deployment carries and no retry cures, so it stays
-        // the 500 it has always been. Anything else is the database being
-        // unreachable, which is temporary, and 503 says so.
+        // message prose (`isAggregateInvariant`, which walks the cause chain
+        // the driver wraps a failed rollback in). Contradictory stored state —
+        // Spaces without Meta, an aggregate that fails complete intake, or a
+        // stored document that does not parse — is a defect this deployment
+        // carries and no retry cures, so it is a 500. Anything else is the
+        // database being unreachable, which is temporary, and 503 says so.
         //
         // `GET /api/aggregate` answers 503 for the unreachable arm too, and the
         // two halves agree there and only there: that handler answers 503 for
@@ -116,7 +144,9 @@ export const createSpaceHost = (
         // because it classifies nothing (`packages/http/src/index.ts`). So it is
         // not the precedent for this branch — it is the half that still cannot
         // say a stored aggregate is broken, and fixing it is not this ticket's.
-        return error instanceof AggregateInvariantError
+        // The identity it would need is now on the shared seam and reachable
+        // from there, which is the half of it this ticket could settle.
+        return isAggregateInvariant(error)
           ? problem('internal-error', 'Stored repository state is not usable.', accept)
           : problem('persistence-unavailable', 'Try the request again later.', accept);
       }
@@ -124,12 +154,19 @@ export const createSpaceHost = (
         // Healthy, and nothing to redirect to yet. 503 because it is the only
         // one of these that claims something true: 404 says the root is missing
         // when it is not, 500 says a defect where there is none, and 302 needs
-        // a Space id that does not exist. `Try the request again later.` is
-        // literal here rather than a hedge — a host reaches this state only by
-        // failing to establish at start-up, and start-up keeps trying, so the
-        // condition is transient by construction and the retry rather than the
-        // request is what ends it.
-        return problem('persistence-unavailable', 'Try the request again later.', accept);
+        // a Space id that does not exist. So this case and an unreachable
+        // database share a status, and the detail is what separates them —
+        // ticket 21 asked for one status each, and there is no second status in
+        // `ProductResponse` that is true of this state.
+        //
+        // The wait is literal rather than a hedge: a host reaches here only by
+        // failing to establish at start-up, and start-up retries without an
+        // attempt bound, so the condition ends without anything the client does.
+        return problem(
+          'persistence-unavailable',
+          'No Meta Space has been established yet.',
+          accept,
+        );
       }
       // No second read proves the Space is there. Reading the aggregate has
       // already read and validated every stored document to answer at all, and

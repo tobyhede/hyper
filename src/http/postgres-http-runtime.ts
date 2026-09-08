@@ -9,6 +9,15 @@ const reportEstablishmentFailure = (cause: unknown): void => {
   console.error('Failed to establish the Meta Space at startup', cause);
 };
 
+/** Report, and let a reporter that fails be the end of the reporting rather than of the host. */
+const reportSafely = (report: (cause: unknown) => void, cause: unknown): void => {
+  try {
+    report(cause);
+  } catch {
+    // There is nowhere left to report the failure of a reporter.
+  }
+};
+
 /**
  * What this runtime can be handed instead of the two ambient things it
  * otherwise names, a timer and stderr (ADR 0016, ADR 0081).
@@ -55,7 +64,11 @@ export const createApp = async ({
   try {
     await establishMetaSpace(repository, newUuid);
   } catch (error) {
-    report(error);
+    // Guarded for the same reason the retry's own reporting is: `report` is a
+    // call, and a call can throw. Unguarded it escaped this `catch` and rejected
+    // `createApp`, which the memoized host makes permanent — the exact failure
+    // the `catch` exists to prevent, reached through the line that reports it.
+    reportSafely(report, error);
     // What a database that came back used to be repaired by was the root
     // address, which established the Meta Space for whichever request arrived
     // first — a safe method creating durable authored state. The repair belongs
@@ -75,13 +88,24 @@ export const createApp = async ({
     // address's `503`. The default `wait` keeps a pending retry from holding
     // the process open.
     //
-    // `catch` because nothing is awaiting this. The loop reports rather than
-    // rethrows, but reporting is itself a call that can throw — `console.error`
-    // onto closed or broken stderr does — and a rejection nothing listens for
-    // is what Node answers by killing the process. There is nowhere left to
-    // report the failure of a reporter, so it stops here, the way
+    // `catch` because nothing is awaiting this, and a rejection nothing listens
+    // for is what Node answers by killing the process. The loop itself neither
+    // throws nor rethrows, so this is the belt to that braces, kept the way
     // `packages/app/vite-space-http-plugin.ts` marks its memoized host handled.
-    void retryMetaSpaceEstablishment(repository, newUuid, wait, report).catch(() => undefined);
+    void retryMetaSpaceEstablishment(repository, newUuid, { wait, report })
+      .then((metaSpaceId) => {
+        if (metaSpaceId !== undefined) return;
+        // The one line that separates a host still trying from a host that has
+        // stopped. Both serve `503` at the root and both have already reported
+        // every failed attempt, so without this an operator reading the log
+        // cannot tell which of the two states the process is in — and only one
+        // of them ends without a restart.
+        reportSafely(
+          report,
+          new Error('Gave up establishing the Meta Space; restart the host once it is fixable'),
+        );
+      })
+      .catch(() => undefined);
   }
   return createSpaceHost(repository, newUuid);
 };

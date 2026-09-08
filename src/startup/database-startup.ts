@@ -1,6 +1,6 @@
 import type { UUID } from '@project/core';
-import type { LoadedSpace } from '@project/persistence';
-import { AggregateInvariantError, type SpaceRepository } from '../persistence/space-repository';
+import { isAggregateInvariant, type LoadedSpace } from '@project/persistence';
+import type { SpaceRepository } from '../persistence/space-repository';
 import { defaultContentAggregate } from './default-content';
 
 export interface OpenedDatabaseStartup {
@@ -40,7 +40,7 @@ export const establishMetaSpace = async (
 
   const initialized = await repository.initializeAggregate(defaultContentAggregate(newId));
   if (initialized.kind === 'aggregate-refused') {
-    throw new Error(
+    throw new DefaultContentInvalidError(
       `Default Content is not a valid aggregate: ${initialized.errors.map(({ kind }) => kind).join(', ')}`,
     );
   }
@@ -48,71 +48,104 @@ export const establishMetaSpace = async (
 };
 
 /**
- * How many times establishment is tried again after the first attempt failed,
- * and how long start-up waits between attempts.
+ * How long start-up waits between establishment attempts.
  *
- * Bounded, and small enough to read as one number: the recovery this buys is
- * for a database that was down when the process started and came back shortly
- * after, which is the sequence PR 156 made possible when it stopped a failed
- * establishment being fatal to composition. A host still failing a minute later
- * is a deployment someone has to look at rather than one a timer will fix, and
- * an unbounded retry would only hide that.
+ * The delay doubles from the first up to the second, and then holds. Growing it
+ * keeps a database that is down for an hour from being read every five seconds
+ * for the life of the process; capping the growth keeps a database that comes
+ * back late from waiting hours to be found.
+ *
+ * There is deliberately no attempt bound. A bounded retry left a host that
+ * outlived it serving `503` at the root forever, because the root address no
+ * longer establishes anything and nothing else was going to — the bound did not
+ * surface the problem, it made it permanent. What tells an operator the
+ * difference between waiting and giving up is the terminal report in
+ * `src/http/postgres-http-runtime.ts`, not a silent stop.
  */
-export const META_SPACE_RETRY_ATTEMPTS = 12;
-export const META_SPACE_RETRY_DELAY_MS = 5_000;
+export const META_SPACE_RETRY_INITIAL_DELAY_MS = 5_000;
+export const META_SPACE_RETRY_MAX_DELAY_MS = 60_000;
 
 /**
- * Try establishment again after a first attempt failed, until one succeeds or
- * the bound above is spent.
+ * Two consecutive invariant failures, not one.
+ *
+ * One is also what a healthy repository looks like for an instant.
+ * `loadAggregate` runs at READ COMMITTED and reads in two statements:
+ * `lockMetaIdentity` finds no Meta row, then `loadEverySpace` reads Spaces under
+ * a fresh snapshot, so a rival host committing between the two is reported as
+ * Spaces without Meta. Two hosts against one fresh database is the ordinary way
+ * to see it — a dev server and `test:integration:postgres`. The interleaving is
+ * over by the next read, and stored state that is genuinely broken fails the
+ * same way every time.
+ */
+const CONFIRMING_INVARIANT_FAILURES = 2;
+
+/**
+ * Default Content is not a valid aggregate.
+ *
+ * A defect in the code this process is running, not in what the database holds
+ * and not in whether the database answers. No read and no wait can change it, so
+ * the retry stops on it at once. Without its own type it read as "not an
+ * invariant failure", which reset the consecutive count — harmless under an
+ * attempt bound, and an endless loop without one.
+ */
+export class DefaultContentInvalidError extends Error {}
+
+/** What start-up's retry is given instead of the two ambient things it would name. */
+export interface MetaSpaceRetryOptions {
+  wait: (milliseconds: number) => Promise<void>;
+  report: (cause: unknown) => void;
+}
+
+/**
+ * Try establishment again after a first attempt failed, until one succeeds or a
+ * failure arrives that no later attempt can cure.
  *
  * This is where the repair the root address used to perform now lives. `GET /`
  * established the Meta Space when the repository had none, so a safe method
  * created durable authored state; establishment is start-up's alone, and
  * start-up owns the failure, so it owns the repair too.
  *
- * `wait` is the caller's rather than a timer this module names (ADR 0016,
- * ADR 0081): the composition root passes one that cannot hold the process open,
- * and a test passes one that records instead of sleeping. Failures are reported
- * through `report` and never thrown — nothing awaits this, and a rejection
- * nothing is listening for is what takes a Node process down.
+ * `wait` and `report` are the caller's rather than a timer and a stream this
+ * module names (ADR 0016, ADR 0081), and they arrive together in one object
+ * because they are one collaborator set and `createApp` already gave them a
+ * born type. The composition root passes a timer that cannot hold the process
+ * open, and a test passes one that records instead of sleeping.
+ *
+ * Nothing is thrown. Nothing awaits this, and a rejection nothing listens for is
+ * what takes a Node process down — which includes a rejection out of `report`,
+ * so reporting a failure cannot become the thing that ends the recovery.
  */
 export const retryMetaSpaceEstablishment = async (
   repository: SpaceRepository,
   newId: () => UUID,
-  wait: (milliseconds: number) => Promise<void>,
-  report: (cause: unknown) => void,
+  { wait, report }: MetaSpaceRetryOptions,
 ): Promise<UUID | undefined> => {
+  const reportSafely = (cause: unknown): void => {
+    try {
+      report(cause);
+    } catch {
+      // There is nowhere left to report the failure of a reporter.
+    }
+  };
   let consecutiveInvariantFailures = 0;
-  for (let attempt = 0; attempt < META_SPACE_RETRY_ATTEMPTS; attempt += 1) {
-    await wait(META_SPACE_RETRY_DELAY_MS);
+  let delay = META_SPACE_RETRY_INITIAL_DELAY_MS;
+  for (;;) {
+    await wait(delay);
+    delay = Math.min(delay * 2, META_SPACE_RETRY_MAX_DELAY_MS);
     try {
       return await establishMetaSpace(repository, newId);
     } catch (error) {
-      report(error);
-      if (!(error instanceof AggregateInvariantError)) {
+      reportSafely(error);
+      if (error instanceof DefaultContentInvalidError) return undefined;
+      if (!isAggregateInvariant(error)) {
+        // A failure that says nothing about stored state cannot help confirm it.
         consecutiveInvariantFailures = 0;
         continue;
       }
-      // Waiting does not cure contradictory stored state, so this is where the
-      // retry stops — but not on the first one, because one is also what a
-      // healthy repository looks like for an instant. `loadAggregate` runs at
-      // READ COMMITTED and reads in two statements: `lockMetaIdentity` finds no
-      // Meta row, then `loadEverySpace` reads Spaces under a fresh snapshot, so
-      // a rival host committing `replaceAllSpaces` between the two is reported
-      // as Spaces without Meta. Two hosts against one fresh database is the
-      // ordinary way to see it — a dev server and `test:integration:postgres`.
-      //
-      // A second consecutive one is what separates the two: the interleaving
-      // is over by the next read, and stored state that is genuinely broken
-      // fails the same way every time. A different failure in between says
-      // nothing about stored state, so it resets the count rather than
-      // confirming it. Repairing the race itself is the repository's problem
-      // and not this loop's.
       consecutiveInvariantFailures += 1;
-      if (consecutiveInvariantFailures === 2) return undefined;
+      if (consecutiveInvariantFailures === CONFIRMING_INVARIANT_FAILURES) return undefined;
     }
   }
-  return undefined;
 };
 
 /** Open the Meta Space, initializing the repository first when it has none. */

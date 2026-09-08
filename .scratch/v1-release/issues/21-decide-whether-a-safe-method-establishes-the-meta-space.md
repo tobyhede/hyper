@@ -102,8 +102,14 @@ Why not the others:
   - Memory double: `test/support/memory-space-repository.ts:141, 148, 157`,
     which rejects with the same prose. The two implementations must agree, or
     a memory-backed test proves nothing about the database.
-- Answer the uninitialized and the unreachable cases from that read, each with
-  its own status. The wire behaviour must not turn on message prose.
+- Answer the uninitialized and the unreachable cases from that read so a client
+  can tell them apart. The wire behaviour must not turn on message prose.
+
+  Not each with its own status, which is what this bullet asked for first.
+  `ProductResponse`'s set holds no second status that is true of an
+  uninitialized repository: 404 says the root is missing when it is not, 500
+  says a defect where there is none, and 302 needs a Space id that does not
+  exist. Both cases are 503 and the problem detail is what separates them.
 - Add 503 to `ProductResponse`'s closed status set
   (`packages/http/src/product-destination.ts`), with its reason in the doc
   comment beside the other five. `GET /api/aggregate` already answers 503
@@ -123,10 +129,31 @@ Why not the others:
 
 - [x] No safe method creates durable authored state. `HEAD /` and `GET /`
       both only read.
+
+      Read in the domain's terms, which is the term the rule is about. The
+      root address writes no Space, Card, Layout or Graph, and mints no
+      identity. It does still cause one SQL write: `loadAggregate` takes the
+      Meta identity's row lock with an `UPDATE` of the value already there
+      (`lockMetaIdentity`, `src/persistence/postgres-space-repository.ts`), so
+      every root request holds that lock for the length of a full aggregate
+      read and the path cannot run on a read-only transaction or a replica.
+      Giving `loadAggregate` a lock-free read path is its own ticket; it
+      touches a lock the commit path depends on.
 - [x] A host whose start-up establishment failed still recovers once the
       database returns, without a request causing the write.
+
+      The retry has no attempt bound. It had one of twelve attempts five
+      seconds apart, which capped recovery at a minute and then left the host
+      serving 503 at the root for the life of the process — the root address
+      no longer establishes anything, so nothing else was going to. The delay
+      now doubles from five seconds to a ceiling of sixty and holds there, and
+      a failure no later attempt can cure — confirmed broken stored state, or
+      Default Content that is not a valid aggregate — is what ends it, with a
+      terminal line in the log saying so.
 - [x] The root address distinguishes a broken invariant from an unreachable
-      database, and answers each with its own status.
+      database, and answers each with its own status. One invariant failure is
+      not the verdict: the read is taken again first, because one is also what
+      the READ COMMITTED interleaving shows for an instant.
 - [x] `ProductResponse` states the reason for every status it admits.
 - [ ] `pnpm verify` and `pnpm e2e` pass.
 

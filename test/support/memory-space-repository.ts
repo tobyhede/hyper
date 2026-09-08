@@ -1,21 +1,21 @@
 import { newUuid, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
-import type {
-  AggregateLoadResult,
-  LoadedAggregate,
-  LoadedSpace,
-  RepositoryCommitResult,
-  SpaceCommit,
-  SpaceSummary,
-} from '@project/persistence';
 import {
   AggregateInvariantError,
-  type AggregateInput,
-  type ImportMode,
-  type InitializeAggregateResult,
-  type ReplaceAggregateResult,
-  type RepositoryImportResult,
-  type SpaceRepository,
+  type AggregateLoadResult,
+  type LoadedAggregate,
+  type LoadedSpace,
+  type RepositoryCommitResult,
+  type SpaceCommit,
+  type SpaceSummary,
+} from '@project/persistence';
+import type {
+  AggregateInput,
+  ImportMode,
+  InitializeAggregateResult,
+  ReplaceAggregateResult,
+  RepositoryImportResult,
+  SpaceRepository,
 } from '../../src/persistence/space-repository';
 import { classifyInitializedAggregate } from '../../src/persistence/aggregate-lifecycle';
 

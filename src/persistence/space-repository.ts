@@ -2,24 +2,6 @@ import type { ImportSpace, SpaceSnapshot, UUID } from '@project/core';
 import type { LoadedAggregate, LoadedSpace, SpaceResourceRepository } from '@project/persistence';
 import type { SpaceAggregateError } from '@project/graph';
 
-/**
- * Stored state no aggregate can be read from: Spaces that no Meta identity
- * names, or a stored aggregate that fails complete intake.
- *
- * Its own type because two unrelated failures arrive at a reader the same way —
- * this one, and a database that is simply unreachable — and a bare `Error`
- * makes them one thing. They are not one thing: broken stored state is a defect
- * this deployment carries and no retry cures, while an unreachable database is
- * temporary and a later attempt is exactly the answer. `src/http/space-host.ts`
- * answers them with different statuses, and start-up stops retrying on this
- * one, both by asking `instanceof` rather than by matching message prose.
- *
- * Every implementation of the seam raises it — `PostgresSpaceRepository` and
- * the memory double alike — or a memory-backed test proves nothing about the
- * database.
- */
-export class AggregateInvariantError extends Error {}
-
 export interface AggregateInput {
   metaSpaceId: UUID;
   spaces: readonly SpaceSnapshot[];
