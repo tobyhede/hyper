@@ -1,5 +1,9 @@
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
-import { createWorkingSpaceLoader, type LoadedSpace } from '@project/persistence';
+import {
+  AggregateInvariantError,
+  createWorkingSpaceLoader,
+  type LoadedSpace,
+} from '@project/persistence';
 import { afterAll, afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import type {
@@ -232,6 +236,34 @@ describe('PostgresSpaceRepository', () => {
 
   afterAll(async () => {
     await db.close();
+  });
+
+  // A stored document that cannot be parsed at all, as opposed to a set of
+  // parsed documents that together break a Meta invariant. Both are stored state
+  // no aggregate can be read from, and both must reach a reader as the same
+  // identifiable failure — the root address answers 500 for one and 503 for the
+  // other, and start-up stops retrying on one and keeps going on the other, so a
+  // corrupt document classified as a reachability problem is answered `try again
+  // later` forever and retried until the budget is spent.
+  //
+  // Only PostgreSQL can hold this state. `MemorySpaceRepository` stores
+  // snapshots that were already parsed on the way in, so it has no way to
+  // present a document that fails intake on the way out.
+  it('raises an identifiable invariant failure for a stored document that cannot be parsed', async () => {
+    createdSpaceIds.add(SPACE_ID);
+    await db.transaction(async ({ orm }) => {
+      await orm.public.Space.create({
+        // `title` is required by `spaceDocumentSchema`, so this row parses as
+        // JSON and fails intake — corruption, a hand-edited row or a format the
+        // code has since rolled forward past.
+        id: SPACE_ID,
+        document: { version: 1 },
+        revision: 0,
+      });
+      await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
+    });
+
+    await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
   });
 
   it('imports a completely identified space and exposes it through load and list', async () => {

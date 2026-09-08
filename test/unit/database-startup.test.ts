@@ -1,10 +1,19 @@
 import { uuidSchema, type UUID } from '@project/core';
-import type { LoadedSpace } from '@project/persistence';
+import {
+  AggregateInvariantError,
+  type AggregateLoadResult,
+  type LoadedSpace,
+} from '@project/persistence';
+import type { InitializeAggregateResult } from '../../src/persistence/space-repository';
 import { describe, expect, it } from 'vitest';
 import {
+  DefaultContentInvalidError,
   establishMetaSpace,
+  META_SPACE_RETRY_INITIAL_DELAY_MS,
+  META_SPACE_RETRY_MAX_DELAY_MS,
   openDatabaseSelection,
   resolveDatabaseStartup,
+  retryMetaSpaceEstablishment,
 } from '../../src/startup/database-startup';
 import { defaultContentAggregate } from '../../src/startup/default-content';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
@@ -145,15 +154,226 @@ describe('establishMetaSpace', () => {
     // Asked of the adapter first, because the refusal is the adapter's: a
     // subclass overriding `loadAggregate` proved only that startup forwards
     // whatever it is handed, and left the branch that decides it unexecuted.
-    await expect(repository.loadAggregate()).rejects.toThrow(
-      'Stored Spaces exist without a Meta Space',
-    );
+    //
+    // The type rather than the message. Classification is what a reader acts on
+    // — the root address picks a status from it and start-up decides whether to
+    // keep trying — so pinning the prose here would leave the assertion and the
+    // behaviour it stands for testing different things.
+    await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
     await expect(establishMetaSpace(repository, mintingIds(OTHER_SPACE_ID))).rejects.toThrow(
-      'Stored Spaces exist without a Meta Space',
+      AggregateInvariantError,
     );
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Existing space' },
     ]);
+  });
+});
+
+/**
+ * A repository whose reads follow a script.
+ *
+ * One double rather than three, because all three cases differ only in the
+ * sequence of failures a read produces: an outage, the READ COMMITTED
+ * interleaving that makes a healthy repository look contradictory for exactly
+ * one read, or any mixture of the two. `loadAggregate` is where establishment
+ * reaches the database first, so failing it there is the whole failure: nothing
+ * is minted and nothing is written, which is what makes "the retry established
+ * it" a claim about the retry rather than about a half-written repository.
+ *
+ * A script entry of `undefined` lets the read through to the real memory
+ * repository. Reads past the end of the script are let through too.
+ */
+class ScriptedRepository extends MemorySpaceRepository {
+  #reads = 0;
+  readonly #script: readonly (Error | undefined)[];
+
+  constructor(script: readonly (Error | undefined)[]) {
+    super();
+    this.#script = script;
+  }
+
+  override loadAggregate(): Promise<AggregateLoadResult> {
+    const scripted = this.#script[this.#reads];
+    this.#reads += 1;
+    return scripted === undefined ? super.loadAggregate() : Promise.reject(scripted);
+  }
+}
+
+const unreachable = (): Error => new Error('connect ECONNREFUSED 127.0.0.1:5432');
+const invariant = (): Error =>
+  new AggregateInvariantError('Stored Spaces exist without a Meta Space');
+
+/** A `wait` that records what it was asked for instead of spending it. */
+const recordingWait = (waits: number[]) => (milliseconds: number) => {
+  waits.push(milliseconds);
+  return Promise.resolve();
+};
+
+/** The four ids one establishment mints, and no more. */
+const establishmentIds = () => mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID);
+
+describe('retryMetaSpaceEstablishment', () => {
+  it('establishes the Meta Space once the database comes back', async () => {
+    const repository = new ScriptedRepository([unreachable(), unreachable()]);
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: recordingWait(waits),
+      report: (error) => reported.push(error),
+    });
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    expect(reported).toHaveLength(2);
+    await expect(repository.loadAggregate()).resolves.toMatchObject({
+      kind: 'loaded',
+      aggregate: { metaSpaceId: SPACE_ID },
+    });
+  });
+
+  // The delay grows so a database that is down for a long time is not read
+  // every five seconds for the life of the process, and stops growing so a
+  // database that comes back late is still found within a minute of doing so.
+  it('backs off, up to a bound it then holds', async () => {
+    const outage = Array.from({ length: 8 }, unreachable);
+    const repository = new ScriptedRepository(outage);
+    const waits: number[] = [];
+
+    await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: recordingWait(waits),
+      report: () => undefined,
+    });
+
+    expect(waits).toEqual([
+      META_SPACE_RETRY_INITIAL_DELAY_MS,
+      10_000,
+      20_000,
+      40_000,
+      META_SPACE_RETRY_MAX_DELAY_MS,
+      META_SPACE_RETRY_MAX_DELAY_MS,
+      META_SPACE_RETRY_MAX_DELAY_MS,
+      META_SPACE_RETRY_MAX_DELAY_MS,
+      META_SPACE_RETRY_MAX_DELAY_MS,
+    ]);
+  });
+
+  // The retry used to stop after twelve attempts. A container that starts before
+  // PostgreSQL accepts connections, over a database that takes longer than that
+  // to arrive, then served 503 at the root forever: the root address no longer
+  // establishes anything, so nothing else was ever going to.
+  it('keeps trying long past the bound it used to have', async () => {
+    const repository = new ScriptedRepository(Array.from({ length: 40 }, unreachable));
+    const waits: number[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: recordingWait(waits),
+      report: () => undefined,
+    });
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    expect(waits).toHaveLength(41);
+  });
+
+  it('stops at contradictory stored state that a second read confirms', async () => {
+    const repository = MemorySpaceRepository.withoutMetaIdentity([storedSpace(4n)]);
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, mintingIds(OTHER_SPACE_ID), {
+      wait: recordingWait(waits),
+      report: (error) => reported.push(error),
+    });
+
+    // Two attempts: the second read finds the same documents and fails the same
+    // way, and the identifiable error is what says so.
+    expect(metaSpaceId).toBeUndefined();
+    expect(waits).toEqual([META_SPACE_RETRY_INITIAL_DELAY_MS, 10_000]);
+    expect(reported).toEqual([
+      expect.any(AggregateInvariantError),
+      expect.any(AggregateInvariantError),
+    ]);
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: SPACE_ID, title: 'Existing space' },
+    ]);
+  });
+
+  it('keeps trying through one invariant failure, which can be a healthy race', async () => {
+    // `loadAggregate` reads the Meta identity and the Spaces in two statements
+    // under READ COMMITTED, so a rival host committing between them makes a
+    // healthy repository look contradictory for exactly one read. The next read
+    // sees both halves, which is why one of these is not a verdict.
+    const repository = new ScriptedRepository([invariant()]);
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: recordingWait(waits),
+      report: (error) => reported.push(error),
+    });
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    expect(reported).toEqual([expect.any(AggregateInvariantError)]);
+  });
+
+  it('counts invariant failures consecutively, so an outage between them resets', async () => {
+    // Three failures and two of them invariant, but never twice running: a
+    // failure that says nothing about stored state cannot help confirm it.
+    const repository = new ScriptedRepository([invariant(), unreachable(), invariant()]);
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: () => Promise.resolve(),
+      report: (error) => reported.push(error),
+    });
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    expect(reported).toEqual([
+      expect.any(AggregateInvariantError),
+      expect.any(Error),
+      expect.any(AggregateInvariantError),
+    ]);
+  });
+
+  // Default Content is code, not stored state, so no read and no wait can make
+  // it valid. Without its own type it was reported as "not an invariant
+  // failure", which reset the consecutive count and, now that the loop has no
+  // attempt bound, would have retried it forever.
+  it('stops at once when Default Content is not a valid aggregate', async () => {
+    class RefusingRepository extends MemorySpaceRepository {
+      override initializeAggregate(): Promise<InitializeAggregateResult> {
+        return Promise.resolve({
+          kind: 'aggregate-refused',
+          errors: [{ kind: 'meta-space-missing', metaSpaceId: SPACE_ID }],
+        });
+      }
+    }
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(
+      new RefusingRepository(),
+      establishmentIds(),
+      { wait: recordingWait(waits), report: (error) => reported.push(error) },
+    );
+
+    expect(metaSpaceId).toBeUndefined();
+    expect(waits).toEqual([META_SPACE_RETRY_INITIAL_DELAY_MS]);
+    expect(reported).toEqual([expect.any(DefaultContentInvalidError)]);
+  });
+
+  // Reporting is a call that can throw. The loop is what recovers a host whose
+  // database came back, so a reporter that fails must not be what stops it.
+  it('survives a reporter that throws', async () => {
+    const repository = new ScriptedRepository([unreachable(), unreachable()]);
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: () => Promise.resolve(),
+      report: () => {
+        throw new Error('stderr is a closed pipe');
+      },
+    });
+
+    expect(metaSpaceId).toBe(SPACE_ID);
   });
 });
 

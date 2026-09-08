@@ -9,6 +9,7 @@ import { connect } from 'node:net';
 import { encodeCompactUuid, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import {
+  AggregateInvariantError,
   decodeLoadedSpace,
   decodeProblemDetails,
   encodeCommitRequest,
@@ -201,9 +202,9 @@ describe('Vite Hono host', () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
-    // Not a cheap single lookup: establishment reads and validates every stored
-    // document through `loadAggregate`, under the Meta identity write lock. What
-    // this pins is that nothing is read *again* through the resource loader —
+    // Not a cheap single lookup: reading the aggregate reads and validates every
+    // stored document, under the Meta identity write lock. What this pins is
+    // that nothing is read *again* through the resource loader —
     // the redirect target's first act is to load this Space, and the id came
     // from the repository state that names it under a restraining foreign key,
     // so loading it here to prove it exists is a read the answer never depended
@@ -211,24 +212,106 @@ describe('Vite Hono host', () => {
     expect(loadSpace).not.toHaveBeenCalled();
   });
 
-  it('initializes an uninitialized repository at root and redirects to the Meta Space', async () => {
-    const spaceRepository = new MemorySpaceRepository();
+  it.each(['GET', 'HEAD'])(
+    'answers %s at root over an uninitialized repository without creating anything',
+    async (method) => {
+      const spaceRepository = new MemorySpaceRepository();
+      const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
+
+      const response = await fetch(`${host.url}/`, { method, redirect: 'manual' });
+
+      // The whole of ticket 21. Both methods the root serves are safe, and a
+      // safe method must not create durable authored state — this used to mint
+      // four identities and write two rows for whichever request arrived first,
+      // `curl -I` included. Establishment is start-up's now, so the answer says
+      // to come back rather than seeding a Meta Space to redirect to.
+      expect(response.status).toBe(503);
+      expect(response.headers.get('location')).toBeNull();
+      await expect(spaceRepository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
+      await expect(spaceRepository.listSpaces()).resolves.toEqual([]);
+    },
+  );
+
+  it('says why the root has nothing to redirect to yet', async () => {
+    const { host } = await startHost(createSpaceHost(new MemorySpaceRepository(), newUuid));
+
+    const response = await fetch(`${host.url}/`, {
+      redirect: 'manual',
+      headers: { Accept: 'application/problem+json' },
+    });
+
+    // 503 rather than a status that claims something untrue: the root is not
+    // missing, nothing is broken, and there is no Space id to redirect to.
+    //
+    // An unreachable database is answered 503 too, since no other status in the
+    // set is true of this state either. The detail is what tells the two apart,
+    // and it is the only thing that does — a client that acts on the difference
+    // reads this, so it is pinned here.
+    expect(decodeProblemDetails(JSON.parse(await response.text()))).toMatchObject({
+      status: 503,
+      title: 'Persistence unavailable',
+      detail: 'No Meta Space has been established yet.',
+    });
+  });
+
+  // One `AggregateInvariantError` is not proof of broken stored state. It is
+  // also what a healthy repository shows for an instant: `loadAggregate` reads
+  // the Meta identity and the Spaces in two statements under READ COMMITTED, so
+  // a rival host committing between them reports Spaces without Meta. The retry
+  // loop already required two consecutive ones for exactly this reason; the wire
+  // path drew a permanent 500 from the first, so a browser landing in that
+  // window was told the database was broken when a reload would have worked.
+  it('reads again before calling one invariant failure a verdict', async () => {
+    class RacingRepository extends MemorySpaceRepository {
+      reads = 0;
+
+      override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
+        this.reads += 1;
+        if (this.reads === 1) {
+          return Promise.reject(new AggregateInvariantError('Stored Spaces exist without Meta'));
+        }
+        return super.loadAggregate();
+      }
+    }
+    const spaceRepository = new RacingRepository(
+      [{ snapshot, revision: 0n, exportedRevision: null }],
+      SPACE_ID,
+    );
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
 
     const response = await fetch(`${host.url}/`, { redirect: 'manual' });
 
-    const loaded = await spaceRepository.loadAggregate();
-    if (loaded.kind !== 'loaded') throw new Error('Root did not initialize the repository');
+    expect(spaceRepository.reads).toBe(2);
     expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toBe(
-      `/spaces/${encodeCompactUuid(loaded.aggregate.metaSpaceId)}`,
-    );
+    expect(response.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
+    logged.mockRestore();
+  });
 
-    // A second arrival reads the Meta Space established by the first rather
-    // than seeding a second one over it.
-    const again = await fetch(`${host.url}/`, { redirect: 'manual' });
-    expect(again.headers.get('location')).toBe(response.headers.get('location'));
-    await expect(spaceRepository.listSpaces()).resolves.toHaveLength(1);
+  it('calls it a verdict when the second read fails the same way', async () => {
+    class BrokenRepository extends MemorySpaceRepository {
+      reads = 0;
+
+      override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
+        this.reads += 1;
+        return Promise.reject(new AggregateInvariantError('Stored Spaces exist without Meta'));
+      }
+    }
+    const spaceRepository = new BrokenRepository();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
+
+    const response = await fetch(`${host.url}/`, {
+      redirect: 'manual',
+      headers: { Accept: 'application/problem+json' },
+    });
+
+    expect(spaceRepository.reads).toBe(2);
+    expect(decodeProblemDetails(JSON.parse(await response.text()))).toMatchObject({
+      status: 500,
+      detail: 'Stored repository state is not usable.',
+    });
+    logged.mockRestore();
   });
 
   it('mints working-load initialization from the identity source it was composed with', async () => {
@@ -266,14 +349,26 @@ describe('Vite Hono host', () => {
   });
 
   it.each([
-    ['contradictory stored Meta state', 'Stored Spaces exist without a Meta Space'],
-    ['an unreachable database', 'connect ECONNREFUSED 127.0.0.1:5432'],
+    {
+      failure: 'contradictory stored Meta state',
+      error: new AggregateInvariantError('Stored Spaces exist without a Meta Space'),
+      status: 500,
+      title: 'Internal server error',
+      detail: 'Stored repository state is not usable.',
+    },
+    {
+      failure: 'an unreachable database',
+      error: new Error('connect ECONNREFUSED 127.0.0.1:5432'),
+      status: 503,
+      title: 'Persistence unavailable',
+      detail: 'Try the request again later.',
+    },
   ])(
-    'answers %s as an explicit failure that keeps the reason out of the response',
-    async (_case, message) => {
+    'answers $failure with its own status and keeps the reason out of the response',
+    async ({ error, status, title, detail }) => {
       class FailingSpaceRepository extends MemorySpaceRepository {
         override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
-          return Promise.reject(new Error(message));
+          return Promise.reject(error);
         }
       }
       const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -287,23 +382,18 @@ describe('Vite Hono host', () => {
         headers: { Accept: 'application/problem+json' },
       });
 
-      // The two are indistinguishable to the host — both arrive as an ordinary
-      // `Error` out of `loadAggregate` — so neither is claimed. In particular a
-      // driver's own message is not served to the client, and an outage is not
-      // reported as the permanent invariant failure it may not be.
-      expect(response.status).toBe(500);
+      // The two are told apart by type rather than by message prose, so a
+      // permanent defect and a database that is merely down get different
+      // answers — and neither serves the driver's own message to the client.
+      expect(response.status).toBe(status);
       expect(response.headers.get('location')).toBeNull();
       const body = await response.text();
-      expect(body).not.toContain(message);
-      expect(decodeProblemDetails(JSON.parse(body))).toMatchObject({
-        status: 500,
-        title: 'Internal server error',
-        detail: 'Try the request again later.',
-      });
+      expect(body).not.toContain(error.message);
+      expect(decodeProblemDetails(JSON.parse(body))).toMatchObject({ status, title, detail });
       // The reason still travels, to the operator rather than the client.
       expect(logged).toHaveBeenCalledWith(
-        'Failed to establish the Meta Space',
-        expect.objectContaining({ message }),
+        'Failed to read the Meta Space',
+        expect.objectContaining({ message: error.message }),
       );
     },
   );
@@ -771,7 +861,17 @@ describe('Database HTTP runtime', () => {
     try {
       const { createApp } = await import('../../src/http/postgres-http-runtime');
 
-      const application = await createApp();
+      // A `wait` that never settles, so the bounded retry this failure schedules
+      // is parked rather than spending twelve real timers, twelve real
+      // connection attempts and twelve `console.error` lines minutes after this
+      // file has finished — into some other file's output, since the spy above
+      // is long restored by then. What the loop does once it runs is proved
+      // against a recording `wait` in `database-startup.test.ts`.
+      //
+      // The reporter is left at its default on purpose: the first attempt's
+      // failure goes through it, so this is also where the runtime's own stderr
+      // line is proved to exist.
+      const application = await createApp({ wait: () => new Promise<void>(() => undefined) });
 
       expect(typeof application.resolveProductRequest).toBe('function');
       // The reason is not swallowed, only kept out of the way of composition.

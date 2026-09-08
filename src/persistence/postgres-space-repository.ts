@@ -11,14 +11,15 @@ import {
   type UUID,
 } from '@project/core';
 import { loadSpaceAggregate as validateSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
-import type {
-  AggregateLoadResult,
-  LoadedAggregate,
-  LoadedSpace,
-  RepositoryCommitResult,
-  SpaceCommit,
-  SpaceConflict,
-  SpaceSummary,
+import {
+  AggregateInvariantError,
+  type AggregateLoadResult,
+  type LoadedAggregate,
+  type LoadedSpace,
+  type RepositoryCommitResult,
+  type SpaceCommit,
+  type SpaceConflict,
+  type SpaceSummary,
 } from '@project/persistence';
 import { db } from '../prisma/db';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
@@ -325,20 +326,44 @@ const loadSpaceAggregate = async (orm: Orm, id: UUID): Promise<LoadedSpace | und
   };
 };
 
+/**
+ * Every stored Space, parsed.
+ *
+ * A row that fails intake raises `AggregateInvariantError` rather than the
+ * private `SnapshotValidationError` a bare `parseSnapshot` would. Both are
+ * stored state no aggregate can be read from, and every caller of this function
+ * is an aggregate-level read whose failure a reader classifies: unconverted, a
+ * corrupt document reaches `src/http/space-host.ts` as an unreachable database
+ * and is answered `try again later` for a defect no later attempt cures, while
+ * start-up spends its whole retry budget on it. The original travels on `cause`,
+ * so the located intake prose is still there for an operator.
+ *
+ * `loadSpace` keeps the narrower error deliberately. One Space failing intake is
+ * that resource's answer to give, not evidence the aggregate cannot be read.
+ */
 const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
   const stored = await orm.public.Space.orderBy((space) => space.id.asc())
     .include('cards', (cards) => cards.select('id', 'document').orderBy((card) => card.id.asc()))
     .all();
 
-  return stored.map((space) => ({
-    snapshot: parseSnapshot({
-      id: space.id,
-      document: space.document,
-      cards: space.cards.map((card) => ({ id: card.id, document: card.document })),
-    }),
-    revision: toRevision(space.revision),
-    exportedRevision: toOptionalRevision(space.exportedRevision),
-  }));
+  return stored.map((space) => {
+    try {
+      return {
+        snapshot: parseSnapshot({
+          id: space.id,
+          document: space.document,
+          cards: space.cards.map((card) => ({ id: card.id, document: card.document })),
+        }),
+        revision: toRevision(space.revision),
+        exportedRevision: toOptionalRevision(space.exportedRevision),
+      };
+    } catch (error) {
+      if (!(error instanceof SnapshotValidationError)) throw error;
+      throw new AggregateInvariantError(`Stored Space ${space.id} does not parse`, {
+        cause: error,
+      });
+    }
+  });
 };
 
 /**
@@ -573,7 +598,7 @@ const authoritativeAggregate = async (orm: Orm, metaSpaceId: UUID): Promise<Load
     metaSpaceId,
     snapshots: spaces.map(({ snapshot }) => snapshot),
   });
-  if (!intake.ok) throw new Error('Stored aggregate violates Meta invariants');
+  if (!intake.ok) throw new AggregateInvariantError('Stored aggregate violates Meta invariants');
   return { metaSpaceId, spaces };
 };
 
@@ -627,7 +652,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
       const metaSpaceId = await lockMetaIdentity(orm);
       if (metaSpaceId === undefined) {
         if ((await loadEverySpace(orm)).length === 0) return { kind: 'uninitialized' };
-        throw new Error('Stored Spaces exist without a Meta Space');
+        throw new AggregateInvariantError('Stored Spaces exist without a Meta Space');
       }
       return { kind: 'loaded', aggregate: await authoritativeAggregate(orm, metaSpaceId) };
     });
@@ -649,7 +674,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
           );
         }
         if ((await loadEverySpace(orm)).length > 0) {
-          throw new Error('Stored Spaces exist without a Meta Space');
+          throw new AggregateInvariantError('Stored Spaces exist without a Meta Space');
         }
         return { kind: 'initialized', aggregate: await replaceAllSpaces(orm, input) };
       });
@@ -684,7 +709,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
         const metaSpaceId = await lockMetaIdentity(orm);
         if (metaSpaceId === undefined) {
           if ((await loadEverySpace(orm)).length > 0)
-            throw new Error('Stored Spaces exist without Meta');
+            throw new AggregateInvariantError('Stored Spaces exist without Meta');
           return { kind: 'uninitialized' };
         }
         if (metaSpaceId !== expectedMetaSpaceId) {
