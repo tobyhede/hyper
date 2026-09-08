@@ -69,8 +69,14 @@ export const SelectContent = forwardRef<
     >
       <SelectPrimitive.Popup
         ref={ref}
+        // `shadow-lg`, which is what `Popover` beside it spends — the same
+        // decision, for the same reason, and the last surface still holding the
+        // value it replaced. `shadow-[0_12px_40px_rgba(0,0,0,0.5)]` is half the
+        // black there is, written in numbers no theme can reach: it was picked
+        // to separate a dark popup from a dark canvas, and on light paper it is
+        // a grey cloud under the list.
         className={cn(
-          'max-h-[var(--available-height)] min-w-[8rem] overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
+          'max-h-[var(--available-height)] min-w-[8rem] overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] shadow-lg data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
           className,
         )}
         {...props}

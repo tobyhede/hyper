@@ -35,38 +35,73 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/*
+ * **Sand is the canvas and nothing else.** The beige is the paper the Cards are
+ * laid on; it is not a tint the chrome inherits. The chrome is a neutral grey
+ * scale over sand, so the only two things on screen carrying warmth are the
+ * canvas and a Card's own face, and the only thing carrying colour is a Graph.
+ *
+ * These values were settled in the Command Dock prototype, which drew a light
+ * canvas while this block was still dark and so had to fork every token it
+ * needed. That fork is gone: the values live here, once, and every
+ * `@project/ui` control, menu, popover and dialog follows without being told —
+ * including the ones that portal to `document.body`, which is what a scoped
+ * fork could never reach.
+ */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  --background: #0f1115;
-  --foreground: #e6e9ef;
-  --card: #181b22;
+  --background: #e5dbc7;
+  --foreground: #1f2933;
+  /* Chrome paper: the shell, its popovers, its menus and its dialogs. Neutral
+     and a shade off white, so it never reads as the Card's cream. */
+  --card: #fbfbfa;
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
-  --primary: #3b82f6;
-  --primary-foreground: var(--background);
-  --secondary: #20242e;
+  /* Ink, not a brand blue. The only colour on this surface that carries meaning
+     is a Graph's, and the canvas draws several at once — so the chrome's own
+     emphasis (a primary button, an open disclosure, a focus ring) is a dark
+     neutral and stays out of that conversation. */
+  --primary: #33404d;
+  --primary-foreground: #fbfbfa;
+  --secondary: #eceded;
   --secondary-foreground: var(--foreground);
   --muted: var(--secondary);
-  --muted-foreground: #98a2b3;
-  --accent: #6ea8fe;
-  --accent-foreground: var(--background);
-  --destructive: #f08c8c;
-  --success: #7fd99b;
-  --border: #2b303b;
+  /* Secondary text has **three** grounds in this theme, not one: chrome paper
+     (`--card`), the muted fill it is drawn on inside a footer or a field, and
+     the sand canvas itself. The prototype's `#6b7280` was picked against paper
+     alone and reads at 4.12:1 on muted and 3.52:1 on sand — both under AA, and
+     the reason the flip failed `test/unit/ui-theme-contrast.test.ts`. Sand is
+     the tightest of the three, so this is close to the lightest step that
+     clears it: 6.15:1 on paper, 5.43:1 on muted, 4.63:1 on sand. */
+  --muted-foreground: #57606d;
+  /* The highlighted row in a menu or combobox, and the hover fill on a control.
+     A hover is a *pointer report*, not a selection, so it is the lightest step
+     that still separates from the paper. */
+  --accent: #f0f0ef;
+  --accent-foreground: var(--foreground);
+  --destructive: #b3261e;
+  --success: #1c7c4a;
+  --border: #dedede;
   --input: var(--border);
-  --ring: var(--accent);
+  --ring: var(--primary);
+  /* React Flow reads its own variables for the pane and the dot pattern and
+     never ours, so without these the canvas takes its shipped defaults — a
+     transparent pane and `#91919a` dots, a cool grey that reads as dirt on
+     sand. The dot is the sand a step down rather than a neutral. */
+  --xy-background-color: var(--background);
+  --xy-background-pattern-color: #cdbfa4;
   --canvas-card-ink-color: #0b0d11;
   --canvas-card-face-rest: #f4efe4;
   --canvas-card-face-active: #fffaf0;
   --canvas-card-title-color: #12161c;
   --card-hover-duration: 120ms;
   --card-hover-easing: ease;
-  /* Text roles the Card draws on its own cream faces. The app's own
-     `--muted-foreground` and the old `#fca5a5` refusal red were both picked
-     against the dark `--card` face and fall under 2.5:1 here;
-     `test/unit/canvas-card-contrast.test.ts` holds these to AA on both faces. */
+  /* Text roles the Card draws on its own cream faces. The Card's paper is
+     warmer and lighter than the chrome's, so these stay separate from
+     `--foreground` and `--muted-foreground` rather than inheriting them;
+     `test/unit/canvas-card-contrast.test.ts` holds them to AA on both faces. */
   --canvas-card-muted-color: #4a505c;
   --canvas-card-error-color: #b3261e;
   --radius-md: 0.5rem;
@@ -80,6 +115,37 @@
   --sidebar-ring: var(--ring);
   --sidebar-width: 16rem;
   --sidebar-width-icon: 3rem;
+}
+
+/*
+ * Tailwind v4's preflight resets every element to `border: 0 solid` and states
+ * no colour, so a bare `border` or `border-t` — which is what a shadcn
+ * component writes for a divider — paints in `currentColor`, the element's own
+ * ink. That is never what one of them means: a divider means `--border`.
+ *
+ * It went unnoticed while the theme was dark, where ink was `#e6e9ef` and a
+ * hairline of it passed for a light divider on a dark surface. Inverted, the
+ * same rule is a black bar across a dialog footer.
+ *
+ * Stated here rather than as a `border-border` added to each component: this is
+ * what the reset omitted, so it belongs beside the tokens the reset should have
+ * used, and a component written later is covered without being told.
+ *
+ * **In `base`, and that is load-bearing.** Tailwind v4 emits its utilities into
+ * `@layer utilities`, and an unlayered rule beats every layered one however low
+ * its specificity — so written outside a layer this paints over
+ * `border-transparent`, `border-input` and `border-ring` at the sites that
+ * deliberately state them, and a ghost Button grows a visible box. Inside
+ * `base` it is what it means to be: the default a utility overrides.
+ */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--border);
+  }
 }
 
 /*

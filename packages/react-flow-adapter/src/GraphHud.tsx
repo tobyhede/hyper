@@ -41,7 +41,13 @@ export function GraphHud({
 
   return (
     <Panel position="bottom-right">
-      <div className="w-[214px] overflow-hidden rounded-[8px] border border-border bg-card shadow-[0_12px_40px_rgb(0_0_0/50%)]">
+      {/*
+        `shadow-lg`, the theme's, as `Popover` and `Select` spend. The value it
+        replaces — half the black there is, written in numbers no theme can
+        reach — separated a dark panel from a dark canvas; over sand it is a
+        grey cloud under the legend.
+      */}
+      <div className="w-[214px] overflow-hidden rounded-[8px] border border-border bg-card shadow-lg">
         <div className="flex flex-col gap-[6px] px-[10px] py-[9px]" data-testid="graph-legend">
           <div className="flex items-center gap-[7px] font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
             <GraphIcon size={13} />

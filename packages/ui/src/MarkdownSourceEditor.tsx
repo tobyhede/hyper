@@ -86,11 +86,17 @@ const markdownSourceTheme = EditorView.theme({
   '&.cm-focused': {
     outline: 'none',
   },
+  // `--accent` is the chrome's highlighted-row fill, which is what a selection
+  // is on chrome paper — but this editor's only mount today is an open Card,
+  // whose face is cream rather than paper, and a fill picked for one ground is
+  // a wash on the other. So the surface gets a say, through a custom property
+  // like every other appearance decision a caller makes here; a caller still
+  // never names a `.cm-*` class (ADR 0063).
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-    backgroundColor: 'var(--accent)',
+    backgroundColor: 'var(--markdown-source-selection-color, var(--accent))',
   },
   '&.cm-focused .cm-content ::selection, .cm-content ::selection': {
-    backgroundColor: 'var(--accent)',
+    backgroundColor: 'var(--markdown-source-selection-color, var(--accent))',
   },
 });
 
