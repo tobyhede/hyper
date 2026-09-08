@@ -60,11 +60,18 @@ export interface CardResize {
  * arguments meant every callee re-paired what its caller had just split.
  *
  * It is the **domain** Edge and its owning Graph, never the React Flow edge id.
- * That id is `<graphId>::<index>` and re-indexes whenever a Graph loses an Edge,
- * so a subject held by id would survive a deletion pointing at whichever Edge
- * slid into the vacated slot. A Graph cannot hold the same pair twice (ADR
- * 0032), so this names exactly one Edge for as long as that Edge exists — and
- * names nothing, harmlessly, once it does not.
+ * A Graph cannot hold the same pair twice (ADR 0032), so this names exactly one
+ * Edge for as long as that Edge exists — and names nothing, harmlessly, once it
+ * does not.
+ *
+ * The projected id (`<graphId>::<from>::<to>`, minted by `buildGraphRenderEdges`)
+ * is now built from that same triple, so the two agree about what identifies an
+ * Edge. They did not always: the id named the Edge's *position* in its Graph and
+ * re-indexed whenever a Graph lost an Edge, so a subject held by id would have
+ * survived a deletion pointing at whichever Edge slid into the vacated slot.
+ * Holding the domain value is still the rule — the id is React Flow's business
+ * and this module's subject is the domain's — but the agreement is what stops a
+ * replaced Edge inheriting the element its predecessor was drawn as.
  */
 export interface EdgeSubject {
   readonly graphId: GraphId;

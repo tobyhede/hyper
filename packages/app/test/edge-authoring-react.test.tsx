@@ -9,7 +9,7 @@ import {
 } from '@xyflow/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
-import { inHandleId, outHandleId, Placement } from '@project/graph';
+import { graphRenderEdgeId, inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
@@ -36,6 +36,7 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const CARD_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -169,8 +170,19 @@ function cardNode(id: string, x: number, title: string): CardFlowNode {
 
 const NODES = [cardNode(CARD_A, 0, 'A'), cardNode(CARD_B, 400, 'B'), cardNode(CARD_C, 800, 'C')];
 
-const flowEdge = (id: string, graphId: string, from: string, to: string): Edge => ({
-  id,
+/**
+ * One projected Edge, with the id minted by the thing that mints it in
+ * production: from the Graph and the two endpoints, so a replaced Edge is a new
+ * element rather than the previous one under a reused id. Spelling the format
+ * out here instead would leave this fixture green against a shape
+ * `buildGraphRenderEdges` no longer produces — which is the divergence between
+ * two ideas of an Edge's identity that the format exists to end.
+ */
+const flowEdge = (graphId: string, from: string, to: string): Edge => ({
+  id: graphRenderEdgeId(uuidSchema.parse(graphId), {
+    from: uuidSchema.parse(from),
+    to: uuidSchema.parse(to),
+  }),
   type: 'routed',
   source: from,
   target: to,
@@ -179,10 +191,7 @@ const flowEdge = (id: string, graphId: string, from: string, to: string): Edge =
   data: { graphId },
 });
 
-const EDGES = [
-  flowEdge(`${GRAPH_ID}::0`, GRAPH_ID, CARD_A, CARD_B),
-  flowEdge(`${OTHER_GRAPH_ID}::0`, OTHER_GRAPH_ID, CARD_B, CARD_C),
-];
+const EDGES = [flowEdge(GRAPH_ID, CARD_A, CARD_B), flowEdge(OTHER_GRAPH_ID, CARD_B, CARD_C)];
 
 /**
  * The composition every canvas test runs on.
@@ -358,7 +367,6 @@ function CanvasHarness({
           projection React Flow has drawn. */}
       <CanvasContinuation
         continuation={continuation}
-        edges={projection?.edges ?? []}
         onSelectCard={adapter.getState().selectCard}
         onSelectEdge={adapter.getState().selectEdge}
       />
@@ -419,17 +427,17 @@ describe('decorated Edges', () => {
   it('makes only the Active Graph Edge focusable and names it for a screen reader', () => {
     mountCanvas();
 
-    const active = edgeElement(`${GRAPH_ID}::0`);
+    const active = edgeElement(EDGES[0]!.id);
     expect(active).toHaveAttribute('tabindex', '0');
     expect(active).toHaveAttribute('aria-label', 'Edge from A to B in Main');
 
-    expect(edgeElement(`${OTHER_GRAPH_ID}::0`)).not.toHaveAttribute('tabindex');
+    expect(edgeElement(EDGES[1]!.id)).not.toHaveAttribute('tabindex');
   });
 
   it('installs a focused Edge as the canvas selection', () => {
     const { adapter } = mountCanvas();
 
-    fireEvent.focus(edgeElement(`${GRAPH_ID}::0`));
+    fireEvent.focus(edgeElement(EDGES[0]!.id));
 
     expect(adapter.getState().selection).toEqual({
       kind: 'edge',
@@ -441,7 +449,7 @@ describe('decorated Edges', () => {
   it('does not select an Edge outside the Active Graph when it receives focus', () => {
     const { adapter } = mountCanvas();
 
-    fireEvent.focus(edgeElement(`${OTHER_GRAPH_ID}::0`));
+    fireEvent.focus(edgeElement(EDGES[1]!.id));
 
     expect(adapter.getState().selection).toEqual({ kind: 'none' });
   });
@@ -785,7 +793,7 @@ describe('a pane covering the graph', () => {
   it('withdraws the Edge surface while the pane covers it', () => {
     mountCanvas(null, { covered: true });
 
-    expect(edgeElement(`${GRAPH_ID}::0`)).not.toHaveAttribute('tabindex');
+    expect(edgeElement(EDGES[0]!.id)).not.toHaveAttribute('tabindex');
   });
 
   it('offers the Edge surface again once the pane closes', () => {
@@ -793,7 +801,7 @@ describe('a pane covering the graph', () => {
 
     setCovered(false);
 
-    expect(edgeElement(`${GRAPH_ID}::0`)).toHaveAttribute('tabindex', '0');
+    expect(edgeElement(EDGES[0]!.id)).toHaveAttribute('tabindex', '0');
   });
 
   /**
@@ -1230,7 +1238,7 @@ describe('what a reconnect release decides', () => {
  */
 describe('spending a continuation on the canvas', () => {
   const RECONNECTED = { graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_C } } as const;
-  const reconnectedFlowEdge = flowEdge(`${GRAPH_ID}::0`, GRAPH_ID, CARD_A, CARD_C);
+  const reconnectedFlowEdge = flowEdge(GRAPH_ID, CARD_A, CARD_C);
 
   it('focuses the Edge on the projection that draws it, not the one before', () => {
     // The real canvas, because resolving the continuation is a DOM lookup: the
@@ -1251,11 +1259,97 @@ describe('spending a continuation on the canvas', () => {
       then: 'focus',
     });
 
+    // One publication, and the reconnected Edge is an element React Flow has
+    // never drawn — it draws that a commit later, from a store it syncs in an
+    // effect of its own. `CanvasContinuation` subscribes to those drawn Edges
+    // for exactly this reason, so the spend does not wait on an unrelated
+    // render to come along.
     act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
 
     expect(continuation.getState().pending).toBeNull();
     expect(document.activeElement).toBe(
-      document.querySelector(`.react-flow__edge[data-id="${GRAPH_ID}::0"]`),
+      document.querySelector(`.react-flow__edge[data-id="${reconnectedFlowEdge.id}"]`),
+    );
+  });
+
+  /**
+   * **The selection survives the focus the continuation spends on it.**
+   *
+   * Landing focus is not the same claim as keeping the selection, and the two
+   * came apart: `reconnect` installs the reconnected subject and *then* asks for
+   * focus, and focus lands on an Edge element whose `onFocus` bridge writes
+   * whatever subject that element is currently drawing back into the union
+   * (`decorated`, above). While a React Flow Edge id named the Edge's *position*
+   * in its Graph, a replaced Edge inherited the previous one's id — so the
+   * element the previous Edge had already drawn answered the query for the
+   * reconnected one, and its still-stale `onFocus` put the Edge the Space no
+   * longer holds back on the union. Nothing then drew selected. Keyed on the
+   * endpoints, the reconnected Edge is a different element, drawn by the
+   * projection that names it, and the bridge writes the subject already stored.
+   */
+  it('leaves the reconnected Edge selected, not only focused', () => {
+    const { edgeAuthoring, adapter, continuation } = mountCanvas();
+    document.body.focus();
+
+    act(() => {
+      edgeAuthoring.openEdgeEditor(SUBJECT);
+      edgeAuthoring.reconnect('to', CARD_C);
+    });
+    act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
+
+    // Asserted after the continuation has been spent, because focus landing is
+    // the event that could take the selection with it.
+    expect(continuation.getState().pending).toBeNull();
+    // Both halves, because "not only focused" is a claim about the pair: the
+    // defect this pins had the focus half true on its own, and a test that
+    // leaves that half to a sibling stops naming what it holds the moment the
+    // sibling moves.
+    expect(document.activeElement).toBe(
+      document.querySelector(`.react-flow__edge[data-id="${reconnectedFlowEdge.id}"]`),
+    );
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...RECONNECTED });
+  });
+
+  /**
+   * **The other kind `staysOwed` waits for, on the same schedule.**
+   *
+   * A card target is resolved by `data-id` against the DOM, so it needs the
+   * commit that draws just as much as an Edge does — React Flow syncs the
+   * `nodes` prop into its own store from an effect and draws from that.
+   *
+   * **`mergeProjected` is what makes that a claim of its own rather than one
+   * the Edge arm answers by accident.** `syncProjection` copies the Edge list
+   * (`edges: [...edges]`), so every publication through it moves the Edge
+   * subscription whether or not an Edge changed. `mergeProjected` spreads the
+   * projection and replaces only `nodes` — it is the path a create-and-connect
+   * takes, where Authoring has just minted a Card and the projection carrying
+   * it arrives with the Edges untouched. `decorated` memoises on that same
+   * reference, so React Flow's store keeps the edges it has and the drawn nodes
+   * are the only thing that moves. Without the node subscription the spend
+   * waits on whatever unrelated render happens along — and on nothing at all if
+   * none does, which is a caret left on `document.body` and, for `reveal`, a
+   * camera that never arrives.
+   */
+  it('focuses a Card on the projection that draws it, not the one before', () => {
+    const { adapter, continuation } = mountCanvas();
+    document.body.focus();
+
+    act(() =>
+      continuation.request({
+        target: { kind: 'card', cardId: CARD_D },
+        select: false,
+        then: 'focus',
+      }),
+    );
+
+    // Owed rather than spent: the canvas is not drawing this Card yet.
+    expect(continuation.getState().pending).not.toBeNull();
+
+    act(() => adapter.getState().mergeProjected([...NODES, cardNode(CARD_D, 1200, 'D')]));
+
+    expect(continuation.getState().pending).toBeNull();
+    expect(document.activeElement).toBe(
+      document.querySelector(`.react-flow__node[data-id="${CARD_D}"]`),
     );
   });
 
@@ -1393,8 +1487,8 @@ describe('the React Flow properties', () => {
         reconnectable: edge.reconnectable,
       })),
     ).toEqual([
-      { id: `${GRAPH_ID}::0`, selected: true, focusable: true, reconnectable: true },
-      { id: `${OTHER_GRAPH_ID}::0`, selected: false, focusable: false, reconnectable: false },
+      { id: EDGES[0]!.id, selected: true, focusable: true, reconnectable: true },
+      { id: EDGES[1]!.id, selected: false, focusable: false, reconnectable: false },
     ]);
   });
 

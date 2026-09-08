@@ -412,11 +412,20 @@ describe('projectCardNodes', () => {
 
 describe('projectGraphEdges', () => {
   const graphRenderEdges = buildGraphRenderEdges(space);
+  // Each Graph's one Edge, named by the id `buildGraphRenderEdges` minted for
+  // it rather than by a restated shape: that id is the Graph and the Edge's two
+  // endpoints, and this file is about the projection rather than about how an
+  // Edge is identified — `packages/graph/test/graph-rendering.test.ts` owns
+  // that. Both fixture Graphs hold exactly one Edge.
+  const edgeIdOf = (graphId: string): string =>
+    graphRenderEdges.find((edge) => edge.graphId === uuid(graphId))!.id;
+  const MAIN_EDGE_ID = edgeIdOf('00000000-0000-4000-8000-000000000004');
+  const ALT_EDGE_ID = edgeIdOf('00000000-0000-4000-8000-000000000030');
 
   it('maps graph edges to colored, port-connected React Flow edges', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors);
     expect(edges).toHaveLength(2);
-    const mainEdge = edges.find((e) => e.id === '00000000-0000-4000-8000-000000000004::0')!;
+    const mainEdge = edges.find((e) => e.id === MAIN_EDGE_ID)!;
     expect(mainEdge).toMatchObject({
       type: 'routed',
       source: '00000000-0000-4000-8000-000000000002',
@@ -433,7 +442,7 @@ describe('projectGraphEdges', () => {
         cards: [],
         edges: [
           {
-            id: '00000000-0000-4000-8000-000000000004::0',
+            id: MAIN_EDGE_ID,
             source: uuid('00000000-0000-4000-8000-000000000002'),
             target: uuid('00000000-0000-4000-8000-000000000003'),
             sourceHandle: '00000000-0000-4000-8000-000000000004::out',
@@ -450,9 +459,7 @@ describe('projectGraphEdges', () => {
       },
     });
     // start → bends → end, flattened for the custom edge to draw.
-    expect(
-      edges.find((e) => e.id === '00000000-0000-4000-8000-000000000004::0')!.data,
-    ).toMatchObject({
+    expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toMatchObject({
       points: [
         { x: 0, y: 0 },
         { x: 5, y: 0 },
@@ -461,9 +468,7 @@ describe('projectGraphEdges', () => {
     });
     // An edge the layout did not route carries no `points` key at all (bezier
     // fallback). The key is omitted, not set to undefined (exactOptionalPropertyTypes).
-    expect(
-      edges.find((e) => e.id === '00000000-0000-4000-8000-000000000030::0')!.data,
-    ).not.toHaveProperty('points');
+    expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).not.toHaveProperty('points');
   });
 
   it('draws every graph the same when nothing is emphasised', () => {
@@ -479,12 +484,8 @@ describe('projectGraphEdges', () => {
         activeGraphId: uuid('00000000-0000-4000-8000-000000000004'),
       });
       return {
-        '00000000-0000-4000-8000-000000000004': edges.find(
-          (e) => e.id === '00000000-0000-4000-8000-000000000004::0',
-        )!,
-        '00000000-0000-4000-8000-000000000030': edges.find(
-          (e) => e.id === '00000000-0000-4000-8000-000000000030::0',
-        )!,
+        '00000000-0000-4000-8000-000000000004': edges.find((e) => e.id === MAIN_EDGE_ID)!,
+        '00000000-0000-4000-8000-000000000030': edges.find((e) => e.id === ALT_EDGE_ID)!,
         count: edges.length,
       };
     };

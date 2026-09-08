@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { useReactFlow, type Edge } from '@xyflow/react';
+import { useReactFlow, useStore } from '@xyflow/react';
 import type { CardId } from '@project/core';
 import { staysOwed, type Continuation, type ContinuationTarget } from '../continuation';
 import { edgeSelectionOf, sameEdgeSubject, type EdgeSubject } from '../render-adapter';
@@ -28,18 +28,53 @@ import { edgeSelectionOf, sameEdgeSubject, type EdgeSubject } from '../render-ad
  */
 export function CanvasContinuation({
   continuation,
-  edges,
   onSelectCard,
   onSelectEdge,
 }: {
   readonly continuation: Continuation;
-  /** The Edges the canvas is drawing, which is where a subject becomes an id. */
-  readonly edges: readonly Edge[];
   readonly onSelectCard: (cardId: CardId) => void;
   readonly onSelectEdge: (subject: EdgeSubject) => void;
 }) {
   const flow = useReactFlow();
   const { pending } = useSyncExternalStore(continuation.subscribe, continuation.getState);
+  /**
+   * What React Flow has taken, read from React Flow — both lists, and both for
+   * the same two reasons.
+   *
+   * *The re-render.* "Every render" below means every render of *this*
+   * component, and the render that carries a projection is one commit too
+   * early: React Flow syncs the `nodes` and `edges` props into its own store
+   * from an effect and draws from that, so an element it has never drawn before
+   * is still absent when this component's effect first looks for it. Nothing
+   * else re-renders this component when that second commit lands, so without
+   * these subscriptions a continuation would be spent whenever some later,
+   * unrelated render happened to come along — and never, if none did.
+   *
+   * **Both kinds `staysOwed` waits for are subscribed, and the node arm is not
+   * spare.** A card target waits on exactly the same schedule an Edge does, and
+   * the Edge arm looked like it covered both only because `syncProjection`
+   * copies the Edge list (`edges: [...edges]`) on every publication. It is
+   * `mergeProjected` that shows the difference: it replaces the nodes and
+   * leaves the Edges the reference they had, which is the path a
+   * create-and-connect takes — Authoring mints a Card, the projection carrying
+   * it arrives with no Edge moving, and nothing in the Edge arm fires.
+   *
+   * *The lookup.* `elementOf` resolves an Edge subject against `drawnEdges`
+   * rather than against a projection prop, so the id it mints comes from the
+   * list the DOM is actually keyed off. The two agree today — the surface
+   * hands React Flow the projected Edges decorated, ids untouched — and
+   * subscribing to one list while resolving against another is what makes that
+   * agreement something to re-establish rather than something to read.
+   *
+   * The stored array references are returned as they are: no derivation, no new
+   * identity per render. `nodes` is subscribed for the render alone, since a
+   * card target is resolved by `data-id` and consults no list.
+   */
+  // `drawnEdges`, not `drawn`: the effect below binds `drawn` to whether the
+  // element it wants has appeared, and confusing "the Edges React Flow drew"
+  // with "did it draw" is the bug class this module exists to get right.
+  const drawnEdges = useStore((state) => state.edges);
+  useStore((state) => state.nodes);
 
   /**
    * The element a target names, against the projection now on screen.
@@ -58,13 +93,13 @@ export function CanvasContinuation({
       );
     }
     if (target.kind !== 'edge') return null;
-    const drawn = edges.find((edge) => {
-      const subject = edgeSelectionOf(edge);
+    const edge = drawnEdges.find((candidate) => {
+      const subject = edgeSelectionOf(candidate);
       return subject !== null && sameEdgeSubject(subject, target);
     });
-    return drawn === undefined
+    return edge === undefined
       ? null
-      : document.querySelector<HTMLElement>(`.react-flow__edge[data-id="${CSS.escape(drawn.id)}"]`);
+      : document.querySelector<HTMLElement>(`.react-flow__edge[data-id="${CSS.escape(edge.id)}"]`);
   };
 
   /**
