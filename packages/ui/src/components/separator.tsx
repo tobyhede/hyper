@@ -10,6 +10,11 @@ import { cn } from '#lib/utils';
  * bar whose items are centred — a toolbar, a command strip — where a stretched
  * rule runs to the top of the line box and sits there off-centre.
  *
+ * Centring is what stops the flex line giving the rule its height, so `center`
+ * brings a default one (`h-4`) that a caller's own `h-*` overrides. Without it
+ * the variant hands back a rule that is zero-tall and invisible unless every
+ * call site remembers to size it.
+ *
  * It is a variant rather than something a caller passes as a class because
  * `data-[orientation=vertical]:self-stretch` compiles to a class *and* an
  * attribute selector, so a plain `self-center` loses to it whatever the sheet
@@ -33,7 +38,20 @@ function Separator({
       className={cn(
         'shrink-0 bg-border data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:w-px',
         align === 'center'
-          ? 'data-[orientation=vertical]:self-center'
+          ? [
+              'data-[orientation=vertical]:self-center',
+              // A plain height, and only for the orientation that needs one.
+              // Plain, because a caller's own `h-*` has to win and `cn` is
+              // `twMerge`, which resolves two plain heights and would not
+              // resolve one against a `data-[orientation=vertical]:` variant —
+              // that variant compiles to a class *and* an attribute selector
+              // and would outrank the caller. Conditional on the orientation
+              // rather than variant-scoped for the same reason in reverse: a
+              // horizontal rule's `h-px` is one of those attribute-qualified
+              // rules and a plain `h-4` reaching it would be an accident of
+              // specificity rather than a decision.
+              orientation === 'vertical' && 'h-4',
+            ]
           : 'data-[orientation=vertical]:self-stretch',
         className,
       )}
