@@ -1,46 +1,79 @@
 import {
+  Box,
   Check,
   ChevronDown,
   CircleAlert,
   Copy,
-  CornerDownRight,
   Ellipsis,
-  FileText,
+  Frame,
+  LayoutGrid,
   Link,
   Maximize,
   Maximize2,
   Minus,
   Minimize2,
-  Network,
-  PanelsTopLeft,
   Pencil,
   Play,
   Plus,
+  Route,
   Search,
   Square,
-  SquareSquare,
+  StickyNote,
   Trash2,
   X,
 } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import { useId, type ComponentProps, type ComponentType } from 'react';
 
 type CardActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
 
-/** An authored Layout: the Cards a Space placed, and the Graphs over them. */
-export const LayoutIcon = () => <PanelsTopLeft size={16} />;
+/**
+ * An authored Layout: the Cards a Space placed, and the Graphs over them.
+ *
+ * Placements on a plane. This was `PanelsTopLeft` — a header, a sidebar and a
+ * content well, which is a *web page chrome* and describes nothing the product
+ * does. A Layout is authored placement (ADR 0014 — placement is authored, not
+ * computed), so the glyph is the placements.
+ */
+export const LayoutIcon = () => <LayoutGrid size={16} />;
 
-/** A directed Graph, including its branches and joins. */
+/**
+ * A directed Graph, including its branches and joins.
+ *
+ * A path from a start pin to an end pin. This was `Network` — one node above
+ * two, joined by a bracket — which draws a *hierarchy*, and a Graph is a
+ * curated traversal over Cards a Layout has already placed. Present is what a
+ * Graph is for, and a path is the thing you present.
+ *
+ * Drawn heavier than Lucide's default 2. This is the only glyph in the set
+ * carrying a *colour* rather than ink, and the palette is pastel because those
+ * values are chosen as a stroke on the sand canvas; at 14px on light chrome the
+ * same value at the default weight is the faintest mark on the surface. Weight
+ * is the right lever because it leaves the hue exactly as the canvas draws it,
+ * which is the whole reason the glyph is coloured at all.
+ */
 export const GraphIcon = ({
   color = 'currentColor',
   size = 16,
 }: {
   color?: string;
   size?: number;
-}) => <Network color={color} size={size} />;
+}) => <Route color={color} size={size} strokeWidth={2.5} />;
 
-/** Start presenting the active Graph. */
-export const PresentIcon = ({ color }: { color: string }) => <Play color={color} size={12} />;
+/**
+ * Start presenting the active Graph.
+ *
+ * `filled` draws the solid triangle transport controls are read as, rather
+ * than Lucide's outline. It is a prop and not a stylesheet's business: Lucide
+ * writes `fill="none"` as a presentation *attribute*, so the only way in from
+ * outside is a rule reaching through the button and into the `svg` — which is
+ * a surface overriding a glyph's own drawing. The fill is the colour the glyph
+ * was already given, so a filled triangle and an outlined one are the same
+ * mark at the same value.
+ */
+export const PresentIcon = ({ color, filled = false }: { color: string; filled?: boolean }) => (
+  <Play color={color} fill={filled ? color : 'none'} size={12} />
+);
 
 /** Stop presenting and return to the Space overview. */
 export const StopPresentingIcon = ({ color }: { color: string }) => (
@@ -82,14 +115,155 @@ export const ZoomInIcon = (props: CanvasControlIconProps) => <Plus size={14} {..
 /** Frame every visible canvas Card in the viewport. */
 export const FitViewIcon = (props: CanvasControlIconProps) => <Maximize size={14} {...props} />;
 
-/** The Card kind that points at another Card's content (ADR 0009). */
-export const AliasIcon = ({ size = 14 }: { size?: number }) => <CornerDownRight size={size} />;
-
 /** The Card kind that owns the Markdown it draws. */
-export const MarkdownIcon = ({ size = 14 }: { size?: number }) => <FileText size={size} />;
+export const MarkdownIcon = ({ size = 14 }: { size?: number | undefined }) => (
+  <StickyNote size={size} />
+);
 
 /** The Card kind that shows one selected view of another Space (ADR 0068). */
-export const SpaceCardIcon = ({ size = 14 }: { size?: number }) => <SquareSquare size={size} />;
+export const SpaceCardIcon = ({ size = 14 }: { size?: number | undefined }) => (
+  <Frame size={size} />
+);
+
+/**
+ * The Space you came from, drawn as the volume the one you are in sits inside.
+ *
+ * **Two Spaces named side by side cannot both take the Space glyph.** The
+ * Command Dock draws the Space you are in beside the Space you entered it from,
+ * and giving both {@link SpaceCardIcon} drew two identical clusters at the same
+ * size and the same `--muted-foreground` — the glyph is what a reader matches
+ * on, so repeating it made the pair harder to tell apart rather than easier.
+ *
+ * A kind glyph cannot separate them, because both rows really are Spaces. What
+ * differs is position, so the mark says position: the Space you are on is a
+ * frame, because a frame is the surface you are working on, and the Space you
+ * came from is the volume that surface is inside. The rows then differ in
+ * silhouette at no width and with no cut base, and the cube is the same object
+ * at a different depth rather than a foreign glyph. Chosen over a direction
+ * mark and over a badged composite; the alternatives are in
+ * `.scratch/command-dock/issues/06-...`.
+ *
+ * **The scale is an optical correction, not a size.** Lucide's `box` has a
+ * geometry box 20 units tall — `3..21` across by `2..22` down, read off
+ * `getBBox` rather than off the vertices in the path data, which stop short of
+ * the arcs that round the corners — against `Frame`'s 22 square. Drawn raw it
+ * reads noticeably smaller than the glyph it stands beside. Scaling so that 20
+ * units plus the stroke comes to 24 lands the ink at 24 tall and 21.8 wide:
+ * the same width as the frame, and a ninth more height, which is what a cube
+ * needs to read as the same size as a square. An isometric silhouette also
+ * leaves all four corners of its box empty, so the eye sizes it by ink rather
+ * than by extents — icon sets correct for that rather than measure it, and
+ * lucide's own circles are 20 units where its squares are 18.
+ *
+ * The stroke is a quarter-unit above lucide's 2 because this glyph is drawn on
+ * lightened chrome, and a mark that has been lightened needs the weight back —
+ * the same trade {@link GraphIcon} makes, in the same direction, for its pastel
+ * canvas colour. The scale is derived from the stroke so the two cannot drift
+ * apart, and the stroke is divided back out by the scale so the correction
+ * changes the silhouette and not the weight.
+ *
+ * **What it costs.** It says *containing*, not *above* and not *back*, so the
+ * reader learns the relationship but nothing in the mark says which way to
+ * travel — and pressing it is still a move. It also gives one domain kind two
+ * glyphs, so {@link SpaceCardIcon} stops answering "what does a Space look
+ * like" on its own. A cube in isometric has an up-face, and filling it would
+ * add the direction back; that is not taken here.
+ */
+export const ParentIcon = ({ size = 14 }: { size?: number | undefined }) => {
+  const view = 24;
+  const stroke = 2.25;
+  const scale = (view - stroke) / 20;
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox={`0 0 ${view} ${view}`}
+      fill="none"
+      aria-hidden="true"
+    >
+      <g transform={`translate(12 12) scale(${scale}) translate(-12 -12)`}>
+        <Box size={view} strokeWidth={stroke / scale} />
+      </g>
+    </svg>
+  );
+};
+
+/**
+ * The Card kinds that own what they draw, and so have a glyph of their own.
+ *
+ * An Alias is deliberately absent: it is not a third silhouette but a badge on
+ * one of these two.
+ */
+export type CardBaseKind = 'markdown' | 'space';
+
+const BASE_GLYPHS = {
+  markdown: MarkdownIcon,
+  space: SpaceCardIcon,
+} satisfies Record<CardBaseKind, ComponentType<{ size?: number }>>;
+
+/**
+ * An Alias, drawn as the glyph of the Card it points at with a badge on it.
+ *
+ * **An Alias is not a third Card silhouette.** A single Alias glyph can say
+ * *that* a Card refers elsewhere but never *what it refers to* — and a Space
+ * Card is as legitimate a Target as a Markdown Card (ADR 0070), so the two
+ * would draw identically while the kind on the canvas is exactly what the
+ * glyph exists to carry. Keeping the base and adding a mark is also what the
+ * canvas already does: `canvas-card.css` keeps the Card and changes only
+ * `border-style` to dotted.
+ *
+ * **The hole is cut, not painted.** The badge sits over the base's own stroke,
+ * and a disc filled with a background colour would have to know which surface
+ * it is on — a menu, a popover, a Card's cream face. An SVG mask removes that
+ * region from the base instead, so whatever is behind shows through and the
+ * mark is legible on every surface. `useId` keeps the mask reference unique
+ * when several of these are drawn in one list, which they are.
+ *
+ * The badge is drawn at a heavier stroke than the base on purpose: at 14px it
+ * is the mark that has to survive, and a filled shape survives where a line
+ * weight does not.
+ */
+export function AliasIcon({
+  base = 'markdown',
+  size = 14,
+}: {
+  /** The kind of the Target. Absent, an Alias draws over the Markdown base. */
+  base?: CardBaseKind | undefined;
+  size?: number | undefined;
+}) {
+  const maskId = useId();
+  const Base = BASE_GLYPHS[base];
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+        <rect x="0" y="0" width="24" height="24" fill="white" />
+        <circle cx="17.5" cy="17.5" r="7.75" fill="black" />
+      </mask>
+      <g mask={`url(#${maskId})`}>
+        <Base size={24} />
+      </g>
+      <g
+        transform="translate(17.5 17.5) scale(0.62) translate(-12 -12)"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M7 7h10v10" />
+        <path d="M7 17 17 7" />
+      </g>
+    </svg>
+  );
+}
 
 /** Mark the selected item in a list. */
 export const CheckIcon = () => <Check color="var(--accent)" size={14} />;

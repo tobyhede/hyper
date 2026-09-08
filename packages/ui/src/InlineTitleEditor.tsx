@@ -106,9 +106,13 @@ export function InlineTitleEditor({
   const control = (
     <Input
       ref={input}
+      // The Sidebar's field is `Input`'s own `compact` size now: the height,
+      // radius, padding and scale it used to spell out here were the same
+      // five utilities the Dock's filter spelled out, and two copies of a
+      // size is what a size variant is for.
+      size={variant === 'sidebar' ? 'compact' : 'default'}
       className={cn(
         variant === 'card' && 'card__title-input',
-        variant === 'sidebar' && 'h-7 rounded-md px-2 py-0 text-sm',
         variant === 'header' && 'h-7 rounded-md border-transparent px-1 py-0 font-medium',
       )}
       aria-label={label}

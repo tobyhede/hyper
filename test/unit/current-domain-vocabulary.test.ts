@@ -141,6 +141,33 @@ const HISTORICAL_TREES = ['docs/adr/', 'docs/superpowers/', '.scratch/'] as cons
  */
 const QUALIFIED_FILES = [] as const;
 
+/**
+ * The one file where the retired name is a **foreign** identifier rather than a
+ * domain one.
+ *
+ * `packages/ui/src/icons.tsx` is the Lucide facade, and Lucide's glyph for a
+ * path between two pins is exported under the retired entity name. The icon is
+ * what a Graph is drawn as (`GraphIcon`) — the name arrives with the library
+ * and names a shape rather than a domain type, so ADR 0041 has nothing to say
+ * about it, and the bare scan cannot tell the two apart because they are
+ * spelled identically.
+ *
+ * This is the same carve-out the block below already makes for React Flow's own
+ * edge-label component and CSS class: a name that is not ours to sweep. It is a
+ * **file** exemption rather than a shape one precisely because there is no shape
+ * to read.
+ *
+ * Kept honest two ways. It is scoped to the facade, which is the only module in
+ * the package allowed to import Lucide at all, so the foreign name cannot spread
+ * behind it; and it is asserted below to still be earning itself, so deleting
+ * the import deletes the exemption rather than leaving a hole.
+ *
+ * **The compound arm still governs this file.** Only the bare word is forgiven:
+ * the retired name carrying an id, an edge or an `active` prefix is the domain
+ * name wherever it is written, and is still reported here.
+ */
+const FOREIGN_BARE_FILES: readonly string[] = ['packages/ui/src/icons.tsx'];
+
 /** The index modes of an ordinary blob; a tracked symlink is `120000`. */
 const REGULAR_FILE_MODES = new Set(['100644', '100755']);
 
@@ -234,12 +261,29 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
   });
 
   it('finds no bare retired type name in implementation source', () => {
-    const found = scanned.filter(isImplementationSource).flatMap((file) => {
-      const source = readTracked(file);
-      return source === null ? [] : hits(source, RETIRED_BARE).map((hit) => `${file}:${hit}`);
-    });
+    const found = scanned
+      .filter(isImplementationSource)
+      .filter((file) => !FOREIGN_BARE_FILES.includes(file))
+      .flatMap((file) => {
+        const source = readTracked(file);
+        return source === null ? [] : hits(source, RETIRED_BARE).map((hit) => `${file}:${hit}`);
+      });
 
     expect(found).toEqual([]);
+  });
+
+  it('still reports the compound sense inside the foreign-name exemption', () => {
+    // The exemption forgives the bare word and nothing else, so the file stays
+    // in the compound scan above. Composed rather than written out, in this
+    // file's usual idiom: spelled literally, the fixture would be a hit this
+    // scan reports against its own source.
+    for (const file of FOREIGN_BARE_FILES) {
+      expect(scanned).toContain(file);
+      expect(readTracked(file), `${file} is exempted but no longer tracked`).not.toBeNull();
+    }
+    expect(hits(`const active${ENTITY} = layout.active${ENTITY};`, RETIRED_COMPOUND)).not.toEqual(
+      [],
+    );
   });
 
   it('finds no retired initial bound over a Graph collection', () => {
@@ -255,6 +299,9 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
 
   it('keeps no exemption that has stopped earning itself', () => {
     expectEachExemptionEarned(QUALIFIED_FILES, RETIRED_COMPOUND);
+    // Read against the pattern it was granted against: the day the facade stops
+    // importing the foreign glyph, the exemption stops being earned and goes.
+    expectEachExemptionEarned(FOREIGN_BARE_FILES, RETIRED_BARE);
   });
 
   it('finds no retired canvas vocabulary in live files', () => {

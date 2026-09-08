@@ -1,0 +1,226 @@
+/* THROWAWAY UX PROTOTYPE — see card-icons.stories.tsx. */
+
+/* The same light ground the Command Dock story settles on, restated here so a
+   candidate is judged against the chrome it would sit on rather than against
+   the catalogue's default. Only the tokens the specimen sheet actually reads. */
+html:has(.icons) {
+  color-scheme: light;
+
+  --background: #e5dbc7;
+  --foreground: #1f2933;
+  --card: #fbfbfa;
+  --muted-foreground: #6b7280;
+  --border: #dedede;
+}
+
+.icons {
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.icons__lede {
+  max-width: 60ch;
+  margin: 0 0 20px;
+  color: var(--muted-foreground);
+}
+
+.icons__heading {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Every panel is the chrome's paper, because that is what a glyph in the Dock
+   is drawn on — a specimen sheet on white would flatter a weight that fails
+   over the real surface. */
+.icons__collisions,
+.icons__column,
+.icons__set {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.icons__collisions {
+  margin-bottom: 20px;
+}
+
+/* Four columns rather than a wrapped strip: the glyph, the `@project/ui` name
+   it is exported under, what a reader already reads it as, and the candidates
+   that die on it. Wrapped, the fourth column was unreadable and the row read
+   as decoration. */
+.icons__spent-list {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  gap: 6px 16px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.icons__spent {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.icons__spent-glyph {
+  display: inline-flex;
+  color: var(--foreground);
+}
+
+.icons__rules-out {
+  font-style: italic;
+}
+
+.icons__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.icons__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.icons__candidate {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+/* Both sizes together, baseline-aligned: the question a candidate fails is
+   almost always "does it survive 14px", and it can only be asked beside the
+   size where the same shape still works. */
+.icons__pair {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 46px;
+  flex: none;
+  padding-top: 2px;
+}
+
+.icons__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.icons__name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.icons__note {
+  color: var(--muted-foreground);
+}
+
+.icons__sets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.icons__set-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.icons__set-claim {
+  margin: 0 0 12px;
+  color: var(--muted-foreground);
+}
+
+.icons__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The Cards list row, copied in shape from the Dock: same padding, same
+   hairline, same gap between glyph and title. */
+.icons__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  border-radius: 6px;
+}
+
+.icons__row-glyph {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted-foreground);
+}
+
+.icons__row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The Card glyph and its Alias badge occupy one box, the badge laid over the
+   base. Absolute rather than an SVG group so the base stays exactly the glyph
+   every other row draws — the decoration must not change the thing it
+   decorates, which is the whole claim being tested. */
+.icons__alias-mark {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.icons__alias-mark > svg {
+  position: absolute;
+  inset: 0;
+}
+
+/* The knockout disc is filled and the badge stroked in one subtree, so the
+   fill has to be painted before the stroke or it covers the mark it isolates. */
+.icons__alias-badge {
+  paint-order: fill stroke markers;
+}
+
+.icons__alias-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The entity name, so a row says which thing the glyph is for as well as
+   showing the glyph beside a real title. */
+.icons__row-label {
+  width: 52px;
+  flex: none;
+  color: var(--muted-foreground);
+}
+
+/* Four specimens rather than two: each decoration is drawn on the Card glyph
+   and on the Space glyph, because a Space Card can be an Alias's Target and a
+   decoration that only works on one base has not answered the question. */
+.icons__pair--alias {
+  width: 104px;
+  gap: 6px;
+}

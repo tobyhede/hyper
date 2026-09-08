@@ -25,6 +25,22 @@ const STATUS_LABELS = {
 } as const satisfies Record<OpenSpaceStatus, string>;
 
 /**
+ * How any surface names an open Space that is not well.
+ *
+ * The words are exported and the record is not, because what a second surface
+ * needs is the *answer* for a state rather than the table — and a table handed
+ * out is a table someone extends from the outside. Both the caller and this
+ * component then spend one decision: change a word here and every surface
+ * reporting that state changes with it.
+ *
+ * It exists because there is a second surface. The Command Dock's Space
+ * switcher reports the same three states over the same open set, and reporting
+ * them in words of its own is how a reader learns that "Save failed" and
+ * "Changes not saved" are two different things.
+ */
+export const openSpaceStatusLabel = (status: OpenSpaceStatus): string => STATUS_LABELS[status];
+
+/**
  * The session's set of open Spaces beside the active Space Sidebar (ADR 0068).
  *
  * Selection belongs to the caller. This component owns the tabs interaction

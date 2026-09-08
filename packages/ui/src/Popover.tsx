@@ -76,8 +76,17 @@ export const PopoverContent = forwardRef<
           ref={ref}
           // React Flow's live Space-key pan activation subscription reaches
           // this portalled popup, so its own `.nokey` ancestor excludes it.
+          // The shadow is the theme's `shadow-lg`, which is what
+          // `DropdownMenuSubContent` beside it already spends — the Menu's
+          // outer popup takes `shadow-md` with a ring, so the sibling this
+          // matches is the nested one rather than every Menu surface. It was
+          // `shadow-[0_12px_40px_rgba(0,0,0,0.5)]` — half the black there is,
+          // written in numbers no theme can reach — which is a value chosen
+          // against a dark face and reads as a smudge on a light one. A token
+          // moves with the theme; an arbitrary value has to be fought by
+          // whichever surface the popover lands on.
           className={cn(
-            'nokey z-50 min-w-[15rem] rounded-[6px] border border-[var(--border)] bg-[var(--card)] p-[0.6rem] text-[var(--foreground)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] outline-none',
+            'nokey z-50 min-w-[15rem] rounded-[6px] border border-[var(--border)] bg-[var(--card)] p-[0.6rem] text-[var(--foreground)] shadow-lg outline-none',
             className,
           )}
           {...popupProps}

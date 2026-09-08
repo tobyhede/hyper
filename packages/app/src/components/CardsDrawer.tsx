@@ -240,8 +240,7 @@ export function CardsDrawer({
                     <DropdownMenuRadioGroup
                       value={kind}
                       onValueChange={(value) => {
-                        const filter = String(value);
-                        if (isKindFilter(filter)) setKind(filter);
+                        if (isKindFilter(value)) setKind(value);
                       }}
                     >
                       <DropdownMenuRadioItem value="all">All kinds</DropdownMenuRadioItem>

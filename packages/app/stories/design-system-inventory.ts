@@ -125,6 +125,11 @@ export const uncataloguedComponents = [
       "Consumed by `OpenSpaces`, which `space-cards/09` stages under `stories/review` until issue 11 supplies an application path and stable parity evidence. Its direct tests still hold the Base UI wrapper's vertical roving tabindex and `keepMounted` behavior independently of that composition.",
   },
   {
+    module: 'packages/ui/src/components/breadcrumb.tsx',
+    reason:
+      'The trail of Spaces a reader crossed, staged by the Command Dock prototype under `stories/review` while the arrangement is under review. A shadcn registry primitive taken as generated: markup and spacing, with every step rendered as a control the surface supplies, so there is no behaviour of its own for a story to press until an application path exists.',
+  },
+  {
     module: 'packages/ui/src/components/empty.tsx',
     reason:
       'Deliberately without a consumer, for the same reason. A shadcn registry primitive for an empty result set — the combobox empty message comes from Base UI’s own `ComboboxEmpty`, not from here.',

@@ -1,9 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../src/components/dropdown-menu';
 
@@ -54,5 +56,97 @@ describe('DropdownMenu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));
 
     expect(screen.getByRole('menu').closest('.nokey')).not.toBeNull();
+  });
+
+  /**
+   * A destructive item colours the row and lets its glyph follow.
+   *
+   * The registry drop painted `color` on the child `svg` as well, which a
+   * surface restating the row's resting colour could not reach past — a
+   * declared colour is not overridden by an ancestor's, however specific — so
+   * every consumer that wanted Delete to be ink at rest had to restate the
+   * glyph too. Nothing in the class list may target the glyph directly.
+   */
+  it('leaves a destructive item glyph following the row rather than colouring it', () => {
+    render(
+      <DropdownMenu>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+
+    const item = screen.getByRole('menuitem', { name: 'Delete' });
+    expect(item).toHaveAttribute('data-variant', 'destructive');
+    expect(item.className).toContain('data-[variant=destructive]:text-destructive');
+    expect(item.className).not.toContain('data-[variant=destructive]:*:[svg]:text-destructive');
+  });
+
+  /**
+   * The radio group is generic over its value, so a caller gets back the type
+   * it put in. Base UI declares all three of `value`, `defaultValue` and
+   * `onValueChange` as `any`; absorbing that here is what stops each consumer
+   * laundering the value it is handed.
+   */
+  it('hands a chosen value back at the type the group was given', () => {
+    const chosen: string[] = [];
+
+    render(
+      <DropdownMenu>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuRadioGroup
+            value="first"
+            onValueChange={(next) => {
+              expectTypeOf(next).toEqualTypeOf<string>();
+              chosen.push(next);
+            }}
+          >
+            <DropdownMenuRadioItem value="first">First</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="second">Second</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Second' }));
+
+    expect(chosen).toEqual(['second']);
+  });
+
+  /**
+   * A union survives the round trip, which is what `String()` destroyed: the
+   * value came back as a bare `string` and had to be parsed again into one of
+   * the things the menu had itself just rendered.
+   */
+  it('preserves a union value type through the group', () => {
+    const chosen: ('left' | 'right')[] = [];
+
+    render(
+      <DropdownMenu>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuRadioGroup<'left' | 'right'>
+            defaultValue="left"
+            onValueChange={(next) => {
+              expectTypeOf(next).toEqualTypeOf<'left' | 'right'>();
+              chosen.push(next);
+            }}
+          >
+            <DropdownMenuRadioItem value="left">Left</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="right">Right</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Right' }));
+
+    expect(chosen).toEqual(['right']);
   });
 });
