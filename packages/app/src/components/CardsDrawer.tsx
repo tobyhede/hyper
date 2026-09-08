@@ -56,8 +56,17 @@ export interface CardsDrawerProps {
   readonly spaceTitleById?: ReadonlyMap<UUID, string>;
 }
 
-const isKindFilter = (value: string): value is KindFilter =>
-  value === 'all' || value === 'markdown' || value === 'space' || value === 'alias';
+/**
+ * The kind rows of the filter menu, bound to the filter's own type.
+ *
+ * `DropdownMenuRadioItem` is generic over its value and the group is generic
+ * over the same one, but the type does not travel from group to children
+ * through JSX — so the surface names it, once, here. That is what makes the
+ * value coming back out of `onValueChange` a `KindFilter` in fact and not only
+ * in the group's declaration, and it retires the runtime re-parse that used to
+ * stand in for it.
+ */
+const KindFilterItem = DropdownMenuRadioItem<KindFilter>;
 
 /** An Alias's Target title, `''` for the intake-guaranteed-unreachable case a Target does not resolve — the same convention `CardNode` draws (ADR 0009). */
 const targetTitle = (card: Card, titleById: ReadonlyMap<CardId, string>): string =>
@@ -237,16 +246,11 @@ export function CardsDrawer({
                     <ChevronDownIcon />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="nokey">
-                    <DropdownMenuRadioGroup
-                      value={kind}
-                      onValueChange={(value) => {
-                        if (isKindFilter(value)) setKind(value);
-                      }}
-                    >
-                      <DropdownMenuRadioItem value="all">All kinds</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="markdown">Markdown</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="space">Space</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="alias">Alias</DropdownMenuRadioItem>
+                    <DropdownMenuRadioGroup value={kind} onValueChange={setKind}>
+                      <KindFilterItem value="all">All kinds</KindFilterItem>
+                      <KindFilterItem value="markdown">Markdown</KindFilterItem>
+                      <KindFilterItem value="space">Space</KindFilterItem>
+                      <KindFilterItem value="alias">Alias</KindFilterItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>

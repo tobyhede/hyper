@@ -119,6 +119,37 @@ describe('DropdownMenu', () => {
   });
 
   /**
+   * The items are held to the same type as the group that reads them.
+   *
+   * The group's generic was a promise nothing kept: `RadioItem`'s own `value`
+   * stayed Base UI's `any`, so a mistyped item still rendered and its value
+   * still came back out typed as the group's `Value`. An item binds the type
+   * once — `DropdownMenuRadioItem<Value>`, or an instantiation expression
+   * where a surface writes several — and a value the group could not produce
+   * is then a compile error at the item that would produce it.
+   */
+  it('refuses an item value the group it belongs to could not produce', () => {
+    const Side = DropdownMenuRadioItem<'left' | 'right'>;
+
+    render(
+      <DropdownMenu>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuRadioGroup<'left' | 'right'> defaultValue="left">
+            <Side value="left">Left</Side>
+            {/* @ts-expect-error The group deals in 'left' | 'right', and 'middle' is neither. */}
+            <Side value="middle">Middle</Side>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+
+    expect(screen.getByRole('menuitemradio', { name: 'Left' })).toBeInTheDocument();
+  });
+
+  /**
    * A union survives the round trip, which is what `String()` destroyed: the
    * value came back as a bare `string` and had to be parsed again into one of
    * the things the menu had itself just rendered.

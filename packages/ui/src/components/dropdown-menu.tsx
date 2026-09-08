@@ -251,14 +251,32 @@ function DropdownMenuRadioGroup<Value>({
   );
 }
 
-function DropdownMenuRadioItem({
+/**
+ * One of the set, and the thing that makes the group's generic true.
+ *
+ * Base UI types `value` as `any` here too, which left `DropdownMenuRadioGroup`
+ * promising a `Value` nothing was holding the items to: an item value the
+ * group could not produce still rendered, and still came back out of
+ * `onValueChange` wearing the group's type. Naming the type on the item is
+ * what closes that — a surface that renders several binds it once with an
+ * instantiation expression (`const Item = DropdownMenuRadioItem<Kind>`) rather
+ * than repeating the argument, and a typo is then a compile error where it is
+ * written instead of a value the group hands on unchallenged.
+ *
+ * The type does not travel from the group through JSX children — TypeScript
+ * has no way to carry it there — so the caller names it, once, on both.
+ */
+type DropdownMenuRadioItemProps<Value> = Omit<MenuPrimitive.RadioItem.Props, 'value'> & {
+  readonly value: Value;
+  readonly inset?: boolean;
+};
+
+function DropdownMenuRadioItem<Value>({
   className,
   children,
   inset,
   ...props
-}: MenuPrimitive.RadioItem.Props & {
-  inset?: boolean;
-}) {
+}: DropdownMenuRadioItemProps<Value>) {
   return (
     <MenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
