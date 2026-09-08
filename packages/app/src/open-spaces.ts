@@ -37,10 +37,35 @@ export interface OpenSpace {
 export interface OpenSpacesState {
   readonly activeSpaceId: UUID | null;
   readonly entries: readonly OpenSpace[];
+  /**
+   * The Space each open Space was entered from, or `null` for one opened
+   * directly. Every open Space has an entry; the map is total over `entries`.
+   *
+   * **It is display-only, and it records entering rather than opening.** The
+   * switcher draws the open set as the tree that crossing makes, each Space
+   * under the one it was entered from — a decision taken against seven other
+   * schemes and recorded in `.scratch/command-dock/issues/01-...`. Nothing acts
+   * on it: Exit closes one Space whether or not anything hangs off it (ADR
+   * 0068), so this asserts a history and never a containment.
+   *
+   * **Off {@link OpenSpace} on purpose.** An entry's object identity is
+   * load-bearing here — `retired` is a `WeakSet` of them, `compositions`
+   * caches the promise that produced one, and the browser location follows
+   * `entry.app` by reference — so re-homing by spreading a new entry would
+   * leave those three holding an object no longer in `entries`. The opener is
+   * a fact about the session rather than about the composition, so it is keyed
+   * by Space Id beside them.
+   *
+   * **The opener is recorded once, at the crossing that first opened the
+   * Space.** A Space already open keeps the opener it joined the set with, so
+   * `enter` and `open` racing for the same Space cannot disagree about it, and
+   * neither can a reader crossing back into somewhere they have already been.
+   */
+  readonly openedFrom: ReadonlyMap<UUID, UUID | null>;
 }
 
-export type CloseSpaceResult =
-  | { readonly kind: 'closed' }
+export type ExitSpaceResult =
+  | { readonly kind: 'exited' }
   | { readonly kind: 'warning'; readonly warning: 'persistence-rejected' }
   | {
       readonly kind: 'refused';
@@ -52,7 +77,7 @@ export type CloseSpaceResult =
           };
     };
 
-export interface RejectedCloseConfirmation {
+export interface RejectedExitConfirmation {
   readonly warning: 'persistence-rejected';
 }
 
@@ -67,10 +92,10 @@ export interface OpenSpaces {
   }>;
   readonly enter: (spaceId: UUID, selection?: LayoutId) => Promise<OpenSpace>;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
-  readonly close: (
+  readonly exit: (
     spaceId: UUID,
-    confirmation?: RejectedCloseConfirmation,
-  ) => Promise<CloseSpaceResult>;
+    confirmation?: RejectedExitConfirmation,
+  ) => Promise<ExitSpaceResult>;
   readonly spaceCards: SpaceCardAuthoring;
   /**
    * The browser's location, following whichever Space is on the canvas.
@@ -130,7 +155,7 @@ export function createOpenSpaces({
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
   const spaceCards = createSpaceCardLifecycle({ backend, registry, newId });
   const observable = createObservableState<OpenSpacesState>(
-    { activeSpaceId: null, entries: [] },
+    { activeSpaceId: null, entries: [], openedFrom: new Map() },
     report,
   );
   const compositions = new Map<UUID, Promise<OpenSpace>>();
@@ -148,7 +173,7 @@ export function createOpenSpaces({
   const followActiveSpace = (): void => {
     const { activeSpaceId, entries } = observable.getState();
     const active = entries.find(({ id }) => id === activeSpaceId);
-    // Closing the last Space leaves nothing on the canvas, and holding the
+    // Exiting the last Space leaves nothing on the canvas, and holding the
     // composition it disposed would keep the whole graph behind that entry
     // alive and claim a Space is followed that is not.
     if (active === undefined) {
@@ -171,10 +196,10 @@ export function createOpenSpaces({
   let activationRequest = 0;
 
   /**
-   * The entries `close` has retired.
+   * The entries `exit` has retired.
    *
    * An activation captures its target and then waits arbitrarily long for the
-   * Space being left. A close completing inside that wait retires the session
+   * Space being left. A exit completing inside that wait retires the session
    * and disposes the composition, so reinstating the target on the canvas would
    * hand the author a Space nothing can commit for. Identity is the test, not
    * the Space Id: the same Space reopened is a different entry and reinstating
@@ -195,17 +220,17 @@ export function createOpenSpaces({
   const abandoned = new Set<number>();
 
   /**
-   * The closes that have begun and not yet settled, by Space.
+   * The exits that have begun and not yet settled, by Space.
    *
-   * A close waits arbitrarily long for its Space to become retirable, and both
+   * A exit waits arbitrarily long for its Space to become retirable, and both
    * caches still advertise the entry it is going to retire while it does. An
    * activation reading one of them inside that window would hand the author a
-   * composition the close is about to dispose and a session the registry is
-   * about to release. So an activation that finds a close underway waits it out
-   * and takes the Space the close leaves behind — the reloaded one, or this
-   * same entry if the close was refused.
+   * composition the exit is about to dispose and a session the registry is
+   * about to release. So an activation that finds a exit underway waits it out
+   * and takes the Space the exit leaves behind — the reloaded one, or this
+   * same entry if the exit was refused.
    */
-  const closing = new Map<UUID, Promise<unknown>>();
+  const exiting = new Map<UUID, Promise<unknown>>();
 
   /**
    * Number one activation intent.
@@ -232,15 +257,30 @@ export function createOpenSpaces({
     };
   };
 
-  const include = (entry: OpenSpace, activeSpaceId: UUID): void => {
+  /**
+   * Put an entry on the canvas, recording what it was entered from if it is new.
+   *
+   * `from` is spent only on the branch that adds the entry. A Space already in
+   * the set is being returned to rather than entered, and rewriting its opener
+   * would make the switcher's tree reshape itself under a reader who was only
+   * moving around in it.
+   */
+  const include = (entry: OpenSpace, activeSpaceId: UUID, from: UUID | null): void => {
     const state = observable.getState();
     if (state.entries.some(({ id }) => id === entry.id)) {
       if (state.activeSpaceId === activeSpaceId) return;
-      observable.publish({ activeSpaceId, entries: state.entries });
+      observable.publish({ ...state, activeSpaceId });
       followActiveSpace();
       return;
     }
-    observable.publish({ activeSpaceId, entries: [...state.entries, entry] });
+    // A Space cannot be entered from itself, which is what `open` on the Space
+    // already on the canvas would otherwise record.
+    const opener = from === entry.id ? null : from;
+    observable.publish({
+      activeSpaceId,
+      entries: [...state.entries, entry],
+      openedFrom: new Map(state.openedFrom).set(entry.id, opener),
+    });
     followActiveSpace();
   };
 
@@ -271,7 +311,7 @@ export function createOpenSpaces({
   ): Promise<OpenSpace> => {
     const { loaded } = validated;
     const spaceId = loaded.snapshot.id;
-    await closing.get(spaceId);
+    await exiting.get(spaceId);
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
     const opening = Promise.resolve().then(() => buildLoaded(validated, selection));
@@ -281,7 +321,7 @@ export function createOpenSpaces({
   };
 
   const compose = async (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> => {
-    await closing.get(spaceId);
+    await exiting.get(spaceId);
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
     const opening = loadWorkingSpace(spaceId).then((loaded) => {
@@ -296,37 +336,57 @@ export function createOpenSpaces({
   const activateAfterLeavingSettles = async (
     target: OpenSpace,
     request: number,
+    from: UUID | null,
   ): Promise<OpenSpace> => {
     const active = observable.getState().activeSpaceId;
     if (active !== null && active !== target.id) {
       await registry.waitUntilRetirable(active);
     }
     if (retired.has(target)) {
-      // The close is the newer choice and has already taken this Space off the
+      // The exit is the newer choice and has already taken this Space off the
       // canvas, so there is nothing to reinstate — and nothing to answer with
       // either, since the composition it names can no longer commit.
-      throw new Error(`Space ${target.id} was closed while it was being activated`);
+      throw new Error(`Space ${target.id} was exited while it was being activated`);
     }
     if (request !== activationRequest) {
-      include(target, observable.getState().activeSpaceId ?? target.id);
+      include(target, observable.getState().activeSpaceId ?? target.id, from);
       return target;
     }
-    include(target, target.id);
+    include(target, target.id, from);
     return target;
   };
 
-  const open = async (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> => {
+  const activate = async (
+    spaceId: UUID,
+    selection: LayoutId | undefined,
+    from: UUID | null,
+  ): Promise<OpenSpace> => {
     // Numbered before the Space is loaded, not after: composition is itself a
     // wait, and a request made first must not be superseded by one made second
     // merely because the second Space was already in hand.
     const { request, abandon } = beginActivation();
     try {
-      return await activateAfterLeavingSettles(await compose(spaceId, selection), request);
+      return await activateAfterLeavingSettles(await compose(spaceId, selection), request, from);
     } catch (error) {
       abandon();
       throw error;
     }
   };
+
+  /** Open a Space directly, which is not a crossing and records no opener. */
+  const open = (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> =>
+    activate(spaceId, selection, null);
+
+  /**
+   * Enter a Space from the one on the canvas, which is the crossing the
+   * switcher's tree is a picture of (ADR 0068).
+   *
+   * The opener is read before the first await, because it is the Space the
+   * reader was standing in when they pressed — not whichever Space the canvas
+   * happens to hold once the load settles.
+   */
+  const enter = (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> =>
+    activate(spaceId, selection, observable.getState().activeSpaceId);
 
   const openPath: OpenSpaces['openPath'] = async (pathname) => {
     const { request, abandon } = beginActivation();
@@ -353,6 +413,9 @@ export function createOpenSpaces({
     const opened = await activateAfterLeavingSettles(
       await composeValidated(validated, destination.selection),
       request,
+      // An address is not a crossing: a Space reached by URL hangs off nothing,
+      // whatever happened to be on the canvas when the location changed.
+      null,
     );
     // A Space already open keeps the selection it is being worked in, so the
     // URL's is only a proposal. Report the one that holds: a caller opening the
@@ -369,11 +432,13 @@ export function createOpenSpaces({
     if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
     const { request, abandon } = beginActivation();
     try {
-      // `entries` still advertises a Space a close is waiting to retire, so
-      // this entry is only the target while nothing is closing it. `compose`
-      // waits that close out and answers whatever it leaves behind.
-      const entry = closing.has(spaceId) ? await compose(spaceId) : target;
-      return await activateAfterLeavingSettles(entry, request);
+      // `entries` still advertises a Space a exit is waiting to retire, so
+      // this entry is only the target while nothing is exiting it. `compose`
+      // waits that exit out and answers whatever it leaves behind.
+      const entry = exiting.has(spaceId) ? await compose(spaceId) : target;
+      // Already open, so `include` spends no opener on it — and would not
+      // rewrite one if it did.
+      return await activateAfterLeavingSettles(entry, request, null);
     } catch (error) {
       abandon();
       throw error;
@@ -383,8 +448,8 @@ export function createOpenSpaces({
   const retireOpenSpace = async (
     spaceId: UUID,
     target: OpenSpace,
-    confirmation?: RejectedCloseConfirmation,
-  ): Promise<CloseSpaceResult> => {
+    confirmation?: RejectedExitConfirmation,
+  ): Promise<ExitSpaceResult> => {
     // Waiting and retiring cannot be one step: a coordination can raise the
     // barrier in the microtask between them, which makes this Space one of its
     // participants again. So the wait, the reading it justifies and the
@@ -415,6 +480,19 @@ export function createOpenSpaces({
     const entries = state.entries.filter(({ id }) => id !== spaceId);
     const activeSpaceId =
       state.activeSpaceId === spaceId ? (entries[0]?.id ?? null) : state.activeSpaceId;
+    // **The Spaces entered from this one are re-homed onto its own opener**, so
+    // the record stays total over `entries` and the switcher's tree stays a
+    // tree. Eagerly, because the lazy alternative — walk up to the nearest
+    // still-open ancestor when the tree is drawn — cannot work: this entry is
+    // about to be gone and its own opener with it, so there is no chain left to
+    // follow. Without this, a Space entered from one that later exits is still
+    // open and no longer anywhere in the list that is the only way back to it.
+    const openedFrom = new Map(state.openedFrom);
+    const inherited = openedFrom.get(spaceId) ?? null;
+    openedFrom.delete(spaceId);
+    for (const [entryId, opener] of openedFrom) {
+      if (opener === spaceId) openedFrom.set(entryId, inherited);
+    }
     // The composition goes with the session the registry has just stopped
     // owning. Each collaborator is released by name rather than relying on
     // `authoring.dispose` clearing the subscriber set the others registered in:
@@ -424,30 +502,30 @@ export function createOpenSpaces({
     target.app.authoring.dispose();
     retired.add(target);
     compositions.delete(spaceId);
-    observable.publish({ activeSpaceId, entries });
+    observable.publish({ activeSpaceId, entries, openedFrom });
     followActiveSpace();
-    return { kind: 'closed' };
+    return { kind: 'exited' };
   };
 
-  const close = async (
+  const exit = async (
     spaceId: UUID,
-    confirmation?: RejectedCloseConfirmation,
-  ): Promise<CloseSpaceResult> => {
+    confirmation?: RejectedExitConfirmation,
+  ): Promise<ExitSpaceResult> => {
     if (spaceId === metaSpaceId) {
       return { kind: 'refused', refusal: { code: 'meta-space-permanent' } };
     }
     const target = observable.getState().entries.find(({ id }) => id === spaceId);
     if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
-    const closed = retireOpenSpace(spaceId, target, confirmation);
+    const exited = retireOpenSpace(spaceId, target, confirmation);
     // Recorded before the first wait, because the window an activation has to
     // see is the whole of it — and recorded as a settlement rather than an
-    // outcome, since a close that threw has still stopped standing in the way.
-    const settled = closed.catch(() => undefined);
-    closing.set(spaceId, settled);
+    // outcome, since a exit that threw has still stopped standing in the way.
+    const settled = exited.catch(() => undefined);
+    exiting.set(spaceId, settled);
     try {
-      return await closed;
+      return await exited;
     } finally {
-      if (closing.get(spaceId) === settled) closing.delete(spaceId);
+      if (exiting.get(spaceId) === settled) exiting.delete(spaceId);
     }
   };
 
@@ -457,9 +535,9 @@ export function createOpenSpaces({
     entry: (spaceId) => observable.getState().entries.find(({ id }) => id === spaceId),
     open,
     openPath,
-    enter: open,
+    enter,
     switchTo,
-    close,
+    exit,
     spaceCards,
     browserLocation,
   };

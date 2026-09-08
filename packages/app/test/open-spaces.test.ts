@@ -25,6 +25,17 @@ const META_SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000
 const MINTED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 const SECOND_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
 const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e');
+/**
+ * A third Space, which is what a crossing needs to be a tree rather than a line.
+ *
+ * Two Spaces can only ever show a Space entered from another; re-homing needs
+ * three, because what it asserts is where the Space below the exited one lands.
+ */
+const THIRD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000f');
+const THIRD_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
+const THIRD_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
+const THIRD_GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
+const THIRD_GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
 
 /**
  * Two aggregate-valid Spaces. Every Card, Layout and Graph id is distinct
@@ -34,10 +45,11 @@ const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e')
  */
 const snapshot = (id: UUID, title: string): SpaceSnapshot => {
   const meta = id === META_ID;
-  const cardId = meta ? CARD_ID : OTHER_CARD_ID;
-  const layoutId = meta ? META_LAYOUT_ID : LAYOUT_ID;
-  const graphOne = meta ? META_GRAPH_ONE : GRAPH_ONE;
-  const graphTwo = meta ? META_GRAPH_TWO : GRAPH_TWO;
+  const third = id === THIRD_ID;
+  const cardId = meta ? CARD_ID : third ? THIRD_CARD_ID : OTHER_CARD_ID;
+  const layoutId = meta ? META_LAYOUT_ID : third ? THIRD_LAYOUT_ID : LAYOUT_ID;
+  const graphOne = meta ? META_GRAPH_ONE : third ? THIRD_GRAPH_ONE : GRAPH_ONE;
+  const graphTwo = meta ? META_GRAPH_TWO : third ? THIRD_GRAPH_TWO : GRAPH_TWO;
   return {
     id,
     document: {
@@ -62,10 +74,12 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
           activeGraph: graphOne,
         },
         // A second Layout, so a selection made in an open Space can differ from
-        // the one an address proposes. Only the ordinary Space needs it.
-        ...(meta
-          ? []
-          : [
+        // the one an address proposes. Only the Space those tests use needs it,
+        // and its ids are its own — every Layout and Graph id is distinct across
+        // the three Spaces, because a Space Card coordination validates the
+        // whole aggregate and refuses a duplicate wherever it appears.
+        ...(id === OTHER_ID
+          ? [
               {
                 id: SECOND_LAYOUT_ID,
                 title: 'Second Layout',
@@ -74,7 +88,8 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
                 graphs: [{ id: SECOND_GRAPH_ID, title: 'Second', edges: [] }],
                 activeGraph: SECOND_GRAPH_ID,
               },
-            ]),
+            ]
+          : []),
       ],
     },
     cards: meta
@@ -95,10 +110,25 @@ const loaded = (id: UUID, title: string) => ({
   exportedRevision: null,
 });
 
-const setup = (control?: MemorySpaceBackendTestControl, newId: () => UUID = () => CARD_ID) => {
+/**
+ * Two Spaces, or three where a test needs a crossing to be a tree.
+ *
+ * The third is opt-in rather than always present because a Space Card
+ * coordination is written over every Space the backend holds: a third one in
+ * the default fixture changes what those tests are coordinating across, and
+ * they assert on the requests it makes.
+ */
+const setup = (
+  control?: MemorySpaceBackendTestControl,
+  newId: () => UUID = () => CARD_ID,
+  spaces: readonly (readonly [UUID, string])[] = [
+    [META_ID, 'Meta'],
+    [OTHER_ID, 'Other'],
+  ],
+) => {
   const backend = new MemorySpaceBackend(
     META_ID,
-    [loaded(META_ID, 'Meta'), loaded(OTHER_ID, 'Other')],
+    spaces.map(([id, title]) => loaded(id, title)),
     control,
   );
   return {
@@ -190,7 +220,7 @@ describe('Open Spaces', () => {
       },
     ],
   ])(
-    'keeps recoverable persistence state discoverable when close is refused',
+    'keeps recoverable persistence state discoverable when exit is refused',
     async (result, expected) => {
       const control = new MemorySpaceBackendTestControl();
       control.queueResult(result);
@@ -200,13 +230,13 @@ describe('Open Spaces', () => {
       await vi.waitFor(() => expect(other.session.getState().persistence.kind).not.toBe('pending'));
       await openSpaces.open(META_ID);
 
-      await expect(openSpaces.close(OTHER_ID)).resolves.toEqual(expected);
+      await expect(openSpaces.exit(OTHER_ID)).resolves.toEqual(expected);
       expect(openSpaces.entry(OTHER_ID)).toBe(other);
       expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
     },
   );
 
-  it('waits for an in-flight commit before closing', async () => {
+  it('waits for an in-flight commit before exiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
     const { openSpaces } = setup(control);
@@ -214,23 +244,23 @@ describe('Open Spaces', () => {
     other.session.submit(edit(other.session.getState().working));
     await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('pending'));
 
-    let closed = false;
-    const closing = openSpaces.close(OTHER_ID).then((result) => {
-      closed = result.kind === 'closed';
+    let exited = false;
+    const exiting = openSpaces.exit(OTHER_ID).then((result) => {
+      exited = result.kind === 'exited';
     });
     await Promise.resolve();
-    expect(closed).toBe(false);
+    expect(exited).toBe(false);
 
     release();
-    await closing;
+    await exiting;
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
   });
 
-  it('reopens a safely closed Space with a fresh session and selection', async () => {
+  it('reopens a safely exited Space with a fresh session and selection', async () => {
     const { openSpaces } = setup();
     const first = await openSpaces.open(OTHER_ID);
     first.app.navigation.activateGraph(GRAPH_TWO);
-    await openSpaces.close(OTHER_ID);
+    await openSpaces.exit(OTHER_ID);
 
     const reopened = await openSpaces.open(OTHER_ID);
 
@@ -242,7 +272,7 @@ describe('Open Spaces', () => {
     });
   });
 
-  it('warns before closing rejected work and permits an explicit close', async () => {
+  it('warns before exiting rejected work and permits an explicit exit', async () => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'no' });
     const { openSpaces } = setup(control);
@@ -250,18 +280,18 @@ describe('Open Spaces', () => {
     other.session.submit(edit(other.session.getState().working));
     await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('rejected'));
 
-    await expect(openSpaces.close(OTHER_ID)).resolves.toEqual({
+    await expect(openSpaces.exit(OTHER_ID)).resolves.toEqual({
       kind: 'warning',
       warning: 'persistence-rejected',
     });
     expect(openSpaces.entry(OTHER_ID)).toBe(other);
-    await expect(openSpaces.close(OTHER_ID, { warning: 'persistence-rejected' })).resolves.toEqual({
-      kind: 'closed',
+    await expect(openSpaces.exit(OTHER_ID, { warning: 'persistence-rejected' })).resolves.toEqual({
+      kind: 'exited',
     });
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
   });
 
-  it('commits an edit queued behind a Space Card coordination before closing', async () => {
+  it('commits an edit queued behind a Space Card coordination before exiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const { backend, openSpaces } = setup(control, countingIds());
     await openSpaces.open(META_ID);
@@ -277,26 +307,26 @@ describe('Open Spaces', () => {
     await vi.waitFor(() => expect(control.requests).toHaveLength(1));
 
     // The coordination has paused persistence on every session, so this edit is
-    // parked as queued work and the session never announces `pending`. Closing
+    // parked as queued work and the session never announces `pending`. Exiting
     // on that reading would retire a session with an uncommitted edit in hand.
     const edited = edit(other.session.getState().working);
     other.session.submit(edited);
     expect(other.session.getState().persistence.kind).toBe('settled');
 
-    const closing = openSpaces.close(OTHER_ID);
+    const exiting = openSpaces.exit(OTHER_ID);
     await Promise.resolve();
     await Promise.resolve();
     expect(openSpaces.entry(OTHER_ID)).toBe(other);
 
     release();
     await creating;
-    await expect(closing).resolves.toEqual({ kind: 'closed' });
+    await expect(exiting).resolves.toEqual({ kind: 'exited' });
     await expect(backend.loadSpace(OTHER_ID)).resolves.toMatchObject({
       snapshot: { document: { title: edited.document.title } },
     });
   });
 
-  it('closes through a coordination that starts while the close is waiting', async () => {
+  it('exits through a coordination that starts while the exit is waiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const { openSpaces } = setup(control, countingIds());
     await openSpaces.open(META_ID);
@@ -311,11 +341,11 @@ describe('Open Spaces', () => {
     });
     await vi.waitFor(() => expect(control.requests).toHaveLength(1));
 
-    // Closing waits behind the running coordination, and a second coordination
+    // Exiting waits behind the running coordination, and a second coordination
     // then queues behind the same turn. When the first ends it wakes both: the
     // wait reports a retirable Space, and the second raises the barrier again
-    // before the close gets to retire it. Retiring has to survive that window.
-    const closing = openSpaces.close(OTHER_ID);
+    // before the exit gets to retire it. Retiring has to survive that window.
+    const exiting = openSpaces.exit(OTHER_ID);
     const second = openSpaces.spaceCards.create({
       containingSpaceId: META_ID,
       layoutId: META_LAYOUT_ID,
@@ -324,7 +354,7 @@ describe('Open Spaces', () => {
     });
 
     releaseFirst();
-    await expect(closing).resolves.toEqual({ kind: 'closed' });
+    await expect(exiting).resolves.toEqual({ kind: 'exited' });
     await first;
     await second;
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
@@ -361,7 +391,7 @@ describe('Open Spaces', () => {
     expect(openSpaces.entry(META_ID)).toBeDefined();
   });
 
-  it('never reinstates a Space closed while an activation waited on the one being left', async () => {
+  it('never reinstates a Space exited while an activation waited on the one being left', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
     const { openSpaces } = setup(control);
@@ -370,22 +400,22 @@ describe('Open Spaces', () => {
     meta.session.submit(edit(meta.session.getState().working));
     await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('pending'));
 
-    // The activation parks until Meta settles. Closing Other retires its
+    // The activation parks until Meta settles. Exiting Other retires its
     // session and disposes its composition while it waits, so neither
     // reinstating it nor answering with it leaves the caller a Space anything
-    // can commit for — the close is the newer choice and the activation fails.
+    // can commit for — the exit is the newer choice and the activation fails.
     const switching = openSpaces.switchTo(OTHER_ID);
     await Promise.resolve();
-    await expect(openSpaces.close(OTHER_ID)).resolves.toEqual({ kind: 'closed' });
+    await expect(openSpaces.exit(OTHER_ID)).resolves.toEqual({ kind: 'exited' });
 
     release();
-    await expect(switching).rejects.toThrow('was closed while it was being activated');
+    await expect(switching).rejects.toThrow('was exited while it was being activated');
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
     expect(openSpaces.getState().entries).toEqual([meta]);
     expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
   });
 
-  it('reloads a Space chosen while its close was still waiting', async () => {
+  it('reloads a Space chosen while its exit was still waiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
     const { openSpaces } = setup(control);
@@ -394,16 +424,16 @@ describe('Open Spaces', () => {
     other.session.submit(edit(other.session.getState().working));
     await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('pending'));
 
-    // The close parks until Other settles, and both caches still advertise the
+    // The exit parks until Other settles, and both caches still advertise the
     // entry it is going to retire while it does. The author choosing Other back
-    // is the newer choice, so it waits the close out and takes the Space the
-    // close leaves behind rather than the composition it has just retired.
-    const closing = openSpaces.close(OTHER_ID);
+    // is the newer choice, so it waits the exit out and takes the Space the
+    // exit leaves behind rather than the composition it has just retired.
+    const exiting = openSpaces.exit(OTHER_ID);
     await Promise.resolve();
     const switching = openSpaces.switchTo(OTHER_ID);
 
     release();
-    await expect(closing).resolves.toEqual({ kind: 'closed' });
+    await expect(exiting).resolves.toEqual({ kind: 'exited' });
     const switched = await switching;
 
     expect(switched).not.toBe(other);
@@ -478,16 +508,16 @@ describe('Open Spaces', () => {
     expect(again.opening?.selection).toBe(SECOND_LAYOUT_ID);
   });
 
-  it('detaches a closed Space\u2019s composition from its retired session', async () => {
+  it('detaches a exited Space\u2019s composition from its retired session', async () => {
     const { openSpaces } = setup();
     const other = await openSpaces.open(OTHER_ID);
     const seen: string[] = [];
     other.app.authoring.subscribe(() => seen.push('notified'));
 
-    await expect(openSpaces.close(OTHER_ID)).resolves.toEqual({ kind: 'closed' });
+    await expect(openSpaces.exit(OTHER_ID)).resolves.toEqual({ kind: 'exited' });
 
     // The registry no longer owns this session, so a composition still driving
-    // it would be a writer outside the one owner. Closing retires both.
+    // it would be a writer outside the one owner. Exiting retires both.
     other.session.submit(edit(other.session.getState().working));
     await vi.waitFor(() => expect(other.session.getState().persistence.kind).not.toBe('pending'));
     expect(seen).toEqual([]);
@@ -558,11 +588,87 @@ describe('Open Spaces', () => {
     expect(other.session.getState().persistence.kind).toBe('conflicted');
   });
 
-  it('never closes the permanent Meta Space', async () => {
+  /**
+   * What the switcher's tree is a picture of.
+   *
+   * The open set is drawn as the tree that *crossing* makes, each Space under
+   * the one it was entered from — chosen against seven other schemes and
+   * recorded in `.scratch/command-dock/issues/01-...`. Production had no parent
+   * of any kind before this, so a switcher indenting anything was indenting a
+   * fact nothing recorded.
+   *
+   * It is display-only, and these tests are about the record rather than about
+   * any behaviour hanging off it: Exit closes one Space whether or not something
+   * was entered from it (ADR 0068), which is the next test but one.
+   */
+  const crossing = () =>
+    setup(undefined, () => CARD_ID, [
+      [META_ID, 'Meta'],
+      [OTHER_ID, 'Other'],
+      [THIRD_ID, 'Third'],
+    ]);
+
+  it('records the Space a crossing was made from, and records none for an address', async () => {
+    const { openSpaces } = crossing();
+
+    await openSpaces.open(META_ID);
+    await openSpaces.enter(OTHER_ID);
+
+    // Opened directly, with nothing on the canvas to have crossed from.
+    expect(openSpaces.getState().openedFrom.get(META_ID)).toBe(null);
+    expect(openSpaces.getState().openedFrom.get(OTHER_ID)).toBe(META_ID);
+  });
+
+  it('keeps the opener a Space joined the set with when it is entered again', async () => {
+    const { openSpaces } = crossing();
+    await openSpaces.open(META_ID);
+    await openSpaces.enter(OTHER_ID);
+    await openSpaces.switchTo(META_ID);
+    await openSpaces.enter(THIRD_ID);
+
+    // Crossing back into a Space already open is returning to it, not entering
+    // it. Rewriting the opener here would reshape the tree under a reader who
+    // was only moving around in it.
+    await openSpaces.enter(OTHER_ID);
+
+    expect(openSpaces.getState().openedFrom.get(OTHER_ID)).toBe(META_ID);
+  });
+
+  it('re-homes what was entered from an exited Space onto that Space\u2019s own opener', async () => {
+    const { openSpaces } = crossing();
+    await openSpaces.open(META_ID);
+    await openSpaces.enter(OTHER_ID);
+    await openSpaces.enter(THIRD_ID);
+
+    expect(await openSpaces.exit(OTHER_ID)).toEqual({ kind: 'exited' });
+
+    // Still open, and still reachable in the list that is the only way back to
+    // it. Walking up lazily could not answer this: the exited entry is gone and
+    // its own opener with it, so there is no chain left to follow.
+    const { entries, openedFrom } = openSpaces.getState();
+    expect(entries.map(({ id }) => id)).toContain(THIRD_ID);
+    expect(openedFrom.get(THIRD_ID)).toBe(META_ID);
+    expect(openedFrom.has(OTHER_ID)).toBe(false);
+  });
+
+  it('closes only the Space exited, whatever was entered from it', async () => {
+    const { openSpaces } = crossing();
+    await openSpaces.open(META_ID);
+    await openSpaces.enter(OTHER_ID);
+    await openSpaces.enter(THIRD_ID);
+
+    await openSpaces.exit(OTHER_ID);
+
+    // ADR 0068: closing one Space never closes another. The record is a history
+    // and never a containment, so nothing cascades down it.
+    expect(openSpaces.getState().entries.map(({ id }) => id)).toEqual([META_ID, THIRD_ID]);
+  });
+
+  it('never exits the permanent Meta Space', async () => {
     const { openSpaces } = setup();
     const meta = await openSpaces.open(META_ID);
 
-    await expect(openSpaces.close(META_ID)).resolves.toEqual({
+    await expect(openSpaces.exit(META_ID)).resolves.toEqual({
       kind: 'refused',
       refusal: { code: 'meta-space-permanent' },
     });
