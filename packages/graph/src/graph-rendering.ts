@@ -150,24 +150,46 @@ export function filterHandlesByGraph(
  * Resolve every graph's authored edges onto the ports they attach to.
  *
  * One edge in, one edge out: the graph already *is* its connections, so nothing
- * here derives them from an order. The id is keyed on the edge's position in its
- * graph because that stays unique even if a graph were to carry the same pair
- * twice.
+ * here derives them from an order.
+ *
+ * **The id names the same triple the render layer identifies an Edge by** — the
+ * graph and the two endpoints — and a graph cannot hold the same pair twice
+ * (ADR 0032), so it names exactly one edge. That agreement is the point: the
+ * render layer's Edge subject is `{ graphId, edge }` compared by those three
+ * fields (`sameEdgeSubject`), and while the id was keyed on the edge's
+ * *position* in its graph the two disagreed about what an Edge is. A removed or
+ * replaced edge slid every later id down one, so a surviving edge inherited an
+ * id that had named its neighbour, and the element React Flow had already drawn
+ * for the departed edge answered a query for whichever edge took its slot —
+ * which is how a completed reconnection ended up focused on a stale element
+ * that put the replaced Edge back on the selection.
+ *
+ * The id is opaque to every consumer: nothing parses it, and the handle ids
+ * (`<graphId>::out`/`::in`) are minted separately and unaffected.
+ *
+ * **What holds the uniqueness up is `duplicate-graph-edge`**, not this function.
+ * The position-keyed id was collision-proof by construction; this one leans on
+ * the intake rule, so a graph that carried the same pair twice would mint the
+ * same id twice — a React key collision, and one Edge's selection changes
+ * resolving to the other. `validateReferences` refuses such a document and
+ * `edge-already-exists` refuses the connect and the reconnect that would author
+ * one, so nothing reaches here holding two; that is the invariant to protect if
+ * either rule is ever relaxed.
  */
 export function buildGraphRenderEdges(space: Space): GraphRenderEdge[] {
   const edges: GraphRenderEdge[] = [];
 
   for (const graph of space.graphs) {
-    graph.edges.forEach((edge, index) => {
+    for (const edge of graph.edges) {
       edges.push({
-        id: `${graph.id}::${index}`,
+        id: `${graph.id}::${edge.from}::${edge.to}`,
         graphId: graph.id,
         source: edge.from,
         target: edge.to,
         sourceHandle: outHandleId(graph.id),
         targetHandle: inHandleId(graph.id),
       });
-    });
+    }
   }
 
   return edges;

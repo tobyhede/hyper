@@ -169,8 +169,13 @@ function cardNode(id: string, x: number, title: string): CardFlowNode {
 
 const NODES = [cardNode(CARD_A, 0, 'A'), cardNode(CARD_B, 400, 'B'), cardNode(CARD_C, 800, 'C')];
 
-const flowEdge = (id: string, graphId: string, from: string, to: string): Edge => ({
-  id,
+/**
+ * One projected Edge, with the id minted the way `buildGraphRenderEdges` mints
+ * it: from the Graph and the two endpoints, so a replaced Edge is a new element
+ * rather than the previous one under a reused id.
+ */
+const flowEdge = (graphId: string, from: string, to: string): Edge => ({
+  id: `${graphId}::${from}::${to}`,
   type: 'routed',
   source: from,
   target: to,
@@ -179,10 +184,7 @@ const flowEdge = (id: string, graphId: string, from: string, to: string): Edge =
   data: { graphId },
 });
 
-const EDGES = [
-  flowEdge(`${GRAPH_ID}::0`, GRAPH_ID, CARD_A, CARD_B),
-  flowEdge(`${OTHER_GRAPH_ID}::0`, OTHER_GRAPH_ID, CARD_B, CARD_C),
-];
+const EDGES = [flowEdge(GRAPH_ID, CARD_A, CARD_B), flowEdge(OTHER_GRAPH_ID, CARD_B, CARD_C)];
 
 /**
  * The composition every canvas test runs on.
@@ -419,17 +421,17 @@ describe('decorated Edges', () => {
   it('makes only the Active Graph Edge focusable and names it for a screen reader', () => {
     mountCanvas();
 
-    const active = edgeElement(`${GRAPH_ID}::0`);
+    const active = edgeElement(EDGES[0]!.id);
     expect(active).toHaveAttribute('tabindex', '0');
     expect(active).toHaveAttribute('aria-label', 'Edge from A to B in Main');
 
-    expect(edgeElement(`${OTHER_GRAPH_ID}::0`)).not.toHaveAttribute('tabindex');
+    expect(edgeElement(EDGES[1]!.id)).not.toHaveAttribute('tabindex');
   });
 
   it('installs a focused Edge as the canvas selection', () => {
     const { adapter } = mountCanvas();
 
-    fireEvent.focus(edgeElement(`${GRAPH_ID}::0`));
+    fireEvent.focus(edgeElement(EDGES[0]!.id));
 
     expect(adapter.getState().selection).toEqual({
       kind: 'edge',
@@ -441,7 +443,7 @@ describe('decorated Edges', () => {
   it('does not select an Edge outside the Active Graph when it receives focus', () => {
     const { adapter } = mountCanvas();
 
-    fireEvent.focus(edgeElement(`${OTHER_GRAPH_ID}::0`));
+    fireEvent.focus(edgeElement(EDGES[1]!.id));
 
     expect(adapter.getState().selection).toEqual({ kind: 'none' });
   });
@@ -785,7 +787,7 @@ describe('a pane covering the graph', () => {
   it('withdraws the Edge surface while the pane covers it', () => {
     mountCanvas(null, { covered: true });
 
-    expect(edgeElement(`${GRAPH_ID}::0`)).not.toHaveAttribute('tabindex');
+    expect(edgeElement(EDGES[0]!.id)).not.toHaveAttribute('tabindex');
   });
 
   it('offers the Edge surface again once the pane closes', () => {
@@ -793,7 +795,7 @@ describe('a pane covering the graph', () => {
 
     setCovered(false);
 
-    expect(edgeElement(`${GRAPH_ID}::0`)).toHaveAttribute('tabindex', '0');
+    expect(edgeElement(EDGES[0]!.id)).toHaveAttribute('tabindex', '0');
   });
 
   /**
@@ -1230,7 +1232,7 @@ describe('what a reconnect release decides', () => {
  */
 describe('spending a continuation on the canvas', () => {
   const RECONNECTED = { graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_C } } as const;
-  const reconnectedFlowEdge = flowEdge(`${GRAPH_ID}::0`, GRAPH_ID, CARD_A, CARD_C);
+  const reconnectedFlowEdge = flowEdge(GRAPH_ID, CARD_A, CARD_C);
 
   it('focuses the Edge on the projection that draws it, not the one before', () => {
     // The real canvas, because resolving the continuation is a DOM lookup: the
@@ -1251,12 +1253,48 @@ describe('spending a continuation on the canvas', () => {
       then: 'focus',
     });
 
+    // One publication, and the reconnected Edge is an element React Flow has
+    // never drawn — it draws that a commit later, from a store it syncs in an
+    // effect of its own. `CanvasContinuation` subscribes to those drawn Edges
+    // for exactly this reason, so the spend does not wait on an unrelated
+    // render to come along.
     act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
 
     expect(continuation.getState().pending).toBeNull();
     expect(document.activeElement).toBe(
-      document.querySelector(`.react-flow__edge[data-id="${GRAPH_ID}::0"]`),
+      document.querySelector(`.react-flow__edge[data-id="${reconnectedFlowEdge.id}"]`),
     );
+  });
+
+  /**
+   * **The selection survives the focus the continuation spends on it.**
+   *
+   * Landing focus is not the same claim as keeping the selection, and the two
+   * came apart: `reconnect` installs the reconnected subject and *then* asks for
+   * focus, and focus lands on an Edge element whose `onFocus` bridge writes
+   * whatever subject that element is currently drawing back into the union
+   * (`decorated`, above). While a React Flow Edge id named the Edge's *position*
+   * in its Graph, a replaced Edge inherited the previous one's id — so the
+   * element the previous Edge had already drawn answered the query for the
+   * reconnected one, and its still-stale `onFocus` put the Edge the Space no
+   * longer holds back on the union. Nothing then drew selected. Keyed on the
+   * endpoints, the reconnected Edge is a different element, drawn by the
+   * projection that names it, and the bridge writes the subject already stored.
+   */
+  it('leaves the reconnected Edge selected, not only focused', () => {
+    const { edgeAuthoring, adapter, continuation } = mountCanvas();
+    document.body.focus();
+
+    act(() => {
+      edgeAuthoring.openEdgeEditor(SUBJECT);
+      edgeAuthoring.reconnect('to', CARD_C);
+    });
+    act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
+
+    // Asserted after the continuation has been spent, because focus landing is
+    // the event that could take the selection with it.
+    expect(continuation.getState().pending).toBeNull();
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...RECONNECTED });
   });
 
   /** A Card already on the canvas resolves on the render that receives it. */
@@ -1393,8 +1431,8 @@ describe('the React Flow properties', () => {
         reconnectable: edge.reconnectable,
       })),
     ).toEqual([
-      { id: `${GRAPH_ID}::0`, selected: true, focusable: true, reconnectable: true },
-      { id: `${OTHER_GRAPH_ID}::0`, selected: false, focusable: false, reconnectable: false },
+      { id: EDGES[0]!.id, selected: true, focusable: true, reconnectable: true },
+      { id: EDGES[1]!.id, selected: false, focusable: false, reconnectable: false },
     ]);
   });
 

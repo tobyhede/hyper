@@ -87,7 +87,9 @@ describe('buildLayoutStrategyGraph', () => {
       buildGraphRenderEdges(space),
       () => SIZE,
     );
-    expect(graph.edges.map((e) => e.id)).toEqual(['00000000-0000-4000-8000-000000000004::0']);
+    expect(graph.edges.map((e) => e.id)).toEqual([
+      '00000000-0000-4000-8000-000000000004::00000000-0000-4000-8000-000000000002::00000000-0000-4000-8000-000000000003',
+    ]);
   });
 });
 

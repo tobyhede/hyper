@@ -2279,6 +2279,20 @@ test(
     const reconnected = selected.replace(/ to .* in /, ` to ${chosen} in `);
     expect(reconnected).not.toBe(selected);
     await expect.poll(focusedEdgeLabel).toBe(reconnected);
+
+    // **Selection, asserted apart from focus, because the two are separately
+    // supplied and were separately true.** `reconnect` installs the subject and
+    // *then* requests focus, so a landed focus says nothing about whether the
+    // selection survived the reprojection that carried it — and for a while it
+    // did not: the Edge drew focused with `.react-flow__edge.selected` at 0, so
+    // the author stood on an Edge that offered no controls and had to select it
+    // again to reach Delete or Edit. The controls are what the selection is
+    // *for*, so the visible control is asserted beside the class rather than
+    // instead of it.
+    const selectedEdge = page.locator('.react-flow__edge.selected');
+    await expect(selectedEdge).toHaveCount(1);
+    await expect(selectedEdge).toHaveAttribute('aria-label', reconnected);
+    await expect(page.getByRole('button', { name: 'Edit this Edge' })).toBeVisible();
   },
 );
 

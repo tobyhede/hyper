@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { useReactFlow, type Edge } from '@xyflow/react';
+import { useReactFlow, useStore, type Edge } from '@xyflow/react';
 import type { CardId } from '@project/core';
 import { staysOwed, type Continuation, type ContinuationTarget } from '../continuation';
 import { edgeSelectionOf, sameEdgeSubject, type EdgeSubject } from '../render-adapter';
@@ -40,6 +40,26 @@ export function CanvasContinuation({
 }) {
   const flow = useReactFlow();
   const { pending } = useSyncExternalStore(continuation.subscribe, continuation.getState);
+  /**
+   * Re-render when React Flow draws, not only when the projection publishes.
+   *
+   * "Every render" below means every render of *this* component, and the render
+   * that carries a projection is one commit too early: React Flow syncs the
+   * `edges` prop into its own store from an effect and draws from that, so an
+   * element it has never drawn before is still absent when this component's
+   * effect first looks for it. Nothing else re-renders this component when that
+   * second commit lands, so without this subscription an Edge continuation would
+   * be spent whenever some later, unrelated render happened to come along — and
+   * never, if none did.
+   *
+   * That gap was invisible while a replaced Edge inherited its predecessor's id:
+   * the element was already on screen, so the first look found it. It stopped
+   * being invisible when the id became the Edge's own identity, which is what
+   * makes the reconnected Edge a new element. The stored array reference is
+   * returned as it is — no derivation, no new identity per render — and the
+   * value is deliberately unread: what is wanted is the subscription.
+   */
+  useStore((state) => state.edges);
 
   /**
    * The element a target names, against the projection now on screen.

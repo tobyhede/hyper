@@ -72,7 +72,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/app/src/components/AuthorableEdge.tsx',
     reason:
-      'Debt with an owner. It is rendered on a real canvas by `Review/Selected Edge On Canvas`, which carries no parity claim on purpose — the Edge line, its colour and its reconnection affordance have no stable story yet. Promoting that review story is the remaining Edge work, and it is blocked on the reconnected-Edge selection defect recorded in `findings/reconnected-edge-loses-its-selection.md`.',
+      'Debt with an owner. It is rendered on a real canvas by `Review/Selected Edge On Canvas`, which carries no parity claim on purpose — the Edge line, its colour and its reconnection affordance have no stable story yet. Promoting that review story is the remaining Edge work. The reconnected-Edge selection defect that blocked it is fixed (`findings/reconnected-edge-loses-its-selection.md`), so what is left is the promotion itself: the story owes the Ladle and application evidence ADR 0052 asks of a stable one.',
   },
   {
     module: 'packages/app/src/components/NewCardPreview.tsx',

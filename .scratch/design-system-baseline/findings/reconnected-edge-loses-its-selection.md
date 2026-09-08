@@ -1,5 +1,7 @@
 # A completed reconnection leaves the Edge focused but not selected
 
+Status: resolved
+
 Found while building issue 06's application evidence for "completion and focus
 after reprojection". **Not caused by that change and not fixed by it** — the
 code below is untouched by it — but it makes a stated intent in
@@ -53,3 +55,59 @@ a confirmed trace.
 `editing.spec.ts`'s "the Edge editor moves an endpoint and keeps the Edge in its
 Graph" asserts the focus half, which holds. Nothing asserts the selection half,
 which is why this survived.
+
+## Answer
+
+Fixed by minting a React Flow Edge id from the Edge's domain identity —
+`` `${graph.id}::${edge.from}::${edge.to}` `` in `buildGraphRenderEdges`
+(`packages/graph/src/graph-rendering.ts`) — in place of the Edge's position in
+its Graph. That is the same triple `sameEdgeSubject` compares an Edge selection
+by, and ADR 0032 makes it unique within a Graph.
+
+**The lead above named the right cause and the wrong mechanism**, so it is worth
+recording which. Traced in the browser by logging every `selectEdge` with its
+stack: `changeEdges` is never reached with a selection change on this path at
+all — React Flow emits no stale deselection here — and the writes are
+
+1. `selectEdge(A→D)` from `reconnect`, and then
+2. `selectEdge(A→B)` from `edge-authoring-react.tsx`'s `domAttributes.onFocus`,
+
+which is the bridge that makes React Flow's Edge focus and the union agree. Both
+Edges were drawn as `<graphId>::0`, so the element the *departed* Edge had
+already been drawn as answered `CanvasContinuation`'s query for the reconnected
+one — one commit before React Flow redrew it — and `.focus()` on it fired an
+`onFocus` still closed over `A→B`. The Edge then drew focused, named `A→D`, and
+selected nothing.
+
+Keyed on the endpoints, the reconnected Edge is an element React Flow has never
+drawn. The continuation stays owed (`staysOwed`) until it is, and the `onFocus`
+that then fires writes the subject already stored.
+
+Covered by:
+
+- `packages/graph/test/graph-rendering.test.ts` — the id is minted from the
+  endpoints, and removing an earlier Edge leaves the survivors' ids unchanged.
+- `packages/app/test/edge-authoring-react.test.tsx` — "leaves the reconnected
+  Edge selected, not only focused", which reproduces the whole sequence in the
+  node environment on the real canvas harness.
+- `packages/app/e2e/editing.spec.ts` — "the Edge editor moves an endpoint and
+  keeps the Edge in its Graph" now asserts the selection half beside the focus
+  half: one `.react-flow__edge.selected`, carrying the reconnected Edge's own
+  label, with `Edit this Edge` visible.
+
+One consequence came with it and is now handled. Because the reconnected Edge is
+an element React Flow has never drawn, it is drawn a commit after the projection
+that carries it — React Flow syncs the `edges` prop into its own store from an
+effect and draws from that — so the focus continuation cannot be spent on the
+render that publishes. Nothing re-rendered `CanvasContinuation` on that second
+commit, which left the spend waiting on whatever unrelated render came along
+next, and on nothing at all if none did. It now subscribes to React Flow's own
+drawn Edges, so the render it needs is the one that draws. That gap was
+invisible while a replaced Edge inherited its predecessor's element; it is a
+property of the id change rather than of any one gesture.
+
+The other thing the position-keyed id gave away is a guarantee: it was unique by
+construction, and `<graphId>::<from>::<to>` is unique only because a Graph cannot
+hold the same pair twice. `validateReferences`' `duplicate-graph-edge` and Space
+Authoring's `edge-already-exists` are what hold that up, and
+`buildGraphRenderEdges`' doc comment now names them.
