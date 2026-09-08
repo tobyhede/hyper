@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   Background,
   ReactFlow,
@@ -8,18 +8,54 @@ import {
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
-import type { CardId, GraphId } from '@project/core';
-import { Placement, positionedStrategy } from '@project/graph';
+import type { CardId, GraphId, LayoutId } from '@project/core';
+import {
+  Placement,
+  positionedStrategy,
+  type LayoutStrategyGraph,
+  type Space,
+} from '@project/graph';
 import { nodeTypes, edgeTypes, ZoomSlider, type CardFlowNode } from '@project/react-flow-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '#src/camera';
-import { canvasProjection, type CanvasInteraction } from '#src/canvas-projection';
+import {
+  canvasProjection,
+  type CanvasInteraction,
+  type CanvasNodesAndEdges,
+} from '#src/canvas-projection';
 import { CARD_SIZE, cardSizeVars } from '#src/card';
 import { resolveLayout } from '#src/layout-resolution';
 import { cardIds, graphIds, layoutId, space } from './fixture';
 
-const resolved = resolveLayout(space, layoutId);
-const pending = canvasProjection(space, resolved);
-const laidOut = positionedStrategy(Placement.fromLayout(resolved.layout))(pending.strategyGraph);
+/**
+ * Which authored Layout of which Space a fixture draws.
+ *
+ * A parameter rather than a module constant because the catalogue now draws
+ * more than one Space: the inventory's own fixture answers most stories, and
+ * the Command Dock's prototype needs a Space with two Layouts and three Graphs
+ * over one of them. Both go through the same derivation, so a story cannot draw
+ * a canvas the application would build differently.
+ */
+export interface DrawnLayout {
+  readonly space: Space;
+  readonly layoutId: LayoutId;
+}
+
+/** What a fixture draws unless it names another Layout. */
+const INVENTORY_LAYOUT: DrawnLayout = { space, layoutId };
+
+interface Derivation {
+  readonly pending: ReturnType<typeof canvasProjection>;
+  readonly laidOut: Promise<LayoutStrategyGraph>;
+}
+
+const derive = ({ space: drawn, layoutId: id }: DrawnLayout): Derivation => {
+  const resolved = resolveLayout(drawn, id);
+  const pending = canvasProjection(drawn, resolved);
+  return {
+    pending,
+    laidOut: positionedStrategy(Placement.fromLayout(resolved.layout))(pending.strategyGraph),
+  };
+};
 
 const interaction = (
   activeGraphId: GraphId | null,
@@ -32,7 +68,7 @@ const interaction = (
   moved: false,
 });
 
-type ProjectedCanvas = ReturnType<typeof pending.project>;
+type ProjectedCanvas = CanvasNodesAndEdges;
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
@@ -52,8 +88,19 @@ export interface FixtureCanvasCard {
 function useProjection(
   activeGraphId: GraphId | null,
   selectedCardId: CardId | null = null,
+  drawn: DrawnLayout = INVENTORY_LAYOUT,
 ): ProjectedCanvas | Error | null {
   const [projected, setProjected] = useState<ProjectedCanvas | Error | null>(null);
+  // Keyed on the two things that decide the whole derivation, so a story that
+  // re-renders on every Active Graph change does not lay the Space out again.
+  // Destructured first because the identity of `drawn` itself is not what
+  // decides a re-layout, and a dependency on the object would make an inline
+  // `{ space, layoutId }` at a call site lay the Space out on every render.
+  const { space: drawnSpace, layoutId: drawnLayoutId } = drawn;
+  const { pending, laidOut } = useMemo(
+    () => derive({ space: drawnSpace, layoutId: drawnLayoutId }),
+    [drawnSpace, drawnLayoutId],
+  );
 
   useEffect(() => {
     const mounted = { current: true };
@@ -70,7 +117,7 @@ function useProjection(
     return () => {
       mounted.current = false;
     };
-  }, [activeGraphId, selectedCardId]);
+  }, [pending, laidOut, activeGraphId, selectedCardId]);
 
   return projected;
 }
@@ -233,13 +280,37 @@ export function ZoomSliderSpecimen() {
  * The real React Flow canvas, adapter nodes, Edges, background and zoom control
  * for application-framed Ladle stories. Extra Cards reuse the production
  * CardNode projection; stories supply only identity, title and placement.
+ *
+ * `drawn` and `activeGraphId` default to the inventory's own Space and its Long
+ * Graph, which is what every story here drew when there was only one Space to
+ * draw. A story that names another Layout — the Command Dock's, which switches
+ * between two of them — gets the same derivation over its own Space rather than
+ * a second canvas beside this one, and switching the Active Graph re-projects
+ * without laying the Space out again.
+ *
+ * The camera is {@link StoryCanvasViewport} rather than an optional `zoom`,
+ * because a default and "fit this Layout to the frame" are both spelled
+ * `undefined` in that shape — a full-viewport story asking to fit would silently
+ * get the pinned camera instead.
  */
+/** Where the application-framed canvas sits when a story does not say. */
+const PINNED_LAYOUT_VIEWPORT: StoryCanvasViewport = { fit: false, x: 0, y: 0, zoom: 0.65 };
+
 export function LayoutCanvasFixture({
   cards = [],
+  drawn,
+  activeGraphId = graphIds.long,
+  viewport = PINNED_LAYOUT_VIEWPORT,
 }: {
   readonly cards?: readonly FixtureCanvasCard[];
+  /** Which Layout of which Space; the inventory's own when absent. */
+  readonly drawn?: DrawnLayout;
+  /** The Graph the canvas emphasises, or `null` for none. */
+  readonly activeGraphId?: GraphId | null;
+  /** The camera, through the same union `StoryCanvas` takes. */
+  readonly viewport?: StoryCanvasViewport;
 }) {
-  const projected = useProjection(graphIds.long);
+  const projected = useProjection(activeGraphId, null, drawn);
   if (projected === null) return null;
   if (projected instanceof Error) return <PlacementFailure reason={projected} />;
   const template = projected.nodes[0];
@@ -260,7 +331,7 @@ export function LayoutCanvasFixture({
       nodes={[...projected.nodes, ...additions]}
       edges={projected.edges}
       controls
-      zoom={0.65}
+      zoom={viewport.fit ? undefined : viewport.zoom}
     />
   );
 }
