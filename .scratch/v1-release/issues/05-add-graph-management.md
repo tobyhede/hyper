@@ -2,7 +2,9 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: none
+Blocked by: `architecture-review/19` — Graph create, rename and delete multiply
+the Sidebar rename rows, and the focus return they need is the captured DOM
+closure stored on React state that ticket deletes
 
 **What to build:** Expose the existing Graph lifecycle operations through the
 Sidebar and finish the selected-Edge lifecycle.

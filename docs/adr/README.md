@@ -97,7 +97,7 @@ under `superseded/`.
 | [0052](0052-stable-ladle-stories-are-production-parity-evidence.md) | A stable Ladle story is production-parity evidence and owes two tests. |
 | [0063](0063-markdown-source-editing-uses-codemirror-behind-a-hyper-owned-component.md) | CodeMirror sits behind one component that `@project/ui` owns. |
 | [0067](0067-ui-owns-the-markdown-editor-lazy-boundary.md) | `@project/ui` owns the lazy split point that loads that editor. |
-| [0053](0053-the-workspace-command-surface-is-a-sidebar-and-the-canvas-takes-one-choice.md) | The Space command surface is a Sidebar, and the canvas takes one choice from it. |
+| [0082](0082-the-space-command-surface-is-bound-by-what-it-owes-not-where-it-sits.md) | The Space command surface is bound by what it owes and takes no canvas space. Its shape is not an ADR question. |
 | [0048](0048-escape-and-commit-are-decided-by-the-surface-not-the-field.md) | The surface decides Escape and commit. The field does not. |
 | [0036](0036-a-card-selects-on-click-and-no-click-opens-it.md) | A Card selects on a click. No click opens it. |
 | [0064](0064-opening-a-card-expands-it-in-place.md) | To open a Card is a Layout-owned Edit that grows the Card in place. |
