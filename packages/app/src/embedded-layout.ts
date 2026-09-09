@@ -32,13 +32,16 @@ export interface EmbeddedLayoutRequest {
 const EMBEDDED_GRAB_SLIVER = 24;
 
 /**
- * Hold a gesture proposal inside the region the containing Card draws.
+ * Hold a gesture proposal inside the region the Card is actually drawn in.
  *
- * That region is the Card's box less {@link SPACE_CARD_EMBED_INSET} — its rail,
- * borders and footer — and not the box itself: a proposal accepted in one of
- * those bands is clipped by `clipEmbeddedNode` rather than drawn, and taken to
- * the corner it is clipped away entirely while the move is still committed to
- * the target Space's Layout.
+ * That region is the request's {@link EmbeddedBounds} — what `SpaceCanvas`
+ * intersects from the containing Card's box less {@link SPACE_CARD_EMBED_INSET}
+ * and every ancestor's clip — and not the containing Card's own box: a proposal
+ * accepted outside it is clipped by `clipEmbeddedNode` rather than drawn, and
+ * taken to the corner it is clipped away entirely while the move is still
+ * committed to the target Space's Layout. Taking the bounds rather than the
+ * node is what makes a nested embedding hold to the region an ancestor leaves
+ * it, which its containing Card's box alone does not know about.
  *
  * Deliberately *not* React Flow's `extent`. A numeric extent is applied by
  * `adoptUserNodes`, which runs on every render and not only on a drag, so an
@@ -51,21 +54,13 @@ const EMBEDDED_GRAB_SLIVER = 24;
  */
 export function constrainEmbeddedPosition(
   position: LayoutPosition,
-  parent: { readonly width?: number | undefined; readonly height?: number | undefined },
+  bounds: EmbeddedBounds,
 ): LayoutPosition {
   const hold = (value: number, least: number, most: number): number =>
     Math.min(Math.max(value, least), Math.max(least, most));
   return {
-    x: hold(
-      position.x,
-      SPACE_CARD_EMBED_INSET.left,
-      (parent.width ?? 0) - SPACE_CARD_EMBED_INSET.right - EMBEDDED_GRAB_SLIVER,
-    ),
-    y: hold(
-      position.y,
-      SPACE_CARD_EMBED_INSET.top,
-      (parent.height ?? 0) - SPACE_CARD_EMBED_INSET.bottom - EMBEDDED_GRAB_SLIVER,
-    ),
+    x: hold(position.x, bounds.left, bounds.right - EMBEDDED_GRAB_SLIVER),
+    y: hold(position.y, bounds.top, bounds.bottom - EMBEDDED_GRAB_SLIVER),
   };
 }
 

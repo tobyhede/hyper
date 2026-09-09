@@ -138,9 +138,15 @@ export function EmbeddedLayoutAuthoring({
           const id = localIds.get(change.id);
           if (id === undefined) return [];
           if (change.type === 'position' && change.position !== undefined) {
-            // The containing bounds constrain what a gesture proposes, never
-            // where an authored Card is drawn (`constrainEmbeddedPosition`).
-            const held = constrainEmbeddedPosition(change.position, parent);
+            // The drawn bounds constrain what a gesture proposes, never where
+            // an authored Card is drawn (`constrainEmbeddedPosition`). These are
+            // the bounds an ancestor has already narrowed, not this Card's box.
+            const held = constrainEmbeddedPosition(change.position, {
+              left,
+              top,
+              right,
+              bottom,
+            });
             return [
               {
                 ...change,
