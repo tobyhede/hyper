@@ -279,6 +279,17 @@ export function SpaceCanvas({
   const [embeddedPublications, setEmbeddedPublications] = useState<
     ReadonlyMap<string, EmbeddedPublication>
   >(new Map());
+  /**
+   * What each target could not be read with, kept apart from the others'.
+   *
+   * One string for the whole canvas made every embedding answer for every
+   * other: any target that opened cleared a sentence raised by a different
+   * Space Card, and the one on screen never said which target it was about.
+   * Keyed by the Space the read was aimed at, because that is what
+   * `spaces.embed` is asked for — two Cards reaching the same missing Space
+   * are reporting one failure, and each names itself where it is drawn.
+   */
+  const [embeddedFailures, setEmbeddedFailures] = useState<ReadonlyMap<CardId, string>>(new Map());
   const embeddedRequests = useMemo(() => {
     const requests: {
       parent: CardFlowNode;
@@ -357,6 +368,38 @@ export function SpaceCanvas({
     }
     return requests;
   }, [nodes, spaceSession, entries, embeddedPublications]);
+  /**
+   * A read outlives its embedding only while the *target* is gone.
+   *
+   * That is the Exit case: the request still stands, `request.entry` is
+   * `undefined`, and the last read is what the retained read-only drawing is
+   * made of. A Space Card that is simply **Closed** makes no request at all, so
+   * its read ends with it — a publication left in the map would be picked up as
+   * *live* by the next Open of that same Card at that same Layout, one commit
+   * of nodes whose `changeNodes` and `removeCard` are bound to a composition
+   * whose `observe()` was torn down, and it would seed the nested traversal
+   * above from a Layout nobody is reading any more.
+   *
+   * Adjusted during render, the way `commandRefusal` is below: React discards
+   * this pass, so neither the DOM nor the load effect ever sees the requests the
+   * dead publication produced.
+   */
+  if (embeddedPublications.size > 0) {
+    const standing = new Set(embeddedRequests.map((request) => request.parent.id));
+    if ([...embeddedPublications.keys()].some((id) => !standing.has(id))) {
+      setEmbeddedPublications(
+        new Map([...embeddedPublications].filter(([id]) => standing.has(id))),
+      );
+    }
+  }
+  // A refusal belongs to the embedding that asked for the read, so it goes the
+  // same way: no standing request means nothing left to announce it on.
+  if (embeddedFailures.size > 0) {
+    const asked = new Set(embeddedRequests.map((request) => request.spaceId));
+    if ([...embeddedFailures.keys()].some((spaceId) => !asked.has(spaceId))) {
+      setEmbeddedFailures(new Map([...embeddedFailures].filter(([id]) => asked.has(id))));
+    }
+  }
   const editingEmbeddingIds = new Set(
     embeddedRequests.flatMap((request) => {
       const value = embeddedPublications.get(request.parent.id);
@@ -400,14 +443,20 @@ export function SpaceCanvas({
     return () => onTitleEditingChange?.(false);
   }, [cardAuthoring.titleEditing, embeddedTitleEditing, onTitleEditingChange]);
   const requested = useRef(new Set<string>());
-  const [embeddedFailure, setEmbeddedFailure] = useState<string | null>(null);
   const resumeEmbedded = useCallback(
     async (spaceId: CardId) => {
       try {
         await spaces?.embed(spaceId);
-        setEmbeddedFailure(null);
+        setEmbeddedFailures((previous) =>
+          previous.has(spaceId)
+            ? new Map([...previous].filter(([id]) => id !== spaceId))
+            : previous,
+        );
       } catch (error) {
-        setEmbeddedFailure(error instanceof Error ? error.message : String(error));
+        const message = error instanceof Error ? error.message : String(error);
+        setEmbeddedFailures((previous) =>
+          previous.get(spaceId) === message ? previous : new Map(previous).set(spaceId, message),
+        );
       }
     },
     [spaces],
@@ -422,18 +471,16 @@ export function SpaceCanvas({
     for (const id of requested.current) if (!visible.has(id)) requested.current.delete(id);
     for (const [id, request] of visible) {
       if (spaces === null || requested.current.has(id)) continue;
+      // The claim outlives the answer, refusal included. This effect re-runs
+      // whenever `embeddedRequests` changes identity — which every session
+      // change in every open Space does — so releasing the id on failure asks a
+      // permanently unreadable target again on essentially every edit anywhere.
+      // One read per embedding: closing and reopening the Card, or selecting
+      // another Layout, is what asks again, and so is `resumeEmbedded`.
       requested.current.add(id);
-      void (async () => {
-        try {
-          await spaces.embed(request.spaceId);
-          setEmbeddedFailure(null);
-        } catch (error) {
-          requested.current.delete(id);
-          setEmbeddedFailure(error instanceof Error ? error.message : String(error));
-        }
-      })();
+      void resumeEmbedded(request.spaceId);
     }
-  }, [spaces, embeddedRequests]);
+  }, [spaces, embeddedRequests, resumeEmbedded]);
   const publishEmbedded = useCallback((id: string, value: EmbeddedPublication | null) => {
     setEmbeddedPublications((previous) => {
       if (previous.get(id) === value || (value === null && !previous.has(id))) return previous;
@@ -927,11 +974,23 @@ export function SpaceCanvas({
           />
         ),
       )}
-      {embeddedFailure === null ? null : (
-        <span role="alert" className="canvas-refusal">
-          {embeddedFailure}
-        </span>
-      )}
+      {/*
+        A failed read is announced on the Space Card that asked for it, named by
+        the Title the author gave that Card: the canvas can hold several
+        embeddings, and a sentence naming none of them says nothing about which
+        one is empty. Drawn from the standing requests, so a Card that is Closed
+        takes its announcement with it.
+      */}
+      {embeddedRequests.flatMap(({ parent, spaceId }) => {
+        const message = embeddedFailures.get(spaceId);
+        return message === undefined
+          ? []
+          : [
+              <span key={parent.id} role="alert" className="canvas-refusal">
+                {`${parent.data.title}: ${message}`}
+              </span>,
+            ];
+      })}
       {/*
         The sentence a refused canvas command leaves behind. Placed and styled
         exactly like Edge Authoring's `gesture` refusal, because it is the same

@@ -6,6 +6,7 @@ import {
   type CardDocument,
   type CardId,
   type SpaceSnapshot,
+  type UUID,
 } from '@project/core';
 import {
   MemorySpaceBackend,
@@ -13,7 +14,7 @@ import {
   type SpaceSession,
 } from '@project/persistence';
 import { embeddedNodeId } from '../src/embedded-layout';
-import { createOpenSpaces } from '../src/open-spaces';
+import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { newUuid } from '@project/core';
@@ -53,6 +54,13 @@ const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
 const DRAWN_A = uuidSchema.parse('00000000-0000-4000-8000-000000000025');
 const DRAWN_B = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
 const UNPLACED = uuidSchema.parse('00000000-0000-4000-8000-000000000027');
+
+/** Two Spaces no backend holds, each reached by a Space Card of its own. */
+const GONE_A_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
+const GONE_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
+const GONE_A_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000052');
+const GONE_B_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000053');
+const GONE_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000054');
 
 /**
  * The target: two Layouts over three Cards, and the one the Card selects is
@@ -564,6 +572,127 @@ describe('the Layout an Open Space Card draws', () => {
     );
   });
 
+  /**
+   * Closing a Space Card ends its read, and reopening starts a new one.
+   *
+   * The drawing left behind by an *Exit* is deliberately retained — the target
+   * is gone and a read-only picture of it is better than a hole. A Close is the
+   * other case: the embedding unmounts with its target still open, so the next
+   * Open composes a fresh one, and anything the previous composition published
+   * describes a Layout nobody is reading any more. Held here through the one
+   * consequence that outlives the frame: the retained drawing says a nested
+   * Space Card is Open, so reopening embeds a Space the target has since closed.
+   */
+  it('forgets what a Closed Space Card read, so reopening embeds nothing it held', async () => {
+    const thirdId = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
+    const thirdLayout = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
+    const thirdGraph = uuidSchema.parse('00000000-0000-4000-8000-000000000042');
+    const thirdCard = uuidSchema.parse('00000000-0000-4000-8000-000000000043');
+    const third = spaceSnapshotSchema.parse({
+      id: thirdId,
+      document: {
+        version: 1,
+        title: 'Nested target',
+        defaultLayout: thirdLayout,
+        layouts: [
+          {
+            id: thirdLayout,
+            title: 'Nested Layout',
+            kind: 'positioned',
+            positions: { [thirdCard]: { x: 0, y: 0, open: false } },
+            graphs: [{ id: thirdGraph, title: 'Nested Graph', edges: [] }],
+          },
+        ],
+      },
+      cards: [{ id: thirdCard, document: { title: 'Nested content', kind: 'markdown', body: '' } }],
+    });
+    const nestedTarget = spaceSnapshotSchema.parse({
+      ...target,
+      cards: target.cards.map((card) =>
+        card.id === DRAWN_B
+          ? {
+              ...card,
+              document: {
+                title: 'Deeper',
+                kind: 'space',
+                spaceId: thirdId,
+                layout: thirdLayout,
+                graph: thirdGraph,
+              },
+            }
+          : card,
+      ),
+      document: {
+        ...target.document,
+        layouts: target.document.layouts?.map((layout) =>
+          layout.id !== SELECTED_LAYOUT_ID
+            ? layout
+            : {
+                ...layout,
+                positions: {
+                  ...layout.positions,
+                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
+                },
+              },
+        ),
+      },
+    });
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      layout: SELECTED_LAYOUT_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [meta, value, nestedTarget, third].map((snapshot) => ({
+        snapshot,
+        revision: 0n,
+        exportedRevision: null,
+      })),
+    );
+    const spaces = createOpenSpaces({
+      backend,
+      metaSpaceId: META_ID,
+      newId: newUuid,
+      history: recordingHistory(),
+    });
+    const initial = await spaces.open(HOME_ID);
+    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    await waitFor(() => expect(spaces.entry(thirdId)).not.toBeUndefined());
+
+    // Close the containing Space Card while the nested one is still Open, so
+    // the read it leaves behind describes a Layout that is about to change.
+    act(() => {
+      initial.app.authoring.complete({ kind: 'closed-card', cardId: SPACE_CARD_ID });
+    });
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).toBeNull());
+    const targetEntry = spaces.entry(TARGET_ID);
+    if (targetEntry === undefined) throw new Error('the target is not open');
+    act(() => {
+      targetEntry.app.authoring.completeInLayout(SELECTED_LAYOUT_ID, {
+        kind: 'closed-card',
+        cardId: DRAWN_B,
+      });
+    });
+    await act(async () => {
+      await spaces.exit(thirdId);
+    });
+    expect(spaces.entry(thirdId)).toBeUndefined();
+
+    act(() => {
+      initial.app.authoring.complete({ kind: 'opened-card', cardId: SPACE_CARD_ID });
+    });
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    for (let settle = 0; settle < 4; settle += 1) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+    expect(spaces.entry(thirdId)).toBeUndefined();
+  }, 20000);
+
   it('stops embedding a Space Card whose Layout is already on the containing path', async () => {
     // Home embeds the target, and the target embeds Home back. Neither Card is
     // a self-reference, so single-Space intake accepts both (`validate.ts` only
@@ -742,5 +871,162 @@ describe('the Layout an Open Space Card draws', () => {
     await screen.findByTestId('space-card-layout');
     expect(queryEmbeddedNode(DRAWN_A)).toBeNull();
     expect(queryEmbeddedNode(UNPLACED)).toBeNull();
+  });
+
+  /**
+   * Home over two Spaces the backend does not hold, and one it does.
+   *
+   * The unreadable pair is what separates a failure *per target* from one
+   * sentence for the whole canvas; the third Card starts Closed so its
+   * successful read happens after both refusals, on a press the author makes.
+   */
+  const unreadable = (): SpaceSnapshot =>
+    spaceSnapshotSchema.parse({
+      id: HOME_ID,
+      document: {
+        version: 1,
+        title: 'Home',
+        layouts: [
+          {
+            id: HOME_LAYOUT_ID,
+            title: 'Layout 1',
+            kind: 'positioned',
+            positions: {
+              [HOME_CARD_ID]: { x: 10, y: 20, open: false },
+              [GONE_A_CARD_ID]: {
+                x: 600,
+                y: 20,
+                open: true,
+                openSize: { width: 700, height: 500 },
+              },
+              [GONE_B_CARD_ID]: {
+                x: 1400,
+                y: 20,
+                open: true,
+                openSize: { width: 700, height: 500 },
+              },
+              [SPACE_CARD_ID]: { x: 2200, y: 20, open: false },
+            },
+            graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
+          },
+        ],
+        defaultLayout: HOME_LAYOUT_ID,
+      },
+      cards: [
+        { id: HOME_CARD_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
+        {
+          id: GONE_A_CARD_ID,
+          document: {
+            title: 'First gone',
+            kind: 'space',
+            spaceId: GONE_A_ID,
+            layout: GONE_LAYOUT_ID,
+          },
+        },
+        {
+          id: GONE_B_CARD_ID,
+          document: {
+            title: 'Second gone',
+            kind: 'space',
+            spaceId: GONE_B_ID,
+            layout: GONE_LAYOUT_ID,
+          },
+        },
+        {
+          id: SPACE_CARD_ID,
+          document: {
+            title: 'Elsewhere',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            layout: SELECTED_LAYOUT_ID,
+            graph: SELECTED_GRAPH_ID,
+          },
+        },
+      ],
+    });
+
+  /**
+   * A failed read belongs to the embedding that asked for it.
+   *
+   * One string for the whole canvas made both true at once: only one of two
+   * unreadable targets was ever announced, the sentence named neither Card, and
+   * a third Card opening successfully erased whichever one was on screen.
+   */
+  it('names each target it could not read and keeps one failure clear of another', async () => {
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [meta, unreadable(), target].map((snapshot) => ({
+        snapshot,
+        revision: 0n,
+        exportedRevision: null,
+      })),
+    );
+    const spaces = createOpenSpaces({
+      backend,
+      metaSpaceId: META_ID,
+      newId: newUuid,
+      history: recordingHistory(),
+    });
+    const initial = await spaces.open(HOME_ID);
+    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    expect((await screen.findByText(new RegExp(GONE_A_ID))).textContent).toContain('First gone');
+    expect((await screen.findByText(new RegExp(GONE_B_ID))).textContent).toContain('Second gone');
+
+    act(() => {
+      initial.app.authoring.complete({ kind: 'opened-card', cardId: SPACE_CARD_ID });
+    });
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    expect(screen.queryByText(new RegExp(GONE_A_ID))).not.toBeNull();
+    expect(screen.queryByText(new RegExp(GONE_B_ID))).not.toBeNull();
+  });
+
+  /**
+   * A target that cannot be read is asked once.
+   *
+   * The load effect re-runs whenever `embeddedRequests` changes identity, and
+   * Open Spaces republishes its entries on every session change in every open
+   * Space — so a claim released on failure had an unreadable target read again
+   * on essentially every edit anywhere in the session, with no backoff.
+   */
+  it('asks a target it could not read once, whatever else changes in the session', async () => {
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [meta, unreadable(), target].map((snapshot) => ({
+        snapshot,
+        revision: 0n,
+        exportedRevision: null,
+      })),
+    );
+    const spaces = createOpenSpaces({
+      backend,
+      metaSpaceId: META_ID,
+      newId: newUuid,
+      history: recordingHistory(),
+    });
+    const attempts: UUID[] = [];
+    const counted: OpenSpaces = {
+      ...spaces,
+      embed: (spaceId) => {
+        attempts.push(spaceId);
+        return spaces.embed(spaceId);
+      },
+    };
+    const initial = await spaces.open(HOME_ID);
+    render(<OpenSpacesApplication spaces={counted} initial={initial} />);
+    await waitFor(() => expect(attempts).toEqual([GONE_A_ID, GONE_B_ID]));
+
+    for (let edit = 0; edit < 5; edit += 1) {
+      act(() => {
+        initial.app.authoring.complete({
+          kind: 'edited-card',
+          cardId: HOME_CARD_ID,
+          document: { title: `Start here ${edit}`, kind: 'markdown', body: '' },
+        });
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+    expect(attempts).toEqual([GONE_A_ID, GONE_B_ID]);
   });
 });

@@ -24,7 +24,21 @@ export interface EmbeddedLayoutRequest {
 }
 
 /**
- * Hold a gesture proposal inside the containing Card.
+ * How much of a proposed Card stays inside the drawn region, so a gesture can
+ * always take it back out. The proposal is held by its top-left corner and the
+ * Card's own extent is not known here, so the sliver is what the corner keeps
+ * clear of the right and bottom edges.
+ */
+const EMBEDDED_GRAB_SLIVER = 24;
+
+/**
+ * Hold a gesture proposal inside the region the containing Card draws.
+ *
+ * That region is the Card's box less {@link SPACE_CARD_EMBED_INSET} — its rail,
+ * borders and footer — and not the box itself: a proposal accepted in one of
+ * those bands is clipped by `clipEmbeddedNode` rather than drawn, and taken to
+ * the corner it is clipped away entirely while the move is still committed to
+ * the target Space's Layout.
  *
  * Deliberately *not* React Flow's `extent`. A numeric extent is applied by
  * `adoptUserNodes`, which runs on every render and not only on a drag, so an
@@ -39,9 +53,19 @@ export function constrainEmbeddedPosition(
   position: LayoutPosition,
   parent: { readonly width?: number | undefined; readonly height?: number | undefined },
 ): LayoutPosition {
+  const hold = (value: number, least: number, most: number): number =>
+    Math.min(Math.max(value, least), Math.max(least, most));
   return {
-    x: Math.min(Math.max(position.x, 0), parent.width ?? 0),
-    y: Math.min(Math.max(position.y, 0), parent.height ?? 0),
+    x: hold(
+      position.x,
+      SPACE_CARD_EMBED_INSET.left,
+      (parent.width ?? 0) - SPACE_CARD_EMBED_INSET.right - EMBEDDED_GRAB_SLIVER,
+    ),
+    y: hold(
+      position.y,
+      SPACE_CARD_EMBED_INSET.top,
+      (parent.height ?? 0) - SPACE_CARD_EMBED_INSET.bottom - EMBEDDED_GRAB_SLIVER,
+    ),
   };
 }
 

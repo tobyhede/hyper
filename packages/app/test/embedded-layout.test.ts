@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { spaceSnapshotSchema, uuidSchema } from '@project/core';
+import { SPACE_CARD_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection } from '../src/canvas-projection';
-import { constrainEmbeddedPosition, embeddedLayout, embeddedNodeId } from '../src/embedded-layout';
+import {
+  clipEmbeddedNode,
+  constrainEmbeddedPosition,
+  embeddedLayout,
+  embeddedNodeId,
+} from '../src/embedded-layout';
 import { resolveLayout } from '../src/layout-resolution';
 
 const id = (value: number) =>
@@ -88,6 +93,20 @@ async function draw(open = false, width = 1000, height = 1000) {
   };
 }
 
+const embedded = (nodes: readonly CardFlowNode[], cardId: string): CardFlowNode => {
+  const node = nodes.find((candidate) => candidate.data.cardId === cardId);
+  if (node === undefined) throw new Error('No embedded Card');
+  return node;
+};
+
+/** The region `embeddedLayout` clips into when no narrower bounds are given. */
+const view = (parent: CardFlowNode) => ({
+  top: SPACE_CARD_EMBED_INSET.top,
+  left: SPACE_CARD_EMBED_INSET.left,
+  right: (parent.width ?? 0) - SPACE_CARD_EMBED_INSET.right,
+  bottom: (parent.height ?? 0) - SPACE_CARD_EMBED_INSET.bottom,
+});
+
 describe('an embedded production projection', () => {
   it('parents Cards and translates their authored positions without moving the source', async () => {
     const { drawn, projected } = await draw();
@@ -119,11 +138,37 @@ describe('an embedded production projection', () => {
     expect(beyond?.style?.clipPath).toBe('inset(0px 292px 0px 0px)');
   });
 
-  it('constrains a gesture proposal to the containing bounds', () => {
-    const bounds = { width: 700, height: 500 };
-    expect(constrainEmbeddedPosition({ x: 600, y: 40 }, bounds)).toEqual({ x: 600, y: 40 });
-    expect(constrainEmbeddedPosition({ x: 900, y: 640 }, bounds)).toEqual({ x: 700, y: 500 });
-    expect(constrainEmbeddedPosition({ x: -30, y: -8 }, bounds)).toEqual({ x: 0, y: 0 });
+  it('constrains a gesture proposal to the drawn region, not the containing box', () => {
+    // These expectations used to clamp into `[0, width] x [0, height]`, which is
+    // the containing Card's own box rather than what it draws: the bands
+    // `SPACE_CARD_EMBED_INSET` reserves are its rail, border and footer, and a
+    // proposal accepted inside them is clipped rather than drawn (below).
+    const containing = { width: 700, height: 500 };
+    expect(constrainEmbeddedPosition({ x: 600, y: 120 }, containing)).toEqual({ x: 600, y: 120 });
+    expect(constrainEmbeddedPosition({ x: 900, y: 640 }, containing)).toEqual({ x: 660, y: 296 });
+    expect(constrainEmbeddedPosition({ x: -30, y: -8 }, containing)).toEqual({ x: 16, y: 42 });
+  });
+
+  it('leaves a proposal taken to the bottom-right corner drawn rather than clipped away', async () => {
+    const { drawn, parent } = await draw(false, 700, 500);
+    const node = embedded(drawn.nodes, B);
+    const held = constrainEmbeddedPosition({ x: 900, y: 640 }, parent);
+    // 260x146 of Card, of which the sliver keeps 24 on each axis inside the
+    // view: right 660 + 260 - 684, bottom 296 + 146 - 320. Clamped to the
+    // containing box instead, both clips exceeded the Card's own extent and the
+    // committed Card vanished from the embedded view altogether.
+    expect(clipEmbeddedNode({ ...node, position: held }, view(parent)).style?.clipPath).toBe(
+      'inset(0px 236px 122px 0px)',
+    );
+  });
+
+  it('leaves a proposal taken to the rail and border bands drawn rather than clipped away', async () => {
+    const { drawn, parent } = await draw(false, 700, 500);
+    const node = embedded(drawn.nodes, B);
+    const held = constrainEmbeddedPosition({ x: -30, y: -8 }, parent);
+    expect(clipEmbeddedNode({ ...node, position: held }, view(parent)).style?.clipPath).toBe(
+      'inset(0px 0px 0px 0px)',
+    );
   });
 
   it('clips a partial Card instead of removing it when the containing Card gets smaller', async () => {

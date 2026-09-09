@@ -129,6 +129,19 @@ export interface ComposedApp extends AppCore {
    */
   readonly continuation: Continuation;
   readonly edgeAuthoring: EdgeAuthoring;
+  /**
+   * The sink this composition reports through, answered as well as taken.
+   *
+   * A collaborator composed *over* a finished app rather than inside it — the
+   * embedded canvas's own authoring (`embedded-authoring.ts`) is the one —
+   * needs the same sink and holds nothing else that could name it. Answering
+   * it is what lets that module take its reporter required, with no default of
+   * its own: ADR 0016 puts the ambient `console.error` at the composition, and
+   * a module mounted from a canvas gesture minting a second one is exactly the
+   * invisible source the one owner exists to prevent. Resolved here when a
+   * caller supplies none, so what is answered is always a function.
+   */
+  readonly reportObserverError: ObserverErrorReporter;
 }
 
 /**
@@ -200,5 +213,13 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     continuation,
     reportObserverError,
   });
-  return { ...core, authoring, adapter, continuation, edgeAuthoring };
+  return {
+    ...core,
+    authoring,
+    adapter,
+    continuation,
+    edgeAuthoring,
+    reportObserverError:
+      reportObserverError ?? ((error) => console.error('Space composition observer failed', error)),
+  };
 }

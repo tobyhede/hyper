@@ -43,7 +43,11 @@ export function EmbeddedLayoutAuthoring({
   readonly bounds: EmbeddedBounds;
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
 }) {
-  const [composition] = useState(() => createEmbeddedAuthoring(entry, layoutId));
+  // The target's own composition names where this reports (ADR 0016); nothing
+  // here holds a second sink, and a default in the module would be one.
+  const [composition] = useState(() =>
+    createEmbeddedAuthoring(entry, layoutId, entry.app.reportObserverError),
+  );
   useEffect(() => composition.observe(), [composition]);
   const state = composition.adapter();
   const space = entry.app.currentSpace();

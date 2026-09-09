@@ -12,7 +12,7 @@ import { type CardId, type LayoutId, type LayoutPosition, type UUID } from '@pro
 import type { ProductDestination } from '@project/http';
 import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
-import type { OpenSpace } from './open-spaces';
+import type { OpenSpace, OpenSpacesState } from './open-spaces';
 import type { AuthoringRefusal } from './space-authoring';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
@@ -56,6 +56,24 @@ import {
   type SpaceChromeTitleEdit,
 } from './components/SpaceSidebar';
 
+/**
+ * What an isolated single-Space mount reads in place of the session's open set.
+ *
+ * `SpaceApp` mounts one Space with no `OpenSpacesContext` above it, and
+ * `useSyncExternalStore` can be called neither conditionally nor with a
+ * snapshot that is a fresh object each render — so the absent store is one
+ * frozen empty state and one subscription that never publishes. Nothing is
+ * derived from it: `active` answers `true` off the null context itself, an
+ * isolated mount always being the Space on the canvas.
+ */
+const NO_OPEN_SPACES: OpenSpacesState = {
+  activeSpaceId: null,
+  entries: [],
+  openedFrom: new Map(),
+};
+const noOpenSpaces = (): OpenSpacesState => NO_OPEN_SPACES;
+const noOpenSpacesChanges = (): (() => void) => () => undefined;
+
 export const createApp = (
   { app: composition, session: spaceSession, spaceCards, initialization }: OpenSpace,
   browserLocation: BrowserLocation,
@@ -83,11 +101,28 @@ export const createApp = (
   }
 
   function App() {
-    const spaces = useOpenSpaces();
-    const active =
-      spaces === null || spaces.getState().activeSpaceId === spaceSession.getState().working.id;
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
     const sessionState = authoringState.session;
+    /**
+     * The session's open set, read through a subscription like every other
+     * observable collaborator here.
+     *
+     * Both things taken off it decide what a *hidden* Space does — `active`
+     * withholds the `window`-level Presenting keys and the shell's
+     * `Ctrl/Cmd-B`, and the entry count yields the width of the strip Open
+     * Spaces draws beside the Sidebar. Reading `getState()` during render
+     * answered both correctly only while every mounted `App` happened to
+     * re-render on each publish, which is `OpenSpacesApplication` rebuilding
+     * every entry's element rather than anything this component asks for:
+     * memoize either and a hidden Space stays `active` and takes back the
+     * global keys this prop exists to withhold.
+     */
+    const spaces = useOpenSpaces();
+    const openSpacesState = useSyncExternalStore(
+      spaces?.subscribe ?? noOpenSpacesChanges,
+      spaces?.getState ?? noOpenSpaces,
+    );
+    const active = spaces === null || openSpacesState.activeSpaceId === sessionState.working.id;
     const navigationState = authoringState.navigation;
     const selectedLayoutId = navigationState.selectedLayoutId;
     /**
@@ -985,9 +1020,7 @@ export const createApp = (
 
     return (
       <AppShell
-        sidebarWidth={
-          (spaces?.getState().entries.length ?? 0) > 1 ? 'calc(16rem - 36px)' : undefined
-        }
+        sidebarWidth={openSpacesState.entries.length > 1 ? 'calc(16rem - 36px)' : undefined}
         // Every open Space keeps its shell mounted, and the sidebar's
         // `Ctrl/Cmd-B` is a `window` listener: the same reason the Presenting
         // keys above are bound only while this Space is the one on the canvas.
