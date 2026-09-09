@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01; `layout-only-v1/04`
+Blocked by: `layout-only-v1/04`
 
 **What to build:** Make the public CLI import and export exactly one complete
 Meta-rooted aggregate.

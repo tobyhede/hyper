@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01, 03, 05, 06, 08, 16, 17, 19; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`
+Blocked by: 03, 05, 06, 08, 16, 17, 19; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`
 
 **What to build:** Close every V1 Definition of Done line with executable evidence
 or an explicit deferred-scope link and apply ticket 14's complete, commit-specific

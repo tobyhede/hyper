@@ -4,10 +4,10 @@
 the complete working surface, move safely among open Spaces, close an ordinary
 context, or open the target independently at its canonical URL.
 
-**Blocked by:** `v1-release/01` — Establish the Meta Space lifecycle;
-`space-cards/10` — Extend the fixture to linked Spaces; `space-cards/11` — Enter
-a Space Card, and Open Spaces carries the session, which owns the Enter surface
-(`space-cards/01`'s Deferred section hands it there).
+**Blocked by:** `space-cards/10` — Extend the fixture to linked Spaces;
+`space-cards/11` — Enter a Space Card, and Open Spaces carries the session,
+which owns the Enter surface (`space-cards/01`'s Deferred section hands it
+there). `v1-release/01` was here and is now `resolved`.
 
 **Status:** ready-for-agent
 Tags: release/v1
