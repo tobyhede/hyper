@@ -911,3 +911,77 @@ describe('the vocabulary the loose-name guard reads', () => {
     ).not.toEqual([]);
   });
 });
+
+/**
+ * The retired name for the surface over the open set.
+ *
+ * Built from fragments for the reason every other retired word here is: this
+ * file is scanned like any other tracked file, and a literal would make the one
+ * document that talks about the word the one place it could hide.
+ *
+ * `CONTEXT.md` names Open Spaces as both the set and the surface that draws it.
+ * The retired word named the set after `switchTo`, the operation that spends
+ * it, which is an implementation name promoted to a product one. It was never
+ * in `CONTEXT.md` or any ADR — it entered in a commit comment and was copied
+ * across a prototype until it read as settled vocabulary. ADR 0082 leaves what
+ * the surface is *called* to stories and tests, which is why this is a scan
+ * rather than a decision record: nothing above it was ever going to catch it.
+ */
+const RETIRED_SURFACE = ['s', 'witcher'].join('');
+const RETIRED_SURFACE_NAME = new RegExp(RETIRED_SURFACE, 'i');
+
+/**
+ * Where the word is not the retired one.
+ *
+ * `CONTEXT.md` has to name what it retires, which is the carve-out every block
+ * above already makes for the document that does the retiring.
+ *
+ * The space-card prototype's variant control — the retired word carrying a
+ * `Variant` prefix — moves that prototype between its own story variants. It
+ * switches variants rather than Spaces, so ADR 0082 and
+ * `CONTEXT.md` have nothing to say about it, and the scan cannot tell the two
+ * apart because they are spelled identically — the same shape of exemption
+ * `FOREIGN_BARE_FILES` makes for Lucide's glyph, and a **file** exemption for
+ * the same reason: there is no shape to read. It is scoped to the two files
+ * that draw that control, so the name cannot spread behind it.
+ *
+ * Each is held below to still be earning itself, so deleting the prototype
+ * deletes its exemption rather than leaving a hole.
+ */
+const RETIRED_SURFACE_FILES: readonly string[] = [
+  'CONTEXT.md',
+  'packages/app/stories/review/space-card-canvas-prototype.stories.tsx',
+  'packages/app/stories/review/space-card-canvas-prototype.css',
+];
+
+describe('the retired name for the surface over the open set is gone', () => {
+  it('finds it nowhere Open Spaces is what is meant', () => {
+    const offenders = scannableFiles()
+      .filter((file) => !RETIRED_SURFACE_FILES.includes(file))
+      .flatMap((file) => {
+        const source = readTracked(file);
+        return source === null
+          ? []
+          : hits(source, RETIRED_SURFACE_NAME).map((hit) => `${file}:${hit}`);
+      });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('holds each exemption to still earning itself', () => {
+    expectEachExemptionEarned(RETIRED_SURFACE_FILES, RETIRED_SURFACE_NAME);
+  });
+
+  it('reads the shapes the word was actually written in', () => {
+    // The prose noun, the camelCase local, the PascalCase component and the
+    // kebab-case union member and CSS block — every spelling the rename found.
+    for (const spelling of [
+      `the ${RETIRED_SURFACE} holds the rest`,
+      `const ${RETIRED_SURFACE} = controls === 'parent-and-${RETIRED_SURFACE}';`,
+      `function Spaces${RETIRED_SURFACE.replace('s', 'S')}({`,
+      `.dock__${RETIRED_SURFACE} {`,
+    ]) {
+      expect(RETIRED_SURFACE_NAME.test(spelling), spelling).toBe(true);
+    }
+  });
+});
