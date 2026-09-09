@@ -2,7 +2,11 @@ import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@tes
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
-import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
+import {
+  MemorySpaceBackend,
+  type ObserverErrorReporter,
+  type SpaceSession,
+} from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
@@ -156,6 +160,7 @@ interface Mounted {
 function mount(
   otherSnapshot: SpaceSnapshot = other,
   broken: Partial<SpaceCardAuthoring> = {},
+  reportObserverError?: ObserverErrorReporter,
 ): Mounted {
   const backend = new MemorySpaceBackend(META_ID, [
     { snapshot: meta, revision: 0n, exportedRevision: null },
@@ -165,7 +170,7 @@ function mount(
   const stored = { snapshot: home, revision: 0n, exportedRevision: null };
   const { spaceSession: session, spaceCards: authoring } = openTestSpace(backend, stored);
   const spaceCards: SpaceCardAuthoring = { ...authoring, ...broken };
-  const app = composeApp({ spaceSession: session });
+  const app = composeApp({ spaceSession: session, reportObserverError });
   let view: RenderResult | undefined;
   mountSpace(
     {
@@ -483,7 +488,7 @@ describe('a coordination that broke rather than refused', () => {
    */
   it('says what broke when a create rejects', async () => {
     // The rejection is reported too, since nothing else would say what broke.
-    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { session } = mount(other, {
       create: () => Promise.reject(new Error('the coordination lost a session')),
     });
@@ -495,8 +500,88 @@ describe('a coordination that broke rather than refused', () => {
       await screen.findByText('This Card was not created: the coordination lost a session'),
     ).toBeVisible();
     expect(screen.getByTestId('new-space-card')).toBeVisible();
+    expect(consoleError).toHaveBeenCalled();
+    await settled(session);
+  });
+
+  /**
+   * Reported through the sink the composition was given, not a second one.
+   *
+   * `card-creation.ts` requires `reportBreak` with no default for the reason
+   * ADR 0016 gives, and a surface that answers that requirement with its own
+   * `console.error` puts back exactly the invisible reporter the requirement
+   * exists to prevent: a host that installed a sink of its own would never
+   * see this failure.
+   */
+  it('reports a rejected create through the sink the composition was given', async () => {
+    const reported = vi.fn();
+    const { session } = mount(
+      other,
+      { create: () => Promise.reject(new Error('the coordination lost a session')) },
+      reported,
+    );
+    await openSpaceCardCreation();
+
+    createNamed('Architecture');
+
+    expect(
+      await screen.findByText('This Card was not created: the coordination lost a session'),
+    ).toBeVisible();
     expect(reported).toHaveBeenCalled();
-    reported.mockRestore();
+    await settled(session);
+  });
+
+  /**
+   * A lifecycle that changed nothing did not create a Card.
+   *
+   * `SpaceCardLifecycleResult` has three arms and only `refused` says a field
+   * is wrong, so an `unchanged` answered as a creation would close the pane and
+   * return the author to Add Card believing a Space Card exists that was never
+   * made. Named the way `createAlias` names its own arms, so the compiler asks
+   * again the day a fourth joins the union.
+   */
+  it('leaves the pane open when the lifecycle answers unchanged', async () => {
+    const create = vi.fn<SpaceCardAuthoring['create']>(() =>
+      Promise.resolve({ kind: 'unchanged' }),
+    );
+    const { session } = mount(other, { create });
+
+    await openSpaceCardCreation();
+    chooseTarget('A new Space');
+    createNamed('Architecture');
+
+    await waitFor(() => expect(screen.getByTestId('new-space-card-create')).toBeEnabled());
+    // The attempt is what makes the three assertions below evidence: an open
+    // pane, live exits and no Space Card are also exactly what a Create that
+    // never reached the lifecycle would leave behind.
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog', { name: 'New Space Card' })).toBeVisible();
+    expect(spaceCardsOf(session)).toHaveLength(0);
+    await settled(session);
+  });
+
+  /**
+   * A read that rejected is reported too, and it is the one failure on this
+   * pane that was not: the seam answers an unreadable list rather than
+   * rejecting, so the shell's own reporting arm never runs and the transport
+   * error was shown to the author and then discarded.
+   */
+  it('reports a stored-Spaces read that rejected, as well as saying so', async () => {
+    const reported = vi.fn();
+    const { session } = mount(
+      other,
+      { referenceableSpaces: () => Promise.reject(new Error('the transport timed out')) },
+      reported,
+    );
+
+    await openSpaceCardCreation();
+
+    expect(
+      await screen.findByText(
+        'The stored Spaces could not be read, so this edit was not attempted.',
+      ),
+    ).toBeVisible();
+    expect(reported).toHaveBeenCalled();
     await settled(session);
   });
 
@@ -650,6 +735,9 @@ describe('creating before the target list has been seen', () => {
   });
 
   it('withholds Create when the stored Spaces could not be read', async () => {
+    // The read is reported as well as shown — proved by its own test above —
+    // and this test is about the pane, so the sink is only silenced here.
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { session } = mount(other, {
       referenceableSpaces: () => Promise.reject(new Error('the transport timed out')),
     });

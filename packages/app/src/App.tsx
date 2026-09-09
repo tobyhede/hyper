@@ -10,6 +10,7 @@ import {
 } from '@project/ui';
 import { type CardId, type LayoutId, type LayoutPosition, type UUID } from '@project/core';
 import type { ProductDestination } from '@project/http';
+import { createNonThrowingReporter } from '@project/persistence';
 import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpacesState } from './open-spaces';
@@ -26,7 +27,12 @@ import {
 } from './authoring-refusal';
 import { useCardCreation } from './card-creation-react';
 import { cardCreationMessage } from './card-creation';
-import type { CardCreationInput, CardCreationOutcome, CardCreationSeams } from './card-creation';
+import type {
+  CardCreationInput,
+  CardCreationOutcome,
+  CardCreationRead,
+  CardCreationSeams,
+} from './card-creation';
 import { useSpaceCardTargets } from './space-card-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
@@ -88,7 +94,46 @@ export const createApp = (
     adapter: useRenderAdapter,
     continuation,
     edgeAuthoring,
+    reportObserverError,
   } = composition;
+  /**
+   * The composed sink, guarded at this point of use.
+   *
+   * `readReferenceableSpaces` below reports and *then* answers, so a sink that
+   * threw would leave the pane on a list that says it is still being read. The
+   * repository wraps where it consumes rather than where it publishes —
+   * `createObservableState` does the same with the sink it is handed — so the
+   * guard is here rather than on `ComposedApp`.
+   */
+  const reportBreak = createNonThrowingReporter(reportObserverError);
+  /**
+   * The Spaces a Space Card may reference, or the fact that they could not be
+   * read.
+   *
+   * Answers rather than rejects, which is what lets the pane word the failure
+   * the way the coordination words it. That also means the shell's own
+   * reporting arm never runs for this path, so the rejection is reported here
+   * — without it, a transport failure is the one failure on this pane that
+   * is shown to the author and then discarded.
+   */
+  const readReferenceableSpaces = async (): Promise<CardCreationRead> => {
+    // Outside the `try`, because this reads the working snapshot rather than
+    // the repository: `currentSpace` throws for a snapshot that fails intake,
+    // and catching that here would word it as a stored-Spaces read that was
+    // never attempted. Left to reject, it takes the same arm the Alias pane's
+    // own `currentSpace` read takes, so one failure is said one way.
+    const containingSpaceId = currentSpace().id;
+    try {
+      const spaces = await spaceCards.referenceableSpaces(containingSpaceId);
+      return { choices: { kind: 'space', targets: { kind: 'read', spaces } }, listing: null };
+    } catch (failure) {
+      reportBreak(failure);
+      return {
+        choices: { kind: 'space', targets: { kind: 'unreadable' } },
+        listing: presentNewSpaceCardRefusal({ code: 'persistence-read-failed' }),
+      };
+    }
+  };
   const openingGraphId = opening?.graphId ?? null;
   const openingPresentationCardId = opening?.presentationCardId ?? null;
   if (openingGraphId !== null && openingPresentationCardId !== null) {
@@ -303,6 +348,11 @@ export const createApp = (
           : spaceCards.link({ ...input, targetSpaceId }));
         if (result.kind === 'refused')
           return { kind: 'refused', errors: presentNewSpaceCardRefusal(result.refusal) };
+        // Named rather than narrowed to "not refused", the way `createAlias`
+        // names its own arms: a lifecycle that changed nothing made no Card, so
+        // closing the pane on it would return the author to Add Card believing
+        // one exists. Not reachable from `create` or `link` today.
+        if (result.kind === 'unchanged') return { kind: 'none' };
         const created = spaceSession.getState().working.cards.find(({ id }) => !before.has(id));
         if (created !== undefined) useRenderAdapter.getState().selectCard(created.id);
         // `null` rather than the Card just selected: there is nothing to
@@ -344,18 +394,9 @@ export const createApp = (
                 },
                 listing: null,
               }
-            : spaceCards.referenceableSpaces(currentSpace().id).then(
-                (spaces) => ({
-                  choices: { kind: 'space', targets: { kind: 'read', spaces } },
-                  listing: null,
-                }),
-                () => ({
-                  choices: { kind: 'space', targets: { kind: 'unreadable' } },
-                  listing: presentNewSpaceCardRefusal({ code: 'persistence-read-failed' }),
-                }),
-              ),
+            : readReferenceableSpaces(),
         submit: (input) => (input.kind === 'alias' ? createAlias(input) : createSpaceCard(input)),
-        reportBreak: (failure) => console.error('The Card creation failed', failure),
+        reportBreak,
         continuation,
       }),
       [createAlias, createSpaceCard],

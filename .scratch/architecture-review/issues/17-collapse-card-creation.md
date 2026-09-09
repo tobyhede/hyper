@@ -16,22 +16,26 @@ module". Validated against that branch at `675a0e53`.
 Both sections below stand as written except for these, which the build departed
 from deliberately. Read them first.
 
-**A reducer, not an observable-state module composed in `compose-app.ts`.**
-"Direction" asks for framework-free state behind `createObservableState`, read
-through one `useSyncExternalStore`, and "Composition" asks that `composeApp`
-gain `spaceCards`. Neither was built. `edge-authoring.ts` is a store for three
-reasons — React Flow asks it synchronous questions mid-gesture, its operations
-answer values to their callers, and it invalidates itself from two collaborator
-subscriptions — and none of the three is true here: nothing asks this module a
-question during a gesture, no operation answers one, and its external facts
-arrive as ordinary dispatches. So the transitions are a pure
-`cardCreationReducer`, `createCardCreation` is a thin asynchronous shell over
-it, and `useCardCreation` is `useReducer` plus one memo. The reason the ticket
-wanted composition — a test driving a transition with no React tree — is
-delivered in full by `packages/app/test/card-creation-state.test.ts`, so nothing
-was added to `compose-app.ts` and `spaceCards` stays on the `OpenSpace` entry;
-the two seams are memoized by `App` and passed to the hook. Recorded in
-`docs/agents/ui.md`.
+**Observable state, but not composed in `compose-app.ts`.** "Direction" asks
+for framework-free state behind `createObservableState`, read through one
+`useSyncExternalStore`, and "Composition" asks that `composeApp` gain
+`spaceCards`. The first was built and the second was not.
+
+The transitions are a pure reducer private to `card-creation.ts`, and
+`createCardCreation` owns the state they answer: it installs and publishes
+through `createObservableState`, and `useCardCreation` mounts one instance and
+reads it through `useSyncExternalStore`. What it is not is a store —
+`edge-authoring.ts` is one for three reasons — React Flow asks it synchronous
+questions mid-gesture, its operations answer values to their callers, and it
+invalidates itself from two collaborator subscriptions — and none of the three
+is true here: nothing asks this module a question during a gesture, no
+operation answers one, and its external facts arrive as ordinary calls.
+
+The reason the ticket wanted composition — a test driving a transition with no
+React tree — is delivered in full by
+`packages/app/test/card-creation-state.test.ts`, so nothing was added to
+`compose-app.ts` and `spaceCards` stays on the `OpenSpace` entry; the two seams
+are memoized by `App` and passed to the hook. Recorded in `docs/agents/ui.md`.
 
 ## The problem
 
@@ -208,3 +212,35 @@ anything in the authored world — the same reason *projection* is deliberately
 absent from that document, and `test/unit/current-domain-vocabulary.test.ts`
 gives every term added there real weight. It belongs in `docs/agents/ui.md`
 beside the other surface conventions.
+
+## Answer
+
+Card creation now owns one authoritative state behind a private pure reducer,
+installed and published through `createObservableState`. The React adapter
+mounts the module and reads it through `useSyncExternalStore`. Admission installs
+the next state before invoking a collaborator, so repeated opens cannot start a
+second read and repeated or reentrant submits cannot begin another attempt. A
+synchronous completion publishes only its settled state; an asynchronous one
+publishes `submitting` until it settles. Refusals permit immediate retry.
+
+This completes the branch's consolidation while correcting its interim choice
+to pass render-captured state into the asynchronous shell. The module remains
+local to the mounting surface; App supplies the two memoized kind seams and the
+composition's reporter. No additional composition dependency was needed.
+
+`card-creation-state.test.ts` drives the module through its own operations
+throughout. The reducer, its action union and the closed state are no longer
+exported, and the transition rules that were reached by reducing a list of
+actions over a seeded state are reached by the gestures that produce them: a
+replacement is `discard()`, an ending a `submit()` that settles, a stale refusal
+`refusalStale()`. Six pairs proved the same rule twice in two idioms and are one
+test each now. `cardCreationMessage` stays exported and stays tested, over
+`CardCreationPane` literals. The one collaborator the module cannot vouch for —
+the injected `reportBreak` — is crossed with both timings on both of its paths,
+so `createNonThrowingReporter` has evidence; dropping it, or rethrowing from
+either `catch`, fails this file. The repeated-open and reentrant-submit
+regressions both failed before their fixes. The existing application tests
+retain pane, naming and focus evidence.
+
+Continuation policy beyond this creation module remains the separate follow-up
+described in the source; Add Card remains outside this change.
