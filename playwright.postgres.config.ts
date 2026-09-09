@@ -5,6 +5,15 @@ export default defineConfig({
   testMatch: 'postgres-persistence.spec.ts',
   fullyParallel: false,
   workers: 1,
+  // This project runs in CI's `postgres` job, so it owes the same `.only` guard
+  // the other two configs carry: a committed `test.only` here would narrow a
+  // one-test project to nothing and still report green.
+  forbidOnly: !!process.env['CI'],
+  // Deliberately not the `retries: 2` of the other two configs. Each attempt
+  // mints its own Space and Card ids and deletes them in `finally`, so a retry
+  // is safe — but this test exists to answer whether an edit is durable, and a
+  // pass on the second attempt does not answer that question the way a pass on
+  // a flaky interaction test does.
   retries: 0,
   // The one test starts two Vite hosts in sequence, drives a drag through the
   // browser and round-trips PostgreSQL between them. Playwright's 30s default
