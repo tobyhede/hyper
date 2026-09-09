@@ -42,7 +42,7 @@ export interface OpenSpacesState {
    * directly. Every open Space has an entry; the map is total over `entries`.
    *
    * This is the **Opener** CONTEXT.md gives the open set, and it is
-   * display-only: the switcher draws the set as the tree that crossing makes,
+   * display-only: Open Spaces draws the set as the tree that crossing makes,
    * each Space under the one it was entered from. Nothing acts on it — Exit
    * closes one Space whether or not anything hangs off it (ADR 0068), so this
    * asserts a history and never a containment.
@@ -198,7 +198,7 @@ export function createOpenSpaces({
    * The entries `exit` has retired.
    *
    * An activation captures its target and then waits arbitrarily long for the
-   * Space being left. A exit completing inside that wait retires the session
+   * Space being left. An exit completing inside that wait retires the session
    * and disposes the composition, so reinstating the target on the canvas would
    * hand the author a Space nothing can commit for. Identity is the test, not
    * the Space Id: the same Space reopened is a different entry and reinstating
@@ -221,11 +221,11 @@ export function createOpenSpaces({
   /**
    * The exits that have begun and not yet settled, by Space.
    *
-   * A exit waits arbitrarily long for its Space to become retirable, and both
+   * An exit waits arbitrarily long for its Space to become retirable, and both
    * caches still advertise the entry it is going to retire while it does. An
    * activation reading one of them inside that window would hand the author a
    * composition the exit is about to dispose and a session the registry is
-   * about to release. So an activation that finds a exit underway waits it out
+   * about to release. So an activation that finds an exit underway waits it out
    * and takes the Space the exit leaves behind — the reloaded one, or this
    * same entry if the exit was refused.
    */
@@ -261,8 +261,8 @@ export function createOpenSpaces({
    *
    * `from` is spent only on the branch that adds the entry. A Space already in
    * the set is being returned to rather than entered, and rewriting its opener
-   * would make the switcher's tree reshape itself under a reader who was only
-   * moving around in it.
+   * would make the tree Open Spaces draws reshape itself under a reader who
+   * was only moving around in it.
    */
   const include = (entry: OpenSpace, activeSpaceId: UUID, from: UUID | null): void => {
     const state = observable.getState();
@@ -272,9 +272,19 @@ export function createOpenSpaces({
       followActiveSpace();
       return;
     }
-    // A Space cannot be entered from itself, which is what `open` on the Space
-    // already on the canvas would otherwise record.
-    const opener = from === entry.id ? null : from;
+    // An opener has to name a Space that is open, and `from` was read before a
+    // wait of arbitrary length. Two things can have happened to it since. The
+    // crossing can have been made from this very Space, which is what `enter`
+    // on the active Space reads back once that Space exits inside the wait.
+    // And the Space crossed from can itself have exited, whose re-homing ran
+    // over a record this entry was not in yet to be re-homed. Either way there
+    // is nothing left to hang off, and an opener naming a Space that is gone
+    // is the one thing that takes this entry out of the list that is the only
+    // way back to it. What the second case loses is the exited Space's own
+    // opener, which its re-homing discarded before this runs, so a crossing
+    // raced this way joins at the root rather than where it would have landed
+    // unraced.
+    const opener = from === entry.id || !state.entries.some(({ id }) => id === from) ? null : from;
     observable.publish({
       activeSpaceId,
       entries: [...state.entries, entry],
@@ -377,8 +387,8 @@ export function createOpenSpaces({
     activate(spaceId, selection, null);
 
   /**
-   * Enter a Space from the one on the canvas, which is the crossing the
-   * switcher's tree is a picture of (ADR 0068).
+   * Enter a Space from the one on the canvas, which is the crossing the tree
+   * Open Spaces draws is a picture of.
    *
    * The opener is read before the first await, because it is the Space the
    * reader was standing in when they pressed — not whichever Space the canvas
@@ -431,12 +441,15 @@ export function createOpenSpaces({
     if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
     const { request, abandon } = beginActivation();
     try {
-      // `entries` still advertises a Space a exit is waiting to retire, so
+      // `entries` still advertises a Space an exit is waiting to retire, so
       // this entry is only the target while nothing is exiting it. `compose`
       // waits that exit out and answers whatever it leaves behind.
       const entry = exiting.has(spaceId) ? await compose(spaceId) : target;
-      // Already open, so `include` spends no opener on it — and would not
-      // rewrite one if it did.
+      // No opener either way, but for two different reasons. A Space still
+      // open is being returned to, and `include` would not rewrite what it
+      // joined with. A Space an exit has already taken is a new entry, and
+      // choosing it from the list is not a crossing — so it joins at the root
+      // rather than recovering the opener the exit re-homed away.
       return await activateAfterLeavingSettles(entry, request, null);
     } catch (error) {
       abandon();
@@ -480,12 +493,13 @@ export function createOpenSpaces({
     const activeSpaceId =
       state.activeSpaceId === spaceId ? (entries[0]?.id ?? null) : state.activeSpaceId;
     // **The Spaces entered from this one are re-homed onto its own opener**, so
-    // the record stays total over `entries` and the switcher's tree stays a
-    // tree. Eagerly, because the lazy alternative — walk up to the nearest
-    // still-open ancestor when the tree is drawn — cannot work: this entry is
-    // about to be gone and its own opener with it, so there is no chain left to
-    // follow. Without this, a Space entered from one that later exits is still
-    // open and no longer anywhere in the list that is the only way back to it.
+    // the record stays total over `entries` and the tree Open Spaces draws
+    // stays a tree. Eagerly, because the lazy alternative — walk up to the
+    // nearest still-open ancestor when the tree is drawn — cannot work: this
+    // entry is about to be gone and its own opener with it, so there is no
+    // chain left to follow. Without this, a Space entered from one that later
+    // exits is still open and no longer anywhere in the list that is the only
+    // way back to it.
     const openedFrom = new Map(state.openedFrom);
     const inherited = openedFrom.get(spaceId) ?? null;
     openedFrom.delete(spaceId);
@@ -518,7 +532,7 @@ export function createOpenSpaces({
     const exited = retireOpenSpace(spaceId, target, confirmation);
     // Recorded before the first wait, because the window an activation has to
     // see is the whole of it — and recorded as a settlement rather than an
-    // outcome, since a exit that threw has still stopped standing in the way.
+    // outcome, since an exit that threw has still stopped standing in the way.
     const settled = exited.catch(() => undefined);
     exiting.set(spaceId, settled);
     try {

@@ -508,7 +508,7 @@ describe('Open Spaces', () => {
     expect(again.opening?.selection).toBe(SECOND_LAYOUT_ID);
   });
 
-  it('detaches a exited Space\u2019s composition from its retired session', async () => {
+  it('detaches an exited Space\u2019s composition from its retired session', async () => {
     const { openSpaces } = setup();
     const other = await openSpaces.open(OTHER_ID);
     const seen: string[] = [];
@@ -589,11 +589,11 @@ describe('Open Spaces', () => {
   });
 
   /**
-   * What the switcher's tree is a picture of.
+   * What the tree Open Spaces draws is a picture of.
    *
    * The open set is drawn as the tree that *crossing* makes, each Space under
    * the one it was entered from — the **Opener** CONTEXT.md gives the open set.
-   * Production recorded no such crossing before this, so a switcher indenting
+   * Production recorded no such crossing before this, so a surface indenting
    * anything was indenting a fact nothing held.
    *
    * It is display-only, and these tests are about the record rather than about
@@ -657,6 +657,39 @@ describe('Open Spaces', () => {
     expect(openSpaces.getState().openedFrom.get(OTHER_ID)).toBe(META_ID);
   });
 
+  it('records no opener naming a Space that exited while the crossing was in flight', async () => {
+    const { backend, openSpaces } = crossing();
+    await openSpaces.open(META_ID);
+    await openSpaces.enter(OTHER_ID);
+
+    // The crossing reads its opener before the load, and Third's load parks, so
+    // it holds Other for as long as that takes. Exiting Other inside that window
+    // re-homes what the record already holds \u2014 and Third is not in it yet to be
+    // re-homed, so the opener it lands with is one nothing re-homed.
+    let releaseThird = (): void => undefined;
+    const parked = new Promise<void>((resolve) => {
+      releaseThird = resolve;
+    });
+    const load = backend.loadSpace.bind(backend);
+    vi.spyOn(backend, 'loadSpace').mockImplementation(async (id) => {
+      if (id === THIRD_ID) await parked;
+      return await load(id);
+    });
+
+    const crossed = openSpaces.enter(THIRD_ID);
+    await Promise.resolve();
+    expect(await openSpaces.exit(OTHER_ID)).toEqual({ kind: 'exited' });
+
+    releaseThird();
+    await crossed;
+
+    // Every opener names a Space that is open, which is what keeps the record
+    // whole and the list the only way back to everything in it.
+    const { entries, openedFrom } = openSpaces.getState();
+    expect(entries.map(({ id }) => id)).toEqual([META_ID, THIRD_ID]);
+    expect(openedFrom.get(THIRD_ID)).toBe(null);
+  });
+
   it('re-homes what was entered from an exited Space onto that Space\u2019s own opener', async () => {
     const { openSpaces } = crossing();
     await openSpaces.open(META_ID);
@@ -672,6 +705,38 @@ describe('Open Spaces', () => {
     expect(entries.map(({ id }) => id)).toContain(THIRD_ID);
     expect(openedFrom.get(THIRD_ID)).toBe(META_ID);
     expect(openedFrom.has(OTHER_ID)).toBe(false);
+  });
+
+  it('joins a Space reopened while its exit was still waiting at the root', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const { openSpaces } = setup(control, () => CARD_ID, [
+      [META_ID, 'Meta'],
+      [OTHER_ID, 'Other'],
+      [THIRD_ID, 'Third'],
+    ]);
+    await openSpaces.open(META_ID);
+    const other = await openSpaces.enter(OTHER_ID);
+    await openSpaces.enter(THIRD_ID);
+    other.session.submit(edit(other.session.getState().working));
+    await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('pending'));
+
+    // The exit parks until Other settles, and choosing Other back waits it out
+    // and takes the Space the exit leaves behind. That Space is a new entry
+    // opened by a choice from the list, which is not a crossing \u2014 so it joins
+    // at the root, and does not recover the opener the exit re-homed away.
+    const exiting = openSpaces.exit(OTHER_ID);
+    await Promise.resolve();
+    const switching = openSpaces.switchTo(OTHER_ID);
+
+    release();
+    await expect(exiting).resolves.toEqual({ kind: 'exited' });
+    const reopened = await switching;
+
+    expect(reopened).not.toBe(other);
+    const { openedFrom } = openSpaces.getState();
+    expect(openedFrom.get(OTHER_ID)).toBe(null);
+    expect(openedFrom.get(THIRD_ID)).toBe(META_ID);
   });
 
   it('closes only the Space exited, whatever was entered from it', async () => {
