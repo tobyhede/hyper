@@ -39,14 +39,26 @@ const sheet = (page: Page) => sidebar(page);
  *
  * Waiting on the element's own animations is the fact rather than a guess at a
  * duration or a read of one property: the promise settles when every animation
- * the Sheet is running has finished, whichever of them arrives last.
+ * the Sheet is running has finished, whichever of them arrives last. An
+ * animation that is cancelled instead of finishing rejects with an `AbortError`,
+ * and that is still the Sheet having stopped moving, so that one rejection is
+ * waited out rather than raised — any other is a fault about the page and is
+ * left to surface.
  */
 async function openMobileSidebar(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
   await expect(sheet(page)).toHaveAttribute('data-mobile', 'true');
   await expect(sheet(page)).toBeVisible();
   await sheet(page).evaluate(async (element) => {
-    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    await Promise.all(
+      element.getAnimations().map(async (animation) => {
+        try {
+          await animation.finished;
+        } catch (error) {
+          if (!(error instanceof DOMException) || error.name !== 'AbortError') throw error;
+        }
+      }),
+    );
   });
 }
 

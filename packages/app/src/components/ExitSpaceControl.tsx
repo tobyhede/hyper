@@ -23,6 +23,12 @@ export function ExitSpaceControl({ spaceId }: { readonly spaceId: UUID }) {
   const [closing, setClosing] = useState(false);
   const exit = async (confirmed = false) => {
     if (spaces === null) return;
+    // A refusal describes the attempt that met it, and the reader answers it by
+    // recovering the Space and exiting again. This attempt is that answer, so
+    // what the last one found stops holding the moment it begins. The
+    // confirmation needs no such reset: both its footer buttons close it, so
+    // nothing can start an attempt while it is still up.
+    setFailure(null);
     setClosing(true);
     try {
       const result = await spaces.exit(
