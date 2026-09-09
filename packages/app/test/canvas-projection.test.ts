@@ -12,6 +12,7 @@ const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const DRAWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const SECOND_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
 const CARDS = [cardFile(CARD_A), cardFile(CARD_B)];
 
@@ -161,6 +162,29 @@ describe('canvasProjection', () => {
       [DRAWN_GRAPH, OTHER_GRAPH].sort(),
     );
     expect(handledGraphIds(nodes)).toEqual([DRAWN_GRAPH, OTHER_GRAPH].sort());
+  });
+
+  it('draws neither the Edge nor the handle of a Graph a sibling Layout owns', async () => {
+    // Two Layouts of one Space place the same Cards, and an embedded sub-flow
+    // merges their projections into one React Flow instance (ADR 0068). Both
+    // Cards the unowned Edge names are therefore mounted, so what keeps that
+    // Edge off this Layout is the derivation here and not React Flow dropping
+    // an Edge whose endpoints it cannot resolve. Edges and handles are filtered
+    // by the same owned set two lines apart: assert both, because dropping
+    // either one alone still leaves the other refusing to draw.
+    const space = spaceWith({
+      layouts: [
+        layoutOwning(DRAWN),
+        { ...layoutOwning(OTHER), id: SECOND_LAYOUT, title: 'Sibling' },
+      ],
+    });
+
+    const sibling = await projectThrough(space, AT_REST, SECOND_LAYOUT);
+
+    expect(sibling.nodes.map((node) => node.id).sort()).toEqual([CARD_A, CARD_B]);
+    expect(sibling.visibleGraphs.map((graph) => graph.id)).toEqual([OTHER_GRAPH]);
+    expect(sibling.edges.map((edge) => edge.data?.['graphId'])).toEqual([OTHER_GRAPH]);
+    expect(handledGraphIds(sibling.nodes)).toEqual([OTHER_GRAPH]);
   });
 
   it('carries each authored Expanded rect through strategy input and node projection', async () => {

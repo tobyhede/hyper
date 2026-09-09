@@ -19,7 +19,11 @@ context rather than the target Space's own navigation selection.
       resolves, and navigating inside the target writes neither selection back
       until an authored Edit records one under the established ownership rules.
 - [ ] Several Space Cards may reference one target while selecting different
-      Layouts and Graphs, and each selection survives aggregate round-trip.
+      Layouts and Graphs, and each selection survives aggregate round-trip. The
+      selected Graph is that embed's Active Graph and emphasises only: which
+      Edges an embed draws is decided by the selected Layout's own Graphs, so
+      two Cards on one target at different Graphs differ in emphasis and not in
+      the Edges they show (ADR 0026).
 - [ ] Direct, self, missing and incompatible target contexts retain stable refusal
       or not-found semantics with accessible recovery where one exists.
 - [ ] Application, Ladle and E2E evidence covers an initialized target, a
