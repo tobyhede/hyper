@@ -222,6 +222,18 @@ jobs:
       - name: Prove a PostgreSQL edit survives a fresh host
         run: pnpm e2e:postgres
 
+      # Its own artifact name, for the reason the `e2e` job below records:
+      # `upload-artifact` refuses a second upload under a name already claimed in
+      # the same run, and this job can fail in the same run as either browser job.
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-postgres
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
       - name: Show PostgreSQL logs
         if: failure() && steps.postgres-env.outcome == 'success'
         run: docker compose logs --no-color postgres
