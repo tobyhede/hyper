@@ -142,12 +142,12 @@ Crossing into the Space a Space Card references, so that Space takes the canvas 
 _Avoid_: drilling in, zooming in, descending, push and pop, navigating into (as a name for the action — Entering is the name).
 
 **Open Spaces**:
-The Spaces open at once in one session, and the surface that draws them beside the Space Sidebar. Each entry names one Space. Selecting an entry switches to that Space and closes nothing. Every open Space keeps its own live Layout and Graph selection for as long as it is open. An entry may mark a Space that has stopped saving.
+The Spaces open at once in one session, and the surface that draws them. Which surface that is, and whether it is the Space's own command surface or one beside it, is treatment (ADR 0082). Each entry names one Space. Selecting an entry switches to that Space and closes nothing. Every open Space keeps its own live Layout and Graph selection for as long as it is open. An entry may mark a Space that has stopped saving.
 
 Every open Space records its **Opener**: the Space it was Entered from, or none for one opened directly. A Space is never its own Opener. An address is not a crossing, so a Space a URL *opens* records none — the Space being worked in when the location changed is left beside it rather than above it. The Opener is recorded once, at the crossing that first opened the Space, so a URL resolving to a Space already open changes nothing: crossing back into a Space is returning to it rather than Entering it, and it keeps the Opener it joined the set with.
 
 **The Opener is a history and never a containment**, which is what keeps closing one Space from closing another. Exit closes only the Space exited, whether or not anything was Entered from it; what was Entered from an exiting Space stays open and takes over that Space's own Opener, so every open Space has one and the record stays whole.
-_Avoid_: rail (that is a Card's toolbar), tab (that is a browser's), stack (the model in which selecting an outer Space closes everything inside it, considered and rejected), breadcrumb, depth.
+_Avoid_: rail (that is a Card's toolbar), tab (that is a browser's), stack (the model in which selecting an outer Space closes everything inside it, considered and rejected), breadcrumb, depth, switcher (it named the set after `switchTo`, the operation that spends it; the Command Dock's disclosure over the set is the Open Spaces menu).
 
 **Presenting**:
 Traversing a Graph through a Layout for an audience, drawn close enough that one Card fills the screen. At the Active Card, the presenter follows one of the Active Graph's outgoing Edges, including the applicable cross-Space Edges carried through Space Cards. A Graph that is a line traverses as a line; a Graph that forks offers a choice. There is no separate artefact and no second surface — a presentation is not a thing a Graph is turned into, it is a way of moving through one.
