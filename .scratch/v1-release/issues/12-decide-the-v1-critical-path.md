@@ -24,27 +24,37 @@ that merge and must not split or reschedule its umbrella ticket.
 
 ### Dependency-critical sequence to End-to-end
 
-`pnpm roadmap` computes the dependency graph and the critical subgraph from the
-tickets' own `Blocked by` fields, and it is the authority for order and for what
-is currently unblocked. Read its output rather than any prose copy of the graph:
-this table says what each wave is **for** and which tickets remain open in it,
-and deliberately does not restate the edges the tool derives. A wave says what
-its work is **for**, not what is pickable today: several tickets in later waves
-have no unmet blockers now, and the tool's ready list is what says so.
+`pnpm roadmap` derives the dependency graph from each implementation ticket's
+`Blocked by` field. Use its release section for order and its ready list for
+unblocked work whose triage state permits pickup. The critical subgraph uses
+one unit per open ticket; it is a dependency-depth view, not an elapsed-time
+estimate. Parallel work can still have blockers and is not automatically ready.
 
-| Wave | Must complete | Parallel work available in the wave |
-| --- | --- | --- |
-| 0 — Settle the model | Landed by V1/20: ADR 0079 is accepted and indexed, `layout-only-v1/01–04` are tracked, ticket 05's aggregate criteria live in V1/08, and the Definition of Done, guidance, Space Card and URL tickets are reconciled with the superseded entries retired. `layout-only-v1/01` and `02` have since been built, so `layout-only-v1/03` — making a Layout the only V1 canvas selection — is all that remains here. It has no unmet blocker, which is what makes it the pickable head of the wave. `layout-only-v1/04` is **not** Wave 0 work: it waits on `space-cards/01`, so it joins Wave 3. | None of the downstream V1 work may author the retired Computed View/Space View contract. |
-| 1 — Resolve the shared seam and Space Card reference authoring | Build architecture issue 14's Open Spaces module over PR 134's registry. Architecture issue 12 is resolved — the server-side repository now owns Meta lifecycle — and issue 13's differential test ran and found the two adapters agree, so no refactor is scheduled and neither gates anything. Space Card creation, reference and lifetime authoring in entity URL 07 belongs here rather than Wave 0: its one open blocker is `layout-only-v1/03`, which is Wave 0 work. | Ticket 17's structured aggregate refusals proceed independently. `alias-cards/06`, V1/02's evidence closure and ticket 18's HTTP wire-policy proof are complete. |
-| 2 — Complete aggregate-facing capabilities | Build Meta initialization/startup in V1/01 and the aggregate import/export format in V1/08. | These two are not parallel with each other: V1/08 is blocked by V1/01. **V1/08 starts here and closes in Wave 3**, because it also blocks on `layout-only-v1/04`, which owns the Space Card's selected-Layout content the round trip must preserve. Build everything in V1/08 that does not depend on that shape, and do not guess it. |
-| 3 — Join Spaces into the application | One chain, in this order: in-place Space Card Opening (`space-cards/01`), then Space Cards selecting initialized Layouts (`layout-only-v1/04`), then closing V1/08, then the tracked multi-Space fixture (`space-cards/10`), then Enter/independent opening and History through Open Spaces (`entity-url-addressability/08`). | Nothing in this wave is parallel with anything else in it. The fixture is **not** available alongside in-place Opening: `space-cards/10` is blocked by V1/08, which is blocked by `layout-only-v1/04`, which is blocked by `space-cards/01`. Enter integration waits for that whole chain plus architecture issue 14. |
-| 4 — Compose the checkpoint product | Rewrite V1/03 as the unified Card-kind command surface and integrate Default Content/reset in V1/16. | The command surface can compose completed feature operations while Default Content integrates the completed Markdown, Alias and Space renderers. |
-| 5 — Complete End-to-end | Close required desktop accessibility/evidence gaps and run ticket 19's clean-clone rehearsal with its compact proof matrix. | Only proof repair and qualifying checkpoint-defect fixes remain; the successful rehearsal completes the untagged checkpoint. |
+The earlier wave table mixed purposes with a second dependency graph and kept
+calling completed work unbuilt. It is retired. The stages below describe the
+obligations, not another schedule:
 
-`pnpm roadmap` prints the critical subgraph and the parallel work beside it.
-This ticket deliberately names neither list: a restated one goes stale the day a
-`Blocked by` field changes, and the prose copies that did restate it are what
-this reconciliation removed.
+- **Foundation:** Layout-only canvas selection, Open Spaces composition, Space
+  Card creation and embedded Opening, and Meta lifecycle are built. Their
+  resolved issues remain evidence rather than tasks to schedule again.
+- **Complete the authored aggregate:** durable Space Card selections precede
+  their canonical round trip and linked fixture. Enter and independent-address
+  integration use that fixture. Follow those issues' blockers rather than
+  guessing the persisted selection shape in a downstream task.
+- **Compose the command surfaces:** Dock promotion precedes the Card and Graph
+  command work. Default Content/reset and refusal recovery keep their own
+  dependencies; merely touching the same file does not join two obligations.
+- **Reach End-to-end:** V1/19 owns the desktop clean-clone authoring and recovery
+  rehearsal. Its blockers describe the checkpoint product, not the full V1
+  surface. Graph management and final responsive treatment may finish outside
+  that checkpoint's dependency chain, as ticket 11 explicitly permits.
+- **Finish V1:** V1/07 joins the checkpoint, final product design, Graph
+  management, refusal recovery and draft-discard acknowledgement before the
+  full proof and human go/no-go.
+
+The declaration in `.scratch/ROADMAP.md` selects the release tag and final gate.
+It does not introduce a second list of blockers. Completed dependencies may
+remain in issue history; the generator excludes them from the live graph.
 
 ### Ticket rewrites and retirements
 
@@ -61,8 +71,9 @@ this reconciliation removed.
   work, the locality cleanup is deferred beyond V1 and the issue is resolved.
   Its direction-if-confirmed criteria stay deliberately unticked; nothing about
   it is built work to schedule.
-- Architecture issue 14 absorbs `space-cards/12` and becomes the binding Open
-  Spaces implementation. `space-cards/12` is superseded.
+- Architecture issue 14 is resolved: it absorbed `space-cards/12` and built
+  Open Spaces. `space-cards/12` is superseded; integration uses the completed
+  module rather than scheduling its implementation again.
 - V1/02 was evidence-and-gap closure only over an already-built core Cards View
   workflow, and it is complete. Do not schedule the Cards View again.
 - Entity URL 07 owns Space Card-specific creation and cascade semantics. V1/03
@@ -76,9 +87,8 @@ this reconciliation removed.
   complete and 17 is open. Ticket 19 owns clean-clone setup, the compact proof
   matrix and checkpoint completion.
 - Ticket 20 owns landing and reconciling the Layout-only prerequisite before
-  downstream implementation proceeds. It is the one durable link the critical
-  subgraph, V1/07 and V1/19 name for that prerequisite; they do not enumerate
-  the `layout-only-v1` tickets, which reach them through V1/08.
+  downstream implementation proceeds. It is resolved. The remaining Layout-only implementation reaches V1/07
+  and V1/19 through V1/08; V1/20 is no longer a live blocker.
 
 The vocabulary above is settled but the filename is not: this ticket is still
 `12-decide-the-v1-critical-path.md`, and its title and the `map.md` entry that
@@ -106,9 +116,10 @@ they block the checkpoint.
 
 ### From End-to-end to `v1.0.0`
 
-After `v1-release/13`'s feedback rule has classified observed results, complete full
-Layout management, Graph management, responsive/design-system polish,
+After `v1-release/13`'s feedback rule has classified observed results, complete
+Graph management, responsive/design-system polish,
 exhaustive Ladle/application parity, README and Definition-of-Done mapping, then
-apply the release proof and go/no-go contract. Only an accepted
+apply the release proof and go/no-go contract. Layout management is already
+built and needs final proof rather than another implementation. Only an accepted
 canonical-journey correction may change this path; non-blocking requests remain
 beyond V1.

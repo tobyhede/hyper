@@ -4,6 +4,8 @@
 
 **Status:** ready-for-agent
 
+**Blocked by:** 01 — the shared doctrine document both skills must reference.
+
 **Why:** The authoring half of the split. Its job is to make idiomatic, provable TypeScript the default behaviour on prompts that never mention TypeScript.
 
 Structure:

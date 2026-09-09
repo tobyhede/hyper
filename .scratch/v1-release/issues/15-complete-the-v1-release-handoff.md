@@ -57,8 +57,9 @@ when a ticket's blockers change. Run it, and read ticket 12 beside it.
 
 What the tool does not say, and this handoff does:
 
-1. **Reach End-to-end.** Build the tickets `pnpm roadmap` reports as unblocked,
-   in the order it reports, until
+1. **Reach End-to-end.** Select unblocked `release/v1` work with the appropriate
+   ready-for-agent or ready-for-human state; the ready list is not a priority
+   ranking, and parallel work is not necessarily unblocked. Continue until
    [V1/03](03-complete-card-lifecycle-controls.md)'s unified Card-kind surface
    and [V1/16](16-seed-and-restore-the-meta-space-default-content.md)'s
    canonical Default Content and reset compose the checkpoint product. Then

@@ -122,6 +122,41 @@ describe('issue tags', () => {
 });
 
 describe('feature phase', () => {
+  it('offers only unblocked ready issues for pickup in text and HTML', () => {
+    const root = scratch();
+    const statuses = [
+      'ready-for-agent',
+      'ready-for-human',
+      'needs-triage',
+      'needs-info',
+      'claimed',
+      'implemented',
+    ];
+    for (const [index, status] of statuses.entries()) {
+      write(root, `effort/issues/0${index + 1}-issue.md`, `# ${status}\n\nStatus: ${status}\n`);
+    }
+    write(
+      root,
+      'effort/issues/07-blocked.md',
+      '# Blocked\n\nStatus: ready-for-agent\nBlocked by: 01\n',
+    );
+
+    const roadmap = buildRoadmap(root);
+    const text = renderRoadmap(roadmap);
+    const html = renderRoadmapHtml(roadmap);
+    const textPickup = text.split('READY TO PICK UP')[1]?.split('\n\n')[0];
+    const htmlPickup = /<ul class="pick">(.*?)<\/ul>/su.exec(html)?.[1];
+
+    expect(textPickup).toContain('effort/01');
+    expect(textPickup).toContain('effort/02');
+    expect(htmlPickup).toContain('effort/01');
+    expect(htmlPickup).toContain('effort/02');
+    for (const number of ['03', '04', '05', '06', '07']) {
+      expect(textPickup).not.toContain(`effort/${number}`);
+      expect(htmlPickup).not.toContain(`effort/${number}`);
+    }
+  });
+
   it('separates complete, in-flight, not-started and issueless efforts', () => {
     const root = scratch();
     write(root, 'complete/issues/01-a.md', 'Status: resolved\n');
@@ -144,6 +179,20 @@ describe('feature phase', () => {
 });
 
 describe('blockers', () => {
+  it('resolves a full tracker path and counts repeated mentions only once', () => {
+    const root = scratch();
+    write(root, 'layout-only-v1/issues/04-context.md', 'Status: ready-for-agent\n');
+    write(
+      root,
+      'architecture-review/issues/21-capabilities.md',
+      'Status: ready-for-agent\nBlocked by: `.scratch/layout-only-v1/issues/04-context.md`; `layout-only-v1/04`.\n',
+    );
+
+    const blocked = featureNamed(buildRoadmap(root), 'architecture-review').issues[0];
+
+    expect(blocked?.unmetBlockers).toEqual(['layout-only-v1/04']);
+  });
+
   it('reports only the blockers that are still unsettled', () => {
     const root = scratch();
     write(root, 'effort/issues/01-a.md', 'Status: resolved\n');
