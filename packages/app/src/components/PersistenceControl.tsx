@@ -16,7 +16,12 @@ import {
   Button,
   PersistenceIndicator,
 } from '@project/ui';
-import { describeAggregateRefusal, describePersistenceFailure } from '../authoring-refusal';
+import {
+  describeAggregateRefusal,
+  describeConflictRecovery,
+  describePersistenceFailure,
+  type ConflictRecovery,
+} from '../authoring-refusal';
 
 export interface PersistenceControlProps {
   readonly active?: boolean;
@@ -29,29 +34,8 @@ type Persistence = SpaceSessionState['persistence'];
 type Rejection = Extract<Persistence, { kind: 'rejected' }>;
 type Conflict = Extract<Persistence, { kind: 'conflicted' }>;
 
-/**
- * What accepting the stored side would do here, which is not one thing.
- *
- * `reload` is the ordinary case: the repository answered with a newer Space.
- * `revert` is a participant the conflict never named — the coordinated edit did
- * not commit, so what is stored for this Space is the baseline it held before
- * the edit, and accepting it discards the edit's effect here. `none` is the
- * Space with no stored snapshot. Accepting the stored side still coordinates
- * recovery across every participant, while keeping local work re-commits this
- * Space as a create.
- */
-type ConflictRecovery = 'reload' | 'revert' | 'none';
-
 const conflictRecovery = ({ current, baseline }: Conflict): ConflictRecovery =>
   current !== undefined ? 'reload' : baseline !== undefined ? 'revert' : 'none';
-
-const CONFLICT_DESCRIPTIONS = {
-  reload:
-    'A newer version of this space is available. Reload discards your local changes; keeping your local version tries to save it again.',
-  revert:
-    'A related space changed while this coordinated edit was saving. Reload returns this space to how it was before the edit; keeping your local version tries to save it again.',
-  none: 'There is no stored version of this space. Keep your local version to restore it.',
-} satisfies Record<ConflictRecovery, string>;
 
 const rejectionDescription = ({ failure }: Rejection): string =>
   failure.kind === 'aggregate-refused'
@@ -156,7 +140,7 @@ function ConflictControl({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Changes conflict</AlertDialogTitle>
-          <AlertDialogDescription>{CONFLICT_DESCRIPTIONS[recovery]}</AlertDialogDescription>
+          <AlertDialogDescription>{describeConflictRecovery(recovery)}</AlertDialogDescription>
         </AlertDialogHeader>
         {remoteRefusal === null ? null : (
           <Alert variant="destructive" data-testid="persistence-remote-refused">

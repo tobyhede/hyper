@@ -285,6 +285,36 @@ export const describeAggregateRefusal = (errors: readonly SpaceAggregateError[])
   [...new Set(errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ');
 
 /**
+ * What accepting the stored side of a conflict would do, which is not one
+ * thing.
+ *
+ * `reload` is the ordinary case: the repository answered with a newer Space.
+ * `revert` is a participant the conflict never named — the coordinated edit did
+ * not commit, so what is stored for this Space is the baseline it held before
+ * the edit, and accepting it discards the edit's effect here. `none` is the
+ * Space with no stored snapshot. Accepting the stored side still coordinates
+ * recovery across every participant, while keeping local work re-commits this
+ * Space as a create.
+ *
+ * Which of the three a conflict is stays with the surface that reads the two
+ * snapshots; only the sentences are here, beside every other sentence the
+ * author reads.
+ */
+export type ConflictRecovery = 'reload' | 'revert' | 'none';
+
+const CONFLICT_DESCRIPTIONS = {
+  reload:
+    'A newer version of this space is available. Reload discards your local changes; keeping your local version tries to save it again.',
+  revert:
+    'A related space changed while this coordinated edit was saving. Reload returns this space to how it was before the edit; keeping your local version tries to save it again.',
+  none: 'There is no stored version of this space. Keep your local version to restore it.',
+} satisfies Record<ConflictRecovery, string>;
+
+/** Application-owned copy for the recovery a conflict offers. */
+export const describeConflictRecovery = (recovery: ConflictRecovery): string =>
+  CONFLICT_DESCRIPTIONS[recovery];
+
+/**
  * Every persistence failure that reaches the author as a code rather than a
  * structured refusal — the retryable four and the permanent three.
  *

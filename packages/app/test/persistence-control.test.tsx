@@ -1,11 +1,20 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import type { LoadedSpace } from '@project/persistence';
 import { PersistenceControl, PersistenceNotice } from '../src/components/PersistenceControl';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a2');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a3');
+
+const SNAPSHOT: SpaceSnapshot = {
+  id: SPACE_ID,
+  document: { version: 1, title: 'Stored space' },
+  cards: [],
+};
+
+const STORED: LoadedSpace = { snapshot: SNAPSHOT, revision: 5n, exportedRevision: null };
 
 describe('PersistenceControl', () => {
   it('explains an aggregate refusal instead of naming its error kinds', () => {
@@ -125,6 +134,43 @@ describe('PersistenceControl', () => {
 
     expect(screen.getByText('You do not have permission to save this space.')).toBeVisible();
     expect(screen.queryByText('Permission denied')).toBeNull();
+  });
+
+  /**
+   * The three recoveries a conflict can offer, each with its own sentence.
+   *
+   * Written before the copy moved out of the component, so the move is proved
+   * to change nothing the author reads. Which recovery a conflict is remains
+   * derived from the two snapshots it carries: a newer stored Space reloads, a
+   * participant the conflict never named reverts to its baseline, and a Space
+   * with neither has nothing stored to accept.
+   */
+  it.each([
+    [
+      'reload',
+      { current: STORED, baseline: undefined },
+      /A newer version of this space is available/,
+    ],
+    [
+      'revert',
+      { current: undefined, baseline: SNAPSHOT },
+      /A related space changed while this coordinated edit was saving/,
+    ],
+    [
+      'none',
+      { current: undefined, baseline: undefined },
+      /There is no stored version of this space/,
+    ],
+  ] as const)('explains the %s recovery a conflict offers', (_recovery, conflict, sentence) => {
+    render(
+      <PersistenceControl
+        persistence={{ kind: 'conflicted', ...conflict }}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(sentence)).toBeVisible();
   });
 });
 
