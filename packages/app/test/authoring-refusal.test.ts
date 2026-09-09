@@ -191,8 +191,14 @@ describe('describePersistenceFailure', () => {
   /**
    * `protocol` is a bucket, and one of the conditions in it is actionable.
    * A commit over the server's size limit is not a disagreement about format:
-   * the author can fix it by making the Card smaller, and the sentence has to
-   * say so or the only instruction they had is gone.
+   * the author can fix it by writing less, and the sentence has to say so or
+   * the only instruction they had is gone.
+   *
+   * What it must not do is misdescribe the limit or the recovery. `MAX_COMMIT_
+   * BODY_BYTES` is checked over the whole serialised snapshot, so a Space can
+   * exceed it on Card *count* with no long Card anywhere — and the rejection
+   * dialog offers only Continue editing, since `PersistenceNotice`, which owns
+   * Retry, draws nothing for `rejected`.
    */
   it('tells an author over the size limit what to do about it', () => {
     const description = describePersistenceFailure({
@@ -201,10 +207,14 @@ describe('describePersistenceFailure', () => {
       message: 'Send a request body no larger than 1048576 bytes.',
     });
 
-    expect(description).toMatch(/too (large|big)|smaller/i);
+    expect(description).toMatch(/large|size|limit/i);
     expect(description).not.toBe(
       'The application and the server disagree about how changes are saved.',
     );
+    // Not one Card: the limit is on the whole change.
+    expect(description).not.toMatch(/\ba (long )?card\b/i);
+    // Not a retry: this dialog has no such control.
+    expect(description).not.toMatch(/try again|retry/i);
   });
 });
 

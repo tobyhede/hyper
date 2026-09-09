@@ -376,7 +376,7 @@ export const describeConflictRecovery = (recovery: ConflictRecovery): string =>
 
 /**
  * Every persistence failure that reaches the author as a code rather than a
- * structured refusal — the retryable four and the permanent three.
+ * structured refusal — the retryable four and the permanent four.
  *
  * Derived from the session state rather than imported as a union, because
  * `CommitResult` is not on `@project/persistence`'s surface and the two states
@@ -411,7 +411,11 @@ const PERSISTENCE_FAILURE_REASONS = {
     'Changes were sent faster than the server accepts. Wait a moment before retrying.',
   'invalid-commit': 'These changes are not in a form the server can store.',
   forbidden: 'You do not have permission to save this space.',
-  'payload-too-large': 'These changes are too large to save. Shorten a long card and try again.',
+  // The limit is on the whole change, not one Card: a Space can exceed it on
+  // Card count with nothing long in it. And the rejection dialog offers only
+  // Continue editing, so this names no retry.
+  'payload-too-large':
+    'This space is larger than the server accepts in one save. Shortening its longest cards is what brings it under the limit.',
   protocol: 'The application and the server disagree about how changes are saved.',
   // `satisfies` for the reason the aggregate table above gives: it still fails
   // the moment a code is added without a sentence, without widening the map.
