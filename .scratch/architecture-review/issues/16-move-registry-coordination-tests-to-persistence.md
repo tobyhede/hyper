@@ -1,6 +1,6 @@
 # Move the registry coordination tests beside the registry
 
-Status: needs-triage
+Status: resolved
 Tags: release/v1, Improvement
 Blocked by: none
 Related: `architecture-review/14` — this is the deferred tail of its
@@ -43,8 +43,34 @@ than folded into `architecture-review/14`:
 
 ## Acceptance
 
-- [ ] No test outside `packages/persistence` composes a `SpaceSessionRegistry`
-      directly.
-- [ ] The moved cases assert the same coordination behaviour they do now.
-- [ ] `pnpm verify` is green, including the per-package coverage thresholds on
+- [x] No test outside `packages/persistence` composes a `SpaceSessionRegistry`
+      *to assert coordination* — see the Answer for why the criterion as
+      written is not the one that held.
+- [x] The moved cases assert the same coordination behaviour they do now.
+- [x] `pnpm verify` is green, including the per-package coverage thresholds on
       both `app` and `persistence`.
+
+## Answer
+
+Resolved by `4966a47b` (“test: move the registry coordination tests beside the
+registry”), which landed the day after this ticket was written and closed it
+without the ticket being triaged or updated. This entry is the retrospective
+close.
+
+`packages/persistence/test/space-card-lifecycle.test.ts` now holds the
+coordination cases — the barrier, the participant set, the aggregate refusals,
+the conflict and retry arms and the create/link/delete cascade — beside
+`session-registry.test.ts`, and it composes the registry directly because it
+owns it.
+
+The first acceptance line did not survive contact, and deliberately so. What
+stays in `packages/app/test/space-card-lifecycle.test.ts` is the two *reads*
+`app` adds over the registry's three writes, and `packages/app/test/opened-space.ts`
+is the shared helper that opens a Space the way the application does. Both call
+`createSpaceSessionRegistry`, because `createSpaceCardLifecycle` is written over
+a registry rather than a session (ADR 0076): a lifecycle built beside a session
+the registry has never seen coordinates nothing, so an `app` test of an
+`app`-owned module cannot avoid constructing one. Neither file asserts
+coordination; both say so in their own doc comments. The rule that actually
+holds is the ownership one — coordination behaviour is proved in `persistence`
+— not the literal absence of a constructor call.
