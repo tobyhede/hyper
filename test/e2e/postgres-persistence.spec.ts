@@ -52,6 +52,8 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
   const repository = new PostgresSpaceRepository(db);
   const spaceId = newUuid();
   const cardId = newUuid();
+  const layoutId = newUuid();
+  const graphId = newUuid();
   const title = `HTTP restart ${spaceId}`;
   let firstHost: ViteDevServer | undefined;
   let secondHost: ViteDevServer | undefined;
@@ -60,10 +62,33 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
   let spaceRemains: boolean | undefined;
 
   try {
+    // The Layout is part of the fixture, and has to be. A layoutless Space is
+    // initialized on its first working load (ADR 0079), and that initialization
+    // mints an *empty* Layout — `positions: {}` in `working-space.ts`. The
+    // imported Card would then belong to the Space and to no Layout, so the
+    // canvas would draw nothing and `nodeByTitle` below would wait out the
+    // timeout with the Card sitting in the Cards drawer. Placing the Card here
+    // also keeps this test about durability alone: initialization is a write,
+    // and an unasked-for write is one more thing between the drag and the
+    // revision this asserts.
     const imported = await repository.importSpaces([
       {
         id: spaceId,
-        document: { version: 1, title },
+        document: {
+          version: 1,
+          title,
+          layouts: [
+            {
+              id: layoutId,
+              title: 'Layout 1',
+              kind: 'positioned',
+              positions: { [cardId]: { x: 0, y: 0, open: false } },
+              graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
+              activeGraph: graphId,
+            },
+          ],
+          defaultLayout: layoutId,
+        },
         cards: [
           {
             id: cardId,
