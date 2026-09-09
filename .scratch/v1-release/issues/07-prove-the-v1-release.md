@@ -21,6 +21,12 @@ corrected instead.
       exporting or presenting the V1 authored aggregate.
 - [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass on the required Node version.
 - [ ] PostgreSQL integration proves an Edit survives a fresh application host.
+      The proving test is `pnpm e2e:postgres`, and CI runs it as the last step of
+      the `postgres` job. It sits in that job rather than in `e2e` because it
+      applies no migration of its own and needs the database
+      `test:integration:postgres` has already migrated. This is no longer a manual
+      gate command. **`v1-release/08` must rewrite that spec**: it builds its
+      fixture through `importSpaces`, which criterion 4 of that ticket deletes.
 - [ ] The Ladle CI check is required to merge.
 - [ ] The README describes the V1 workflow, supported Card kinds and deliberate
       exclusions.

@@ -203,6 +203,25 @@ jobs:
       - name: Verify live database contract
         run: pnpm exec prisma-next db verify
 
+      # The one test that proves a browser edit reaches PostgreSQL and reads
+      # back from a host that did not make it. It belongs to this job rather
+      # than to `e2e` because it needs a migrated database and brings no
+      # migration of its own: `test:integration:postgres` above is the step that
+      # applies the committed history, so this command must follow it and
+      # cannot move to a job without one.
+      #
+      # `install chromium` carries no `--with-deps` on purpose. The `e2e` job's
+      # note records what that flag does on `ubuntu-latest`: it finds every
+      # shared library already present and fetches only font packages, which
+      # this test cannot see because it takes no screenshot. Omitting it keeps
+      # this job off the apt mirror that cost that one 11-23s of every run and,
+      # once, 9m49s.
+      - name: Install Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Prove a PostgreSQL edit survives a fresh host
+        run: pnpm e2e:postgres
+
       - name: Show PostgreSQL logs
         if: failure() && steps.postgres-env.outcome == 'success'
         run: docker compose logs --no-color postgres
