@@ -81,6 +81,15 @@ body {
   right: 1rem;
   z-index: 5;
   width: min(22rem, calc(100% - 2rem));
+  /* The lift is the shell's, not the `Alert`'s: an `Alert` is also drawn inside
+     a dialog, where it is part of the surface rather than over one. Here it is
+     chrome laid on the canvas, and on sand paper an unlifted panel reads as a
+     hole cut in the Space rather than a report about it. The same two-part
+     shadow `.canvas-refusal` spends, being the same kind of thing. */
+  box-shadow:
+    0 1px 2px rgb(31 41 51 / 6%),
+    0 6px 18px rgb(31 41 51 / 10%);
+  border-radius: var(--radius-md);
 }
 
 /* Nothing to say: the slot is unconditional, so it takes itself out of the
@@ -323,7 +332,13 @@ body {
   background: var(--card);
   color: var(--destructive);
   font-size: 0.8rem;
-  box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
+  /* Lifted off the sand rather than smudged onto it. Half of black was what it
+     took to separate this from a near-black canvas; on light ground the same
+     value is a grey cloud, so it is two stated shadows in the foreground's own
+     ink — a contact edge and a spread. */
+  box-shadow:
+    0 1px 2px rgb(31 41 51 / 6%),
+    0 6px 18px rgb(31 41 51 / 10%);
   transform: translateX(-50%);
 }
 
@@ -425,11 +440,22 @@ body {
   pointer-events: none;
 }
 
+/* The same scrim `AlertDialogOverlay` draws, in the same terms: a tenth of the
+   foreground's ink over whatever it covers. A 60% near-black was reading the
+   canvas as something to black out; on sand it has to recede the canvas without
+   extinguishing it, which is what tells the reader the pane is over a Space
+   rather than replacing it. */
 .card-pane__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(6, 8, 12, 0.6);
+  background: rgb(31 41 51 / 10%);
   pointer-events: auto;
+}
+
+@supports (backdrop-filter: blur(2px)) {
+  .card-pane__backdrop {
+    backdrop-filter: blur(2px);
+  }
 }
 
 /* The card frame. 16:9, matching `card.ts` — a card in the graph and the same
@@ -442,7 +468,11 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+  /* Deeper than the refusal's, being a full pane rather than a line of text,
+     and in the same ink for the same reason. */
+  box-shadow:
+    0 2px 4px rgb(31 41 51 / 6%),
+    0 18px 48px rgb(31 41 51 / 14%);
   aspect-ratio: 16 / 9;
   width: min(1100px, 100%, calc((100vh - 8rem) * 16 / 9));
   padding: 1rem 1.25rem;
@@ -523,8 +553,10 @@ body {
   line-height: 1.5;
 }
 
+/* The one refusal red, rather than a second one. `#fca5a5` was picked to carry
+   on a near-black pane and is barely a tint on the light one. */
 .card-pane__field-error {
-  color: #fca5a5;
+  color: var(--destructive);
   font-size: 0.8rem;
 }
 

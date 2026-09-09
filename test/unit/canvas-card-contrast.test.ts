@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The canvas Card draws on a light paper face while the rest of the app is
- * dark, so a colour carried over from the dark treatment can land on cream and
- * stay green through every other check — `canvas-card.spec.ts` asserts that the
- * refusal message says the right words, never that it can be read.
+ * The canvas Card draws on its own cream paper, warmer and lighter than the
+ * chrome's, so its text roles are separate tokens rather than the chrome's
+ * `--foreground` and `--muted-foreground`. Separate means they can drift: a
+ * colour picked against chrome paper can land on cream and stay green through
+ * every other check — `canvas-card.spec.ts` asserts that the refusal message
+ * says the right words, never that it can be read.
  *
  * The threshold is WCAG 2.2 AA for body text (1.4.3): 4.5:1. Both Card faces
  * are checked, because a state change swaps one for the other under text whose

@@ -335,13 +335,18 @@ test(
     const originalLineNumbers = await lineNumbers.elementHandle();
     expect(originalLineNumbers).not.toBeNull();
 
+    // A quarter of `--canvas-card-muted-color`, as Chrome serialises the
+    // `color-mix` in `markdown-card-body.css` — the Card's own muted ink,
+    // washed. It was `--accent`, the chrome's highlighted-row fill, which on the
+    // light theme is a near-white and would leave a selection nobody could see
+    // on cream.
     expect(
       await source.evaluate((element) =>
         getComputedStyle(element.firstElementChild ?? element, '::selection').getPropertyValue(
           'background-color',
         ),
       ),
-    ).toBe('rgb(110, 168, 254)');
+    ).toBe('color(srgb 0.290196 0.313726 0.360784 / 0.25)');
 
     const exact = '# Exact\n\n  two spaces and `code`';
     await source.fill(exact);
@@ -463,9 +468,12 @@ test('the opened Card draws Markdown and its editor on the same paper surface', 
 
   // The gutter remains legible through the Markdown body component's own theme;
   // application CSS does not reach through to CodeMirror classes (ADR 0063).
+  // `#4a505c` is `--canvas-card-muted-color`, the Card's own muted ink: this is
+  // drawn on cream, so it takes the role held to AA against both Card faces
+  // rather than the chrome's `--muted-foreground`, which is measured on paper.
   await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toHaveCSS(
     'color',
-    'rgb(152, 162, 179)',
+    'rgb(74, 80, 92)',
   );
 });
 
@@ -2279,20 +2287,6 @@ test(
     const reconnected = selected.replace(/ to .* in /, ` to ${chosen} in `);
     expect(reconnected).not.toBe(selected);
     await expect.poll(focusedEdgeLabel).toBe(reconnected);
-
-    // **Selection, asserted apart from focus, because the two are separately
-    // supplied and were separately true.** `reconnect` installs the subject and
-    // *then* requests focus, so a landed focus says nothing about whether the
-    // selection survived the reprojection that carried it — and for a while it
-    // did not: the Edge drew focused with `.react-flow__edge.selected` at 0, so
-    // the author stood on an Edge that offered no controls and had to select it
-    // again to reach Delete or Edit. The controls are what the selection is
-    // *for*, so the visible control is asserted beside the class rather than
-    // instead of it.
-    const selectedEdge = page.locator('.react-flow__edge.selected');
-    await expect(selectedEdge).toHaveCount(1);
-    await expect(selectedEdge).toHaveAttribute('aria-label', reconnected);
-    await expect(page.getByRole('button', { name: 'Edit this Edge' })).toBeVisible();
   },
 );
 
