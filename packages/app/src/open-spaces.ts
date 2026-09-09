@@ -41,12 +41,11 @@ export interface OpenSpacesState {
    * The Space each open Space was entered from, or `null` for one opened
    * directly. Every open Space has an entry; the map is total over `entries`.
    *
-   * **It is display-only, and it records entering rather than opening.** The
-   * switcher draws the open set as the tree that crossing makes, each Space
-   * under the one it was entered from — a decision taken against seven other
-   * schemes and recorded in `.scratch/command-dock/issues/01-...`. Nothing acts
-   * on it: Exit closes one Space whether or not anything hangs off it (ADR
-   * 0068), so this asserts a history and never a containment.
+   * This is the **Opener** CONTEXT.md gives the open set, and it is
+   * display-only: the switcher draws the set as the tree that crossing makes,
+   * each Space under the one it was entered from. Nothing acts on it — Exit
+   * closes one Space whether or not anything hangs off it (ADR 0068), so this
+   * asserts a history and never a containment.
    *
    * **Off {@link OpenSpace} on purpose.** An entry's object identity is
    * load-bearing here — `retired` is a `WeakSet` of them, `compositions`

@@ -142,7 +142,11 @@ Crossing into the Space a Space Card references, so that Space takes the canvas 
 _Avoid_: drilling in, zooming in, descending, push and pop, navigating into (as a name for the action — Entering is the name).
 
 **Open Spaces**:
-The Spaces open at once in one session, and the surface that draws them beside the Space Sidebar. Each entry names one Space. Selecting an entry switches to that Space and closes nothing, and an entry remembers nothing about how it was reached, so closing one Space never closes another. Every open Space keeps its own live Layout and Graph selection for as long as it is open. An entry may mark a Space that has stopped saving.
+The Spaces open at once in one session, and the surface that draws them beside the Space Sidebar. Each entry names one Space. Selecting an entry switches to that Space and closes nothing. Every open Space keeps its own live Layout and Graph selection for as long as it is open. An entry may mark a Space that has stopped saving.
+
+Every open Space records its **Opener**: the Space it was Entered from, or none for one opened directly. An address is not a crossing, so a Space reached by URL records none whatever was on the canvas when the location changed, and a Space is never its own Opener. The Opener is recorded once, at the crossing that first opened the Space — crossing back into a Space already open is returning to it rather than Entering it, so it keeps the Opener it joined the set with.
+
+**The Opener is a history and never a containment**, which is what keeps closing one Space from closing another. Exit closes only the Space exited, whether or not anything was Entered from it; what was Entered from an exiting Space stays open and takes over that Space's own Opener, so every open Space has one and the record stays whole.
 _Avoid_: rail (that is a Card's toolbar), tab (that is a browser's), stack (the model in which selecting an outer Space closes everything inside it, considered and rejected), breadcrumb, depth.
 
 **Presenting**:

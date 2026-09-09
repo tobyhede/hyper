@@ -592,10 +592,9 @@ describe('Open Spaces', () => {
    * What the switcher's tree is a picture of.
    *
    * The open set is drawn as the tree that *crossing* makes, each Space under
-   * the one it was entered from — chosen against seven other schemes and
-   * recorded in `.scratch/command-dock/issues/01-...`. Production had no parent
-   * of any kind before this, so a switcher indenting anything was indenting a
-   * fact nothing recorded.
+   * the one it was entered from — the **Opener** CONTEXT.md gives the open set.
+   * Production recorded no such crossing before this, so a switcher indenting
+   * anything was indenting a fact nothing held.
    *
    * It is display-only, and these tests are about the record rather than about
    * any behaviour hanging off it: Exit closes one Space whether or not something
@@ -617,6 +616,16 @@ describe('Open Spaces', () => {
     // Opened directly, with nothing on the canvas to have crossed from.
     expect(openSpaces.getState().openedFrom.get(META_ID)).toBe(null);
     expect(openSpaces.getState().openedFrom.get(OTHER_ID)).toBe(META_ID);
+
+    // An address is not a crossing. Other is on the canvas and the location
+    // changes underneath it, so the Space that arrives hangs off nothing —
+    // recording Other here would put Third under a Space it was never entered
+    // from, only standing beside.
+    await openSpaces.openPath(
+      productDestinationPath({ kind: 'layout', spaceId: THIRD_ID, layoutId: THIRD_LAYOUT_ID }),
+    );
+
+    expect(openSpaces.getState().openedFrom.get(THIRD_ID)).toBe(null);
   });
 
   it('keeps the opener a Space joined the set with when it is entered again', async () => {
