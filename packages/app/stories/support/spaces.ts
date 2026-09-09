@@ -6,6 +6,7 @@ import {
   type GraphEdge,
   type GraphId,
   type SpaceSnapshot,
+  type UUID,
 } from '@project/core';
 import {
   loadSpace,
@@ -292,35 +293,35 @@ const TRAVERSAL_CARDS = [
  * what the one-move story has to show, and what a sink reached by advancing
  * twice through it has to end.
  */
-export const traversalSpace: Space = loaded(
-  loadSpaceSnapshot({
-    id: uuidSchema.parse('00000000-0000-4000-8000-000000000041'),
-    document: {
-      version: 1,
-      title: 'Traversal',
-      defaultLayout: TRAVERSAL_LAYOUT,
-      layouts: [
-        {
-          id: TRAVERSAL_LAYOUT,
-          title: 'Traversal',
-          kind: 'positioned',
-          positions: traversalPositions(TRAVERSAL_CARDS.map(([id]) => id)),
-          graphs: [
-            {
-              id: uuidSchema.parse('00000000-0000-4000-8000-000000000061'),
-              title: 'Traversal',
-              edges: [
-                { from: TRAVERSAL_CARDS[0][0], to: TRAVERSAL_CARDS[1][0] },
-                { from: TRAVERSAL_CARDS[1][0], to: TRAVERSAL_CARDS[2][0] },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    cards: traversalCards(TRAVERSAL_CARDS),
-  }),
-);
+export const traversalSnapshot: SpaceSnapshot = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000041'),
+  document: {
+    version: 1,
+    title: 'Traversal',
+    defaultLayout: TRAVERSAL_LAYOUT,
+    layouts: [
+      {
+        id: TRAVERSAL_LAYOUT,
+        title: 'Traversal',
+        kind: 'positioned',
+        positions: traversalPositions(TRAVERSAL_CARDS.map(([id]) => id)),
+        graphs: [
+          {
+            id: uuidSchema.parse('00000000-0000-4000-8000-000000000061'),
+            title: 'Traversal',
+            edges: [
+              { from: TRAVERSAL_CARDS[0][0], to: TRAVERSAL_CARDS[1][0] },
+              { from: TRAVERSAL_CARDS[1][0], to: TRAVERSAL_CARDS[2][0] },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  cards: traversalCards(TRAVERSAL_CARDS),
+};
+
+export const traversalSpace: Space = loaded(loadSpaceSnapshot(traversalSnapshot));
 
 const DEEP_DIVE_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 const DEEP_DIVE_CARDS = [
@@ -343,32 +344,423 @@ const DEEP_DIVE_CARDS = [
  * bound and a Card's title no length limit, so a design that only ever sees two
  * short choices never shows what it does with either.
  */
-export const deepDiveSpace: Space = loaded(
-  loadSpaceSnapshot({
-    id: uuidSchema.parse('00000000-0000-4000-8000-000000000042'),
-    document: {
-      version: 1,
-      title: 'Deep dive',
-      defaultLayout: DEEP_DIVE_LAYOUT,
-      layouts: [
-        {
-          id: DEEP_DIVE_LAYOUT,
-          title: 'Deep dive',
-          kind: 'positioned',
-          positions: traversalPositions(DEEP_DIVE_CARDS.map(([id]) => id)),
-          graphs: [
-            {
-              id: uuidSchema.parse('00000000-0000-4000-8000-000000000071'),
-              title: 'Deep dive',
-              edges: DEEP_DIVE_CARDS.slice(1).map(([id]) => ({
-                from: DEEP_DIVE_CARDS[0][0],
-                to: id,
-              })),
-            },
-          ],
-        },
-      ],
-    },
-    cards: traversalCards(DEEP_DIVE_CARDS),
-  }),
-);
+export const deepDiveSnapshot: SpaceSnapshot = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000042'),
+  document: {
+    version: 1,
+    title: 'Deep dive',
+    defaultLayout: DEEP_DIVE_LAYOUT,
+    layouts: [
+      {
+        id: DEEP_DIVE_LAYOUT,
+        title: 'Deep dive',
+        kind: 'positioned',
+        positions: traversalPositions(DEEP_DIVE_CARDS.map(([id]) => id)),
+        graphs: [
+          {
+            id: uuidSchema.parse('00000000-0000-4000-8000-000000000071'),
+            title: 'Deep dive',
+            edges: DEEP_DIVE_CARDS.slice(1).map(([id]) => ({
+              from: DEEP_DIVE_CARDS[0][0],
+              to: id,
+            })),
+          },
+        ],
+      },
+    ],
+  },
+  cards: traversalCards(DEEP_DIVE_CARDS),
+};
+
+export const deepDiveSpace: Space = loaded(loadSpaceSnapshot(deepDiveSnapshot));
+
+/* -------------------------------------------------------------------------- */
+/* Command Dock                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Where the Command Dock prototype's identities live: `0x80`..`0xbf`.
+ *
+ * A reserved block, like {@link MINTED_GRAPH_ID_BASE} and for the same reason.
+ * Thirty-four Cards, Layouts and Graphs written out as full literals would bury
+ * the shape of the fixture in uuids, so they are minted from this base instead
+ * — and the base is declared here, above everything that draws from it, so the
+ * block a reader has to keep clear is visible in one place.
+ */
+const DOCK_ID_BASE = 0x80;
+
+const dockId = (offset: number): UUID =>
+  uuidSchema.parse(
+    `00000000-0000-4000-8000-${(DOCK_ID_BASE + offset).toString(16).padStart(12, '0')}`,
+  );
+
+const DOCK_COLLECTION_ONE = dockId(0);
+const DOCK_COLLECTION_TWO = dockId(1);
+
+/**
+ * The Cards `Collection 1` places, and all three kinds among them.
+ *
+ * The kinds are the point rather than decoration: the Dock's Cards list draws
+ * `CardKindIcon` on every row and the canvas draws the production `CardNode`,
+ * so a fixture of five markdown Cards would let a list and a canvas disagree
+ * about what a Space Card looks like without either being wrong.
+ *
+ * The second title is the long one, carried over from the inventory fixture for
+ * the same reason it exists there: three lines at 18px in a 260px Card is what
+ * the balance and the clamp are there to survive, and a Dock that occludes a
+ * Card is judged against a Card that is actually full.
+ */
+const DOCK_PLACED = [
+  { id: dockId(0x10), title: 'Opening', kind: 'markdown' },
+  {
+    id: dockId(0x11),
+    title: 'Why authored placement beats a layout engine that reshuffles on every edit',
+    kind: 'markdown',
+  },
+  { id: dockId(0x12), title: 'Strategies', kind: 'markdown' },
+  { id: dockId(0x13), title: 'Design system', kind: 'space' },
+  { id: dockId(0x14), title: 'Strategy overview', kind: 'alias' },
+] as const;
+
+/**
+ * The Cards `Collection 1` does *not* place — what the Dock's Cards surface offers.
+ *
+ * **Twenty-nine rather than four, and that count is the fixture's whole claim.**
+ * A list of four fits any surface and settles nothing, while a real Space's
+ * unplaced Cards outnumber its Layouts and Graphs by an order of magnitude. The
+ * open question the Dock's list surfaces are compared on — an edge drawer, an
+ * anchored popover, a second dock — is whether each can carry that many rows
+ * and still be dragged out of, so a fixture that cannot overrun a popover
+ * cannot be evidence either way.
+ *
+ * The Space Cards among them are not a separate fixture. They are what the
+ * Dock's Spaces list draws, which is the whole of the claim that a Space is a
+ * Card and needs no construct of its own.
+ */
+const DOCK_UNPLACED = [
+  { title: 'Constraints', kind: 'markdown' },
+  { title: 'Prior art', kind: 'markdown' },
+  { title: 'Persistence', kind: 'space' },
+  { title: 'Revision history', kind: 'markdown' },
+  { title: 'Optimistic commit', kind: 'markdown' },
+  { title: 'Conflict states', kind: 'markdown' },
+  { title: 'Retry policy', kind: 'markdown' },
+  { title: 'Handle geometry', kind: 'markdown' },
+  { title: 'Camera', kind: 'markdown' },
+  { title: 'Edge authoring', kind: 'space' },
+  { title: 'Traversal', kind: 'markdown' },
+  { title: 'Entry points', kind: 'markdown' },
+  { title: 'Unreachable Cards', kind: 'markdown' },
+  { title: 'Fork ranking', kind: 'markdown' },
+  { title: 'Vocabulary', kind: 'markdown' },
+  { title: 'Add vs Create', kind: 'markdown' },
+  { title: 'Layout strategies', kind: 'space' },
+  { title: 'Grid', kind: 'markdown' },
+  { title: 'Cluster', kind: 'markdown' },
+  { title: 'Tree', kind: 'markdown' },
+  { title: 'Sorts', kind: 'markdown' },
+  { title: 'Open size', kind: 'markdown' },
+  { title: 'Magnetic close', kind: 'markdown' },
+  { title: 'Rendering', kind: 'space' },
+  { title: 'HTTP boundary', kind: 'space' },
+  { title: 'Tooling', kind: 'space' },
+  { title: 'Camera overview', kind: 'alias' },
+  { title: 'Grid overview', kind: 'alias' },
+  { title: 'Traversal overview', kind: 'alias' },
+] as const;
+
+/** Every Card in the fixture, placed and unplaced, keyed by the title an alias names. */
+const DOCK_CARD_IDS: ReadonlyMap<string, UUID> = new Map([
+  ...DOCK_PLACED.map((card): [string, UUID] => [card.title, card.id]),
+  ...DOCK_UNPLACED.map((card, index): [string, UUID] => [card.title, dockId(0x20 + index)]),
+]);
+
+const dockCardId = (title: string): UUID => {
+  const id = DOCK_CARD_IDS.get(title);
+  if (id === undefined) throw new Error(`Command Dock fixture has no Card titled ${title}`);
+  return id;
+};
+
+/**
+ * The Spaces a Space Card here points at: the other tracked fixtures, in turn.
+ *
+ * Real ids rather than minted ones, because a Space Card's whole content is the
+ * Space it names — a fixture pointing at nothing would draw a Space Card that
+ * could never resolve, and the Dock's Spaces list is exactly the surface that
+ * would have to pretend otherwise.
+ */
+const DOCK_TARGET_SPACES = [authoredSnapshot.id, traversalSpace.id, deepDiveSpace.id] as const;
+
+const dockTargetSpace = (index: number): UUID =>
+  DOCK_TARGET_SPACES[index % DOCK_TARGET_SPACES.length] ?? authoredSnapshot.id;
+
+/**
+ * Which Card each Alias shows, named rather than derived from its title.
+ *
+ * A rule that stripped a suffix would make the Target a fact about spelling —
+ * `Strategy overview` would have to point at `Strategys` — and an Alias whose
+ * Target moves when someone rewords a title is not what ADR 0070 makes
+ * immutable.
+ */
+const DOCK_ALIAS_TARGETS = new Map([
+  ['Strategy overview', 'Strategies'],
+  ['Camera overview', 'Camera'],
+  ['Grid overview', 'Grid'],
+  ['Traversal overview', 'Traversal'],
+]);
+
+const dockAliasTarget = (title: string): UUID => {
+  const target = DOCK_ALIAS_TARGETS.get(title);
+  if (target === undefined) throw new Error(`Command Dock fixture Alias ${title} names no Target`);
+  return dockCardId(target);
+};
+
+type DockCardKind = 'markdown' | 'space' | 'alias';
+
+const dockCardDocument = (
+  title: string,
+  kind: DockCardKind,
+  index: number,
+): SpaceSnapshot['cards'][number]['document'] => {
+  if (kind === 'space') return { title, kind, spaceId: dockTargetSpace(index) };
+  if (kind === 'alias') return { title, kind, target: dockAliasTarget(title) };
+  return { title, kind, body: '' };
+};
+
+const DOCK_CARDS: SpaceSnapshot['cards'] = [
+  ...DOCK_PLACED.map((card, index) => ({
+    id: card.id,
+    document: dockCardDocument(card.title, card.kind, index),
+  })),
+  ...DOCK_UNPLACED.map((card, index) => ({
+    id: dockCardId(card.title),
+    document: dockCardDocument(card.title, card.kind, index),
+  })),
+];
+
+/** The first `links` steps along the placed Cards: Graphs of one shape at three lengths. */
+const dockChain = (links: number): GraphEdge[] =>
+  DOCK_PLACED.flatMap((card, index) => {
+    const to = DOCK_PLACED[index + 1];
+    return index < links && to !== undefined ? [{ from: card.id, to: to.id }] : [];
+  });
+
+const dockPositions = (count: number): Record<string, CardPlacement> =>
+  Object.fromEntries(
+    DOCK_PLACED.slice(0, count).map((card, index) => [
+      card.id,
+      { x: index * 420, y: 0, open: false },
+    ]),
+  );
+
+/**
+ * The Space the Command Dock prototype draws.
+ *
+ * Purpose-built, and deliberately not {@link authoredSpace}: that one exists to
+ * draw a sidebar and every Card in it is placed, so a Cards surface opened over
+ * it would have nothing to offer. The Dock needs three things at once that no
+ * existing fixture has together — **two Layouts** to switch between, **three
+ * Graphs over one Layout** so emphasis is a visible answer rather than a
+ * one-member choice, and **many more unplaced Cards than placed ones**, which
+ * is what its list surfaces are being compared on.
+ *
+ * **No Graph carries a colour**, exactly as `authoredSnapshot` does not: a Graph
+ * without one takes a palette slot by order through `graphColorMap`. The
+ * prototype this replaced wrote `#4c8dff`, `#d08a3a` and `#2f9e8f` out by hand,
+ * which is a fixture free to disagree with the palette the canvas draws.
+ *
+ * It **declares where it opens**, so `defaultLayout` answers that for the Dock
+ * exactly as it does for the app.
+ */
+export const commandDockSnapshot: SpaceSnapshot = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000043'),
+  document: {
+    version: 1,
+    title: 'Rendering',
+    defaultLayout: DOCK_COLLECTION_ONE,
+    layouts: [
+      {
+        id: DOCK_COLLECTION_ONE,
+        title: 'Collection 1',
+        kind: 'positioned',
+        positions: dockPositions(5),
+        graphs: [
+          { id: dockId(2), title: 'Long', edges: dockChain(4) },
+          { id: dockId(3), title: 'Mid', edges: dockChain(3) },
+          { id: dockId(4), title: 'Short', edges: dockChain(2) },
+        ],
+      },
+      {
+        id: DOCK_COLLECTION_TWO,
+        title: 'Collection 2',
+        kind: 'positioned',
+        positions: dockPositions(2),
+        graphs: [{ id: dockId(5), title: 'Echo', edges: dockChain(1) }],
+      },
+    ],
+  },
+  cards: DOCK_CARDS,
+};
+
+export const commandDockSpace: Space = loaded(loadSpaceSnapshot(commandDockSnapshot));
+
+/* -------------------------------------------------------------------------- */
+/* Crossing chain                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** Where the crossing chain's identities live: `0xd0`..`0xef`. */
+const CHAIN_ID_BASE = 0xd0;
+
+const chainId = (offset: number): UUID =>
+  uuidSchema.parse(
+    `00000000-0000-4000-8000-${(CHAIN_ID_BASE + offset).toString(16).padStart(12, '0')}`,
+  );
+
+/**
+ * A Space whose Cards are all Space Cards: one link in a chain of crossings.
+ *
+ * **Depth is what these exist for.** Meta held every other fixture directly, so
+ * the deepest trail a reader could walk was two — Meta and the Space they
+ * entered — and a trail two deep cannot show what a Dock does with a trail that
+ * outgrows it. Two links between Meta and the Dock's own Space make the walk
+ * `Meta ▸ Platform ▸ Design system ▸ Rendering`, which is the shape the
+ * collapsed form is judged on.
+ *
+ * They are ordinary Spaces and the crossing into them is the ordinary one: a
+ * Space Card names a target, and the target is a tracked fixture that loads.
+ * Seeding a session with a path no Space Card supports would draw a trail the
+ * prototype could not have been walked into.
+ *
+ * Each takes a **block of sixteen** off {@link CHAIN_ID_BASE} — the Space, its
+ * Layout, its Graph, then one Card per target — so a link that gains a target
+ * cannot reach into the next link's ids.
+ */
+const crossingSpace = (
+  block: number,
+  title: string,
+  targets: readonly (readonly [string, UUID])[],
+): SpaceSnapshot => ({
+  id: chainId(block),
+  document: {
+    version: 1,
+    title,
+    defaultLayout: chainId(block + 1),
+    layouts: [
+      {
+        id: chainId(block + 1),
+        title: 'Catalogue',
+        kind: 'positioned',
+        positions: Object.fromEntries(
+          targets.map((_, index): [string, CardPlacement] => [
+            chainId(block + 3 + index),
+            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
+          ]),
+        ),
+        graphs: [{ id: chainId(block + 2), title: 'Catalogue', edges: [] }],
+      },
+    ],
+  },
+  cards: targets.map(([cardTitle, spaceId], index) => ({
+    id: chainId(block + 3 + index),
+    document: { title: cardTitle, kind: 'space', spaceId },
+  })),
+});
+
+/** The link above the Dock's own Space, and the one the Dock's trail names. */
+export const designSystemSnapshot: SpaceSnapshot = crossingSpace(0x00, 'Design system', [
+  ['Rendering', commandDockSnapshot.id],
+  ['Space', authoredSnapshot.id],
+  ['Traversal', traversalSnapshot.id],
+]);
+
+/** The link below Meta, which a deep trail collapses. */
+export const platformSnapshot: SpaceSnapshot = crossingSpace(0x10, 'Platform', [
+  ['Design system', designSystemSnapshot.id],
+  ['Deep dive', deepDiveSnapshot.id],
+]);
+
+export const designSystemSpace: Space = loaded(loadSpaceSnapshot(designSystemSnapshot));
+export const platformSpace: Space = loaded(loadSpaceSnapshot(platformSnapshot));
+
+/* -------------------------------------------------------------------------- */
+/* Meta Space                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** Where the Meta Space fixture's identities live: `0xc0`..`0xcf`. */
+const META_ID_BASE = 0xc0;
+
+const metaId = (offset: number): UUID =>
+  uuidSchema.parse(
+    `00000000-0000-4000-8000-${(META_ID_BASE + offset).toString(16).padStart(12, '0')}`,
+  );
+
+/**
+ * Every Space there is, as the Space Cards that reference them (ADR 0074).
+ *
+ * A Card's title is its own and the Space it points at has its own name, so
+ * one of these deliberately disagrees: `Design system` in the Command Dock
+ * fixture targets the Space titled `Space`. That is not a fixture error — it is
+ * the question a crossing trail has to answer, since the row you pressed and
+ * the Space you arrive in are named by two different authors.
+ */
+const META_TARGETS = [
+  ['Platform', platformSnapshot.id],
+  ['Rendering', commandDockSnapshot.id],
+  ['Space', authoredSnapshot.id],
+  ['Traversal', traversalSnapshot.id],
+  ['Deep dive', deepDiveSnapshot.id],
+] as const satisfies readonly (readonly [string, UUID])[];
+
+/**
+ * Meta's own identity, and the Layout and Graph it owns — three values from the
+ * reserved block rather than one shared between kinds.
+ *
+ * The Space used to spell its Id as the literal `metaId(0)` resolves to, so the
+ * Space *was* its Catalogue Layout as far as any Id comparison could tell, and
+ * `/spaces/:spaceId/views/:layoutId` drew the same 22 characters twice.
+ */
+const META_SPACE_ID = metaId(0);
+const META_LAYOUT = metaId(1);
+const META_GRAPH = metaId(2);
+
+/**
+ * The permanent Meta Space, which every other Space traces up to (ADR 0074).
+ *
+ * It exists here so the Command Dock prototype has a **root to exit to**. Meta
+ * is where navigation starts and the one Space no reference reaches, so it is
+ * the one crumb a crossing trail can never pop — and a prototype whose trail
+ * bottoms out in whichever Space the story happened to open cannot show that.
+ *
+ * Its Cards are all Space Cards, which is the whole of CONTEXT's claim that at
+ * the top level "every Space there is" needs no construct of its own: the list
+ * a Space offers is the Space Cards in it, and up here that list is the
+ * catalogue.
+ */
+export const metaSnapshot: SpaceSnapshot = {
+  id: META_SPACE_ID,
+  document: {
+    version: 1,
+    title: 'Meta Space',
+    defaultLayout: META_LAYOUT,
+    layouts: [
+      {
+        id: META_LAYOUT,
+        title: 'Catalogue',
+        kind: 'positioned',
+        positions: Object.fromEntries(
+          META_TARGETS.map((_, index): [string, CardPlacement] => [
+            metaId(0x8 + index),
+            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
+          ]),
+        ),
+        graphs: [{ id: META_GRAPH, title: 'Catalogue', edges: [] }],
+      },
+    ],
+  },
+  cards: META_TARGETS.map(([title, spaceId], index) => ({
+    id: metaId(0x8 + index),
+    document: { title, kind: 'space', spaceId },
+  })),
+};
+
+export const metaSpace: Space = loaded(loadSpaceSnapshot(metaSnapshot));

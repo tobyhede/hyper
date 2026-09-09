@@ -5,6 +5,8 @@ import { requireDefaultLayout } from '../src/layout-resolution';
 import {
   authoredSnapshot,
   authoredSpace,
+  commandDockSpace,
+  metaSnapshot,
   sparseAuthoredSnapshot,
   deepDiveSpace,
   editedSnapshot,
@@ -113,11 +115,13 @@ describe('the story Spaces', () => {
 
     const declared = new Set<string>([
       authoredSnapshot.id,
-      ...[authoredSpace, edited.space, traversalSpace, deepDiveSpace].flatMap((space) => [
-        ...space.cards.map((card) => card.id),
-        ...space.layouts.map((layout) => layout.id),
-        ...space.graphs.map((graph) => graph.id),
-      ]),
+      ...[authoredSpace, edited.space, traversalSpace, deepDiveSpace, commandDockSpace].flatMap(
+        (space) => [
+          ...space.cards.map((card) => card.id),
+          ...space.layouts.map((layout) => layout.id),
+          ...space.graphs.map((graph) => graph.id),
+        ],
+      ),
     ]);
 
     const mint = storyGraphIds();
@@ -201,5 +205,89 @@ describe('the story Spaces', () => {
       'Echo',
     ]);
     expect(authoredSpace.graphs.every((graph) => graph.color === undefined)).toBe(true);
+  });
+
+  /**
+   * The Command Dock's Space, held to the three things it exists to supply.
+   *
+   * The prototype it feeds compares list surfaces, Layout switching and Graph
+   * emphasis, and each of those needs a shape no other fixture has: **more
+   * unplaced Cards than a popover can comfortably hold**, **two Layouts**, and
+   * **three Graphs over the opening one** so emphasis is a real choice rather
+   * than a one-member list. Pinned here because all three are quietly easy to
+   * lose — a Card placed while adjusting the fixture empties the Cards list,
+   * and a Graph removed makes emphasis unjudgeable — and the loss would show up
+   * as a prototype that reads fine and settles nothing.
+   */
+  it('gives the Command Dock two Layouts, three Graphs over the first, and Cards outside it', () => {
+    const opens = requireDefaultLayout(commandDockSpace);
+    const layout = commandDockSpace.lookup.layout(opens)?.layout;
+
+    expect(opens).toBe(commandDockSpace.defaultLayout);
+    expect(openedLayoutTitle(commandDockSpace, opens)).toBe('Collection 1');
+    expect(commandDockSpace.layouts.map((entry) => entry.title)).toEqual([
+      'Collection 1',
+      'Collection 2',
+    ]);
+    expect(layout?.graphs.map((graph) => graph.title)).toEqual(['Long', 'Mid', 'Short']);
+
+    const unplaced = commandDockSpace.cards.filter(
+      (card) => layout?.positions[card.id] === undefined,
+    );
+    expect(unplaced.length).toBeGreaterThan(Object.keys(layout?.positions ?? {}).length * 4);
+  });
+
+  /**
+   * All three Card kinds, in one Space, on both sides of placement.
+   *
+   * The Dock draws `CardKindIcon` on every list row while the canvas draws the
+   * production `CardNode`, so a fixture whose placed Cards were all markdown
+   * would let the list and the canvas disagree about a kind without either
+   * being wrong.
+   */
+  it('carries every Card kind on the Command Dock canvas and in its Cards list', () => {
+    const opens = requireDefaultLayout(commandDockSpace);
+    const layout = commandDockSpace.lookup.layout(opens)?.layout;
+    const kinds = (cards: readonly { readonly kind: string }[]): readonly string[] =>
+      [...new Set(cards.map((card) => card.kind))].sort();
+
+    const placed = commandDockSpace.cards.filter(
+      (card) => layout?.positions[card.id] !== undefined,
+    );
+    const unplaced = commandDockSpace.cards.filter(
+      (card) => layout?.positions[card.id] === undefined,
+    );
+
+    expect(kinds(placed)).toEqual(['alias', 'markdown', 'space']);
+    expect(kinds(unplaced)).toEqual(['alias', 'markdown', 'space']);
+  });
+
+  /**
+   * The Command Dock's Graphs carry no colour either, for `authoredSpace`'s
+   * reason: the prototype this fixture replaced wrote three hex literals out by
+   * hand, which is a fixture free to disagree with the palette the canvas draws.
+   */
+  it('leaves the palette to colour the Command Dock Graphs', () => {
+    expect(commandDockSpace.graphs.filter((graph) => graph.color !== undefined)).toEqual([]);
+  });
+  /**
+   * **A Space, its Layouts and its Graphs are four kinds of thing with one
+   * spelling for identity, so a fixture that reuses a value hides the mistake
+   * a real reader would make.** Meta's own Id was written as a literal and its
+   * Catalogue Layout as `metaId(0)`, which is the same UUID — so the product
+   * URL ADR 0069 builds for it read `/spaces/<X>/views/<X>`, and any assertion
+   * that a Layout is not its Space passed here without meaning anything.
+   */
+  it('gives the Meta Space an identity none of its own Layouts or Graphs shares', () => {
+    const { layouts } = metaSnapshot.document;
+    if (layouts === undefined) throw new Error('The Meta Space declares no Layout.');
+    const layoutIds = layouts.map(({ id }) => id);
+    const graphIds = layouts.flatMap(({ graphs }) => graphs.map(({ id }) => id));
+    const owned = [...layoutIds, ...graphIds];
+
+    expect(owned).not.toContain(metaSnapshot.id);
+    // And the Layouts and Graphs are distinct from each other, which is the
+    // same rule one level down.
+    expect(new Set(owned).size).toBe(owned.length);
   });
 });

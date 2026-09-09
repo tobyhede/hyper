@@ -34,7 +34,7 @@ const STATUS_LABELS = {
  * reporting that state changes with it.
  *
  * It exists because there is a second surface. The Command Dock's Space
- * switcher reports the same three states over the same open set, and reporting
+ * Open Spaces menu reports the same three states over the same open set, and reporting
  * them in words of its own is how a reader learns that "Save failed" and
  * "Changes not saved" are two different things.
  */

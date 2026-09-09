@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
+import type { Card } from '@project/core';
 
 type CardActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
@@ -194,10 +195,17 @@ export const ParentIcon = ({ size = 14 }: { size?: number | undefined }) => {
  *
  * An Alias is deliberately absent: it is not a third silhouette but a badge on
  * one of these two.
+ *
+ * **Subtracted from the domain union rather than restated as its own.** Written
+ * out as `'markdown' | 'space'` it was a second list agreeing with `Card['kind']`
+ * only by hand, so a kind added to the domain left every record keyed by this
+ * type exhaustive and wrong. Derived, the addition lands here, and
+ * {@link BASE_GLYPHS} fails to build until the new kind has a silhouette.
  */
-export type CardBaseKind = 'markdown' | 'space';
+export type CardBaseKind = Exclude<Card['kind'], 'alias'>;
 
-const BASE_GLYPHS = {
+/** The silhouette each Card kind that owns one draws. */
+export const BASE_GLYPHS = {
   markdown: MarkdownIcon,
   space: SpaceCardIcon,
 } satisfies Record<CardBaseKind, ComponentType<{ size?: number }>>;
