@@ -990,6 +990,46 @@ describe('render adapter', () => {
   });
 
   /*
+   * An embedded Layout's live edit is an Interaction of the canvas, so it is
+   * held beside `resizeDraft` rather than reported up through a callback prop:
+   * this store is what re-renders the Space's command surface and the canvas
+   * together, and every availability answer is derived once, above both of them
+   * (`authoring-availability.ts`).
+   */
+  it('carries no embedded edit before the canvas has reported one', () => {
+    expect(adapter().getState().editingEmbeddedLayout).toBe(false);
+  });
+
+  it("takes the canvas's report of a live embedded edit and of its end", () => {
+    const store = adapter();
+
+    store.getState().reportEmbeddedLayoutEditing(true);
+    expect(store.getState().editingEmbeddedLayout).toBe(true);
+
+    store.getState().reportEmbeddedLayoutEditing(false);
+    expect(store.getState().editingEmbeddedLayout).toBe(false);
+  });
+
+  /*
+   * The canvas reports what it currently holds rather than a transition, so the
+   * same answer arrives again whenever anything else about the embeddings
+   * changes. Publishing a fresh state for it would notify every subscriber of
+   * this store — the projection's readers included — for a fact none of them
+   * has seen change.
+   */
+  it('publishes nothing for a report that says what the store already holds', () => {
+    const store = adapter();
+    const seen: boolean[] = [];
+    store.subscribe((state) => seen.push(state.editingEmbeddedLayout));
+
+    store.getState().reportEmbeddedLayoutEditing(false);
+    store.getState().reportEmbeddedLayoutEditing(true);
+    store.getState().reportEmbeddedLayoutEditing(true);
+
+    expect(seen).toEqual([true]);
+  });
+
+  /*
    * Accepting a stored Space replaces the working state without unmounting
    * anything, so this store is left holding a projection of Cards that may no
    * longer exist. Local placement cannot outlive the Space it belonged to

@@ -201,6 +201,23 @@ export interface RenderAdapterState {
   selection: CanvasSelection;
   /** One transient resize layered over the authored Placement. */
   resizeDraft: ResizeDraft | null;
+  /**
+   * Whether some embedded Layout on this canvas is running a Card edit.
+   *
+   * The one Interaction fact this store holds that it does not itself produce.
+   * A Space Card draws another Space's Layout inside this one, and an edit
+   * begun in there withdraws authoring from the canvas around it
+   * (`authoring-availability.ts`'s `editingEmbeddedLayout`). It begins and ends
+   * inside the canvas subtree, so it has to be published to be read above it —
+   * and it is published *here*, beside `resizeDraft`, because both are drafts
+   * of one canvas gesture and because this store re-renders the Space's command
+   * surface and the canvas together. A callback prop into the composition root
+   * would report it an effect late instead.
+   *
+   * The aggregate only. Which embedding holds the edit is a question about a
+   * Card of that canvas and is answered where the Cards are.
+   */
+  editingEmbeddedLayout: boolean;
   /** Publish projected Card nodes, their declared handles and Graph Edges together. */
   syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
   /**
@@ -219,6 +236,14 @@ export interface RenderAdapterState {
    * kind this store owns.
    */
   changeEdges: (changes: EdgeChange<Edge>[]) => void;
+  /**
+   * Report whether any embedded Layout on this canvas is now running an edit.
+   *
+   * A report of what the canvas currently holds rather than of a transition, so
+   * an unchanged answer publishes nothing: this store's subscribers include
+   * every reader of the projection, and none of them has seen this change.
+   */
+  reportEmbeddedLayoutEditing: (editing: boolean) => void;
   /** Select one Card after a completed connection. */
   selectCard: (cardId: CardId) => void;
   /**
@@ -411,6 +436,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     moved: false,
     selection: NO_SELECTION,
     resizeDraft: null,
+    editingEmbeddedLayout: false,
 
     // Written once, here, and by nothing after: every `set` below merges a
     // partial, so this reference is what the canvas keeps holding.
@@ -502,6 +528,10 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         resizeDraft: null,
       });
       authoring.replacePlacement(placement);
+    },
+
+    reportEmbeddedLayoutEditing: (editing) => {
+      if (get().editingEmbeddedLayout !== editing) set({ editingEmbeddedLayout: editing });
     },
 
     selectCard: (cardId) => set((state) => selecting(state, { kind: 'card', cardId })),
