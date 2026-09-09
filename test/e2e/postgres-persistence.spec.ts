@@ -4,6 +4,7 @@ import { encodeCompactUuid, newUuid, type UUID } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
+import { clearHyperContent } from '../support/clear-hyper-content';
 import { dragBy, nodeByTitle, positionOf, settled } from '../../packages/app/e2e/graph';
 import { POSTGRES_E2E_PORT } from '../../packages/app/e2e/projects';
 
@@ -141,8 +142,21 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     // here throws over whatever failure sent us into this block, and would also
     // strand the connection below unclosed.
     try {
-      await db.orm.public.Card.where({ spaceId }).delete();
-      await db.orm.public.Space.where({ id: spaceId }).delete();
+      // Not a per-Space delete, because on a fresh database this Space *is* the
+      // Meta Space: `importSpaces` takes the `initializeAggregate` branch when no
+      // Meta identity is stored, and makes the first Space imported the Meta one.
+      // `repository_state_meta_space_id_fkey` is `Restrict`, so deleting it then
+      // fails — which the integration suite asserts on purpose, in *prevents
+      // direct deletion of the Meta Space while repository state names it*. That
+      // is also why this passes on a developer's database and failed in CI: a
+      // database that already holds a Meta Space takes the ordinary insert branch
+      // and the old cleanup had nothing to trip over.
+      //
+      // `clearHyperContent` drops the repository-state row first, which is what
+      // releases the key, and it is the same reset the integration suite runs.
+      // Safe here for the reason it is safe there: `workers: 1` and one test, so
+      // nothing else holds this `DATABASE_URL`.
+      await clearHyperContent();
       spaceRemains = (await repository.loadSpace(spaceId)) !== undefined;
     } finally {
       await db.close();
