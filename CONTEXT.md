@@ -86,6 +86,14 @@ What an authoring attempt produces: **completed**, **unchanged** or **refused**,
 None of the three is an error. A refusal is an anticipated outcome of attempting an Edit, not an exception, which is why it is named apart from one. A broken invariant is neither completed, unchanged, nor refused — it throws, or is reported through the non-throwing reporter, because dressing a programming defect as a refusal would put it in front of the author as their own mistake.
 _Avoid_: error, failure, exception (all reserved for a broken invariant or a thrown/reported defect — never for one of the three outcomes), validation error.
 
+**Availability**:
+Whether an authoring operation may be started now, given what is already in progress. A live rename, a creation pane over the canvas, an Open Card, a Layout whose placement has not resolved — each withholds some operations and leaves others available. Availability is one question with many answers, not one rule per control: the same facts decide what the Space's command surface offers and what the canvas offers, and an answer omitted at one of them is how two surfaces come to disagree about the same operation.
+
+An unavailable operation is **not a refusal**. Nothing was attempted, so there is no Edit to refuse and no refusal code to name; the three completion outcomes describe an attempt that was made, and availability decides which attempts a surface offers to make in the first place.
+
+Availability reads what is in progress and never reads the Space. Whether a proposed Edge may exist is a different question with a different answer, taken against the Space itself.
+_Avoid_: eligibility (that is the Space's answer about a proposed thing — an Edge between two Cards — and this one never reads the Space), permission, enabled and disabled (how a surface draws an answer, not the answer; a withheld command may equally be absent), refusal (reserved for an attempt that was made), mode.
+
 **Replacement epoch**:
 Which epoch of the working Space a piece of local work was made against. Replacing the working Space wholesale — accepting the stored Space is the only thing that does it — advances the epoch once, as part of the same transition that installs the replacement. Nothing else advances it: retrying, keeping local work, a change in persistence status, choosing another Layout, and completing an Edit all leave it where it is.
 
