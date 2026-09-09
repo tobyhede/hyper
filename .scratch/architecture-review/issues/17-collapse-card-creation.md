@@ -16,23 +16,26 @@ module". Validated against that branch at `675a0e53`.
 Both sections below stand as written except for these, which the build departed
 from deliberately. Read them first.
 
-**A reducer, not an observable-state module composed in `compose-app.ts`.**
-"Direction" asks for framework-free state behind `createObservableState`, read
-through one `useSyncExternalStore`, and "Composition" asks that `composeApp`
-gain `spaceCards`. Neither was built. `edge-authoring.ts` is a store for three
-reasons — React Flow asks it synchronous questions mid-gesture, its operations
-answer values to their callers, and it invalidates itself from two collaborator
-subscriptions — and none of the three is true here: nothing asks this module a
-question during a gesture, no operation answers one, and its external facts
-arrive as ordinary dispatches. So the transitions are a pure reducer private to
-`card-creation.ts`, and `createCardCreation` is an asynchronous shell that owns
-the state the reducer answers rather than taking a render's — see "Answer"
-below, which corrects the rest of this paragraph as first written. The reason
-the ticket wanted composition — a test driving a transition with no React tree —
-is delivered in full by `packages/app/test/card-creation-state.test.ts`, so
-nothing was added to `compose-app.ts` and `spaceCards` stays on the `OpenSpace`
-entry; the two seams are memoized by `App` and passed to the hook. Recorded in
-`docs/agents/ui.md`.
+**Observable state, but not composed in `compose-app.ts`.** "Direction" asks
+for framework-free state behind `createObservableState`, read through one
+`useSyncExternalStore`, and "Composition" asks that `composeApp` gain
+`spaceCards`. The first was built and the second was not.
+
+The transitions are a pure reducer private to `card-creation.ts`, and
+`createCardCreation` owns the state they answer: it installs and publishes
+through `createObservableState`, and `useCardCreation` mounts one instance and
+reads it through `useSyncExternalStore`. What it is not is a store —
+`edge-authoring.ts` is one for three reasons — React Flow asks it synchronous
+questions mid-gesture, its operations answer values to their callers, and it
+invalidates itself from two collaborator subscriptions — and none of the three
+is true here: nothing asks this module a question during a gesture, no
+operation answers one, and its external facts arrive as ordinary calls.
+
+The reason the ticket wanted composition — a test driving a transition with no
+React tree — is delivered in full by
+`packages/app/test/card-creation-state.test.ts`, so nothing was added to
+`compose-app.ts` and `spaceCards` stays on the `OpenSpace` entry; the two seams
+are memoized by `App` and passed to the hook. Recorded in `docs/agents/ui.md`.
 
 ## The problem
 

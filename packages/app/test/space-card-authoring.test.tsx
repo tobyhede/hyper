@@ -488,7 +488,7 @@ describe('a coordination that broke rather than refused', () => {
    */
   it('says what broke when a create rejects', async () => {
     // The rejection is reported too, since nothing else would say what broke.
-    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { session } = mount(other, {
       create: () => Promise.reject(new Error('the coordination lost a session')),
     });
@@ -500,8 +500,7 @@ describe('a coordination that broke rather than refused', () => {
       await screen.findByText('This Card was not created: the coordination lost a session'),
     ).toBeVisible();
     expect(screen.getByTestId('new-space-card')).toBeVisible();
-    expect(reported).toHaveBeenCalled();
-    reported.mockRestore();
+    expect(consoleError).toHaveBeenCalled();
     await settled(session);
   });
 
@@ -542,13 +541,20 @@ describe('a coordination that broke rather than refused', () => {
    * again the day a fourth joins the union.
    */
   it('leaves the pane open when the lifecycle answers unchanged', async () => {
-    const { session } = mount(other, { create: () => Promise.resolve({ kind: 'unchanged' }) });
+    const create = vi.fn<SpaceCardAuthoring['create']>(() =>
+      Promise.resolve({ kind: 'unchanged' }),
+    );
+    const { session } = mount(other, { create });
 
     await openSpaceCardCreation();
     chooseTarget('A new Space');
     createNamed('Architecture');
 
     await waitFor(() => expect(screen.getByTestId('new-space-card-create')).toBeEnabled());
+    // The attempt is what makes the three assertions below evidence: an open
+    // pane, live exits and no Space Card are also exactly what a Create that
+    // never reached the lifecycle would leave behind.
+    expect(create).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('dialog', { name: 'New Space Card' })).toBeVisible();
     expect(spaceCardsOf(session)).toHaveLength(0);
     await settled(session);
@@ -729,8 +735,9 @@ describe('creating before the target list has been seen', () => {
   });
 
   it('withholds Create when the stored Spaces could not be read', async () => {
-    // The read is reported as well as shown, and this test is about the pane.
-    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    // The read is reported as well as shown — proved by its own test above —
+    // and this test is about the pane, so the sink is only silenced here.
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { session } = mount(other, {
       referenceableSpaces: () => Promise.reject(new Error('the transport timed out')),
     });
@@ -742,7 +749,6 @@ describe('creating before the target list has been seen', () => {
     expect(screen.getByTestId('new-space-card-create')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
     expect(spaceCardsOf(session)).toHaveLength(0);
-    reported.mockRestore();
     await settled(session);
   });
 });
