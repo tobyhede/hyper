@@ -4,6 +4,7 @@ import {
   describeAuthoringRefusal,
   describePersistenceFailure,
   describeStoredSpaceRefusal,
+  type PersistenceFailure,
   presentEdgeDeletionRefusal,
   presentEdgeEndpointRefusal,
   presentNewAliasRefusal,
@@ -12,6 +13,9 @@ import type { AuthoringRefusal } from '../src/space-authoring';
 
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+
+/** One transport sentence, so any copy that leaked it is visible as a collision. */
+const WIRE = 'the transport said this';
 
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
 const EVERY_REFUSAL = {
@@ -155,6 +159,36 @@ describe('describePersistenceFailure', () => {
   });
 
   /**
+   * One sample of every persistence failure, keyed by code, on the same
+   * precedent as `EVERY_REFUSAL` above: `satisfies` proves a sentence exists
+   * for each code, not that it is reachable, distinct, or the right one.
+   *
+   * Every `message` here is deliberately the same string, so a sentence that
+   * leaked the transport's prose would collapse the distinctness assertion
+   * rather than passing quietly.
+   */
+  const EVERY_FAILURE = {
+    network: { kind: 'retryable-failure', code: 'network', message: WIRE },
+    timeout: { kind: 'retryable-failure', code: 'timeout', message: WIRE },
+    unavailable: { kind: 'retryable-failure', code: 'unavailable', message: WIRE },
+    'rate-limited': { kind: 'retryable-failure', code: 'rate-limited', message: WIRE },
+    'invalid-commit': { kind: 'permanent-failure', code: 'invalid-commit', message: WIRE },
+    forbidden: { kind: 'permanent-failure', code: 'forbidden', message: WIRE },
+    'payload-too-large': { kind: 'permanent-failure', code: 'payload-too-large', message: WIRE },
+    protocol: { kind: 'permanent-failure', code: 'protocol', message: WIRE },
+  } as const satisfies Readonly<Record<PersistenceFailure['code'], PersistenceFailure>>;
+
+  it('gives every code a sentence of its own, and none of them the wire’s', () => {
+    const descriptions = Object.values(EVERY_FAILURE).map(describePersistenceFailure);
+
+    for (const description of descriptions) {
+      expect(description).not.toBe(WIRE);
+      expect(description.length).toBeGreaterThan(0);
+    }
+    expect(new Set(descriptions).size).toBe(descriptions.length);
+  });
+
+  /**
    * `protocol` is a bucket, and one of the conditions in it is actionable.
    * A commit over the server's size limit is not a disagreement about format:
    * the author can fix it by making the Card smaller, and the sentence has to
@@ -186,6 +220,46 @@ describe('describePersistenceFailure', () => {
  * above, which names Spaces the author was just editing and can fix.
  */
 describe('describeStoredSpaceRefusal', () => {
+  it('tells an author whose Space was deleted what recovers it', () => {
+    expect(describeStoredSpaceRefusal({ code: 'stored-space-deleted' })).toBe(
+      'This Space was deleted while the coordinated edit was saving. Keep your local version to restore it.',
+    );
+  });
+
+  /**
+   * A shape or version failure names nothing: the document as a whole is what
+   * failed, so there is no reference to recite and the sentence stands alone.
+   */
+  it('says only the sentence when no error carries an identity', () => {
+    expect(
+      describeStoredSpaceRefusal({
+        code: 'stored-space-invalid',
+        errors: [{ kind: 'invalid-shape', message: 'document is not an object' }],
+      }),
+    ).toBe('The remote space is invalid and was not accepted.');
+  });
+
+  /**
+   * The recital is capped because the alert announces it.
+   *
+   * The point of naming a reference is to give the author one handle to report;
+   * a `role="alert"` reading out dozens of UUIDs is the illegibility the
+   * aggregate table above is written to avoid, arriving by another route.
+   */
+  it('caps how many references it recites and says how many it left out', () => {
+    const errors = Array.from({ length: 7 }, (_, index) => ({
+      kind: 'graph-edge-missing-card' as const,
+      ref: `00000000-0000-4000-8000-00000000000${index}`,
+      message: 'graph edge references unknown card',
+    }));
+
+    const description = describeStoredSpaceRefusal({ code: 'stored-space-invalid', errors });
+
+    expect(description).toContain('00000000-0000-4000-8000-000000000000');
+    expect(description).not.toContain('00000000-0000-4000-8000-000000000006');
+    expect(description).toContain('4 more');
+  });
+
   it('names the failing reference and not intake’s own prose', () => {
     const description = describeStoredSpaceRefusal({
       code: 'stored-space-invalid',

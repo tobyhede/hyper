@@ -172,6 +172,50 @@ describe('PersistenceControl', () => {
 
     expect(screen.getByText(sentence)).toBeVisible();
   });
+
+  /**
+   * Two rejections of one code are two rejections.
+   *
+   * Dismissing the dialog is an acknowledgement of the failure in front of the
+   * author, not a standing preference, so the next failure has to draw it
+   * again. Nothing in the failure's *value* can tell the two apart now the
+   * transport's message is unread — both are `invalid-commit` and nothing else
+   * — so what separates them is that they are different publications, and the
+   * control follows the failure it was handed rather than a key derived from
+   * what that failure says.
+   *
+   * The coordinated path is why this matters rather than being theoretical:
+   * `prepareCoordinatedCommit` installs `pending` without notifying, so the
+   * render that would otherwise unmount this control between two rejections is
+   * not guaranteed to happen.
+   */
+  it('draws a second rejection of the same code after the first was dismissed', () => {
+    const rejection = (message: string) =>
+      ({
+        kind: 'rejected',
+        failure: { kind: 'permanent-failure', code: 'invalid-commit', message },
+      }) as const;
+    const view = render(
+      <PersistenceControl
+        persistence={rejection('first')}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('persistence-rejection-continue'));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    view.rerender(
+      <PersistenceControl
+        persistence={rejection('second')}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
+  });
 });
 
 /**

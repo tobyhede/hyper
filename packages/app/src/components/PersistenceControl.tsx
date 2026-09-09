@@ -44,9 +44,6 @@ const rejectionDescription = ({ failure }: Rejection): string =>
     ? describeAggregateRefusal(failure.errors)
     : describePersistenceFailure(failure);
 
-const rejectionIdentity = ({ failure }: Rejection): string =>
-  failure.kind === 'aggregate-refused' ? JSON.stringify(failure.errors) : failure.code;
-
 /**
  * Production persistence feedback and recovery at the application boundary.
  *
@@ -75,7 +72,7 @@ export function PersistenceControl({
   }
 
   if (persistence.kind === 'rejected') {
-    return <RejectionControl key={rejectionIdentity(persistence)} persistence={persistence} />;
+    return <RejectionControl persistence={persistence} />;
   }
 
   return <PersistenceIndicator state={persistence.kind} />;
@@ -167,13 +164,39 @@ function ConflictControl({
   );
 }
 
+/**
+ * Two rejections of one code are two rejections.
+ *
+ * Dismissing this dialog acknowledges the failure in front of the author, not
+ * every failure after it, so the next one draws again. What separates two is
+ * that they are different publications rather than anything they say: the
+ * transport's `message` is unread now (ADR 0057), so two `invalid-commit`
+ * rejections are equal by value and a key derived from the failure cannot tell
+ * them apart. The acknowledgement therefore records *which failure* was
+ * dismissed and is spent the moment the session hands over another.
+ *
+ * This is not a remount, deliberately. The control used to rely on being
+ * unmounted between rejections by the `pending` state in between, and the
+ * coordinated path does not guarantee one: `prepareCoordinatedCommit` installs
+ * `pending` without notifying (`session.ts`), so the render that resets local
+ * state may never happen.
+ */
 function RejectionControl({ persistence }: { readonly persistence: Rejection }) {
-  const [open, setOpen] = useState(true);
+  const [acknowledged, setAcknowledged] = useState<Rejection['failure'] | null>(null);
 
-  if (!open) return <PersistenceIndicator state="rejected" />;
+  // Derived from a prop during render rather than in an effect, the way
+  // `PersistenceIndicator`'s own cue is: the dialog is right on the first
+  // render of a new failure instead of flashing dismissed and correcting.
+  if (acknowledged !== null && acknowledged !== persistence.failure) setAcknowledged(null);
+  if (acknowledged !== null) return <PersistenceIndicator state="rejected" />;
 
   return (
-    <AlertDialog open onOpenChange={setOpen}>
+    <AlertDialog
+      open
+      onOpenChange={(next: boolean) => {
+        if (!next) setAcknowledged(persistence.failure);
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Changes couldn’t be saved</AlertDialogTitle>

@@ -290,6 +290,16 @@ export const describeAggregateRefusal = (errors: readonly SpaceAggregateError[])
 const STORED_SPACE_INVALID = 'The remote space is invalid and was not accepted.';
 
 /**
+ * How many references the sentence recites before counting the rest.
+ *
+ * The alert announces what it contains, so the recital is a handle for a bug
+ * report rather than an inventory: three ids identify the failure, and thirty
+ * read aloud is the illegibility the aggregate table is written to avoid,
+ * arriving by another route.
+ */
+const STORED_SPACE_REFS_RECITED = 3;
+
+/**
  * What the application can name about one intake error: the id that failed to
  * resolve, the card file that would not parse, or nothing.
  *
@@ -298,6 +308,14 @@ const STORED_SPACE_INVALID = 'The remote space is invalid and was not accepted.'
  * is the thing ADR 0057 exists to keep off the screen. A shape or version
  * error names nothing here because there is nothing in it to name — the
  * document as a whole is what failed.
+ *
+ * It reads the fields rather than switching on `kind` because the identity is
+ * carried by two shapes across fifteen-odd kinds, and a switch would be that
+ * list written out to say one of two things. The cost is that the compiler
+ * does not hold the sentence above: an arm added with its identity under a
+ * third field name returns `null` here and no test fails. The sentence still
+ * stands on its own in that case, which is why this is a legibility loss
+ * rather than a defect.
  */
 const namedInStoredSpace = (error: SpaceError): string | null =>
   'ref' in error ? error.ref : 'path' in error ? error.path : null;
@@ -317,9 +335,11 @@ export const describeStoredSpaceRefusal = (refusal: StoredSpaceRefusal): string 
       const named = [
         ...new Set(refusal.errors.map(namedInStoredSpace).filter((ref) => ref !== null)),
       ];
-      return named.length === 0
-        ? STORED_SPACE_INVALID
-        : `${STORED_SPACE_INVALID} Affected: ${named.join(', ')}.`;
+      if (named.length === 0) return STORED_SPACE_INVALID;
+      const recited = named.slice(0, STORED_SPACE_REFS_RECITED);
+      const remaining = named.length - recited.length;
+      const more = remaining === 0 ? '' : ` and ${remaining} more`;
+      return `${STORED_SPACE_INVALID} Affected: ${recited.join(', ')}${more}.`;
     }
   }
 };
@@ -364,7 +384,7 @@ export const describeConflictRecovery = (recovery: ConflictRecovery): string =>
  */
 type Persistence = SpaceSessionState['persistence'];
 type Rejected = Extract<Persistence, { kind: 'rejected' }>['failure'];
-type PersistenceFailure =
+export type PersistenceFailure =
   | Extract<Persistence, { kind: 'failed' }>['failure']
   | Exclude<Rejected, { kind: 'aggregate-refused' }>;
 
