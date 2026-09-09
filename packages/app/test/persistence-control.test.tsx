@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { PersistenceControl } from '../src/components/PersistenceControl';
+import { PersistenceControl, PersistenceNotice } from '../src/components/PersistenceControl';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a2');
@@ -104,5 +104,51 @@ describe('PersistenceControl', () => {
 
     fireEvent.click(reload);
     expect(onAcceptRemote).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The rejection dialog's other arm. An aggregate refusal is structured and
+   * already described from its errors; a permanent failure carries only a code
+   * and the transport's message, and until now the message is what showed.
+   */
+  it('explains a permanent rejection from its code rather than the wire’s message', () => {
+    render(
+      <PersistenceControl
+        persistence={{
+          kind: 'rejected',
+          failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
+        }}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('You do not have permission to save this space.')).toBeVisible();
+    expect(screen.queryByText('Permission denied')).toBeNull();
+  });
+});
+
+/**
+ * The standing notice behind the toolbar's red dot.
+ *
+ * A retryable failure's `message` is whatever the transport had to hand —
+ * `problem.detail` from the server, or a thrown `Error`'s own text — so it
+ * arrives in the server's voice, or in none at all. The author reads the
+ * application's sentence for the code instead (ADR 0057).
+ */
+describe('PersistenceNotice', () => {
+  it('explains a retryable failure from its code rather than the wire’s message', () => {
+    render(
+      <PersistenceNotice
+        persistence={{
+          kind: 'failed',
+          failure: { kind: 'retryable-failure', code: 'network', message: 'Failed to fetch' },
+        }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Your device could not reach the server.')).toBeVisible();
+    expect(screen.queryByText('Failed to fetch')).toBeNull();
   });
 });

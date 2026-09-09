@@ -448,7 +448,10 @@ describe('Space app permanent save refusal', () => {
     );
 
     expect(screen.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
-    expect(screen.getByText('Graph names an absent card')).toBeVisible();
+    // The code's sentence, not the server's. `message` here is `problem.detail`
+    // off the wire, and ADR 0057 leaves the wording to the application.
+    expect(screen.getByText('These changes are not in a form the server can store.')).toBeVisible();
+    expect(screen.queryByText('Graph names an absent card')).toBeNull();
 
     fireEvent.click(screen.getByTestId('persistence-rejection-continue'));
 

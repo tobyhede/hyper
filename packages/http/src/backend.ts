@@ -24,11 +24,14 @@ import { hasValidUniqueMediaTypeParameters } from './media-type';
 /**
  * What a network failure says when the thrown value carries no message.
  *
- * Named rather than inline so a story can draw this state without transcribing
- * a sentence the application would have to keep matching by hand — ADR 0052
- * parity is derived, not promised in a comment.
+ * Package-private, and not display copy. It was exported so a story could draw
+ * this state without transcribing a sentence — which was true only while the
+ * surface rendered a failure's `message` verbatim. It does not: the code is the
+ * identity that crosses the seam and the application writes the sentence
+ * (ADR 0057), so what this fills is a diagnostic field for a thrown value that
+ * carried no message of its own.
  */
-export const NETWORK_FAILURE_MESSAGE = 'Network request failed';
+const NETWORK_FAILURE_MESSAGE = 'Network request failed';
 
 type SpaceHttpClient = ReturnType<typeof hc<SpaceHttpApp>>;
 

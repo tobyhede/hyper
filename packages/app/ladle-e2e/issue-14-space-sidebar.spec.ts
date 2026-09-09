@@ -243,7 +243,8 @@ test(
     // reason and action.
     await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeVisible();
     const failure = page.getByTestId('persistence-failure');
-    await expect(failure).toContainText('Network unavailable');
+    await expect(failure).toContainText('Your device could not reach the server.');
+    await expect(failure).not.toContainText('Network unavailable');
     // The claim this story owns: a failed save keeps the unsaved work on screen.
     // `Collection 3` is in the snapshot the session submitted and in no revision
     // the backend has stored, so a sidebar drawing anything but its own session's
@@ -340,7 +341,8 @@ test(
     await expect(
       page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' }),
     ).toBeVisible();
-    await expect(page.getByText('Permission denied')).toBeVisible();
+    await expect(page.getByText('You do not have permission to save this space.')).toBeVisible();
+    await expect(page.getByText('Permission denied')).toBeHidden();
     await page.getByRole('button', { name: 'Continue editing' }).click();
     await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
   },

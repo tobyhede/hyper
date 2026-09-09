@@ -16,7 +16,7 @@ import {
   Button,
   PersistenceIndicator,
 } from '@project/ui';
-import { describeAggregateRefusal } from '../authoring-refusal';
+import { describeAggregateRefusal, describePersistenceFailure } from '../authoring-refusal';
 
 export interface PersistenceControlProps {
   readonly active?: boolean;
@@ -54,12 +54,12 @@ const CONFLICT_DESCRIPTIONS = {
 } satisfies Record<ConflictRecovery, string>;
 
 const rejectionDescription = ({ failure }: Rejection): string =>
-  failure.kind === 'aggregate-refused' ? describeAggregateRefusal(failure.errors) : failure.message;
+  failure.kind === 'aggregate-refused'
+    ? describeAggregateRefusal(failure.errors)
+    : describePersistenceFailure(failure);
 
 const rejectionIdentity = ({ failure }: Rejection): string =>
-  failure.kind === 'aggregate-refused'
-    ? JSON.stringify(failure.errors)
-    : `${failure.code}:${failure.message}`;
+  failure.kind === 'aggregate-refused' ? JSON.stringify(failure.errors) : failure.code;
 
 /**
  * Production persistence feedback and recovery at the application boundary.
@@ -120,7 +120,7 @@ export function PersistenceNotice({ persistence, onRetry }: PersistenceNoticePro
     <Alert variant="destructive" data-testid="persistence-failure">
       <AlertIcon />
       <AlertTitle>Changes not saved</AlertTitle>
-      <AlertDescription>{persistence.failure.message}</AlertDescription>
+      <AlertDescription>{describePersistenceFailure(persistence.failure)}</AlertDescription>
       <AlertAction>
         <Button
           variant="secondary"

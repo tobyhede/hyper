@@ -1,4 +1,5 @@
 import type { SpaceAggregateError } from '@project/graph';
+import type { SpaceSessionState } from '@project/persistence';
 import type { AuthoringRefusal, EdgeEndpoint } from './space-authoring';
 import type { SpaceCardLifecycleResult } from './space-card-lifecycle';
 import { failureMessage } from './failure-message';
@@ -282,6 +283,52 @@ const AGGREGATE_REFUSAL_REASONS = {
  */
 export const describeAggregateRefusal = (errors: readonly SpaceAggregateError[]): string =>
   [...new Set(errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ');
+
+/**
+ * Every persistence failure that reaches the author as a code rather than a
+ * structured refusal — the retryable four and the permanent three.
+ *
+ * Derived from the session state rather than imported as a union, because
+ * `CommitResult` is not on `@project/persistence`'s surface and the two states
+ * that carry these failures are.
+ */
+type Persistence = SpaceSessionState['persistence'];
+type Rejected = Extract<Persistence, { kind: 'rejected' }>['failure'];
+type PersistenceFailure =
+  | Extract<Persistence, { kind: 'failed' }>['failure']
+  | Exclude<Rejected, { kind: 'aggregate-refused' }>;
+
+/**
+ * What each persistence failure means, in the author's terms rather than the
+ * transport's.
+ *
+ * Every one of these also carries a `message`, and that message is the wire's:
+ * `problem.detail` from the server, or a thrown `Error`'s own text. ADR 0057
+ * rejected `{ message: string }` by name for exactly this — the code is the
+ * identity that crosses the seam and the sentence is the application's, so the
+ * message is a diagnostic and never what the author reads.
+ *
+ * The sentences complement their surfaces rather than repeating them. A
+ * retryable failure is drawn under "Changes not saved" beside a Retry button
+ * and a rejection under "Changes couldn't be saved", so no entry here restates
+ * either.
+ */
+const PERSISTENCE_FAILURE_REASONS = {
+  network: 'Your device could not reach the server.',
+  timeout: 'The server did not respond in time.',
+  unavailable: 'The server is temporarily unable to store changes.',
+  'rate-limited':
+    'Changes were sent faster than the server accepts. Wait a moment before retrying.',
+  'invalid-commit': 'These changes are not in a form the server can store.',
+  forbidden: 'You do not have permission to save this space.',
+  protocol: 'The application and the server disagree about how changes are saved.',
+  // `satisfies` for the reason the aggregate table above gives: it still fails
+  // the moment a code is added without a sentence, without widening the map.
+} satisfies Record<PersistenceFailure['code'], string>;
+
+/** Application-owned copy for a stable persistence failure identity. */
+export const describePersistenceFailure = (failure: PersistenceFailure): string =>
+  PERSISTENCE_FAILURE_REASONS[failure.code];
 
 /** Why a coordinated Space Card operation refused, in the author's terms. */
 export const describeSpaceCardRefusal = (refusal: SpaceCardRefusal): string => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
+  describePersistenceFailure,
   presentEdgeDeletionRefusal,
   presentEdgeEndpointRefusal,
   presentNewAliasRefusal,
@@ -130,5 +131,24 @@ describe('presentEdgeDeletionRefusal', () => {
         form: describeAuthoringRefusal(refusal),
       });
     }
+  });
+});
+
+/**
+ * Persistence failures are refusals like any other (ADR 0057): the code is the
+ * identity, and the sentence is the application's. The `message` each one
+ * carries is the transport's — `problem.detail` off the wire, or a thrown
+ * `Error`'s own text — and it is deliberately not what the author reads.
+ */
+describe('describePersistenceFailure', () => {
+  it('writes its own sentence for a forbidden rejection rather than the wire’s', () => {
+    const description = describePersistenceFailure({
+      kind: 'permanent-failure',
+      code: 'forbidden',
+      message: 'Permission denied',
+    });
+
+    expect(description).not.toBe('Permission denied');
+    expect(description).toBe('You do not have permission to save this space.');
   });
 });
