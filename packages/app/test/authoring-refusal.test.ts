@@ -153,6 +153,25 @@ describe('describePersistenceFailure', () => {
     expect(description).not.toBe('Permission denied');
     expect(description).toBe('You do not have permission to save this space.');
   });
+
+  /**
+   * `protocol` is a bucket, and one of the conditions in it is actionable.
+   * A commit over the server's size limit is not a disagreement about format:
+   * the author can fix it by making the Card smaller, and the sentence has to
+   * say so or the only instruction they had is gone.
+   */
+  it('tells an author over the size limit what to do about it', () => {
+    const description = describePersistenceFailure({
+      kind: 'permanent-failure',
+      code: 'payload-too-large',
+      message: 'Send a request body no larger than 1048576 bytes.',
+    });
+
+    expect(description).toMatch(/too (large|big)|smaller/i);
+    expect(description).not.toBe(
+      'The application and the server disagree about how changes are saved.',
+    );
+  });
 });
 
 /**

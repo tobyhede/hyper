@@ -391,6 +391,7 @@ const PERSISTENCE_FAILURE_REASONS = {
     'Changes were sent faster than the server accepts. Wait a moment before retrying.',
   'invalid-commit': 'These changes are not in a form the server can store.',
   forbidden: 'You do not have permission to save this space.',
+  'payload-too-large': 'These changes are too large to save. Shorten a long card and try again.',
   protocol: 'The application and the server disagree about how changes are saved.',
   // `satisfies` for the reason the aggregate table above gives: it still fails
   // the moment a code is added without a sentence, without widening the map.

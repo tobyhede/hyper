@@ -212,10 +212,11 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
       // A 422 carrying `invalid-snapshot` cannot reach this exhaustive mapping:
       // commit/decodeCommitRefusal rejects a problem whose code mismatches its status.
       return { kind: 'permanent-failure', code: 'invalid-commit', message: problem.detail };
+    case 'payload-too-large':
+      return { kind: 'permanent-failure', code: 'payload-too-large', message: problem.detail };
     case 'not-found':
     case 'invalid-space-id':
     case 'unsupported-media-type':
-    case 'payload-too-large':
     case 'method-not-allowed':
       return protocolFailure(problem.detail);
   }

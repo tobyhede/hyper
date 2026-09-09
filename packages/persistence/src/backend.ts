@@ -58,7 +58,11 @@ export type CommitResult =
     }
   | {
       kind: 'permanent-failure';
-      code: 'invalid-commit' | 'forbidden' | 'protocol';
+      // `payload-too-large` is separate from `protocol` although both are the
+      // server declining the request as sent: it is the one permanent failure
+      // an author can act on, by shortening what they wrote, and folding it in
+      // with a format disagreement leaves them a sentence they cannot use.
+      code: 'invalid-commit' | 'forbidden' | 'payload-too-large' | 'protocol';
       message: string;
     };
 

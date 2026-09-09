@@ -139,6 +139,10 @@ describe('HTTP Space backend failure mapping', () => {
     ['unauthorized', 'forbidden'],
     ['forbidden', 'forbidden'],
     ['invalid-request', 'invalid-commit'],
+    // Its own code, not the `protocol` bucket the other declined-as-sent
+    // problems share: it is the one permanent failure an author can act on,
+    // and the application has a sentence telling them how.
+    ['payload-too-large', 'payload-too-large'],
   ] as const)('maps %s to permanent %s', async (problemCode, resultCode) => {
     await expect(
       backendAnswering(problemResponse(problemCode, 'Correct the request.')).commit(commit),
