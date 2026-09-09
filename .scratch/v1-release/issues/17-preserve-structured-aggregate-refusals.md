@@ -29,7 +29,7 @@ the sentence. Criteria 2, 4 and 5 are what is left.
 - [ ] Retry, conflict and permanent rejection remain distinct states; aggregate
       refusal is the `refused` persistence state and recovers through an authored
       correction, never Retry of the unchanged aggregate.
-- [ ] `PersistenceControl` explains each actionable refusal without exposing
+- [x] `PersistenceControl` explains each actionable refusal without exposing
       storage or transport vocabulary and without colour as the only signal.
 - [ ] Coordinated participants observe the same completed refusal and remain in
       valid recoverable state.

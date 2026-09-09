@@ -78,7 +78,7 @@ than a copy one.
 ## The three changes
 
 1. `issues/01` — bring persistence onto the refusal pattern: copy tables for
-   the seven transport codes, no `problem.detail` on screen, codes rather than
+   the eight transport codes, no `problem.detail` on screen, codes rather than
    sentences out of `acceptStoredSpace`.
 2. `issues/02` — every surface receives the identity, not the sentence. Four
    call sites take a pre-described `string` today — `01` owns the fifth — and
