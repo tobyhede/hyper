@@ -20,7 +20,7 @@ import type { ExitSpaceResult, RejectedExitConfirmation } from '#src/open-spaces
  */
 
 /**
- * What a Space's row in the switcher owes about its last commit, and nothing
+ * What a Space's row in the Open Spaces menu owes about its last commit, and nothing
  * more.
  *
  * The three states that need saying are the three `PersistenceControl` and
@@ -31,7 +31,7 @@ import type { ExitSpaceResult, RejectedExitConfirmation } from '#src/open-spaces
  * names.
  *
  * The words are `openSpaceStatusLabel`'s rather than this module's. `OpenSpaces`
- * — the tab strip this switcher is proposed to replace — already reports the
+ * — the tab strip this Open Spaces menu is proposed to replace — already reports the
  * same three states over the same open set, and a second vocabulary for one
  * state is how a reader learns that "Save failed" and "Changes not saved" are
  * two different things.
@@ -376,7 +376,7 @@ export const editSelectedLayout = (
 
 /* ------------------------------------------------------------ open Spaces */
 
-/** A Space the Dock names: the parent step, and every row of the switcher. */
+/** A Space the Dock names: the parent step, and every row of the Open Spaces menu. */
 export interface SpaceStep {
   readonly spaceId: UUID;
   readonly title: string;
@@ -388,7 +388,7 @@ export interface SpaceStep {
  * The set of open Spaces is a **tree**, not a path: each entry remembers the
  * Space it was entered from, so `Meta ▸ Platform ▸ Design system` and a second
  * Space opened straight off Meta are both in it at once. `depth` is what the
- * switcher indents by, and it is derived from `from` rather than stored, so a
+ * Open Spaces menu indents by, and it is derived from `from` rather than stored, so a
  * row cannot claim a depth its opener does not give it.
  */
 export interface OpenRow extends SpaceStep {
@@ -407,13 +407,13 @@ export interface SessionState {
  * Every open Space, depth-first from the root, in the order they were opened.
  *
  * A tree because `from` makes one — and drawing it as a tree rather than as a
- * flat list is what lets the switcher say *where* a Space is as well as that it
+ * flat list is what lets the Open Spaces menu say *where* a Space is as well as that it
  * is open. A flat list would put a Space three crossings down beside the root
  * with nothing to tell them apart but their names, which is exactly the
  * confusion the bar's parent step exists to remove.
  *
  * `Map` iterates in insertion order, so siblings are listed in the order the
- * reader opened them. Nothing sorts them: a switcher that reordered itself as
+ * reader opened them. Nothing sorts them: a Open Spaces menu that reordered itself as
  * the reader moved would move the row they were aiming at.
  *
  * **Every `from` names a Space that is open**, which is what makes the walk
@@ -436,12 +436,12 @@ export const openTree = (session: SessionState): readonly OpenRow[] => {
  * What the bar draws above the Space you are in.
  *
  * `none` is the session that has never crossed and has nowhere to go; the
- * other three are the parent step, the switcher, or both.
+ * other three are the parent step, the Open Spaces menu, or both.
  */
-export type TrailControls = 'none' | 'switcher' | 'parent' | 'parent-and-switcher';
+export type TrailControls = 'none' | 'open-spaces-menu' | 'parent' | 'parent-and-open-spaces-menu';
 
 /**
- * **The bar names one step and the switcher holds the rest.**
+ * **The bar names one step and the Open Spaces menu holds the rest.**
  *
  * Settled against nine candidates drawn at one, three and six crossings in both
  * dock orientations; the sheet that drew them is gone and the reasoning is in
@@ -451,20 +451,20 @@ export type TrailControls = 'none' | 'switcher' | 'parent' | 'parent-and-switche
  * same way: by four crossings it is a row of collapsed glyphs saying "two
  * Spaces, and you will have to hover to learn which". One named step — the
  * Space you came from, which is the one a reader actually reaches for — costs a
- * word, and everything above it moves behind the switcher.
+ * word, and everything above it moves behind the Open Spaces menu.
  *
- * What that buys beyond width is the thing no trail could offer: the switcher
+ * What that buys beyond width is the thing no trail could offer: the Open Spaces menu
  * lists the **open set** rather than the path, so a Space opened from the root
  * and left behind is in it beside the branch you are standing on. A trail can
  * only show what is above you, so an open Space that is not an ancestor had
  * nowhere to be and leaving one meant losing it.
  *
- * **The switcher discloses whatever the bar is not already naming**, which is
+ * **The Open Spaces menu discloses whatever the bar is not already naming**, which is
  * why the count it is compared against is 1 at the root and 2 below it: the bar
  * names this Space always, and the parent step when there is one. So the
- * switcher arrives at the Space after those — the third ordinarily, the second
+ * Open Spaces menu arrives at the Space after those — the third ordinarily, the second
  * at the root. It stays at the root rather than vanishing there, because a
- * switcher reachable from everywhere except the top makes the top the one place
+ * Open Spaces menu reachable from everywhere except the top makes the top the one place
  * a reader cannot get back from.
  */
 export const trailControls = (
@@ -472,9 +472,9 @@ export const trailControls = (
   openSpaces: readonly OpenRow[],
 ): TrailControls => {
   const named = parent === null ? 1 : 2;
-  const switcher = openSpaces.length > named;
-  if (parent === null) return switcher ? 'switcher' : 'none';
-  return switcher ? 'parent-and-switcher' : 'parent';
+  const openSpacesMenu = openSpaces.length > named;
+  if (parent === null) return openSpacesMenu ? 'open-spaces-menu' : 'none';
+  return openSpacesMenu ? 'parent-and-open-spaces-menu' : 'parent';
 };
 
 /**
@@ -545,6 +545,16 @@ export const exitReportSentence = (title: string, outcome: ExitOutcome): string 
  * `ExitSpaceResult` rather than a shape invented here, which is what the three
  * arms the Dock draws are drawn from.
  *
+ * **One rule is approximated, and the approximation is stated rather than
+ * hidden.** Production refuses `spaceId === metaSpaceId`; this refuses an entry
+ * whose Opener is `null`, because a `SessionState` carries no Meta id to
+ * compare against. In this fixture the two coincide — Meta is the only entry
+ * minted with no Opener — but they are not the same rule: production records a
+ * `null` Opener for a Space opened directly and for one reached by URL, so the
+ * built Exit closes Spaces this stand-in would refuse. Nothing here is
+ * evidence about those, and the seam that removes the approximation is
+ * `.scratch/command-dock/issues/07`'s.
+ *
  * **It is a stand-in and not the call, and that is a finding rather than a
  * shortcut.** `exit` is a closure over a `SpaceSessionRegistry` of live
  * `SpaceSession`s: it decides by awaiting `waitUntilRetirable` and reading
@@ -575,7 +585,8 @@ export const exitSpace = (
   // the caller rather than an outcome a reader is owed a sentence about.
   if (entry === undefined) throw new Error(`Space ${spaceId} is not open`);
   const opener = entry.from;
-  // Meta is the entry nothing was entered from, and it is the one that cannot go.
+  // Meta is the entry nothing was entered from, and in this fixture that is the
+  // one that cannot go — the approximation the doc comment above states.
   if (opener === null) {
     return { result: { kind: 'refused', refusal: { code: 'meta-space-permanent' } }, session };
   }
@@ -606,7 +617,10 @@ export const exitSpace = (
     if (id === spaceId) continue;
     open.set(id, each.from === spaceId ? { ...each, from: opener } : each);
   }
-  const first = [...open.keys()][0] ?? spaceId;
+  // The Opener, not the Space just removed, is what an empty set falls back to.
+  // `opener` is non-null on this branch and `spaceId` names a Space that is no
+  // longer open, so the arm that cannot be reached still says something true.
+  const first = [...open.keys()][0] ?? opener;
   return {
     result: { kind: 'exited' },
     session: { open, currentId: session.currentId === spaceId ? first : session.currentId },

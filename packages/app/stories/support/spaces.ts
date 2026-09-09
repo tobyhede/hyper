@@ -711,7 +711,17 @@ const META_TARGETS = [
   ['Deep dive', deepDiveSnapshot.id],
 ] as const satisfies readonly (readonly [string, UUID])[];
 
-const META_LAYOUT = metaId(0);
+/**
+ * Meta's own identity, and the Layout and Graph it owns — three values from the
+ * reserved block rather than one shared between kinds.
+ *
+ * The Space used to spell its Id as the literal `metaId(0)` resolves to, so the
+ * Space *was* its Catalogue Layout as far as any Id comparison could tell, and
+ * `/spaces/:spaceId/views/:layoutId` drew the same 22 characters twice.
+ */
+const META_SPACE_ID = metaId(0);
+const META_LAYOUT = metaId(1);
+const META_GRAPH = metaId(2);
 
 /**
  * The permanent Meta Space, which every other Space traces up to (ADR 0074).
@@ -727,7 +737,7 @@ const META_LAYOUT = metaId(0);
  * catalogue.
  */
 export const metaSnapshot: SpaceSnapshot = {
-  id: uuidSchema.parse('00000000-0000-4000-8000-0000000000c0'),
+  id: META_SPACE_ID,
   document: {
     version: 1,
     title: 'Meta Space',
@@ -743,7 +753,7 @@ export const metaSnapshot: SpaceSnapshot = {
             { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
           ]),
         ),
-        graphs: [{ id: metaId(1), title: 'Catalogue', edges: [] }],
+        graphs: [{ id: META_GRAPH, title: 'Catalogue', edges: [] }],
       },
     ],
   },

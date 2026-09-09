@@ -104,7 +104,7 @@
  * The Sidebar's answer was `OpenSpaces`, a strip of vertical tabs. It is not
  * carried over as a strip: a tab strip needs a permanent column to stand beside
  * and a Dock has none. What it modelled — the *set* of open Spaces — is what the
- * switcher models, with the crossing that a flat strip lost drawn as the tree's
+ * Open Spaces menu models, with the crossing that a flat strip lost drawn as the tree's
  * indent.
  *
  * **What it says when something goes wrong is production's, and only the
@@ -124,10 +124,10 @@
  * `conflicted`. Disagreeing with that is disagreeing with a sixth cluster that
  * is blank almost always.
  *
- * **And the switcher says which Space is the unwell one.** That was a
- * regression rather than a gap: `OpenSpaces`, the tab strip the switcher
+ * **And the Open Spaces menu says which Space is the unwell one.** That was a
+ * regression rather than a gap: `OpenSpaces`, the tab strip the Open Spaces menu
  * replaces, badged each open Space for `conflicted`, `failed` and `rejected`,
- * and a switcher listing the same set in silence makes a Space that needs a
+ * and a Open Spaces menu listing the same set in silence makes a Space that needs a
  * decision look like one that does not. The row says only *which* — the
  * recovery belongs to that Space's own dock, one press away.
  *
@@ -344,7 +344,7 @@ const dropPlacement = (placed: number): CardPlacement => ({
 
 /**
  * **The session itself is `dock-model`'s.** `OpenEntry` and `opened`, the
- * `SessionState` they make up, the `openTree` the switcher draws and the
+ * `SessionState` they make up, the `openTree` the Open Spaces menu draws and the
  * `exitSpace` that has to keep that tree true are all over there, where a node
  * test can hold them to an answer. What is left here is the fixture the stories
  * open on and the three derivations React spends.
@@ -354,7 +354,7 @@ const dropPlacement = (placed: number): CardPlacement => ({
  * 0074): they may converge and never cycle, so a Space reached two ways has no
  * canonical parent and no canonical path. The parent the Dock names is the
  * crossing that is live, which is why it is kept there and never derived from
- * the documents — and it is what gives the switcher's tree its shape.
+ * the documents — and it is what gives the Open Spaces menu's tree its shape.
  *
  * The selections are per entry because ADR 0068 makes them so — leave a Space
  * and come back and the selection is the one you left, because the entry behind
@@ -370,13 +370,13 @@ const META_ENTRY = opened(metaSnapshot, null);
  * A prototype that opened at Meta would draw a Dock with nothing above it and
  * settle nothing, and one crossing in settles only the easy half. So it opens
  * on `Meta ▸ Platform ▸ Design system ▸ Rendering`: deep enough that the whole
- * path cannot be on the bar, which is the case the switcher exists for.
+ * path cannot be on the bar, which is the case the Open Spaces menu exists for.
  *
  * **And `Traversal` is open from Meta, off the path**, which is the other half
  * and the one a trail could never show. A set of open Spaces that is only ever
- * a line is a set for which a tree, an indent and a switcher are all
+ * a line is a set for which a tree, an indent and a Open Spaces menu are all
  * unnecessary — the bar would already be naming everything there is. One branch
- * is the least that makes the switcher answer a question the parent step does
+ * is the least that makes the Open Spaces menu answer a question the parent step does
  * not.
  *
  * Every entry is a crossing a reader could make: each Space above holds a Space
@@ -395,7 +395,7 @@ const CROSSED = [platformSnapshot, designSystemSnapshot, commandDockSnapshot] as
  * what is under review is *where the report goes* on a strip of furniture with
  * no column to pin it down. `elsewhere` is a Space that went wrong while you
  * were somewhere else — the case a single session-wide persistence field could
- * not express at all, and the whole of question C: the switcher lists that
+ * not express at all, and the whole of question C: the Open Spaces menu lists that
  * Space, and it has to say which one it is without the reader going there to
  * find out.
  */
@@ -406,7 +406,7 @@ type Unwell = 'here' | 'elsewhere';
  * for.
  *
  * `elsewhere` puts it on `Design system`, which is the parent the trail already
- * names — so the story shows both a Space that is one press away and a switcher
+ * names — so the story shows both a Space that is one press away and a Open Spaces menu
  * that has to mark it.
  */
 const initialSession = (
@@ -437,7 +437,7 @@ const currentEntry = (state: SessionState): OpenEntry =>
  *
  * One rather than the whole path, and that is the arrangement's answer to the
  * width question rather than an omission: the step a reader reaches for is the
- * one above them, and everything further up is in the switcher beside it.
+ * one above them, and everything further up is in the Open Spaces menu beside it.
  */
 const parentOf = (state: SessionState): SpaceStep | null => {
   const from = currentEntry(state).from;
@@ -447,7 +447,7 @@ const parentOf = (state: SessionState): SpaceStep | null => {
 };
 
 /**
- * Moving to an open Space, which is what the parent step and the switcher both do.
+ * Moving to an open Space, which is what the parent step and the Open Spaces menu both do.
  *
  * **Nothing closes.** This is the change ADR 0068 has to answer to: Exit used
  * to close the entry outright, so leaving a Space took its selections with it
@@ -504,20 +504,20 @@ interface DockChrome {
  * The Space you are in, the one you came from, and the set open beside them.
  *
  * One group rather than two because the bar draws them as one region: the
- * parent step and the switcher are how you leave this Space, and the name and
+ * parent step and the Open Spaces menu are how you leave this Space, and the name and
  * its menu are what you can do while you are in it.
  */
 interface DockSpace {
   /** This Space's name — a Space Card's title, seen from inside it. */
   readonly title: string;
-  /** Which Space the Dock is in, which is what the switcher marks. */
+  /** Which Space the Dock is in, which is what the Open Spaces menu marks. */
   readonly currentSpaceId: UUID;
   /** The Space this one was entered from, and the only step the bar names. Null at the root. */
   readonly parent: SpaceStep | null;
-  /** Every open Space, depth-first from the root — what the switcher lists. */
+  /** Every open Space, depth-first from the root — what the Open Spaces menu lists. */
   readonly openSpaces: readonly OpenRow[];
   readonly onRename: (title: string) => void;
-  /** Move to an open Space, closing nothing. The parent step and the switcher both spend this. */
+  /** Move to an open Space, closing nothing. The parent step and the Open Spaces menu both spend this. */
   readonly onSwitchTo: (spaceId: UUID) => void;
   /**
    * Exit this Space — one Space, never a second (ADR 0068). Never the root.
@@ -737,11 +737,11 @@ function useChrome(
       onRename: (title) =>
         setSnapshot((current) => ({ ...current, document: { ...current.document, title } })),
       // Moving, not exiting: the entry left behind stays open with its Layout and
-      // its Graph, which is what makes the switcher a switcher.
+      // its Graph, so this is a move between Spaces and never a close.
       onSwitchTo: (spaceId) => setSession((current) => switchTo(current, spaceId)),
-      // And this is what the switcher made necessary. Once nothing closes on its
+      // And this is what the Open Spaces menu made necessary. Once nothing closes on its
       // own, exiting is a command, and it is the Space's own — so it sits in the
-      // Space menu with New and Copy link rather than on the switcher's rows.
+      // Space menu with New and Copy link rather than on the Open Spaces menu's rows.
       //
       // **Computed whole, then installed.** `exitSpace` answers the next session
       // and the outcome together, so both come from one reading of the session
@@ -1523,14 +1523,14 @@ function CardList({
  * button.
  *
  * **One construction, because there are two of these and they drifted.** Cards
- * and the switcher-at-the-root are the same shape and were built twice: one
+ * and the open-spaces-menu-at-the-root are the same shape and were built twice: one
  * carried `gap-1.5` from `ListControl` and the other carried none, so the same
  * arrangement of glyph, word and chevron came out spaced two different ways.
  * That is the sort of difference nobody writes down and everybody sees.
  *
  * The button itself is the caller's, because the two sit in different
  * containers — Cards is in a `Toolbar` and takes a `ToolbarButton`, the
- * switcher is in a `Breadcrumb` and cannot, since Base UI's toolbar button
+ * Open Spaces menu is in a `Breadcrumb` and cannot, since Base UI's toolbar button
  * throws outside a `Toolbar.Root`. What has to match is the size, the classes
  * and the order of the parts, so those are {@link SET_TRIGGER} and this, and a
  * caller supplies neither.
@@ -1774,10 +1774,10 @@ function CardsControl({
  * What is left is what a Layout and a Graph disclose minus the part that names
  * a set: New and Copy link, in that order, in one group. The list of Spaces
  * this control does *not* draw is the **open** set, and that belongs to the
- * switcher beside the parent step, where the question is which Space you are
+ * Open Spaces menu beside the parent step, where the question is which Space you are
  * looking at rather than what you can do to it.
  *
- * **Exit is the one command the switcher made necessary.** While pressing an
+ * **Exit is the one command the Open Spaces menu made necessary.** While pressing an
  * ancestor was Exit, leaving and closing were the same gesture and neither
  * needed a name; now that moving closes nothing, the open set only grows unless
  * something takes from it. It sits behind its own separator for the reason
@@ -1867,7 +1867,7 @@ function SpaceMenu({
  * in a portalled `AlertDialog` that owns the viewport.
  *
  * **The arms are `ExitSpaceResult`'s and there are three.** `exited` draws
- * nothing — the Space is gone from the switcher and the canvas has moved, which
+ * nothing — the Space is gone from the Open Spaces menu and the canvas has moved, which
  * is the whole of the report. `warning` is a question, because ADR 0068 makes
  * `rejected` the one bad state Exit permits: the work is certainly lost and
  * there is no recovery to name, so refusing would trap the entry. Answering it
@@ -1932,11 +1932,11 @@ function ExitReport({ space }: { readonly space: DockSpace }) {
 }
 
 /**
- * The word the switcher shows, and the word it is named by.
+ * The word the Open Spaces menu shows, and the word it is named by.
  *
  * One token spent twice rather than two strings that agree today. Every
  * control's accessible name has to contain its visible label (WCAG 2.5.3, ADR
- * 0082), and the switcher is the control in this surface where the two were
+ * 0082), and the Open Spaces menu is the control in this surface where the two were
  * written independently and had already drifted apart. A token cannot drift: a
  * reader who renames the set renames both.
  */
@@ -1945,14 +1945,14 @@ const SPACES_LABEL = 'Spaces';
 /**
  * `[Parent] [⌄]` — where you came from, and every other Space you have open.
  *
- * **The bar names one step, and the switcher holds the rest.** Depth costs
+ * **The bar names one step, and the Open Spaces menu holds the rest.** Depth costs
  * width and the Dock is furniture at the edge of a canvas, so drawing the whole
  * path was always going to lose: at four crossings it was a row of collapsed
  * glyphs saying "two Spaces, and you will have to hover to learn which". One
  * named step — the Space you came from, the one a reader actually reaches for —
- * costs a word, and everything else moves behind the switcher's `⌄`.
+ * costs a word, and everything else moves behind the Open Spaces menu's `⌄`.
  *
- * **The switcher is not the path.** It lists the *open* Spaces as the tree they
+ * **The Open Spaces menu is not the path.** It lists the *open* Spaces as the tree they
  * are, so a Space opened from Meta and left behind is in it beside the branch
  * you are standing on, indented under the Space it was entered from. That is
  * the gap a trail could not close: a trail can only offer what is above you, so
@@ -1961,15 +1961,15 @@ const SPACES_LABEL = 'Spaces';
  * reader learns stays the list they come back to — the shape of the menu does
  * not change under them when they use it.
  *
- * **The switcher appears only when it has something to disclose**, and what it has is
+ * **The Open Spaces menu appears only when it has something to disclose**, and what it has is
  * whatever the bar is not already naming. The bar names the Space you are in,
- * and the parent step when there is one, so the switcher arrives at the Space
+ * and the parent step when there is one, so the Open Spaces menu arrives at the Space
  * after those: the third, ordinarily, and the second at the root, where there
  * is no parent step to spend one on.
  *
  * At the root the shape is therefore `[⌄] [⬡ Space ⌄]`, or the cluster alone in
- * a session that has never crossed. Keeping the switcher there is what stops the root
- * being the one place a reader cannot get back from — a switcher reachable from
+ * a session that has never crossed. Keeping the Open Spaces menu there is what stops the root
+ * being the one place a reader cannot get back from — a Open Spaces menu reachable from
  * everywhere except the top would send them back down the way they came.
  */
 function ParentSpace({
@@ -1982,17 +1982,18 @@ function ParentSpace({
   const { id: triggerId, open, onOpenChange } = useDockDisclosure();
   const parent = space.parent;
   // The trail decision, held in the model rather than in this JSX: which of the
-  // parent step and the switcher the bar draws, and when it draws neither.
+  // parent step and the Open Spaces menu the bar draws, and when it draws neither.
   const controls = trailControls(parent, space.openSpaces);
   if (controls === 'none') return null;
-  const switcher = controls === 'switcher' || controls === 'parent-and-switcher';
+  const openSpacesMenu =
+    controls === 'open-spaces-menu' || controls === 'parent-and-open-spaces-menu';
 
   return (
     <Breadcrumb className="dock-proto__trail">
       {/* The Dock has one type scale and the trail is in it. `BreadcrumbList`
           defaults to `text-sm`, which is a page's scale: the crumb inside it
           drew its own 13px and took its line height from the list, so the
-          switcher came out a pixel shorter than every other named control.
+          Open Spaces menu came out a pixel shorter than every other named control.
           `compact` is the 13px the rest of the surface is at. */}
       <BreadcrumbList size="compact" className="dock-proto__trail-list">
         {parent === null ? null : (
@@ -2025,10 +2026,10 @@ function ParentSpace({
         )}
         {/* The grid places the list's items, so the track a row belongs in is a
             class on the `li` — and a placement class of its own, not the name
-            control's borrowed. At the root the switcher carries the word and
+            control's borrowed. At the root the Open Spaces menu carries the word and
             stands in the name track; below it, it is a bare chevron in the
             disclosure track. */}
-        {switcher ? (
+        {openSpacesMenu ? (
           <BreadcrumbItem
             className={parent === null ? 'dock-proto__name-item' : 'dock-proto__disclose'}
           >
@@ -2115,7 +2116,7 @@ function ParentSpace({
                         )}
                         {row.title}
                         {/* **The regression `OpenSpaces` did not have.** The
-                          vertical tab strip this switcher replaces drew a badge
+                          vertical tab strip this Open Spaces menu replaces drew a badge
                           per open Space for `conflicted`, `failed` and
                           `rejected`; a list that says nothing makes a Space
                           whose commit conflicted while the reader was elsewhere
@@ -2159,7 +2160,7 @@ function ParentSpace({
  *
  *   one    `[⬡ Space ⌄]`                  — the root, or a session that has not crossed
  *   two    `[↰ Parent] │ [⬡ Space ⌄]`     — the parent names everything else there is
- *   many   `[↰ Parent] [⌄] │ [⬡ Space ⌄]` — and the rest are in the switcher
+ *   many   `[↰ Parent] [⌄] │ [⬡ Space ⌄]` — and the rest are in the Open Spaces menu
  *
  * Two parts, and the split is the arrangement. The **parent** is one step back,
  * marked with a direction rather than the Space glyph because both are Spaces
@@ -2170,7 +2171,7 @@ function ParentSpace({
  *
  * **The Spaces inside this one are not in either.** They are Space Cards, so
  * they are in the Cards list with every other Card — as Cards, with nothing on
- * the row that goes into one. That is the difference the two surfaces keep: the switcher
+ * the row that goes into one. That is the difference the two surfaces keep: the Open Spaces menu
  * lists the Spaces already **open**, and the Cards list holds Cards. At the top
  * — the Meta Space — that list is every Space there is, which is the "All
  * Spaces" every comparable tool builds a separate screen for.
@@ -2182,7 +2183,7 @@ function ParentSpace({
  * **Three things this removed rather than added.** There is no Exit button on
  * the bar — Exit is in the Space menu — no
  * separate list of open Spaces beside a trail of ancestors, and no tooltip
- * carrying depth — the switcher's indent carries it. The Sidebar's tab strip
+ * carrying depth — the Open Spaces menu's indent carries it. The Sidebar's tab strip
  * (`OpenSpaces`) is not carried over as a strip, but this is what it modelled:
  * the *set* of open Spaces. What it could not model is the crossing, and the
  * parent step is that.
@@ -2203,14 +2204,14 @@ function SpacesControl({
 }) {
   return (
     /* Two parts rather than one group, because they are two things: the way
-       back with the switcher on it, and the commands on the Space you are in.
+       back with the Open Spaces menu on it, and the commands on the Space you are in.
        The split is what lets the vertical dock put them on separate lines, and
        it costs no tab stop — the toolbar root is the Dock's, so both parts'
        controls are items in the one roving order. */
     <div className="dock-proto__space">
       <ParentSpace space={space} side={side} />
-      {/* Whenever the region above drew anything — the parent, the switcher, or
-          both. At the root there is no parent and the switcher carries the word
+      {/* Whenever the region above drew anything — the parent, the Open Spaces menu, or
+          both. At the root there is no parent and the Open Spaces menu carries the word
           "Spaces", which is a cluster like any other and wants the line beside
           it; in a session that has never crossed there is neither, and a line
           would divide the Space cluster from nothing. */}
@@ -2535,12 +2536,21 @@ function Dock({
     if (!spent) setSlotsOpen(true);
   };
 
-  const release = () => {
+  /**
+   * A cancel ends the gesture with no `click` behind it — pointer capture lost,
+   * or the browser claiming the gesture for itself — so nothing is coming to
+   * spend what the press recorded. Left set, it is the *next* genuine press
+   * that gets swallowed and the slot list does not open.
+   *
+   * **This is the cancel path only, and sharing it with the release was a
+   * defect.** `click` fires *after* `pointerup`, so on that path the flag is
+   * exactly what the `click` is about to read: clearing it there threw away
+   * both the drag `onPointerMove` recorded and the dismissal `onPointerDown`
+   * did, so a completed drag opened the menu over the slot it had just landed
+   * in, and a press on an open list closed it and reopened it in one gesture.
+   */
+  const cancel = () => {
     track(null);
-    // A cancel ends the gesture with no `click` behind it — pointer capture
-    // lost, or the browser claiming the gesture for itself — so nothing is
-    // coming to spend what the press recorded. Left set, it is the *next*
-    // genuine press that gets swallowed and the slot list does not open.
     pressSpent.current = false;
   };
 
@@ -2610,7 +2620,9 @@ function Dock({
     // A press that never moved docks nothing; the `click` after it spends the
     // menu request instead.
     if (held.moved) onDock(held.hint);
-    release();
+    // Only the gesture ends here. What it recorded on `pressSpent` belongs to
+    // the `click` behind this release, which is the one that spends it.
+    track(null);
   };
 
   const vertical = orientationOf(dock.edge) === 'vertical';
@@ -2664,7 +2676,7 @@ function Dock({
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          onPointerCancel={release}
+          onPointerCancel={cancel}
           onClick={onGripClick}
           // A keyboard activation arrives as a `click` with no press in front of
           // it, so whatever the last press left on `pressSpent` would answer for
@@ -3067,17 +3079,17 @@ SaveConflict.meta = { iframed: true };
  * This is question C, and it is the one the Dock could not answer at all. The
  * strip is over `Rendering`, which is fine; `Design system` — the Space one step
  * up the trail — is the one whose commit failed. Nothing about the Dock says so
- * until the switcher is opened, and then the row that names it carries the mark.
+ * until the Open Spaces menu is opened, and then the row that names it carries the mark.
  *
  * **It is a regression the Sidebar did not have.** `OpenSpaces`, the vertical
- * tab strip the switcher replaces, drew a badge per open Space for `conflicted`,
- * `failed` and `rejected`. A switcher that lists the same set and says nothing
+ * tab strip the Open Spaces menu replaces, drew a badge per open Space for `conflicted`,
+ * `failed` and `rejected`. A Open Spaces menu that lists the same set and says nothing
  * makes a Space that needs a decision look exactly like one that does not.
  *
  * The row says *which*, and nothing else: a dot at the trailing edge, its
  * sentence in the row's title and in an `sr-only` span so the state is never
  * colour alone. The recovery itself belongs to that Space's own Dock, which is
- * one press away — the switcher is a way to Spaces, not a place to repair one.
+ * one press away — the Open Spaces menu is a way to Spaces, not a place to repair one.
  */
 export const SaveFailedElsewhere: Story = () => {
   const chrome = useChrome(

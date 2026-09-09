@@ -172,7 +172,7 @@ describe('exiting a Space', () => {
     expect([...next.open.keys()]).toEqual([meta.id, platform.id, rendering.id, traversal.id]);
   });
 
-  it('keeps a Space whose opener exited in the switcher, under the nearest still-open one', () => {
+  it('keeps a Space whose opener exited in the Open Spaces menu, under the nearest still-open one', () => {
     const { session: next } = exitSpace(session(), designSystem.id);
 
     expect(openTree(next).map((row) => [row.title, row.depth])).toEqual([

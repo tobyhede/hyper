@@ -1,5 +1,5 @@
 import type { Card } from '@project/core';
-import { AliasIcon, MarkdownIcon, SpaceCardIcon, type CardBaseKind } from './icons';
+import { AliasIcon, BASE_GLYPHS, type CardBaseKind } from './icons';
 
 /**
  * What kind of Card this is, drawn rather than described.
@@ -53,18 +53,17 @@ export interface CardKindIconProps {
 }
 
 /**
- * The glyph carries the name twice — as an `aria-label` on an `img` role, which
- * is what a screen reader announces, and as a `title`, which is what a pointer
- * hovering it sees. The SVG underneath stays `aria-hidden`, so the two do not
- * both reach the accessibility tree.
- */
-/**
- * The glyph for one Card, composed rather than looked up.
+ * The glyph for one Card: a table lookup for the kinds that own a silhouette,
+ * and a composition for the one that does not.
  *
- * `markdown` and `space` each draw their own silhouette; `alias` draws one of
- * those two with a badge on it. That is a composition and not a third entry in
- * a table, because the Alias case needs a second input — which kind it is an
- * Alias of — that the other two do not have.
+ * `alias` is the composition — it draws one of the other silhouettes with a
+ * badge on it, because it needs a second input, which kind it is an Alias of,
+ * that the others do not have. Everything else is {@link BASE_GLYPHS}, keyed by
+ * the domain union with `alias` subtracted, and **that lookup is what makes
+ * adding a kind a compile-time obligation**. Picking between the two with
+ * `kind === 'space' ? … : …` read as the same composition and was not: it gave
+ * every future kind the Markdown silhouette by default, silently, while this
+ * file's own doc still promised a build failure.
  */
 function KindGlyph({ kind, aliasOf, size }: CardKindIconProps) {
   // `size` is forwarded even when absent: every one of these declares its own
@@ -72,9 +71,16 @@ function KindGlyph({ kind, aliasOf, size }: CardKindIconProps) {
   // selects — so passing it through preserves omission rather than overriding
   // it, and no conditional spread is needed to say so.
   if (kind === 'alias') return <AliasIcon base={aliasOf ?? 'markdown'} size={size} />;
-  const Base = kind === 'space' ? SpaceCardIcon : MarkdownIcon;
+  const Base = BASE_GLYPHS[kind];
   return <Base size={size} />;
 }
+
+/**
+ * The glyph carries the name twice — as an `aria-label` on an `img` role, which
+ * is what a screen reader announces, and as a `title`, which is what a pointer
+ * hovering it sees. The SVG underneath stays `aria-hidden`, so the two do not
+ * both reach the accessibility tree.
+ */
 
 export function CardKindIcon({ kind, aliasOf, size }: CardKindIconProps) {
   const name = kind === 'alias' && aliasOf !== undefined ? ALIAS_NAMES[aliasOf] : KIND_NAMES[kind];

@@ -6,6 +6,7 @@ import {
   authoredSnapshot,
   authoredSpace,
   commandDockSpace,
+  metaSnapshot,
   sparseAuthoredSnapshot,
   deepDiveSpace,
   editedSnapshot,
@@ -268,5 +269,25 @@ describe('the story Spaces', () => {
    */
   it('leaves the palette to colour the Command Dock Graphs', () => {
     expect(commandDockSpace.graphs.filter((graph) => graph.color !== undefined)).toEqual([]);
+  });
+  /**
+   * **A Space, its Layouts and its Graphs are four kinds of thing with one
+   * spelling for identity, so a fixture that reuses a value hides the mistake
+   * a real reader would make.** Meta's own Id was written as a literal and its
+   * Catalogue Layout as `metaId(0)`, which is the same UUID — so the product
+   * URL ADR 0069 builds for it read `/spaces/<X>/views/<X>`, and any assertion
+   * that a Layout is not its Space passed here without meaning anything.
+   */
+  it('gives the Meta Space an identity none of its own Layouts or Graphs shares', () => {
+    const { layouts } = metaSnapshot.document;
+    if (layouts === undefined) throw new Error('The Meta Space declares no Layout.');
+    const layoutIds = layouts.map(({ id }) => id);
+    const graphIds = layouts.flatMap(({ graphs }) => graphs.map(({ id }) => id));
+    const owned = [...layoutIds, ...graphIds];
+
+    expect(owned).not.toContain(metaSnapshot.id);
+    // And the Layouts and Graphs are distinct from each other, which is the
+    // same rule one level down.
+    expect(new Set(owned).size).toBe(owned.length);
   });
 });

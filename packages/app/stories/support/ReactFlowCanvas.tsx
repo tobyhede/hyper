@@ -231,18 +231,28 @@ export function StoryCanvasFrame({
   );
 }
 
+/**
+ * The camera is carried whole rather than as a `zoom` this rebuilds around.
+ *
+ * Taking `zoom?: number` and writing `{ fit: false, x: 0, y: 0, zoom }` here
+ * meant a caller holding a full {@link StoryCanvasViewport} had nowhere to put
+ * its `x` and `y`: it handed over the zoom, the offset was dropped without a
+ * diagnostic, and the story drew pinned at the origin it did not ask for. The
+ * union is the one shape from the caller to `StoryCanvas`, so there is no
+ * lossy field left to forget.
+ */
 function RealReactFlow({
   nodes,
   edges,
   className,
   controls = false,
-  zoom,
+  viewport = { fit: true },
 }: {
   readonly nodes: readonly CardFlowNode[];
   readonly edges: readonly Edge[];
   readonly className: string;
   readonly controls?: boolean;
-  readonly zoom?: number | undefined;
+  readonly viewport?: StoryCanvasViewport;
 }) {
   return (
     <StoryCanvas
@@ -250,7 +260,7 @@ function RealReactFlow({
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
-      viewport={zoom === undefined ? { fit: true } : { fit: false, x: 0, y: 0, zoom }}
+      viewport={viewport}
       maxZoom={MAX_ZOOM}
       interactive
       className={className}
@@ -331,7 +341,7 @@ export function LayoutCanvasFixture({
       nodes={[...projected.nodes, ...additions]}
       edges={projected.edges}
       controls
-      zoom={viewport.fit ? undefined : viewport.zoom}
+      viewport={viewport}
     />
   );
 }
@@ -426,7 +436,7 @@ export function CanvasCardNodeSpecimen({
       className={`inv-card-node-stage ${stageClassName}`}
       nodes={[node]}
       edges={[]}
-      zoom={zoom}
+      viewport={zoom === undefined ? { fit: true } : { fit: false, x: 0, y: 0, zoom }}
     />
   );
 }

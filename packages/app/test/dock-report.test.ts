@@ -3,9 +3,9 @@ import { openSpaceStatusLabel } from '@project/ui';
 import { exitReportSentence, unwellReport, type ExitOutcome } from '../stories/review/dock-model';
 
 /**
- * What the Command Dock's switcher says about an open Space that is not well.
+ * What the Command Dock's Open Spaces menu says about an open Space that is not well.
  *
- * The Dock's switcher is proposed to replace `OpenSpaces`, the vertical tab
+ * The Dock's Open Spaces menu is proposed to replace `OpenSpaces`, the vertical tab
  * strip that already badges each open Space for `conflicted`, `failed` and
  * `rejected`. Two surfaces reporting one state is a transitional fact, not a
  * design — so what they must not do is report it in *different words*, which is

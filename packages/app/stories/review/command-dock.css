@@ -39,9 +39,11 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: color-mix(in oklab, var(--card) 92%, transparent);
+  /* The ink, washed — `rgb(31 41 51)` is `--foreground` spelled out, and
+     spelling it out is what made the paragraph above this file untrue. */
   box-shadow:
-    0 1px 2px rgb(31 41 51 / 6%),
-    0 6px 18px rgb(31 41 51 / 10%);
+    0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
+    0 6px 18px color-mix(in oklab, var(--foreground) 10%, transparent);
   backdrop-filter: blur(8px);
 }
 
@@ -84,7 +86,7 @@
 
 .dock-proto__docked[data-dragging='true'] {
   cursor: grabbing;
-  box-shadow: 0 14px 34px rgb(31 41 51 / 20%);
+  box-shadow: 0 14px 34px color-mix(in oklab, var(--foreground) 20%, transparent);
 }
 
 /* The snap is the only motion this surface has, and a reader who has asked for
@@ -160,7 +162,7 @@
 /* **The gap belongs to the control, not to the label.** This used to carry
    `margin-inline-start: 6px`, which separated a name from the glyph before it —
    and gave a label with no glyph a 6px indent from nothing. The one trigger
-   without a glyph is the switcher at the root, and that is where it showed. The
+   without a glyph is the Open Spaces menu at the root, and that is where it showed. The
    space between a glyph and its name now comes from the button's own `gap`
    below, which every named control in the Dock shares. */
 .dock-proto__ident {
@@ -254,7 +256,7 @@
    disclosure tracks and pushes that chevron to the end of the span. The 6px is
    what an icon button spends on either side of a 16px glyph in a 28px track, so
    the chevron lands in the column rather than merely near it. */
-/* At the root the switcher carries the word "Spaces", so it stands in the name
+/* At the root the Open Spaces menu carries the word "Spaces", so it stands in the name
    track and pushes its own chevron into the disclosure column — the same
    arrangement the Cards trigger has, and the same rule. */
 .dock-proto__surface[data-orientation='vertical'] .dock-proto__name-item,
@@ -286,7 +288,7 @@
    up under each other in the vertical dock instead of ending wherever the words
    happen to. In a horizontal dock there is no slack and this does nothing. */
 /* Every control that carries a name: the four identities, the Cards trigger and
-   the switcher at the root. One gap, so a glyph, a name and a chevron sit the
+   the Open Spaces menu at the root. One gap, so a glyph, a name and a chevron sit the
    same distance apart wherever they appear — and a control with no glyph is
    simply one item short rather than one indent adrift. */
 .dock-proto__name {
@@ -430,7 +432,7 @@
   gap: 2px;
 }
 
-/* The parent step and the switcher are the trail's two list items, and the
+/* The parent step and the Open Spaces menu are the trail's two list items, and the
    grid places **those** — a class on the button inside an `li` is a class on
    something the grid never sees. So `dock-proto__crumb` and
    `dock-proto__disclose` sit on the `BreadcrumbItem`, and the button inherits
@@ -483,7 +485,7 @@
   margin-inline-start: 6px;
 }
 
-/* The switcher's trigger — a chevron, like every other disclosure in the Dock.
+/* The Open Spaces menu's trigger — a chevron, like every other disclosure in the Dock.
 
    It was `⋯` while it stood for hidden steps of a trail. It stopped standing for
    that when the trail became one named parent and a list of the open set: what
@@ -549,7 +551,7 @@
   top: 0;
 }
 
-/* **Which open Space is the unwell one**, on the switcher row that names it.
+/* **Which open Space is the unwell one**, on the Open Spaces menu row that names it.
 
    A dot rather than a word or an icon: the row's content is a name and an
    indent, and the mark has to be findable down a six-row list without becoming

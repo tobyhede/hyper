@@ -7,7 +7,7 @@ import { Default } from '../stories/review/command-dock.stories';
  *
  * Three of ADR 0082's obligations and one of ADR 0073's are assertable without
  * a browser, and each of them is a claim the prototype failed before this file
- * existed: a Card could only be placed by dragging it, the switcher's
+ * existed: a Card could only be placed by dragging it, the Open Spaces menu's
  * accessible name did not contain the word on its face, and the bar was four
  * toolbars where the ADR draws one.
  *
@@ -33,6 +33,21 @@ beforeAll(() => {
       }
     },
   );
+});
+
+/**
+ * jsdom implements no pointer capture, and the grip claims it on every press.
+ * Installed rather than stubbed per test, because it is a gap in the
+ * environment like `ResizeObserver` above rather than a collaborator any test
+ * here has an opinion about.
+ */
+beforeAll(() => {
+  Element.prototype.setPointerCapture = function setPointerCapture(): void {
+    return undefined;
+  };
+  Element.prototype.releasePointerCapture = function releasePointerCapture(): void {
+    return undefined;
+  };
 });
 
 afterAll(() => vi.unstubAllGlobals());
@@ -102,22 +117,22 @@ describe('placing a Card into a Layout without a pointer (ADR 0082)', () => {
 
 describe("every control's accessible name contains its visible label (WCAG 2.5.3)", () => {
   /**
-   * The switcher is the control this rule was written down for: it showed
+   * The Open Spaces menu is the control this rule was written down for: it showed
    * `Spaces` under `aria-label="Switch Space. N open."`, so speech input could
    * not reach the word on its face. It is one token now, spent in both places.
    */
-  it('names the root Spaces switcher with the word it shows', () => {
+  it('names the root Open Spaces menu with the word it shows', () => {
     render(<Default />);
-    // Three crossings in, the switcher is a bare chevron; the word is what the
+    // Three crossings in, the Open Spaces menu is a bare chevron; the word is what the
     // root draws. Walk up to it, which is what the parent step is for.
     fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Design system' }));
     fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Platform' }));
     fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Meta Space' }));
 
-    const switcher = within(dock()).getByRole('button', { name: /^Spaces\./ });
+    const openSpacesMenu = within(dock()).getByRole('button', { name: /^Spaces\./ });
 
-    expect(visibleLabel(switcher)).toBe('Spaces');
-    expect(accessibleName(switcher)).toContain(visibleLabel(switcher));
+    expect(visibleLabel(openSpacesMenu)).toBe('Spaces');
+    expect(accessibleName(openSpacesMenu)).toContain(visibleLabel(openSpacesMenu));
   });
 
   /**
@@ -227,5 +242,48 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
 
     expect(document.activeElement).toBe(grip);
+  });
+  /**
+   * **A drag ends the gesture; it does not also ask for the list.**
+   *
+   * `click` fires after `pointerup`, so whatever the pointer sequence recorded
+   * has to survive the release to be spent by the `click` behind it. It did
+   * not: the release shared its handler with `pointercancel`, whose whole
+   * reason for clearing the flag is that no `click` is coming. So every
+   * completed drag redocked the bar and then opened the twelve-slot menu over
+   * the slot it had just landed in.
+   */
+  it('does not open the slot list when the press was a drag', () => {
+    render(<Default />);
+    const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
+
+    fireEvent.pointerDown(grip, { pointerId: 1, clientX: 100, clientY: 100 });
+    // Past `DRAG_THRESHOLD` on both axes, which is what makes this a drag
+    // rather than a press that wobbled.
+    fireEvent.pointerMove(grip, { pointerId: 1, clientX: 220, clientY: 140 });
+    fireEvent.pointerUp(grip, { pointerId: 1, clientX: 220, clientY: 140 });
+    fireEvent.click(grip);
+
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  /**
+   * The other half of the same flag. Base UI dismisses the popup on the outside
+   * press, so the `click` behind that press must not ask for it again — a grip
+   * that reopens what it just closed is a control with no off.
+   */
+  it('does not reopen the slot list when the press dismissed it', () => {
+    render(<Default />);
+    const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
+    fireEvent.click(grip);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    // The press that dismisses, and the `click` it carries. No movement, so
+    // this is a press rather than a drag.
+    fireEvent.pointerDown(grip, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.pointerUp(grip, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.click(grip);
+
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 });
