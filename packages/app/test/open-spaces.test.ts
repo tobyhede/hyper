@@ -641,6 +641,20 @@ describe('Open Spaces', () => {
     await openSpaces.enter(OTHER_ID);
 
     expect(openSpaces.getState().openedFrom.get(OTHER_ID)).toBe(META_ID);
+
+    // An address records none only where it *opens* a Space. Resolving onto one
+    // already open is the same return, so recording the address's own `null`
+    // here would strand Other at the root of a tree it never sat at. Meta takes
+    // the canvas first, because a URL onto the Space already being worked in
+    // settles before it reaches the record at all.
+    await openSpaces.switchTo(META_ID);
+    await openSpaces.openPath(
+      productDestinationPath({ kind: 'layout', spaceId: OTHER_ID, layoutId: LAYOUT_ID }),
+    );
+
+    expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+
+    expect(openSpaces.getState().openedFrom.get(OTHER_ID)).toBe(META_ID);
   });
 
   it('re-homes what was entered from an exited Space onto that Space\u2019s own opener', async () => {
