@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { productDestinationPath } from '@project/http';
 import {
@@ -15,6 +15,8 @@ import { recordingHistory } from './browser-history';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
+import { createOpenSpaces } from '../src/open-spaces';
+import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -102,6 +104,92 @@ beforeAll(() => {
 });
 
 afterAll(() => vi.unstubAllGlobals());
+
+it('keeps a hidden Space presentation unchanged when the active Space receives Escape', async () => {
+  const base = snapshot('First Space', 'First Card', 0, 0);
+  const first = {
+    ...base,
+    document: {
+      ...base.document,
+      layouts: base.document.layouts?.map((layout) => ({
+        ...layout,
+        graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: CARD_ID }] }],
+      })),
+    },
+  };
+  const second = { ...snapshot('Second Space', 'Second Card', 0, 0), id: newUuid() };
+  const backend = new MemorySpaceBackend(
+    SPACE_ID,
+    [first, second].map((value) => ({
+      snapshot: value,
+      revision: 0n,
+      exportedRevision: null,
+    })),
+  );
+  const spaces = createOpenSpaces({
+    backend,
+    metaSpaceId: SPACE_ID,
+    newId: newUuid,
+    history: recordingHistory(),
+  });
+  const initial = await spaces.open(SPACE_ID);
+  render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+  await act(async () => {
+    initial.app.navigation.present();
+    await Promise.resolve();
+  });
+  expect(initial.app.navigation.getState().mode).toBe('presenting');
+  await act(async () => {
+    await spaces.open(second.id);
+  });
+
+  fireEvent.keyDown(document.body, { key: 'Escape' });
+
+  expect(initial.app.navigation.getState().mode).toBe('presenting');
+});
+
+/** The `data-state` of the shell sidebar the named Space's own chrome draws. */
+const sidebarStateOf = (spaceTitle: string): string | null => {
+  const title = [...document.querySelectorAll('[data-testid="space-title"]')].find(
+    (element) => element.textContent === spaceTitle,
+  );
+  if (title === undefined) throw new Error(`no Sidebar names the Space ${spaceTitle}`);
+  return title.closest('[data-slot="sidebar"]')?.getAttribute('data-state') ?? null;
+};
+
+/**
+ * The sibling of the Escape claim above, for the shell's own global key.
+ *
+ * Every open Space keeps its shell mounted, so `Ctrl/Cmd-B` on `window` reaches
+ * as many `SidebarProvider`s as there are Spaces. Only the Space on the canvas
+ * is being looked at, so only its sidebar answers the press.
+ */
+it('leaves a hidden Space sidebar alone when the active Space receives Cmd/Ctrl+B', async () => {
+  const first = snapshot('First Space', 'First Card', 0, 0);
+  const second = { ...snapshot('Second Space', 'Second Card', 0, 0), id: newUuid() };
+  const backend = new MemorySpaceBackend(
+    SPACE_ID,
+    [first, second].map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
+  );
+  const spaces = createOpenSpaces({
+    backend,
+    metaSpaceId: SPACE_ID,
+    newId: newUuid,
+    history: recordingHistory(),
+  });
+  const initial = await spaces.open(SPACE_ID);
+  render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+  await act(async () => {
+    await spaces.open(second.id);
+  });
+  expect(sidebarStateOf('First Space')).toBe('expanded');
+  expect(sidebarStateOf('Second Space')).toBe('expanded');
+
+  fireEvent.keyDown(document.body, { key: 'b', ctrlKey: true });
+
+  expect(sidebarStateOf('Second Space')).toBe('collapsed');
+  expect(sidebarStateOf('First Space')).toBe('expanded');
+});
 
 describe('Space app conflict recovery', () => {
   it('replaces the visible runtime and editor placement when remote state is accepted', async () => {

@@ -60,6 +60,7 @@ function SidebarProvider({
   defaultOpen,
   open: openProp,
   onOpenChange: setOpenProp,
+  active = true,
   className,
   style,
   children,
@@ -68,6 +69,16 @@ function SidebarProvider({
   defaultOpen?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /**
+   * Whether this shell is the surface the reader is looking at.
+   *
+   * A session can keep several shells mounted at once — every open Space keeps
+   * its own, and only one of them is on screen — and the shortcut below is a
+   * `window` listener, so one press otherwise reaches all of them and toggles
+   * chrome nobody can see. The composer says which one is showing; a shell with
+   * no rival is active and says nothing.
+   */
+  active?: boolean;
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
@@ -99,6 +110,7 @@ function SidebarProvider({
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
+    if (!active) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.target instanceof Element && event.target.closest(EDITABLE_TARGET) !== null) return;
       if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
@@ -109,7 +121,7 @@ function SidebarProvider({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleSidebar]);
+  }, [active, toggleSidebar]);
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.

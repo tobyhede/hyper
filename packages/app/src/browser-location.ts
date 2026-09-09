@@ -58,6 +58,8 @@ export interface BrowserLocation {
    * mounting used to leave implicit.
    */
   readonly follow: (app: ComposedApp) => void;
+  /** A deliberate switch between already composed Spaces updates the address. */
+  readonly activate: (app: ComposedApp) => void;
   readonly chooseLayout: (layoutId: LayoutId) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   /** The absolute URL of a destination, for the clipboard to carry. */
@@ -78,6 +80,7 @@ export function createBrowserLocation(
   history: HistoryApi,
   reportObserverError: ObserverErrorReporter = (error) =>
     console.error('Browser location observer failed', error),
+  openPath?: (pathname: string) => Promise<void>,
 ): BrowserLocation {
   let followed: ComposedApp | null = null;
   let unfollow: (() => void) | null = null;
@@ -270,7 +273,7 @@ export function createBrowserLocation(
     deliberateMove(() => app.navigation.activateGraph(graphId));
   };
 
-  const restore = (): void => {
+  const restoreFollowed = (): void => {
     const app = followed;
     if (app === null) return;
     const restoration = destinationRestoration(
@@ -292,6 +295,42 @@ export function createBrowserLocation(
     settle();
   };
 
+  let restorationRequest = 0;
+  const restore = (): void => {
+    if (openPath === undefined) {
+      restoreFollowed();
+      return;
+    }
+    const request = ++restorationRequest;
+    const pathname = history.pathname();
+    void openPath(pathname).then(
+      () => {
+        if (request === restorationRequest && history.pathname() === pathname) restoreFollowed();
+      },
+      () => {
+        if (request !== restorationRequest || history.pathname() !== pathname) return;
+        // One rejection refuses two different things, and only one of them is a
+        // destination that failed to resolve. A location outside product
+        // addressing refuses to open because it is not an address of ours: the
+        // application did not write it and it names no position to be wrong
+        // about, so it is left alone here exactly as {@link restoreFollowed}
+        // leaves the `ignored` it classifies the same pathname as.
+        const app = followed;
+        if (
+          app !== null &&
+          destinationRestoration(
+            app.currentSpace(),
+            app.authoring.getState().session.working,
+            pathname,
+          ).kind === 'ignored'
+        ) {
+          return;
+        }
+        destinationNotFound = true;
+        publish();
+      },
+    );
+  };
   const releasePopState = history.onPopState(restore);
 
   /**
@@ -325,10 +364,31 @@ export function createBrowserLocation(
     getState: observable.getState,
     subscribe: observable.subscribe,
     follow,
+    activate: (app) => {
+      const previous = syncedPosition;
+      follow(app);
+      // Back and Forward have already moved the browser. Restore that complete
+      // destination before deriving a write from the arriving Space's retained
+      // Navigation, which may still name a different Layout or Graph.
+      const restoration = destinationRestoration(
+        app.currentSpace(),
+        app.authoring.getState().session.working,
+        history.pathname(),
+      );
+      if (restoration.kind === 'opening') {
+        restoreFollowed();
+        return;
+      }
+      if (previous !== null) {
+        syncedPosition = previous;
+        settle();
+      }
+    },
     chooseLayout,
     activateGraph,
     href: (destination) => new URL(productDestinationPath(destination), history.href()).href,
     dispose: () => {
+      restorationRequest += 1;
       releasePopState();
       unfollow?.();
       unfollow = null;

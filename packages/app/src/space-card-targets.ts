@@ -1,6 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Card, UUID } from '@project/core';
-import type { SpaceCardTarget } from './space-card-lifecycle';
+import { spaceCardTarget, type SpaceCardTarget } from './space-card-lifecycle';
+import { useOpenSpaces } from './open-spaces-context';
+
+const NO_ENTRIES = [] as const;
+const noSubscription = () => () => undefined;
+const noEntries = () => NO_ENTRIES;
 
 /** What every Space Card on a canvas needs from the Spaces it references. */
 export type SpaceCardTargets = ReadonlyMap<UUID, SpaceCardTarget>;
@@ -55,16 +60,19 @@ const nextTargets = (
  * lands — which is why `CanvasCard` takes an absent selection as a state rather
  * than as an error.
  *
- * **Read once per set of targets, not kept in step.** A Layout authored in a
- * target Space that this browser also has open is picked up the next time the
- * set of referenced Spaces changes, and not before. Watching every target for
- * edits would mean subscribing this Space to sessions it does not own, which is
- * the coupling ADR 0076 keeps out of the ordinary single-Space path.
+ * Reads fill the unopened targets. Open Spaces publishes changes to its live
+ * entries, and their current working Spaces override those reads immediately.
  */
 export const useSpaceCardTargets = (
   cards: readonly Card[],
   read: (spaceId: UUID) => Promise<SpaceCardTarget | undefined>,
 ): SpaceCardTargets => {
+  const spaces = useOpenSpaces();
+  const getEntries = useCallback(() => spaces?.getState().entries ?? NO_ENTRIES, [spaces]);
+  const entries = useSyncExternalStore(
+    spaces?.subscribe ?? noSubscription,
+    spaces === null ? noEntries : getEntries,
+  );
   const [targets, setTargets] = useState<SpaceCardTargets>(NO_SPACE_CARD_TARGETS);
   /**
    * Which set of targets has been asked for, and which answer is still wanted.
@@ -98,7 +106,10 @@ export const useSpaceCardTargets = (
     [],
   );
 
+  const previousEntries = useRef(entries);
   useEffect(() => {
+    if (previousEntries.current.some((entry) => !entries.includes(entry))) requested.current = null;
+    previousEntries.current = entries;
     const ids = referencedSpaceIds(cards);
     const key = ids.join(' ');
     if (key === requested.current) return;
@@ -131,7 +142,15 @@ export const useSpaceCardTargets = (
       if (reads.some(({ answered }) => !answered)) requested.current = null;
       setTargets((previous) => nextTargets(reads, previous));
     });
-  }, [cards, read]);
+  }, [cards, read, entries]);
 
-  return targets;
+  return useMemo(() => {
+    const live = new Map(targets);
+    for (const entry of entries) {
+      if (cards.some((card) => card.kind === 'space' && card.spaceId === entry.id)) {
+        live.set(entry.id, spaceCardTarget(entry.app.currentSpace()));
+      }
+    }
+    return live;
+  }, [targets, entries, cards]);
 };

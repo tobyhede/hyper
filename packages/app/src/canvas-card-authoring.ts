@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import {
   cardDocumentSchema,
   uuidSchema,
+  SPACE_CARD_MIN_OPEN_SIZE,
   type CardDocument,
   type CardId,
   type GraphId,
@@ -10,7 +11,7 @@ import type { SpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { CanvasSpaceCardSelection } from '@project/ui';
 import { describeAuthoringRefusal } from './authoring-refusal';
-import { CARD_SIZE } from './card';
+import { CARD_SIZE, snapCardSizeToClose } from './card';
 import type { CardResize } from './render-adapter';
 import type { SpaceAuthoring } from './space-authoring';
 import type { SpaceCardTarget, SpaceCardTargetLayout } from './space-card-lifecycle';
@@ -73,7 +74,7 @@ export interface CanvasCardAuthoringInput {
   /** Whether the canvas is uncovered by a modal authoring surface. */
   readonly enabled: boolean;
   readonly nameOnCreation: string | null;
-  readonly authoring: SpaceAuthoring;
+  readonly authoring: Pick<SpaceAuthoring, 'complete'>;
   readonly spaceSession: SpaceSession;
   readonly cardResize: CardResize;
   readonly onSelectCard: (cardId: CardId) => void;
@@ -92,6 +93,7 @@ export interface CanvasCardAuthoringInput {
 export interface CanvasCardAuthoring {
   readonly nodes: CardFlowNode[];
   readonly bodyEditing: boolean;
+  readonly titleEditing: boolean;
   readonly canAuthorOnCanvas: boolean;
   readonly openCard: (cardId: string) => 'completed' | 'retained';
   readonly beginTitleEditing: (cardId: string) => void;
@@ -300,6 +302,9 @@ export function useCanvasCardAuthoring({
             });
         }
         if (cardBelongsToWorkingSpace && node.data.expanded === true && canAuthorOnCanvas) {
+          // Ordinary Open proposals preserve the Space footer. The gesture
+          // itself still reaches Closed Size so ADR 0066's magnet can Close it.
+          const floor = node.data.kind === 'space' ? SPACE_CARD_MIN_OPEN_SIZE : CARD_SIZE;
           data.resize = {
             minWidth: CARD_SIZE.width,
             minHeight: CARD_SIZE.height,
@@ -307,7 +312,18 @@ export function useCanvasCardAuthoring({
               onSelectCard(node.data.cardId);
               cardResize.beginResize(node.data.cardId);
             },
-            onResize: (size) => cardResize.previewResize(node.data.cardId, size),
+            onResize: (size) => {
+              const proposed = snapCardSizeToClose(size);
+              cardResize.previewResize(
+                node.data.cardId,
+                proposed === CARD_SIZE
+                  ? proposed
+                  : {
+                      width: Math.max(floor.width, size.width),
+                      height: Math.max(floor.height, size.height),
+                    },
+              );
+            },
             onResizeEnd: () => cardResize.finishResize(node.data.cardId),
             onResizeCancel: () => cardResize.cancelResize(node.data.cardId),
           };
@@ -382,6 +398,7 @@ export function useCanvasCardAuthoring({
   return {
     nodes: decoratedNodes,
     bodyEditing,
+    titleEditing: editingTitleCardId !== null,
     canAuthorOnCanvas,
     openCard,
     beginTitleEditing,
