@@ -4,6 +4,8 @@
 
 **Status:** ready-for-agent
 
+**Blocked by:** 02 — the review skill reads typescript-write before applying its rubric.
+
 **Why:** separation of authoring and review is the point, and it has to be mechanical rather than nominal. Reviewed inline, the reviewer inherits every rationalisation the author just produced — it reads its own reasoning back and agrees with it. A "review your work" paragraph appended to the authoring skill is that failure by construction.
 
 There is no name collision: no `typescript-*` skill exists in any installed plugin. The five existing review pathways (`mattpocock-skills:code-review`, superpowers' `requesting-code-review` and `receiving-code-review`, `trailofbits:differential-review`, the built-in `/code-review`) are namespaced or generic, so this sits beside them rather than over them. None of them triggers on TypeScript-specific type-hole review, and a rubric that no trigger loads at review time is not a rubric — which is why this is a skill and not a reference file beside `typescript-write`.

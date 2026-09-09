@@ -1,3 +1,15 @@
+# Historical roadmap audit notes
+
+Status: historical
+
+This is an earlier audit snapshot, not the current implementation schedule.
+Its counts, build-status claims and suggested edits have since changed. Use
+`pnpm roadmap`, the issue files and [the release handoff](v1-release/issues/15-complete-the-v1-release-handoff.md)
+for current work. The notes below are retained as history and are not commands
+to reapply.
+
+---
+
 Changes to align the V1 issues
 
 Every item below was verified against the tree by a separate agent. Items the

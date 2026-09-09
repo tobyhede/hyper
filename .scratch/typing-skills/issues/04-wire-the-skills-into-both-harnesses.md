@@ -4,6 +4,8 @@
 
 **Status:** ready-for-agent
 
+**Blocked by:** 02, 03 — both skills must exist before their tracking and discovery are verified.
+
 **Why:** A skill that exists but is not tracked is absent from every worktree; a skill that is tracked in one location serves one harness. Both failures have happened here before, which is why `workflow.md` records them.
 
 - [ ] Confirm `.agents/skills/typescript-write/**` and `.agents/skills/typescript-review/**` and both `.claude/skills/` symlinks are **tracked**, not merely present. An ordinary `git worktree add` populates only tracked files.

@@ -92,7 +92,7 @@ technical presentation without editing source files or losing authored work.
 ## Alias Cards
 
 - [x] Creation chooses one immutable Markdown Target — the Target picker offers
-      Markdown Cards, choosing one *is* the completion, and no Target control
+      Markdown Cards, choosing one _is_ the completion, and no Target control
       survives it:
       [`editing.spec.ts:2888`](../../packages/app/e2e/editing.spec.ts#L2888).
       What creation chose then cannot change: a changed Target is refused
@@ -165,9 +165,15 @@ technical presentation without editing source files or losing authored work.
       decision is ticked because ADR 0079 is accepted; the code half was owned by
       [`layout-only-v1/03`](../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md),
       which is `Status: done` — Computed Views and `defaultRenderer` are out of
-      the tree. This line stays open on its remaining half, the evidence that a
-      selected Layout draws only its own Cards and the Graphs it owns. A decided
-      ADR is not evidence that the code follows it.
+      the tree. Graph isolation now has direct evidence in
+      [`canvas-projection.test.ts:167`](../../packages/app/test/canvas-projection.test.ts#L167):
+      two Layouts share Cards, and the projection excludes the sibling Graph's
+      Edges and handles. Card membership is exercised by
+      [`space-card-embedded-layout.test.tsx:915`](../../packages/app/test/space-card-embedded-layout.test.tsx#L915),
+      which draws the Card's selected Layout and excludes the other Layout's
+      Card. V1/07 owns closing this complete row against the final candidate,
+      including the selectable/addressable-context proof from Layout-only/03;
+      it is no longer an unowned rendering-evidence gap.
 - [x] A working Space always has a durable default Layout, so deleting its last
       Layout is refused — the `deleted-layout` derivation refuses
       `space-must-keep-layout` before touching anything at
@@ -280,7 +286,7 @@ technical presentation without editing source files or losing authored work.
       durable key is now `defaultLayout` — Add Layout
       creates an empty Layout, and first working load initializes a layoutless
       Space — [ADR 0079](../../docs/adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md).
-      This closes the *decision*, not the code:
+      This closes the _decision_, not the code:
       [`layout-only-v1/03`](../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md)
       has landed, and the behaviour line under Layouts above stays open on its
       own evidence. This tick is not evidence for it.
@@ -323,7 +329,7 @@ technical presentation without editing source files or losing authored work.
 ### 9 September 2026 — `defaultRenderer` was a dead name
 
 Three lines above named `defaultRenderer`, and one of them asserted outright that
-the persisted key *was still* `defaultRenderer` rather than `defaultLayout`. That
+the persisted key _was still_ `defaultRenderer` rather than `defaultLayout`. That
 identifier no longer exists anywhere the repo authors: `git grep defaultRenderer
 -- packages src` returns nothing. The key is `defaultLayout`
 (`packages/core/src/schema.ts:303`, `packages/graph/src/space.ts:60`,

@@ -122,9 +122,12 @@ const ANY_HEADING_PATTERN = /^#{1,6}[ \t]+/u;
 /**
  * A blocked-by line carries prose alongside its references, and that prose cites
  * ADR and PR numbers. Requiring no adjacent digit and no leading `#` keeps `0052`
- * and `#83` out while still reading `03` and `space-authoring/05`.
+ * and `#83` out while still reading `03`, `issues/03`, `space-authoring/05` and
+ * complete tracker paths such as `.scratch/space-authoring/issues/05-title.md`.
+ * A relative `issues/` prefix names the current feature, so it is not captured.
  */
-const REFERENCE_PATTERN = /(?:([a-z][a-z0-9-]*)\/)?(?<![#\d])(\d{2})(?!\d)/giu;
+const REFERENCE_PATTERN =
+  /(?:issues\/|([a-z][a-z0-9-]*)(?:\/issues)?\/)?(?<![#\d])(\d{2})(?!\d)/giu;
 /**
  * Only a declared deferral counts — a heading or a list item that announces one.
  * Prose merely mentioning the word appears throughout resolved tickets and drowns
@@ -325,12 +328,16 @@ export const buildRoadmap = (root: string): Roadmap => {
     const issues = feature.issues.map((issue): ScratchIssue => {
       const unmet = isSettled(issue.state)
         ? []
-        : issue.blockers
-            .map((blocker) => blockerKey(blocker.feature ?? feature.slug, blocker.number))
-            .filter((key) => {
-              const state = stateByKey.get(key);
-              return state === undefined || !isSettled(state);
-            });
+        : [
+            ...new Set(
+              issue.blockers.map((blocker) =>
+                blockerKey(blocker.feature ?? feature.slug, blocker.number),
+              ),
+            ),
+          ].filter((key) => {
+            const state = stateByKey.get(key);
+            return state === undefined || !isSettled(state);
+          });
       return { ...issue, unmetBlockers: unmet };
     });
     const settledCount = issues.filter((issue) => isSettled(issue.state)).length;
@@ -385,6 +392,10 @@ const byPhase = (roadmap: Roadmap, phase: FeaturePhase): readonly FeatureRoadmap
 
 const openIssues = (feature: FeatureRoadmap): readonly ScratchIssue[] =>
   feature.issues.filter((issue) => !isSettled(issue.state));
+
+const readyToPickUp = (issue: ScratchIssue): boolean =>
+  issue.unmetBlockers.length === 0 &&
+  (issue.state === 'ready-for-agent' || issue.state === 'ready-for-human');
 
 const issueTagSuffix = (issue: ScratchIssue): string =>
   issue.tags.length === 0 ? '' : `  [${issue.tags.join(', ')}]`;
@@ -555,10 +566,10 @@ export const renderRoadmap = (roadmap: Roadmap, release: ReleaseScope | null = n
   const untracked = byPhase(roadmap, 'no-issues');
   const grabbable = roadmap.features.flatMap((feature) =>
     openIssues(feature)
-      .filter((issue) => issue.unmetBlockers.length === 0 && issue.state !== 'claimed')
+      .filter(readyToPickUp)
       .map(
         (issue) =>
-          `  ${feature.slug}/${issue.number ?? '--'}  ${issue.title}${issueTagSuffix(issue)}`,
+          `  ${feature.slug}/${issue.number ?? '--'}  ${issue.state}  ${issue.title}${issueTagSuffix(issue)}`,
       ),
   );
   const deferred = roadmap.features.flatMap((feature) =>
@@ -987,10 +998,10 @@ export const renderRoadmapHtml = (
   );
   const grabbable = roadmap.features.flatMap((feature) =>
     openIssues(feature)
-      .filter((issue) => issue.unmetBlockers.length === 0 && issue.state !== 'claimed')
+      .filter(readyToPickUp)
       .map(
         (issue) =>
-          `<li><a href="${escapeHtml(issue.path)}"><span class="ref">${escapeHtml(feature.slug)}/${escapeHtml(issue.number ?? '--')}</span>${inlineMarkup(issue.title)}</a>${htmlTags(issue)}</li>`,
+          `<li><a href="${escapeHtml(issue.path)}"><span class="ref">${escapeHtml(feature.slug)}/${escapeHtml(issue.number ?? '--')}</span>${inlineMarkup(issue.title)}</a> <span class="status">${escapeHtml(issue.state)}</span>${htmlTags(issue)}</li>`,
       ),
   );
   const deferred = roadmap.features.flatMap((feature) =>
