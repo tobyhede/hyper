@@ -201,11 +201,22 @@ with 503.
 ### Resolved
 
 Option D is decided and built. Every acceptance box in the body is ticked except
-`pnpm verify` and `pnpm e2e`, and that is a gate rather than a design question:
-the work merged as PR 162 (`50f6c20f`), and CI runs `verify:static`,
-`test:coverage`, `postgres`, `e2e` and `ladle` on every pull request, so the
-merge is the passing run. Nobody has re-run either command for this audit and
-this note claims no local run.
+`pnpm verify` and `pnpm e2e`, and that is a gate rather than a design question.
+The verification evidence is PR 162's own head run:
+
+<https://github.com/tobyhede/hyper/actions/runs/34212988418>
+
+`pull_request` on `21-safe-method-meta-space` at `93f99007`, conclusion
+`success`, with `static-checks`, `coverage`, `e2e` (all three shards),
+`postgres` and `ladle` each green.
+
+**Cite that run and not the merge.** An earlier draft of this note said "the
+work merged as PR 162 (`50f6c20f`) ... so the merge is the passing run", which
+does not follow: the `reuse-pr-ci` job exists precisely so a push to `main`
+whose tree already passed on the pull request skips every test job below it.
+The merge commit's run is therefore the one that may have proved nothing, and
+the head run is the one that did the work. Nobody has re-run either command for
+this audit and this note claims no local run.
 
 The built state, confirmed against the tree:
 

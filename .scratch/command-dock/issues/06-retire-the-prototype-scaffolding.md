@@ -76,8 +76,41 @@ is worth its own file.
       grounds that every Tailwind shadow is `rgb(0 0 0 / 0.1)` and a tenth of
       black on `#0f1115` draws nothing. Sound reasoning, dead premise — on the
       light ground the application now stands on, `shadow-lg` is right and the
-      0.5 value was the smudge ticket `03` said it was. The change was made and
-      reverted.
+      0.5 value was the smudge ticket `03` said it was. See the Answer below for
+      what the tree actually holds.
+
+## Answer
+
+**The change was kept, not reverted, and the prototype sheet was never part of
+it.** The sentence above used to end "the change was made and reverted", which
+is wrong on the outcome and vague about which surfaces it touched. Both halves
+are answered here.
+
+`shadow-lg` is what `Popover` and `Select` carry now, and it arrived with the
+theme change rather than against it:
+
+- `packages/ui/src/Popover.tsx:89` carries `shadow-lg`, and the comment at
+  `:79-87` records the replacement in full — it was
+  `shadow-[0_12px_40px_rgba(0,0,0,0.5)]`, "half the black there is, written in
+  numbers no theme can reach", chosen against a dark face and a smudge on a
+  light one. It also names the sibling it matches: `DropdownMenuSubContent`,
+  the nested Menu popup, rather than the outer one, which takes `shadow-md`
+  with a ring.
+- `packages/ui/src/Select.tsx:79` carries the same token, and its comment at
+  `:72-77` calls it "the last surface still holding the value it replaced".
+
+`git log -S'shadow-lg' -- packages/ui/src/Popover.tsx packages/ui/src/Select.tsx`
+answers `a5a76669` and `7a947fcc`, and no revert appears in either file's
+history. `a5a76669` is the theme change itself, so the move to the token and the
+light ground landed together — which is why the review's premise died at the
+same moment its reasoning was answered.
+
+**`command-dock.css` uses neither class.** Its three shadows are explicit
+`box-shadow` declarations — `:44`, `:89` (a `color-mix` against `--foreground`)
+and `:577` (an inset destructive ring). There is no `shadow-lg` and no arbitrary
+Tailwind shadow anywhere in the sheet, so the palette fork this item deleted
+never carried a shadow decision and the prototype was never a surface this
+change could reach.
 
 ## What is left, and who owns it
 
