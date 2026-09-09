@@ -1,7 +1,10 @@
 # 06 — Retire the prototype scaffolding
 
 Status: ready-for-human
-Blocked by: the theme change, which has no ticket anywhere in `.scratch/`
+Tags: release/v1
+Blocked by: nothing. The theme change landed as `a5a76669` (`feat(theme): sand
+is the canvas, and the chrome is neutral over it`), which is what the phantom
+"no ticket anywhere in `.scratch/`" blocker was waiting for.
 
 **What to build:** The cleanup pass that runs last. Three unrelated things share
 this ticket only because each is a deletion or a one-line compliance fix, and none
@@ -47,43 +50,54 @@ is worth its own file.
       one transition rather than shortening it: what it buys is legibility of a
       move the reader just made with their own pointer, and they know where it
       went.
-- [ ] **Resolve the palette fork — BLOCKED on the theme change, which has no
-      ticket.** `packages/app/src/tailwind.css:39` is still `color-scheme: dark`.
-      This item's own condition is "once the app's `:root` is light", so it
-      cannot be started, let alone finished, until that lands. The rest of the
-      item is unchanged and still correct:
-      `command-dock.css:25-64` sets `color-scheme: light` and forks roughly
-      twenty-four semantic tokens; the app's `:root` is dark
-      (`packages/app/src/tailwind.css:39`). This item was written assuming the
-      dark `:root` was the target and the fork was the mistake. **It is the other
-      way round: the application is not meant to be dark, and that is being
-      fixed.** So the fork is the proposal, the prototype's colour judgements
-      were made against the theme the application is moving to, and nothing in
-      that sheet needs redrawing on these grounds.
+- [x] **Resolve the palette fork.** The blocker went first: `a5a76669` made the
+      application light (`packages/app/src/tailwind.css:52` is `color-scheme:
+      light`, under the block that says sand is the canvas and the chrome is
+      neutral grey over it). The item's own condition — "once the app's `:root`
+      is light" — is met, and the fork is gone with it.
 
-      What remains is the second half of the original item — the fork must stop
-      being implicit. Once the app's `:root` is light, `command-dock.css`'s
-      twenty-four token overrides are either redundant (delete them) or they
-      disagree with the real theme (reconcile them). A fork that survives the
-      thing it was forking from is how a prototype's palette quietly becomes a
-      second design system.
+      The reading this item was rewritten to was the right one: the application
+      was not meant to be dark, so the fork was the proposal rather than the
+      mistake, and the prototype's colour judgements were made against the theme
+      the application has now moved to. Those values live in `tailwind.css`
+      once, which is what a scoped fork could never reach — a portalled Popover,
+      Menu or Select lands wherever the portal puts it rather than inside
+      `.dock-proto`, which is why the fork had to be carried on a
+      `.dock-proto__panel` class as well. Both halves are redundant and both are
+      deleted; `command-dock.css`'s header records that and cites this ticket.
+      **`.dock-proto__panel` survives on a second reason it acquired in the
+      meantime** — reaching a portalled surface at all is a problem the fork did
+      not create and does not take with it, and one rule still needs it.
 
       **This bit while it is still true.** A colour fix justified by "the app is
-      dark" is wrong for the theme being built. One already happened: a review of
-      ticket `03` called `Popover`'s move from
+      dark" is wrong for the theme that was built. One already happened: a review
+      of ticket `03` called `Popover`'s move from
       `shadow-[0_12px_40px_rgba(0,0,0,0.5)]` to `shadow-lg` a regression, on the
       grounds that every Tailwind shadow is `rgb(0 0 0 / 0.1)` and a tenth of
       black on `#0f1115` draws nothing. Sound reasoning, dead premise — on the
-      light ground this is heading for, `shadow-lg` is right and the 0.5 value
-      was the smudge ticket `03` said it was. The change was made and reverted.
-
-The palette item is the one with teeth: it does not merely need tidying, it
-invalidates evidence. Do it before anyone cites a colour decision from this sheet.
+      light ground the application now stands on, `shadow-lg` is right and the
+      0.5 value was the smudge ticket `03` said it was. The change was made and
+      reverted.
 
 ## What is left, and who owns it
 
-One item, the human's:
+Nothing. All four items are done and the theme change that blocked the fourth
+has merged, so no colour judgement in this ticket or in `07` is waiting on
+anything. The `Status:` line is left at `ready-for-human` for the human to
+confirm and close rather than being closed on an agent's reading.
 
-1. **The theme change.** `:root` is dark, there is no ticket for making it
-   light anywhere in `.scratch/`, and both this ticket's palette item and any
-   colour judgement in `07` wait on it.
+## Comments
+
+**Tagged `release/v1`, and the phantom blocker replaced with the commit that
+answered it.** ADR 0082 supersedes ADR 0053 and retires the Sidebar as the bound
+command surface, so `07` — the promotion this ticket cleans up after — is now V1
+work and is sequenced before `v1-release/03`, `05` and `06`. This ticket is
+tagged with it because it is `07`'s own cleanup pass and shares its scope.
+
+The `Blocked by:` line named "the theme change, which has no ticket anywhere in
+`.scratch/`". That change merged as `a5a76669`, so the blocker was not merely
+untracked, it was already discharged — and the palette item it was holding up
+was discharged with it, which the sheet's own header at
+`packages/app/stories/review/command-dock.css:5-21` records. A blocker written as
+an absence is the kind that outlives its reason silently: nothing fails when it
+stops being true, so it goes on reading as work.

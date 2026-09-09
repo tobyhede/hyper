@@ -35,13 +35,15 @@ technical presentation without editing source files or losing authored work.
       commits once. That negative half is proved for listing alone: import
       completion, export and reference checks reach no loader that could
       initialize, because `createWorkingSpaceLoader` is called only from the
-      single-Space working read and the two application openers. **The persisted key is still `defaultRenderer`, not
-      `defaultLayout`** — the comment at
-      [`working-space.ts:54`](../../packages/persistence/src/working-space.ts#L54)
-      says so and
+      single-Space working read and the two application openers. **The persisted key is
+      `defaultLayout`** — the rename
       [`layout-only-v1/03`](../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md)
-      owns the rename, so the behaviour this line describes holds while its name
-      is ahead of the code. Owner
+      owned is done, so the name and the code agree:
+      [`working-space.ts:54`](../../packages/persistence/src/working-space.ts#L54)
+      writes `defaultLayout`, the schema declares it
+      (`packages/core/src/schema.ts:303`) and `Space` carries it
+      (`packages/graph/src/space.ts:60`). `defaultRenderer` is gone from
+      `packages/**` and `src/**`. Owner
       [`layout-only-v1/02`](../layout-only-v1/issues/02-initialize-layoutless-space-on-first-working-load.md).
 - [ ] Every successful Edit is saved through the unified authored commit path
       over HTTP/PostgreSQL and survives reload.
@@ -160,10 +162,12 @@ technical presentation without editing source files or losing authored work.
 - [ ] An authored Layout is the only selectable and addressable canvas context; a
       selected Layout draws only its own Cards and the Graphs it owns. **This
       behaviour line is not what the scope decision below records.** The V1 scope
-      decision is ticked because ADR 0079 is accepted; this line stays open until
-      [`layout-only-v1/03`](../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md)
-      removes Computed Views and `defaultRenderer` from the tree. A decided ADR
-      is not evidence that the code follows it.
+      decision is ticked because ADR 0079 is accepted; the code half was owned by
+      [`layout-only-v1/03`](../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md),
+      which is `Status: done` — Computed Views and `defaultRenderer` are out of
+      the tree. This line stays open on its remaining half, the evidence that a
+      selected Layout draws only its own Cards and the Graphs it owns. A decided
+      ADR is not evidence that the code follows it.
 - [x] A working Space always has a durable default Layout, so deleting its last
       Layout is refused — the `deleted-layout` derivation refuses
       `space-must-keep-layout` before touching anything at
@@ -272,13 +276,14 @@ technical presentation without editing source files or losing authored work.
       Card is deleted; the Meta Space is permanent.
 - [x] An authored Layout is the only selectable and addressable canvas context in
       V1. Computed Views, the union term Space View and the persisted
-      `defaultRenderer` selection are retired rather than hidden, Add Layout
+      Computed-View opening selection are retired rather than hidden — the
+      durable key is now `defaultLayout` — Add Layout
       creates an empty Layout, and first working load initializes a layoutless
       Space — [ADR 0079](../../docs/adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md).
-      This closes the *decision*, not the code: the behaviour line under Layouts
-      above stays open until
+      This closes the *decision*, not the code:
       [`layout-only-v1/03`](../layout-only-v1/issues/03-make-layout-the-only-v1-canvas-selection.md)
-      lands, and this tick is not evidence for it.
+      has landed, and the behaviour line under Layouts above stays open on its
+      own evidence. This tick is not evidence for it.
 
 ## Deferred beyond V1
 
@@ -312,3 +317,25 @@ technical presentation without editing source files or losing authored work.
 - Remaining non-blocking TypeScript assertion cleanup.
 - React Flow registry declaration.
 - Themed zoom control.
+
+## Corrections log
+
+### 9 September 2026 — `defaultRenderer` was a dead name
+
+Three lines above named `defaultRenderer`, and one of them asserted outright that
+the persisted key *was still* `defaultRenderer` rather than `defaultLayout`. That
+identifier no longer exists anywhere the repo authors: `git grep defaultRenderer
+-- packages src` returns nothing. The key is `defaultLayout`
+(`packages/core/src/schema.ts:303`, `packages/graph/src/space.ts:60`,
+`packages/persistence/src/working-space.ts`). All three are corrected.
+
+Two of those lines also held work open "until `layout-only-v1/03` lands" or
+"removes Computed Views and `defaultRenderer` from the tree". That ticket is
+`Status: done`, so both were rewritten to name the half that is genuinely still
+open — the evidence that a selected Layout draws only its own Cards and the
+Graphs it owns — rather than a landed one.
+
+Authorised by [`v1-release/07`](issues/07-prove-the-v1-release.md), which
+instructs that no proof-matrix row may claim, waive or defer a Computed View or
+Space View behaviour — ADR 0079 retired it and the Definition of Done is
+corrected instead.

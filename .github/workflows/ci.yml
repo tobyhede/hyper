@@ -217,12 +217,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # Three shards, and the number is arithmetic rather than taste. The suite is
-    # CPU-saturated on one runner: 156 tests summing 382s of test time, and
-    # raising Playwright's workers past cores/2 made it slower on *both* wall
-    # clock and total work (98s at 4 workers, 110s at 8), so more workers on one
-    # 4-vCPU runner is not a lever. Parallel efficiency at cores/2 is already
-    # ~97%, which leaves only more machines. Against ~55s of fixed setup and the
-    # ~134s the `verify` path is heading for:
+    # CPU-saturated on one runner: 156 tests summing 382s of test time when this
+    # was measured, and raising Playwright's workers past cores/2 made it slower
+    # on *both* wall clock and total work (98s at 4 workers, 110s at 8), so more
+    # workers on one 4-vCPU runner is not a lever. Parallel efficiency at cores/2
+    # is already ~97%, which leaves only more machines. Against ~55s of fixed
+    # setup and the ~134s the `verify` path is heading for:
     #
     #     shards   slowest shard        vs the ~134s cap
     #       1        202 + 55 = 257s     over
@@ -240,8 +240,9 @@ jobs:
     #
     # This works at all because `playwright.config.ts` sets `fullyParallel:
     # true`, so Playwright shards at test level rather than file level:
-    # `--shard=i/3 --list` gives 52/52/52 even though `editing.spec.ts` alone
-    # holds 73 of the 156 tests. File-level sharding would pin one shard to that
+    # `--shard=i/3 --list` gives an even split even though `editing.spec.ts`
+    # alone holds well over a third of the suite — 53/53/53 against its 69 of
+    # 159 as this is written. File-level sharding would pin one shard to that
     # file and the split would be worthless.
     #
     # `fail-fast: false` because the default cancels the surviving shards the

@@ -7,7 +7,11 @@ content is ordinary authored state after creation: authors may edit or delete
 it, and later loads never repair or reseed it.
 
 **Blocked by:** 01 — Establish the Meta Space lifecycle; `space-cards/01` — Open
-and edit a Space Card in place.
+and edit a Space Card in place; `layout-only-v1/04` — Make Space Cards select
+initialized Layouts. Criterion 2's Open Space Card cannot show a *durable*
+selected Layout and Graph until that ticket lands: `layout` and `graph` are still
+optional on `spaceCardFrontmatterSchema`
+(`packages/core/src/schema.ts:61-62`).
 
 **Status:** ready-for-agent
 Tags: release/v1
