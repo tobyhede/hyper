@@ -88,16 +88,21 @@ const sizeVars = (open: boolean): CardSizeStyle => {
 /**
  * Three glyphs the shipped icon module does not offer at the rail's 14px.
  *
- * `LayoutGlyph` is the same Lucide `panels-top-left` the Sidebar's
- * `LayoutIcon` draws, redrawn here only because that export fixes its size at
- * 16 and the rail's other glyphs are 14 — production would give `LayoutIcon` a
- * `size` prop rather than keep this. `EnterSpaceGlyph` is Lucide `log-in`: an
- * arrow going *into* a container, deliberately unlike the Open control's
- * `maximize-2`, because entering the Space and expanding the Card in place are
- * two different destinations and must not share a symbol. `SpaceKindGlyph` is
- * Lucide `square-square` — a Card with a canvas inside it — and it has to
- * differ from `LayoutGlyph`, or the kind at the rail's leading edge and the
- * Layout selector at its trailing edge draw the same mark.
+ * `LayoutGlyph` is the same Lucide `layout-grid` the Sidebar's `LayoutIcon`
+ * draws, redrawn here only because that export fixes its size at 16 and the
+ * rail's other glyphs are 14 — production would give `LayoutIcon` a `size` prop
+ * rather than keep this. `EnterSpaceGlyph` is Lucide `log-in`: an arrow going
+ * *into* a container, deliberately unlike the Open control's `maximize-2`,
+ * because entering the Space and expanding the Card in place are two different
+ * destinations and must not share a symbol. `SpaceKindGlyph` is Lucide `frame`
+ * — a bounded region you go into — and it has to differ from `LayoutGlyph`, or
+ * the kind at the rail's leading edge and the Layout selector at its trailing
+ * edge draw the same mark.
+ *
+ * Both were `panels-top-left` and `square-square` until the entity glyphs were
+ * chosen (`review/card-icons`); they are copied from production and have to
+ * move with it, which is the standing cost of a story that redraws rather than
+ * imports.
  */
 const glyphProps = {
   width: 14,
@@ -113,16 +118,19 @@ const glyphProps = {
 
 const SpaceKindGlyph = () => (
   <svg {...glyphProps}>
-    <rect x="3" y="3" width="18" height="18" rx="2" />
-    <rect x="7" y="7" width="10" height="10" rx="1" />
+    <line x1="22" x2="2" y1="6" y2="6" />
+    <line x1="22" x2="2" y1="18" y2="18" />
+    <line x1="6" x2="6" y1="2" y2="22" />
+    <line x1="18" x2="18" y1="2" y2="22" />
   </svg>
 );
 
 const LayoutGlyph = () => (
   <svg {...glyphProps}>
-    <rect width="18" height="18" x="3" y="3" rx="2" />
-    <path d="M3 9h18" />
-    <path d="M9 21V9" />
+    <rect width="7" height="7" x="3" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="14" rx="1" />
+    <rect width="7" height="7" x="3" y="14" rx="1" />
   </svg>
 );
 
@@ -312,7 +320,7 @@ function RailSelect({
         {children}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto min-w-[11rem]">
-        <DropdownMenuRadioGroup value={value} onValueChange={(next) => onValueChange(String(next))}>
+        <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
           {options.map((option) => (
             // A Base UI radio item keeps its menu open by default, which suits
             // a set of toggles. Choosing a Layout is one choice and done,

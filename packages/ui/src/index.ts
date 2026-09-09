@@ -6,7 +6,7 @@ export { Button, buttonVariants } from './Button';
 export type { ButtonProps } from './Button';
 export { PersistenceIndicator } from './PersistenceIndicator';
 export type { PersistenceIndicatorProps, PersistenceIndicatorState } from './PersistenceIndicator';
-export { OpenSpaces } from './OpenSpaces';
+export { OpenSpaces, openSpaceStatusLabel } from './OpenSpaces';
 export type { OpenSpaceEntry, OpenSpacesProps, OpenSpaceStatus } from './OpenSpaces';
 export { StatusBusy, StatusFailure } from './StatusPanel';
 export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
@@ -89,6 +89,7 @@ export {
   LinkActionsIcon,
   MarkdownIcon,
   OpenCardIcon,
+  ParentIcon,
   SearchIcon,
   PlusIcon,
   ZoomInIcon,
@@ -96,6 +97,7 @@ export {
   PresentIcon,
   StopPresentingIcon,
 } from './icons';
+export type { CardBaseKind } from './icons';
 export {
   Select,
   SelectContent,
@@ -120,6 +122,15 @@ export {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from './components/alert-dialog';
+export {
+  Breadcrumb,
+  BreadcrumbEllipsis,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from './components/breadcrumb';
 export {
   Card,
   CardAction,

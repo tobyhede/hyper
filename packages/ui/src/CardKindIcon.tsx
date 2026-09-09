@@ -1,6 +1,5 @@
-import type { ComponentProps, ComponentType } from 'react';
 import type { Card } from '@project/core';
-import { AliasIcon, MarkdownIcon, SpaceCardIcon } from './icons';
+import { AliasIcon, MarkdownIcon, SpaceCardIcon, type CardBaseKind } from './icons';
 
 /**
  * What kind of Card this is, drawn rather than described.
@@ -15,17 +14,21 @@ import { AliasIcon, MarkdownIcon, SpaceCardIcon } from './icons';
  * name rather than silently drawing as nothing.
  */
 
-const KIND_GLYPHS = {
-  markdown: MarkdownIcon,
-  alias: AliasIcon,
-  space: SpaceCardIcon,
-} satisfies Record<Card['kind'], ComponentType<{ size?: number }>>;
-
 const KIND_NAMES = {
   markdown: 'Markdown Card',
   alias: 'Alias',
   space: 'Space Card',
 } satisfies Record<Card['kind'], string>;
+
+/**
+ * What an Alias announces once its Target's kind is known. The glyph carries
+ * the distinction, so the accessible name has to carry it too — otherwise the
+ * two draw differently and announce identically.
+ */
+const ALIAS_NAMES = {
+  markdown: 'Alias of a Markdown Card',
+  space: 'Alias of a Space Card',
+} satisfies Record<CardBaseKind, string>;
 
 /**
  * What this kind of Card is called, for a surface that names one in words
@@ -36,7 +39,17 @@ export const cardKindName = (kind: Card['kind']): string => KIND_NAMES[kind];
 
 export interface CardKindIconProps {
   readonly kind: Card['kind'];
-  readonly size?: number;
+  /**
+   * For an Alias, the kind of the Card it points at.
+   *
+   * The badge is drawn over that kind's glyph, so an Alias of a Space Card and
+   * an Alias of a Markdown Card are told apart — which a single Alias glyph
+   * could not do, and which is the whole reason the Alias is a decoration.
+   * Absent, an Alias draws over the Markdown base; it is also ignored for the
+   * other two kinds, which are not Aliases of anything.
+   */
+  readonly aliasOf?: CardBaseKind | undefined;
+  readonly size?: number | undefined;
 }
 
 /**
@@ -45,19 +58,36 @@ export interface CardKindIconProps {
  * hovering it sees. The SVG underneath stays `aria-hidden`, so the two do not
  * both reach the accessibility tree.
  */
-export function CardKindIcon({ kind, size }: CardKindIconProps) {
-  const Glyph = KIND_GLYPHS[kind];
-  const glyphProps: ComponentProps<typeof Glyph> = {};
-  if (size !== undefined) glyphProps.size = size;
+/**
+ * The glyph for one Card, composed rather than looked up.
+ *
+ * `markdown` and `space` each draw their own silhouette; `alias` draws one of
+ * those two with a badge on it. That is a composition and not a third entry in
+ * a table, because the Alias case needs a second input — which kind it is an
+ * Alias of — that the other two do not have.
+ */
+function KindGlyph({ kind, aliasOf, size }: CardKindIconProps) {
+  // `size` is forwarded even when absent: every one of these declares its own
+  // default by destructuring, and a destructuring default is what `undefined`
+  // selects — so passing it through preserves omission rather than overriding
+  // it, and no conditional spread is needed to say so.
+  if (kind === 'alias') return <AliasIcon base={aliasOf ?? 'markdown'} size={size} />;
+  const Base = kind === 'space' ? SpaceCardIcon : MarkdownIcon;
+  return <Base size={size} />;
+}
+
+export function CardKindIcon({ kind, aliasOf, size }: CardKindIconProps) {
+  const name = kind === 'alias' && aliasOf !== undefined ? ALIAS_NAMES[aliasOf] : KIND_NAMES[kind];
   return (
     <span
       className="inline-flex flex-none items-center text-[var(--muted-foreground)]"
       role="img"
-      aria-label={KIND_NAMES[kind]}
-      title={KIND_NAMES[kind]}
+      aria-label={name}
+      title={name}
       data-card-kind={kind}
+      data-alias-of={kind === 'alias' ? aliasOf : undefined}
     >
-      <Glyph {...glyphProps} />
+      <KindGlyph kind={kind} aliasOf={aliasOf} size={size} />
     </span>
   );
 }

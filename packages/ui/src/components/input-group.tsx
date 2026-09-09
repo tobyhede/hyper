@@ -114,7 +114,7 @@ function InputGroupText({ className, ...props }: React.ComponentProps<'span'>) {
   );
 }
 
-const InputGroupInput = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
+const InputGroupInput = React.forwardRef<HTMLInputElement, React.ComponentProps<typeof Input>>(
   ({ className, ...props }, ref) => (
     <Input
       ref={ref}

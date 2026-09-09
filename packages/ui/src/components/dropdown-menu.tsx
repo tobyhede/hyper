@@ -23,12 +23,16 @@ const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, MenuPrimitive.Tr
 function DropdownMenuContent({
   align = 'start',
   alignOffset = 0,
+  anchor,
   side = 'bottom',
   sideOffset = 4,
   className,
   ...props
 }: MenuPrimitive.Popup.Props &
-  Pick<MenuPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'>) {
+  Pick<
+    MenuPrimitive.Positioner.Props,
+    'align' | 'alignOffset' | 'anchor' | 'side' | 'sideOffset'
+  >) {
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
@@ -38,6 +42,12 @@ function DropdownMenuContent({
         className="z-50 outline-none"
         align={align}
         alignOffset={alignOffset}
+        // The element the menu positions against when it is not the trigger's —
+        // `PopoverContent` forwards the same Positioner prop for the same
+        // reason. A surface whose control both drags and discloses cannot be a
+        // `Menu.Trigger` at all (Base UI opens one on `mousedown`, which is the
+        // first pixel of the drag), so it hands its own ref over here instead.
+        anchor={anchor}
         side={side}
         sideOffset={sideOffset}
       >
@@ -94,8 +104,18 @@ function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       data-inset={inset}
       data-variant={variant}
+      // A destructive item's glyph follows the row rather than being coloured
+      // separately. The registry drop carried
+      // `data-[variant=destructive]:*:[svg]:text-destructive`, which paints
+      // `color` directly on the child `svg` — and a declared colour is not
+      // overridden by an ancestor's, however specific that ancestor's rule is,
+      // so a surface restating the row's resting colour had to restate the
+      // glyph's too and reach for `!important` to be sure of it. The utility
+      // bought nothing: the row is already `text-destructive`, Lucide draws on
+      // `currentColor`, and the `**:text-accent-foreground` rule above excludes
+      // destructive rows precisely so their descendants keep it.
       className={cn(
-        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
+        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}
@@ -188,18 +208,75 @@ function DropdownMenuCheckboxItem({
   );
 }
 
-function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
-  return <MenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
+/**
+ * Which one of a set the reader is looking at, chosen from a menu.
+ *
+ * Generic over the value, which Base UI declares as `any` on all three of
+ * `value`, `defaultValue` and `onValueChange`. That `any` is the group's to
+ * absorb, not each caller's: without this every consumer took an untyped
+ * `next` back out of a group it had just handed typed values to, and laundered
+ * it — `String(next)` five times over in one surface — which is a cast written
+ * as a conversion. Naming the type here means the value a caller gets back is
+ * the type it put in, and nothing downstream needs an assertion to say so.
+ *
+ * `Value` is inferred from `value` or `defaultValue` where a caller passes one,
+ * and can be named explicitly where the group is uncontrolled.
+ */
+type DropdownMenuRadioGroupProps<Value> = Omit<
+  MenuPrimitive.RadioGroup.Props,
+  'defaultValue' | 'onValueChange' | 'value'
+> & {
+  readonly value?: Value;
+  readonly defaultValue?: Value;
+  readonly onValueChange?: (
+    value: Value,
+    eventDetails: MenuPrimitive.RadioGroup.ChangeEventDetails,
+  ) => void;
+};
+
+function DropdownMenuRadioGroup<Value>({
+  defaultValue,
+  onValueChange,
+  value,
+  ...props
+}: DropdownMenuRadioGroupProps<Value>) {
+  return (
+    <MenuPrimitive.RadioGroup
+      data-slot="dropdown-menu-radio-group"
+      defaultValue={defaultValue}
+      onValueChange={onValueChange}
+      value={value}
+      {...props}
+    />
+  );
 }
 
-function DropdownMenuRadioItem({
+/**
+ * One of the set, and the thing that makes the group's generic true.
+ *
+ * Base UI types `value` as `any` here too, which left `DropdownMenuRadioGroup`
+ * promising a `Value` nothing was holding the items to: an item value the
+ * group could not produce still rendered, and still came back out of
+ * `onValueChange` wearing the group's type. Naming the type on the item is
+ * what closes that — a surface that renders several binds it once with an
+ * instantiation expression (`const Item = DropdownMenuRadioItem<Kind>`) rather
+ * than repeating the argument, and a typo is then a compile error where it is
+ * written instead of a value the group hands on unchallenged.
+ *
+ * The type does not travel from the group through JSX children — TypeScript
+ * has no way to carry it there — so the caller names it, once, on both.
+ */
+type DropdownMenuRadioItemProps<Value> = Omit<MenuPrimitive.RadioItem.Props, 'value'> & {
+  readonly value: Value;
+  readonly inset?: boolean;
+};
+
+function DropdownMenuRadioItem<Value>({
   className,
   children,
   inset,
   ...props
-}: MenuPrimitive.RadioItem.Props & {
-  inset?: boolean;
-}) {
+}: DropdownMenuRadioItemProps<Value>) {
   return (
     <MenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
