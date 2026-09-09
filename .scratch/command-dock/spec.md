@@ -29,8 +29,12 @@ ADR 0052 ratchet, which is why the model lives there.
 | [07](issues/07-promote-the-dock-and-retire-the-space-sidebar.md) | Promote the Dock and retire the Space Sidebar | ready-for-agent |
 
 01 gated the component and is settled: the trail is the parent step and a
-switcher, the switcher draws indent guides and no glyph, and the Dock carries no
-resting persistence cue. The reasoning is in that ticket, which is where it has
+switcher, the switcher draws indent guides and no glyph, and the Dock's toolbar
+strip carries no resting persistence cue — `failed`, `rejected` and `conflicted`
+still report unasked, through the standing `PersistenceNotice`, the portalled
+`AlertDialog`s and a dot on the switcher row naming which Space is unwell, which
+is what ADR 0082 binds. Read that clause with its scope: it retires a permanent
+slot in the bar, not the reporting. The reasoning is in that ticket, which is where it has
 to be — the three sheets that held it are `06`'s to delete. 02, 03 and 04 ran in
 parallel against the prototype as it stands. 06 is last of the prototype work by
 construction, and 07 is what the other six are preparation for — it mounts the
@@ -49,6 +53,8 @@ and lives at [`react-compiler/01`](../react-compiler/issues/01-decide-whether-to
 ## Evidence
 
 Anything reaching `packages/ui` owes `pnpm e2e:ladle`, which neither `verify` nor
-`e2e` runs and which is its own CI job. Anything reaching a stable story owes
-ADR 0052's two proofs. A prototype-only change owes `pnpm verify` and nothing
-else — say which commands you judged inapplicable and why.
+`e2e` runs and which is its own CI job — and that is true of a prototype change
+too, so reaching `packages/ui` outranks being prototype-only. Anything reaching a
+stable story owes ADR 0052's two proofs. A prototype-only change that stays out
+of `packages/ui` owes `pnpm verify` and nothing else — say which commands you
+judged inapplicable and why.

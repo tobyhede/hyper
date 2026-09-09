@@ -7,8 +7,16 @@ hand-memoization as the standing convention.
 
 It is **not enabled**, verified four ways: no `babel-plugin-react-compiler` and no
 `reactCompiler` key in `package.json`, in `packages/app/vite.config.ts` or in
-`pnpm-lock.yaml`, and no `.ladle/` directory carrying a config of its own. The app
-uses a plain `react()` plugin.
+`pnpm-lock.yaml`. The app uses a plain `react()` plugin.
+
+**The catalogue has its own pipeline, and it lacks the compiler too.**
+`packages/app/.ladle/config.mjs` exists and points `viteConfig` at
+`packages/app/ladle-vite.config.ts`, which deliberately does not reuse the
+application configuration and carries `tailwindcss()` as its only plugin. So a
+decision to enable the compiler is two configurations to change, not one — and
+ADR 0052 makes that mandatory rather than optional, since a stable story is
+production-parity evidence and a catalogue compiled differently from the
+application is no longer evidence of what the application does.
 
 This surfaced in the Command Dock prototype, where a derivation was written
 un-memoized on the assumption the compiler would handle it, and had to be given

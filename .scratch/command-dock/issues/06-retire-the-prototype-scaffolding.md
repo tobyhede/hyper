@@ -82,10 +82,8 @@ invalidates evidence. Do it before anyone cites a colour decision from this shee
 
 ## What is left, and who owns it
 
-Two items, both the human's:
+One item, the human's:
 
-1. **Delete `parent-space-mark` or say why it stays.** The ticket instructed
-   asking, and the sheet's header disagrees with what was built.
-2. **The theme change.** `:root` is dark, there is no ticket for making it
+1. **The theme change.** `:root` is dark, there is no ticket for making it
    light anywhere in `.scratch/`, and both this ticket's palette item and any
    colour judgement in `07` wait on it.

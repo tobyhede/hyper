@@ -74,6 +74,17 @@ cleanup pass — `06` is that — and it is not small.
       that path. `ui:catalog:check` fails an entry whose subject has since gained
       a story, so each is either removed with its subject gaining stable
       evidence, or rewritten to a reason that is still true.
+- [ ] **Take the persistence report out of `role="toolbar"`.** Ticket `02` left
+      this standing deliberately and deferred it to `03` because the fix is a
+      `command-dock.css` change and that file was `03`'s. `03` closed without it,
+      so it has no owner until this ticket takes it. The report is a child of the
+      surface element, which is now the toolbar root, so a standing `Alert` sits
+      inside `role="toolbar"` — a status region nested in a command region,
+      which is what ADR 0082's *"status is not a command"* forbids. The fix is a
+      positioned wrapper around the Toolbar so the report is its sibling rather
+      than its child. This is treatment with an accessibility obligation behind
+      it, so it is settled by a story and a behaviour test here and does not go
+      near an ADR.
 - [ ] **Re-spell `continuation.ts`'s `sidebar-row` target** (`:40`, `:140`). It
       is one of the two arms `ChromeContinuation` spends. If the Dock has no
       rows in that sense, the name is a lie the next reader inherits.

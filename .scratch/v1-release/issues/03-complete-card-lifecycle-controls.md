@@ -2,10 +2,11 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: `entity-url-addressability/07`; `architecture-review/17` — this
-ticket adds a third creation pane kind and the delete confirmations onto the
-structure that ticket collapses, and its first criterion (Add Card chooses the
-kind) is that module's own state shape
+Blocked by: `entity-url-addressability/07`
+Related: `architecture-review/17` (resolved) — this ticket adds a third creation
+pane kind and the delete confirmations onto the structure that ticket collapsed,
+and its first criterion (Add Card chooses the kind) is that module's own state
+shape
 
 **What to build:** Expose one coherent kind-selection, rename, confirmation and
 responsive command surface for Markdown, Alias and Space Cards using authoring
