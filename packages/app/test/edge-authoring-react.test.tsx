@@ -13,6 +13,7 @@ import { graphRenderEdgeId, inHandleId, outHandleId, Placement } from '@project/
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
+import { authoringAvailability } from '../src/authoring-availability';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import { edgeSelectionOf } from '../src/render-adapter';
 import type { ConnectionCompletion } from '../src/connection-completion';
@@ -353,7 +354,7 @@ function CanvasHarness({
   ReturnType<typeof compose>,
   'adapter' | 'edgeAuthoring' | 'continuation' | 'currentSpace' | 'authoring' | 'session'
 > & {
-  /** A modal pane is open over the graph — what `App` reports as no title editing. */
+  /** A modal pane is open over the graph, withdrawing everything on it. */
   readonly covered: boolean;
   readonly presenting: boolean;
 }) {
@@ -376,8 +377,18 @@ function CanvasHarness({
         projectedNodes={null}
         activeCardId={null}
         presenting={presenting}
-        editable={true}
-        titleEditingEnabled={!covered}
+        placementReady={true}
+        availability={authoringAvailability({
+          editable: true,
+          presenting,
+          creatingCard: covered,
+          editingCardBody: false,
+          editingCardTitle: false,
+          cardIsOpen: false,
+          editingChromeTitle: false,
+          spaceOnCanvas: true,
+          editingEmbeddedLayout: false,
+        })}
         onNodesChange={adapter.getState().changeNodes}
         onEdgesChange={adapter.getState().changeEdges}
         edgeAuthoring={edgeAuthoring}
@@ -397,6 +408,7 @@ function CanvasHarness({
           finishResize: () => undefined,
           cancelResize: () => undefined,
         }}
+        reportEmbeddedLayoutEditing={() => undefined}
         graphs={currentSpace().graphs}
         colorByGraphId={{}}
         activeGraphId={GRAPH_ID}
@@ -776,13 +788,13 @@ describe("the app's canvas delete key", () => {
  * A pane over the graph withdraws the Edge lifecycle — one authoring surface at
  * a time.
  *
- * `titleEditingEnabled` is named for the first control it took away and means
- * "no modal pane covers the graph": `App` passes
- * `!creatingAlias && spaceChromeEdit === null`, both of them modal surfaces —
- * `role="dialog" aria-modal="true"`, a backdrop at `inset: 0` over the whole
- * graph area, and a focus trap. The canvas fed it to every Card control and
- * *not* to Edge authoring, so the two disagreed about when the graph is
- * authorable.
+ * A creation pane is a `Dialog` — a backdrop at `inset: 0` over the whole graph
+ * area, and a focus trap — and `authorOnCanvas` carries it, alongside the live
+ * chrome rename, which withdraws canvas authoring without covering anything.
+ * The canvas once fed that condition to every Card control and *not* to Edge
+ * authoring, so the two disagreed about when the graph is authorable.
+ *
+ * The `covered` prop below is the pane, which is the case this file exercises.
  *
  * A hidden live gesture is the asymmetry that matters, and the delete key is
  * where it bites. The app-owned canvas command listens on `window`, so its
@@ -827,7 +839,7 @@ describe('a pane covering the graph', () => {
 
   /**
    * Presenting is the exception, and it is the reason `nodesConnectable` reads
-   * `canConnectOnCanvas` rather than `canAuthorOnCanvas`.
+   * `connectOnCanvas` rather than `authorOnCanvas`.
    *
    * The presenting chrome enumerates the active Card's outgoing Edges at render
    * time so an Edge drawn from the presented Card is a move available without

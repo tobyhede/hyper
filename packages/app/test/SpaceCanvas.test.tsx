@@ -5,6 +5,7 @@ import { spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CARD_DRAG_TYPE } from '../src/components/CardsDrawer';
+import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
 import type { EdgeAuthoring } from '../src/edge-authoring';
@@ -157,8 +158,21 @@ function mountGraph(
         projectedNodes={null}
         activeCardId={null}
         presenting={false}
-        editable={editable}
-        titleEditingEnabled={titleEditing}
+        placementReady={editable}
+        // The facts a mounted canvas is given, turned into answers by the one
+        // module that owns them: `titleEditing` is the creation pane `App`
+        // reports, and `editable` is a resolved placement.
+        availability={authoringAvailability({
+          editable,
+          presenting: false,
+          creatingCard: !titleEditing,
+          editingCardBody: false,
+          editingCardTitle: false,
+          cardIsOpen: false,
+          editingChromeTitle: false,
+          spaceOnCanvas: true,
+          editingEmbeddedLayout: false,
+        })}
         onNodesChange={nodesChanged}
         onEdgesChange={() => undefined}
         edgeAuthoring={edgeAuthoring}
@@ -175,6 +189,7 @@ function mountGraph(
         onBodyEditingChange={() => undefined}
         onTitleEditingChange={titleEditingChanged}
         cardResize={cardResize}
+        reportEmbeddedLayoutEditing={() => undefined}
         graphs={[]}
         colorByGraphId={{}}
         activeGraphId={null}

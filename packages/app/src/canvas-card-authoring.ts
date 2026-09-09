@@ -10,6 +10,7 @@ import {
 import type { SpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { CanvasSpaceCardSelection } from '@project/ui';
+import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { CARD_SIZE, snapCardSizeToClose } from './card';
 import type { CardResize } from './render-adapter';
@@ -69,10 +70,14 @@ const spaceCardSelection = (
 
 export interface CanvasCardAuthoringInput {
   readonly nodes: readonly CardFlowNode[];
-  readonly editable: boolean;
-  readonly presenting: boolean;
-  /** Whether the canvas is uncovered by a modal authoring surface. */
-  readonly enabled: boolean;
+  /**
+   * What may be authored right now, answered once for the whole application.
+   *
+   * Two answers are read here, and they are deliberately different: every
+   * control drawn on a Card is `authorOnCanvas`, while a *live* content editor
+   * is `editCardBody`, which a modal pane does not withdraw.
+   */
+  readonly availability: AuthoringAvailability;
   readonly nameOnCreation: string | null;
   readonly authoring: Pick<SpaceAuthoring, 'complete'>;
   readonly spaceSession: SpaceSession;
@@ -94,7 +99,6 @@ export interface CanvasCardAuthoring {
   readonly nodes: CardFlowNode[];
   readonly bodyEditing: boolean;
   readonly titleEditing: boolean;
-  readonly canAuthorOnCanvas: boolean;
   readonly openCard: (cardId: string) => 'completed' | 'retained';
   readonly beginTitleEditing: (cardId: string) => void;
 }
@@ -106,9 +110,7 @@ export interface CanvasCardAuthoring {
  */
 export function useCanvasCardAuthoring({
   nodes,
-  editable,
-  presenting,
-  enabled,
+  availability,
   nameOnCreation,
   authoring,
   spaceSession,
@@ -136,11 +138,10 @@ export function useCanvasCardAuthoring({
   }
 
   const bodyEditorCardId =
-    caret?.field === 'body' && editable && !presenting && bodyCaretNamesOpenMarkdown
+    caret?.field === 'body' && availability.editCardBody && bodyCaretNamesOpenMarkdown
       ? caret.cardId
       : null;
   const bodyEditing = bodyEditorCardId !== null;
-  const canAuthorOnCanvas = editable && enabled && !presenting;
 
   useEffect(() => {
     onBodyEditingChange?.(bodyEditing);
@@ -161,10 +162,12 @@ export function useCanvasCardAuthoring({
     return () => onTitleEditingChange?.(false);
   }, [editingTitleCardId, onTitleEditingChange]);
 
-  const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(canAuthorOnCanvas);
-  if (canvasAuthoringWasEnabled !== canAuthorOnCanvas) {
-    setCanvasAuthoringWasEnabled(canAuthorOnCanvas);
-    if (!canAuthorOnCanvas && caret?.field === 'title') setCaret(null);
+  const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(
+    availability.authorOnCanvas,
+  );
+  if (canvasAuthoringWasEnabled !== availability.authorOnCanvas) {
+    setCanvasAuthoringWasEnabled(availability.authorOnCanvas);
+    if (!availability.authorOnCanvas && caret?.field === 'title') setCaret(null);
   }
 
   const [lastCreatedCardId, setLastCreatedCardId] = useState(nameOnCreation);
@@ -177,7 +180,7 @@ export function useCanvasCardAuthoring({
 
   const openCard = useCallback(
     (cardIdInput: string): 'completed' | 'retained' => {
-      if (!enabled) return 'retained';
+      if (!availability.authorOnCanvas) return 'retained';
       const cardId = uuidSchema.safeParse(cardIdInput);
       if (!cardId.success) return 'retained';
       const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId.data);
@@ -192,7 +195,7 @@ export function useCanvasCardAuthoring({
       const result = authoring.complete({ kind: 'opened-card', cardId: cardId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
-    [authoring, enabled, spaceSession],
+    [authoring, availability.authorOnCanvas, spaceSession],
   );
 
   const closeCard = useCallback(
@@ -279,18 +282,19 @@ export function useCanvasCardAuthoring({
         const cardBelongsToWorkingSpace = editableCardIds.has(node.data.cardId);
         const data: CardFlowNode['data'] = {
           ...node.data,
-          titleEditingEnabled: cardBelongsToWorkingSpace && canAuthorOnCanvas && !bodyEditing,
+          titleEditingEnabled:
+            cardBelongsToWorkingSpace && availability.authorOnCanvas && !bodyEditing,
         };
-        if (cardBelongsToWorkingSpace && canAuthorOnCanvas) {
+        if (cardBelongsToWorkingSpace && availability.authorOnCanvas) {
           data.cardEditingEnabled = true;
           data.onEditCard = (open) => (open ? openCard(node.id) : closeCard(node.data.cardId));
         }
-        if (cardBelongsToWorkingSpace && canAuthorOnCanvas && !bodyEditing) {
+        if (cardBelongsToWorkingSpace && availability.authorOnCanvas && !bodyEditing) {
           data.onBeginTitleEditing = () => beginTitleEditing(node.id);
         }
         if (
           cardBelongsToWorkingSpace &&
-          canAuthorOnCanvas &&
+          availability.authorOnCanvas &&
           !bodyEditing &&
           node.data.kind === 'markdown'
         ) {
@@ -301,7 +305,11 @@ export function useCanvasCardAuthoring({
               openObserved: node.data.expanded === true,
             });
         }
-        if (cardBelongsToWorkingSpace && node.data.expanded === true && canAuthorOnCanvas) {
+        if (
+          cardBelongsToWorkingSpace &&
+          node.data.expanded === true &&
+          availability.authorOnCanvas
+        ) {
           // Ordinary Open proposals preserve the Space footer. The gesture
           // itself still reaches Closed Size so ADR 0066's magnet can Close it.
           const floor = node.data.kind === 'space' ? SPACE_CARD_MIN_OPEN_SIZE : CARD_SIZE;
@@ -338,7 +346,11 @@ export function useCanvasCardAuthoring({
             onEnd: () => setCaret(null),
           };
         }
-        if (cardBelongsToWorkingSpace && canAuthorOnCanvas && node.id === editingTitleCardId) {
+        if (
+          cardBelongsToWorkingSpace &&
+          availability.authorOnCanvas &&
+          node.id === editingTitleCardId
+        ) {
           data.titleEditor = {
             onComplete: (title) => {
               const error = completeCardTitle(node.id, title);
@@ -369,7 +381,7 @@ export function useCanvasCardAuthoring({
               target,
               stored?.document.kind === 'space' ? stored.document : undefined,
               completeSpaceCardSelection,
-              !(cardBelongsToWorkingSpace && canAuthorOnCanvas),
+              !(cardBelongsToWorkingSpace && availability.authorOnCanvas),
             );
           }
         }
@@ -377,7 +389,7 @@ export function useCanvasCardAuthoring({
       }),
     [
       nodes,
-      canAuthorOnCanvas,
+      availability.authorOnCanvas,
       bodyEditing,
       openCard,
       closeCard,
@@ -399,7 +411,6 @@ export function useCanvasCardAuthoring({
     nodes: decoratedNodes,
     bodyEditing,
     titleEditing: editingTitleCardId !== null,
-    canAuthorOnCanvas,
     openCard,
     beginTitleEditing,
   };

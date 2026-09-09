@@ -3,6 +3,7 @@ import type { Edge, NodeChange } from '@xyflow/react';
 import { SPACE_CARD_EMBED_INSET, type CardId, type GraphId, type LayoutId } from '@project/core';
 import { Placement, positionedStrategy } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
+import { authoringAvailability } from '../authoring-availability';
 import { canvasProjection } from '../canvas-projection';
 import { useCanvasCardAuthoring } from '../canvas-card-authoring';
 import { createEmbeddedAuthoring } from '../embedded-authoring';
@@ -87,11 +88,39 @@ export function EmbeddedLayoutAuthoring({
   }, [composition, projected]);
   const readTarget = useCallback((id: CardId) => entry.spaceCards.target(id), [entry]);
   const targets = useSpaceCardTargets(space.cards, readTarget);
+  /**
+   * This embedding's own answers, from the one module that owns them.
+   *
+   * The facts are stated about *this* canvas rather than the containing one:
+   * its placement has resolved by the time anything is drawn, a traversal never
+   * runs inside an embedding, and no pane or chrome rename belongs to it.
+   * `enabled` is the containing canvas's `authorOnCanvas`, already narrowed to
+   * this embedding, and it arrives here as the same question one level down —
+   * so it is the `spaceOnCanvas` fact and nothing else, which is what keeps a
+   * live content editor in here through a withdrawal up there.
+   */
+  const availability = useMemo(
+    () =>
+      authoringAvailability({
+        editable: true,
+        presenting: false,
+        creatingCard: false,
+        editingCardBody: false,
+        editingCardTitle: false,
+        cardIsOpen: false,
+        editingChromeTitle: false,
+        spaceOnCanvas: enabled,
+        // Never this embedding's own fact. A Space Card *inside* this Layout is
+        // drawn by the containing `SpaceCanvas` too — its queue descends into
+        // the nodes this one publishes — so a nested edit is reported into that
+        // one Set, and reaches back here as `enabled` rather than from below.
+        editingEmbeddedLayout: false,
+      }),
+    [enabled],
+  );
   const authoring = useCanvasCardAuthoring({
     nodes: state.projection?.nodes ?? EMPTY_NODES,
-    editable: true,
-    presenting: false,
-    enabled,
+    availability,
     nameOnCreation: null,
     authoring: composition.authoring,
     spaceSession: entry.session,

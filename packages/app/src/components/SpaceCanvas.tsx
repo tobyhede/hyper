@@ -38,6 +38,7 @@ import {
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
 import { describeAuthoringRefusal } from '../authoring-refusal';
+import type { AuthoringAvailability } from '../authoring-availability';
 import { useCanvasCardAuthoring } from '../canvas-card-authoring';
 import type { SpaceCardTargets } from '../space-card-targets';
 import { useEdgeAuthoring } from '../edge-authoring-react';
@@ -143,25 +144,44 @@ export interface SpaceCanvasProps {
   projectedNodes: readonly CardFlowNode[] | null;
   /** The Card the traversal has reached, or `null` in overview. */
   activeCardId: string | null;
+  /**
+   * That a traversal is running — the Navigation mode, not an availability
+   * answer. Two things read it, and neither is an authoring operation: the
+   * camera that returns to the overview when the traversal ends (ADR 0027), and
+   * the click that resumes an embedded read of a Space that has been Exited,
+   * which nothing edits. What presenting *withdraws* from authoring is
+   * `availability`'s to say.
+   */
   presenting: boolean;
   /**
-   * Whether the selected Layout's placement is ready for authoring.
-   */
-  editable: boolean;
-  /**
-   * Whether the graph is uncovered — no modal pane is open over it.
+   * That the selected Layout's placement has resolved and the store has taken
+   * it — the fact, not an operation, and read by one thing: the aria
+   * description React Flow gives every node.
    *
-   * **Named for the first control it took away, and read by all of them.** `App`
-   * passes `!creatingAlias && spaceChromeEdit === null`, and both of those are a
-   * modal surface: `role="dialog" aria-modal="true"`, a backdrop across the whole
-   * graph area, and a focus trap. So this says nothing about titles — it says
-   * one authoring surface at a time, the same rule `AddCardControl` is
-   * withdrawn on. An Open Card is *not* one of them: Opening is an ordinary
-   * Layout Edit on the canvas (ADR 0064), so it leaves title editing alone.
-   * The name is stale vocabulary rather than a second concept; renaming it is
-   * its own change (`docs/agents/workflow.md`).
+   * It is here rather than folded into `availability` because that description
+   * is a *statement about the placement* and its withheld form says so in
+   * words: "This Card is unavailable while placement is pending." Any
+   * availability answer would make it false somewhere — `connectOnCanvas`
+   * announces "pending" over a placement that resolved long ago the moment an
+   * author begins an inline Layout rename in the Sidebar, which is a lie told
+   * to exactly the readers who depend on it, and told while the canvas behind
+   * that rename is fully reachable (nothing about a chrome rename covers the
+   * graph or traps focus).
+   *
+   * So it is named for the fact rather than for a control, and it is not a
+   * reinstatement of any withdrawal term: nothing that decides what may be
+   * *authored* reads it.
    */
-  titleEditingEnabled: boolean;
+  placementReady: boolean;
+  /**
+   * What may be authored right now, answered once for the whole application.
+   *
+   * Every withdrawal on this canvas is one of these answers rather than a
+   * recombination of the facts behind them, so the canvas and the Space's
+   * command surface cannot disagree about an operation they both offer
+   * (`CONTEXT.md`, Availability).
+   */
+  availability: AuthoringAvailability;
   onNodesChange: OnNodesChange<CardFlowNode>;
   onEdgesChange: OnEdgesChange;
   /** The whole Edge interaction lifecycle, which this canvas composes rather than interprets. */
@@ -204,6 +224,18 @@ export interface SpaceCanvasProps {
   /** Reports the Card title draft so sibling naming surfaces stay withdrawn. */
   onTitleEditingChange?: (editing: boolean) => void;
   cardResize: CardResize;
+  /**
+   * Report whether some embedded Layout on this canvas is running a Card edit.
+   *
+   * The one availability fact that is produced *inside* this subtree: an
+   * embedded Layout publishes its live edits from within React Flow, so nothing
+   * above can see one without being told. It goes into the render adapter
+   * rather than up a chain of `useState` because that store re-renders the
+   * Space's command surface and this canvas together, and the answer derived
+   * from it comes back down as `availability.authorOnCanvas` — one answer, not
+   * a term recombined here (`authoring-availability.ts`).
+   */
+  reportEmbeddedLayoutEditing: (editing: boolean) => void;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: GraphId | null;
@@ -218,8 +250,8 @@ export function SpaceCanvas({
   projectedNodes,
   activeCardId,
   presenting,
-  editable,
-  titleEditingEnabled,
+  placementReady,
+  availability,
   onNodesChange,
   onEdgesChange,
   edgeAuthoring,
@@ -236,6 +268,7 @@ export function SpaceCanvas({
   onBodyEditingChange,
   onTitleEditingChange,
   cardResize,
+  reportEmbeddedLayoutEditing,
   graphs,
   colorByGraphId,
   activeGraphId,
@@ -243,35 +276,6 @@ export function SpaceCanvas({
   spaceCardTargets,
 }: SpaceCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
-  /**
-   * Whether a drag may begin at a Card's authoring handles.
-   *
-   * **The one authoring gesture presenting does not withdraw**, and the reason
-   * is a product decision rather than an oversight: the presenting chrome
-   * enumerates the active Card's outgoing Edges at render time precisely so an
-   * Edge drawn from the presented Card is a move the presenter can take without
-   * leaving the presentation (ADR 0027, and the `moves()` note in `docs/agents/rendering.md`).
-   * `editing.spec.ts` authors a self-Edge mid-presentation and asserts the
-   * chrome offers it.
-   *
-   * A pane is different, and so is a canvas with no Cards on it yet — one covers
-   * the graph, the other has nowhere to write.
-   */
-  const canConnectOnCanvas = editable && titleEditingEnabled;
-  /**
-   * One rule for everything this canvas authors — the Card controls *and* the
-   * whole Edge lifecycle.
-   *
-   * The three conditions are three ways there is nothing to author: no Cards on
-   * the canvas to write into, a modal pane covering the graph, and a
-   * presentation running. `AddCardControl` in the toolbar is withdrawn on
-   * exactly these, and so is every control drawn on a Card.
-   *
-   * **Edge authoring was the one thing reading a shorter rule**, and the gap was
-   * not cosmetic. A pane covering the canvas must withdraw its keyboard
-   * commands as well as its spatial gestures. The Card controls and Edge
-   * lifecycle agree here, and `edge-authoring-react.test.tsx` holds them to it.
-   */
 
   const spaces = useOpenSpaces();
   const getEntries = useCallback(() => spaces?.getState().entries ?? EMPTY_ENTRIES, [spaces]);
@@ -411,11 +415,30 @@ export function SpaceCanvas({
         : [];
     }),
   );
+  /**
+   * The one availability fact this subtree produces, on its way to the module
+   * that answers with it.
+   *
+   * *Whether* an embedding is editing is the fact; *which* one stays here, in
+   * the Set above, because it is a question about a Card of this canvas rather
+   * than about what is in progress. A layout effect rather than an ordinary
+   * one: the answer comes back through the store in the same commit, so no
+   * frame is painted with authoring still offered over a live embedded edit.
+   *
+   * Every reason the answers carry lives in `authoring-availability.ts`, beside
+   * the answer it governs — including why the Edge lifecycle reads
+   * `authorOnCanvas` rather than the shorter rule it once had, and why a
+   * connection is reachable on the presented Card that `authorOnCanvas`
+   * withdraws.
+   */
+  const embeddedEditing = editingEmbeddingIds.size > 0;
+  useLayoutEffect(() => {
+    reportEmbeddedLayoutEditing(embeddedEditing);
+    return () => reportEmbeddedLayoutEditing(false);
+  }, [embeddedEditing, reportEmbeddedLayoutEditing]);
   const cardAuthoring = useCanvasCardAuthoring({
     nodes,
-    editable,
-    presenting,
-    enabled: titleEditingEnabled && editingEmbeddingIds.size === 0,
+    availability,
     nameOnCreation,
     authoring,
     spaceSession,
@@ -423,7 +446,7 @@ export function SpaceCanvas({
     onSelectCard,
     spaceCardTargets,
   });
-  const { bodyEditing, canAuthorOnCanvas, openCard: onOpenCard, beginTitleEditing } = cardAuthoring;
+  const { bodyEditing, openCard: onOpenCard, beginTitleEditing } = cardAuthoring;
 
   const embeddedBodyEditing = embeddedRequests.some(
     (request) =>
@@ -541,7 +564,7 @@ export function SpaceCanvas({
     graphs,
     placedCards,
     newCardTitle,
-    enabled: canAuthorOnCanvas,
+    enabled: availability.authorOnCanvas,
     onSelectEdge,
   });
 
@@ -565,9 +588,9 @@ export function SpaceCanvas({
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (presenting || !(event.target instanceof Element)) return;
+      if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
       if (event.key === 'Enter' || event.key === ' ') {
-        if (!canAuthorOnCanvas || bodyEditing) return;
+        if (bodyEditing) return;
         // The same exclusion the `C` branch below makes, and now load-bearing
         // rather than defensive: an Expanded Card draws its editor *inside* the
         // node, so a Space typed into it would otherwise be cancelled here
@@ -608,12 +631,14 @@ export function SpaceCanvas({
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       // The default is prevented only where the command can actually run
       // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while authoring is
-      // withdrawn is left to whatever else would have had it.
-      if (!canAuthorOnCanvas || bodyEditing) return;
+      // withdrawn is left to whatever else would have had it. The guard at the
+      // top of this handler is the other half of that: it is `authorOnCanvas`
+      // rather than the mode alone, so every branch below is already behind it.
+      if (bodyEditing) return;
       event.preventDefault();
       onAddCard();
     },
-    [presenting, onOpenCard, canAuthorOnCanvas, bodyEditing, onAddCard, liveEmbeddings],
+    [onOpenCard, availability.authorOnCanvas, bodyEditing, onAddCard, liveEmbeddings],
   );
 
   // `F2` renames the selected Card, and this is the *only* handler that answers
@@ -623,7 +648,7 @@ export function SpaceCanvas({
   // handlers for one key means one of them is the unguarded one; don't add a
   // second back.
   useLayoutEffect(() => {
-    if (!canAuthorOnCanvas || bodyEditing) return;
+    if (!availability.authorOnCanvas || bodyEditing) return;
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
       if (event.key !== 'F2') return;
       if (event.target instanceof Element && event.target.closest(NOT_A_CANVAS_COMMAND) !== null) {
@@ -642,7 +667,7 @@ export function SpaceCanvas({
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, [canAuthorOnCanvas, bodyEditing, nodes, beginTitleEditing, liveEmbeddings]);
+  }, [availability.authorOnCanvas, bodyEditing, nodes, beginTitleEditing, liveEmbeddings]);
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
@@ -702,7 +727,7 @@ export function SpaceCanvas({
     embedded: liveEmbeddings,
     authoring,
     bodyEditing,
-    canAuthorOnCanvas,
+    authorOnCanvas: availability.authorOnCanvas,
     deleteEdges,
     edges: edgeSurface.edges,
     nodes,
@@ -716,7 +741,7 @@ export function SpaceCanvas({
       embedded: liveEmbeddings,
       authoring,
       bodyEditing,
-      canAuthorOnCanvas,
+      authorOnCanvas: availability.authorOnCanvas,
       deleteEdges,
       edges: edgeSurface.edges,
       nodes,
@@ -725,7 +750,7 @@ export function SpaceCanvas({
   }, [
     authoring,
     bodyEditing,
-    canAuthorOnCanvas,
+    availability.authorOnCanvas,
     deleteEdges,
     edgeSurface.edges,
     nodes,
@@ -749,7 +774,7 @@ export function SpaceCanvas({
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       if (canvasRef.current?.contains(event.target) !== true) return;
       const current = latestDeletion.current;
-      if (!current.canAuthorOnCanvas || current.bodyEditing) return;
+      if (!current.authorOnCanvas || current.bodyEditing) return;
       const focusedNodeId = event.target.closest<HTMLElement>('.react-flow__node[data-id]')
         ?.dataset['id'];
       const embedded = current.embedded.find((value) =>
@@ -822,18 +847,19 @@ export function SpaceCanvas({
 
   const onExternalDragOver = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
-      if (!canAuthorOnCanvas || !event.dataTransfer.types.includes(CARD_DRAG_TYPE)) return;
+      if (!availability.authorOnCanvas || !event.dataTransfer.types.includes(CARD_DRAG_TYPE))
+        return;
       if (!(event.target instanceof Element) || event.target.closest('.react-flow__pane') === null)
         return;
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
     },
-    [canAuthorOnCanvas],
+    [availability.authorOnCanvas],
   );
 
   const onExternalDrop = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
-      if (!canAuthorOnCanvas || !(event.target instanceof Element)) return;
+      if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
       if (event.target.closest('.react-flow__pane') === null) return;
       const cardId = uuidSchema.safeParse(event.dataTransfer.getData(CARD_DRAG_TYPE));
       if (!cardId.success) return;
@@ -844,7 +870,7 @@ export function SpaceCanvas({
         y: point.y - CARD_SIZE.height / 2,
       });
     },
-    [canAuthorOnCanvas, onAddExistingCard, screenToFlowPosition],
+    [availability.authorOnCanvas, onAddExistingCard, screenToFlowPosition],
   );
 
   const embeddedEvents = useMemo(() => {
@@ -910,22 +936,24 @@ export function SpaceCanvas({
       zoomOnDoubleClick={false}
       // While presenting the arrow keys control traversal, so React Flow must not
       // also read them as moving or selecting a node.
-      nodesDraggable={editable && !presenting}
-      nodesFocusable={!presenting}
-      elementsSelectable={!presenting}
+      nodesDraggable={availability.dragNodes}
+      nodesFocusable={availability.selectNodes}
+      elementsSelectable={availability.selectNodes}
       // Half of a pair, and useless without the other half. React Flow resolves
       // this into `NodeProps.isConnectable` and hands it to the node, enforcing
       // nothing itself on a handle it did not render — so `CardNode` forwards it
       // to the four authoring handles, and only then does this line mean
       // anything beyond whether the connection line draws.
       //
-      // **Not `canAuthorOnCanvas`**, and the difference is the whole of
-      // `canConnectOnCanvas`: this line read `editable && !presenting` for as
-      // long as it was inert, and the first thing forwarding it did was break
-      // the presented-Card connection `editing.spec.ts` has always asserted. An
-      // expression nothing reads is not a decision that was made.
-      nodesConnectable={canConnectOnCanvas}
-      ariaLabelConfig={editable ? ARIA_LABEL_CONFIG : PENDING_ARIA_LABEL_CONFIG}
+      // **Not `authorOnCanvas`**: presenting deliberately keeps this one
+      // gesture, and `authoring-availability.ts` records why.
+      nodesConnectable={availability.connectOnCanvas}
+      // **The placement fact, deliberately not an availability answer.** The
+      // withheld form of this description is a sentence about placement, so the
+      // only condition that may gate it is whether placement resolved. Every
+      // other withdrawal — presenting, a creation pane, a live chrome rename —
+      // leaves the description saying "pending" about a placement that is not.
+      ariaLabelConfig={placementReady ? ARIA_LABEL_CONFIG : PENDING_ARIA_LABEL_CONFIG}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the
       // authoring handles refuse via `isConnectableEnd` and the graph ports via
@@ -961,13 +989,23 @@ export function SpaceCanvas({
             entry={request.entry}
             layoutId={request.layoutId}
             graphId={request.graphId}
+            // Two answers and one membership test, and each is here for its own
+            // reason. `authorInEmbeddedLayout` is every way this canvas is not
+            // being authored *except* an embedded edit; `authorOnCanvas` adds
+            // that one, so it is false the moment any embedding is editing —
+            // and the membership test is that same fact read the other way
+            // round, reinstating the one embedding that owns the edit. Which
+            // embedding it is never leaves this component, so it could not be
+            // an answer.
+            //
+            // The two live edits are this canvas's own and read at same-render
+            // freshness; the answers `App` holds are a frame behind them, since
+            // each is reported up through an effect.
             enabled={
-              editable &&
-              titleEditingEnabled &&
-              !presenting &&
+              availability.authorInEmbeddedLayout &&
+              (availability.authorOnCanvas || editingEmbeddingIds.has(request.parent.id)) &&
               !bodyEditing &&
-              !cardAuthoring.titleEditing &&
-              (editingEmbeddingIds.size === 0 || editingEmbeddingIds.has(request.parent.id))
+              !cardAuthoring.titleEditing
             }
             bounds={request.bounds}
             publish={publishEmbedded}

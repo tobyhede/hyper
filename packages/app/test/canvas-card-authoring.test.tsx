@@ -9,6 +9,7 @@ import {
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CARD_SIZE } from '../src/card';
+import { authoringAvailability } from '../src/authoring-availability';
 import { useCanvasCardAuthoring } from '../src/canvas-card-authoring';
 import { composeApp } from '../src/compose-app';
 
@@ -124,9 +125,21 @@ const mountAuthoring = (
     ({ expanded, enabled, presenting, nameOnCreation, cardId }: HookProps) =>
       useCanvasCardAuthoring({
         nodes: [node(expanded, cardId, projectedKind)],
-        editable: true,
-        presenting,
-        enabled,
+        // The two facts this hook's rules turn on, stated as facts and turned
+        // into answers by the one module that owns them: a modal pane is what
+        // `enabled: false` has always meant here, and it is deliberately not
+        // the thing that ends a live content edit.
+        availability: authoringAvailability({
+          editable: true,
+          presenting,
+          creatingCard: !enabled,
+          editingCardBody: false,
+          editingCardTitle: false,
+          cardIsOpen: false,
+          editingChromeTitle: false,
+          spaceOnCanvas: true,
+          editingEmbeddedLayout: false,
+        }),
         nameOnCreation,
         authoring,
         spaceSession,
@@ -205,6 +218,34 @@ describe('canvas Card authoring', () => {
     expect(alias.data.titleEditingEnabled).toBe(true);
     expect(alias.data.onBeginBodyEditing).toBeUndefined();
     expect(alias.data.bodyEditor).toBeUndefined();
+  });
+
+  /**
+   * `openCard` refuses on `authorOnCanvas`, so presenting withdraws it — and
+   * that term is the one the guard gained when it stopped reading the modal
+   * pane alone.
+   *
+   * Unreachable through today's two call sites, both of which are already
+   * behind the same answer, which is exactly why it is pinned here: the
+   * presenting chrome does reach this canvas (`connectOnCanvas` deliberately
+   * survives a presentation), so a future caller Opening a Card mid-traversal
+   * would otherwise take a silent `'retained'` with nothing failing.
+   */
+  it('withholds Open while presenting, which authorOnCanvas withdraws', () => {
+    const { result, rerender, spaceSession } = mountAuthoring();
+
+    rerender({
+      expanded: false,
+      enabled: true,
+      presenting: true,
+      nameOnCreation: null,
+      cardId: CARD_ID,
+    });
+
+    act(() => expect(result.current.openCard(CARD_ID)).toBe('retained'));
+    expect(
+      spaceSession.getState().working.document.layouts?.[0]?.positions[CARD_ID]?.open,
+    ).not.toBe(true);
   });
 
   it('forgets a title caret when canvas authoring is withdrawn', () => {
