@@ -212,6 +212,7 @@ import {
 } from '@project/core';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
+import type { StoredSpaceRefusal } from '#src/space-authoring';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import type { RejectedExitConfirmation } from '#src/open-spaces';
 import { GRAPH_PALETTE, graphColorMap } from '#src/colors';
@@ -620,7 +621,7 @@ interface DockPersistence {
   /** Try the failed commit again, which is the one recovery that is not a decision. */
   readonly onRetry: () => void;
   /** Take the stored Space over the local one, ending a conflict. */
-  readonly onAcceptRemote: () => string | null;
+  readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   /** Keep the local Space and commit it again, ending a conflict. */
   readonly onKeepLocal: () => void;
 }

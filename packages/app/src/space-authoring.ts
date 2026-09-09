@@ -12,7 +12,13 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement, type ResolvedLayout, type Space } from '@project/graph';
+import {
+  loadSpaceSnapshot,
+  Placement,
+  type ResolvedLayout,
+  type Space,
+  type SpaceError,
+} from '@project/graph';
 import {
   createNonThrowingReporter,
   createObservableState,
@@ -201,6 +207,22 @@ type LayoutRequiredOperation = Extract<
   | { readonly kind: 'deleted-edge' }
 >['kind'];
 
+/**
+ * Why accepting the stored side of a conflict was refused.
+ *
+ * Separate from `AuthoringRefusal` because it refuses an operation on the
+ * *session* rather than an authored Edit, and neither surface that presents one
+ * presents the other. Both are the same rule (ADR 0057): the code crosses the
+ * seam and the application writes the sentence.
+ *
+ * `stored-space-invalid` carries `loadSpace`'s errors as typed context rather
+ * than a joined string, so what the author is shown — and how much of it — is
+ * the application's decision rather than intake's.
+ */
+export type StoredSpaceRefusal =
+  | { readonly code: 'stored-space-deleted' }
+  | { readonly code: 'stored-space-invalid'; readonly errors: readonly SpaceError[] };
+
 /** Stable identities for every expected refusal at the Authoring seam. */
 export type AuthoringRefusal =
   | { readonly code: 'placement-pending' }
@@ -301,7 +323,7 @@ export interface SpaceAuthoring {
    */
   readonly keepLocalWork: () => void;
   /** Replace local work with the current stored Space, or explain why it was refused. */
-  readonly acceptStoredSpace: () => string | null;
+  readonly acceptStoredSpace: () => StoredSpaceRefusal | null;
   /**
    * Release the collaborator subscriptions this Authoring holds.
    *
@@ -1537,7 +1559,7 @@ export function createSpaceAuthoring({
    * epoch advancing is what tells the canvas its nodes describe a Space that
    * is gone.
    */
-  const acceptStoredSpace = (): string | null => {
+  const acceptStoredSpace = (): StoredSpaceRefusal | null => {
     const { persistence } = session.getState();
     if (persistence.kind !== 'conflicted') return null;
     // The stored side is the newer Space when the conflict named this one, and
@@ -1547,13 +1569,11 @@ export function createSpaceAuthoring({
     // recovery rather than this one.
     const stored = persistence.current?.snapshot ?? persistence.baseline;
     if (stored === undefined) {
-      return 'This Space was deleted while the coordinated edit was saving. Keep your local version to restore it.';
+      return { code: 'stored-space-deleted' };
     }
     const accepted = loadSpaceSnapshot(stored);
     if (!accepted.ok) {
-      return `The remote space is invalid and was not accepted:\n${accepted.errors
-        .map((error) => `  - ${error.message}`)
-        .join('\n')}`;
+      return { code: 'stored-space-invalid', errors: accepted.errors };
     }
     const selection = requireDefaultLayout(accepted.space);
     const resolved = resolveLayout(accepted.space, selection);

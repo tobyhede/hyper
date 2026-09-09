@@ -20,13 +20,15 @@ import {
   describeAggregateRefusal,
   describeConflictRecovery,
   describePersistenceFailure,
+  describeStoredSpaceRefusal,
   type ConflictRecovery,
 } from '../authoring-refusal';
+import type { StoredSpaceRefusal } from '../space-authoring';
 
 export interface PersistenceControlProps {
   readonly active?: boolean;
   readonly persistence: SpaceSessionState['persistence'];
-  readonly onAcceptRemote: () => string | null;
+  readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
 }
 
@@ -125,10 +127,10 @@ function ConflictControl({
   onKeepLocal,
 }: {
   readonly recovery: ConflictRecovery;
-  readonly onAcceptRemote: () => string | null;
+  readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
 }) {
-  const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
+  const [remoteRefusal, setRemoteRefusal] = useState<StoredSpaceRefusal | null>(null);
 
   return (
     // A conflict has no safe dismissal: the revision conflict doesn't resolve
@@ -145,7 +147,7 @@ function ConflictControl({
         {remoteRefusal === null ? null : (
           <Alert variant="destructive" data-testid="persistence-remote-refused">
             <AlertTitle>Unable to reload</AlertTitle>
-            <AlertDescription>{remoteRefusal}</AlertDescription>
+            <AlertDescription>{describeStoredSpaceRefusal(remoteRefusal)}</AlertDescription>
           </Alert>
         )}
         <AlertDialogFooter>

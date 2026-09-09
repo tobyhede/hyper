@@ -333,9 +333,13 @@ test(
     await page.keyboard.press('Escape');
     await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
     await page.getByRole('button', { name: 'Reload' }).click();
-    await expect(page.getByTestId('persistence-remote-refused')).toContainText(
-      'The remote space is invalid and was not accepted.',
-    );
+    const refused = page.getByTestId('persistence-remote-refused');
+    await expect(refused).toContainText('The remote space is invalid and was not accepted.');
+    // The one place this module recites an id: a stored Space that will not
+    // load has no authored correction to describe, so the reference that failed
+    // is the only handle the author has for reporting it.
+    await expect(refused).toContainText('00000000-0000-4000-8000-00000000000a');
+    await expect(refused).not.toContainText('graph edge references unknown card');
 
     await page.goto('/?story=space--messaging--save-rejected&mode=preview');
     await expect(

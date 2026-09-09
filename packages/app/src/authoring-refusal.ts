@@ -1,6 +1,6 @@
-import type { SpaceAggregateError } from '@project/graph';
+import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
-import type { AuthoringRefusal, EdgeEndpoint } from './space-authoring';
+import type { AuthoringRefusal, EdgeEndpoint, StoredSpaceRefusal } from './space-authoring';
 import type { SpaceCardLifecycleResult } from './space-card-lifecycle';
 import { failureMessage } from './failure-message';
 
@@ -283,6 +283,46 @@ const AGGREGATE_REFUSAL_REASONS = {
  */
 export const describeAggregateRefusal = (errors: readonly SpaceAggregateError[]): string =>
   [...new Set(errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ');
+
+/**
+ * The sentence, without the detail that only some intake errors can supply.
+ */
+const STORED_SPACE_INVALID = 'The remote space is invalid and was not accepted.';
+
+/**
+ * What the application can name about one intake error: the id that failed to
+ * resolve, the card file that would not parse, or nothing.
+ *
+ * Never `error.message`. Intake writes those for a CLI and a log, in
+ * `@project/graph`'s vocabulary, and a sentence the application did not write
+ * is the thing ADR 0057 exists to keep off the screen. A shape or version
+ * error names nothing here because there is nothing in it to name — the
+ * document as a whole is what failed.
+ */
+const namedInStoredSpace = (error: SpaceError): string | null =>
+  'ref' in error ? error.ref : 'path' in error ? error.path : null;
+
+/**
+ * Why accepting the stored side of a conflict was refused, in the author's
+ * terms.
+ *
+ * Both sentences say what to do next, because both leave the conflict standing
+ * and every control on screen.
+ */
+export const describeStoredSpaceRefusal = (refusal: StoredSpaceRefusal): string => {
+  switch (refusal.code) {
+    case 'stored-space-deleted':
+      return 'This Space was deleted while the coordinated edit was saving. Keep your local version to restore it.';
+    case 'stored-space-invalid': {
+      const named = [
+        ...new Set(refusal.errors.map(namedInStoredSpace).filter((ref) => ref !== null)),
+      ];
+      return named.length === 0
+        ? STORED_SPACE_INVALID
+        : `${STORED_SPACE_INVALID} Affected: ${named.join(', ')}.`;
+    }
+  }
+};
 
 /**
  * What accepting the stored side of a conflict would do, which is not one

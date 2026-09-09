@@ -2,6 +2,8 @@ import type { Story } from '@ladle/react';
 import { uuidSchema } from '@project/core';
 import { RetryableSpaceSidebarFixture, SpaceSidebarFixture } from '../support/SpaceSidebarFixture';
 
+const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+
 export default { title: 'Space/Messaging' };
 
 export const Saving: Story = () => <SpaceSidebarFixture persistence={{ kind: 'pending' }} />;
@@ -35,7 +37,16 @@ export const SaveConflict: Story = () => (
       },
       baseline: undefined,
     }}
-    remoteRefusal="The remote space is invalid and was not accepted."
+    remoteRefusal={{
+      code: 'stored-space-invalid',
+      errors: [
+        {
+          kind: 'graph-edge-missing-card',
+          ref: MISSING_CARD_ID,
+          message: 'graph edge references unknown card',
+        },
+      ],
+    }}
   />
 );
 SaveConflict.meta = { iframed: true };

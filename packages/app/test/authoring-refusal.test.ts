@@ -3,6 +3,7 @@ import { uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
   describePersistenceFailure,
+  describeStoredSpaceRefusal,
   presentEdgeDeletionRefusal,
   presentEdgeEndpointRefusal,
   presentNewAliasRefusal,
@@ -10,6 +11,7 @@ import {
 import type { AuthoringRefusal } from '../src/space-authoring';
 
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
 const EVERY_REFUSAL = {
@@ -150,5 +152,35 @@ describe('describePersistenceFailure', () => {
 
     expect(description).not.toBe('Permission denied');
     expect(description).toBe('You do not have permission to save this space.');
+  });
+});
+
+/**
+ * Accepting the stored side of a conflict, refused.
+ *
+ * The invalid arm is the one place in this module that recites ids, and the
+ * reason is that it is a diagnostic rather than an instruction. A stored Space
+ * that fails intake is a repository producing a document that cannot load —
+ * `persistence` depends on `graph` precisely so every committed snapshot passes
+ * intake — so there is no authored correction to describe, and the id is the
+ * only handle the author has for reporting it. Contrast the aggregate table
+ * above, which names Spaces the author was just editing and can fix.
+ */
+describe('describeStoredSpaceRefusal', () => {
+  it('names the failing reference and not intake’s own prose', () => {
+    const description = describeStoredSpaceRefusal({
+      code: 'stored-space-invalid',
+      errors: [
+        {
+          kind: 'graph-edge-missing-card',
+          ref: MISSING_CARD_ID,
+          message: 'graph edge references unknown card',
+        },
+      ],
+    });
+
+    expect(description).toContain('The remote space is invalid and was not accepted');
+    expect(description).toContain(MISSING_CARD_ID);
+    expect(description).not.toContain('graph edge references unknown card');
   });
 });
