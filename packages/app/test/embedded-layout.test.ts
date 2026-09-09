@@ -100,7 +100,10 @@ const embedded = (nodes: readonly CardFlowNode[], cardId: string): CardFlowNode 
 };
 
 /** The region `embeddedLayout` clips into when no narrower bounds are given. */
-const view = (parent: CardFlowNode) => ({
+const view = (parent: {
+  readonly width?: number | undefined;
+  readonly height?: number | undefined;
+}) => ({
   top: SPACE_CARD_EMBED_INSET.top,
   left: SPACE_CARD_EMBED_INSET.left,
   right: (parent.width ?? 0) - SPACE_CARD_EMBED_INSET.right,
@@ -143,16 +146,26 @@ describe('an embedded production projection', () => {
     // the containing Card's own box rather than what it draws: the bands
     // `SPACE_CARD_EMBED_INSET` reserves are its rail, border and footer, and a
     // proposal accepted inside them is clipped rather than drawn (below).
-    const containing = { width: 700, height: 500 };
-    expect(constrainEmbeddedPosition({ x: 600, y: 120 }, containing)).toEqual({ x: 600, y: 120 });
-    expect(constrainEmbeddedPosition({ x: 900, y: 640 }, containing)).toEqual({ x: 660, y: 296 });
-    expect(constrainEmbeddedPosition({ x: -30, y: -8 }, containing)).toEqual({ x: 16, y: 42 });
+    const drawn = view({ width: 700, height: 500 });
+    expect(constrainEmbeddedPosition({ x: 600, y: 120 }, drawn)).toEqual({ x: 600, y: 120 });
+    expect(constrainEmbeddedPosition({ x: 900, y: 640 }, drawn)).toEqual({ x: 660, y: 296 });
+    expect(constrainEmbeddedPosition({ x: -30, y: -8 }, drawn)).toEqual({ x: 16, y: 42 });
+  });
+
+  it('holds a proposal inside bounds an ancestor has narrowed', () => {
+    // A nested embedding is clipped by every ancestor as well as by its own
+    // containing Card, and `SpaceCanvas` hands that intersection down as the
+    // request's bounds. Clamped into the containing Card's own region instead,
+    // a proposal is accepted where the ancestor's clip then hides it — the same
+    // defect as the corner case above, one level in.
+    const narrowed = { left: 16, top: 42, right: 300, bottom: 200 };
+    expect(constrainEmbeddedPosition({ x: 900, y: 640 }, narrowed)).toEqual({ x: 276, y: 176 });
   });
 
   it('leaves a proposal taken to the bottom-right corner drawn rather than clipped away', async () => {
     const { drawn, parent } = await draw(false, 700, 500);
     const node = embedded(drawn.nodes, B);
-    const held = constrainEmbeddedPosition({ x: 900, y: 640 }, parent);
+    const held = constrainEmbeddedPosition({ x: 900, y: 640 }, view(parent));
     // 260x146 of Card, of which the sliver keeps 24 on each axis inside the
     // view: right 660 + 260 - 684, bottom 296 + 146 - 320. Clamped to the
     // containing box instead, both clips exceeded the Card's own extent and the
@@ -165,7 +178,7 @@ describe('an embedded production projection', () => {
   it('leaves a proposal taken to the rail and border bands drawn rather than clipped away', async () => {
     const { drawn, parent } = await draw(false, 700, 500);
     const node = embedded(drawn.nodes, B);
-    const held = constrainEmbeddedPosition({ x: -30, y: -8 }, parent);
+    const held = constrainEmbeddedPosition({ x: -30, y: -8 }, view(parent));
     expect(clipEmbeddedNode({ ...node, position: held }, view(parent)).style?.clipPath).toBe(
       'inset(0px 0px 0px 0px)',
     );
