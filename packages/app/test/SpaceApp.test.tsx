@@ -760,8 +760,9 @@ describe('Space app Cards drawer', () => {
   });
 
   /**
-   * The menu's Edits are withdrawn wherever the chrome title edit is, and
-   * `editable` is one of that condition's terms.
+   * The menu's Edits are withdrawn wherever the chrome title edit is, and a
+   * resolved placement is one of that condition's terms
+   * (`authoringAvailability`'s `editable` fact).
    *
    * Before the strategy has placed anything there is no projected canvas, which
    * is the state the placeholder above announces. Offering Rename there is
@@ -930,7 +931,8 @@ describe('Space app Cards drawer', () => {
    * Card, Present, Delete Card and every entity menu's Edits.
    *
    * Choosing a Layout row spends `setSpaceChromeEdit(null)` at the call site,
-   * and this arrival does not — it is `chromeEditingDisabled` that answers it,
+   * and this arrival does not — it is `authoringAvailability`'s
+   * `chromeTitleEdit` that answers it,
    * because the Layout change clears the published projection and the canvas
    * holds no Cards until placement resolves. That is one clear standing on
    * another's condition, which is why the behaviour is pinned here rather than

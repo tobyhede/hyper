@@ -21,6 +21,7 @@ import { AppShell } from '@project/ui';
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { resolveLayout } from '#src/layout-resolution';
 import { graphColorMap } from '#src/colors';
+import { authoringAvailability } from '#src/authoring-availability';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { createContinuation, renameReturn } from '#src/continuation';
 import { spaceEntityActions } from '#src/entity-actions';
@@ -211,26 +212,31 @@ export function SpaceSidebarFixture({
   // The production builder, over the fixture's own Space, with the two side
   // effects replaced: a copy records the destination it would have written and
   // a rename runs the real chrome title edit above, which is the Sidebar's own.
-  // Both Edits are behind one condition, and it is `App.tsx`'s whole condition
-  // rather than the first half of it. A Layout rename begins the chrome title
-  // edit `chromeTitleEdit.disabled` withdraws, and Delete Layout goes with it
-  // rather than standing alone in a menu whose other Edit cannot run — that is
-  // the first term. The second is `titleEdit === null`, production's
-  // `spaceChromeEdit === null`: while a rename is already running, no row's
-  // menu offers a second start to it. Reading only the first drew a menu in the
-  // catalogue that the application does not have, which is the one thing a
-  // story owing an application proof must not do (ADR 0052). Copying is in
-  // front of both — an address is a fact about the entity rather than a change
-  // to it.
-  const editsAvailable = chromeTitleEdit.disabled !== true && titleEdit === null;
+  // Both Edits are behind production's own answer, from production's own
+  // module: this fixture states the facts it has and asks what they leave
+  // available, so the catalogue cannot draw a menu the application does not
+  // have — the one thing a story owing an application proof must not do
+  // (ADR 0052). Copying is in front of the answer: an address is a fact about
+  // the entity rather than a change to it.
+  const availability = authoringAvailability({
+    editable: !authoringDisabled,
+    presenting,
+    creatingCard: false,
+    editingCardBody: false,
+    editingCardTitle: false,
+    cardIsOpen: false,
+    editingChromeTitle: titleEdit !== null,
+    spaceOnCanvas: true,
+    editingEmbeddedLayout: false,
+  });
   const productionEntityActions = spaceEntityActions({
     spaceId: displayedSpace.id,
     spaceTitle: displayedSpace.title,
     onCopy: recordCopy,
-    onRename: editsAvailable
+    onRename: availability.entityEdits
       ? (subject, title) => chromeTitleEdit.onBegin(subject, title, 'sidebar')
       : null,
-    onDeleteLayout: editsAvailable
+    onDeleteLayout: availability.entityEdits
       ? (layoutId) => authoring.complete({ kind: 'deleted-layout', layoutId }).kind === 'completed'
       : null,
   });

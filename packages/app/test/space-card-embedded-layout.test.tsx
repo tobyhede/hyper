@@ -197,6 +197,23 @@ const embeddedNode = (cardId: CardId): HTMLElement => {
   return node;
 };
 
+/** A Card of the *containing* Layout, by the node the canvas draws it as. */
+const containingNode = (cardId: CardId): HTMLElement => {
+  const node = document.querySelector(`.react-flow__node[data-id="${cardId}"]`);
+  if (!(node instanceof HTMLElement)) throw new Error(`no node is drawn for ${cardId}`);
+  return node;
+};
+
+/** An embedded Card drawn by a named Space Card rather than by `SPACE_CARD_ID`. */
+const embeddedNodeOf = (parentId: CardId, cardId: CardId): HTMLElement => {
+  const node = document.querySelector(
+    `.react-flow__node[data-id="${embeddedNodeId(parentId, cardId)}"]`,
+  );
+  if (!(node instanceof HTMLElement))
+    throw new Error(`no embedded node is drawn for ${cardId} under ${parentId}`);
+  return node;
+};
+
 beforeAll(() => {
   vi.stubGlobal(
     'ResizeObserver',
@@ -376,6 +393,86 @@ describe('the Layout an Open Space Card draws', () => {
     await waitFor(() =>
       expect(within(duplicate).getByRole('button', { name: /Edit Card/ })).toBeTruthy(),
     );
+  });
+
+  /**
+   * The two questions the containing canvas asks of one live embedded edit,
+   * pinned together because they are read from one Set by different halves of
+   * it. *Is any* embedding editing withdraws this canvas's own Card controls
+   * and every other embedding; *which* embedding is editing is what leaves the
+   * one that owns the caret its editor.
+   *
+   * Driven through a **title** edit rather than a content edit, because that is
+   * the arm the membership half is load-bearing for: a live content editor
+   * survives its canvas being withdrawn (ADR 0064), so withdrawing every
+   * embedding would still leave Save and Cancel standing and prove nothing. A
+   * title caret is dropped the moment its canvas loses `authorOnCanvas`, so it
+   * is gone the instant the editing embedding is withdrawn along with the rest.
+   *
+   * A single-embedding mount cannot tell the two halves apart either, so this
+   * fixture draws the same target twice, from two Open Space Cards of the
+   * containing Layout.
+   */
+  it('withdraws the containing canvas for a live embedded edit and leaves that embedding its own', async () => {
+    const spaceCard: CardDocument = {
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      layout: SELECTED_LAYOUT_ID,
+      graph: SELECTED_GRAPH_ID,
+    };
+    const value = home(spaceCard);
+    await mount({
+      ...value,
+      cards: value.cards.map((card) =>
+        card.id === HOME_CARD_ID ? { ...card, document: spaceCard } : card,
+      ),
+      document: {
+        ...value.document,
+        layouts: value.document.layouts?.map((layout) => ({
+          ...layout,
+          positions: {
+            ...layout.positions,
+            [HOME_CARD_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
+          },
+        })),
+      },
+    });
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    const editing = containingNode(SPACE_CARD_ID);
+    const other = containingNode(HOME_CARD_ID);
+    const otherEmbedded = embeddedNodeOf(HOME_CARD_ID, DRAWN_A);
+    expect(within(editing).getByRole('button', { name: /Close Card/ })).toBeTruthy();
+    expect(within(other).getByRole('button', { name: /Close Card/ })).toBeTruthy();
+    expect(within(otherEmbedded).getByRole('button', { name: 'Edit Title Intake' })).toBeTruthy();
+
+    fireEvent.click(
+      within(embeddedNode(DRAWN_A)).getByRole('button', { name: 'Edit Title Intake' }),
+    );
+    await waitFor(() =>
+      expect(
+        within(embeddedNode(DRAWN_A)).getByRole('textbox', { name: 'Card title' }),
+      ).toBeTruthy(),
+    );
+
+    // The embedding that owns the caret keeps its editor.
+    expect(within(embeddedNode(DRAWN_A)).getByRole('textbox', { name: 'Card title' })).toBeTruthy();
+    // Every containing Card control goes, on the Space Card holding the edit
+    // and on its sibling alike, and so does the other embedding's own.
+    expect(within(editing).queryByRole('button', { name: /Close Card/ })).toBeNull();
+    expect(within(editing).getByTestId('space-card-layout').hasAttribute('disabled')).toBe(true);
+    expect(within(other).queryByRole('button', { name: /Close Card/ })).toBeNull();
+    expect(within(other).getByTestId('space-card-layout').hasAttribute('disabled')).toBe(true);
+    expect(within(otherEmbedded).queryByRole('button', { name: 'Edit Title Intake' })).toBeNull();
+
+    fireEvent.keyDown(within(embeddedNode(DRAWN_A)).getByRole('textbox', { name: 'Card title' }), {
+      key: 'Escape',
+    });
+    await waitFor(() =>
+      expect(within(editing).getByRole('button', { name: /Close Card/ })).toBeTruthy(),
+    );
+    expect(within(other).getByRole('button', { name: /Close Card/ })).toBeTruthy();
+    expect(within(otherEmbedded).getByRole('button', { name: 'Edit Title Intake' })).toBeTruthy();
   });
 
   it('reclips the retained drawing when its containing Card resizes after Exit', async () => {

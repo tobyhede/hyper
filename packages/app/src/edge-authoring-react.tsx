@@ -108,10 +108,16 @@ export interface EdgeAuthoringInput {
   readonly newCardTitle: string;
   /**
    * Edge authoring is withdrawn before a placement resolves, while a modal pane
-   * covers the graph, and while presenting — the same three conditions the Card
-   * controls are withdrawn on, and the canvas passes one value to both. The pane
-   * was missing here, which left the pointer gesture live behind it; see
-   * `SpaceCanvas`'s `canAuthorOnCanvas`.
+   * covers the graph, while a chrome title edit is running, and while
+   * presenting — the four terms `authorOnCanvas` carries, and the canvas passes
+   * one value to it and to the Card controls alike. The pane was missing here,
+   * which left the pointer gesture live behind it; see
+   * `authoring-availability.ts`'s `authorOnCanvas`.
+   *
+   * The chrome rename is its own term rather than a second pane: it is inline
+   * and not modal at all — no backdrop, no focus trap, the canvas fully
+   * reachable behind it — and it withdraws this lifecycle because a second
+   * authoring surface must not start over a live one.
    *
    * Placement readiness is separate from Layout existence because the
    * positioned strategy resolves asynchronously.

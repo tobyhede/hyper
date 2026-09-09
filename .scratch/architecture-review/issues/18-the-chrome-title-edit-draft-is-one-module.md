@@ -92,3 +92,32 @@ without help.
   none decision.
 - **Card title editing.** `editingCardTitle` is the canvas's inline rename and a
   different Interaction. It appears here only as a term of the precondition.
+
+## Comments
+
+**2026-09-09** — Confirmed at HEAD by the architecture review of that date, and
+**re-measured after `architecture-review/20` landed**, which moved every filed
+line again and deleted two of the names. No line numbers are recorded here for
+that reason: grep the four surviving anchors instead — `spaceChromeEdit`'s
+`useState`, its two discarding effects, and `SpaceChromeTitleEdit` — all in
+`App.tsx`. `chromeEditingDisabled` and `entityEditsAvailable` are gone as
+identifiers; both are now answers of `authoring-availability.ts`
+(`chromeTitleEdit` and `entityEdits`). `architecture-review/19` has landed as it
+predicted, so `onBegin` is at three arguments and `spaceChromeEdit` at four
+fields.
+
+The open question — whether the withdrawal matrix is this module's — is answered
+**no**. The matrix has nine consumers and crosses two seams into the canvas that
+this draft has nothing to do with; settling it here would put its home inside a
+draft module and make the canvas import it. It is now
+`architecture-review/20`, which builds `authoringAvailability`. This ticket takes
+its precondition from that module rather than housing it, and should be re-measured
+against the tree 20 leaves behind rather than amended now — the line numbers above
+have already moved once.
+
+Also confirmed: the claim that one clear stands on another's condition still
+holds. The `editable` fact is `liveProjection !== null`, so the
+Back-to-another-Layout discard still rides on a frame in which the published
+projection is empty. Issue 20 deliberately preserves that source so its own change
+stays behaviour-preserving; changing it to `placement.kind === 'ready'` belongs
+here, where the discard rule is being moved anyway.

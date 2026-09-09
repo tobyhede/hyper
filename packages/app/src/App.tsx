@@ -14,6 +14,7 @@ import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpacesState } from './open-spaces';
 import type { AuthoringRefusal } from './space-authoring';
+import { authoringAvailability } from './authoring-availability';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
 import { canvasContent } from './canvas-content';
@@ -449,18 +450,53 @@ export const createApp = (
         ),
       [selectedLayout, renderedSpace.cards],
     );
-    // The one condition the toggle's `disabled` and the drawer's own open state
-    // both read, so neither can drift from the other into an enabled control
-    // over a drawer that will not open.
-    const cardsDrawerAvailable = !presenting && !creatingCard;
+    const liveProjection = useRenderAdapter((s) => s.projection);
+    // Reported by the canvas, which is the only place it can be seen: an
+    // embedded Layout publishes its live edits from inside the React Flow
+    // subtree. Read back out of the store the canvas wrote it into, so the
+    // answers derived from it reach the command surface and the canvas in one
+    // render rather than an effect apart.
+    const editingEmbeddedLayout = useRenderAdapter((s) => s.editingEmbeddedLayout);
+    // There are Cards on the canvas to interact with once placement resolves
+    // and the store has taken it.
+    const hasCardsOnCanvas = liveProjection !== null;
+    const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
+      readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;
+      readonly draft: string;
+      readonly error: string | null;
+      readonly surface: 'sidebar' | 'header';
+    } | null>(null);
+    const cardIsOpen = Object.values(selectedLayout.layout.positions).some(
+      (at) => at?.open === true,
+    );
+    /**
+     * What may be authored right now — one question, answered once, spent by
+     * every surface below and by the canvas (`CONTEXT.md`, Availability).
+     *
+     * The reasons each answer carries live in `authoring-availability.ts`,
+     * beside the answer they govern, rather than at the call sites that spend
+     * them: two surfaces reading the same operation cannot disagree about it,
+     * and a term added for one of them is added for all of them.
+     */
+    const availability = authoringAvailability({
+      editable: hasCardsOnCanvas,
+      presenting,
+      creatingCard,
+      editingCardBody,
+      editingCardTitle,
+      cardIsOpen,
+      editingChromeTitle: spaceChromeEdit !== null,
+      spaceOnCanvas: active,
+      editingEmbeddedLayout,
+    });
     // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
     // `cardsDrawerOpen`. Presenting and creating an Alias both pass through here,
     // and a drawer that reopened itself on the way back would take
     // focus with it — `Drawer.Popup` moves focus in on every open, so Stop would
     // land the reader in the Cards list instead of on the canvas they returned to.
     useEffect(() => {
-      if (!cardsDrawerAvailable) setCardsDrawerOpen(false);
-    }, [cardsDrawerAvailable]);
+      if (!availability.cardsView) setCardsDrawerOpen(false);
+    }, [availability.cardsView]);
     // Reveals the drawer once per (Layout, address) rather than on every
     // dependency change: an unrelated edit elsewhere in the Space still
     // recomputes `cardsOutsideSelectedLayout` with a fresh array identity, and
@@ -528,15 +564,11 @@ export const createApp = (
       if (projected) syncProjection(projected.nodes, projected.edges);
     }, [projected, syncProjection]);
 
-    const liveProjection = useRenderAdapter((s) => s.projection);
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
     const cardResize = useRenderAdapter((s) => s.cardResize);
-    // There are Cards on the canvas to interact with once placement resolves
-    // and the store has taken it.
-    const hasCardsOnCanvas = liveProjection !== null;
+    const reportEmbeddedLayoutEditing = useRenderAdapter((s) => s.reportEmbeddedLayoutEditing);
     const canvas = canvasContent(placement, hasCardsOnCanvas);
-    const editable = hasCardsOnCanvas;
     // Both refusals are drawn under Add Layout and both are about the Layout
     // that was selected when they were refused — the Edit Add Layout would have
     // made, and the Rename or Delete on that row. Neither says anything about
@@ -545,46 +577,14 @@ export const createApp = (
       setCreateLayoutRefusal(null);
       setLayoutManagementRefusal(null);
     }, [selectedLayoutId]);
-    const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
-      readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;
-      readonly draft: string;
-      readonly error: string | null;
-      readonly surface: 'sidebar' | 'header';
-    } | null>(null);
-    const chromeEditingDisabled =
-      !editable || presenting || creatingCard || editingCardBody || editingCardTitle;
-    const cardIsOpen = Object.values(selectedLayout.layout.positions).some(
-      (at) => at?.open === true,
-    );
-
-    /**
-     * Delete Card is withdrawn wherever Add Card is, and for one reason more.
-     *
-     * It is a whole-Space authoring action on the *selected* Card, so it reads
-     * the conditions `addCard.disabled` reads and adds `editingCardTitle`: that
-     * one names the selected Card, and destroying the subject of a live rename
-     * is the edit answering itself. Withdrawing it while a Card is open is what
-     * keeps the Layout's Open state from outliving the Card it names — nothing
-     * clears it on a Delete, so every affordance reading that state would stay
-     * withdrawn with no pane left to close.
-     */
-    const deleteCardAvailable =
-      editable &&
-      !presenting &&
-      !cardIsOpen &&
-      !creatingCard &&
-      !editingCardBody &&
-      !editingCardTitle &&
-      spaceChromeEdit === null;
-
     useEffect(() => {
-      if (chromeEditingDisabled) setSpaceChromeEdit(null);
-    }, [chromeEditingDisabled]);
+      if (!availability.chromeTitleEdit) setSpaceChromeEdit(null);
+    }, [availability.chromeTitleEdit]);
 
     // A replacement discards every open Interaction draft (ADR 0042), and this
     // one lives outside the canvas subtree `replacementEpoch` keys, so the
     // remount does not reach it. Separate from the guard above because that
-    // guard reads only `chromeEditingDisabled`: listing the epoch beside it
+    // guard reads only the availability of a chrome title edit: listing the epoch beside it
     // re-ran an effect whose body could then do nothing, which is how the two
     // rules came to look like one.
     useEffect(() => {
@@ -609,7 +609,7 @@ export const createApp = (
       surface: spaceChromeEdit?.surface ?? null,
       draft: spaceChromeEdit?.draft ?? '',
       error: spaceChromeEdit?.error ?? null,
-      disabled: chromeEditingDisabled,
+      disabled: !availability.chromeTitleEdit,
       onBegin: (subject, title, surface) =>
         setSpaceChromeEdit({ subject, draft: title, error: null, surface }),
       onDraftChange: (draft) =>
@@ -634,39 +634,17 @@ export const createApp = (
       },
     };
 
-    /**
-     * Whether a menu's Rename and Delete may be offered at all.
-     *
-     * Rename begins the very chrome title edit `chromeEditingDisabled`
-     * withdraws — the effect above discards a draft begun against that
-     * condition on the same render — so this reads that condition itself rather
-     * than a second spelling of it that can fall behind. It once was one, and
-     * what the copy dropped was `editable`: while placement is pending there is
-     * no projected canvas, so Rename opened an editor the effect closed on the
-     * same render and Delete Layout ran a real Edit against it. Delete Layout
-     * goes with Rename rather than standing alone in a menu whose other item
-     * cannot run.
-     *
-     * `spaceChromeEdit === null` is the term `chromeEditingDisabled` does not
-     * carry: it is what stops a second Rename beginning over a live one.
-     *
-     * The copy commands are deliberately **not** behind it: an address is a
-     * fact about the entity rather than an Edit, and nothing about a live
-     * rename or a presentation makes one uncopyable.
-     */
-    const entityEditsAvailable = !chromeEditingDisabled && spaceChromeEdit === null;
-
     const entityActions = spaceEntityActions({
       spaceId: renderedSpace.id,
       spaceTitle: renderedSpace.title,
       onCopy: copyProductDestination,
-      onRename: entityEditsAvailable
+      onRename: availability.entityEdits
         ? (subject, title) => {
             setLayoutManagementRefusal(null);
             titleEdit.onBegin(subject, title, 'sidebar');
           }
         : null,
-      onDeleteLayout: entityEditsAvailable
+      onDeleteLayout: availability.entityEdits
         ? (layoutId) => {
             const result = authoring.complete({ kind: 'deleted-layout', layoutId });
             setLayoutManagementRefusal(result.kind === 'refused' ? result.refusal : null);
@@ -789,8 +767,10 @@ export const createApp = (
      *
      * The toolbar remains available for an empty authored Layout: it is the
      * zero-Card Space's way to create the first Card. Canvas-local authoring is
-     * still gated on `editable`, because there is no projected node surface to
-     * receive its shortcut until that first Card exists.
+     * still gated on a resolved placement — `hasCardsOnCanvas`, which reaches
+     * the canvas as `availability.authorOnCanvas` — because there is no
+     * projected node surface to receive its shortcut until that first Card
+     * exists.
      *
      * What that argument does *not* license is a catch-all, so each outcome is
      * named below. If Add Card ever grows an input — a kind, a title, a
@@ -910,7 +890,7 @@ export const createApp = (
           colorByGraphId: projection.colors,
           onActivate: activateGraph,
           onPresent: present,
-          canPresent: !editingCardBody && spaceChromeEdit === null,
+          canPresent: availability.present,
           presenting,
           onExitPresenting: exitPresenting,
         }}
@@ -918,35 +898,12 @@ export const createApp = (
           onAddCard: addCard,
           onAddAlias: () => cardCreation.open('alias'),
           onAddSpaceCard: () => cardCreation.open('space'),
-          // `editingCardBody` is here for the reason it is on `canPresent`
-          // above, and it is the condition that makes this control agree with
-          // the `C` shortcut answering the same operation on the canvas. Add
-          // Card ends by putting a caret in the created Card's title editor, and
-          // title editing is withdrawn while a content edit owns the keyboard
-          // (ADR 0064) — so a live toolbar created a Card and then swallowed the
-          // naming it exists to begin.
-          disabled: presenting || creatingCard || editingCardBody || spaceChromeEdit !== null,
+          disabled: !availability.addCard,
           keyShortcut: ADD_CARD_KEY,
           hidden: presenting,
         }}
         createLayout={{
-          // Reads `editingCardTitle` for the reason `layoutActions` does, and
-          // for one more that is this control's own. Creating a Layout selects
-          // it, and the created Layout is empty — so the canvas re-derives with
-          // no nodes and a Card mid-rename unmounts, taking the draft, the
-          // reason it was refused and the caret with it. A valid draft would
-          // have been committed by the blur this button's own mousedown causes
-          // (ADR 0065), which is precisely why a refused one is the case worth
-          // withdrawing for: it is re-focused rather than settled, and nothing
-          // else stands between the click and the Card that holds it. Add Card
-          // above omits the same condition deliberately — it *begins* a title
-          // edit rather than outliving one.
-          disabled:
-            presenting ||
-            creatingCard ||
-            editingCardBody ||
-            editingCardTitle ||
-            spaceChromeEdit !== null,
+          disabled: !availability.createLayout,
           refusal: createLayoutRefusal ?? layoutManagementRefusal,
           onCreate: () => {
             const result = authoring.complete({ kind: 'created-layout' });
@@ -990,7 +947,7 @@ export const createApp = (
                  * Space Authoring refuses it on its own account, so the choice
                  * is made here rather than discovered there.
                  */
-                onDelete: deleteCardAvailable
+                onDelete: availability.deleteCard
                   ? selectedCard.kind === 'space'
                     ? async () => {
                         const result = await spaceCards.delete({
@@ -1037,12 +994,12 @@ export const createApp = (
             {/* Trigger and panel are one component: only the trigger renders
                 here, the drawer portalling its popup over the canvas. That is
                 what stops the toggle's `disabled` and the surface it names from
-                drifting apart — they are now the same `cardsDrawerAvailable`
+                drifting apart — they are now the same availability answer
                 read in one place rather than two 850 lines apart. */}
             <CardsDrawer
               open={cardsDrawerOpen}
               onOpenChange={setCardsDrawerOpen}
-              disabled={!cardsDrawerAvailable}
+              disabled={!availability.cardsView}
               cards={cardsOutsideSelectedLayout}
               allCards={renderedSpace.cards}
               spaceTitleById={spaceTitleById}
@@ -1127,12 +1084,8 @@ export const createApp = (
                 projectedNodes={projected?.nodes ?? null}
                 activeCardId={activeCardId}
                 presenting={presenting}
-                editable={editable}
-                // Both panes cover the graph, so both withdraw everything on it.
-                // The toolbar's Add Card already reads the pair; this read only
-                // the opened Card, so `C` and the inline title editor stayed
-                // live behind an open Alias creation pane.
-                titleEditingEnabled={active && !creatingCard && spaceChromeEdit === null}
+                placementReady={hasCardsOnCanvas}
+                availability={availability}
                 onNodesChange={changeNodes}
                 onEdgesChange={changeEdges}
                 edgeAuthoring={edgeAuthoring}
@@ -1149,6 +1102,7 @@ export const createApp = (
                 onBodyEditingChange={setEditingCardBody}
                 onTitleEditingChange={setEditingCardTitle}
                 cardResize={cardResize}
+                reportEmbeddedLayoutEditing={reportEmbeddedLayoutEditing}
                 graphs={projection.visibleGraphs}
                 colorByGraphId={projection.colors}
                 activeGraphId={activeGraphId}
