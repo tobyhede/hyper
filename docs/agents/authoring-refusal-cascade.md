@@ -5,6 +5,12 @@ this before adding a completion action, adding or reordering a check inside
 one, or adding a refusal code — it is the one place the full cascade is drawn
 out end to end instead of scattered across a 1300-line function.
 
+Scoped to completions, and that scope is the point. `StoredSpaceRefusal`
+(`acceptStoredSpace`) is the other refusal family in the tree and is
+deliberately absent below: it refuses an operation on the session, reaches no
+completion outcome, and no surface presents both. Adding a code there is not a
+change to this table.
+
 Every `complete(completion)` call answers exactly one **completion outcome** —
 `completed`, `unchanged` or `refused` (`CONTEXT.md`, ADR 0042/0057;
 architecture and rationale live in `docs/agents/editing-and-persistence.md`'s

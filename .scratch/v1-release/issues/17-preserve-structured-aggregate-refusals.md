@@ -18,6 +18,12 @@ this ticket is about a returned refusal. The two are separate mechanisms and
 location through coordinated session state, and explain it at the application
 feedback surface as one sentence rather than a joined list of transport strings.
 
+**Reduced 2026-09-10.** `error-feedback-pattern/01` landed and took criterion 3
+with it (see the audit below), and it moved the ground under criterion 2:
+`rejected`'s two arms now each have their own copy, so what remains of the
+`rejected`/`refused` split is the state machine and the recovery it names, not
+the sentence. Criteria 2, 4 and 5 are what is left.
+
 - [ ] Persistence state carries structured aggregate refusals without losing
       Space, Card, Layout, Graph or field location.
 - [ ] Retry, conflict and permanent rejection remain distinct states; aggregate
@@ -77,12 +83,16 @@ verified one.
   `session-registry.ts:101` belongs to the Space Card lifecycle result, a
   different state machine for a different operation. Do not read one as the
   other.
-- **Criterion 3, two gaps.** Several refusals join into one string
-  (`authoring-refusal.ts:284`). The non-aggregate path falls through to the raw
-  `failure.message` — at `PersistenceControl.tsx:57` in `rejectionDescription`,
-  and again at `:123` where `PersistenceNotice` renders a retryable failure's
-  message — so `HTTP 403`, `Network request failed` and
-  `application/problem+json` reach the same dialog the clean sentences do.
+- **Criterion 3, two gaps — closed 2026-09-10 by `error-feedback-pattern/01`,
+  not by this ticket.** The audit recorded that several refusals join into one
+  string (`authoring-refusal.ts`, still true and still deliberate) and that the
+  non-aggregate path fell through to the raw `failure.message` in both
+  `rejectionDescription` and `PersistenceNotice`, so `HTTP 403`,
+  `Network request failed` and `application/problem+json` reached the same
+  dialog as the clean sentences. That second half is gone: every
+  `retryable-failure` and `permanent-failure` code now has application-owned
+  copy and no surface reads `message`. **Criterion 3 is met.** What this ticket
+  still owns of it is nothing — re-read it before planning work against it.
 - **Criterion 4 — part built.** The coordinated multi-participant failure path
   is tested with `permanent-failure` only
   (`packages/persistence/test/space-card-lifecycle.test.ts:845`). The one

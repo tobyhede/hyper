@@ -2,12 +2,19 @@
 
 Status: ready-for-agent
 
-Blocked by: nothing. `01-bring-persistence-onto-the-refusal-pattern.md` owns the
-fifth prose site, `acceptStoredSpace`, because that one *originates* the
-sentence and needs new codes minted for it. The four here only describe too
-early and mint nothing, so the two tickets are independent and either may land
-first. Together they retire the last operation in the tree that answers a
-refusal as `string`.
+Blocked by: nothing. `01-bring-persistence-onto-the-refusal-pattern.md` owned
+the fifth prose site, `acceptStoredSpace`, because that one *originates* the
+sentence and needed new codes minted for it. **`01` landed on 2026-09-10**, so
+that site is gone: it answers a `StoredSpaceRefusal` and `ConflictControl`
+describes it. The four here are now the whole of what still answers a refusal
+as `string`.
+
+**Sequence this after `command-dock/07`.** Three of the four live in
+`SpaceSidebar.tsx` and `OpenSpaceSidebars.tsx`, which that ticket deletes
+outright — its acceptance criterion is that both files are gone rather than
+unused. Doing `02` first means writing the fix into files that then vanish, and
+the Dock inherits the same two contracts unexamined. `CardsDrawer`'s is the one
+site independent of it.
 
 Surfaced by: investigating whether persistence error handling should be
 extracted as the application-wide error pattern — see `spec.md`.
@@ -38,11 +45,13 @@ The other two on the prose side:
 - `SpaceSidebar`'s `onDelete` chain at `:733` forwards the sidebar's string
   upward through `OpenSpaceSidebars`.
 
-A fifth site, `App.tsx:787`'s `onAcceptRemote`, is the same defect but not the
-same change: `acceptStoredSpace` writes its sentences itself
-(`space-authoring.ts:1418`, `:1422`) rather than describing a code someone else
-produced, so giving it an identity means minting codes. That is `01`'s, and
-`ConflictControl` (`PersistenceControl.tsx:178`, `:195`) moves with it.
+A fifth site, `App.tsx`'s `onAcceptRemote`, was the same defect but not the
+same change: `acceptStoredSpace` wrote its sentences itself rather than
+describing a code someone else produced, so giving it an identity meant minting
+codes. That was `01`'s, and it is done — `StoredSpaceRefusal` crosses the seam
+and `ConflictControl` describes it, with `App.tsx` unchanged because it passes
+the function straight through. It is recorded here as the worked example of
+what the four below need.
 
 This is not cosmetic. A surface handed a sentence cannot decide the channel,
 cannot attribute the refusal to a field, and cannot be held to an exhaustive
