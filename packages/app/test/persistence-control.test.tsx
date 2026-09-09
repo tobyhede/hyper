@@ -190,14 +190,22 @@ describe('PersistenceControl', () => {
    * not guaranteed to happen.
    */
   it('draws a second rejection of the same code after the first was dismissed', () => {
-    const rejection = (message: string) =>
+    // Byte-identical on purpose. A key derived from what the failure *says* —
+    // `${code}:${message}`, which is what this replaced — tells two different
+    // messages apart and would pass this test without the fix. Two rejections
+    // that are equal by value are exactly the pair the fix is for.
+    const rejection = () =>
       ({
         kind: 'rejected',
-        failure: { kind: 'permanent-failure', code: 'invalid-commit', message },
+        failure: {
+          kind: 'permanent-failure',
+          code: 'invalid-commit',
+          message: 'Send a request body no larger than 1048576 bytes.',
+        },
       }) as const;
     const view = render(
       <PersistenceControl
-        persistence={rejection('first')}
+        persistence={rejection()}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
       />,
@@ -208,13 +216,79 @@ describe('PersistenceControl', () => {
 
     view.rerender(
       <PersistenceControl
-        persistence={rejection('second')}
+        persistence={rejection()}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
       />,
     );
 
     expect(screen.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
+  });
+
+  /**
+   * A dismissal is spent by the next failure, not by leaving the Space.
+   *
+   * `active` is false for every open Space but the one on screen (`App.tsx`),
+   * and every managed Space stays mounted behind it
+   * (`OpenSpacesApplication.tsx`). So switching away and back is not a
+   * republication and must not re-raise a dialog the author already answered.
+   */
+  it('keeps a rejection dismissed across a switch away from the Space', () => {
+    const persistence = {
+      kind: 'rejected',
+      failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
+    } as const;
+    const control = (active: boolean) => (
+      <PersistenceControl
+        active={active}
+        persistence={persistence}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />
+    );
+    const view = render(control(true));
+
+    fireEvent.click(screen.getByTestId('persistence-rejection-continue'));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    view.rerender(control(false));
+    view.rerender(control(true));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
+  });
+
+  /**
+   * A refusal belongs to the conflict that raised it.
+   *
+   * Two coordinated conflicts are equal by value — neither carries a stored
+   * revision to key on — and the coordinated path installs its states without
+   * notifying (`session.ts`), so no render between them unmounts this control.
+   * The refusal from the first must not be left standing over the second.
+   */
+  it('drops a remote refusal when a second coordinated conflict arrives', () => {
+    const conflict = () =>
+      ({ kind: 'conflicted', current: undefined, baseline: SNAPSHOT }) as const;
+    const view = render(
+      <PersistenceControl
+        persistence={conflict()}
+        onAcceptRemote={vi.fn(() => ({ code: 'stored-space-deleted' }) as const)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(screen.getByTestId('persistence-remote-refused')).toBeVisible();
+
+    view.rerender(
+      <PersistenceControl
+        persistence={conflict()}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId('persistence-remote-refused')).toBeNull();
   });
 });
 

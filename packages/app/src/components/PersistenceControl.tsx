@@ -59,20 +59,41 @@ export function PersistenceControl({
   onAcceptRemote,
   onKeepLocal,
 }: PersistenceControlProps) {
+  const rejection = persistence.kind === 'rejected' ? persistence : null;
+  /*
+   * The acknowledgement lives here rather than in `RejectionControl` because
+   * `active` is what Open Spaces moves, and a dismissal is spent by the
+   * next failure rather than by looking away. Every managed Space stays mounted
+   * (`OpenSpacesApplication.tsx`), so this component survives the switch that
+   * unmounts everything it returns.
+   */
+  const [acknowledged, setAcknowledged] = useState<Rejection['failure'] | null>(null);
+  // Derived from a prop during render rather than in an effect, the way
+  // `PersistenceIndicator`'s own cue is: the dialog is right on the first
+  // render of a new failure instead of flashing dismissed and correcting.
+  if (acknowledged !== null && acknowledged !== rejection?.failure) setAcknowledged(null);
+
   if (!active) return null;
   if (persistence.kind === 'conflicted') {
     return (
       <ConflictControl
-        key={persistence.current?.revision.toString() ?? 'coordinated'}
-        recovery={conflictRecovery(persistence)}
+        conflict={persistence}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={onKeepLocal}
       />
     );
   }
 
-  if (persistence.kind === 'rejected') {
-    return <RejectionControl persistence={persistence} />;
+  if (rejection !== null) {
+    if (acknowledged !== null) return <PersistenceIndicator state="rejected" />;
+    return (
+      <RejectionControl
+        persistence={rejection}
+        onAcknowledge={() => {
+          setAcknowledged(rejection.failure);
+        }}
+      />
+    );
   }
 
   return <PersistenceIndicator state={persistence.kind} />;
@@ -118,16 +139,34 @@ export function PersistenceNotice({ persistence, onRetry }: PersistenceNoticePro
   );
 }
 
+/**
+ * A refusal belongs to the conflict that raised it.
+ *
+ * The conflict object the session published is what separates two, for the same
+ * reason it separates two rejections above: a coordinated conflict carries no
+ * stored revision to key on, so two of them are equal by value, and the
+ * coordinated path installs its states without notifying (`session.ts`) — the
+ * render that would otherwise unmount this control between them is not
+ * guaranteed to happen. Keyed on a revision, both were `'coordinated'` and the
+ * first refusal stayed on screen over the second conflict.
+ */
 function ConflictControl({
-  recovery,
+  conflict,
   onAcceptRemote,
   onKeepLocal,
 }: {
-  readonly recovery: ConflictRecovery;
+  readonly conflict: Conflict;
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
 }) {
-  const [remoteRefusal, setRemoteRefusal] = useState<StoredSpaceRefusal | null>(null);
+  const recovery = conflictRecovery(conflict);
+  const [refused, setRefused] = useState<{
+    readonly conflict: Conflict;
+    readonly refusal: StoredSpaceRefusal;
+  } | null>(null);
+
+  if (refused !== null && refused.conflict !== conflict) setRefused(null);
+  const remoteRefusal = refused !== null && refused.conflict === conflict ? refused.refusal : null;
 
   return (
     // A conflict has no safe dismissal: the revision conflict doesn't resolve
@@ -151,7 +190,10 @@ function ConflictControl({
           <Button
             variant="secondary"
             data-testid="persistence-accept-remote"
-            onClick={() => setRemoteRefusal(onAcceptRemote())}
+            onClick={() => {
+              const refusal = onAcceptRemote();
+              setRefused(refusal === null ? null : { conflict, refusal });
+            }}
           >
             Reload
           </Button>
@@ -180,21 +222,23 @@ function ConflictControl({
  * coordinated path does not guarantee one: `prepareCoordinatedCommit` installs
  * `pending` without notifying (`session.ts`), so the render that resets local
  * state may never happen.
+ *
+ * The acknowledgement itself is `PersistenceControl`'s, one level up, because
+ * that is the component Open Spaces leaves mounted — see the note
+ * beside it.
  */
-function RejectionControl({ persistence }: { readonly persistence: Rejection }) {
-  const [acknowledged, setAcknowledged] = useState<Rejection['failure'] | null>(null);
-
-  // Derived from a prop during render rather than in an effect, the way
-  // `PersistenceIndicator`'s own cue is: the dialog is right on the first
-  // render of a new failure instead of flashing dismissed and correcting.
-  if (acknowledged !== null && acknowledged !== persistence.failure) setAcknowledged(null);
-  if (acknowledged !== null) return <PersistenceIndicator state="rejected" />;
-
+function RejectionControl({
+  persistence,
+  onAcknowledge,
+}: {
+  readonly persistence: Rejection;
+  readonly onAcknowledge: () => void;
+}) {
   return (
     <AlertDialog
       open
       onOpenChange={(next: boolean) => {
-        if (!next) setAcknowledged(persistence.failure);
+        if (!next) onAcknowledge();
       }}
     >
       <AlertDialogContent>

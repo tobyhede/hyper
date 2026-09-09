@@ -3040,11 +3040,19 @@ SaveFailed.meta = { iframed: true };
  * unlike the notice it needs no placement at all, and where the Dock is sitting
  * is not part of the decision.
  */
+/*
+ * Hoisted for the reason `space/messaging.stories.tsx` gives: the control tells
+ * two rejections apart by the identity of the failure the session published, so
+ * a literal minted per render reads as a new rejection and re-raises a dismissed
+ * dialog.
+ */
+const DOCK_REJECTED = {
+  kind: 'rejected',
+  failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
+} as const;
+
 export const SaveRejected: Story = () => {
-  const chrome = useChrome({
-    kind: 'rejected',
-    failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
-  });
+  const chrome = useChrome(DOCK_REJECTED);
 
   return <PrototypeCanvas chrome={chrome} initialEdge="top" />;
 };
