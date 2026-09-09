@@ -152,7 +152,7 @@ export interface CardCreationState {
   readonly opening: number;
 }
 
-export type CardCreationAction =
+type CardCreationAction =
   | { readonly type: 'open'; readonly kind: CardCreationKind }
   | { readonly type: 'choices'; readonly opening: number; readonly read: CardCreationRead }
   | { readonly type: 'submitting' }
@@ -164,7 +164,7 @@ export type CardCreationAction =
   /** The working Space was replaced, so what the pane is offering is gone. */
   | { readonly type: 'replaced' };
 
-export const CARD_CREATION_CLOSED: CardCreationState = {
+const CARD_CREATION_CLOSED: CardCreationState = {
   pane: { status: 'closed' },
   opening: 0,
 };
@@ -236,7 +236,7 @@ export const cardCreationMessage = (pane: CardCreationPane): CardCreationRefusal
   }
 };
 
-export function cardCreationReducer(
+function cardCreationReducer(
   state: CardCreationState,
   action: CardCreationAction,
 ): CardCreationState {

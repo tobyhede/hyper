@@ -1,11 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
-  CARD_CREATION_CLOSED,
   cardCreationMessage,
-  cardCreationReducer,
   createCardCreation,
-  type CardCreationAction,
   type CardCreationChoices,
   type CardCreationOutcome,
   type CardCreationRead,
@@ -19,29 +16,20 @@ const SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 
 const aliasChoices: CardCreationChoices = { kind: 'alias', targets: [] };
 const spaceChoices: CardCreationChoices = { kind: 'space', targets: { kind: 'read', spaces: [] } };
+const aliasInput = { kind: 'alias', target: CARD_ID, title: '' } as const;
+const spaceInput = { kind: 'space', targetSpaceId: null, title: 'Recap' } as const;
 const UNREADABLE: CardCreationRead = {
   choices: { kind: 'space', targets: { kind: 'unreadable' } },
   listing: { fields: {}, form: 'The stored Spaces could not be read.' },
 };
 
-/** Drive the reducer through a list of actions, the way the shell would. */
-const reduce = (state: CardCreationState, ...actions: readonly CardCreationAction[]) =>
-  actions.reduce(cardCreationReducer, state);
-
-const choosing = (choices: CardCreationChoices = spaceChoices): CardCreationState =>
-  reduce(
-    CARD_CREATION_CLOSED,
-    { type: 'open', kind: choices.kind },
-    { type: 'choices', opening: 1, read: { choices, listing: null } },
-  );
-
 /**
  * One mounted Card creation module, driven through its own operations.
  *
- * The module owns its current state, so a test drives it rather than seeding a
- * state and recording the dispatches a shell would have made: what the
+ * The module owns its current state and its transitions are private, so a test
+ * drives it rather than seeding a state and reducing actions over it: what the
  * synchronous-admission rule is about is precisely what a collaborator sees
- * when it reenters, and a recorded dispatch list cannot say.
+ * when it reenters, and a list of actions cannot say.
  *
  * The continuation is recorded rather than composed: what this file is about is
  * *which* continuation each ending earns, and the module that holds one is
@@ -79,15 +67,32 @@ const openedOn = (
   return driven;
 };
 
+/** A read that never answers, so a pane is seen exactly as opening left it. */
+const neverRead = (): Promise<CardCreationRead> => new Promise<never>(() => undefined);
+
+/** An attempt that never settles, so a pane is seen while its Edit runs. */
+const neverSettles = (): Promise<CardCreationOutcome> =>
+  new Promise<CardCreationOutcome>(() => undefined);
+
 const RETURN_TO_ADD_CARD: PendingContinuation = {
   target: { kind: 'control', name: 'add-card' },
   select: false,
   then: 'focus',
 };
 
+const NAME_CREATED_CARD: PendingContinuation = {
+  target: { kind: 'card', cardId: CARD_ID },
+  select: true,
+  then: 'rename',
+};
+
 describe('the Card creation pane', () => {
   it('opens on the kind it was asked for, with nothing refused', () => {
-    expect(reduce(CARD_CREATION_CLOSED, { type: 'open', kind: 'alias' }).pane).toEqual({
+    const { creation } = shell({ readChoices: neverRead });
+
+    creation.open('alias');
+
+    expect(creation.getState().pane).toEqual({
       status: 'choosing',
       choices: { kind: 'alias', targets: [] },
       listing: null,
@@ -95,58 +100,26 @@ describe('the Card creation pane', () => {
     });
   });
 
+  /**
+   * `pending` rather than an empty list: an empty array cannot say whether the
+   * repository holds no other Space or the read has simply not answered, and
+   * only the first is a list the author may create against.
+   */
   it('opens the Space Card pane on a list that has not been read yet', () => {
-    expect(reduce(CARD_CREATION_CLOSED, { type: 'open', kind: 'space' }).pane).toEqual({
+    const { creation } = shell({ readChoices: neverRead });
+
+    creation.open('space');
+
+    expect(creation.getState().pane).toEqual({
       status: 'choosing',
       choices: { kind: 'space', targets: { kind: 'pending' } },
       listing: null,
       refusal: null,
     });
   });
-
-  /**
-   * The pane that stands is the first one, not the last: a second `open` has no
-   * read behind it — the shell refuses to make one over an open pane — so
-   * letting it through would replace a filled pane with an empty one nothing
-   * would ever fill.
-   */
-  it('cannot offer both kinds at once', () => {
-    const state = reduce(
-      CARD_CREATION_CLOSED,
-      { type: 'open', kind: 'alias' },
-      { type: 'open', kind: 'space' },
-    );
-    expect(state.pane.status === 'choosing' && state.pane.choices.kind).toBe('alias');
-    expect(state.opening).toBe(1);
-  });
 });
 
-describe('a create in flight', () => {
-  it('gives the pane its exits back when it is refused', () => {
-    const refusal = { fields: { target: 'That Target is no longer part of the Space.' } };
-    const state = reduce(
-      choosing(),
-      { type: 'submitting' },
-      { type: 'settled', outcome: { kind: 'refused', errors: refusal } },
-    );
-    expect(state.pane).toEqual({
-      status: 'choosing',
-      choices: spaceChoices,
-      listing: null,
-      refusal,
-    });
-  });
-
-  it('does not close the pane while a create is in flight', () => {
-    const state = reduce(choosing(), { type: 'submitting' }, { type: 'cancel' });
-    expect(state.pane.status).toBe('submitting');
-  });
-
-  it('does not close the pane when presenting starts while a create is in flight', () => {
-    const state = reduce(choosing(), { type: 'submitting' }, { type: 'presenting' });
-    expect(state.pane.status).toBe('submitting');
-  });
-
+describe('a replacement while the pane is up', () => {
   /**
    * A replacement discards every open Interaction draft (ADR 0042), and this
    * pane is one. It matters more since the choices became a snapshot read once
@@ -155,13 +128,23 @@ describe('a create in flight', () => {
    * `alias-target-not-found` against a row still on screen.
    */
   it('closes the pane when the Space is replaced', () => {
-    const state = reduce(choosing(aliasChoices), { type: 'replaced' });
-    expect(state.pane.status).toBe('closed');
+    const { creation, requested } = openedOn(aliasChoices);
+
+    creation.discard();
+
+    expect(creation.getState().pane.status).toBe('closed');
+    // The epoch that replaced the Space has already discarded whatever
+    // continuation this pane was owed, so it asks for none.
+    expect(requested).toEqual([]);
   });
 
   it('does not close the pane when a replacement lands while a create is in flight', () => {
-    const state = reduce(choosing(), { type: 'submitting' }, { type: 'replaced' });
-    expect(state.pane.status).toBe('submitting');
+    const { creation } = openedOn(spaceChoices, { submit: neverSettles });
+    creation.submit(spaceInput);
+
+    creation.discard();
+
+    expect(creation.getState().pane.status).toBe('submitting');
   });
 
   /**
@@ -177,20 +160,19 @@ describe('a create in flight', () => {
     ['none', { kind: 'none' }],
   ] as const)(
     'closes the discarded pane when the create it waited on is %s',
-    (_ending, outcome) => {
-      const state = reduce(
-        choosing(),
-        { type: 'submitting' },
-        { type: 'replaced' },
-        { type: 'settled', outcome },
-      );
-      expect(state.pane.status).toBe('closed');
+    async (_ending, outcome) => {
+      const attempt = Promise.withResolvers<CardCreationOutcome>();
+      const { creation } = openedOn(spaceChoices, { submit: () => attempt.promise });
+      creation.submit(spaceInput);
+      creation.discard();
+
+      attempt.resolve(outcome);
+      await attempt.promise;
+      await Promise.resolve();
+
+      expect(creation.getState().pane.status).toBe('closed');
     },
   );
-
-  it('cannot be busy with no pane to disable', () => {
-    expect(reduce(CARD_CREATION_CLOSED, { type: 'submitting' }).pane.status).toBe('closed');
-  });
 });
 
 describe('the one message an open pane draws', () => {
@@ -198,27 +180,29 @@ describe('the one message an open pane draws', () => {
   const refusal = { fields: { title: 'A Card needs a Title.' } };
 
   it('says nothing when there is no pane', () => {
-    expect(cardCreationMessage(CARD_CREATION_CLOSED.pane)).toBeNull();
+    expect(cardCreationMessage({ status: 'closed' })).toBeNull();
   });
 
   it('prefers the refused attempt to the failed listing while the pane is editable', () => {
-    const state = reduce(
-      CARD_CREATION_CLOSED,
-      { type: 'open', kind: 'space' },
-      { type: 'choices', opening: 1, read: UNREADABLE },
-      { type: 'submitting' },
-      { type: 'settled', outcome: { kind: 'refused', errors: refusal } },
-    );
-    expect(cardCreationMessage(state.pane)).toEqual(refusal);
+    expect(
+      cardCreationMessage({
+        status: 'choosing',
+        choices: UNREADABLE.choices,
+        listing,
+        refusal,
+      }),
+    ).toEqual(refusal);
   });
 
   it('falls back to the failed listing when no attempt was refused', () => {
-    const state = reduce(
-      CARD_CREATION_CLOSED,
-      { type: 'open', kind: 'space' },
-      { type: 'choices', opening: 1, read: UNREADABLE },
-    );
-    expect(cardCreationMessage(state.pane)).toEqual(listing);
+    expect(
+      cardCreationMessage({
+        status: 'choosing',
+        choices: UNREADABLE.choices,
+        listing,
+        refusal: null,
+      }),
+    ).toEqual(listing);
   });
 
   /**
@@ -226,24 +210,24 @@ describe('the one message an open pane draws', () => {
    * is over — but nothing typed makes a failed listing readable, so that stays.
    */
   it('draws only the failed listing while an attempt runs', () => {
-    const state = reduce(
-      CARD_CREATION_CLOSED,
-      { type: 'open', kind: 'space' },
-      { type: 'choices', opening: 1, read: UNREADABLE },
-      { type: 'submitting' },
-    );
-    expect(cardCreationMessage(state.pane)).toEqual(listing);
+    expect(
+      cardCreationMessage({
+        status: 'submitting',
+        choices: UNREADABLE.choices,
+        listing,
+        discarded: false,
+      }),
+    ).toEqual(listing);
   });
 });
 
 describe('a choices read that failed', () => {
   it('reports it rather than offering an empty list', () => {
-    const state = reduce(
-      CARD_CREATION_CLOSED,
-      { type: 'open', kind: 'space' },
-      { type: 'choices', opening: 1, read: UNREADABLE },
-    );
-    expect(state.pane).toEqual({
+    const { creation } = shell({ readChoices: () => UNREADABLE });
+
+    creation.open('space');
+
+    expect(creation.getState().pane).toEqual({
       status: 'choosing',
       choices: UNREADABLE.choices,
       listing: UNREADABLE.listing,
@@ -252,42 +236,97 @@ describe('a choices read that failed', () => {
   });
 
   it('keeps that message while the author types, unlike a refused attempt', () => {
-    const unreadable = reduce(
-      CARD_CREATION_CLOSED,
-      { type: 'open', kind: 'space' },
-      { type: 'choices', opening: 1, read: UNREADABLE },
-      { type: 'refusal-stale' },
-    );
-    expect(unreadable.pane.status === 'choosing' && unreadable.pane.listing).toEqual(
-      UNREADABLE.listing,
-    );
+    const { creation } = shell({
+      readChoices: () => UNREADABLE,
+      submit: () => ({ kind: 'refused', errors: { fields: { title: 'Required.' } } }),
+    });
+    creation.open('space');
+    creation.submit(spaceInput);
+    expect(creation.getState().pane).toMatchObject({
+      refusal: { fields: { title: 'Required.' } },
+    });
 
-    const typed = reduce(
-      choosing(),
-      { type: 'settled', outcome: { kind: 'refused', errors: { fields: { title: 'Required.' } } } },
-      { type: 'refusal-stale' },
-    );
-    expect(typed.pane.status === 'choosing' && typed.pane.refusal).toBeNull();
+    creation.refusalStale();
+
+    expect(creation.getState().pane).toEqual({
+      status: 'choosing',
+      choices: UNREADABLE.choices,
+      listing: UNREADABLE.listing,
+      refusal: null,
+    });
   });
 
-  it('ignores a read that answers a pane the author has since reopened', () => {
-    const state = reduce(
-      CARD_CREATION_CLOSED,
-      { type: 'open', kind: 'space' },
-      { type: 'cancel' },
-      { type: 'open', kind: 'space' },
-      { type: 'choices', opening: 1, read: { choices: spaceChoices, listing: null } },
-    );
-    expect(state.pane.status === 'choosing' && state.pane.choices).toEqual({
-      kind: 'space',
-      targets: { kind: 'pending' },
+  it('keeps a failed listing visible while an attempt is running', async () => {
+    const read = Promise.withResolvers<CardCreationRead>();
+    const { creation } = shell({ readChoices: () => read.promise, submit: neverSettles });
+    creation.open('space');
+    creation.submit(spaceInput);
+
+    read.resolve(UNREADABLE);
+    await read.promise;
+    await Promise.resolve();
+    creation.refusalStale();
+
+    expect(creation.getState().pane).toEqual({
+      status: 'submitting',
+      choices: UNREADABLE.choices,
+      listing: UNREADABLE.listing,
+      discarded: false,
     });
   });
 });
 
-describe('where the creation continues', () => {
-  const ALIAS = { kind: 'alias', target: CARD_ID, title: '' } as const;
+/**
+ * A read answers the opening it was made for, and nothing else.
+ *
+ * Both endings are reachable with one gesture each: cancelling the Space Card
+ * pane while its listing is in flight, and doing that then opening a second
+ * pane before the first read answers.
+ */
+describe('a choices read that answers a pane that has moved on', () => {
+  it('ignores a choices read after the pane has closed', async () => {
+    const read = Promise.withResolvers<CardCreationRead>();
+    const { creation } = shell({ readChoices: () => read.promise });
+    creation.open('space');
+    creation.cancel();
 
+    read.resolve({ choices: spaceChoices, listing: null });
+    await read.promise;
+    await Promise.resolve();
+
+    expect(creation.getState().pane.status).toBe('closed');
+  });
+
+  it('ignores a read that answers a pane the author has since reopened', async () => {
+    const first = Promise.withResolvers<CardCreationRead>();
+    const second = Promise.withResolvers<CardCreationRead>();
+    const readChoices = vi
+      .fn<CardCreationSeams['readChoices']>()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const { creation } = shell({ readChoices });
+    creation.open('space');
+    creation.cancel();
+    creation.open('space');
+
+    first.resolve(UNREADABLE);
+    await first.promise;
+    await Promise.resolve();
+
+    expect(creation.getState().pane).toMatchObject({
+      choices: { kind: 'space', targets: { kind: 'pending' } },
+      listing: null,
+    });
+
+    second.resolve({ choices: spaceChoices, listing: null });
+    await second.promise;
+    await Promise.resolve();
+
+    expect(creation.getState().pane).toMatchObject({ choices: spaceChoices, listing: null });
+  });
+});
+
+describe('where the creation continues', () => {
   it('returns to Add Card when the pane is cancelled', () => {
     const { creation, requested } = openedOn();
 
@@ -302,11 +341,9 @@ describe('where the creation continues', () => {
       submit: () => ({ kind: 'created', cardId: CARD_ID }),
     });
 
-    creation.submit(ALIAS);
+    creation.submit(aliasInput);
 
-    expect(requested).toEqual([
-      { target: { kind: 'card', cardId: CARD_ID }, select: true, then: 'rename' },
-    ]);
+    expect(requested).toEqual([NAME_CREATED_CARD]);
   });
 
   /**
@@ -338,7 +375,7 @@ describe('where the creation continues', () => {
   it('owes nothing when the attempt did nothing', () => {
     const { creation, requested } = openedOn(aliasChoices, { submit: () => ({ kind: 'none' }) });
 
-    creation.submit(ALIAS);
+    creation.submit(aliasInput);
 
     expect(requested).toEqual([]);
   });
@@ -348,17 +385,15 @@ describe('where the creation continues', () => {
       submit: () => ({ kind: 'refused', errors: { fields: {}, form: 'No.' } }),
     });
 
-    creation.submit(ALIAS);
+    creation.submit(aliasInput);
 
     expect(requested).toEqual([]);
   });
 
   /** Cancel is refused while an Edit runs, so it owes nothing either. */
   it('owes nothing for a cancel the pane refuses', () => {
-    const { creation, requested } = openedOn(spaceChoices, {
-      submit: () => new Promise<CardCreationOutcome>(() => undefined),
-    });
-    creation.submit({ kind: 'space', targetSpaceId: null, title: 'Recap' });
+    const { creation, requested } = openedOn(spaceChoices, { submit: neverSettles });
+    creation.submit(spaceInput);
 
     creation.cancel();
 
@@ -390,6 +425,12 @@ describe('the asynchronous shell', () => {
     expect(pane.status === 'choosing' && pane.choices).toEqual(spaceChoices);
   });
 
+  /**
+   * The pane that stands is the first one, not the last: a second `open` has no
+   * read behind it — admission refuses to make one over an open pane — so
+   * letting it through would replace a filled pane with an empty one nothing
+   * would ever fill.
+   */
   it('opens nothing over a pane that is already open', () => {
     const readChoices = vi.fn((): CardCreationRead => ({ choices: spaceChoices, listing: null }));
     const { creation } = shell({ readChoices });
@@ -419,7 +460,7 @@ describe('the asynchronous shell', () => {
 
   it('goes busy only for a submit that is actually asynchronous', () => {
     const { creation, published } = openedOn(aliasChoices, { submit: () => ({ kind: 'none' }) });
-    creation.submit({ kind: 'alias', target: CARD_ID, title: '' });
+    creation.submit(aliasInput);
     expect(published.map(({ pane }) => pane.status)).toEqual(['choosing']);
   });
 
@@ -435,47 +476,6 @@ describe('the asynchronous shell', () => {
 
     expect(creation.getState().pane.status).toBe('choosing');
   });
-
-  it('gives the pane its exits back when a submit rejects, and says what broke', async () => {
-    const failure = new Error('the session has gone');
-    const reportBreak = vi.fn();
-    const { creation } = openedOn(spaceChoices, {
-      submit: () => Promise.reject(failure),
-      reportBreak,
-    });
-    creation.submit({ kind: 'space', targetSpaceId: null, title: 'Recap' });
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(reportBreak).toHaveBeenCalledWith(failure);
-    const { pane } = creation.getState();
-    expect(pane.status === 'choosing' && pane.refusal).toEqual({
-      fields: {},
-      form: 'This Card was not created: the session has gone',
-    });
-  });
-
-  it('answers a choices read that rejects with an unreadable list, not a waiting one', async () => {
-    const failure = new Error('the repository is unreachable');
-    const reportBreak = vi.fn();
-    const { creation } = shell({ readChoices: () => Promise.reject(failure), reportBreak });
-    creation.open('space');
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(reportBreak).toHaveBeenCalledWith(failure);
-    const { pane } = creation.getState();
-    // `pending` withholds Create and says the read is still running, so a
-    // failure answered with it would leave the author waiting on a read that
-    // is over.
-    expect(pane.status === 'choosing' && pane.choices).toEqual({
-      kind: 'space',
-      targets: { kind: 'unreadable' },
-    });
-    // A read that failed attempted no Edit, so it does not say one failed.
-    expect(pane.status === 'choosing' && pane.listing).toEqual({
-      fields: {},
-      form: 'The choices for this Card could not be read: the repository is unreachable',
-    });
-  });
 });
 
 /**
@@ -487,9 +487,6 @@ describe('the asynchronous shell', () => {
  * moved. These hold that shut at the module.
  */
 describe('admission before the collaborator runs', () => {
-  const ALIAS = { kind: 'alias', target: CARD_ID, title: '' } as const;
-  const SPACE = { kind: 'space', targetSpaceId: null, title: 'Recap' } as const;
-
   it('installs admission before notifying an observer that opens another kind', () => {
     const readChoices = vi.fn((kind: 'alias' | 'space'): CardCreationRead => ({
       choices: kind === 'alias' ? aliasChoices : spaceChoices,
@@ -508,26 +505,24 @@ describe('admission before the collaborator runs', () => {
   it('admits the attempt before its collaborator can reenter', () => {
     const submit = vi.fn((): CardCreationOutcome => {
       if (submit.mock.calls.length === 1) {
-        creation.submit(ALIAS);
+        creation.submit(aliasInput);
         creation.cancel();
       }
       return { kind: 'created', cardId: CARD_ID };
     });
     const { creation, requested } = openedOn(aliasChoices, { submit });
 
-    creation.submit(ALIAS);
+    creation.submit(aliasInput);
 
     expect(submit).toHaveBeenCalledTimes(1);
-    expect(requested).toEqual([
-      { target: { kind: 'card', cardId: CARD_ID }, select: true, then: 'rename' },
-    ]);
+    expect(requested).toEqual([NAME_CREATED_CARD]);
   });
 
   it('starts no attempt when closed', () => {
     const submit = vi.fn((): CardCreationOutcome => ({ kind: 'none' }));
     const { creation } = shell({ submit });
 
-    creation.submit(SPACE);
+    creation.submit(spaceInput);
 
     expect(submit).not.toHaveBeenCalled();
     expect(creation.getState().pane.status).toBe('closed');
@@ -538,8 +533,8 @@ describe('admission before the collaborator runs', () => {
     const submit = vi.fn(() => attempt.promise);
     const { creation, requested } = openedOn(spaceChoices, { submit });
 
-    creation.submit(SPACE);
-    creation.submit(SPACE);
+    creation.submit(spaceInput);
+    creation.submit(spaceInput);
     creation.cancel();
     creation.withdraw();
 
@@ -565,13 +560,15 @@ describe('admission before the collaborator runs', () => {
       .mockReturnValueOnce({ kind: 'created', cardId: CARD_ID });
     const { creation } = openedOn(aliasChoices, { submit });
 
-    creation.submit(ALIAS);
+    creation.submit(aliasInput);
     expect(creation.getState().pane).toMatchObject({
       status: 'choosing',
+      choices: aliasChoices,
+      listing: null,
       refusal: { fields: { title: 'Required.' } },
     });
 
-    creation.submit(ALIAS);
+    creation.submit(aliasInput);
 
     expect(submit).toHaveBeenCalledTimes(2);
     expect(creation.getState().pane.status).toBe('closed');
@@ -581,8 +578,8 @@ describe('admission before the collaborator runs', () => {
     const submit = vi.fn((): CardCreationOutcome => ({ kind: 'created', cardId: CARD_ID }));
     const { creation } = openedOn(aliasChoices, { submit });
 
-    creation.submit(ALIAS);
-    creation.submit(ALIAS);
+    creation.submit(aliasInput);
+    creation.submit(aliasInput);
 
     expect(submit).toHaveBeenCalledTimes(1);
     expect(creation.getState().pane.status).toBe('closed');
@@ -593,8 +590,93 @@ describe('admission before the collaborator runs', () => {
       submit: () => ({ kind: 'created', cardId: CARD_ID }),
     });
 
-    creation.submit(ALIAS);
+    creation.submit(aliasInput);
 
     expect(published.map(({ pane }) => pane.status)).toEqual(['closed']);
   });
+});
+
+/**
+ * A diagnostic is never the failure path of the work it describes.
+ *
+ * The recovery this module owes on every one of these paths is a *transition*,
+ * and each sits behind the report. A sink that threw would take the transition
+ * with it: the pane stays `submitting` with Create, Cancel and Escape all
+ * disabled and nothing left to end it, or stays on a list that says it is still
+ * being read — and on the synchronous arms the throw escapes into the event
+ * handler that submitted, taking the canvas down. The reporter is injected and
+ * required with no default (ADR 0016), so it is exactly the collaborator this
+ * module cannot vouch for: `createNonThrowingReporter` is the repository's
+ * answer and it is applied here rather than trusted of whoever composed this.
+ *
+ * Crossed with both timings, because the sink sits on four distinct paths and
+ * only the two synchronous ones can reach the caller's stack.
+ */
+describe.each(['returns', 'throws'] as const)('a diagnostic reporter that %s', (reporting) => {
+  const reporter = () =>
+    vi.fn(() => {
+      if (reporting === 'throws') throw new Error('the sink is broken');
+    });
+
+  it.each(['synchronous', 'asynchronous'] as const)(
+    'recovers a %s creation failure',
+    async (timing) => {
+      const failure = new Error('the session has gone');
+      const reportBreak = reporter();
+      const { creation } = openedOn(spaceChoices, {
+        submit: () => {
+          if (timing === 'synchronous') throw failure;
+          return Promise.reject(failure);
+        },
+        reportBreak,
+      });
+
+      creation.submit(spaceInput);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(reportBreak).toHaveBeenCalledWith(failure);
+      expect(creation.getState().pane).toMatchObject({
+        status: 'choosing',
+        refusal: { fields: {}, form: 'This Card was not created: the session has gone' },
+      });
+      creation.cancel();
+      expect(creation.getState().pane.status).toBe('closed');
+    },
+  );
+
+  it.each(['synchronous', 'asynchronous'] as const)(
+    'recovers a %s choices failure',
+    async (timing) => {
+      const failure = new Error('the repository is unreachable');
+      const reportBreak = reporter();
+      const { creation } = shell({
+        readChoices: () => {
+          if (timing === 'synchronous') throw failure;
+          return Promise.reject(failure);
+        },
+        reportBreak,
+      });
+
+      creation.open('space');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(reportBreak).toHaveBeenCalledWith(failure);
+      // `pending` withholds Create and says the read is still running, so a
+      // failure answered with it would leave the author waiting on a read that
+      // is over. A read that failed attempted no Edit, so it says the list
+      // failed rather than that a creation did.
+      expect(creation.getState().pane).toMatchObject({
+        status: 'choosing',
+        choices: { kind: 'space', targets: { kind: 'unreadable' } },
+        listing: {
+          fields: {},
+          form: 'The choices for this Card could not be read: the repository is unreachable',
+        },
+      });
+      creation.cancel();
+      expect(creation.getState().pane.status).toBe('closed');
+    },
+  );
 });

@@ -24,13 +24,14 @@ reasons — React Flow asks it synchronous questions mid-gesture, its operations
 answer values to their callers, and it invalidates itself from two collaborator
 subscriptions — and none of the three is true here: nothing asks this module a
 question during a gesture, no operation answers one, and its external facts
-arrive as ordinary dispatches. So the transitions are a pure
-`cardCreationReducer`, `createCardCreation` is a thin asynchronous shell over
-it, and `useCardCreation` is `useReducer` plus one memo. The reason the ticket
-wanted composition — a test driving a transition with no React tree — is
-delivered in full by `packages/app/test/card-creation-state.test.ts`, so nothing
-was added to `compose-app.ts` and `spaceCards` stays on the `OpenSpace` entry;
-the two seams are memoized by `App` and passed to the hook. Recorded in
+arrive as ordinary dispatches. So the transitions are a pure reducer private to
+`card-creation.ts`, and `createCardCreation` is an asynchronous shell that owns
+the state the reducer answers rather than taking a render's — see "Answer"
+below, which corrects the rest of this paragraph as first written. The reason
+the ticket wanted composition — a test driving a transition with no React tree —
+is delivered in full by `packages/app/test/card-creation-state.test.ts`, so
+nothing was added to `compose-app.ts` and `spaceCards` stays on the `OpenSpace`
+entry; the two seams are memoized by `App` and passed to the hook. Recorded in
 `docs/agents/ui.md`.
 
 ## The problem
@@ -224,12 +225,19 @@ to pass render-captured state into the asynchronous shell. The module remains
 local to the mounting surface; App supplies the two memoized kind seams and the
 composition's reporter. No additional composition dependency was needed.
 
-`card-creation-state.test.ts` keeps driving the reducer directly for the
-transition rules, and its shell half now drives the module through its own
-operations rather than recording the dispatches an injected `dispatch` was
-handed — which is the only way to observe what a reentrant collaborator sees.
-The repeated-open and reentrant-submit regressions both failed before their
-fixes. The existing application tests retain pane, naming and focus evidence.
+`card-creation-state.test.ts` drives the module through its own operations
+throughout. The reducer, its action union and the closed state are no longer
+exported, and the transition rules that were reached by reducing a list of
+actions over a seeded state are reached by the gestures that produce them: a
+replacement is `discard()`, an ending a `submit()` that settles, a stale refusal
+`refusalStale()`. Six pairs proved the same rule twice in two idioms and are one
+test each now. `cardCreationMessage` stays exported and stays tested, over
+`CardCreationPane` literals. The one collaborator the module cannot vouch for —
+the injected `reportBreak` — is crossed with both timings on both of its paths,
+so `createNonThrowingReporter` has evidence; dropping it, or rethrowing from
+either `catch`, fails this file. The repeated-open and reentrant-submit
+regressions both failed before their fixes. The existing application tests
+retain pane, naming and focus evidence.
 
 Continuation policy beyond this creation module remains the separate follow-up
 described in the source; Add Card remains outside this change.
