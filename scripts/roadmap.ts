@@ -122,10 +122,12 @@ const ANY_HEADING_PATTERN = /^#{1,6}[ \t]+/u;
 /**
  * A blocked-by line carries prose alongside its references, and that prose cites
  * ADR and PR numbers. Requiring no adjacent digit and no leading `#` keeps `0052`
- * and `#83` out while still reading `03`, `space-authoring/05` and complete
- * tracker paths such as `.scratch/space-authoring/issues/05-title.md`.
+ * and `#83` out while still reading `03`, `issues/03`, `space-authoring/05` and
+ * complete tracker paths such as `.scratch/space-authoring/issues/05-title.md`.
+ * A relative `issues/` prefix names the current feature, so it is not captured.
  */
-const REFERENCE_PATTERN = /(?:([a-z][a-z0-9-]*)(?:\/issues)?\/)?(?<![#\d])(\d{2})(?!\d)/giu;
+const REFERENCE_PATTERN =
+  /(?:issues\/|([a-z][a-z0-9-]*)(?:\/issues)?\/)?(?<![#\d])(\d{2})(?!\d)/giu;
 /**
  * Only a declared deferral counts — a heading or a list item that announces one.
  * Prose merely mentioning the word appears throughout resolved tickets and drowns

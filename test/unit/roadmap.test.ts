@@ -179,6 +179,38 @@ describe('feature phase', () => {
 });
 
 describe('blockers', () => {
+  it('makes a ready issue pickable when its relative issues reference is settled', () => {
+    const root = scratch();
+    write(root, 'effort/issues/04-context.md', 'Status: resolved\n');
+    write(root, 'effort/issues/05-consumer.md', 'Status: ready-for-agent\nBlocked by: issues/04\n');
+
+    const roadmap = buildRoadmap(root);
+    const issue = featureNamed(roadmap, 'effort').issues[1];
+
+    expect(issue?.unmetBlockers).toEqual([]);
+    expect(issue?.blockers).toEqual([{ feature: null, number: '04' }]);
+    expect(renderRoadmap(roadmap).split('READY TO PICK UP')[1]?.split('\n\n')[0]).toContain(
+      'effort/05',
+    );
+    expect(/<ul class="pick">(.*?)<\/ul>/su.exec(renderRoadmapHtml(roadmap))?.[1]).toContain(
+      'effort/05',
+    );
+  });
+
+  it('deduplicates relative, full tracker and same-feature shorthand blockers', () => {
+    const root = scratch();
+    write(root, 'effort/issues/04-context.md', 'Status: ready-for-agent\n');
+    write(
+      root,
+      'effort/issues/05-consumer.md',
+      'Status: ready-for-agent\nBlocked by: `issues/04-context.md`; `.scratch/effort/issues/04-context.md`; `effort/04`.\n',
+    );
+
+    const issue = featureNamed(buildRoadmap(root), 'effort').issues[1];
+
+    expect(issue?.unmetBlockers).toEqual(['effort/04']);
+  });
+
   it('resolves a full tracker path and counts repeated mentions only once', () => {
     const root = scratch();
     write(root, 'layout-only-v1/issues/04-context.md', 'Status: ready-for-agent\n');
