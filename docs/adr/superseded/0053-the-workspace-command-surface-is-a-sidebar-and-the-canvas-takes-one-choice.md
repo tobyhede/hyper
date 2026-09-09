@@ -1,6 +1,7 @@
 # The workspace command surface is a sidebar and the canvas takes one choice
 
-Status: accepted
+Status: superseded
+Superseded by: 0082
 Refines: 0031
 Refined by: 0055, 0068, 0079
 Related: 0025, 0026, 0028, 0040, 0045, 0047, 0050, 0052
