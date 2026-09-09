@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 01, 03, 08, 16, 17; `entity-url-addressability/08`; `space-cards/10`; `architecture-review/14`
+Blocked by: 01, 03, 08, 16, 17; `entity-url-addressability/08`; `space-cards/10`
 
 **What to build:** Complete the untagged End-to-end checkpoint with one recorded
 technical-author rehearsal from a clean clone and a compact proof matrix linking
@@ -14,6 +14,18 @@ longer names it as a blocker; the `layout-only-v1` implementation tickets reach
 this ticket through [V1/08](08-round-trip-multi-space-import-and-export.md). The
 rehearsal exercises Add Layout and first-load initialization, never a Computed
 View, and includes presenting from the Active Graph of an initialized Space.
+
+Two of the blockers above are human decision gates rather than build work, so
+read their `Status:` lines before scheduling this rehearsal rather than assuming
+they clear with the code:
+
+- [V1/01](01-establish-the-meta-space-lifecycle.md) was `ready-for-human`. Its
+  criteria are built and its one open criterion is ticket 08's, so it is
+  resolved by that reading rather than by a decision anyone still owes.
+- [V1/17](17-preserve-structured-aggregate-refusals.md) was `ready-for-human` because
+  its criteria 1 and 5 contradicted each other. That contradiction was being
+  settled concurrently with this note, so read that ticket's own `Status:` line
+  for where it landed rather than trusting this one.
 
 - [ ] Document the supported Node/pnpm, Docker PostgreSQL and desktop Chromium
       setup path for macOS or Linux without assuming an existing checkout state.

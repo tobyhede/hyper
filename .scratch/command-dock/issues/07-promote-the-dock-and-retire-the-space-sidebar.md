@@ -1,7 +1,12 @@
 # 07 — Promote the Dock and retire the Space Sidebar
 
 Status: ready-for-agent
-Blocked by: the theme change (no ticket). 01, 02, 04 and 05 are closed.
+Tags: release/v1
+Blocked by: nothing. The theme change merged as `a5a76669` (`feat(theme): sand
+is the canvas, and the chrome is neutral over it`), so the colour judgements
+here stand on the application's own tokens. 01, 02, 04 and 05 are closed; 06's
+four items are all done and it is `ready-for-human` only for the close.
+Blocks: `v1-release/03`, `v1-release/05`, `v1-release/06`.
 
 **What to build:** The thing the other six tickets are preparation for. `01`–`06`
 all finish with the Dock still a prototype under `stories/review`, nothing in
@@ -140,3 +145,26 @@ converts `03` from an epic into a debt with interest. Prefer it done first.
 Everything here reaches production and `packages/ui`, so all three bars apply:
 `pnpm verify`, `pnpm e2e`, `pnpm e2e:ladle`. The third is its own CI job and is
 the only one that can see a story broken by a component change.
+
+## Comments
+
+**Brought into V1 and sequenced ahead of three V1 tickets.** ADR 0082 supersedes
+ADR 0053 and retires the Sidebar as the bound command surface; this ticket is
+where that stops being true only on paper, because it deletes
+`packages/app/src/components/SpaceSidebar.tsx` and
+`packages/app/src/components/OpenSpaceSidebars.tsx`.
+
+`v1-release/03`, `05` and `06` were all written against that module: `05` said
+in as many words that it exposes the Graph lifecycle "through the Sidebar", and
+`03` and `06` inherit it through the responsive obligation the Sidebar primitive
+was answering. Running any of them first spends the work twice — once on a
+surface being deleted, once on the one replacing it — and the second spend is
+not a port, because the audit above shows five of the thirteen Sidebar claims
+state behaviour the Dock does not have or has decided against. So all three now
+carry this ticket in `Blocked by:`, and their surface language is the Command
+Dock's.
+
+The V1 tag is on `06` as well, since it is this ticket's own cleanup pass.
+
+**The phantom blocker is gone.** Both tickets named "the theme change (no
+ticket)". It merged as `a5a76669`, so nothing here waits on it.

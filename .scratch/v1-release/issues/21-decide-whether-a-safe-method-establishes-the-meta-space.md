@@ -1,6 +1,6 @@
 # 21 — Decide whether a safe method establishes the Meta Space
 
-Status: ready-for-agent
+Status: resolved
 Tags: release/v1
 Blocked by: none. This ticket was briefly marked as blocked by `v1-release/17`.
 That mark was wrong and an audit removed it — see "Why ticket 17 does not
@@ -197,3 +197,30 @@ identifiable throw. The classification is this ticket's, and it is built —
 `AggregateInvariantError` is raised by both implementations of the seam, and the
 root address answers a permanent defect with 500 and an unreachable database
 with 503.
+
+### Resolved
+
+Option D is decided and built. Every acceptance box in the body is ticked except
+`pnpm verify` and `pnpm e2e`, and that is a gate rather than a design question:
+the work merged as PR 162 (`50f6c20f`), and CI runs `verify:static`,
+`test:coverage`, `postgres`, `e2e` and `ladle` on every pull request, so the
+merge is the passing run. Nobody has re-run either command for this audit and
+this note claims no local run.
+
+The built state, confirmed against the tree:
+
+- The root branch of `resolveProductRequest` reads and never writes
+  (`src/http/space-host.ts:118-127`); `establishMetaSpace` is gone from it and
+  its remaining callers are start-up and its retry
+  (`src/startup/database-startup.ts:136,156`,
+  `src/http/postgres-http-runtime.ts:65`, `test/support/e2e-http-runtime.ts:24`).
+- The identifiable invariant error is `AggregateInvariantError`
+  (`packages/persistence/src/repository.ts:36`), classified by type through
+  `isAggregateInvariant` (`src/http/space-host.ts:149-151`) rather than by
+  message prose, and one occurrence is re-read before it is believed
+  (`:80-88`).
+- The uninitialized and the unreachable cases are both 503 and the problem
+  detail separates them (`:153-169`).
+
+`v1-release/01`'s criterion 3 was corrected in the same pass, since it still
+described the GET-initializes design this ticket retired.
