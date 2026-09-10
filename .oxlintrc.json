@@ -111,7 +111,6 @@
       // dependency rather than a wire format.
       "files": [
         "packages/ui/test/Button.test.tsx",
-        "packages/ui/test/AddCardControl-base-ui.test.tsx",
         "packages/react-flow-adapter/test/CardNode.test.tsx",
         "packages/react-flow-adapter/test/GraphHud.test.tsx",
         "packages/app/test/cameras.test.tsx"

@@ -79,11 +79,6 @@
       "count": 1
     }
   },
-  "packages/ui/src/components/sidebar.tsx": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 2
-    }
-  },
   "src/persistence/postgres-space-repository.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1

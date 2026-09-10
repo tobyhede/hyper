@@ -515,13 +515,16 @@ const moduleReferences = (source: ts.SourceFile): readonly ModuleReference[] => 
  *
  * **Only a component name marks its module rendered.** A module may export a
  * component and a plain helper side by side, and a story taking the *helper*
- * renders nothing — `OpenSpaces.tsx` exports the retired strip beside
- * `openSpaceStatusLabel`, the words the Command Dock spends, and that one
- * import marked the whole module rendered and carried `tabs.tsx` in behind it.
- * A dead surface then passed the ratchet unlisted, which is the one thing this
- * walk exists to prevent. Read off the name's own casing, which is what a JSX
- * tag is resolved by: `<OpenSpaces/>` is a component and
- * `openSpaceStatusLabel` cannot be one.
+ * renders nothing. The case this rule was written for: `OpenSpaces.tsx` exported
+ * the retired open-Spaces strip beside `openSpaceStatusLabel`, the words the
+ * Command Dock spends, and that one import marked the whole module rendered and
+ * carried `components/tabs.tsx` in behind it. A dead surface passed the ratchet
+ * unlisted, which is the one thing this walk exists to prevent. Both modules are
+ * deleted now (`.scratch/command-dock/issues/08`) and the words live in
+ * `packages/ui/src/open-space-status.ts`, so the example is history rather than
+ * a module to look at — the rule it bought is not. Read off the name's own
+ * casing, which is what a JSX tag is resolved by: `<OpenSpaces/>` was a
+ * component and `openSpaceStatusLabel` cannot be one.
  */
 const isComponentName = (name: string): boolean => /^[A-Z]/u.test(name);
 

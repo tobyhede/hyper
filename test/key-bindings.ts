@@ -42,14 +42,6 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'commit Markdown editing',
   },
   {
-    module: 'packages/ui/src/components/sidebar.tsx',
-    sourceKey: 'b',
-    occurrence: 1,
-    key: 'Mod-B',
-    surface: 'Sidebar',
-    behaviour: 'toggle the Sidebar outside editable controls',
-  },
-  {
     module: 'packages/ui/src/InlineTitleEditor.tsx',
     sourceKey: 'Enter',
     occurrence: 1,

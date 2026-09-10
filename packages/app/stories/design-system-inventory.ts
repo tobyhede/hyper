@@ -36,18 +36,8 @@
  */
 export const uncataloguedComponents = [
   {
-    module: 'packages/app/src/SpaceApp.tsx',
-    reason:
-      'Isolated single-Space mounting adapter. The shared error boundary and managed application are catalogued through the embedded Diagram story.',
-  },
-  {
     module: 'packages/app/src/main.tsx',
     reason: 'The browser entry point: one `createRoot` call and startup composition.',
-  },
-  {
-    module: 'packages/app/src/startup.tsx',
-    reason:
-      'Startup composition. It renders one opened outcome by mounting the application, while `operational-feedback-startup-failure` catalogues its failure panel.',
   },
   {
     module: 'packages/react-flow-adapter/src/CardNode.tsx',
@@ -57,42 +47,12 @@ export const uncataloguedComponents = [
   {
     module: 'packages/ui/src/Command.tsx',
     reason:
-      'Deliberately without a consumer, like `Select` above. It wraps cmdk, which ADR 0050 kept rather than migrating; `CardSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
-  },
-  {
-    module: 'packages/ui/src/AddCardControl.tsx',
-    reason:
-      "Without a consumer since ADR 0082: the Space Sidebar drew it, and the Command Dock's `CreateMenu` offers the three kinds as peers behind one trigger rather than as this split control, on grounds its own doc comment states. The two designs disagree deliberately, so this is not a component waiting to be re-mounted — but it is named by ADR 0050 and by `docs/agents/ui.md` as where the Base UI `Menu` and the `aria-keyshortcuts` convention are read from, so retiring it is a foundation decision rather than a surface one. `.scratch/command-dock/issues/08-retire-the-sidebar-era-primitives.md` owns taking it.",
-  },
-  {
-    module: 'packages/ui/src/components/sidebar.tsx',
-    reason:
-      'The registry `Sidebar`, whose Space-chrome consumer ADR 0082 retired: the gutter is gone, the command surface is a `Toolbar` over the canvas, and nothing composes `SidebarProvider`, `SidebarInset` or `SidebarTrigger` any more. Same owner as `AddCardControl` above — retiring a registry primitive an ADR names is a foundation decision, not this surface promotion.',
-  },
-  {
-    module: 'packages/ui/src/OpenSpaces.tsx',
-    reason:
-      'The vertical tab strip that drew the open set beside the Sidebar. ADR 0082 leaves *which* surface draws that set as treatment and the Command Dock draws it, as the tree the Opener makes — a strip as well would be a second place to switch Spaces, and it is the one that needs a permanent column to stand in. So `OpenSpacesApplication` stopped rendering it and nothing else does. It is listed here rather than deleted because the module also exports `openSpaceStatusLabel`, the words both surfaces spend, which `dock-model.ts` imports — and that import is exactly what let the module pass the ratchet unlisted, since a barrel name resolving here marks it rendered whether or not the *component* has a consumer. `.scratch/command-dock/issues/08-retire-the-sidebar-era-primitives.md` owns splitting the words out and taking the component with `tabs.tsx`, its only remaining dependency.',
-  },
-  {
-    module: 'packages/ui/src/components/tabs.tsx',
-    reason:
-      'Reached only from `OpenSpaces.tsx` above, and retired with it. Nothing else in the tree composes a tab list — the Dock discloses its sets from the bar.',
-  },
-  {
-    module: 'packages/ui/src/components/sheet.tsx',
-    reason:
-      "The registry `Sidebar`'s phone branch, and its only importer. The Dock has no Sheet on purpose — it never takes the canvas away, so there is nothing to dismiss before a command's result can be seen — so this stands or falls with `sidebar.tsx` above and is retired with it.",
-  },
-  {
-    module: 'packages/ui/src/components/skeleton.tsx',
-    reason:
-      "The registry `Sidebar`'s loading placeholder, reached only through `SidebarMenuSkeleton`, and its only importer. Stands or falls with `sidebar.tsx` above.",
+      'Deliberately without a consumer. It wraps cmdk, which ADR 0050 kept rather than migrating; `CardSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
   },
   {
     module: 'packages/ui/src/components/empty.tsx',
     reason:
-      'Deliberately without a consumer, for the same reason. A shadcn registry primitive for an empty result set — the combobox empty message comes from Base UI’s own `ComboboxEmpty`, not from here.',
+      'Deliberately without a consumer, for the same reason as `Command.tsx` above. A shadcn registry primitive for an empty result set — the combobox empty message comes from Base UI’s own `ComboboxEmpty`, not from here.',
   },
 ] as const;
 

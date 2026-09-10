@@ -272,7 +272,13 @@ as the module being rendered. Retiring a primitive an ADR names is a foundation
 decision rather than a surface one, so
 `.scratch/command-dock/issues/08-retire-the-sidebar-era-primitives.md` owns
 taking it, and it owns giving `openSpaceStatusLabel` a home that is not an
-accident either way.
+accident either way. **It has: `08` is resolved, all six are deleted with
+`hooks/use-mobile.ts` behind them, and the words live in
+`packages/ui/src/open-space-status.ts`.** Two claims in this paragraph were
+already untrue when it was written and `08` corrects them there: this commit's
+own `isComponentName` change closed the blind spot, so `OpenSpaces.tsx` and
+`tabs.tsx` did carry inventory entries; and no ADR names `AddCardControl`, so
+the foundation-decision argument covered the registry primitives alone.
 
 **A class written in a template literal's *tail* is invisible to the dead-rule
 scan.** `ui-catalog.ts` reads a template's head and middles and cannot know where

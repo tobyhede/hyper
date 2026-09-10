@@ -12,8 +12,9 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId, inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { AddCardControl } from '@project/ui';
+import { Toolbar, ToolbarButton } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
+import { CARDS_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import { edgeSelectionOf } from '../src/render-adapter';
 import type { ConnectionCompletion } from '../src/connection-completion';
@@ -650,18 +651,25 @@ describe("the app's canvas delete key", () => {
   it.each(DELETE_KEYS)(
     'leaves the Edge standing when %s reaches the Add Card menu trigger',
     (key) => {
-      // The real control, mounted where the real one is: outside the flow
+      // The real treatment, mounted where the real control is: outside the flow
       // entirely, in chrome that marks itself `.nokey` — which is the marker
-      // the canvas guard reads rather than a list of its own. It carried a
-      // second case beside it, over a `SpaceSidebar` mounted the same way; the
-      // Sidebar is gone and the Command Dock that replaced it marks itself the
-      // same way, so what is left is one production control proving one guard.
+      // the canvas guard reads rather than a list of its own. `CARDS_TRIGGER` is
+      // the Command Dock's own Cards trigger, exported for whoever supplies that
+      // surface, so the class under test here is the class the Dock ships.
+      //
+      // It carried two cases beside it once, over `AddCardControl` and a
+      // `SpaceSidebar` mounted the same way. ADR 0082 retired the Sidebar,
+      // `.scratch/command-dock/issues/08` deleted the control, and the Dock that
+      // replaced both marks itself the same way — so one production trigger
+      // proves one guard.
       const { adapter, session } = mountCanvas(
-        <AddCardControl onAddCard={NO_OP} onAddAlias={NO_OP} onAddSpaceCard={NO_OP} />,
+        <Toolbar>
+          <ToolbarButton {...CARDS_TRIGGER}>Cards</ToolbarButton>
+        </Toolbar>,
       );
       act(() => adapter.getState().selectEdge(SUBJECT));
 
-      fireEvent.keyDown(screen.getByRole('button', { name: 'More Card kinds' }), { key });
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Cards' }), { key });
 
       expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
     },
