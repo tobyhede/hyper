@@ -381,7 +381,10 @@ describe('canvas Card authoring', () => {
       space.data.resize?.onResizeStart();
       space.data.resize?.onResize({ width: 280, height: 220 });
     });
-    expect(adapter.getState().interactionDraft?.size).toEqual(SPACE_CARD_MIN_OPEN_SIZE);
+    expect(adapter.getState().interactionDraft).toMatchObject({
+      kind: 'resize',
+      size: SPACE_CARD_MIN_OPEN_SIZE,
+    });
     const remembered =
       spaceSession.getState().working.document.layouts?.[0]?.positions[SPACE_CARD_ID];
     act(() => {

@@ -43,11 +43,33 @@ export interface Projection {
  * consumer, and the consumers are the two that ask exactly this: the Space's
  * canvas and an embedded Layout's.
  */
-export interface InteractionDraft {
-  readonly cardId: CardId;
-  readonly size: { readonly width: number; readonly height: number };
-  readonly placement: Placement;
-}
+export type InteractionDraft =
+  /** A live resize: the Card, the size it is proposing, and the canvas under it. */
+  | {
+      readonly kind: 'resize';
+      readonly cardId: CardId;
+      readonly size: { readonly width: number; readonly height: number };
+      readonly placement: Placement;
+    }
+  /**
+   * A live drag of an **Open** Card, and only of an Open Card.
+   *
+   * An Open Card displaces every Card `+x` and `+y` of it (ADR 0064), derived
+   * from that Card's *authored* position — so moving it is the one drag whose
+   * neighbours are somewhere else by the end of it. Without this draft they
+   * only find out at release, which is one frame after the author aimed at
+   * them, and the alignment they were aiming for is gone by the time they see
+   * the result.
+   *
+   * A closed Card's drag mints nothing, because no neighbour's drawn position
+   * depends on it: displacement reads the Open Cards alone, and a draft per
+   * frame would re-run the strategy to answer the geometry already on screen.
+   */
+  | {
+      readonly kind: 'move';
+      readonly cardId: CardId;
+      readonly placement: Placement;
+    };
 
 export interface CardResize {
   beginResize: (cardId: CardId) => void;
@@ -300,6 +322,53 @@ function placementFromNodes(nodes: readonly CardFlowNode[]): Placement {
   return Placement.fromEntries(nodes.map((node) => [node.id as CardId, node.position]));
 }
 
+/**
+ * The Placement a live drag of one or more Open Cards is proposing, or `null`
+ * when this frame proposes nothing worth redrawing.
+ *
+ * The positions React Flow reports are **drawn** coordinates, so each one is
+ * carried back through `Placement.authoredPoint` before it is placed — the same
+ * inverse the settled completion applies, which is what makes release produce
+ * the geometry already on screen rather than a second arrangement of it. Every
+ * point is inverted against the placement as the gesture found it, so two Cards
+ * moving together cannot each read the other's half-applied position.
+ *
+ * `null` for a drag of closed Cards only: their positions displace nobody, so
+ * the canvas already draws the truth and a draft would re-run the strategy for
+ * an identical answer. `null` too when no drawn position is available for a
+ * dragging Card, which is a frame with nothing to say rather than a reason to
+ * author the origin.
+ */
+function moveDraft(
+  authored: Placement | null,
+  positionChanges: readonly NodePositionChange[],
+  drawnById: ReadonlyMap<string, LayoutPosition>,
+): InteractionDraft | null {
+  if (authored === null) return null;
+  // Read from the authored side rather than from the change, so React Flow's
+  // widened `Node.id` never has to be asserted back into a `CardId`: the
+  // placement's own keys are already branded, and an id it does not hold names
+  // no Card of this Layout anyway.
+  const dragging = new Set(
+    positionChanges.filter((change) => change.dragging === true).map((change) => change.id),
+  );
+  if (dragging.size === 0) return null;
+
+  let placement = authored;
+  let openCardId: CardId | null = null;
+  for (const [cardId, at] of authored) {
+    if (!at.open || !dragging.has(cardId)) continue;
+    const drawn = drawnById.get(cardId);
+    if (drawn === undefined) continue;
+    openCardId = cardId;
+    placement = Placement.place(placement, cardId, {
+      ...at,
+      ...Placement.authoredPoint(authored, drawn, cardId),
+    });
+  }
+  return openCardId === null ? null : { kind: 'move', cardId: openCardId, placement };
+}
+
 function trackDragOrigins(
   dragOrigins: Map<string, LayoutPosition>,
   positionChanges: readonly NodePositionChange[],
@@ -456,6 +525,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         if (authored === null || at?.open !== true) return;
         set({
           interactionDraft: {
+            kind: 'resize',
             cardId,
             size: at.openSize,
             placement: authored,
@@ -465,12 +535,13 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
 
       previewResize: (cardId, size) => {
         const draft = get().interactionDraft;
-        if (draft?.cardId !== cardId) return;
+        if (draft?.kind !== 'resize' || draft.cardId !== cardId) return;
         const at = draft.placement.get(cardId);
         if (at?.open !== true) return;
         const proposedSize = snapCardSizeToClose(size);
         set({
           interactionDraft: {
+            kind: 'resize',
             cardId,
             size: proposedSize,
             placement: Placement.place(draft.placement, cardId, {
@@ -483,13 +554,14 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
 
       finishResize: (cardId) => {
         const draft = get().interactionDraft;
-        if (draft?.cardId !== cardId) return;
+        if (draft?.kind !== 'resize' || draft.cardId !== cardId) return;
         authoring.complete({ kind: 'resized-card', cardId, size: draft.size });
         set({ interactionDraft: null });
       },
 
       cancelResize: (cardId) => {
-        if (get().interactionDraft?.cardId === cardId) set({ interactionDraft: null });
+        const draft = get().interactionDraft;
+        if (draft?.kind === 'resize' && draft.cardId === cardId) set({ interactionDraft: null });
       },
     },
 
@@ -625,15 +697,49 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       trackDragOrigins(dragOrigins, positionChanges, beforeById);
 
       const settled = positionChanges.filter((change) => change.dragging === false);
+      /**
+       * The draft this frame leaves behind.
+       *
+       * Mid-gesture it is the displacement a dragged Open Card is causing, so
+       * the neighbours move under the pointer instead of one frame after the
+       * author aimed at them. `reconcile` keeps the dragged node itself on the
+       * pointer through every projection this mints, `dragOrigins` naming it by
+       * then. A settle ends the drag and so ends its draft: the placement the
+       * completion below installs redraws exactly what the draft was already
+       * showing, which is what makes release still.
+       *
+       * A resize's draft is not this stream's to touch. Nothing drags during
+       * one — the control is the whole gesture — but clobbering it would be a
+       * live Card losing its proposed rect, which is worth one comparison.
+       */
+      const nextDraft = ((): InteractionDraft | null => {
+        if (state.interactionDraft?.kind === 'resize') return state.interactionDraft;
+        if (settled.length > 0) return null;
+        return (
+          moveDraft(authoring.authoredPlacement(), positionChanges, afterById) ??
+          state.interactionDraft
+        );
+      })();
+
       if (settled.length === 0) {
-        set({ projection: { ...projection, nodes }, dragOrigins, selection });
+        set({
+          projection: { ...projection, nodes },
+          dragOrigins,
+          selection,
+          interactionDraft: nextDraft,
+        });
         return;
       }
 
       const movedIds = consumeSettledMovedIds(settled, dragOrigins, beforeById, afterById);
 
       if (movedIds.length === 0) {
-        set({ projection: { ...projection, nodes }, dragOrigins, selection });
+        set({
+          projection: { ...projection, nodes },
+          dragOrigins,
+          selection,
+          interactionDraft: nextDraft,
+        });
         return;
       }
 
@@ -642,6 +748,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         dragOrigins,
         moved: true,
         selection,
+        interactionDraft: nextDraft,
       });
       authoring.complete({
         kind: 'settled-card-movement',

@@ -560,6 +560,57 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   }
 });
 
+/**
+ * Dragging an Open Card previews the displacement it is causing.
+ *
+ * An Open Card displaces every Card `+x` and `+y` of it (ADR 0064), and that
+ * displacement is derived from the Open Card's *authored* position. So moving
+ * the Open Card is the one gesture that changes where every other Card is
+ * drawn — and the author is aiming at those Cards while they do it. Release is
+ * therefore the moment the canvas must not move: whatever the neighbours are
+ * showing under the pointer is what they show once the Edit lands, or the
+ * alignment the author just made was made against geometry that no longer
+ * exists.
+ */
+test('dragging an Open Card displaces its neighbours before release, not after', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  const b = nodeByTitle(page, 'B').first();
+  await expect(b).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /./);
+  await settled(page);
+
+  await openCard(b, 'B');
+  await settled(page);
+  const openedId = await b.getAttribute('data-id');
+  const box = (await b.boundingBox())!;
+  const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
+
+  // Up and to the left, far enough to cross every other Card's authored origin
+  // on both axes — which is exactly the crossing that adds their displacement.
+  const grip = { x: box.x + box.width / 2, y: box.y + 12 };
+  await page.mouse.move(grip.x, grip.y);
+  await page.mouse.down();
+  // React Flow starts a drag on the first move after mousedown; a single jump
+  // can be swallowed, so move twice.
+  await page.mouse.move(grip.x - 200 * zoom, grip.y - 150 * zoom, { steps: 5 });
+  await page.mouse.move(grip.x - 400 * zoom, grip.y - 300 * zoom, { steps: 5 });
+
+  // Still holding the pointer: this is what the author is aiming at.
+  const held = await allPositions(page);
+  await page.mouse.up();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await settled(page);
+  const released = await allPositions(page);
+
+  for (const [id, position] of Object.entries(held)) {
+    if (id === openedId) continue;
+    expect(released[id], `card ${id} moved on release`).toEqual(position);
+  }
+});
+
 test(
   'selecting Layouts is navigation and does not persist',
   { tag: '@parity:space-sidebar-marks-one-current-renderer' },

@@ -725,6 +725,7 @@ describe('render adapter', () => {
     store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
 
     expect(store.getState().interactionDraft).toEqual({
+      kind: 'resize',
       cardId: CARD_A,
       size: { width: 620, height: 440 },
       placement: Placement.fromEntries([
@@ -827,6 +828,121 @@ describe('render adapter', () => {
 
     expect(store.getState().interactionDraft).toBeNull();
     expect(spy.completions).toEqual([]);
+  });
+
+  /**
+   * A dragged Open Card is the one gesture that moves Cards it is not.
+   *
+   * Displacement is derived from the Open Card's *authored* position (ADR 0064),
+   * so the neighbours are somewhere else the moment it crosses them — and the
+   * author is aiming at those neighbours while they drag. The draft is what puts
+   * that answer on screen during the gesture rather than one frame after it.
+   */
+  describe('a dragged Open Card previews the displacement it is causing', () => {
+    // B sits `+x` and `+y` of A, so it takes A's whole growth on both axes:
+    // 500 - 260 = 240 across, 360 - 146 = 214 down.
+    const openAAndClosedB = () =>
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+        [CARD_B, { x: 300, y: 200, open: false }],
+      ]);
+
+    it('drafts the placement the neighbours are drawn from, per frame', () => {
+      const authored = openAAndClosedB();
+      const store = createRenderAdapter(authoringSpy({ authoredPlacement: authored }).authoring);
+      store.getState().syncProjection([node(CARD_A, 10, 20), node(CARD_B, 540, 414)], []);
+
+      // Dragged to (400, 300) in drawn coordinates. A displaces nobody but B,
+      // and never itself, so a lone Open Card's drawn position is its authored
+      // one and the draft takes the drop point as it stands.
+      store.getState().changeNodes(moving(CARD_A, 400, 300));
+
+      expect(store.getState().interactionDraft).toEqual({
+        kind: 'move',
+        cardId: CARD_A,
+        placement: Placement.fromEntries([
+          [CARD_A, { x: 400, y: 300, open: true, openSize: { width: 500, height: 360 } }],
+          [CARD_B, { x: 300, y: 200, open: false }],
+        ]),
+      });
+      // B is now `-x` and `-y` of A, so the draft draws it undisplaced — which
+      // is the jump the author would otherwise have seen only at release.
+      expect(Placement.drawn(store.getState().interactionDraft!.placement).get(CARD_B)).toEqual({
+        x: 300,
+        y: 200,
+        open: false,
+      });
+
+      store.getState().changeNodes(moving(CARD_A, 400, 100));
+
+      // Back above B on `y` alone: B takes the vertical growth again and keeps
+      // its horizontal freedom. Each frame is answered from the authored
+      // placement rather than from the frame before, so nothing accumulates.
+      expect(Placement.drawn(store.getState().interactionDraft!.placement).get(CARD_B)).toEqual({
+        x: 300,
+        y: 414,
+        open: false,
+      });
+    });
+
+    it('leaves release still: the authored placement redraws what the draft showed', () => {
+      const authored = openAAndClosedB();
+      const spy = authoringSpy({ authoredPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().syncProjection([node(CARD_A, 10, 20), node(CARD_B, 540, 414)], []);
+
+      store.getState().changeNodes(moving(CARD_A, 400, 300));
+      const previewed = store.getState().interactionDraft!.placement;
+      store.getState().changeNodes(settled(CARD_A, 400, 300));
+
+      // The draft is gone and the completion carries the same drop point, so
+      // what Authoring installs draws exactly what was already on screen.
+      expect(store.getState().interactionDraft).toBeNull();
+      expect(spy.completions).toMatchObject([{ kind: 'settled-card-movement', placed: [CARD_A] }]);
+      expect(Placement.next(authored, store.getState().renderedPlacement()!, [CARD_A])).toEqual(
+        previewed,
+      );
+    });
+
+    it('drafts nothing for a closed Card, whose position displaces nobody', () => {
+      const store = createRenderAdapter(
+        authoringSpy({ authoredPlacement: openAAndClosedB() }).authoring,
+      );
+      store.getState().syncProjection([node(CARD_A, 10, 20), node(CARD_B, 540, 414)], []);
+
+      store.getState().changeNodes(moving(CARD_B, 900, 900));
+
+      expect(store.getState().interactionDraft).toBeNull();
+    });
+
+    it('leaves a live resize draft alone', () => {
+      const store = createRenderAdapter(
+        authoringSpy({ authoredPlacement: openAAndClosedB() }).authoring,
+      );
+      store.getState().syncProjection([node(CARD_A, 10, 20), node(CARD_B, 540, 414)], []);
+      store.getState().cardResize.beginResize(CARD_A);
+      store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
+      const resizing = store.getState().interactionDraft;
+
+      store.getState().changeNodes(moving(CARD_A, 400, 300));
+      expect(store.getState().interactionDraft).toBe(resizing);
+
+      store.getState().changeNodes(settled(CARD_A, 400, 300));
+      expect(store.getState().interactionDraft).toBe(resizing);
+    });
+
+    it('discards the draft when the canvas moves to another Layout', () => {
+      const store = createRenderAdapter(
+        authoringSpy({ authoredPlacement: openAAndClosedB() }).authoring,
+      );
+      store.getState().syncProjection([node(CARD_A, 10, 20), node(CARD_B, 540, 414)], []);
+      store.getState().changeNodes(moving(CARD_A, 400, 300));
+      expect(store.getState().interactionDraft).not.toBeNull();
+
+      store.getState().selectLayout(null);
+
+      expect(store.getState().interactionDraft).toBeNull();
+    });
   });
 
   it('keeps an in-flight drag position while applying projected expanded geometry', () => {
