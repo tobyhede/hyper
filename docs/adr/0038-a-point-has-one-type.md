@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0014
-Refined by: 0083
+Refined by: 0085
 Related: 0005, 0025
 
 `core`'s schema-derived `LayoutPosition` is the one representation of a point. `graph`'s `LayoutPoint` is deleted, and the strategy contract's routed edge sections and the `Placement` map both carry `LayoutPosition`. This is about the type a point is *declared* as, not about where geometry sits: `LayoutCard` and `LayoutPort` keep their loose optional `x`/`y`, because ADR 0005 has geometry ride as optional fields on the elements and the title is not a mandate to collapse those into one.

@@ -1000,7 +1000,7 @@ describe('the retired name for the surface over the open set is gone', () => {
 });
 
 /**
- * ADR 0083 makes Diagram the first-public name for the entity that was a
+ * ADR 0085 makes Diagram the first-public name for the entity that was a
  * Layout, and states the same completion criterion ADR 0041 did: a repository
  * scan finds the retired name only in historical records and in qualified
  * layout-strategy prose. This is the first of that ADR's two changes; the
@@ -1015,7 +1015,7 @@ describe('the retired name for the surface over the open set is gone', () => {
  * **Two carve-outs are shape rather than exception**, in the `Routed*` idiom
  * this file already uses:
  *
- *  - `LayoutStrategy` and everything built on it keeps its name, which ADR 0083
+ *  - `LayoutStrategy` and everything built on it keeps its name, which ADR 0085
  *    records as a negative in as many words. The word there is the verb: two of
  *    its three implementations read no Diagram at all, so naming the contract
  *    after the entity would assert a relationship they do not have and would
@@ -1068,7 +1068,7 @@ const RETIRED_DIAGRAM_NAME = new RegExp(
 );
 
 /**
- * The retired name standing alone, which no compound arm can see. ADR 0083
+ * The retired name standing alone, which no compound arm can see. ADR 0085
  * states the completion criterion ADR 0041 did — the word does not survive as
  * an alias — and `RETIRED_BARE` above is what holds that for Route. The two
  * names that keep the word need no exemption here: a boundary cannot land
@@ -1105,7 +1105,7 @@ const withoutForeignSpellings = (source: string): string =>
 /**
  * A retired name quoted as **history** rather than used as vocabulary.
  *
- * ADR 0083 requires this: accepted ADR bodies and resolved records keep the old
+ * ADR 0085 requires this: accepted ADR bodies and resolved records keep the old
  * words as provenance, and a current-state document that explains what changed
  * has to be able to name what it changed from. Two do — the trap a persisted-key
  * rename set twice, and the symbol a stale spike harness went stale against —
@@ -1141,7 +1141,7 @@ const FOREIGN_DIAGRAM_FILES: readonly string[] = [
   'packages/react-flow-adapter/test/elk-strategy.test.ts',
 ];
 
-describe('a Diagram is named once (ADR 0083)', () => {
+describe('a Diagram is named once (ADR 0085)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
@@ -1244,13 +1244,13 @@ describe('a Diagram is named once (ADR 0083)', () => {
 
   it('stays silent on the verb, on the foreign names, and on the vocabulary that replaced it', () => {
     const kept = [
-      // The contract ADR 0083 records as keeping its name, in every shape.
+      // The contract ADR 0085 records as keeping its name, in every shape.
       `import type { ${RETIRED_DIAGRAM}Strategy, ${RETIRED_DIAGRAM}StrategyGraph } from './${retiredDiagramLower}';`,
       `export const gridStrategy: ${RETIRED_DIAGRAM}Strategy = async (graph) => graph;`,
       `const ${retiredDiagramLower}Strategy = elkStrategy();`,
       // React's hook, which is spelled the one way a lookbehind separates.
       `const measured = use${RETIRED_DIAGRAM}Effect(() => measure(), []);`,
-      // The verb, in the prose ADR 0083 leaves alone.
+      // The verb, in the prose ADR 0085 leaves alone.
       `// it is furniture over the canvas and takes no ${retiredDiagramLower} space`,
       `const GROUP_${RETIRED_DIAGRAM_UPPER} = 'inline-flex items-center gap-1';`,
       `// see reactflow.dev/learn/${retiredDiagramLower}ing/sub-flows for nesting`,

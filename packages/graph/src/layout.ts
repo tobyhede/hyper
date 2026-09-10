@@ -45,7 +45,7 @@ export interface LayoutStrategyCard {
  * author wrote one, no schema parses one, and nothing round-trips one to disk.
  *
  * Deliberately **not** `core`'s `DiagramPosition`, which is what an author
- * stored in a Diagram. The two were one type until ADR 0083 split them, and the
+ * stored in a Diagram. The two were one type until ADR 0085 split them, and the
  * comment that used to stand here recorded why that was wrong while deferring
  * the call: a constraint added to `diagramPositionSchema` for the sake of
  * authored placement — a bound, an integer, a non-negative x — would have

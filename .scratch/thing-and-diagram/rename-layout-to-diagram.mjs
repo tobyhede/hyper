@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ADR 0083, change one of two: Layout becomes Diagram.
+ * ADR 0085, change one of two: Layout becomes Diagram.
  *
  * Tracked so a branch that was in flight when this landed can replay it rather
  * than hand-merge it: rebase onto the commit before the rename, run this, commit.
@@ -9,7 +9,7 @@
  * It is deliberately NOT a blind substring sweep. `s/layout/diagram/g` produces
  * damage a reviewer will not catch by eye: "takes no layout space" becomes
  * "takes no diagram space", `useLayoutEffect` stops resolving, and
- * `LayoutStrategy` — which ADR 0083 records as a negative, in as many words —
+ * `LayoutStrategy` — which ADR 0085 records as a negative, in as many words —
  * loses the verb it is named for. So the protected spellings are masked first,
  * the general rule runs, and the masks come back.
  *
@@ -23,7 +23,7 @@
  * Two things in the rename commit are NOT produced here, because neither is a
  * spelling. A branch replaying this takes both from the merge like any other
  * edit:
- *   - the product URL segment `/views/` → `/diagrams/` (ADR 0069, ADR 0083 —
+ *   - the product URL segment `/views/` → `/diagrams/` (ADR 0069, ADR 0085 —
  *     `views` was a third word for the entity, left behind when ADR 0079
  *     retired the View);
  *   - this rename's guard block in `test/unit/current-domain-vocabulary.test.ts`.
@@ -74,7 +74,7 @@ const EXCLUDED_PATHS = ['pnpm-lock.yaml', 'skills-lock.json', '.agents/skills/']
  *  - foreign names that arrive with a library and are not ours to sweep
  *    (React's hook, Lucide's glyph, elkjs's options bag);
  *  - `LayoutStrategy` and everything built on it, where the word is the verb —
- *    two of its three implementations read no Diagram at all (ADR 0014, 0083);
+ *    two of its three implementations read no Diagram at all (ADR 0014, 0085);
  *  - ordinary prose about arranging things on a screen, which survives the
  *    entity releasing the noun.
  *

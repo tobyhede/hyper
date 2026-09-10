@@ -14,7 +14,7 @@ const typeScriptSourceFiles = (directory: string): readonly string[] =>
 
 /**
  * ADR 0038 made `core`'s schema-derived `DiagramPosition` the one representation
- * of an **authored** point, and ADR 0083 split the computed one back out: the
+ * of an **authored** point, and ADR 0085 split the computed one back out: the
  * geometry a LayoutStrategy returns is `graph`'s own bare `Point`, because no
  * author wrote one and no schema parses one. Those were never one point — a
  * constraint added to `diagramPositionSchema` for the sake of authored placement
@@ -83,7 +83,7 @@ describe('a point has one type', () => {
    */
   const STRATEGY_POINT = 'Point in packages/graph/src/layout.ts';
 
-  it('declares no point type beyond the strategy geometry ADR 0083 split out', () => {
+  it('declares no point type beyond the strategy geometry ADR 0085 split out', () => {
     const declared = graphSourceFiles().flatMap((file) =>
       parse(file)
         .statements.map(declaredPoint)
@@ -99,7 +99,7 @@ describe('a point has one type', () => {
    * exempt from `noUnusedLocals`, so `Point` can sit declared, exported and
    * unused while the routed geometry goes straight back onto `DiagramPosition`
    * — the split reverted, with every guard here and both typechecks green.
-   * Measured, not assumed. So what ADR 0083 actually decided is read where it
+   * Measured, not assumed. So what ADR 0085 actually decided is read where it
    * landed: on the members of the section type.
    */
   it('types the routed geometry on that point rather than the authored position', () => {

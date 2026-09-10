@@ -25,7 +25,7 @@ under `superseded/`.
 
 | ADR | Binds |
 | --- | --- |
-| [0083](0083-thing-and-diagram-are-the-first-public-names-for-card-and-layout.md) | A Card is a Thing and a Layout is a Diagram. `LayoutStrategy` keeps its name. |
+| [0085](0085-thing-and-diagram-are-the-first-public-names-for-card-and-layout.md) | A Card is a Thing and a Layout is a Diagram. `LayoutStrategy` keeps its name. |
 | [0001](0001-recursive-spaces.md) | A Card may hold another Space, so Spaces nest. |
 | [0004](0004-cards-are-the-graph.md) | Cards are the graph. Nothing sits between a Card and its position. |
 | [0007](0007-routes-are-the-only-structure.md) | Cards and Graphs are the only structure. There are no separately authored edges. |

@@ -33,7 +33,7 @@ A Title is one or more **Title Lines**. The first line is the Thing's **name**: 
 _Avoid_: heading, label, caption as a name for the Title itself (a caption is the role the third and later Title Lines take), and description or subtitle as a name for a separate field — there is no separate field.
 
 A thing is one of three kinds, and the kind is what its content is: **Markdown** — written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or an **alias** — another thing, shown again here.
-_Avoid_: Card (retired by ADR 0083), node, slide, page, tile, subgraph. For the content: prose (it may be a table, a drawing or code, not only writing), body (works for markdown, but a space thing's content is a graph).
+_Avoid_: Card (retired by ADR 0085), node, slide, page, tile, subgraph. For the content: prose (it may be a table, a drawing or code, not only writing), body (works for markdown, but a space thing's content is a graph).
 
 **Space Thing**:
 A thing of kind **space**: a reference to another Space, shown through the target's selected Diagram and Graph. The Space reference is immutable but the selections are authored on the Thing; many Space Things may show the same Space differently. The Space Things referencing a Space own its lifetime together: deleting one leaves the target alive while another reference remains, and deleting the last one deletes the target and every Space below it that nothing else references (ADR 0074). Space Thing references may converge but may not form a cycle.
@@ -109,7 +109,7 @@ _Avoid_: revision (that is what a stored Space is versioned by, and the two move
 A thing-to-rect map the author wrote — which of a Space's Things are in the Diagram, where they sit, their Open/Closed state, and the Open Size each remembers. It belongs to the Space and is part of what the Space is. A working Space always has at least one Diagram and may hold several. Membership, position, Open/Closed state and Open Size are properties of the Diagram, never of the Thing: the same Thing may be absent from one Diagram, sit at different coordinates in others, and be Open at different sizes in each. A Diagram may not name Things the Space does not have.
 
 A Diagram owns a non-empty ordered collection of Graphs over its Things. Several Graphs may share Things within that Diagram. A Diagram may also name which of its Graphs opens active; otherwise its first Graph opens active.
-_Avoid_: Layout (retired by ADR 0083 — it named both this entity and the behaviour that arranges Things, which is why a **layout strategy** keeps the word and this does not), View, placement as a synonym (a Diagram *holds* a placement, and adds an identity, a title and its owned Graphs), manual and custom and free-form (a Diagram is authored, so the qualifiers say nothing).
+_Avoid_: Layout (retired by ADR 0085 — it named both this entity and the behaviour that arranges Things, which is why a **layout strategy** keeps the word and this does not), View, placement as a synonym (a Diagram *holds* a placement, and adds an identity, a title and its owned Graphs), manual and custom and free-form (a Diagram is authored, so the qualifiers say nothing).
 
 **Placement**:
 The thing-to-rect map itself — which Things are present, where they sit, whether each is **Open** or **Closed**, and its remembered **Open Size**, and nothing more. A **Diagram** is the authored entity a Space holds; the placement is the map inside it. Every Closed Thing has the same **Closed Size** by domain rule, so that fixed size is not authored alongside each Thing. Placement is also what an automatic **layout strategy** computes and what the positioned strategy reads.
@@ -126,7 +126,7 @@ _Avoid_: arrangement (ADR 0005 — applying a strategy produces no separate enti
 **Layout strategy**:
 A named strategy for arranging a space's things — how they are organised and positioned. Which things it arranges is the Diagram's choice, not the strategy's.
 
-It keeps the word *layout*, which here is the verb. The **Diagram** is the authored artifact; a layout strategy is the behaviour that positions Things, and two of the three that ship read no Diagram at all (ADR 0014, ADR 0083).
+It keeps the word *layout*, which here is the verb. The **Diagram** is the authored artifact; a layout strategy is the behaviour that positions Things, and two of the three that ship read no Diagram at all (ADR 0014, ADR 0085).
 
 A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from Things and Graphs alone — a grid, Things ordered by name, a tree, a cluster map, a Graph-driven placement — so it needs no authored positions and carries no authored data. Automatic strategies are non-addressable application capabilities. The positioned strategy reads a **Diagram**, and it is the strategy V1 uses to render selectable Diagrams.
 
