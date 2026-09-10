@@ -1370,3 +1370,351 @@ describe('a Diagram is named once (ADR 0085)', () => {
     }
   });
 });
+
+/**
+ * ADR 0085 makes Thing the first-public name for the entity that was a Card,
+ * and states the same completion criterion ADR 0041 did: a repository scan
+ * finds the retired name only in historical records and in the vendored
+ * registry carve-out. This is the second of that ADR's two changes; the Diagram
+ * block above is the first.
+ *
+ * **This block is the whole reason the name is Thing and not Object.** The ADR
+ * rejected the better-pedigreed word on one ground — that a scan for
+ * `Object[A-Z]`, `[A-Za-z]Object`, `object[A-Z]` and `OBJECTS?` already matches
+ * 287 sites (`RefObject`, `toMatchObject`, oxlint's `ObjectExpression`), and a
+ * domain word whose guard needs 287 exceptions has no guard. The same scan for
+ * Thing matched zero. So a rename of this size was accepted *because* this file
+ * could hold it, and the acceptance is only cashed here.
+ *
+ * **The English words need no exemption, which is worth stating because the
+ * reconnaissance expected otherwise.** `cardinality` (67), `discard` (148) and
+ * `wildcard` (4) are all invisible to every arm below, and not by luck: each
+ * arm requires either a capital after the retired word, a word boundary before
+ * it, or a key's colon after it, and none of the three offers any. What did
+ * need protecting was the *codemod*, which substitutes plain substrings.
+ *
+ * **`migrations/` is excluded here and nowhere else.** The 21 files it
+ * contributes are `start-contract` / `end-contract` snapshots of a schema that
+ * really did have a Card model, and ADR 0085 says migration snapshots are
+ * history and are not rewritten. It is scoped to this block rather than added
+ * to `HISTORICAL_TREES` because that list feeds `scannableFiles()`, which every
+ * other block starts from, and none of them has been asked whether it wants the
+ * tree gone. `src/prisma/` stays in scope: `contract.prisma` is authored and the
+ * two emitted artifacts beside it are regenerated from it, so a retired model
+ * name there is a live defect rather than a record.
+ *
+ * What needs a **file** exemption is what ADR 0085 predicted, and it is the one
+ * carve-out: the vendored shadcn registry. `packages/ui/src/components/card.tsx`
+ * exports seven components under the retired name, and six other modules import
+ * them — a barrel, two components, a baseline test, a review story, and the
+ * agent-facing document that explains why the barrel carries two content
+ * components with different names. A foreign name with no shape to read, exactly
+ * as Lucide's glyph is for Route and elkjs's options bag is for Layout.
+ *
+ * The registry's Tailwind tokens and custom properties need **nothing**, and
+ * that is the collection-key arm's `(?<!-)` earning itself a second time:
+ * `bg-card`, `text-card-foreground`, `--card` and `--color-card` all carry a
+ * hyphen immediately before the retired word, so a rule written to keep prose
+ * about re-running a strategy out of a Diagram scan keeps a whole vendored
+ * palette out of this one.
+ */
+const RETIRED_THING = ['C', 'ard'].join('');
+const retiredThingLower = RETIRED_THING.toLowerCase();
+const RETIRED_THING_UPPER = RETIRED_THING.toUpperCase();
+
+const RETIRED_THING_NAME = new RegExp(
+  [
+    // PascalCase compounds opening with it: its id, its schema, its node.
+    `${RETIRED_THING}[A-Z]`,
+    // Compounds ending in it: the canvas one, the space one, the markdown one.
+    // `s?` for the reason the Diagram arm above carries it — a lowercase plural
+    // ends the word without a boundary landing after the retired name, so every
+    // compound that ended in its plural would be invisible to this arm.
+    `[A-Za-z]${RETIRED_THING}s?\\b`,
+    // camelCase compounds opening with it: its id, its kind, its title.
+    `\\b${retiredThingLower}[A-Z]`,
+    // The screaming-case constants: the bare word, its plural, its fixtures.
+    `\\b${RETIRED_THING_UPPER}S?\\b`,
+    // Deliberately without a leading `\\b`: `_` is a word character, so a
+    // boundary never lands mid-identifier and the shape most of a screaming
+    // constant is written in goes unseen.
+    `${RETIRED_THING_UPPER}_[A-Z]`,
+    // The retired collection, in a document, an object literal or a table
+    // declaration. `(?<!-)` because a hyphen makes it a different word, and it
+    // is what keeps the registry's whole Tailwind palette out of this scan.
+    `(?<!-)\\b${retiredThingLower}s?["']?\\s*[:=]`,
+    // ...and read back off a value.
+    `\\.${retiredThingLower}s\\b`,
+    // The retired name as a whole quoted string, which is how the database
+    // spells it and how no compound arm above can see it: a Prisma `@@map`, a
+    // migration's table field, a raw identifier in the repository. Without this
+    // the model rename could land with every table name still retired and the
+    // scan silent.
+    `["']${retiredThingLower}s?["']`,
+  ].join('|'),
+);
+
+/**
+ * The retired name standing alone, which no compound arm can see. ADR 0085
+ * states the completion criterion ADR 0041 did — the word does not survive as an
+ * alias — and this is what holds it. Scoped to implementation source, like the
+ * Route and Diagram bare arms, because the bare English word is legitimate in
+ * prose and a glossary entry retiring a noun has to spell the noun.
+ */
+const RETIRED_THING_BARE = new RegExp(`\\b${RETIRED_THING}\\b`);
+
+/**
+ * The six registry compounds the exemption below forgives. The registry's
+ * seventh export is the bare word, which no compound arm reads and which the
+ * bare arm forgives by file instead.
+ */
+const FOREIGN_THING_SPELLINGS = new RegExp(
+  [
+    `${RETIRED_THING}Action`,
+    `${RETIRED_THING}Content`,
+    `${RETIRED_THING}Description`,
+    `${RETIRED_THING}Footer`,
+    `${RETIRED_THING}Header`,
+    `${RETIRED_THING}Title`,
+    // Tailwind's group variant, which the collection-key arm reads as a key
+    // because a slash is a word boundary where a hyphen is not.
+    `/${retiredThingLower}:`,
+    // The registry's own slot value, which the quoted-string arm reads.
+    `data-slot="${retiredThingLower}"`,
+  ].join('|'),
+);
+
+/**
+ * An exempted file read with those six spellings masked out. Masking rather than
+ * skipping is the point, and it matters more here than anywhere else in this
+ * file: `packages/ui/src/index.ts` is a barrel exporting 25+ domain names, and a
+ * whole-file exemption there would forgive the entire package surface to
+ * accommodate seven vendored ones.
+ */
+const withoutForeignThingSpellings = (source: string): string =>
+  source.replace(new RegExp(FOREIGN_THING_SPELLINGS.source, 'g'), 'foreign');
+
+/**
+ * The files where the retired spelling is the **shadcn registry's** rather than
+ * ours: the vendored module, the barrel that re-exports it, the two components
+ * and the two catalogue fixtures that render it, and the agent-facing document
+ * that explains why the barrel now carries a domain content component and a
+ * registry one under different names (ADR 0047, ADR 0050, ADR 0085).
+ */
+const FOREIGN_THING_FILES: readonly string[] = [
+  'packages/ui/src/components/card.tsx',
+  'packages/ui/src/index.ts',
+  'packages/ui/src/CanvasThing.tsx',
+  'packages/ui/src/ThingRail.tsx',
+  'packages/ui/test/design-system-baseline.test.tsx',
+  'packages/app/stories/review/space-thing-canvas-prototype.stories.tsx',
+  'docs/agents/ui.md',
+];
+
+/**
+ * The implementation source that renders the registry's *bare* component, which
+ * is spelled exactly as the domain type was. Narrower than the list above on
+ * purpose: `ThingRail` takes only the header, and the two fixtures are not
+ * implementation source, so neither reaches the bare arm at all.
+ */
+const FOREIGN_BARE_THING_FILES: readonly string[] = [
+  'packages/ui/src/components/card.tsx',
+  'packages/ui/src/index.ts',
+  'packages/ui/src/CanvasThing.tsx',
+];
+
+/**
+ * The callback binding, in the arm ADR 0041's Route block established and for
+ * the reason its comment records: the convention is the domain initial
+ * (`(t)` for thing, `(d)` for diagram, `(e)` for edge), so a binding introduced
+ * over the Thing collection has exactly one correct letter and the retired
+ * name's is not it. Twenty-five sites carried `(c)` over a Thing collection
+ * through this rename and a text sweep could not see any of them, because
+ * substituting the collection's own name leaves the callback's parameter
+ * untouched — the same drift, in the same shape, that the Route arm was
+ * written after.
+ *
+ * The collection has to be the **receiver**, with nothing between them, which is
+ * what keeps a `count`, a `cell` or a `colour` bound by something this guard
+ * does not govern out of it. Two live bindings are deliberately outside its
+ * reach and should stay there: `elk-strategy.test.ts` binds `(c)` over elkjs's
+ * own `children`, and a foreign collection has no domain initial to take.
+ */
+const RETIRED_THING_INITIAL_BINDING = new RegExp(
+  [
+    `\\.things\\s*\\.\\s*[A-Za-z]+\\s*\\(`,
+    `\\s*(?:\\(\\s*${retiredThingLower[0] ?? ''}\\s*(?::[^)]*)?\\)|${retiredThingLower[0] ?? ''}\\b)\\s*=>`,
+  ].join(''),
+);
+
+/**
+ * Snapshots of a schema that really did carry the retired model. Excluded from
+ * this block alone; see the block comment for why it is not a shared historical
+ * tree.
+ */
+const MIGRATION_SNAPSHOTS = 'migrations/';
+
+describe('a Thing is named once (ADR 0085)', () => {
+  const scanned = scannableFiles().filter((file) => !file.startsWith(MIGRATION_SNAPSHOTS));
+
+  it('reaches the kinds of file this rename actually touched', () => {
+    // The domain schema, the authored database contract, and the agent-facing
+    // document that describes the editing seam. A file list that quietly
+    // stopped resolving would report nothing forever.
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('src/prisma/contract.prisma');
+    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
+  });
+
+  it('finds no compound of the retired name anywhere it still governs', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      if (source === null) return [];
+      const read = FOREIGN_THING_FILES.includes(file)
+        ? withoutForeignThingSpellings(source)
+        : source;
+      return hits(read, RETIRED_THING_NAME).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no bare retired name in implementation source', () => {
+    const found = scanned
+      .filter(isImplementationSource)
+      .filter((file) => !FOREIGN_BARE_THING_FILES.includes(file))
+      .flatMap((file) => {
+        const source = readTracked(file);
+        return source === null
+          ? []
+          : hits(source, RETIRED_THING_BARE).map((hit) => `${file}:${hit}`);
+      });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no retired initial bound over a Thing collection', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : spanningHits(source, RETIRED_THING_INITIAL_BINDING).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no exemption that has stopped earning itself', () => {
+    // Read against the spellings each was granted against: the day the registry
+    // stops exporting one, or a consumer stops importing it, the exemption stops
+    // being earned and goes.
+    expectEachExemptionEarned(FOREIGN_THING_FILES, FOREIGN_THING_SPELLINGS);
+    expectEachExemptionEarned(FOREIGN_BARE_THING_FILES, RETIRED_THING_BARE);
+
+    // And the excluded tree is excluded because it still carries the record it
+    // is excluded for, rather than out of habit.
+    const snapshots = trackedFiles().filter((file) => file.startsWith(MIGRATION_SNAPSHOTS));
+    expect(snapshots).not.toEqual([]);
+    expect(
+      snapshots.flatMap((file) => hits(readTracked(file) ?? '', RETIRED_THING_NAME)),
+      'no migration snapshot still records the retired model',
+    ).not.toEqual([]);
+  });
+
+  it('still reports a domain compound inside the registry exemption', () => {
+    const source = [
+      `import { ${RETIRED_THING}Header, ${RETIRED_THING}Title } from './components/${retiredThingLower}';`,
+      `export { ${RETIRED_THING}Content } from './components/${retiredThingLower}';`,
+      `const chosen = diagram.selected${RETIRED_THING};`,
+    ].join('\n');
+
+    expect(hits(withoutForeignThingSpellings(source), RETIRED_THING_NAME)).toEqual([
+      `3: const chosen = diagram.selected${RETIRED_THING};`,
+    ]);
+  });
+
+  it('reports the retired name in every shape it was written in', () => {
+    // Composed rather than written out, in this file's usual idiom: spelled
+    // literally, each fixture would be a hit this scan reports against its own
+    // source.
+    const retired = [
+      `export type ${RETIRED_THING}Id = string;`,
+      `import { parse${RETIRED_THING}File } from './${retiredThingLower}-file';`,
+      `const canvas${RETIRED_THING} = space.${retiredThingLower}s[0];`,
+      `const ${retiredThingLower}Kind = thing.kind;`,
+      `const ${RETIRED_THING_UPPER}_ID = uuidSchema.parse('...');`,
+      `const COLLAPSED_${RETIRED_THING_UPPER}_SIZE = 120;`,
+      `{ "${retiredThingLower}s": [], "default${RETIRED_THING}": null }`,
+      `model ${RETIRED_THING} { @@map("${retiredThingLower}s") }`,
+      `for (const entry of space.${retiredThingLower}s) {`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_THING_NAME.test(line), line).toBe(true);
+    }
+  });
+
+  it('reports the retired name standing alone', () => {
+    for (const line of [
+      `export type ${RETIRED_THING} = Thing;`,
+      `import type { ${RETIRED_THING} } from '@project/core';`,
+    ]) {
+      expect(RETIRED_THING_BARE.test(line), line).toBe(true);
+    }
+  });
+
+  it('reports the retired initial only where a Thing collection introduces it', () => {
+    for (const line of [
+      `space.things.map((${retiredThingLower[0] ?? ''}) => ${retiredThingLower[0] ?? ''}.id)`,
+      `strategyGraph.things.map(${retiredThingLower[0] ?? ''} => ${retiredThingLower[0] ?? ''}.width)`,
+      `laid.things.find((${retiredThingLower[0] ?? ''}: Thing) => true)`,
+    ]) {
+      expect(spanningHits(line, RETIRED_THING_INITIAL_BINDING), line).not.toEqual([]);
+    }
+
+    for (const line of [
+      // The correct initial over the correct collection.
+      'space.things.map((t) => t.id)',
+      // The letter bound by something this guard does not govern.
+      'children.map((c) => c.id)',
+      'rows.flatMap((c) => c.cells)',
+      // The collection named, but not as the receiver of the callback.
+      'const ids = space.things; rows.map((c) => c.id)',
+    ]) {
+      expect(spanningHits(line, RETIRED_THING_INITIAL_BINDING), line).toEqual([]);
+    }
+  });
+
+  it('stays silent on the registry, on ordinary English, and on the vocabulary that replaced it', () => {
+    const kept = [
+      // The registry's Tailwind tokens and custom properties, which the
+      // collection-key arm's lookbehind keeps out without an exemption.
+      `'rounded-xl bg-${retiredThingLower} text-sm text-${retiredThingLower}-foreground'`,
+      `  --color-${retiredThingLower}: var(--${retiredThingLower});`,
+      `  --${retiredThingLower}-foreground: var(--foreground);`,
+      // Ordinary English that merely contains the letters.
+      `const ${retiredThingLower}inality = new Set(ids).size;`,
+      `// the author dis${retiredThingLower}ed the draft rather than saving it`,
+      `const pattern = 'wild${retiredThingLower}';`,
+      // The vocabulary this rename arrived at.
+      `const selectedThing = space.things.find((thing) => thing.id === id);`,
+      `export type ThingId = z.infer<typeof uuidSchema>;`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_THING_NAME.test(line), line).toBe(false);
+    }
+
+    // The registry's component names are forgiven by the exemption rather than
+    // by the shape — the arms above read them exactly as they read a domain
+    // compound, which is the whole reason this carve-out is by file.
+    for (const line of [
+      `import { ${RETIRED_THING}Header } from './components/${retiredThingLower}';`,
+      `<${RETIRED_THING}Content className="canvas-thing__body">`,
+      `<div data-slot="${retiredThingLower}" className="group/${retiredThingLower}" />`,
+    ]) {
+      expect(RETIRED_THING_NAME.test(line), line).toBe(true);
+      expect(RETIRED_THING_NAME.test(withoutForeignThingSpellings(line)), line).toBe(false);
+    }
+  });
+});

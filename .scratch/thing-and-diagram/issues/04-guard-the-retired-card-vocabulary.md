@@ -1,6 +1,6 @@
 # 04 — Guard the retired Card vocabulary
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 
 **What to build:** The Thing block in
@@ -82,3 +82,83 @@ the retired model the guard should say so.
 - The guard is 1,266 lines with five blocks and shared helpers at 22-245. Read
   the Diagram block (1002-1266) whole before writing this one; it is the
   template, and every one of its regex arms carries the recorded reason it exists.
+
+## Answer
+
+Resolved. The Thing block is at the foot of
+`test/unit/current-domain-vocabulary.test.ts`, modelled on the Diagram block
+above it, with eight `it` blocks and 46 assertions passing.
+
+### The decision this issue owned
+
+**`migrations/` is a historical exclusion scoped to this block**, as
+recommended, and it earns itself: the block asserts that the tree is still
+tracked *and* that some snapshot in it still matches the retired pattern, so the
+day the last one stops recording a Card model the exclusion fails rather than
+quietly covering nothing. `src/prisma/` stays in scope, and the arm below is what
+makes that worth something.
+
+### Three things the reconnaissance got wrong, and one it did not have
+
+**The English words need no exemption at all.** `cardinality` (67 hits),
+`discard` (148) and `wildcard` (4) are invisible to every arm, and not by luck —
+each arm requires a capital after the retired word, a word boundary before it, or
+a key's colon after it, and none of the three offers any. The inventory expected
+`cardinality` to need the treatment `LayoutStrategy` got. What actually needed
+protecting was the *codemod*, which substitutes plain substrings. No exemption
+was added, because `expectEachExemptionEarned` would have failed one that matched
+nothing.
+
+**The registry's Tailwind tokens need nothing either**, and this is the
+collection-key arm's `(?<!-)` earning itself a second time: `bg-card`,
+`text-card-foreground`, `--card` and `--color-card` all carry a hyphen
+immediately before the retired word. A lookbehind written to keep prose about
+re-running a strategy out of the Diagram scan keeps a whole vendored palette out
+of this one. Two registry spellings *did* need forgiving and neither was
+predicted: Tailwind's `group-data-[size=sm]/card:` variant, where a slash is a
+word boundary a hyphen is not, and `data-slot="card"`.
+
+**The `packages/ui/src/index.ts` worry dissolves in the masking idiom.** The ADR
+asked for the mask to be narrowed to the `from './components/card'` block rather
+than the whole file, because the barrel exports 25+ domain names. Masking
+*spellings* rather than skipping *files* already achieves that: only the six
+registry compounds are replaced before the scan reads the file, so a domain
+compound anywhere in the barrel is still reported. The block asserts exactly that
+with a three-line fixture.
+
+**A quoted-string arm the inventory did not name.** `@@map("cards")` and a
+migration's `table: 'cards'` match none of the compound shapes — the word is
+whole, lowercase, and followed by a quote rather than a colon — so the database
+rename could have landed with every table name still retired and this scan
+silent. `["']cards?["']` closes it, and `src/prisma/` staying in scope is what
+points it at the one file that matters.
+
+### The callback-binding arm
+
+Added, over the Thing collection, in the shape ADR 0041's Route arm established.
+It is not theoretical: 25 sites carried `(c)` over a Thing collection through
+this rename and no text sweep could see one of them, because substituting the
+collection's own name leaves the callback's parameter untouched. Two live
+bindings sit outside its reach on purpose — `elk-strategy.test.ts` binds over
+elkjs's `children`, and a foreign collection has no domain initial to take.
+
+### AGENTS.md
+
+The ADR 0085 entry is gone, as the ADR and the entry's own closing sentence both
+required. Its three quotations of the retired name were the last hits in the
+tree, so removing it and passing the scan were the same act.
+
+The one thing in it worth keeping outlives it in `docs/agents/workflow.md`'s
+Renames section, which now says to write a repo-wide rename as a tracked codemod,
+points at both of ADR 0085's, and says a rename is not finished until this guard
+can prove it — including the reason that instrument decides which names are
+affordable at all.
+
+### Verification
+
+`pnpm verify:static` green. `pnpm test` is **one test red and it is 03's**:
+`prisma-foundation.test.ts > reaches the emitted contract from the existing
+migration head`.
+
+`pnpm e2e` and `pnpm e2e:ladle` judged **inapplicable**: this issue changes one
+unit test and two agent-facing documents. Nothing it touches is rendered.

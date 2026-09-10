@@ -79,6 +79,10 @@ Never let a rename ride along with a structural change. Separate commits — oth
 
 A repo-wide rename conflicts with everything, so it should run alone, and early. Every ticket completed before it adds new surface in the old vocabulary.
 
+**Write it as a tracked codemod, not a `sed` one-liner.** Two live under `.scratch/thing-and-diagram/` — `rename-layout-to-diagram.mjs` and `rename-card-to-thing.mjs` — and they are tracked so a branch that was in flight rebases onto the commit before one and replays it rather than hand-merging several hundred files. Read a header before writing the next one: each records the mask-then-rewrite-then-unmask design, the spellings it must not change and, separately, the files it must not open at all, which is the distinction both scripts learned the hard way. Each also lists what it deliberately does **not** produce, because those are the edits a replaying branch has to take from the merge.
+
+**And the rename is not finished until `test/unit/current-domain-vocabulary.test.ts` can prove it.** Every completed rename here has a block there reporting the retired word in the identifier shapes it was written in, because a manual sweep misses sites and the scan is what found them. That instrument is also what decides whether a candidate name is affordable at all: ADR 0085 rejected *Object* on the ground that the same scan would need 287 exceptions, which is no guard.
+
 ## Verification bar
 
 Also stated in AGENTS.md; repeated here because it is the easiest step to skip.
