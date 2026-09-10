@@ -17,13 +17,17 @@ const MODAL = '[role="dialog"],[role="alertdialog"]';
 /**
  * Whether a modal surface owns this press.
  *
- * Deference is not only about a control that activates itself. Below the
- * Sidebar's breakpoint the whole command surface is a Base UI Sheet — a modal
- * dialog drawn *over* the canvas — and it can be reopened during a traversal,
- * because the header trigger stays. Its focus trap means every press then
- * originates inside it, and a window listener that went on traversing would run
+ * Deference is not only about a control that activates itself. **The rule was
+ * written for a surface that has gone** — below the Space Sidebar's breakpoint
+ * the whole command surface was a Base UI Sheet over the canvas, reopenable
+ * during a traversal, and its focus trap meant every press then originated
+ * inside it. The Command Dock has no Sheet and hides itself while presenting
+ * (ADR 0082), so that particular surface is not what this defers to any more.
+ * The rule stays because the *shape* is not the Sheet's: a creation pane, the
+ * persistence conflict dialog and the Card deletion confirmation are all modal
+ * and all reachable, and a window listener that went on traversing would run
  * a Traversal command behind a surface the presenter is looking at: one Escape
- * both dismissing the sheet and leaving presentation, Arrow keys moving a Graph
+ * both dismissing the dialog and leaving presentation, Arrow keys moving a Graph
  * nobody can see.
  *
  * The same rule as the one below, spent on a whole surface rather than one
@@ -53,8 +57,8 @@ const INTERACTIVE = [
  * Whether the browser is already going to activate the control this press
  * landed on.
  *
- * A `button` — the chrome's moves, Back and Overview, and the Sidebar's own
- * controls — activates on Space and Enter by itself, and a `keydown` listener on
+ * A `button` — the chrome's moves, Back and Overview, and every control on the
+ * Dock — activates on Space and Enter by itself, and a `keydown` listener on
  * `window` sees that press first. Calling `preventDefault` there is what stopped
  * the activation ever happening; not calling it, but still advancing, ran two
  * commands for one press. Either way the presenter got something they did not

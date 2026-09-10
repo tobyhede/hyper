@@ -1,37 +1,32 @@
-/* THROWAWAY UX PROTOTYPE — see command-dock.stories.tsx. */
+/* The Command Dock's appearance, beside the component that draws it.
+
+   Colocated rather than in `packages/app/src/styles.css`: `scripts/ui-catalog.ts`
+   treats colocation as the approved home for product appearance, so this sheet
+   owes no inventory entry and is still held to the dead-rule half of the ratchet
+   — a class no production module names is reported here exactly as it is there.
+
+   **It names no colour token of its own.** The prototype forked roughly two
+   dozen of them because it drew a light canvas while the application's `:root`
+   was still dark, and carried the fork onto portalled Popovers and Menus through
+   a `panel` class of its own. `:root` is light now (`packages/app/src/tailwind.css`)
+   and the destructive row's resting ink — the last rule that needed to reach a
+   portalled surface — is settled in `@project/ui` itself, so both the fork and
+   the class it was carried on are gone
+   (`.scratch/command-dock/issues/06`, `/07`). Every colour below is the
+   application's own token, read from the one place it is set.
+
+   **There is no container block here.** The Dock positions itself against
+   whichever element its caller hands it as the frame, which in the application
+   is `.graph-area` — already the canvas's own positioned box. A second
+   full-viewport wrapper declared here would be this sheet deciding the shape of
+   a surface it only decorates. */
 
 /* ------------------------------------------------------------------ frame */
-
-/* The palette that used to sit here is gone, and this sheet no longer names a
-   colour token. It forked roughly two dozen of them because the prototype drew
-   a light canvas while the application's `:root` was still dark — and because a
-   portalled Popover, Menu or Select lands wherever the portal puts it rather
-   than inside `.dock-proto`, the fork had to be carried on a
-   `.dock-proto__panel` class as well, which is what that class was invented
-   for. `:root` is light now (`packages/app/src/tailwind.css`), so both halves
-   are redundant: a fork that outlives the thing it forked from is how a
-   prototype's palette quietly becomes a second design system
-   (`.scratch/command-dock/issues/06`). Every colour below is the application's
-   own token, read from the one place it is set.
-
-   **The class stays, on a second reason it acquired in the meantime.** Reaching
-   a portalled surface at all is a problem the fork did not create and does not
-   take with it, and one rule below still needs to — the destructive row's
-   resting ink, which is inside a Menu the portal has moved out of `.dock-proto`
-   entirely. */
-
-.dock-proto {
-  position: relative;
-  width: 100%;
-  height: 100vh;
-  overflow: hidden;
-  background: var(--background);
-}
 
 /* Every dock shares one treatment so the variants differ by arrangement
    rather than by decoration. Chrome is *about* the canvas, so it reads as a
    layer over it: translucent, blurred, and never the paper a Card is. */
-.dock-proto__surface {
+.command-dock__surface {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -47,7 +42,7 @@
   backdrop-filter: blur(8px);
 }
 
-.dock-proto__surface[data-orientation='vertical'] {
+.command-dock__surface[data-orientation='vertical'] {
   flex-direction: column;
 }
 
@@ -56,27 +51,103 @@
    dozen pixels, and the OS takes the pointer before the page does. React
    Flow's own 15px panel margin is not enough to clear any of them, so a
    bottom-anchored dock needs a real offset — and a design that puts the
-   primary command surface down here is fighting for a target it cannot win. */
-.dock-proto .react-flow__panel.bottom {
+   primary command surface down here is fighting for a target it cannot win.
+
+   **Only while the dock is actually down there.** The offset is the Dock's to
+   ask for, so it is asked for by the Dock: unconditional, it moved the Graph key
+   and the zoom control up by 40px at every one of the twelve slots, which put
+   the key over the bottom-right corner of any Card drawn under it — and a Card's
+   resize control lives in exactly that corner.
+
+   Written as an attribute test rather than `.bottom`, because `bottom` is a
+   class React Flow puts on its own panel and no module here names. The
+   catalogue check forgives a framework class by its `react-flow__` prefix,
+   which this one does not carry, so as a class it reads as a dead rule; as the
+   attribute match it really is, it says what it is. */
+.graph-area:has(.command-dock[data-edge='bottom']) .react-flow__panel[class~='bottom'] {
   margin-bottom: 2.5rem;
 }
 
-/* Presenting hides the authoring chrome rather than dimming it: the audience
-   sees the Space, not the tools. Only the exit survives. */
-.dock-proto__surface[data-presenting='true'] {
-  display: none;
-}
+/* The frame, which is what docks: it holds the command surface and the standing
+   persistence report as siblings, positioned against whichever element the
+   caller gave the Dock as its container.
 
-/* A dock positions itself against `.dock-proto`, above the canvas
-   but below every portalled popup. */
-.dock-proto__docked {
+   **The report is not inside the toolbar**, and that is the whole reason this
+   element exists. It used to be a child of the surface — a status region nested
+   in `role="toolbar"`, which is what ADR 0082's *"status is not a command"*
+   forbids and what a screen reader reads as one more item in the command order.
+   A wrapper is the smallest thing that makes the two siblings without moving
+   either off the dock. */
+.command-dock {
   position: absolute;
   z-index: 20;
 }
 
+/* Hide commands while presenting, but keep the separate failure report and
+   Retry reachable. Retaining the toolbar's box keeps the report anchored to
+   the same slot; hidden controls cannot receive focus or pointer input. */
+.command-dock[data-presenting='true'] .command-dock__surface {
+  visibility: hidden;
+}
+
+/* **The responsive story, which is this surface's own** (ADR 0082).
+
+   The Sidebar got offcanvas collapse, a mobile Sheet, a remembered open state
+   and `cmd/ctrl+B` free from the registry primitive; a surface that is not a
+   Sidebar owns all of it. What it does *not* owe is the Sheet's contract. A
+   Sheet had to be dismissed before a command's result could be seen, because it
+   covered the canvas and trapped focus — so every command in it dismissed first
+   and the author was handed back the paper. This surface never took the canvas
+   away: it is furniture over it, it takes no layout space, and at 390px it
+   still covers a strip rather than a screen. There is nothing to dismiss, so
+   there is no dismissal to get right.
+
+   What is left is that it has to *fit*, and the answer is one constraint rather
+   than a second arrangement. Four clusters do not fit across a phone, so the
+   frame is capped to the container it docks in and the surface scrolls along
+   its own axis — the axis it already runs on, so a narrow dock is the same dock
+   shorter rather than a second component. Every control keeps its name, its
+   place in the roving order and its disclosure; nothing is withdrawn at a
+   breakpoint, which is what would make the phone a different product.
+
+   Capped against the **container** and not the viewport, because the container
+   is what the twelve slots are slots of — a media query would be this sheet
+   guessing at a box the caller already states. */
+.command-dock {
+  max-width: calc(100% - 2 * 16px);
+  max-height: calc(100% - 16px - 44px);
+}
+
+.command-dock__surface {
+  /* Along the dock's own axis only. The cross axis is set by the tallest
+     control in the strip, and a scrollbar there would be scrolling a row
+     against its own height. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* The scroll container must not clip a control's focus ring to nothing, and
+     `overflow` on one axis makes the other `auto` in CSS — so the strip keeps
+     the padding that the ring is drawn into. */
+  scrollbar-width: none;
+}
+
+.command-dock__surface[data-orientation='vertical'] {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* The grip is the one control that must stay reachable when the strip has
+   scrolled: it is how the dock is moved to an edge with more room, and it is
+   the anchor the slot menu positions against. */
+.command-dock__surface > .command-dock__grip {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 1;
+}
+
 /* No transition while the pointer holds it — the dock must track the finger
    exactly — and a short one when it snaps, so the edge it chose is legible. */
-.dock-proto__docked[data-dragging='false'] {
+.command-dock[data-dragging='false'] {
   transition:
     top 160ms ease,
     left 160ms ease,
@@ -84,8 +155,11 @@
     bottom 160ms ease;
 }
 
-.dock-proto__docked[data-dragging='true'] {
+.command-dock[data-dragging='true'] {
   cursor: grabbing;
+}
+
+.command-dock[data-dragging='true'] .command-dock__surface {
   box-shadow: 0 14px 34px color-mix(in oklab, var(--foreground) 20%, transparent);
 }
 
@@ -96,7 +170,7 @@
    — they know where it went. The repo's own rule (`packages/app/src/styles.css`)
    rather than ADR 0082's, which leaves animation unbound on purpose. */
 @media (prefers-reduced-motion: reduce) {
-  .dock-proto__docked[data-dragging='false'] {
+  .command-dock[data-dragging='false'] {
     transition: none;
   }
 }
@@ -104,7 +178,7 @@
 /* The grip is the only part of the dock that starts a drag: every other
    control in it is a command, and a surface that drags from anywhere is a
    surface whose buttons miss. */
-.dock-proto__grip {
+.command-dock__grip {
   width: 14px;
   height: 22px;
   flex: 0 0 auto;
@@ -122,11 +196,11 @@
   touch-action: none;
 }
 
-.dock-proto__grip:hover {
+.command-dock__grip:hover {
   opacity: 1;
 }
 
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__grip {
+.command-dock__surface[data-orientation='vertical'] .command-dock__grip {
   width: 22px;
   height: 14px;
   background-position: 3px 2px;
@@ -138,7 +212,7 @@
    size of a stop rather than a bar down a whole edge, because an edge is no
    longer the answer: there are three stops on each, and a bar could not say
    which of them a release had chosen. */
-.dock-proto__snap-hint {
+.command-dock__snap-hint {
   position: absolute;
   z-index: 19;
   width: 34px;
@@ -148,8 +222,8 @@
   opacity: 0.4;
 }
 
-.dock-proto__snap-hint[data-edge='left'],
-.dock-proto__snap-hint[data-edge='right'] {
+.command-dock__snap-hint[data-edge='left'],
+.command-dock__snap-hint[data-edge='right'] {
   width: 6px;
   height: 34px;
 }
@@ -165,7 +239,7 @@
    without a glyph is the Open Spaces menu at the root, and that is where it showed. The
    space between a glyph and its name now comes from the button's own `gap`
    below, which every named control in the Dock shares. */
-.dock-proto__ident {
+.command-dock__ident {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -173,7 +247,7 @@
   overflow: hidden;
 }
 
-.dock-proto__ident-text {
+.command-dock__ident-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -188,7 +262,7 @@
    line up under the Layout and Graph glyphs and the column reads as a list;
    centred, they float in the middle of a width the titles set and the column
    reads as an accident. */
-.dock-proto__surface[data-orientation='vertical'] > *:not(.dock-proto__grip) {
+.command-dock__surface[data-orientation='vertical'] > *:not(.command-dock__grip) {
   width: 100%;
   justify-content: flex-start;
 }
@@ -206,12 +280,12 @@
    Present, Create — in the third, empty where a row has neither. A reader who
    learns where the chevrons are at one cluster finds them at the next, and the
    column does not move when the Space does. */
-.dock-proto__surface[data-orientation='vertical'] {
+.command-dock__surface[data-orientation='vertical'] {
   width: 208px;
 }
 
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__cluster,
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__trail-list {
+.command-dock__surface[data-orientation='vertical'] .command-dock__cluster,
+.command-dock__surface[data-orientation='vertical'] .command-dock__trail-list {
   display: grid;
   align-items: center;
   gap: 1px;
@@ -230,25 +304,25 @@
    column spent on gutters. Trailing, Present and Create sit in one track and
    the name keeps the width. `GraphControls` reorders its own JSX for this, so
    the Tab order still matches what the eye reads. */
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__name,
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__name-item,
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__crumb {
+.command-dock__surface[data-orientation='vertical'] .command-dock__name,
+.command-dock__surface[data-orientation='vertical'] .command-dock__name-item,
+.command-dock__surface[data-orientation='vertical'] .command-dock__crumb {
   grid-column: 1;
 }
 
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__disclose {
+.command-dock__surface[data-orientation='vertical'] .command-dock__disclose {
   grid-column: 2;
 }
 
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__verb,
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__set-verb {
+.command-dock__surface[data-orientation='vertical'] .command-dock__verb,
+.command-dock__surface[data-orientation='vertical'] .command-dock__set-verb {
   grid-column: 3;
 }
 
 /* The trail's own leading pad is a horizontal-dock rule — there it puts the
    first crumb in the same column as the glyphs beside it. Here the grid does
    that, and the pad would push the whole row out of the column instead. */
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__trail-list {
+.command-dock__surface[data-orientation='vertical'] .command-dock__trail-list {
   padding-inline-start: 0;
 }
 
@@ -259,15 +333,15 @@
 /* At the root the Open Spaces menu carries the word "Spaces", so it stands in the name
    track and pushes its own chevron into the disclosure column — the same
    arrangement the Cards trigger has, and the same rule. */
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__name-item,
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__spaces-trigger,
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__cards-trigger {
+.command-dock__surface[data-orientation='vertical'] .command-dock__name-item,
+.command-dock__surface[data-orientation='vertical'] .command-dock__spaces-trigger,
+.command-dock__surface[data-orientation='vertical'] .command-dock__cards-trigger {
   padding-inline-end: 6px;
   grid-column: 1 / span 2;
 }
 
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__spaces-trigger > svg:last-child,
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__cards-trigger > svg:last-child {
+.command-dock__surface[data-orientation='vertical'] .command-dock__spaces-trigger > svg:last-child,
+.command-dock__surface[data-orientation='vertical'] .command-dock__cards-trigger > svg:last-child {
   margin-inline-start: auto;
 }
 
@@ -276,7 +350,7 @@
 /* Layout and Graph each read as one named thing carrying several commands,
    which is what a Card rail is (ADR 0073) — so each is a `Toolbar`, drawn
    tight, with the dock's own gap doing the separating between them. */
-.dock-proto__cluster {
+.command-dock__cluster {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -291,90 +365,31 @@
    the Open Spaces menu at the root. One gap, so a glyph, a name and a chevron sit the
    same distance apart wherever they appear — and a control with no glyph is
    simply one item short rather than one indent adrift. */
-.dock-proto__name {
+.command-dock__name {
   min-width: 0;
   flex: 1 1 auto;
   justify-content: flex-start;
   gap: 6px;
 }
 
-.dock-proto__name-editor {
+.command-dock__name-editor {
   flex: 1 1 auto;
 }
 
-/* The one control presenting leaves standing, where `Panel position=
-   "bottom-center"` used to put it. */
-.dock-proto__presenting-exit {
-  position: absolute;
-  z-index: 4;
-  bottom: 15px;
-  left: 50%;
-  transform: translateX(-50%);
-}
+/* A name with no rename behind it, drawn as the label it is.
 
-/* --------------------------------------------------------------- list rows */
-
-/* The list scrolls rather than growing: the popover is anchored to a small
-   trigger, and a Space's unplaced Cards have no ceiling. This is the only
-   region of the popover that scrolls — what the list is of sits above it and
-   the commands sit below it, so a New never leaves the window. */
-.dock-proto__card-list {
-  display: flex;
-  max-height: 300px;
-  flex-direction: column;
-  gap: 2px;
-  overflow-y: auto;
-
-  /* The overlay scrollbar is painted inside this box, over whatever sits under
-     it — which is the right border of every row, thickened into a rail running
-     the height of the list. The gutter moves the rows out from under it; the
-     negative margin spends the popover's own padding on the scrollbar, so the
-     rows stay flush with the filter field above them rather than shuffling
-     left to make room. */
-  padding-inline-end: 8px;
-  margin-inline-end: -8px;
-}
-
-.dock-proto__row {
-  display: flex;
+   It keeps the name slot and takes the button's box by hand, because it is not
+   a button: the Space is the one identity the product has no rename Edit for
+   (see `DockSpace.onRename`), and a greyed-out control would advertise a
+   command nobody can run rather than simply naming the Space. Everything the
+   vertical grid places it by is the shared `command-dock__name` above; what is
+   here is only the padding and the height the three button-drawn names get for
+   free. */
+.command-dock__name--static {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.dock-proto__row {
-  cursor: grab;
-}
-
-.dock-proto__row-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* `row` — the affordance is drawn and never moves. The grip is the dock's own
-   dotted field at row scale, so the thing you drag a Card by and the thing you
-   drag the dock by are one mark. */
-.dock-proto__row-grip {
-  width: 10px;
-  height: 14px;
-  flex: none;
-  background-image: radial-gradient(currentcolor 1px, transparent 1px);
-  background-position: 0 0;
-  background-size: 5px 5px;
-  opacity: 0.4;
-}
-
-/* The hover is a *pointer report*, not a selection. It used to swap in
-   `--secondary` when that was beige, which painted a warm block the eye read
-   as a chosen row rather than the one the pointer happens to be over. */
-.dock-proto__row:hover,
-.dock-proto__row:focus-visible {
-  border-color: var(--border);
-  background: var(--accent);
+  height: 28px;
+  padding-inline: 6px;
 }
 
 /* ------------------------------------------------------------ disclosure */
@@ -385,19 +400,8 @@
    without being told. It is a step above the hover fill and no more: an open
    disclosure is already announced by the surface hanging off it, and a trigger
    that also inverts reads as a selected mode. */
-.dock-proto__surface [aria-expanded='true'] {
+.command-dock__surface [aria-expanded='true'] {
   background: var(--secondary);
-  color: var(--foreground);
-}
-
-/* Delete is ink at rest and red under the pointer.
-   A destructive row that is already red before it is reached spends the alarm
-   on merely being in the list, and reads as a warning about the menu rather
-   than about the command. `@project/ui`'s menu item colours the row on
-   `:focus` — which is what a Base UI menu item takes on hover as well as from
-   the keyboard — so only the resting state is restated here, and one rule does
-   it: the glyph follows the row's colour rather than carrying its own. */
-.dock-proto__panel [data-variant='destructive']:not(:focus) {
   color: var(--foreground);
 }
 
@@ -412,21 +416,21 @@
    row of crumbs running across its narrow axis and set the dock's width by how
    deep the reader had travelled. Given its own line above the cluster, the
    trail spends the axis the vertical dock has to spare. */
-.dock-proto__space {
+.command-dock__space {
   display: inline-flex;
   min-width: 0;
   align-items: center;
   gap: 2px;
 }
 
-.dock-proto__surface[data-orientation='vertical'] .dock-proto__space {
+.command-dock__surface[data-orientation='vertical'] .command-dock__space {
   flex-direction: column;
   align-items: stretch;
 }
 
 /* Never wraps, and never has to: the region is one name and one icon button, so
    it is the same width at one crossing and at six. */
-.dock-proto__trail-list {
+.command-dock__trail-list {
   flex-wrap: nowrap;
   padding-inline-start: 4px;
   gap: 2px;
@@ -434,10 +438,10 @@
 
 /* The parent step and the Open Spaces menu are the trail's two list items, and the
    grid places **those** — a class on the button inside an `li` is a class on
-   something the grid never sees. So `dock-proto__crumb` and
-   `dock-proto__disclose` sit on the `BreadcrumbItem`, and the button inherits
+   something the grid never sees. So `command-dock__crumb` and
+   `command-dock__disclose` sit on the `BreadcrumbItem`, and the button inherits
    the colour below through it. */
-.dock-proto__crumb {
+.command-dock__crumb {
   display: inline-flex;
   min-width: 0;
 }
@@ -457,7 +461,7 @@
    bar's other glyphs, since the tone step it recedes by is weight it has to be
    given back. And a `Divider` stands between them — every cluster boundary in
    the Dock has one now, so this is the rule rather than a patch on this pair. */
-.dock-proto__crumb {
+.command-dock__crumb {
   color: color-mix(in oklab, var(--muted-foreground) 72%, transparent);
 }
 
@@ -472,14 +476,14 @@
    so a rule stretched to the item's content box stops 4px short at each end and
    the column reads as a stack of dashes; spending the item's own vertical
    padding turns them into one line per level. */
-.dock-proto__guides {
+.command-dock__guides {
   display: inline-flex;
   flex: none;
   align-self: stretch;
   margin-block: -4px;
 }
 
-.dock-proto__guide {
+.command-dock__guide {
   width: 14px;
   border-inline-start: 1px solid color-mix(in oklab, var(--border) 80%, var(--muted-foreground));
   margin-inline-start: 6px;
@@ -499,13 +503,13 @@
    Nothing sizes it. It is an icon button like every other disclosure, and it
    was 24px against their 28 until the vertical dock put them all in one column
    and the four pixels showed. */
-.dock-proto__more {
+.command-dock__more {
   color: var(--muted-foreground);
 }
 
 /* The parent's own row: glyph and name at one weight, so the two follow the
    button's colour together. */
-.dock-proto__crumb .dock-proto__ident-text {
+.command-dock__crumb .command-dock__ident-text {
   margin-inline-start: 6px;
 }
 
@@ -521,7 +525,7 @@
    Absolutely positioned out of the surface's own flex flow, because the dock is
    a row (or a column) of clusters and the notice is neither: it is a report
    about the Space, drawn beside the furniture that owns it. */
-.dock-proto__notice {
+.command-dock__notice {
   position: absolute;
   z-index: 21;
   width: 22rem;
@@ -531,22 +535,22 @@
   pointer-events: auto;
 }
 
-.dock-proto__notice[data-side='bottom'] {
+.command-dock__notice[data-side='bottom'] {
   top: calc(100% + 8px);
   left: 0;
 }
 
-.dock-proto__notice[data-side='top'] {
+.command-dock__notice[data-side='top'] {
   bottom: calc(100% + 8px);
   left: 0;
 }
 
-.dock-proto__notice[data-side='right'] {
+.command-dock__notice[data-side='right'] {
   left: calc(100% + 8px);
   top: 0;
 }
 
-.dock-proto__notice[data-side='left'] {
+.command-dock__notice[data-side='left'] {
   right: calc(100% + 8px);
   top: 0;
 }
@@ -561,7 +565,7 @@
 
    `margin-inline-start: auto` pushes it to the trailing edge, away from the
    guides that carry structure at the leading one. */
-.dock-proto__unwell {
+.command-dock__unwell {
   margin-inline-start: auto;
   width: 7px;
   height: 7px;
@@ -570,9 +574,19 @@
   background: var(--destructive);
 }
 
+/* **On the bar rather than in a row.** The same dot, on the control that
+   discloses the list, so a standing failure elsewhere announces itself without
+   the reader opening anything (ADR 0082). It is not the trailing mark of a full
+   -width row here, so it takes no auto margin — it sits against the trigger's
+   own content with the gap the control already spends between its parts. */
+.command-dock__spaces-trigger .command-dock__unwell,
+.command-dock__more .command-dock__unwell {
+  margin-inline-start: 4px;
+}
+
 /* A conflict is a decision rather than a failure, so it is marked without being
    painted as broken — the local work is intact and the reader has to choose. */
-.dock-proto__unwell[data-state='conflicted'] {
+.command-dock__unwell[data-state='conflicted'] {
   background: transparent;
   box-shadow: inset 0 0 0 2px var(--destructive);
 }

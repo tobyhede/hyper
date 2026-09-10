@@ -1,146 +1,56 @@
 /**
- * THROWAWAY UX PROTOTYPE — not a production component and not an ADR proof.
+ * The Command Dock: the Space's one command surface, floating over the canvas.
  *
- * One arrangement of floating chrome over a full-bleed canvas: a **Command
- * Dock** snapped to an edge, which draws itself from the edge it is on. Four
- * others were compared here first — three horizontal docks, a vertical rail
- * beside a context dock, one bottom-centre dock, and a summoned context menu —
- * and they have been deleted. The Command Dock is the candidate; the other
- * four were context, not competition.
+ * It is what ADR 0082 asks for and nothing about its shape is that ADR's. What
+ * is bound is what the surface owes an author — one exclusive canvas choice with
+ * no second control and no empty value; Graph activation kept separate from it;
+ * status that is never a command; every command reachable from the keyboard
+ * alone; a persistence state reported without being asked, naming which open
+ * Space is unwell; the Space being worked in named, and the Spaces open beside
+ * it reachable — and one spatial fact: **it takes no layout space from the
+ * canvas**. Where it sits, how it is moved, how its commands are grouped and
+ * which glyph stands for each are treatment, settled by the stories and
+ * behaviour tests beside it rather than by a document (ADR 0052).
  *
- * **Two questions this file used to hold open are now closed**, and what is
- * left is the answer rather than the comparison. A list — Cards or Spaces — is
- * a **Popover** anchored to the control that opened it; the Drawer and the
- * second docked panel are gone with their switch. And there is **one Dock**,
- * not one per orientation: the second instance existed so a popover could be
- * seen anchored under a top dock and beside a side one at once, which is a
- * thing to look at rather than a thing to propose. Drag the one that remains
- * to any edge; the orientation follows on release.
- *
- * A dock on a side edge keeps its names rather than collapsing to icons. The
- * three modes that question was compared through are gone: a vertical dock is
- * wide enough for `[name] [v]` per row, and it has to be, because the row is
- * what a disclosure hangs off.
- *
- * **The grip both drags and discloses.** Dragging is the shortcut; pressing it
- * opens the twelve slots as an ordinary radio menu, marked at the one the dock
- * is in. A drag was never enough on its own — it is unreachable from a
- * keyboard, which made the dock's own position the single command in this
- * surface a keyboard could not spend — and it was unreachable from a test,
- * which is why a second story existed only to start in the vertical
- * arrangement. Both are gone.
- *
- * The command set the Dock covers:
+ * The command set, in the order containment gives it:
  *
  *   Spaces  — which Space this is, rename it, cross into and out of one
- *   Cards   — Create (Markdown/Space/Alias), and the list of existing Cards,
- *             the Space Cards among them the way into the Spaces inside this one
- *   Layouts — which is active, select another, add/rename/delete
+ *   Layouts — which is drawing, select another, add/rename/delete
  *   Graphs  — which is active, select another, present, add/rename/delete
+ *   Cards   — Create, and the Cards this Space holds
  *
- * The organising rule under test: a Card is the literal object on the canvas,
- * and everything here is *about* the canvas. So Card operations are absent —
- * they belong to the Card rail (ADR 0073) — and the Dock reads as a layer
- * over the paper rather than as more paper.
+ * **A Card's own commands are absent on purpose.** Open, Edit, Delete, a Card's
+ * links and taking a Card back out of a Layout belong to the Card rail (ADR
+ * 0073), which draws them on the Card itself. This surface is *about* the
+ * canvas; a Card is the literal object on it. That is a dependency and not just
+ * an exclusion — the Space Sidebar carried a Card's links and its Delete in a
+ * footer, and this arrangement is only complete because the rail carries them
+ * now.
  *
- * That is a **dependency and not just an exclusion**, and it is worth writing
- * down because the audit of this surface turns on it: Open, Edit, Delete, a
- * Card's links and taking a Card back out of a Layout all have no home here on
- * purpose, and the Space Sidebar carried the last two in its footer. The
- * arrangement is only complete when the rail lands with it — and Delete in
- * particular is expected to answer to `Del` on the selected Card, which is a
- * canvas key rather than anything the Dock would draw.
+ * **A Space is a Space Card, held by the Meta Space above it.** So the Spaces
+ * *inside* a Space are Cards in it and the Cards surface already offers them,
+ * while the bar names one step back and the Open Spaces menu holds the set open
+ * beside it — drawn as the tree the Opener makes. Moving between them closes
+ * nothing; Exit, in the Space menu, is what takes one out of the set (ADR 0068).
  *
- * **A Space is a Space Card, held by the Meta Space above it.** That is the
- * revision this arrangement is built on, and it decides two things at once. The
- * Spaces a Space offers are the Space Cards *in* it, so at the top level the
- * list is every Space there is and the phrase "All Spaces" needs no separate
- * construct. And the surface that offers them is therefore **the Cards surface,
- * the one there is** — one disclosure, one list, one drag. There was a second
- * disclosure drawing the same list over the Space Cards alone; folding it away
- * is what makes the claim structural rather than stated.
+ * **There is no saving cue, and its absence is a decision.** `PersistenceIndicator`
+ * is deliberately not called: a commit settles faster than a dot can be read, so
+ * a permanent slot in a five-cluster strip spent reporting the expected outcome
+ * is a slot spent on nothing. The states worth drawing are the three that need a
+ * reader — `failed`, `rejected`, `conflicted` — and those are
+ * `PersistenceControl`'s and `PersistenceNotice`'s own surfaces, mounted
+ * unchanged. Only their placement is this module's.
  *
- * **That list does not enter a Space, and cannot.** It is a list you choose a
- * Card from and drag one out of, and a control on its rows that went *into* one
- * of them would be a third thing a row means. Entering is the Open Space Card's
- * on the canvas (ADR 0068) — the Card front is production's and out of this
- * prototype's reach, so the Dock does not stand in for it.
- *
- * The Space cluster's own chevron is then an ordinary menu like Layout's and
- * Graph's, carrying the two commands about the Space itself: New Space and Copy
- * link. New Space sits there against the rule that creating a Space is Create
- * Card → Space, and it is the one item in the Dock that has not been
- * reconciled.
- *
- * The order follows the containment: Spaces hold Cards, a Layout places some
- * of those Cards, and a Graph connects what a Layout placed.
- *
- * **What it draws is real.** The Space is `commandDockSpace`
- * (`../support/spaces`) and the canvas is `LayoutCanvasFixture`
- * (`../support/ReactFlowCanvas`), so the Cards, the Edge stacking, the Graph
- * colours and the placement are production's rather than this file's — which
- * matters most for the identity question, whose whole premise is that the
- * canvas already says which Graph is active. Every command that changes
- * something writes the stored snapshot and reloads it through
- * `loadSpaceSnapshot`: switching a Layout, adding and renaming a Layout or a
- * Graph, and dragging a Card out of a list onto the canvas are all real Edits.
- *
- * **The Dock carries the open set, not the crossing.** The bar names one step
- * back and the Space you are in — `[Design system] [\u22ef] │ [\u2b21 Rendering][\u2304]` —
- * and the `\u22ef` beside the parent switches among **every open Space**, drawn as
- * the tree that `from` makes. Moving closes nothing, so a Space opened and left
- * is still there with the Layout and Graph it was left on, and Exit Space in
- * the Space menu is what takes one out of the set — **one** Space, never a
- * second (ADR 0068), with the rows below it moving up a level rather than going
- * with it.
- *
- * Every Space in it is a tracked fixture, so the Layouts, Graphs and Cards in
- * the Dock all change under you when you move — which is the thing the
- * arrangement had to be judged against and could not be while there was one
- * Space. **How a Space joins the set is not the Dock's**: entering is a gesture
- * on the Open Space Card (ADR 0068), so the session is seeded with what a reader
- * would have crossed rather than crossed here.
- *
- * The Sidebar's answer was `OpenSpaces`, a strip of vertical tabs. It is not
- * carried over as a strip: a tab strip needs a permanent column to stand beside
- * and a Dock has none. What it modelled — the *set* of open Spaces — is what the
- * Open Spaces menu models, with the crossing that a flat strip lost drawn as the tree's
- * indent.
- *
- * **What it says when something goes wrong is production's, and only the
- * placement is proposed.** `PersistenceControl` maps a conflict and a rejection
- * to their `AlertDialog`s and `PersistenceNotice` is the standing `Alert` with
- * a Retry; both are mounted here unchanged. Two placements follow from that and
- * neither is a new state: the dialogs are portalled and own the viewport, so
- * they need no placement at all, and the notice hangs off the dock on the same
- * `MENU_SIDE` its disclosures open on, so it follows the dock to any of the
- * twelve slots and never opens off the edge it is against.
- *
- * **There is no saving cue, and its absence is the proposal.** Production's
- * `PersistenceIndicator` is deliberately not called: a commit settles faster
- * than a dot can be read, so a permanent slot in a five-cluster strip spent
- * reporting the expected outcome is a slot spent on nothing. The states worth
- * drawing are the three that need a reader — `failed`, `rejected`,
- * `conflicted`. Disagreeing with that is disagreeing with a sixth cluster that
- * is blank almost always.
- *
- * **And the Open Spaces menu says which Space is the unwell one.** That was a
- * regression rather than a gap: `OpenSpaces`, the tab strip the Open Spaces menu
- * replaces, badged each open Space for `conflicted`, `failed` and `rejected`,
- * and a Open Spaces menu listing the same set in silence makes a Space that needs a
- * decision look like one that does not. The row says only *which* — the
- * recovery belongs to that Space's own dock, one press away.
- *
- * Deliberately not built: real Card creation and traversal. Presenting only
- * hides the chrome, which is the part that bears on the arrangement. Delete
- * this surface once the UX decision is made.
+ * It replaces `SpaceSidebar` and `OpenSpaceSidebars`, which ADR 0082 retired
+ * along with the gutter they stood in
+ * (`.scratch/command-dock/issues/07-promote-the-dock-and-retire-the-space-sidebar.md`).
  */
 import {
   createContext,
   Fragment,
   useContext,
+  useEffect,
   useId,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -148,7 +58,6 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import type { Story } from '@ladle/react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -162,12 +71,12 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  Button,
   CardKindIcon,
   cardKindName,
   ChevronDownIcon,
   CloseIcon,
   CopyIcon,
+  DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -180,54 +89,31 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   DeleteIcon,
-  Input,
   FALLBACK_GRAPH_COLOR,
   GraphIcon,
   InlineTitleEditor,
-  DropdownMenu,
   LayoutIcon,
   ParentIcon,
   PlusIcon,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   PresentIcon,
   Separator,
-  StopPresentingIcon,
   Toolbar,
   ToolbarButton,
   ToolbarGroup,
 } from '@project/ui';
-import {
-  newUuid,
-  type Card,
-  type CardId,
-  type CardPlacement,
-  type Graph,
-  type GraphId,
-  type Layout,
-  type LayoutId,
-  type SpaceSnapshot,
-  type UUID,
-} from '@project/core';
-import { loadSpaceSnapshot, type Space } from '@project/graph';
+import type { Graph, GraphId, Layout, LayoutId, UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
-import type { StoredSpaceRefusal } from '#src/space-authoring';
-import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
-import type { RejectedExitConfirmation } from '#src/open-spaces';
-import { GRAPH_PALETTE, graphColorMap } from '#src/colors';
+import type { StoredSpaceRefusal } from '../space-authoring';
+import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
+import type { RejectedExitConfirmation } from '../open-spaces';
+import { GRAPH_PALETTE } from '../colors';
 import {
   DOCK_ALONGS,
   DOCK_EDGES,
   dockSlot,
-  editDocument,
-  editSelectedLayout,
   exitReportSentence,
-  exitSpace,
   nearestAlong,
   nearestEdge,
-  openTree,
-  opened,
   orientationOf,
   slotValue,
   trailControls,
@@ -238,51 +124,18 @@ import {
   type DockOrientation,
   type DockPosition,
   type ExitOutcome,
-  type OpenEntry,
   type OpenRow,
-  type SessionState,
   type SpaceStep,
-} from './dock-model';
-import { nextGraphTitle, nextLayoutTitle } from '#src/titles';
-import { LayoutCanvasFixture, type DrawnLayout } from '../support/ReactFlowCanvas';
-import {
-  commandDockSnapshot,
-  designSystemSnapshot,
-  metaSnapshot,
-  platformSnapshot,
-  traversalSnapshot,
-} from '../support/spaces';
+} from '../dock-model';
+import { SET_TRIGGER } from './command-dock-triggers';
 import './command-dock.css';
-
-export default { title: 'Review/Command Dock' };
-
-/* ------------------------------------------------------------------ model */
-
-/**
- * The Space is `commandDockSpace` (`../support/spaces`) and everything drawn
- * here is derived from it — the canvas through the production projection, the
- * lists and the menus off the same aggregate.
- *
- * Nothing about Layouts, Graphs, Cards or Graph colour is declared in this
- * file. An earlier draft carried its own `PrototypeLayout`, `PrototypeGraph`,
- * `PrototypeCard`, a hand-rolled `CardNode` with three fixed handle lanes and
- * three hex literals for the palette. Every one of those was a second answer to
- * a question the repository already answers, free to drift from it — and the
- * lanes in particular were a stand-in for the Edge stacking production does,
- * which is exactly the thing the identity question turns on.
- *
- * An Edit is expressed on the stored `SpaceSnapshot` and reloaded through
- * `loadSpaceSnapshot`, production's own intake. So the prototype cannot reach a
- * Space the application would refuse, and Add Layout, Add Graph, renaming and
- * placing a Card are all real rather than list surgery beside a fixed canvas.
- */
 
 /**
  * The palette a Graph's colour is chosen from, named.
  *
  * `GRAPH_PALETTE` is the application's own — the same six values authoring
  * rotates through when it mints a Graph — so the menu cannot offer a colour the
- * canvas would not draw. The names are this file's, because a swatch with no
+ * canvas would not draw. The names are this module's, because a swatch with no
  * word beside it is a colour a reader cannot ask anyone else for.
  */
 const GRAPH_COLOR_NAMES = ['Blue', 'Amber', 'Green', 'Pink', 'Purple', 'Red'] as const;
@@ -293,8 +146,6 @@ const GRAPH_COLORS: readonly (readonly [string, string])[] = GRAPH_PALETTE.map(
 
 /** The three kinds Create offers, in the order the menu lists them. */
 const CARD_KINDS = ['markdown', 'space', 'alias'] as const;
-
-const MIME_CARD_ID = 'text/plain';
 
 /**
  * Every disclosure opens the same way, whichever primitive draws it.
@@ -314,186 +165,48 @@ const DISCLOSURE_ALIGN = 'center' as const;
 const DISCLOSURE_SIDE_OFFSET = 6;
 const DISCLOSURE_WIDTH = 'w-72';
 
-/**
- * The class every disclosure surface carries, and the reason it exists.
- *
- * A portalled panel is not inside `.dock-proto` — in Ladle's catalogue UI it is
- * not even in the same document, because the story runs in an iframe and the
- * popup is appended to the top document's body. So the story's palette travels
- * on the panel itself rather than being inherited from an ancestor that may not
- * be there. See `command-dock.css`.
- */
-const DISCLOSURE_PANEL = 'dock-proto__panel';
-
-/**
- * Where a Card dragged out of a list lands.
- *
- * A second row under the placed Cards rather than the point under the pointer.
- * The claim the list surfaces are compared on is that a drag *out of* a surface
- * survives that surface's own dismissal and leaves the list — where exactly it
- * lands is the Edit's business, and converting a client point into canvas
- * coordinates would mean reaching past `LayoutCanvasFixture` into the React
- * Flow instance it owns.
- */
-const dropPlacement = (placed: number): CardPlacement => ({
-  x: (placed % 5) * 420,
-  y: 420 * Math.floor(placed / 5),
-  open: false,
-});
-
-/* ---------------------------------------------------------------- session */
-
-/**
- * **The session itself is `dock-model`'s.** `OpenEntry` and `opened`, the
- * `SessionState` they make up, the `openTree` the Open Spaces menu draws and the
- * `exitSpace` that has to keep that tree true are all over there, where a node
- * test can hold them to an answer. What is left here is the fixture the stories
- * open on and the three derivations React spends.
- *
- * `from` is the Space an entry was **entered from**, and it is session state
- * rather than structure. Space Card references form a DAG rooted at Meta (ADR
- * 0074): they may converge and never cycle, so a Space reached two ways has no
- * canonical parent and no canonical path. The parent the Dock names is the
- * crossing that is live, which is why it is kept there and never derived from
- * the documents — and it is what gives the Open Spaces menu's tree its shape.
- *
- * The selections are per entry because ADR 0068 makes them so — leave a Space
- * and come back and the selection is the one you left, because the entry behind
- * it stayed alive. Exit it and the selections go with the entry.
- */
-
-const META_ENTRY = opened(metaSnapshot, null);
-
-/**
- * The session starts **three crossings in, with a branch beside it**, and that
- * is the fixture's claim.
- *
- * A prototype that opened at Meta would draw a Dock with nothing above it and
- * settle nothing, and one crossing in settles only the easy half. So it opens
- * on `Meta ▸ Platform ▸ Design system ▸ Rendering`: deep enough that the whole
- * path cannot be on the bar, which is the case the Open Spaces menu exists for.
- *
- * **And `Traversal` is open from Meta, off the path**, which is the other half
- * and the one a trail could never show. A set of open Spaces that is only ever
- * a line is a set for which a tree, an indent and a Open Spaces menu are all
- * unnecessary — the bar would already be naming everything there is. One branch
- * is the least that makes the Open Spaces menu answer a question the parent step does
- * not.
- *
- * Every entry is a crossing a reader could make: each Space above holds a Space
- * Card naming the next, and Meta holds one naming `Traversal`. The Space it
- * arrives in is still `Rendering`, the fixture with two Layouts, three Graphs
- * and thirty-four Cards, so nothing else the Dock is judged on is traded for
- * the depth.
- */
-const CROSSED = [platformSnapshot, designSystemSnapshot, commandDockSnapshot] as const;
-
-/**
- * Which of the open Spaces a story puts in trouble.
- *
- * **Two cases, and they are different questions.** `here` is a commit that
- * failed on the Space you are looking at: the Dock is already pointed at it, so
- * what is under review is *where the report goes* on a strip of furniture with
- * no column to pin it down. `elsewhere` is a Space that went wrong while you
- * were somewhere else — the case a single session-wide persistence field could
- * not express at all, and the whole of question C: the Open Spaces menu lists that
- * Space, and it has to say which one it is without the reader going there to
- * find out.
- */
-type Unwell = 'here' | 'elsewhere';
-
-/**
- * The session, opened with one Space in whatever persistence state a story asks
- * for.
- *
- * `elsewhere` puts it on `Design system`, which is the parent the trail already
- * names — so the story shows both a Space that is one press away and a Open Spaces menu
- * that has to mark it.
- */
-const initialSession = (
-  persistence: SpaceSessionState['persistence'] = { kind: 'settled' },
-  unwell: Unwell = 'here',
-): SessionState => {
-  const path = CROSSED.reduce(
-    (open, snapshot, index) =>
-      open.set(snapshot.id, opened(snapshot, (CROSSED[index - 1] ?? metaSnapshot).id)),
-    new Map<UUID, OpenEntry>([[metaSnapshot.id, META_ENTRY]]),
-  );
-  const troubled = (unwell === 'here' ? commandDockSnapshot : designSystemSnapshot).id;
-  const entry = path.get(troubled);
-  if (entry !== undefined) path.set(troubled, { ...entry, persistence });
-  return {
-    open: path.set(traversalSnapshot.id, opened(traversalSnapshot, metaSnapshot.id)),
-    currentId: commandDockSnapshot.id,
-  };
-};
-
-/** Total by construction: Meta is opened first and can never be closed. */
-const currentEntry = (state: SessionState): OpenEntry =>
-  state.open.get(state.currentId) ?? META_ENTRY;
-
-/** The Spaces crossed to reach the current one, root first — the current one excluded. */
-/**
- * The Space this one was entered from, which is the only step the bar names.
- *
- * One rather than the whole path, and that is the arrangement's answer to the
- * width question rather than an omission: the step a reader reaches for is the
- * one above them, and everything further up is in the Open Spaces menu beside it.
- */
-const parentOf = (state: SessionState): SpaceStep | null => {
-  const from = currentEntry(state).from;
-  if (from === null) return null;
-  const entry = state.open.get(from);
-  return entry === undefined ? null : { spaceId: from, title: entry.snapshot.document.title };
-};
-
-/**
- * Moving to an open Space, which is what the parent step and the Open Spaces menu both do.
- *
- * **Nothing closes.** This is the change ADR 0068 has to answer to: Exit used
- * to close the entry outright, so leaving a Space took its selections with it
- * and a Space open but not above you had nowhere to be. Making the open set a
- * tree you move around is what gives it somewhere — and it is why every entry
- * keeps its Layout and Graph, so coming back to one arrives where you left it.
- *
- * What it costs is that the set only grows unless something takes from it, which
- * is why Exit is a command of its own, in the Space menu. Exit used to be both
- * the move and the close, and separating them is what lets a reader leave a
- * Space without losing it — and, when they do mean to lose it, say so.
- */
-const switchTo = (state: SessionState, spaceId: UUID): SessionState =>
-  state.open.has(spaceId) ? { ...state, currentId: spaceId } : state;
-
 /* ------------------------------------------------------------------ state */
 
 /**
- * **What the Dock is given, in the groups `SpaceSidebar` already gives them
- * in.**
+ * **What the Dock is given, in the groups the surface it replaced was given
+ * them in.**
  *
  * It was one flat `Chrome` of thirty-three members, threaded whole into ten
  * components — so `PresentingExit`, which reads four of them, was declared to
  * take every command in the surface, and no signature in the file said what any
- * component actually used. `SpaceSidebar` is the promoted sibling doing this
- * same job and it does not do that: it takes `canvas`, `graph`, `addCard`,
- * `createLayout`, `persistence`, `selectedCard`, `entityActions` and `titleEdit`
- * (`packages/app/src/components/SpaceSidebar.tsx`), and each of its own pieces
- * takes the group it draws.
+ * component actually used. `SpaceSidebar` did not do that: it took `canvas`,
+ * `graph`, `addCard`, `createLayout`, `persistence`, `selectedCard`,
+ * `entityActions` and `titleEdit`, and each of its own pieces took the group it
+ * drew.
  *
  * The groups here are named after it wherever there is a counterpart —
  * `canvas` is the Layouts and the one that is drawing, `graph` is the Graphs
- * and Present, `persistence` is the report and its recoveries — so that ticket
- * 07, which promotes this component and deletes that one, is a move rather
- * than a translation.
+ * and Present, `persistence` is the report and its recoveries — which is what
+ * made promoting this surface a move rather than a translation.
  *
- * Two composition points still take the whole of it, and that is the shape
- * rather than a leftover: `PrototypeCanvas` stands where the application mounts
- * the surface and `CommandDock` stands where the surface distributes to its own
- * clusters, exactly as `App` and `SpaceSidebar` do. Everything below them takes
- * a group.
+ * Two composition points take the whole of it, and that is the shape rather
+ * than a leftover: `App` stands where the application mounts the surface and
+ * {@link CommandDock} stands where the surface distributes to its own clusters.
+ * Everything below them takes a group.
  */
-interface DockChrome {
-  /** What the canvas draws, in the shape `LayoutCanvasFixture` takes. */
-  readonly drawn: DrawnLayout;
+export interface DockChrome {
+  /**
+   * That a name in the bar is being renamed right now.
+   *
+   * **One fact under the whole bar, reported rather than owned.** The editor is
+   * `InlineTitleEditor` and the open/closed state is the name control's own —
+   * which is the whole reason the shared draft the Sidebar needed is gone. But
+   * the *application* still has to know one is running: a live chrome rename
+   * withdraws Create Card, Present, Delete Card and the canvas's own title
+   * editing, because each of those would re-derive the canvas or take the
+   * caret from under it (`authoring-availability.ts`).
+   *
+   * So the text, the refusal and the focus return stay in the component and only
+   * the fact crosses the seam. It is `DockChrome`'s rather than `canvas`'s or
+   * `graph`'s because there is one answer for the bar: two fields would let a
+   * Layout rename and a Graph rename disagree about whether a rename is running.
+   */
+  readonly onRenamingChange: (renaming: boolean) => void;
   readonly space: DockSpace;
   readonly canvas: DockCanvas;
   readonly graph: DockGraph;
@@ -508,7 +221,7 @@ interface DockChrome {
  * parent step and the Open Spaces menu are how you leave this Space, and the name and
  * its menu are what you can do while you are in it.
  */
-interface DockSpace {
+export interface DockSpace {
   /** This Space's name — a Space Card's title, seen from inside it. */
   readonly title: string;
   /** Which Space the Dock is in, which is what the Open Spaces menu marks. */
@@ -517,7 +230,35 @@ interface DockSpace {
   readonly parent: SpaceStep | null;
   /** Every open Space, depth-first from the root — what the Open Spaces menu lists. */
   readonly openSpaces: readonly OpenRow[];
-  readonly onRename: (title: string) => void;
+  /**
+   * Rename this Space, or `null` while the product has no such Edit.
+   *
+   * **Null in the application today, and that is a fact rather than a gap this
+   * surface can close.** Space Authoring's completion union has
+   * `renamed-layout` and `renamed-graph` and no `renamed-space`: a Space's title
+   * lives on the stored document, and a Space is named from outside by the Space
+   * Card that references it (ADR 0074), so what a rename from *inside* does to
+   * that Card is a domain question rather than a control this component can
+   * answer by drawing a field. Until it is answered, the name is a label.
+   *
+   * Nullable rather than optional so both callers state it: the catalogue
+   * fixture passes the same `null` the application does, which is what keeps the
+   * story parity evidence instead of a surface showing a command production has
+   * not got.
+   */
+  readonly onRename: ((title: string) => string | null) | null;
+  /** Copy this Space's own address — the one link a Space offers (`entity-actions.tsx`). */
+  readonly onCopyLink: () => void;
+  /**
+   * Create a Space, which is Create Card → Space.
+   *
+   * It sits in the Space menu against that rule, and it is the one item in the
+   * Dock that has not been reconciled: the arrangement asked for a way to make a
+   * Space from the Space you are in, and Create Card offers the same command one
+   * cluster along. Both spend the same operation, so the duplication is a second
+   * path rather than a second behaviour.
+   */
+  readonly onNewSpace: () => void;
   /** Move to an open Space, closing nothing. The parent step and the Open Spaces menu both spend this. */
   readonly onSwitchTo: (spaceId: UUID) => void;
   /**
@@ -529,6 +270,17 @@ interface DockSpace {
    * means "and I mean it".
    */
   readonly onExit: (spaceId: UUID, confirmation?: RejectedExitConfirmation) => void;
+  /**
+   * Whether this Space can be left at all, which is one question and not two.
+   *
+   * The meta Space is permanent (`open-spaces.ts`), and every other open Space
+   * can be exited. This read {@link parent} instead — "is there a Space I was
+   * opened from" — which answers `null` for every Space reached by its own
+   * address as well, and so withheld Exit from a pasted link. The two happen to
+   * agree while the reader arrived by pressing Space Cards, which is what hid
+   * it.
+   */
+  readonly exitDisabled: boolean;
   /** The exit that did not happen, which is the only kind there is anything to draw about. */
   readonly exitReport: SpaceExitReport | null;
   readonly onDismissExitReport: () => void;
@@ -547,7 +299,7 @@ interface DockSpace {
  * and it must re-call it on the Space the warning was about rather than on
  * whichever one is current when the answer arrives.
  */
-interface SpaceExitReport {
+export interface SpaceExitReport {
   readonly spaceId: UUID;
   readonly title: string;
   readonly outcome: ExitOutcome;
@@ -557,24 +309,56 @@ interface SpaceExitReport {
  * The canvas's one exclusive choice: which authored Layout is drawing (ADR
  * 0079, ADR 0082).
  *
- * Named `canvas` after `SpaceSidebar`'s own group for the same thing, and
- * carrying `selected` as the Layout rather than as an id for the same reason
- * that one does — the title belongs to the Layout, so a cluster naming what is
+ * Named `canvas` after the group the Space Sidebar carried for the same thing,
+ * and carrying `selected` as the Layout rather than as an id for the same reason
+ * that one did — the title belongs to the Layout, so a cluster naming what is
  * drawing reads it off the Layout instead of deriving a second title.
  */
-interface DockCanvas {
+export interface DockCanvas {
   /** The Space's authored Layouts, in the order it declares them. */
   readonly layouts: readonly Layout[];
   /** The Layout that is drawing. */
   readonly selected: Layout;
   readonly onSelect: (layoutId: LayoutId) => void;
-  readonly onRename: (layoutId: LayoutId, title: string) => void;
+  /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
+  readonly onRename: ((layoutId: LayoutId, title: string) => string | null) | null;
   readonly onCreate: () => void;
+  /**
+   * Whether New Layout may run.
+   *
+   * Its own term beyond Create Card's: creating a Layout **selects** it, and the
+   * created Layout is empty — so the canvas re-derives with no nodes and a Card
+   * holding a live title draft unmounts, taking the draft, the announced reason
+   * and the caret with it. A valid draft is safe, because pressing the control
+   * blurs the input and a valid blur completes the Title (ADR 0065); a refused
+   * one is re-focused instead and the press lands anyway.
+   */
+  readonly createDisabled: boolean;
   readonly onDelete: (layoutId: LayoutId) => void;
+  /**
+   * Whether Delete Layout may run, beyond the rule the row already knows.
+   *
+   * The last Layout cannot be deleted (ADR 0079) and the surface reads that off
+   * `layouts` itself — but that is one of *two* rules, and the second is not
+   * derivable here: every entity Edit is withdrawn while a title editor or a
+   * live content edit owns the caret (`authoring-availability.ts`). The command
+   * this row dispatches does not exist in that state, so a row that read only
+   * the ADR rule pressed cleanly, ran nothing, and reported nothing.
+   */
+  readonly deleteDisabled: boolean;
+  /**
+   * Copy the drawing Layout's address — the one form a Layout has.
+   *
+   * A Layout offers no permanent link because it has no second address to be
+   * permanent *against*: its own address is the only one there is
+   * (`entity-actions.tsx`), where a Graph and a Card each have a within-Layout
+   * form as well.
+   */
+  readonly onCopyLink: () => void;
 }
 
 /** The Graphs the selected Layout owns, the Active one, and Present. */
-interface DockGraph {
+export interface DockGraph {
   /** The Graphs the selected Layout owns, which are the only ones it draws. */
   readonly graphs: readonly Graph[];
   readonly active: Graph;
@@ -583,310 +367,105 @@ interface DockGraph {
   /** The Active Graph's colour, which several controls carry as its identity. */
   readonly activeColor: string;
   readonly onActivate: (graphId: GraphId) => void;
-  readonly onRename: (graphId: GraphId, title: string) => void;
+  /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
+  readonly onRename: ((graphId: GraphId, title: string) => string | null) | null;
   /** A Graph's stored colour, which the canvas draws its Edges in. */
   readonly onRecolor: (graphId: GraphId, color: string) => void;
   readonly onCreate: () => void;
   readonly onDelete: (graphId: GraphId) => void;
+  /**
+   * Whether this cluster's lifecycle commands may run at all.
+   *
+   * One term for the three of them, because they are withdrawn by one rule and
+   * not by three: New Graph, Colour and Delete are entity Edits, and no entity
+   * Edit runs while a title editor or a live content edit owns the caret
+   * (`authoring-availability.ts`). Delete carries the ADR 0079 rule on top of
+   * this one, read off `graphs` here; the Layout cluster splits create from
+   * delete because creating a Layout **selects** it and so has a second reason
+   * of its own, which no Graph command has.
+   */
+  readonly editsDisabled: boolean;
+  /**
+   * The two addresses a Graph always has, and why both are offered.
+   *
+   * A Layout **owns** its Graphs (ADR 0040), so a Graph always has a
+   * within-Layout address as well as its own. "Copy link" reproduces what is on
+   * screen — this Graph inside this Layout, so a recipient lands where the
+   * sender was — and "Copy permanent link" is the Graph's own address, which
+   * survives the sender's Layout being renamed, redrawn or deleted.
+   */
+  readonly onCopyLink: () => void;
+  readonly onCopyPermanentLink: () => void;
   readonly presenting: boolean;
   readonly onPresent: () => void;
-  readonly onExitPresenting: () => void;
+  /**
+   * Whether Present may begin a traversal.
+   *
+   * An empty Graph is legal and ordinary — creating a Layout mints one — and it
+   * has nothing to traverse, so `present()` would return having changed nothing
+   * and an enabled control would swallow the press. Unavailable rather than
+   * absent: a control that disappears teaches nothing about why.
+   */
+  readonly presentDisabled: boolean;
 }
 
-interface DockCards {
+export interface DockCards {
   /**
-   * Every Card this Space holds, of every kind, placed or not.
+   * The Cards surface itself — its trigger and its panel, supplied whole.
    *
-   * **One list, because a Space Card is a Card.** This used to be the Cards the
-   * selected Layout had not placed, with the Space Cards drawn a second time in
-   * a Spaces surface of their own — two disclosures over overlapping sets, and
-   * a Space Card that appeared in both or in neither depending on where it had
-   * been put. Filtering by Layout membership is what made the second surface
-   * necessary: the Spaces you can cross into are not the Spaces this Layout
-   * happens to place, so a list that hid the placed ones hid crossings.
+   * **A slot rather than a list, because there is one Cards surface and it is
+   * not this one's.** The prototype drew its own filtered popover here and it
+   * was compared against a Drawer and a second dock at the scale that separates
+   * them; the Popover won that comparison. What settled it the other way is that
+   * the application already had `CardsDrawer` — a production surface with its
+   * own stable story, its own behaviour tests and seven parity claims — and two
+   * surfaces offering "add an existing Card to this Layout" is the second place
+   * commands live that ADR 0082 rules out. So the Dock offers the *way* to the
+   * Cards and the drawer is what it opens; re-deciding which of the two the
+   * product wants is a promotion of its own rather than a side effect of this
+   * one.
    *
-   * What the Layout does not place is still the common case and still what the
-   * drag is for; a Card already on the canvas simply moves when it is dropped
-   * again.
+   * The caller supplies trigger and panel together because they are one
+   * component: a toggle whose `disabled` and whose surface are decided in two
+   * places is a toggle that comes to disagree with what it names. It draws in
+   * the Dock's own name slot through {@link CARDS_TRIGGER} and
+   * {@link CardsTrigger}, so it lands in the column the other three names land
+   * in, whichever edge the dock is on.
    */
-  readonly cards: readonly Card[];
-  /** A Card dropped on the canvas joins the Layout, so it leaves the list. */
-  readonly onPlace: (cardId: CardId) => void;
+  readonly surface: ReactNode;
+  /**
+   * Create a Card of one kind — the one command about the *set*.
+   *
+   * The kind is chosen at creation, so the menu offers three peers rather than a
+   * split button with a hidden default. This is *Create*, distinct from adding
+   * an existing Card, which is what the surface above is for.
+   */
+  readonly onCreate: (kind: (typeof CARD_KINDS)[number]) => void;
+  /** Whether creating is available at all — presenting and an open pane both withdraw it. */
+  readonly createDisabled: boolean;
 }
 
 /** What went wrong, which is the only thing persistence ever says. */
-interface DockPersistence {
+export interface DockPersistence {
   /** How this Space's last commit went. `settled` and `pending` draw nothing. */
   readonly state: SpaceSessionState['persistence'];
+  /**
+   * Whether this Space is the one on the canvas.
+   *
+   * A session mounts one Dock per open Space and shows one of them, and both
+   * decision surfaces below are portalled `AlertDialog`s that own the viewport —
+   * so a hidden Space's conflict would block the Space the reader is actually
+   * working in, about a commit made somewhere else. What that Space is owed
+   * instead is the mark on its row in the Open Spaces menu, which is where ADR
+   * 0082's *"it names which open Space is unwell"* is met.
+   */
+  readonly active: boolean;
   /** Try the failed commit again, which is the one recovery that is not a decision. */
   readonly onRetry: () => void;
   /** Take the stored Space over the local one, ending a conflict. */
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   /** Keep the local Space and commit it again, ending a conflict. */
   readonly onKeepLocal: () => void;
-}
-
-/**
- * Layouts, Graphs and placement are edits on a stored snapshot rather than
- * three lists of local state.
- *
- * A prototype whose rename control refuses an empty name and then changes
- * nothing is lying about the part under review — and one whose Add Layout
- * appended to an array the canvas never read would be lying about a larger
- * part. Each operation writes the snapshot; `loadSpaceSnapshot` re-derives the
- * Space, and the canvas, the lists and the menus all follow from that one
- * value.
- *
- * Identities come from `newUuid` at the call site because this story is its own
- * composition root, exactly as `newSpaceFixture` is in `../support/spaces`
- * (ADR 0016).
- */
-function useChrome(
-  persistence: SpaceSessionState['persistence'] = { kind: 'settled' },
-  unwell: Unwell = 'here',
-): DockChrome {
-  const [session, setSession] = useState<SessionState>(() => initialSession(persistence, unwell));
-  const [presenting, setPresenting] = useState(false);
-  const [exitReport, setExitReport] = useState<SpaceExitReport | null>(null);
-
-  const entry = currentEntry(session);
-  const { snapshot, layoutId, graphId } = entry;
-
-  /**
-   * One Edit on the current entry, leaving every other entry as it was left.
-   *
-   * The three setters below keep the signatures the body already had, so
-   * everything under them is unchanged by the session: an Edit is still one
-   * write to a stored snapshot that `loadSpaceSnapshot` then re-derives. What
-   * changed is only *which* snapshot, and that the other open ones are still
-   * there when you come back to them.
-   */
-  const write = (next: (live: OpenEntry) => OpenEntry): void =>
-    setSession((current) => {
-      const live = current.open.get(current.currentId);
-      if (live === undefined) return current;
-      return { ...current, open: new Map(current.open).set(current.currentId, next(live)) };
-    });
-
-  const setSnapshot = (edit: (current: SpaceSnapshot) => SpaceSnapshot): void =>
-    write((live) => ({ ...live, snapshot: edit(live.snapshot) }));
-  const setLayoutId = (id: LayoutId | null): void => write((live) => ({ ...live, layoutId: id }));
-  const setGraphId = (id: GraphId | null): void => write((live) => ({ ...live, graphId: id }));
-
-  const parent = parentOf(session);
-  const openSpaces = useMemo(() => openTree(session), [session]);
-
-  /**
-   * The Space, derived once per snapshot rather than once per render.
-   *
-   * **The comment that stood here said the React Compiler was memoizing this,
-   * and the React Compiler is not enabled.** Neither pipeline runs it: the
-   * application's `vite.config.ts` uses a plain `react()`, the catalogue's
-   * `ladle-vite.config.ts` adds only Tailwind and says in its own comment that
-   * Ladle supplies the React pipeline, and no manifest or lockfile entry names
-   * `babel-plugin-react-compiler`. So the claim was not a description of a
-   * build step, and what it was actually justifying was a full Zod parse,
-   * reference validation and indexing of a thirty-four-Card Space on every
-   * render — twice per render under StrictMode, and once for every keystroke of
-   * an inline rename.
-   *
-   * The objection it raised is real and is about the compiler, which is absent:
-   * plain React's `useMemo` has no opinion about immutability, and `snapshot`
-   * is a stable reference between Edits because the session holds the same
-   * `OpenEntry` until one replaces it. So the dependency is exactly right and
-   * the memo does what it says.
-   *
-   * Enabling the compiler instead is a defensible answer and a larger one — it
-   * is a toolchain decision for the whole repository, not a fix to this
-   * surface — so it is left as a decision rather than taken here.
-   */
-  const result = useMemo(() => loadSpaceSnapshot(snapshot), [snapshot]);
-  // The prototype only ever writes Edits the application would accept, so a
-  // refusal here is a defect in this file rather than a state to draw.
-  if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('\n'));
-  const space: Space = result.space;
-
-  const colors = useMemo(() => graphColorMap(space), [space]);
-
-  const layout = space.layouts.find((candidate) => candidate.id === layoutId) ?? space.layouts[0];
-  // ADR 0079 keeps the last Layout undeletable and gives a new one an empty
-  // Active Graph, so both of these hold for every Edit this file makes.
-  if (layout === undefined) throw new Error('The Command Dock fixture has no Layout to draw.');
-  const graph = layout.graphs.find((candidate) => candidate.id === graphId) ?? layout.graphs[0];
-  if (graph === undefined) throw new Error(`${layout.title} owns no Graph.`);
-
-  /**
-   * One Edit on the Layout the **live** entry selects.
-   *
-   * It used to close over `layout.id` read during this render and spend it
-   * inside a functional updater that had already gone and fetched the live
-   * entry, so the write and the thing saying where to write it came from two
-   * different moments. `editSelectedLayout` takes the entry instead, which is
-   * what makes a captured id unrepresentable rather than merely wrong.
-   */
-  const withinSelected = (edit: (layout: Layout) => Layout): void =>
-    write((live) => editSelectedLayout(live, edit));
-
-  return {
-    drawn: { space, layoutId: layout.id },
-
-    space: {
-      title: space.title,
-      currentSpaceId: session.currentId,
-      parent,
-      openSpaces,
-      onRename: (title) =>
-        setSnapshot((current) => ({ ...current, document: { ...current.document, title } })),
-      // Moving, not exiting: the entry left behind stays open with its Layout and
-      // its Graph, so this is a move between Spaces and never a close.
-      onSwitchTo: (spaceId) => setSession((current) => switchTo(current, spaceId)),
-      // And this is what the Open Spaces menu made necessary. Once nothing closes on its
-      // own, exiting is a command, and it is the Space's own — so it sits in the
-      // Space menu with New and Copy link rather than on the Open Spaces menu's rows.
-      //
-      // **Computed whole, then installed.** `exitSpace` answers the next session
-      // and the outcome together, so both come from one reading of the session
-      // rather than from a captured id spent inside an updater that had gone and
-      // fetched a later one — the stale-closure shape `editSelectedLayout` and
-      // the drag gesture were both fixed for. React flushes discrete events, so
-      // the `session` this closes over is the one the press was made against.
-      onExit: (spaceId, confirmation) => {
-        const exited = exitSpace(session, spaceId, confirmation);
-        setSession(exited.session);
-        setExitReport(
-          exited.result.kind === 'exited'
-            ? null
-            : {
-                spaceId,
-                title: session.open.get(spaceId)?.snapshot.document.title ?? space.title,
-                outcome: exited.result,
-              },
-        );
-      },
-      exitReport,
-      onDismissExitReport: () => setExitReport(null),
-    },
-
-    canvas: {
-      layouts: space.layouts,
-      selected: layout,
-      onSelect: setLayoutId,
-      onRename: (renamed, title) =>
-        setSnapshot((current) =>
-          editDocument(current, (layouts) =>
-            layouts.map((candidate) =>
-              candidate.id === renamed ? { ...candidate, title } : candidate,
-            ),
-          ),
-        ),
-      // One Edit that creates and selects an empty Layout owning one empty
-      // Active Graph, which is what ADR 0079 makes Add Layout mean.
-      onCreate: () => {
-        const added = newUuid();
-        setSnapshot((current) =>
-          editDocument(current, (layouts) => [
-            ...layouts,
-            {
-              id: added,
-              title: nextLayoutTitle(current),
-              kind: 'positioned',
-              positions: {},
-              graphs: [{ id: newUuid(), title: 'Graph 1', edges: [] }],
-            },
-          ]),
-        );
-        setLayoutId(added);
-        setGraphId(null);
-      },
-      onDelete: (deleted) => {
-        setSnapshot((current) =>
-          editDocument(current, (layouts) =>
-            layouts.filter((candidate) => candidate.id !== deleted),
-          ),
-        );
-        // **`null` and not `''`.** Deleting the Layout the entry selects leaves
-        // it selecting nothing until the render's fallback picks the first, and
-        // an empty string was a stand-in for that with no type to say so — the
-        // same laundering `defaultLayout` was doing one field over.
-        // `LayoutId | null` spells it, so the sentinel is gone.
-        setLayoutId(layoutId === deleted ? null : layoutId);
-        setGraphId(null);
-      },
-    },
-
-    graph: {
-      graphs: layout.graphs,
-      active: graph,
-      colorByGraphId: colors,
-      activeColor: colors[graph.id] ?? FALLBACK_GRAPH_COLOR,
-      onActivate: setGraphId,
-      onRename: (renamed, title) =>
-        withinSelected((entry) => ({
-          ...entry,
-          graphs: entry.graphs.map((candidate) =>
-            candidate.id === renamed ? { ...candidate, title } : candidate,
-          ),
-        })),
-      // Stored on the Graph rather than held beside it: `graphColorMap` resolves a
-      // Graph's own colour ahead of the palette slot its order would give it, so
-      // writing it is the whole of the change and the canvas, the glyph and the
-      // menu all follow from the one value.
-      onRecolor: (recolored, color) =>
-        withinSelected((entry) => ({
-          ...entry,
-          graphs: entry.graphs.map((candidate) =>
-            candidate.id === recolored ? { ...candidate, color } : candidate,
-          ),
-        })),
-      onCreate: () => {
-        const added = newUuid();
-        withinSelected((entry) => ({
-          ...entry,
-          graphs: [...entry.graphs, { id: added, title: nextGraphTitle(entry.graphs), edges: [] }],
-        }));
-        setGraphId(added);
-      },
-      onDelete: (deleted) => {
-        withinSelected((entry) => ({
-          ...entry,
-          graphs: entry.graphs.filter((candidate) => candidate.id !== deleted),
-        }));
-        setGraphId(graphId === deleted ? null : graphId);
-      },
-      presenting,
-      onPresent: () => setPresenting(true),
-      onExitPresenting: () => setPresenting(false),
-    },
-
-    cards: {
-      cards: space.cards,
-      onPlace: (cardId) =>
-        withinSelected((entry) => ({
-          ...entry,
-          positions: {
-            ...entry.positions,
-            [cardId]: dropPlacement(Object.keys(entry.positions).length),
-          },
-        })),
-    },
-
-    // Recovery writes the entry's own persistence, which is what makes it this
-    // Space's rather than the session's. Each is what production's own
-    // `PersistenceControl` and `PersistenceNotice` call: Retry re-attempts the
-    // commit, and the two conflict answers each end it. What the prototype does
-    // not model is the commit that follows — it settles, because what is under
-    // review is where the report goes rather than whether the second attempt
-    // works.
-    persistence: {
-      state: entry.persistence,
-      onRetry: () => write((live) => ({ ...live, persistence: { kind: 'settled' } })),
-      onAcceptRemote: () => {
-        write((live) => ({ ...live, persistence: { kind: 'settled' } }));
-        return null;
-      },
-      onKeepLocal: () => write((live) => ({ ...live, persistence: { kind: 'settled' } })),
-    },
-  };
 }
 
 /**
@@ -900,39 +479,6 @@ type MenuSide = 'top' | 'bottom' | 'left' | 'right';
 
 /* ----------------------------------------------------------------- pieces */
 
-/** A control group that stays where it is put. Only a `Dock` moves. */
-function ControlGroup({
-  children,
-  presenting = false,
-}: {
-  readonly children: ReactNode;
-  readonly presenting?: boolean;
-}) {
-  return (
-    <div
-      className="dock-proto__surface nokey nodrag nopan"
-      data-orientation="horizontal"
-      data-presenting={presenting ? 'true' : 'false'}
-    >
-      {children}
-    </div>
-  );
-}
-
-/**
- * The line between two regions of the Dock.
- *
- * **The prop names the line's own axis**, which is the opposite of the dock's:
- * a horizontal dock is separated by vertical rules. Every other control here
- * takes `vertical` meaning *the dock is a column*, so a `Divider` taking the
- * same word meant `vertical` at a call site drew a horizontal line, and the one
- * component in the file with an axis of its own was the one whose axis the
- * reader had to invert. It takes `orientation` and passes it straight through.
- *
- * A vertical rule is centred rather than stretched — `Separator`'s own `align`
- * variant, which exists because the alternative was a stylesheet outranking the
- * component from outside.
- */
 function Divider({ orientation }: { readonly orientation: 'horizontal' | 'vertical' }) {
   return (
     <Separator
@@ -961,8 +507,8 @@ function Divider({ orientation }: { readonly orientation: 'horizontal' | 'vertic
  */
 function IdentityLabel({ children }: { readonly children: ReactNode }) {
   return (
-    <span className="dock-proto__ident">
-      <span className="dock-proto__ident-text">{children}</span>
+    <span className="command-dock__ident">
+      <span className="command-dock__ident-text">{children}</span>
     </span>
   );
 }
@@ -973,7 +519,7 @@ function IdentityLabel({ children }: { readonly children: ReactNode }) {
  * This is `InlineTitleEditor` — the component Cards and the Space Sidebar
  * already rename through — in its `header` variant, which exists for named
  * chrome rather than a Card's own title. Reusing it buys the whole edit
- * lifecycle the prototype would otherwise fake and get wrong: select on entry,
+ * lifecycle a hand-rolled rename would otherwise fake and get wrong: select on entry,
  * Enter and blur complete, Escape cancels, focus returns to the control, and a
  * refused draft stays open and editable.
  *
@@ -990,31 +536,143 @@ function IdentityName({
   icon,
   kind,
   title,
+  testId,
+  subject,
   onRename,
 }: {
   readonly icon: ReactNode;
   readonly kind: 'Space' | 'Layout' | 'Graph';
   readonly title: string;
-  readonly onRename: (title: string) => void;
+  /**
+   * What a behaviour test addresses this identity by.
+   *
+   * The three identities are one component drawn three times, so an accessible
+   * name is the only thing distinguishing them — and a test that reached for
+   * `Rename Layout: Collection 1` would have to know the title to find the
+   * control that names it, which is the assertion inverted. The id names the
+   * slot; the text in it is what is under test.
+   */
+  readonly testId: string;
+  /**
+   * Which thing this name is naming, so a rename cannot outlive its subject.
+   *
+   * The editor is seeded from `title` and its open state is this component's, so
+   * a Layout or Graph changing underneath a live rename would leave the caret in
+   * a field editing something the reader has already left — a Back onto another
+   * Layout is exactly that, and it moves the whole cluster without unmounting
+   * it. Read as a render-time transition rather than an effect, because an
+   * effect would let one render draw the stale editor first.
+   */
+  readonly subject: string;
+  /** Absent for an entity the product cannot rename — see {@link DockSpace.onRename}. */
+  readonly onRename: ((title: string) => string | null) | null;
 }) {
   const [editing, setEditing] = useState(false);
+  const [renaming, setRenamingSubject] = useState(subject);
+  const reportRenaming = useContext(DockRenamingContext);
+  if (renaming !== subject) {
+    setRenamingSubject(subject);
+    if (editing) setEditing(false);
+  }
+
+  /**
+   * **The App is told from an effect, never from this render.**
+   *
+   * `reportRenaming` is the App's own `setEditingChromeTitle`, and the subject
+   * transition above runs in the render body — so calling it there wrote a
+   * *parent's* state while a child rendered, which React reports out loud and
+   * which under concurrent rendering can fire for a render that is thrown away.
+   * The transition keeps its own state and the notification follows the commit.
+   *
+   * `live` rather than `editing`, and silent while it is false, for two reasons
+   * that are one rule: three identities share this one flag, so an instance
+   * that is *not* renaming must never write it, and an editor whose rename
+   * stops being available renders as a static label with `editing` still true —
+   * a state in which no rename is live and the App must not think one is. The
+   * cleanup covers the third case, an unmount mid-rename, which otherwise left
+   * the flag stuck true with nothing able to clear it.
+   */
+  const live = editing && onRename !== null;
+  useEffect(() => {
+    if (!live) return undefined;
+    reportRenaming(true);
+    return () => reportRenaming(false);
+  }, [live, reportRenaming]);
+
+  /**
+   * **Where the caret goes when the editor closes.**
+   *
+   * The editor replaces this control rather than expanding inside it, so ending
+   * a rename unmounts the element holding the caret and it falls to
+   * `document.body` unless something puts it back. The Sidebar had a
+   * continuation for this because the rename could be *begun* from either of
+   * two surfaces and had to return to whichever began it; here there is one
+   * name and it is right there, so a ref is the whole of it.
+   *
+   * Only the editor's own three exits spend this. The subject transition above
+   * ends a rename too, and it must not — the reader moved to another Layout
+   * from the menu beside this name, and pulling the caret onto the name they
+   * just moved away from is taking focus, not returning it.
+   */
+  const nameRef = useRef<HTMLButtonElement>(null);
+  /**
+   * A ref rather than state, because it decides nothing that is rendered — it
+   * is a note from the press to the commit that follows it, and holding it in
+   * state would set state from inside the effect that reads it.
+   */
+  const returningFocus = useRef(false);
+  const endRename = (): void => {
+    returningFocus.current = true;
+    setEditing(false);
+  };
+  useEffect(() => {
+    if (editing || !returningFocus.current) return;
+    returningFocus.current = false;
+    nameRef.current?.focus();
+  }, [editing]);
+
+  /**
+   * A name with no rename behind it is a **label**, not a disabled button.
+   *
+   * A control that is present and unavailable teaches that the command exists
+   * and is out of reach now, which is right for Delete on the last Layout. This
+   * is the other case: the product has no such Edit at all, so a greyed-out
+   * name would be advertising a command nobody can ever run. It keeps the
+   * treatment and the `testId` either way, so the surface reads the same and a
+   * behaviour test addresses the same slot.
+   */
+  if (onRename === null) {
+    return (
+      <span className="command-dock__name command-dock__name--static" data-testid={testId}>
+        {icon}
+        <IdentityLabel>{title}</IdentityLabel>
+      </span>
+    );
+  }
 
   if (editing) {
     return (
       <InlineTitleEditor
         variant="header"
-        className="dock-proto__name-editor"
+        className="command-dock__name-editor"
         title={title}
         label={`${kind} name`}
         onComplete={(next) => {
           const named = next.trim();
           if (named === '') return `A ${kind} needs a name.`;
-          onRename(named);
-          setEditing(false);
+          // **The Edit's answer, not the press.** A rename can be refused for
+          // more than a blank name — a Layout that has stopped drawing, a title
+          // Authoring will not take — and `InlineTitleEditor` holds a refused
+          // draft open and editable for exactly that. Closing on the press
+          // instead would drop the author's words on the floor and leave the
+          // stored title unchanged with nothing said.
+          const refusal = onRename(named);
+          if (refusal !== null) return refusal;
+          endRename();
           return null;
         }}
-        onCancel={() => setEditing(false)}
-        onReturnFocus={() => setEditing(false)}
+        onCancel={endRename}
+        onReturnFocus={endRename}
       />
     );
   }
@@ -1023,7 +681,9 @@ function IdentityName({
     <ToolbarButton
       variant="ghost"
       size="compact"
-      className="dock-proto__name"
+      ref={nameRef}
+      className="command-dock__name"
+      data-testid={testId}
       aria-label={`Rename ${kind}: ${title}`}
       title={`Rename ${kind}`}
       onClick={() => setEditing(true)}
@@ -1060,17 +720,23 @@ function LayoutControls({
 }) {
   const { id: triggerId, open, onOpenChange } = useDockDisclosure();
   return (
-    <ToolbarGroup aria-label="Layout" className="dock-proto__cluster">
+    <ToolbarGroup aria-label="Layout" className="command-dock__cluster">
       <IdentityName
         icon={<LayoutIcon />}
         kind="Layout"
+        testId="selected-canvas"
+        subject={canvas.selected.id}
         title={canvas.selected.title}
-        onRename={(title) => canvas.onRename(canvas.selected.id, title)}
+        onRename={
+          canvas.onRename === null
+            ? null
+            : (title) => canvas.onRename?.(canvas.selected.id, title) ?? null
+        }
       />
       <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
         <DropdownMenuTrigger
           id={triggerId}
-          className="nokey dock-proto__disclose"
+          className="nokey command-dock__disclose"
           aria-label={`Layout: ${canvas.selected.title}`}
           title="Switch Layout"
           render={<ToolbarButton variant="ghost" size="icon" />}
@@ -1081,7 +747,7 @@ function LayoutControls({
           align={DISCLOSURE_ALIGN}
           side={side}
           sideOffset={DISCLOSURE_SIDE_OFFSET}
-          className={`${DISCLOSURE_PANEL} nokey ${DISCLOSURE_WIDTH}`}
+          className={`nokey ${DISCLOSURE_WIDTH}`}
         >
           <DropdownMenuRadioGroup
             value={canvas.selected.id}
@@ -1101,11 +767,15 @@ function LayoutControls({
               pinned position are the same place — which is why one rule covers
               both and neither has to know which case it is. */}
           <DropdownMenuGroup>
-            <DropdownMenuItem className="gap-2" onClick={canvas.onCreate}>
+            <DropdownMenuItem
+              className="gap-2"
+              disabled={canvas.createDisabled}
+              onClick={canvas.onCreate}
+            >
               <PlusIcon />
               New Layout
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem className="gap-2" onClick={canvas.onCopyLink}>
               <CopyIcon />
               Copy link
             </DropdownMenuItem>
@@ -1119,7 +789,7 @@ function LayoutControls({
             <DropdownMenuItem
               variant="destructive"
               className="gap-2"
-              disabled={canvas.layouts.length <= 1}
+              disabled={canvas.deleteDisabled || canvas.layouts.length <= 1}
               onClick={() => canvas.onDelete(canvas.selected.id)}
             >
               <DeleteIcon />
@@ -1172,9 +842,10 @@ function GraphControls({
     <ToolbarButton
       variant="ghost"
       size="icon"
-      className="dock-proto__verb"
+      className="command-dock__verb"
       aria-label={`Present ${graph.active.title}`}
       title={`Present ${graph.active.title}`}
+      disabled={graph.presentDisabled}
       onClick={graph.onPresent}
     >
       {/* Filled rather than outlined, which is the transport convention and not
@@ -1191,24 +862,30 @@ function GraphControls({
   );
 
   return (
-    <ToolbarGroup aria-label="Graph" className="dock-proto__cluster">
+    <ToolbarGroup aria-label="Graph" className="command-dock__cluster">
       {vertical ? null : present}
       {/* The one identity that carries colour, and it carries it on the glyph
           alone — the stroke the Edges of this Graph are drawn in. A neutral
           swatch stood here and said only "a colour applies"; a Graph glyph
           says which *kind* of thing the colour belongs to, and it is
-          `@project/ui`'s own `GraphIcon` rather than a mark this file
+          `@project/ui`'s own `GraphIcon` rather than a mark this module
           invents. */}
       <IdentityName
         icon={<GraphIcon color={graph.activeColor} size={14} />}
         kind="Graph"
+        testId="active-graph"
+        subject={graph.active.id}
         title={graph.active.title}
-        onRename={(title) => graph.onRename(graph.active.id, title)}
+        onRename={
+          graph.onRename === null
+            ? null
+            : (title) => graph.onRename?.(graph.active.id, title) ?? null
+        }
       />
       <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
         <DropdownMenuTrigger
           id={triggerId}
-          className="nokey dock-proto__disclose"
+          className="nokey command-dock__disclose"
           aria-label={`Active Graph: ${graph.active.title}`}
           title="Switch Graph"
           render={<ToolbarButton variant="ghost" size="icon" />}
@@ -1219,7 +896,7 @@ function GraphControls({
           align={DISCLOSURE_ALIGN}
           side={side}
           sideOffset={DISCLOSURE_SIDE_OFFSET}
-          className={`${DISCLOSURE_PANEL} nokey ${DISCLOSURE_WIDTH}`}
+          className={`nokey ${DISCLOSURE_WIDTH}`}
         >
           <DropdownMenuRadioGroup
             value={graph.active.id}
@@ -1256,11 +933,11 @@ function GraphControls({
                 focus and keyboard selection come free — where a row of buttons
                 inside a menu would be a focus manager fighting the menu's. */}
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="gap-2">
+              <DropdownMenuSubTrigger className="gap-2" disabled={graph.editsDisabled}>
                 <GraphIcon color={graph.activeColor} size={14} />
                 Colour
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className={`${DISCLOSURE_PANEL} nokey`}>
+              <DropdownMenuSubContent className="nokey">
                 <DropdownMenuRadioGroup
                   value={graph.active.color ?? ''}
                   onValueChange={(next) => graph.onRecolor(graph.active.id, next)}
@@ -1274,10 +951,23 @@ function GraphControls({
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuItem className="gap-2" onClick={graph.onCreate}>
+            <DropdownMenuItem
+              className="gap-2"
+              disabled={graph.editsDisabled}
+              onClick={graph.onCreate}
+            >
               <PlusIcon />
               New Graph
             </DropdownMenuItem>
+            {/* **A copy reports through the application's standing notice**, not
+                in the item's own label. `EntityActionsMenu` swaps a pressed
+                item's words to "Copied" or "Not copied", and it does that
+                because the Sidebar's menus were inside a Sheet drawn over the
+                area a pinned notice renders in — on a phone the reader could
+                not see the report any other way. This surface has no Sheet and
+                covers nothing: "Link not copied" is pinned in the shell at every
+                width, so the in-place swap has lost the reason it existed for.
+                The Card rail keeps it, being a menu on the canvas itself. */}
             {/* Both forms, always: a Layout owns its Graphs (ADR 0040), so a
                 Graph always has a within-Layout address as well as its own —
                 which is exactly what `spaceEntityActions` offers on a Graph.
@@ -1290,11 +980,11 @@ function GraphControls({
                 The second form is offered only where it differs from the first,
                 which on a Graph is always — a Layout row shows one link for the
                 same reason, having only its own. */}
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem className="gap-2" onClick={graph.onCopyLink}>
               <CopyIcon />
               Copy link
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem className="gap-2" onClick={graph.onCopyPermanentLink}>
               <CopyIcon />
               Copy permanent link
             </DropdownMenuItem>
@@ -1302,7 +992,7 @@ function GraphControls({
             <DropdownMenuItem
               variant="destructive"
               className="gap-2"
-              disabled={graph.graphs.length <= 1}
+              disabled={graph.editsDisabled || graph.graphs.length <= 1}
               onClick={() => graph.onDelete(graph.active.id)}
             >
               <DeleteIcon />
@@ -1338,15 +1028,29 @@ function GraphControls({
  * second chevron beside `Cards ⌄` would read as a second disclosure of the
  * same list.
  */
-function CreateMenu({ side = 'top' }: { readonly side?: MenuSide }) {
+function CreateMenu({
+  side = 'top',
+  onCreate,
+  disabled,
+}: {
+  readonly side?: MenuSide;
+  readonly onCreate: (kind: (typeof CARD_KINDS)[number]) => void;
+  readonly disabled: boolean;
+}) {
   const { id: triggerId, open, onOpenChange } = useDockDisclosure();
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
       <DropdownMenuTrigger
         id={triggerId}
-        className="nokey dock-proto__set-verb"
+        className="nokey command-dock__set-verb"
         aria-label="Create Card"
         title="Create Card"
+        // Where a cancelled creation pane puts the caret back. The pane is modal
+        // and unmounts on cancel, so there is no element to have held on to —
+        // the continuation names this control by address instead, and one
+        // adapter resolves it (`continuation.ts`, `ChromeContinuation`).
+        data-continuation-control="add-card"
+        disabled={disabled}
         render={<ToolbarButton variant="ghost" size="icon" />}
       >
         <PlusIcon />
@@ -1355,12 +1059,12 @@ function CreateMenu({ side = 'top' }: { readonly side?: MenuSide }) {
         align={DISCLOSURE_ALIGN}
         side={side}
         sideOffset={DISCLOSURE_SIDE_OFFSET}
-        className={`${DISCLOSURE_PANEL} nokey ${DISCLOSURE_WIDTH}`}
+        className={`nokey ${DISCLOSURE_WIDTH}`}
       >
         <DropdownMenuGroup>
           <DropdownMenuLabel>Create Card</DropdownMenuLabel>
           {CARD_KINDS.map((kind) => (
-            <DropdownMenuItem key={kind} className="gap-2">
+            <DropdownMenuItem key={kind} className="gap-2" onClick={() => onCreate(kind)}>
               <CardKindIcon kind={kind} />
               {cardKindName(kind)}
             </DropdownMenuItem>
@@ -1368,138 +1072,6 @@ function CreateMenu({ side = 'top' }: { readonly side?: MenuSide }) {
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/**
- * **The list is a Popover, and that is decided.**
- *
- * Three surfaces were compared here — a Drawer from the screen edge, a Popover
- * anchored to its trigger, and a second dock of its own — over a Space with
- * twenty-nine unplaced Cards, which is the scale that separates them. The
- * Popover won on the two things the comparison was for: it is anchored to the
- * control that opened it the way the menus beside it are, so the Dock reads as
- * one surface rather than a bar that sometimes summons a panel; and a drag out
- * of it survives its own dismissal, so adding several Cards costs one
- * disclosure rather than one each.
- *
- * What the other two cost is why they went. The Drawer occludes the edge of
- * the canvas you are dropping onto, and it is a screen-level surface answering
- * a control-level question. The panel is furniture: it has to be positioned,
- * it stays until closed, and choosing it means choosing that once per list —
- * two docked docks plus two panels was more than the canvas could carry.
- */
-
-/**
- * The dotted grip a row is dragged by.
- *
- * Three answers to "how does a Card offer itself to be dragged" were compared
- * here — this strip-with-a-grip, the production Card at row scale two to a
- * line, and a strip that raised into paper on hover. The grip won: a Card at
- * row scale was mostly empty paper with a title too small to read at 117x66,
- * and an affordance that only arrives on hover arrives after the reader has
- * decided the list is not draggable. The switch that compared them is gone
- * with them.
- */
-
-function RowGrip() {
-  return <span className="dock-proto__row-grip" aria-hidden="true" />;
-}
-
-/**
- * The list every surface draws: a filter, then Cards as grips.
- *
- * The drag is real here rather than decorative. It is the whole question — the
- * claim under test is that a drag out of an anchored popover survives the
- * popover's own dismissal, and a row that only *looks* draggable proves
- * nothing about it. The canvas takes the drop and the Card leaves the list.
- *
- * The filter is here because twenty-nine Cards is the scale objection, and a
- * surface that cannot be narrowed answers it by scrolling forever.
- *
- * **One list of every Card, of every kind.** There was a Spaces popover beside
- * this one drawing the same component over the Space Cards, and it is gone: a
- * Space Card is a Card, so the surface that offers Cards offers it, and a
- * second disclosure over a subset of the same set was a place for the two to
- * disagree. Every row is draggable and none is annotated — an earlier draft
- * marked a Space Card the Layout already held with "In <Layout>", which is a
- * distinction this surface has no business drawing.
- *
- * **A row is a button, and the drag is the shortcut.** ADR 0082 binds that
- * everything the surface offers is operable from the keyboard alone, and names
- * this case: a drag may be *a* way to place a Card into a Layout and is never
- * the only one. The rows were bare `<div draggable>` — no role, no tab stop, no
- * activation — so the one command in the Dock that adds a Card to the canvas
- * was the one a keyboard could not reach.
- *
- * The route is the **same completion**, not a second one: activating a row
- * spends `onPlace`, which is exactly what {@link PrototypeCanvas}'s `onDrop`
- * spends when a row is dragged onto the canvas. Nothing here knows which of the
- * two got here, and there is no second Edit to keep in step.
- *
- * A native button rather than a `div` with a role and a `tabIndex`: Enter and
- * Space activating a control is the platform's, and the three attributes it
- * would take to reproduce that are three chances to reproduce it wrong. The
- * popover stays open either way, so adding several Cards costs one disclosure.
- */
-function CardList({
-  cards,
-  onPlace,
-}: {
-  readonly cards: readonly Card[];
-  readonly onPlace: (cardId: CardId) => void;
-}) {
-  const [filter, setFilter] = useState('');
-  const needle = filter.trim().toLowerCase();
-  const shown =
-    needle === '' ? cards : cards.filter((card) => card.title.toLowerCase().includes(needle));
-
-  return (
-    <div>
-      <Input
-        size="compact"
-        className="mb-2"
-        aria-label="Filter Cards"
-        placeholder={`Filter ${cards.length} Cards`}
-        value={filter}
-        onChange={(event) => setFilter(event.currentTarget.value)}
-      />
-      {shown.length === 0 ? (
-        <p className="px-1 py-4 text-center text-[13px] text-muted-foreground">No Card matches.</p>
-      ) : (
-        <ul className="dock-proto__card-list">
-          {shown.map((card) => (
-            <li key={card.id}>
-              <Button
-                variant="ghost"
-                draggable
-                // The row's own sheet decides its box bar two things `Button`
-                // decides differently. `justify-start` because `Button`
-                // centres and the title would drift off the grip; `w-full`
-                // because a `<button>` shrink-to-fits whatever its `display`,
-                // where the `<div>` this replaced filled its `<li>`. Without
-                // it the rows are ragged, the hover fill covers only the
-                // words, and `dock-proto__row-title` has no width to
-                // ellipsise against, so a long title widens the row and
-                // overflows the list sideways.
-                className="dock-proto__row w-full justify-start"
-                aria-label={`Add ${card.title} to Layout`}
-                title="Add to Layout, or drag it onto the canvas"
-                onClick={() => onPlace(card.id)}
-                onDragStart={(event) => {
-                  event.dataTransfer.setData(MIME_CARD_ID, card.id);
-                  event.dataTransfer.effectAllowed = 'move';
-                }}
-              >
-                <RowGrip />
-                <CardKindIcon kind={card.kind} />
-                <span className="dock-proto__row-title">{card.title}</span>
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   );
 }
 
@@ -1519,33 +1091,6 @@ function CardList({
  * lands in the column the other three names land in, whichever edge the dock
  * is on.
  */
-/**
- * A control that names a **set** and discloses it: `[glyph] Name ⌄`, in one
- * button.
- *
- * **One construction, because there are two of these and they drifted.** Cards
- * and the open-spaces-menu-at-the-root are the same shape and were built twice: one
- * carried `gap-1.5` from `ListControl` and the other carried none, so the same
- * arrangement of glyph, word and chevron came out spaced two different ways.
- * That is the sort of difference nobody writes down and everybody sees.
- *
- * The button itself is the caller's, because the two sit in different
- * containers — Cards is in a `Toolbar` and takes a `ToolbarButton`, the
- * Open Spaces menu is in a `Breadcrumb` and cannot, since Base UI's toolbar button
- * throws outside a `Toolbar.Root`. What has to match is the size, the classes
- * and the order of the parts, so those are {@link SET_TRIGGER} and this, and a
- * caller supplies neither.
- *
- * A set has no name to edit, so the word lives inside the trigger rather than
- * as a control beside it — which is what separates these two from the three
- * identities, where the name is a rename target and the chevron is its own
- * button.
- */
-const SET_TRIGGER = {
-  className: 'nokey dock-proto__name',
-  size: 'compact',
-} as const satisfies { className: string; size: 'compact' };
-
 function SetTrigger({
   icon,
   children,
@@ -1562,7 +1107,7 @@ function SetTrigger({
   );
 }
 
-function CardsTrigger() {
+export function CardsTrigger() {
   return (
     /* The Card glyph the rows in its own list carry, not `OpenCardIcon`'s
        expand arrows: beside a Space, a Layout and a Graph's colour, the icon
@@ -1572,21 +1117,6 @@ function CardsTrigger() {
   );
 }
 
-/**
- * One disclosure of one list, anchored to the control that opened it.
- *
- * **One list, and it scrolls.** There is nothing pinned under it any more: the
- * two commands that used to sit there — New Space and Copy link — are commands
- * about the Space, not about its Cards, and they have gone to the Space
- * cluster's menu where the same two commands sit for a Layout and a Graph. What
- * is left is the inventory and the filter that narrows it, so the surface has
- * one region and no question about which of them a control belongs to.
- *
- * **It carries no label**, because there is one list in it and the trigger
- * already names it. There were two disclosures here, Cards and Spaces, each
- * drawing this component — and the second had to label its regions to say which
- * subset of Cards it was showing. One list needs no such caption.
- */
 /**
  * Which of the Dock's list disclosures is open, if any.
  *
@@ -1611,6 +1141,16 @@ const DockDisclosureContext = createContext<DockDisclosure>({
   openId: null,
   setOpenId: () => undefined,
 });
+
+/**
+ * How a name control tells the application it is being renamed.
+ *
+ * A context for the same reason the disclosure above is one: the fact belongs to
+ * the bar rather than to any cluster, and threading a reporter through two
+ * components to reach a leaf is the shape that makes the next person keep it
+ * locally instead.
+ */
+const DockRenamingContext = createContext<(renaming: boolean) => void>(() => undefined);
 
 /**
  * One disclosure's share of the Dock's single open slot.
@@ -1655,57 +1195,6 @@ function useDockDisclosure() {
   } satisfies DisclosureBinding;
 }
 
-function ListControl({
-  side,
-  label,
-  hint,
-  className,
-  trigger,
-  children,
-}: {
-  readonly side: MenuSide;
-  readonly label: string;
-  readonly hint: string;
-  /** For the Cards cluster, whose trigger stands in the name slot. */
-  readonly className?: string;
-  readonly trigger: ReactNode;
-  readonly children: ReactNode;
-}) {
-  // A **controlled** Base UI Popover has to be told which trigger it belongs
-  // to; without `triggerId` the root has no trigger association and `open`
-  // opens nothing at all, silently.
-  // The open state belongs to the Dock rather than to this control, which is
-  // the whole point: two of these side by side each holding their own `open`
-  // is how both come to be open at once, covering each other.
-  const { id: triggerId, open, onOpenChange } = useDockDisclosure();
-
-  return (
-    <Popover open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
-      <PopoverTrigger
-        id={triggerId}
-        className={`${SET_TRIGGER.className} ${className ?? ''}`}
-        aria-label={label}
-        title={hint}
-        // Every disclosure trigger is a plain ghost button, and the open
-        // treatment is one CSS rule over `aria-expanded` rather than a variant
-        // swapped here. Branching in one of the five is how the Cards trigger
-        // came to fill dark on open while the three menus did not.
-        render={<ToolbarButton variant="ghost" size={SET_TRIGGER.size} />}
-      >
-        {trigger}
-      </PopoverTrigger>
-      <PopoverContent
-        side={side}
-        align={DISCLOSURE_ALIGN}
-        sideOffset={DISCLOSURE_SIDE_OFFSET}
-        className={`${DISCLOSURE_PANEL} ${DISCLOSURE_WIDTH}`}
-      >
-        {children}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function CardsControl({
   cards,
   side = 'bottom',
@@ -1723,8 +1212,8 @@ function CardsControl({
    * announces once on the way past rather than on every item.
    */
   return (
-    <ToolbarGroup aria-label="Cards" className="dock-proto__cluster">
-      {/* **The list carries no commands, and that is the shape rather than a
+    <ToolbarGroup aria-label="Cards" className="command-dock__cluster">
+      {/* **The surface carries no commands, and that is the shape rather than a
           gap in it.** Cards names no one thing — a Card's own commands are the
           Card rail's (ADR 0073) and this Dock deliberately carries none — and
           its one set command, Create, is the `+` beside this trigger.
@@ -1734,19 +1223,7 @@ function CardsControl({
           It offers Space Cards like any other Card and does nothing special
           with them: entering one is the canvas Card's gesture (ADR 0068), not a
           list's. */}
-      <ListControl
-        side={side}
-        label="Cards"
-        hint="Cards in this Space"
-        // Two classes rather than one: it stands in the name slot like the other
-        // three, and it is the one trigger that carries its own disclosure
-        // inside it — which the vertical dock's column grid has to know, because
-        // that chevron has to land in the column the others' chevrons are in.
-        className="dock-proto__name dock-proto__cards-trigger"
-        trigger={<CardsTrigger />}
-      >
-        <CardList cards={cards.cards} onPlace={cards.onPlace} />
-      </ListControl>
+      {cards.surface}
       {/* **Trailing, where Present leads**, and the asymmetry is the point.
           Present acts on the named thing the cluster is showing — present *this
           Graph* — so it sits at the edge the eye enters from, ahead of the name
@@ -1758,7 +1235,7 @@ function CardsControl({
           It costs the vertical dock a fourth track — see the grid in
           `command-dock.css` — because this is the one cluster with a control on
           both sides of its name. */}
-      <CreateMenu side={side} />
+      <CreateMenu side={side} onCreate={cards.onCreate} disabled={cards.createDisabled} />
     </ToolbarGroup>
   );
 }
@@ -1783,19 +1260,16 @@ function CardsControl({
  * needed a name; now that moving closes nothing, the open set only grows unless
  * something takes from it. It sits behind its own separator for the reason
  * Delete does on the other two menus — the commands above it make something and
- * this one takes something away — and it is disabled at the root, which cannot
- * be exited.
+ * this one takes something away — and it is disabled on the meta Space, which
+ * cannot be exited.
  *
- * **It is the built Exit's rules and not this file's.** The prototype used to
- * invent both halves — a cascade that closed a whole subtree, and refusals of
- * its own — while `openSpaces.exit` had implemented `CONTEXT.md`'s Exit all
- * along under the name `close`. `exitSpace` in `dock-model` now follows those
- * rules and answers production's `ExitSpaceResult`, and `ExitReport` below is
- * the three arms drawn. What it still is not is the *call*: see that function's
- * comment for the seam that is missing.
+ * **It is `openSpaces.exit`'s rules and not this module's.** `CONTEXT.md`'s Exit
+ * — wait on an in-flight commit, refuse for `failed` and `conflicted` naming the
+ * recovery each has, warn and permit for `rejected` — is implemented there, and
+ * `ExitReport` below draws the three arms of the `ExitSpaceResult` it answers.
  *
  * There is still no **Delete**, which a Layout and a Graph both offer: deleting
- * the Space you are standing in has nowhere to leave you, and the prototype does
+ * the Space you are standing in has nowhere to leave you, and this surface does
  * not answer that. Exit is not it — exiting discards a session's place in a
  * Space, and the Space is untouched.
  */
@@ -1811,7 +1285,7 @@ function SpaceMenu({
     <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
       <DropdownMenuTrigger
         id={triggerId}
-        className="nokey dock-proto__disclose"
+        className="nokey command-dock__disclose"
         aria-label={`Space: ${space.title}`}
         title="Space commands"
         render={<ToolbarButton variant="ghost" size="icon" />}
@@ -1822,18 +1296,18 @@ function SpaceMenu({
         align={DISCLOSURE_ALIGN}
         side={side}
         sideOffset={DISCLOSURE_SIDE_OFFSET}
-        className={`${DISCLOSURE_PANEL} nokey ${DISCLOSURE_WIDTH}`}
+        className={`nokey ${DISCLOSURE_WIDTH}`}
       >
         <DropdownMenuGroup>
-          {/* Against the rule stated at the top of this file: creating a Space
+          {/* Against the rule stated at the top of this module: creating a Space
               is Create Card → Space, so this is a second path to one command.
               Drawn because the arrangement asked for it; it is the one item
               here that has not been reconciled. */}
-          <DropdownMenuItem className="gap-2">
+          <DropdownMenuItem className="gap-2" onClick={space.onNewSpace}>
             <PlusIcon />
             New Space
           </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2">
+          <DropdownMenuItem className="gap-2" onClick={space.onCopyLink}>
             <CopyIcon />
             Copy link
           </DropdownMenuItem>
@@ -1842,7 +1316,9 @@ function SpaceMenu({
               It is **not** destructive though, and does not draw as it — exiting
               a Space discards a session's place in it, not the Space, and
               re-entering costs one press on a Card. Meta cannot be exited, so
-              at the root the row is present and unavailable rather than gone.
+              there the row is present and unavailable rather than gone — and
+              that is the *only* case, which `exitDisabled` is named for and
+              `space.parent` was not.
 
               **Exit, because the glossary says Exit.** `CONTEXT.md` gives the
               word to the one action that closes an entered Space, and
@@ -1851,7 +1327,7 @@ function SpaceMenu({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="gap-2"
-            disabled={space.parent === null}
+            disabled={space.exitDisabled}
             onClick={() => space.onExit(space.currentSpaceId)}
           >
             <CloseIcon />
@@ -1989,16 +1465,35 @@ function ParentSpace({
   const openSpacesMenu =
     controls === 'open-spaces-menu' || controls === 'parent-and-open-spaces-menu';
 
+  /**
+   * **The open Spaces that are unwell, counted on the bar rather than inside
+   * the menu.**
+   *
+   * The rows say *which* one and that is the whole of the detail — but ADR 0082
+   * puts the announcement before the disclosure: "a standing failure announces
+   * itself rather than waiting to be opened — a report you have to go and find
+   * is not a report". A mark that exists only under the chevron is exactly that
+   * report, and the vertical strip this replaced badged the set permanently.
+   *
+   * The Space the reader is *in* is excluded, because it reports for itself:
+   * its own persistence control and standing notice are on this same bar, with
+   * the recovery in them. What this mark is for is the Space you are not
+   * looking at.
+   */
+  const unwellElsewhere = space.openSpaces.filter(
+    (row) => row.spaceId !== space.currentSpaceId && unwellReport(row.persistence) !== null,
+  ).length;
+
   return (
-    <Breadcrumb className="dock-proto__trail">
+    <Breadcrumb>
       {/* The Dock has one type scale and the trail is in it. `BreadcrumbList`
           defaults to `text-sm`, which is a page's scale: the crumb inside it
           drew its own 13px and took its line height from the list, so the
           Open Spaces menu came out a pixel shorter than every other named control.
           `compact` is the 13px the rest of the surface is at. */}
-      <BreadcrumbList size="compact" className="dock-proto__trail-list">
+      <BreadcrumbList size="compact" className="command-dock__trail-list">
         {parent === null ? null : (
-          <BreadcrumbItem className="dock-proto__crumb">
+          <BreadcrumbItem className="command-dock__crumb">
             <BreadcrumbLink
               // A `ToolbarButton`, because the Dock is one `Toolbar` now: a
               // plain `Button` in here is a control the roving tabindex does not
@@ -2010,7 +1505,7 @@ function ParentSpace({
                 <ToolbarButton
                   variant="ghost"
                   size="compact"
-                  className="dock-proto__crumb nokey"
+                  className="command-dock__crumb nokey"
                   aria-label={`Go to ${parent.title}`}
                   title={`Go to ${parent.title}`}
                   onClick={() => space.onSwitchTo(parent.spaceId)}
@@ -2021,7 +1516,7 @@ function ParentSpace({
                   this one is somewhere you are not, so the one thing it offers
                   is going there. */}
               <ParentIcon />
-              <span className="dock-proto__ident-text">{parent.title}</span>
+              <span className="command-dock__ident-text">{parent.title}</span>
             </BreadcrumbLink>
           </BreadcrumbItem>
         )}
@@ -2032,15 +1527,15 @@ function ParentSpace({
             disclosure track. */}
         {openSpacesMenu ? (
           <BreadcrumbItem
-            className={parent === null ? 'dock-proto__name-item' : 'dock-proto__disclose'}
+            className={parent === null ? 'command-dock__name-item' : 'command-dock__disclose'}
           >
             <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
               <DropdownMenuTrigger
                 id={triggerId}
                 className={
                   parent === null
-                    ? `${SET_TRIGGER.className} dock-proto__spaces-trigger`
-                    : 'nokey dock-proto__more dock-proto__disclose'
+                    ? `command-dock__spaces-trigger ${SET_TRIGGER.className}`
+                    : 'nokey command-dock__more command-dock__disclose'
                 }
                 // **The name is built from the visible word, not matched to
                 // it.** This read `Switch Space. N open.` while the trigger
@@ -2050,7 +1545,14 @@ function ParentSpace({
                 // word twice and keeping the two in step is the fix that stops
                 // working the first time either side is edited; sharing
                 // {@link SPACES_LABEL} is the one that cannot come apart.
-                aria-label={`${SPACES_LABEL}. ${space.openSpaces.length} open.`}
+                // The count of unwell Spaces joins the name rather than riding
+                // on the glyph alone, so the state is never colour alone and a
+                // reader who never opens the menu is still told.
+                aria-label={
+                  unwellElsewhere === 0
+                    ? `${SPACES_LABEL}. ${space.openSpaces.length} open.`
+                    : `${SPACES_LABEL}. ${space.openSpaces.length} open, ${unwellElsewhere} needs attention.`
+                }
                 title="Switch Space"
                 // A `ToolbarButton` like every other control in the bar. It sits
                 // in a breadcrumb rather than in a cluster, which used to mean a
@@ -2077,12 +1579,21 @@ function ParentSpace({
                     just decided cannot sit beside the Space you are in, and
                     "Spaces" is a set rather than one of them. */}
                 {parent === null ? <SetTrigger>{SPACES_LABEL}</SetTrigger> : <ChevronDownIcon />}
+                {/* The same dot the unwell row carries, on the control that
+                    discloses it — one treatment for one meaning, so the mark on
+                    the bar and the mark in the list read as the same thing. It
+                    is `aria-hidden` because the count above already says it;
+                    two announcements of one state is the `title`-beside-`sr-only`
+                    duplication the row below was fixed for. */}
+                {unwellElsewhere === 0 ? null : (
+                  <span className="command-dock__unwell" data-unwell aria-hidden="true" />
+                )}
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align={DISCLOSURE_ALIGN}
                 side={side}
                 sideOffset={DISCLOSURE_SIDE_OFFSET}
-                className={`${DISCLOSURE_PANEL} nokey ${DISCLOSURE_WIDTH}`}
+                className={`nokey ${DISCLOSURE_WIDTH}`}
               >
                 {/* A radio group, as Layout and Graph both use, because this is
                     the same question those ask: which of a set is the one you
@@ -2109,9 +1620,9 @@ function ParentSpace({
                           this one won is in
                           `.scratch/command-dock/issues/01-...`. */}
                         {row.depth === 0 ? null : (
-                          <span className="dock-proto__guides" aria-hidden="true">
+                          <span className="command-dock__guides" aria-hidden="true">
                             {Array.from({ length: row.depth }, (_, level) => (
-                              <span key={level} className="dock-proto__guide" />
+                              <span key={level} className="command-dock__guide" />
                             ))}
                           </span>
                         )}
@@ -2130,7 +1641,7 @@ function ParentSpace({
                           *which one*, and it says that to a screen reader too
                           rather than in colour alone. */}
                         {report === null ? null : (
-                          <span className="dock-proto__unwell" data-state={row.persistence.kind}>
+                          <span className="command-dock__unwell" data-state={row.persistence.kind}>
                             {/* The `sr-only` span is the whole announcement. A
                               native `title` beside it said the same sentence a
                               second time — announced twice by a screen reader,
@@ -2209,7 +1720,7 @@ function SpacesControl({
        The split is what lets the vertical dock put them on separate lines, and
        it costs no tab stop — the toolbar root is the Dock's, so both parts'
        controls are items in the one roving order. */
-    <div className="dock-proto__space">
+    <div className="command-dock__space">
       <ParentSpace space={space} side={side} />
       {/* Whenever the region above drew anything — the parent, the Open Spaces menu, or
           both. At the root there is no parent and the Open Spaces menu carries the word
@@ -2219,10 +1730,12 @@ function SpacesControl({
       {space.parent === null && space.openSpaces.length <= 1 ? null : (
         <Divider orientation={vertical ? 'horizontal' : 'vertical'} />
       )}
-      <ToolbarGroup aria-label="Space" className="dock-proto__cluster">
+      <ToolbarGroup aria-label="Space" className="command-dock__cluster">
         <IdentityName
           icon={<CardKindIcon kind="space" />}
           kind="Space"
+          testId="space-title"
+          subject={space.currentSpaceId}
           title={space.title}
           onRename={space.onRename}
         />
@@ -2231,28 +1744,6 @@ function SpacesControl({
       {/* Outside the menu that spends it: the menu closes on the press, and a
           dialog mounted inside its content would go with it. */}
       <ExitReport space={space} />
-    </div>
-  );
-}
-
-/**
- * The one control presenting leaves standing.
- *
- * Positioned by the prototype's own stylesheet rather than by React Flow's
- * `Panel`: the canvas is `LayoutCanvasFixture`'s now, and reaching inside it to
- * mount a Panel would mean this file owning a React Flow instance again. It is
- * chrome over the paper, which is what the whole arrangement claims.
- */
-function PresentingExit({ graph }: { readonly graph: DockGraph }) {
-  if (!graph.presenting) return null;
-  return (
-    <div className="dock-proto__presenting-exit">
-      <ControlGroup>
-        <Button variant="ghost" size="compact" className="gap-2" onClick={graph.onExitPresenting}>
-          <StopPresentingIcon color={graph.activeColor} />
-          Stop presenting {graph.active.title}
-        </Button>
-      </ControlGroup>
     </div>
   );
 }
@@ -2432,6 +1923,7 @@ function Dock({
   presenting,
   label,
   className,
+  report,
   children,
 }: {
   readonly dock: DockPosition;
@@ -2444,9 +1936,21 @@ function Dock({
   readonly presenting: boolean;
   readonly label: string;
   readonly className?: string;
+  /**
+   * What the surface has to say without being asked, drawn beside the commands
+   * rather than among them.
+   *
+   * A separate slot and not one more child, because ADR 0082 makes status not a
+   * command: everything in `children` is an item of the toolbar the Dock draws,
+   * and a standing `Alert` among them is a status region inside `role="toolbar"`.
+   * It hangs off the frame instead, which is what lets it follow the dock to any
+   * of the twelve slots while belonging to neither the toolbar's roving order
+   * nor its announcement.
+   */
+  readonly report?: ReactNode;
   readonly children: ReactNode;
 }) {
-  const surface = useRef<HTMLDivElement | null>(null);
+  const frame = useRef<HTMLDivElement | null>(null);
   /**
    * The grip, which the slot menu positions against.
    *
@@ -2495,13 +1999,13 @@ function Dock({
    */
   const pressSpent = useRef(false);
 
-  const bounds = (): { readonly surface: DOMRect; readonly container: DOMRect } | null => {
-    const element = surface.current;
-    const frame = container.current;
-    if (element === null || frame === null) return null;
+  const bounds = (): { readonly docked: DOMRect; readonly container: DOMRect } | null => {
+    const element = frame.current;
+    const box = container.current;
+    if (element === null || box === null) return null;
     return {
-      surface: element.getBoundingClientRect(),
-      container: frame.getBoundingClientRect(),
+      docked: element.getBoundingClientRect(),
+      container: box.getBoundingClientRect(),
     };
   };
 
@@ -2563,10 +2067,10 @@ function Dock({
     pressSpent.current = slotsOpen;
     event.currentTarget.setPointerCapture(event.pointerId);
     track({
-      x: measured.surface.left - measured.container.left,
-      y: measured.surface.top - measured.container.top,
-      offsetX: event.clientX - measured.surface.left,
-      offsetY: event.clientY - measured.surface.top,
+      x: measured.docked.left - measured.container.left,
+      y: measured.docked.top - measured.container.top,
+      offsetX: event.clientX - measured.docked.left,
+      offsetY: event.clientY - measured.docked.top,
       hint: dock,
       fromX: event.clientX,
       fromY: event.clientY,
@@ -2601,8 +2105,8 @@ function Dock({
       hint: nearestSlot(measured.container, {
         left,
         top,
-        right: left + measured.surface.width,
-        bottom: top + measured.surface.height,
+        right: left + measured.docked.width,
+        bottom: top + measured.docked.height,
       }),
     });
   };
@@ -2633,175 +2137,128 @@ function Dock({
     <>
       {dragging ? (
         <div
-          className="dock-proto__snap-hint"
+          className="command-dock__snap-hint"
           data-edge={drag.hint.edge}
           style={dockStyle(drag.hint)}
           aria-hidden="true"
         />
       ) : null}
-      {/* **One toolbar, and it is the surface itself** (ADR 0073). Each cluster
-          used to be a `Toolbar` of its own, which made the Dock four roots and
-          so four tab stops; the ADR draws one root with named `role="group"`s
-          inside it, so the root is here and the clusters are groups. Putting a
-          wrapper *inside* the surface would have been the other way to do it and
-          is the wrong one: the vertical column's grid places this element's
-          direct children, so a layer between them moves every slot. */}
-      <Toolbar
-        ref={surface}
-        aria-label={label}
-        // The arrows follow the edge the dock is on: a column whose arrow keys
-        // ran left and right would be a toolbar disagreeing with its own shape.
-        orientation={vertical ? 'vertical' : 'horizontal'}
-        className={`dock-proto__docked dock-proto__surface nokey nodrag nopan ${className ?? ''}`}
-        data-orientation={vertical ? 'vertical' : 'horizontal'}
+      {/* **The frame is what docks, and the toolbar is what commands.** The
+          two were one element until the persistence report needed somewhere to
+          be: it hangs off the dock, so it has to be positioned against the
+          docked box — and as a child of the toolbar it was a status region
+          inside `role="toolbar"`, which ADR 0082 forbids. The frame carries the
+          slot, the drag state and the presenting switch; the surface carries the
+          treatment and the roving order. It is measured here rather than on the
+          toolbar because it is the element the twelve slots place, and an
+          absolutely positioned report contributes nothing to its box. */}
+      <div
+        ref={frame}
+        className="command-dock"
+        data-testid="command-dock"
+        // Which edge the dock is against, for the one rule outside this frame
+        // that has to know: React Flow's own bottom panels move up out of the
+        // way, and only while there is something down there to move out of.
+        data-edge={dock.edge}
         data-presenting={presenting ? 'true' : 'false'}
         data-dragging={dragging ? 'true' : 'false'}
         style={dragging ? { left: drag.x, top: drag.y } : dockStyle(dock)}
       >
-        {/* The grip is both the drag handle and the disclosure, which is what a
-            grip on a movable panel already reads as. It draws its dots from CSS
-            and carries no children, so the two roles cost one control — and it
-            is a toolbar item like every other command here, so it is in the
-            arrow order rather than beside it. `aria-haspopup` and
-            `aria-expanded` are stated because there is no `Menu.Trigger` to
-            state them; the Dock's open treatment keys off the second. */}
-        <ToolbarButton
-          ref={grip}
-          variant="ghost"
-          size="icon"
-          className="dock-proto__grip nokey"
-          aria-label={`Move ${label}. ${slotLabel(dock)}.`}
-          aria-haspopup="menu"
-          aria-expanded={slotsOpen}
-          title="Drag to another slot, or press for the list"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={cancel}
-          onClick={onGripClick}
-          // A keyboard activation arrives as a `click` with no press in front of
-          // it, so whatever the last press left on `pressSpent` would answer for
-          // it. Base UI's own `useClick` clears its recorded pointer type on
-          // `keydown` for the same reason.
-          onKeyDown={() => {
-            pressSpent.current = false;
-          }}
-        />
-        <DropdownMenu open={slotsOpen} onOpenChange={setSlotsOpen}>
-          <DropdownMenuContent
-            align={DISCLOSURE_ALIGN}
-            // The grip, not a trigger. There is no `Menu.Trigger` in this menu
-            // at all, so the popup would have nothing to position against and
-            // nothing to hand focus back to on the way out.
-            anchor={grip}
-            finalFocus={grip}
-            side={MENU_SIDE[dock.edge]}
-            sideOffset={DISCLOSURE_SIDE_OFFSET}
-            className={`${DISCLOSURE_PANEL} nokey ${DISCLOSURE_WIDTH}`}
-          >
-            {/* A radio group, as every other set in the Dock is: which of a set
-                is the one you are in. The edges are labels rather than submenus
-                because twelve rows down one panel is one arrow-key sweep, and
-                four submenus would put the reader's own slot two levels from
-                the mark that says so. */}
-            <DropdownMenuRadioGroup
-              value={slotValue(dock)}
-              onValueChange={(next) => {
-                // A slot is parsed rather than trusted: `next` is the string
-                // this menu's own items carry, and a `DockSlot` is one of
-                // twelve. `dock-slots.test.ts` holds every value this menu
-                // renders to a round trip, which is what says the miss cannot
-                // come from the menu.
-                const slot = dockSlot(next);
-                if (slot !== null) onDock(slot);
-              }}
+        {/* **One toolbar, and it is the command surface** (ADR 0073). Each cluster
+            used to be a `Toolbar` of its own, which made the Dock four roots and
+            so four tab stops; the ADR draws one root with named `role="group"`s
+            inside it, so the root is here and the clusters are groups. Putting a
+            wrapper *inside* the surface would have been the other way to do it and
+            is the wrong one: the vertical column's grid places this element's
+            direct children, so a layer between them moves every slot. */}
+        <Toolbar
+          aria-label={label}
+          // The arrows follow the edge the dock is on: a column whose arrow keys
+          // ran left and right would be a toolbar disagreeing with its own shape.
+          orientation={vertical ? 'vertical' : 'horizontal'}
+          className={`command-dock__surface nokey nodrag nopan ${className ?? ''}`}
+          data-orientation={vertical ? 'vertical' : 'horizontal'}
+        >
+          {/* The grip is both the drag handle and the disclosure, which is what a
+              grip on a movable panel already reads as. It draws its dots from CSS
+              and carries no children, so the two roles cost one control — and it
+              is a toolbar item like every other command here, so it is in the
+              arrow order rather than beside it. `aria-haspopup` and
+              `aria-expanded` are stated because there is no `Menu.Trigger` to
+              state them; the Dock's open treatment keys off the second. */}
+          <ToolbarButton
+            ref={grip}
+            variant="ghost"
+            size="icon"
+            className="command-dock__grip nokey"
+            aria-label={`Move ${label}. ${slotLabel(dock)}.`}
+            aria-haspopup="menu"
+            aria-expanded={slotsOpen}
+            title="Drag to another slot, or press for the list"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={cancel}
+            onClick={onGripClick}
+            // A keyboard activation arrives as a `click` with no press in front of
+            // it, so whatever the last press left on `pressSpent` would answer for
+            // it. Base UI's own `useClick` clears its recorded pointer type on
+            // `keydown` for the same reason.
+            onKeyDown={() => {
+              pressSpent.current = false;
+            }}
+          />
+          <DropdownMenu open={slotsOpen} onOpenChange={setSlotsOpen}>
+            <DropdownMenuContent
+              align={DISCLOSURE_ALIGN}
+              // The grip, not a trigger. There is no `Menu.Trigger` in this menu
+              // at all, so the popup would have nothing to position against and
+              // nothing to hand focus back to on the way out.
+              anchor={grip}
+              finalFocus={grip}
+              side={MENU_SIDE[dock.edge]}
+              sideOffset={DISCLOSURE_SIDE_OFFSET}
+              className={`nokey ${DISCLOSURE_WIDTH}`}
             >
-              {DOCK_EDGES.map((edge) => (
-                <Fragment key={edge}>
-                  <DropdownMenuLabel>{EDGE_LABEL[edge]}</DropdownMenuLabel>
-                  {DOCK_ALONGS.map((along) => (
-                    <DropdownMenuRadioItem
-                      key={along}
-                      value={slotValue({ edge, along })}
-                      closeOnClick
-                    >
-                      {ALONG_LABEL[orientationOf(edge)][along]}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </Fragment>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {children}
-      </Toolbar>
+              {/* A radio group, as every other set in the Dock is: which of a set
+                  is the one you are in. The edges are labels rather than submenus
+                  because twelve rows down one panel is one arrow-key sweep, and
+                  four submenus would put the reader's own slot two levels from
+                  the mark that says so. */}
+              <DropdownMenuRadioGroup
+                value={slotValue(dock)}
+                onValueChange={(next) => {
+                  // A slot is parsed rather than trusted: `next` is the string
+                  // this menu's own items carry, and a `DockSlot` is one of
+                  // twelve. `dock-slots.test.ts` holds every value this menu
+                  // renders to a round trip, which is what says the miss cannot
+                  // come from the menu.
+                  const slot = dockSlot(next);
+                  if (slot !== null) onDock(slot);
+                }}
+              >
+                {DOCK_EDGES.map((edge) => (
+                  <Fragment key={edge}>
+                    <DropdownMenuLabel>{EDGE_LABEL[edge]}</DropdownMenuLabel>
+                    {DOCK_ALONGS.map((along) => (
+                      <DropdownMenuRadioItem
+                        key={along}
+                        value={slotValue({ edge, along })}
+                        closeOnClick
+                      >
+                        {ALONG_LABEL[orientationOf(edge)][along]}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </Fragment>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {children}
+        </Toolbar>
+        {report}
+      </div>
     </>
-  );
-}
-
-/* ----------------------------------------------------------------- canvas */
-
-/**
- * The prototype's canvas is `LayoutCanvasFixture` (`../support/ReactFlowCanvas`).
- *
- * That fixture owns the real React Flow instance, the production `CardNode` and
- * `RoutedEdge`, the projection every stable canvas story draws through, and the
- * production `ZoomSlider` — so this file states which Layout to draw and which
- * Graph to emphasise, and nothing about how a canvas is built. The Edge
- * stacking is production's own rather than three fixed handle lanes standing
- * in for it.
- *
- * The drop is caught on the wrapper, exactly as `ApplicationChromeFixture`
- * catches it: the Cards surfaces float above the canvas, so a drag out of one
- * crosses chrome on the way down, and drop events bubble to here either way.
- *
- * **It also owns the box the Dock docks to, and hands it over as a ref.** The
- * Dock used to reach for `element.parentElement` and measure whatever it found
- * — an unwritten DOM contract on whichever element a caller happened to mount
- * it inside, which no signature stated, no test could hold and nothing would
- * report if a wrapper were added between them. This element is the container by
- * declaration now: it is the surface the twelve slots are slots *of*, and the
- * `overlay` prop that let a story mount the Dock from outside is gone with the
- * guesswork, because a caller that supplies the surface has to be the caller
- * that supplies the frame.
- */
-function PrototypeCanvas({
-  chrome,
-  initialEdge,
-}: {
-  readonly chrome: DockChrome;
-  readonly initialEdge: DockEdge;
-}) {
-  const container = useRef<HTMLDivElement | null>(null);
-
-  return (
-    <div
-      ref={container}
-      className="dock-proto"
-      // A drop is Add to Layout, which is a real Edit on the stored snapshot:
-      // the Card joins the selected Layout and so leaves the list that served
-      // the drag. That surface is deliberately left open — adding Cards is
-      // repetitive, and whether a surface survives the drag it just served is
-      // the comparison.
-      onDragOver={(event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        const id = event.dataTransfer.getData(MIME_CARD_ID);
-        const placed = chrome.cards.cards.find((card) => card.id === id);
-        if (placed !== undefined) chrome.cards.onPlace(placed.id);
-      }}
-    >
-      <LayoutCanvasFixture
-        drawn={chrome.drawn}
-        activeGraphId={chrome.graph.active.id}
-        viewport={{ fit: true }}
-      />
-      <PresentingExit graph={chrome.graph} />
-      <CommandDock chrome={chrome} container={container} initialEdge={initialEdge} />
-    </div>
   );
 }
 
@@ -2812,7 +2269,7 @@ function PrototypeCanvas({
  * canvas.
  *
  * **Nothing here is a new state or a new sentence.** Production settled both
- * long ago and this file spends them unchanged: `PersistenceControl` maps a
+ * long ago and this module spends them unchanged: `PersistenceControl` maps a
  * conflict and a rejection to their `AlertDialog`s, and `PersistenceNotice` is
  * the standing `Alert` with a Retry for the one failure that is neither fine
  * nor final. What had no answer is placement, so placement is all this
@@ -2858,13 +2315,14 @@ function PersistenceReport({
     <>
       {decision ? (
         <PersistenceControl
+          active={persistence.active}
           persistence={state}
           onAcceptRemote={persistence.onAcceptRemote}
           onKeepLocal={persistence.onKeepLocal}
         />
       ) : null}
-      {state.kind === 'failed' ? (
-        <div className="dock-proto__notice" data-side={MENU_SIDE[edge]}>
+      {state.kind === 'failed' && persistence.active ? (
+        <div className="command-dock__notice" data-side={MENU_SIDE[edge]}>
           <PersistenceNotice persistence={state} onRetry={persistence.onRetry} />
         </div>
       ) : null}
@@ -2883,7 +2341,7 @@ function PersistenceReport({
  * named rows with the disclosure at the end of each, which is what the vertical
  * dock is for and why it stays wide enough to hang a popover off.
  */
-function CommandDock({
+export function CommandDock({
   chrome,
   container,
   initialEdge,
@@ -2902,14 +2360,16 @@ function CommandDock({
 
   return (
     <DockDisclosureContext.Provider value={{ openId, setOpenId }}>
-      <Dock
-        dock={dock}
-        onDock={setDock}
-        container={container}
-        presenting={chrome.graph.presenting}
-        label="Command Dock"
-      >
-        {/* Space | Layout Graph | Cards.
+      <DockRenamingContext.Provider value={chrome.onRenamingChange}>
+        <Dock
+          dock={dock}
+          onDock={setDock}
+          container={container}
+          presenting={chrome.graph.presenting}
+          label="Command Dock"
+          report={<PersistenceReport persistence={chrome.persistence} edge={dock.edge} />}
+        >
+          {/* Space | Layout Graph | Cards.
           The three selections first, then the inventory. Which Space, which
           Layout and which Graph are one question asked three times — each names
           the current one, discloses the set, and promotes at most one verb — and
@@ -2924,24 +2384,24 @@ function CommandDock({
           it names a set rather than a selection, so it has no name to edit and
           nothing to promote but Create. Between Layout and Space it looked like
           a fourth selection that had lost its name. */}
-        {/* One open-id under the whole row, spent by every disclosure through
+          {/* One open-id under the whole row, spent by every disclosure through
           `useDockDisclosure` — that, and not a convention each control keeps,
           is what makes at most one open. The hook says why the `Menubar` this
           obviously wants cannot be used inside Toolbars. */}
-        <SpacesControl space={chrome.space} side={side} vertical={vertical} />
-        <Divider orientation={divider} />
-        <LayoutControls canvas={chrome.canvas} side={side} />
-        <Divider orientation={divider} />
-        <GraphControls
-          graph={chrome.graph}
-          layoutTitle={chrome.canvas.selected.title}
-          side={side}
-          vertical={vertical}
-        />
-        <Divider orientation={divider} />
-        <CardsControl cards={chrome.cards} side={side} />
-        <PersistenceReport persistence={chrome.persistence} edge={dock.edge} />
-      </Dock>
+          <SpacesControl space={chrome.space} side={side} vertical={vertical} />
+          <Divider orientation={divider} />
+          <LayoutControls canvas={chrome.canvas} side={side} />
+          <Divider orientation={divider} />
+          <GraphControls
+            graph={chrome.graph}
+            layoutTitle={chrome.canvas.selected.title}
+            side={side}
+            vertical={vertical}
+          />
+          <Divider orientation={divider} />
+          <CardsControl cards={chrome.cards} side={side} />
+        </Dock>
+      </DockRenamingContext.Provider>
     </DockDisclosureContext.Provider>
   );
 }
@@ -2960,160 +2420,3 @@ function CommandDock({
  * it stands. Both are real and both are the same Edit: the Card joins the
  * Layout and the popover stays open, so the next one costs nothing either way.
  */
-export const Default: Story = () => {
-  const chrome = useChrome();
-
-  return <PrototypeCanvas chrome={chrome} initialEdge="top" />;
-};
-
-/**
- * The Dock is the whole viewport's furniture — it docks to the *container's*
- * edges — so it draws in its own frame rather than inside the catalogue's
- * layout, where Ladle's own toolbar lands on top of it.
- */
-Default.meta = { iframed: true };
-
-/**
- * The same Dock on a side edge, which is the arrangement worth looking at
- * rather than dragging to.
- *
- * A second story and not a second dock: the JSX is the same, `initialEdge` is
- * the only difference, and the point is that a vertical dock is a column of
- * `[name] [v]` rows rather than a rail of icons. Its disclosures open into the
- * canvas, away from the edge it is against.
- *
- * **It no longer exists because the drag is untestable.** It used to: a
- * synthetic pointer sequence could not drive the old drag, so starting in the
- * orientation was the only way to see it. That was a defect in the drag rather
- * than a fact about pointers — the handlers read the gesture out of a render
- * closure, so a sequence delivered inside one task found `null` at every step
- * after the first. The gesture is a ref now, the grip discloses the twelve
- * slots to a keyboard as well as a pointer, and either route reaches this
- * arrangement from `Default`. What the story is for now is only the standing
- * view of it.
- */
-export const DockedLeft: Story = () => {
-  const chrome = useChrome();
-
-  return <PrototypeCanvas chrome={chrome} initialEdge="left" />;
-};
-
-DockedLeft.meta = { iframed: true };
-
-/* ------------------------------------------------------------- when it fails */
-
-/**
- * **A commit that failed on the Space you are looking at.**
- *
- * `PersistenceNotice` unchanged — production's own standing `Alert`, its own
- * sentence, its own Retry — hung off the Dock on the side its menus open on, so
- * it follows the surface to any of the twelve slots. Drag the Dock, or press
- * the grip and pick another slot, and the notice goes with it.
- *
- * The canvas stays live behind it on purpose: a retryable failure leaves the
- * local work intact and the next commit may succeed on its own, so blocking the
- * paper would overstate it.
- *
- * And **there is no saving cue anywhere in the Dock**, in this story or any
- * other. That is the proposal: a commit settles faster than a spinner can be
- * read, so the states worth drawing are the three that need a reader.
- */
-export const SaveFailed: Story = () => {
-  const chrome = useChrome({
-    kind: 'failed',
-    failure: {
-      kind: 'retryable-failure',
-      code: 'network',
-      message: 'The space could not be reached.',
-    },
-  });
-
-  return <PrototypeCanvas chrome={chrome} initialEdge="top" />;
-};
-
-SaveFailed.meta = { iframed: true };
-
-/**
- * **A rejection, which is final and has to be acknowledged.**
- *
- * `PersistenceControl`'s `AlertDialog`, portalled and owning the viewport — so
- * unlike the notice it needs no placement at all, and where the Dock is sitting
- * is not part of the decision.
- */
-/*
- * Hoisted for the reason `space/messaging.stories.tsx` gives: the control tells
- * two rejections apart by the identity of the failure the session published, so
- * a literal minted per render reads as a new rejection and re-raises a dismissed
- * dialog.
- */
-const DOCK_REJECTED = {
-  kind: 'rejected',
-  failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
-} as const;
-
-export const SaveRejected: Story = () => {
-  const chrome = useChrome(DOCK_REJECTED);
-
-  return <PrototypeCanvas chrome={chrome} initialEdge="top" />;
-};
-
-SaveRejected.meta = { iframed: true };
-
-/**
- * **A conflict, which blocks until local or stored work is chosen.**
- *
- * The same production `AlertDialog`, and the same reason it needs no placement:
- * a conflict has no safe dismissal, so it owns the viewport wherever the
- * furniture is.
- */
-export const SaveConflict: Story = () => {
-  const chrome = useChrome({
-    kind: 'conflicted',
-    current: {
-      snapshot: { ...commandDockSnapshot, document: { version: 1, title: 'Rendering' } },
-      revision: 5n,
-      exportedRevision: null,
-    },
-    baseline: undefined,
-  });
-
-  return <PrototypeCanvas chrome={chrome} initialEdge="top" />;
-};
-
-SaveConflict.meta = { iframed: true };
-
-/**
- * **A Space that went wrong while the reader was somewhere else.**
- *
- * This is question C, and it is the one the Dock could not answer at all. The
- * strip is over `Rendering`, which is fine; `Design system` — the Space one step
- * up the trail — is the one whose commit failed. Nothing about the Dock says so
- * until the Open Spaces menu is opened, and then the row that names it carries the mark.
- *
- * **It is a regression the Sidebar did not have.** `OpenSpaces`, the vertical
- * tab strip the Open Spaces menu replaces, drew a badge per open Space for `conflicted`,
- * `failed` and `rejected`. A Open Spaces menu that lists the same set and says nothing
- * makes a Space that needs a decision look exactly like one that does not.
- *
- * The row says *which*, and nothing else: a dot at the trailing edge, its
- * sentence in the row's title and in an `sr-only` span so the state is never
- * colour alone. The recovery itself belongs to that Space's own Dock, which is
- * one press away — the Open Spaces menu is a way to Spaces, not a place to repair one.
- */
-export const SaveFailedElsewhere: Story = () => {
-  const chrome = useChrome(
-    {
-      kind: 'failed',
-      failure: {
-        kind: 'retryable-failure',
-        code: 'network',
-        message: 'The space could not be reached.',
-      },
-    },
-    'elsewhere',
-  );
-
-  return <PrototypeCanvas chrome={chrome} initialEdge="top" />;
-};
-
-SaveFailedElsewhere.meta = { iframed: true };

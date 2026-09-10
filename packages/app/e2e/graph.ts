@@ -82,6 +82,26 @@ export function nodeByTitle(page: Page, title: string): Locator {
     .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
 }
 
+/** The visible face shares its node's complete rectangle, including during resize. */
+export async function expectCardFillsNode(node: Locator): Promise<void> {
+  await expect
+    .poll(() =>
+      node.evaluate((element) => {
+        const face = element.querySelector('.canvas-card');
+        if (face === null) throw new Error('Card face is missing');
+        const outer = element.getBoundingClientRect();
+        const inner = face.getBoundingClientRect();
+        return Math.max(
+          Math.abs(outer.x - inner.x),
+          Math.abs(outer.y - inner.y),
+          Math.abs(outer.width - inner.width),
+          Math.abs(outer.height - inner.height),
+        );
+      }),
+    )
+    .toBeLessThan(0.1);
+}
+
 /**
  * The Card reached during traversal, by the class the projection marks it with.
  *
@@ -96,7 +116,7 @@ export function activeCard(page: Page): Locator {
 }
 
 /**
- * Open a Card, which is to say edit it (ADR 0037).
+ * Open a Card in place, without beginning content editing (ADR 0064).
  *
  * No pointer gesture on a Card's body opens it (ADR 0036) — the Card's own
  * control does, and it is revealed by hovering the Card.
@@ -106,12 +126,55 @@ export async function openCard(node: Locator, title: string): Promise<void> {
   await node.getByRole('button', { name: `Open Card ${title}` }).click();
 }
 
-/** The Space's command surface: one list of everything the canvas can draw. */
-export function sidebar(page: Page): Locator {
-  return page.getByTestId('space-sidebar');
+/**
+ * The Space's command surface (ADR 0082).
+ *
+ * **Every helper below opens a menu where it used to press a button**, and that
+ * is the whole of what the Command Dock changed for this suite. The Sidebar was
+ * a sixteen-rem column with room for a permanent row per Layout, a permanent row
+ * per Graph and a permanent Add Layout; the Dock is a strip over the canvas that
+ * finds room by disclosure. So the *claims* the specs make are unchanged and the
+ * reach is not, which is exactly why the reach lives here — one module rather
+ * than the thirty call sites that would otherwise each settle on their own way
+ * of pressing it. `packages/app/test/command-dock.ts` is this module's opposite
+ * number in the unit suite, for the same reason.
+ */
+export function dock(page: Page): Locator {
+  return page.getByRole('toolbar', { name: 'Command Dock' });
 }
 
-/** What the canvas header says is drawing. */
+/**
+ * Press a Dock disclosure and wait for what it discloses.
+ *
+ * `delay` is not decoration. A default Playwright click puts mousedown and
+ * mouseup in one tick and Base UI's dismissal never gets a turn between them, so
+ * a menu can open and close inside one press without this suite seeing it
+ * (`ladle-e2e/link-actions.spec.ts` records the regression that found it).
+ *
+ */
+async function disclose(page: Page, name: string | RegExp): Promise<Locator> {
+  await dock(page).getByRole('button', { name }).click({ delay: 120 });
+  const menu = page.getByRole('menu').last();
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+/** The Layout cluster's disclosure: the authored Layouts, then its own commands. */
+export function layoutMenu(page: Page): Promise<Locator> {
+  return disclose(page, /^Layout: /);
+}
+
+/** The Graph cluster's disclosure: the Graphs this Layout owns, then its commands. */
+export function graphMenu(page: Page): Promise<Locator> {
+  return disclose(page, /^Active Graph: /);
+}
+
+/** The Space cluster's disclosure: New Space, Copy link and Exit Space. */
+export function spaceMenu(page: Page): Promise<Locator> {
+  return disclose(page, /^Space: /);
+}
+
+/** What the Dock says is drawing. */
 export function selectedCanvas(page: Page): Locator {
   return page.getByTestId('selected-canvas');
 }
@@ -119,28 +182,78 @@ export function selectedCanvas(page: Page): Locator {
 /**
  * Draw one authored Layout, by title.
  *
- * One helper for both because there is one choice (ADR 0053): the sidebar lists
- * every View and every Layout together and exactly one row is pressed. The
- * fixture declares two Layouts (`fixture/space.json`), so a test can open one
- * without authoring it first — which is the only way to drag a Card in a Layout
- * that already owns Edges.
+ * One exclusive choice over authored Layouts, with no second control and no
+ * empty value — ADR 0053's one durable clause, which ADR 0082 keeps verbatim.
+ * The fixture declares two Layouts (`fixture/space.json`), so a test can open
+ * one without authoring it first, which is the only way to drag a Card in a
+ * Layout that already owns Edges.
  */
 export async function selectCanvas(page: Page, title: string): Promise<void> {
-  const choice = sidebar(page).getByRole('button', { name: title, exact: true });
-  if ((await choice.getAttribute('aria-pressed')) !== 'true') await choice.click();
-  await expect(selectedCanvas(page)).toContainText(title);
+  // Exact, both times. On a substring the early return fires for `Workshop`
+  // while `Workshop 2` is drawing — the test then runs against the wrong Layout
+  // and the closing `toContainText` agrees with it.
+  const named = (text: string): boolean => text.trim() === title;
+  if (named(await selectedCanvas(page).innerText())) return;
+  const menu = await layoutMenu(page);
+  await menu.getByRole('menuitemradio', { name: title, exact: true }).click();
+  await expect(selectedCanvas(page)).toHaveText(title);
 }
 
-/** The row of the Graph the Sidebar is emphasising, or nothing when none is. */
+/** Create and select an empty Layout owning one empty Graph (ADR 0079, ADR 0080). */
+export async function newLayout(page: Page): Promise<void> {
+  const menu = await layoutMenu(page);
+  await menu.getByRole('menuitem', { name: 'New Layout' }).click();
+}
+
+/** The Layouts the Space offers, read from the one list that offers them. */
+export async function layoutChoices(page: Page): Promise<Locator> {
+  return (await layoutMenu(page)).getByRole('menuitemradio');
+}
+
+/** The Graph the Dock is naming as active, or nothing when none is. */
 export function activeGraph(page: Page): Locator {
-  return sidebar(page).locator('[data-testid="graph-choice"][aria-pressed="true"]');
+  return page.getByTestId('active-graph');
 }
 
 /** Emphasise one Graph by title. Activating is never an Edit (ADR 0028). */
 export async function activateGraph(page: Page, title: string): Promise<void> {
-  const choice = sidebar(page).getByRole('button', { name: title, exact: true });
-  if ((await choice.getAttribute('aria-pressed')) !== 'true') await choice.click();
+  // Exact, for the reason {@link selectCanvas} is.
+  if ((await activeGraph(page).innerText()).trim() === title) return;
+  const menu = await graphMenu(page);
+  await menu.getByRole('menuitemradio', { name: title, exact: true }).click();
   await expect(activeGraph(page)).toHaveText(title);
+}
+
+/** The Graphs the selected Layout owns, read from the one list that offers them. */
+export async function graphChoices(page: Page): Promise<Locator> {
+  return (await graphMenu(page)).getByRole('menuitemradio');
+}
+
+/**
+ * Present, which traverses the Active Graph.
+ *
+ * Named for the Graph it acts on rather than sitting under a generic label, so
+ * the prefix is matched and the title is left to the assertion that wants it.
+ */
+export function presentControl(page: Page): Locator {
+  return dock(page).getByRole('button', { name: /^Present / });
+}
+
+/** Whether creating a Card is available at all, which the `+` reports. */
+export function createCardControl(page: Page): Locator {
+  return dock(page).getByRole('button', { name: 'Create Card' });
+}
+
+/** Create a Card of one kind, from the Cards cluster's `+`. */
+export async function createCard(
+  page: Page,
+  kind: 'Markdown Card' | 'Space Card' | 'Alias',
+): Promise<void> {
+  const menu = await disclose(page, 'Create Card');
+  // The row says the kind twice — `CardKindIcon` announces it and the word
+  // beside it repeats it — so which of the two carries the accessible name is
+  // the glyph's decision and not this module's.
+  await menu.getByRole('menuitem', { name: new RegExp(`^(${kind}\\s*)+$`) }).click();
 }
 
 /** The resolved colour drawn on one Graph's legend swatch, by its title. */

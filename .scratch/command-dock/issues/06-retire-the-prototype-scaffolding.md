@@ -6,9 +6,19 @@ Blocked by: nothing. The theme change landed as `a5a76669` (`feat(theme): sand
 is the canvas, and the chrome is neutral over it`), which is what the phantom
 "no ticket anywhere in `.scratch/`" blocker was waiting for.
 
-**What to build:** The cleanup pass that runs last. Three unrelated things share
+**What to build:** The cleanup pass for `01`–`05`. Three unrelated things share
 this ticket only because each is a deletion or a one-line compliance fix, and none
 is worth its own file.
+
+**It is not the pass that runs last, and this line used to say it was.** `07`
+agreed with it — *"It is not a cleanup pass — `06` is that"* — and both sentences
+were written before `07` settled on **moving** the prototype rather than deleting
+it. `command-dock.stories.tsx` goes to `stories/space/` and flips to
+`stable: true`, which takes the `dock-proto__` prefixes, the hand-rolled sheet
+that has no production home yet (`ui-catalog.ts:149` reads only
+`packages/app/src/styles.css`), the guard below and the portal hook below with
+it. Each of those is an acceptance criterion of that move rather than a second
+pass scheduled after it, so nothing is waiting on this ticket to run again.
 
 - [x] **Delete the settled sheets and their CSS.** `01` answered all three, so
       `space-trail`, `space-switcher` and `dock-feedback` are gone with the
@@ -69,6 +79,20 @@ is worth its own file.
       meantime** — reaching a portalled surface at all is a problem the fork did
       not create and does not take with it, and one rule still needs it.
 
+      **That reason is `03`'s unfinished item, not a new one.** The rule is
+      `command-dock.css:400`, and `03:37` asked for exactly its removal: fix
+      `DropdownMenuItem`'s destructive variant upstream *so the consumer can
+      delete the rule*. Half of it was fixed — `dropdown-menu.tsx:107-116`
+      records the glyph override going — but `:118` still paints the row
+      `text-destructive` at rest, so the consumer rewrote its override (the
+      `!important` is gone) rather than deleting it, and `03` closed over the
+      difference. Red-at-rest is a disagreement with the design system rather
+      than a defect in it, which is why it is not reopened here: it is a
+      `@project/ui` decision, and at promotion the override stops being a
+      prototype's opinion and becomes a production sheet contradicting the menu
+      primitive. `07` owns it, on the same grounds it already took `02`'s
+      deferred toolbar item.
+
       **This bit while it is still true.** A colour fix justified by "the app is
       dark" is wrong for the theme that was built. One already happened: a review
       of ticket `03` called `Popover`'s move from
@@ -114,10 +138,23 @@ change could reach.
 
 ## What is left, and who owns it
 
-Nothing. All four items are done and the theme change that blocked the fourth
-has merged, so no colour judgement in this ticket or in `07` is waiting on
+Nothing here. All four items are done and the theme change that blocked the
+fourth has merged, so no colour judgement in this ticket or in `07` is waiting on
 anything. The `Status:` line is left at `ready-for-human` for the human to
 confirm and close rather than being closed on an agent's reading.
+
+Two things this ticket surfaced are owed by `07` rather than by it, and both are
+written into `07`'s checklist:
+
+- **The parent mark's evidence.** Moving the glyph to `@project/ui` locked the
+  decision in prose, which is the strength that was wanted, but `ParentIcon`'s
+  only caller today is the prototype and `ui:catalog:check` cannot see that: it
+  resolves coverage per *module* through the import graph, and `icons.tsx` is
+  already rendered by its siblings, so an unused export in it owes no inventory
+  entry and fails nothing. `07` is where a real consumer and a parity claim
+  arrive; without one the cube reaches V1 with a doc comment as its only
+  evidence, which is the outcome this item set out to avoid.
+- **The destructive row's resting ink**, above.
 
 ## Comments
 

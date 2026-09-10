@@ -36,9 +36,15 @@ function DropdownMenuContent({
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
-        // `z-50`, as every other portalled surface in this package carries:
-        // the Space Sidebar's container is `fixed` at `z-10`, and a popup
-        // left at the auto stacking level opens behind it.
+        // `z-50`, as every other portalled surface in this package carries.
+        // What a popup has to clear is the Command Dock, which floats over the
+        // canvas: `packages/app/src/components/command-dock.css` puts
+        // `.command-dock` at `position: absolute; z-index: 20`, its drag snap
+        // hint at `19` and the standing persistence notice it hangs off itself
+        // at `21`. So the number to beat is the *highest* thing the Dock puts
+        // on screen and not the Dock's own frame — a popup left at the auto
+        // stacking level opens behind all of it, and one re-derived down to
+        // `z-20` from the frame's number alone would open under the notice.
         className="z-50 outline-none"
         align={align}
         alignOffset={alignOffset}
@@ -109,13 +115,27 @@ function DropdownMenuItem({
       // `data-[variant=destructive]:*:[svg]:text-destructive`, which paints
       // `color` directly on the child `svg` — and a declared colour is not
       // overridden by an ancestor's, however specific that ancestor's rule is,
-      // so a surface restating the row's resting colour had to restate the
-      // glyph's too and reach for `!important` to be sure of it. The utility
-      // bought nothing: the row is already `text-destructive`, Lucide draws on
-      // `currentColor`, and the `**:text-accent-foreground` rule above excludes
-      // destructive rows precisely so their descendants keep it.
+      // so a surface restating the row's colour had to restate the glyph's too
+      // and reach for `!important` to be sure of it. The utility bought nothing:
+      // Lucide draws on `currentColor`, and the `**:text-accent-foreground` rule
+      // above excludes destructive rows precisely so their descendants keep it.
+      //
+      // **A destructive row is ink at rest and red where the reader is** — the
+      // registry's `data-[variant=destructive]:text-destructive` is gone with
+      // the glyph rule, and only the `focus:` pair below survives. A row that is
+      // already red before it is reached spends the alarm on merely being in the
+      // list, so the menu reads as a warning about itself rather than about the
+      // one command that removes something; the colour lands where a reader is
+      // about to act instead. Base UI gives a menu item `:focus` on hover as
+      // well as from the keyboard, so both routes get it.
+      //
+      // Settled here rather than by each surface. It was a consumer rule in the
+      // Command Dock's prototype sheet (`.scratch/command-dock/issues/03`, `/07`);
+      // at promotion that would have become a production stylesheet contradicting
+      // the primitive, which is the second design system this package exists to
+      // prevent. `EntityActionsMenu`'s Delete rows change with it, deliberately.
       className={cn(
-        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 data-inset:pl-7 data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}

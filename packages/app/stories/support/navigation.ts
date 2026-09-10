@@ -9,12 +9,21 @@ import { requireDefaultLayout } from '#src/layout-resolution';
 /**
  * Production Navigation, composed the way a story needs it and no other way.
  *
- * Two surfaces now open a real Navigation — the Space Sidebar and the
- * presenting chrome — and what they share is genuinely the composition rather
- * than a look: the Space reader Navigation resolves every selection against,
- * the rule that the instance is *state* rather than a memo, and the one call that puts a story in the state it is about. Delete this
- * module and both fixtures grow the same twenty lines back, including the
- * lifecycle rule `SpaceSidebarFixture.test.tsx` exists to pin.
+ * One surface opens a real Navigation — the presenting chrome — and
+ * `PresentingChromeFixture` is this module's only importer. It was two until
+ * ADR 0082 retired the Space Sidebar, and the shared-composition argument went
+ * with the second consumer: what is left is a single-consumer helper, and it is
+ * written down that way rather than dressed up as a seam it no longer is.
+ *
+ * What it still carries is the reasoning, not the line count. Three rules live
+ * here and each one is a mistake a fixture would otherwise make again: the
+ * Space reader Navigation resolves every selection against has to answer *now*
+ * rather than at mount (`composeStoryNavigation` below), the instance is
+ * *state* rather than a memo, and the opening call runs exactly once. Inlining
+ * them into the one fixture would put a page of lifecycle argument in the
+ * middle of a component whose subject is the chrome — a decision to take
+ * deliberately if a reader thinks the indirection now costs more than it saves,
+ * not a tidy-up to do in passing.
  *
  * It is deliberately **not** a second lifecycle owner and not a visual facsimile
  * (ADR 0052). It holds no selected index, no Traversal history and no copy of

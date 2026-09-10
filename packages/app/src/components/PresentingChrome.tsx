@@ -157,8 +157,11 @@ export function PresentingChrome({
     <div
       data-testid="presenting-chrome"
       // Its own container, so the responsive rule below reads the width the
-      // chrome actually has rather than the viewport's: the Space Sidebar
-      // takes 16rem of it above the breakpoint and none below.
+      // chrome actually has rather than the viewport's. It was tuned when the
+      // Space Sidebar took 16rem of that width above its breakpoint and none
+      // below; ADR 0082 gives the chrome the whole width at every size, so the
+      // container query now stacks only where the *viewport* is genuinely narrow
+      // — which is what `@container` was chosen to express either way.
       // React Flow's live Space-key pan activation subscription reaches this
       // chrome outside the canvas, so `.nokey` excludes all of its controls.
       className="nokey @container absolute inset-x-0 bottom-0 z-20 border-t border-border bg-background/90"

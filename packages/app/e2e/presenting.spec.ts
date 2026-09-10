@@ -6,7 +6,9 @@ import {
   activeCard,
   authoringHandle,
   connectHandles,
+  dock,
   nodeByTitle,
+  presentControl,
   selectCanvas,
   settled,
   viewportTransform,
@@ -46,7 +48,7 @@ async function present(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
   await settled(page);
-  await page.getByTestId('present-button').click();
+  await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await settled(page);
 }
@@ -116,7 +118,7 @@ test('the camera closes in on the active card, and pulls back on exit', async ({
   await settled(page);
 
   const overview = await camera(page);
-  await page.getByTestId('present-button').click();
+  await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await settled(page);
 
@@ -142,28 +144,23 @@ test(
   'the chrome names the moves available, and says when the graph ends',
   {
     tag: [
-      '@parity:space-sidebar-withdraws-authoring-while-presenting',
+      '@parity:command-dock-withdraws-entirely-while-presenting',
       '@parity:presenting-line-offers-one-move',
     ],
   },
   async ({ page }) => {
     await present(page);
-    await expect(page.getByRole('button', { name: 'Add Card' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Add Layout' })).toBeDisabled();
-    // The Layout's own menu is withdrawn down to its address. Rename and Delete
-    // Layout are Edits and go with the rest of authoring; copying a link is not
-    // an Edit, and nothing about a presentation makes an address uncopyable
-    // (`.scratch/link-ux/issues/02`).
-    await page.getByRole('button', { name: 'Collection 1', exact: true }).hover();
-    await page
-      .getByRole('button', { name: /^Actions for Layout Collection 1$/ })
-      .click({ delay: 120 });
-    const layoutMenu = page.getByRole('menu');
-    await expect(layoutMenu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
-    await expect(layoutMenu.getByRole('menuitem', { name: 'Delete Layout' })).toHaveCount(0);
-    await expect(layoutMenu.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
+    // **The whole surface goes, rather than its commands one at a time.** The
+    // Sidebar withdrew authoring item by item and this test named which items
+    // left a Layout row's menu; the Dock is furniture over the paper, so
+    // presenting removes the furniture and there is no menu left to withdraw
+    // anything from. What the audience is left with is the canvas and
+    // `PresentingChrome`, which carries the way out.
+    await expect(page.getByTestId('command-dock')).toHaveAttribute('data-presenting', 'true');
+    await expect(dock(page)).toBeHidden();
+    await expect(page.getByRole('toolbar', { name: 'Command Dock' })).toBeHidden();
+    await expect(page.getByTestId('selected-canvas')).toBeHidden();
+    await expect(page.getByTestId('exit-presenting')).toBeVisible();
 
     // A line gives a one-member choice at each card — the degenerate fork, not a
     // second mode (ADR 0024).
@@ -229,7 +226,7 @@ test('clicking a card while presenting does not open it', async ({ page }) => {
 
 test('returning to the overview restores the space and its gestures', async ({ page }) => {
   await present(page);
-  await page.getByTestId('exit-presenting-button').click();
+  await page.getByTestId('exit-presenting').click();
 
   await expect(page.getByTestId('presenting-chrome')).toHaveCount(0);
   // No card is active, so every node is back to drawing its title.
@@ -282,11 +279,14 @@ test(
 /**
  * Entering presentation with the pointer, then advancing with Space.
  *
- * The Sidebar's Present button is the one DOM node that relabels to Stop, so
- * React keeps focus on it across the click. Left there, the presenter holds the
- * control that *leaves* — and Space, which advances, defers to whatever has
- * focus, so the first press dropped straight back to the overview. The chrome
- * claims focus as it mounts, so the press reaches the move it is aimed at.
+ * Space activates whatever has focus, so where focus lands on entering decides
+ * what the first press does. The control that entered cannot keep it: the Dock's
+ * Present button carries a fixed `Present <Graph>` label rather than relabelling
+ * to Stop, and presenting removes the whole Dock
+ * (`.command-dock[data-presenting='true'] { display: none }`), so the button
+ * that was clicked is gone rather than merely renamed. The chrome claims focus
+ * as it mounts, so the press reaches the move it is aimed at rather than
+ * deferring to a control that happened to hold focus.
  */
 test('Space advances on the first press after entering with the pointer', async ({ page }) => {
   await present(page);
@@ -301,24 +301,25 @@ test('Space advances on the first press after entering with the pointer', async 
 });
 
 /**
- * The same deference, on a control the chrome does not own.
+ * The same deference, on the control that leaves rather than the one that moves.
  *
  * The rule is about interactive controls rather than about one button, and the
- * Sidebar's exit action is the other one a presenter can be focused on. Had the
- * global handler taken this press it would have called `preventDefault`, the
+ * presenting chrome's own exit control — the `Overview` button
+ * (`PresentingChrome.tsx`) — is the other one a presenter can be focused on. Had
+ * the global handler taken this press it would have called `preventDefault`, the
  * button would never have activated, and the traversal would have advanced
  * instead — so the chrome being gone is the whole proof.
  */
-test('Space on the Sidebar exit action leaves presentation rather than advancing', async ({
+test('Space on the presenting chrome exit control leaves presentation rather than advancing', async ({
   page,
 }) => {
   await present(page);
 
-  await page.getByTestId('exit-presenting-button').focus();
+  await page.getByTestId('exit-presenting').focus();
   await page.keyboard.press('Space');
 
   await expect(page.getByTestId('presenting-chrome')).toHaveCount(0);
-  await expect(page.getByTestId('present-button')).toBeVisible();
+  await expect(presentControl(page)).toBeVisible();
 });
 
 /**
@@ -394,7 +395,7 @@ test(
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
     await settled(page);
 
-    await page.getByTestId('present-button').click();
+    await presentControl(page).click();
     await expect(page.getByTestId('presenting-chrome')).toBeVisible();
     await settled(page);
 
@@ -430,43 +431,52 @@ test(
 );
 
 /**
- * The chrome at a phone width, where the Space Sidebar is a Sheet and the
- * canvas — and so the chrome — has the whole viewport.
+ * The presenting chrome at a phone width, where it has the whole viewport.
  *
- * The primary Traversal choices stay choices: their own full-width row, not a
- * menu, and not a block wrapped over the Card being presented.
+ * Presenting removes the Dock, so at this width nothing is left over the canvas
+ * to reopen or to take a keypress before the traversal does. The primary
+ * Traversal choices stay choices: their own full-width row, not a menu, and not
+ * a block wrapped over the Card being presented.
  */
 test.describe('at a phone width', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   /**
-   * The Sidebar Sheet is a modal drawn *over* the canvas, and its trigger
-   * survives into presentation — so it can be reopened mid-traversal. While it
-   * is up it owns every key pressed inside it: one Escape dismisses the sheet
-   * and leaves the traversal exactly where it was, rather than doing both.
+   * **The Sheet this described is gone (ADR 0082).**
+   *
+   * The Sidebar's phone branch was a modal over the canvas whose trigger
+   * survived into a presentation, so it could be reopened mid-traversal and had
+   * to own the keys pressed inside it — one Escape dismissed the sheet and left
+   * the traversal where it was. The Dock has no Sheet and no trigger that
+   * outlives the surface: presenting removes the whole thing, so there is
+   * nothing to reopen and no key to arbitrate. What replaced the obligation is
+   * `mobile-dock.spec.ts`, which holds the surface to fitting rather than to
+   * dismissing.
    */
-  test('a reopened Sidebar Sheet owns its own keys while presenting', async ({ page }) => {
+  test('presenting leaves no command surface to reopen at a phone width', async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
 
-    const toggle = page.getByRole('button', { name: 'Toggle Sidebar' });
-    await toggle.click();
-    await page.getByTestId('present-button').click();
+    await presentControl(page).click();
     await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-    await expect(page.getByTestId('space-sidebar')).toHaveCount(0);
+    await expect(dock(page)).toBeHidden();
     await settled(page);
 
-    await toggle.click();
-    await expect(page.getByTestId('space-sidebar')).toBeVisible();
-    await page.keyboard.press('Escape');
-
-    await expect(page.getByTestId('space-sidebar')).toHaveCount(0);
+    // The traversal keys reach the canvas rather than a surface over it: there
+    // is nothing left at this width to own a keypress before the presentation
+    // gets it, which is the whole of what the Sheet's arbitration was for.
+    await page.keyboard.press('ArrowRight');
     await expect(page.getByTestId('presenting-chrome')).toBeVisible();
     await expect(activeCard(page)).toHaveAttribute(
       'data-id',
-      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
     );
+
+    // And Escape is the way out, reaching the presentation for the same reason.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('presenting-chrome')).toHaveCount(0);
+    await expect(dock(page)).toBeVisible();
   });
 
   test(
@@ -477,12 +487,11 @@ test.describe('at a phone width', () => {
       await expect(nodeByTitle(page, 'A').first()).toBeVisible();
       await settled(page);
 
-      await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
-      await page.getByTestId('present-button').click();
+      await presentControl(page).click();
       await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-      // The Sheet is modal and covers the canvas, so nothing here is a fair
-      // reading of the chrome until it is gone (ADR 0053).
-      await expect(page.getByTestId('space-sidebar')).toHaveCount(0);
+      // Nothing covers the canvas: presenting removed the command surface, so
+      // what is measured below is the presenting chrome alone (ADR 0082).
+      await expect(dock(page)).toBeHidden();
       await settled(page);
 
       // One move on, taken with the pointer, which is the affordance a narrow

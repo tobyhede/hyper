@@ -5,12 +5,13 @@ import {
   activateGraph,
   activeGraph,
   boxOf,
+  graphChoices,
   graphLegendSwatchColor,
+  layoutChoices,
   openCard,
   selectCanvas,
   selectedCanvas,
   settled,
-  sidebar,
 } from './graph';
 
 // The app loads the abstract layout fixture (packages/app/fixture) — two
@@ -41,8 +42,8 @@ function nodeByTitle(page: Page, title: string): Locator {
 
 test('offers more than one named graph', async ({ page }) => {
   await page.goto('/');
-  // The sidebar's Graphs group lists every Graph the canvas draws.
-  await expect(sidebar(page).getByTestId('graph-choice')).toHaveCount(3);
+  // The Graph cluster's own list holds every Graph the selected Layout owns.
+  await expect(await graphChoices(page)).toHaveCount(3);
 });
 
 test('draws every Graph in the selected Layout, each in its own color', async ({ page }) => {
@@ -126,14 +127,17 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
   const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
 
   await expect(selectedCanvas(page)).toContainText('Collection 1');
-  await expect(sidebar(page).getByTestId('layout-row')).toHaveCount(2);
+  await expect(await layoutChoices(page)).toHaveCount(2);
+  await page.keyboard.press('Escape');
 
   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
   await selectCanvas(page, 'Collection 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   await expect(legendItems).toHaveCount(3);
-  await expect(sidebar(page).getByTestId('graph-choice')).toHaveCount(3);
-  await expect(sidebar(page).getByRole('button', { name: 'Echo', exact: true })).toHaveCount(0);
+  const owned = await graphChoices(page);
+  await expect(owned).toHaveCount(3);
+  await expect(owned.filter({ hasText: 'Echo' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
 
   // Collection 2 owns Echo alone.
   await selectCanvas(page, 'Collection 2');
@@ -147,54 +151,61 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
 /**
  * The two surfaces that name a Graph, held to the same answer.
  *
- * ADR 0053 gave the Space Sidebar a Graphs group carrying every Graph's
- * title, colour and active state — which is what the canvas HUD's key already
- * said. Issue 06 keeps the key: it is the on-canvas colour reference beside the
- * Edges being read, and it is the only one of the two still on screen once the
- * Sidebar is collapsed. What the decision costs is this test — the two must
- * never disagree, which is why both resolve a colour through the one shared
- * `graphColor` seam rather than each deriving its own.
+ * The Command Dock's Graph cluster discloses every Graph the selected Layout
+ * owns, with its title, its colour and which one is active — which is what the
+ * canvas HUD's key already said. Issue 06 keeps the key: it is the on-canvas
+ * colour reference beside the Edges being read, and it is the one of the two
+ * that is on screen without a menu being opened for it. What the decision costs
+ * is this test — the two must never disagree, which is why both resolve a colour
+ * through the one shared `graphColor` seam rather than each deriving its own.
  */
 test(
-  'the Sidebar and the canvas HUD agree about every Graph, collapsed or not',
-  { tag: '@parity:graph-hud-and-sidebar-agree-on-the-active-graph' },
+  'the Dock and the canvas HUD agree about every Graph, disclosed or not',
+  { tag: '@parity:graph-hud-and-dock-agree-on-the-active-graph' },
   async ({ page }) => {
     await page.goto('/');
     const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
     await expect(legendItems).toHaveCount(3);
 
     // Titles, in the same order from the selected Layout.
-    expect(await legendItems.allInnerTexts()).toEqual(
-      await sidebar(page).getByTestId('graph-choice').allInnerTexts(),
-    );
+    const choices = await graphChoices(page);
+    expect(await legendItems.allInnerTexts()).toEqual(await choices.allInnerTexts());
 
-    // Colours. Lucide paints the Sidebar's glyph by `stroke`, the HUD paints its
-    // stripe as a background — two properties, one resolved value each.
-    const sidebarColors = await sidebar(page)
-      .getByTestId('graph-choice')
-      .locator('svg')
-      .evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke));
+    // Colours. Lucide paints the menu row's glyph by `stroke`, the HUD paints
+    // its stripe as a background — two properties, one resolved value each.
+    // The Graph glyph and nothing else: a checked radio row also draws the
+    // menu's own tick, and Lucide leaves that one on `currentColor` while
+    // `GraphIcon` is given the Graph's resolved colour.
+    const dockColors = await choices
+      .locator('svg:not([stroke="currentColor"])')
+      .evaluateAll((els: readonly Element[]) => els.map((el) => getComputedStyle(el).stroke));
     const hudColors = await legendItems
       .locator('[aria-hidden="true"]')
-      .evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
-    expect(hudColors).toEqual(sidebarColors);
+      .evaluateAll((els: readonly Element[]) =>
+        els.map((el) => getComputedStyle(el).backgroundColor),
+      );
+    expect(hudColors).toEqual(dockColors);
     expect(new Set(hudColors).size).toBe(3);
 
     // Emphasis, through an activation neither surface owns — and asserted on
     // **both** surfaces, because agreement is the claim. Reading only the HUD
-    // would leave the Sidebar free to stop marking the Active Graph entirely
-    // while the one test named for the two agreeing stayed green.
+    // would leave the Dock free to stop marking the Active Graph entirely while
+    // the one test named for the two agreeing stayed green.
+    await page.keyboard.press('Escape');
     await activateGraph(page, 'Mid');
     const emphasised = page.getByTestId('graph-legend').locator('li[data-active="true"]');
     await expect(emphasised).toHaveCount(1);
     await expect(emphasised).toHaveText('Mid');
-    const pressed = sidebar(page).locator('[data-testid="graph-choice"][aria-pressed="true"]');
-    await expect(pressed).toHaveCount(1);
-    await expect(pressed).toHaveText('Mid');
+    await expect(activeGraph(page)).toContainText('Mid');
+    const checked = (await graphChoices(page)).and(page.locator('[aria-checked="true"]'));
+    await expect(checked).toHaveCount(1);
+    await expect(checked).toHaveText('Mid');
 
-    // And with the Sidebar gone, which is the whole reason the key was kept.
-    await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
-    await expect(page.locator('[data-slot="sidebar"]')).toHaveAttribute('data-state', 'collapsed');
+    // And with the menu dismissed, which is the whole reason the key was kept:
+    // the Dock names the Active Graph and nothing else without being opened,
+    // while the key stays on the canvas beside the Edges it explains.
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(emphasised).toHaveText('Mid');
     await expect(legendItems).toHaveCount(3);
   },
@@ -275,6 +286,10 @@ test('a card shows its title in the graph, and opens to show rendered Markdown',
   await openCard(a, 'A');
   await expect(a.getByText('A', { exact: true }).last()).toHaveCSS('font-weight', '700');
 
+  // Hovered again before the press: opening grows the Card under the pointer, so
+  // the rail the Open left revealed may already have faded by the time Close is
+  // reached — and a faded rail takes no pointer events.
+  await a.hover();
   await a.getByRole('button', { name: 'Close Card A' }).click();
   await expect(a.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });
@@ -414,13 +429,17 @@ test(
     await page.getByRole('button', { name: 'Zoom out' }).click();
     await settled(page);
     const resizeBox = await boxOf(resizeControl, "Alias A′'s resize control");
-    await page.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + resizeBox.height / 2);
+    // The drag has to end **inside the viewport**: a `mousemove` past the
+    // window's edge is clamped, and the gesture then ends where it never went
+    // and commits nothing. `A′` is the last Card on the spine and sits near the
+    // right edge, so the delta is what fits rather than what is round.
+    const grabX = resizeBox.x + resizeBox.width / 2;
+    const grabY = resizeBox.y + resizeBox.height / 2;
+    const viewport = page.viewportSize();
+    if (viewport === null) throw new Error('The resize drag needs a sized viewport.');
+    await page.mouse.move(grabX, grabY);
     await page.mouse.down();
-    await page.mouse.move(
-      resizeBox.x + resizeBox.width / 2 + 120,
-      resizeBox.y + resizeBox.height / 2 + 80,
-      { steps: 6 },
-    );
+    await page.mouse.move(Math.min(grabX + 120, viewport.width - 8), grabY + 80, { steps: 6 });
     await page.mouse.up();
     await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 1));
     await recap.evaluate(async (element) => {

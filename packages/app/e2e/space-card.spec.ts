@@ -1,5 +1,13 @@
 import { expect, test, type Locator, type Page } from './fixtures';
-import { boxOf, dragBy, nodeByTitle, selectCanvas, settled } from './graph';
+import {
+  boxOf,
+  createCard,
+  dragBy,
+  expectCardFillsNode,
+  nodeByTitle,
+  selectCanvas,
+  settled,
+} from './graph';
 
 /**
  * Authoring a Space Card through the application, over HTTP and a real
@@ -12,6 +20,36 @@ import { boxOf, dragBy, nodeByTitle, selectCanvas, settled } from './graph';
  * through the same boundary every other Edit does — one revision on the
  * containing Space, no partial state on the canvas.
  */
+
+/**
+ * Move to an open Space from the Command Dock's Open Spaces menu.
+ *
+ * The vertical tab strip this replaces is gone with the Space Sidebar (ADR
+ * 0082): the open set is disclosed from the bar as the tree the crossings make,
+ * and a row is a way *to* a Space rather than a tab beside it. `delay` is the
+ * press a menu trigger needs — a zero-delay click puts mousedown and mouseup in
+ * one tick and Base UI's dismissal never gets a turn between them.
+ */
+const switchToSpace = async (page: Page, title: string): Promise<void> => {
+  await page.getByRole('button', { name: /^Spaces\. \d+ open\.$/ }).click({ delay: 120 });
+  await page.getByRole('menuitemradio', { name: new RegExp(`^${title}`) }).click();
+  await expect(showingSpace(page)).toContainText(title);
+};
+
+/**
+ * The name of the Space on screen.
+ *
+ * `:visible`, because every open Space stays mounted and only one is shown
+ * (`OpenSpacesApplication`). A role query already skips the hidden ones — they
+ * are out of the accessibility tree — but a test id does not.
+ */
+const showingSpace = (page: Page): Locator => page.locator('[data-testid="space-title"]:visible');
+
+/** Leave the Space you are in, which is the Space cluster's own command. */
+const exitSpace = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: /^Space: / }).click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Exit Space' }).click();
+};
 
 /**
  * The whole creation gesture, from the menu to the Card on the canvas.
@@ -31,8 +69,7 @@ test(
     await settled(page);
     const nodes = await page.locator('.react-flow__node').count();
 
-    await page.getByTestId('add-card-menu').click();
-    await page.getByRole('menuitem', { name: 'Add Space Card' }).click();
+    await createCard(page, 'Space Card');
 
     const pane = page.getByTestId('new-space-card');
     const create = pane.getByRole('button', { name: 'Create' });
@@ -72,15 +109,13 @@ test('a second Space Card may reference the Space the first one created', async 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Space Card' }).click();
+  await createCard(page, 'Space Card');
   await page.getByTestId('new-space-card-title').fill('Architecture');
   await page.getByTestId('new-space-card').getByRole('button', { name: 'Create' }).click();
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
   await settled(page);
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Space Card' }).click();
+  await createCard(page, 'Space Card');
   await page.getByTestId('new-space-card-title').fill('Architecture again');
   await page.getByRole('combobox', { name: 'Space' }).click();
   await page.getByRole('option', { name: 'Architecture' }).click();
@@ -112,8 +147,7 @@ test('an Open Space Card shows its target and offers no way to change it', async
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Space Card' }).click();
+  await createCard(page, 'Space Card');
   await page.getByTestId('new-space-card-title').fill('Architecture');
   await page.getByTestId('new-space-card').getByRole('button', { name: 'Create' }).click();
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
@@ -162,16 +196,20 @@ test('deleting the last Space Card deletes the Space it referenced', async ({ pa
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Space Card' }).click();
+  await createCard(page, 'Space Card');
   await page.getByTestId('new-space-card-title').fill('Architecture');
   await page.getByTestId('new-space-card').getByRole('button', { name: 'Create' }).click();
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
   await settled(page);
 
-  // No click selects it: a completed creation leaves the Card it made selected,
-  // exactly as Add Card and Add Alias do, so Delete Card already names it.
-  await page.getByRole('button', { name: 'Delete Card Architecture' }).click();
+  // Deleting a Card is the Card's own rail (ADR 0073), reached by hovering it —
+  // the Space's command surface draws no Card commands at all (ADR 0082).
+  const created = nodeByTitle(page, 'Architecture');
+  await created.hover();
+  await created
+    .getByRole('button', { name: 'Actions for Card Architecture', exact: true })
+    .click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Delete Card' }).click();
   await expect(
     page.getByText(
       'If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.',
@@ -185,8 +223,7 @@ test('deleting the last Space Card deletes the Space it referenced', async ({ pa
 
   // The Space went with it, so a second Space Card is offered no existing Space
   // to reference — which is the only way this surface can see the cascade.
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Space Card' }).click();
+  await createCard(page, 'Space Card');
   await page.getByRole('combobox', { name: 'Space' }).click();
   await expect(page.getByRole('option', { name: 'Architecture' })).toHaveCount(0);
 });
@@ -223,8 +260,7 @@ async function openSpaceCardOnItsLayout(page: Page): Promise<Locator> {
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Space Card' }).click();
+  await createCard(page, 'Space Card');
   await page.getByTestId('new-space-card-title').fill('Architecture');
   await page.getByTestId('new-space-card').getByRole('button', { name: 'Create' }).click();
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
@@ -278,7 +314,12 @@ test(
     expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
     const layout = await boxOf(card.getByTestId('space-card-layout'), 'Layout selector');
     const graph = await boxOf(card.getByTestId('space-card-graph'), 'Graph selector');
-    expect(layout.y).toBeGreaterThan(inner.y + inner.height);
+    // **Below where the embedding begins, not below every embedded box.** An
+    // embedded Card that runs past the region is *clipped* rather than
+    // shortened (`embedded-layout.ts`), so its layout box is the clip's input
+    // and says nothing about what is drawn — comparing against it held only at
+    // the zoom the old chrome happened to produce.
+    expect(layout.y).toBeGreaterThan(inner.y);
     expect(graph.y).toBeGreaterThanOrEqual(layout.y + layout.height);
     expect(graph.y + graph.height).toBeLessThan(outer.y + outer.height);
   },
@@ -299,8 +340,7 @@ test(
     await editor.fill('Written inside the Space Card');
     await embedded.getByRole('button', { name: 'Save Card Card 1' }).click();
     await expect(embedded).toContainText('Written inside the Space Card');
-    await expect(page.getByRole('tab', { name: 'Architecture', exact: true })).toBeVisible();
-    await page.getByRole('tab', { name: 'Architecture', exact: true }).click();
+    await switchToSpace(page, 'Architecture');
     await expect(
       page.locator('.react-flow__node:visible').getByRole('heading', { name: 'Card 1' }),
     ).toBeVisible();
@@ -348,8 +388,12 @@ test('an embedded Card can move, open with the keyboard and resize in its target
   const parent = await openSpaceCardOnItsLayout(page);
   const embedded = embeddedNodes(page);
   await expect(embedded).toHaveCount(1);
+  await expectCardFillsNode(parent);
+  await expectCardFillsNode(embedded);
   const before = await boxOf(embedded, 'embedded Card');
   const outerBefore = await boxOf(parent, 'containing Card');
+  const parentFace = parent.locator('.canvas-card').first();
+  const parentFaceBefore = await boxOf(parentFace, 'containing Card face');
   await page.mouse.move(before.x + before.width / 2, before.y + before.height - 12);
   await page.mouse.down();
   await page.mouse.move(before.x + before.width / 2 + 50, before.y + before.height - 12 + 20, {
@@ -364,6 +408,8 @@ test('an embedded Card can move, open with the keyboard and resize in its target
   await embedded.evaluate(async (element) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
+  await expectCardFillsNode(embedded);
+  await expectCardFillsNode(parent);
   await embedded.hover();
   const control = embedded.locator('.react-flow__resize-control.handle.bottom.right');
   const resize = await boxOf(control, 'embedded resize control');
@@ -373,29 +419,68 @@ test('an embedded Card can move, open with the keyboard and resize in its target
   await page.mouse.move(resize.x + resize.width / 2 + 25, resize.y + resize.height / 2 + 20, {
     steps: 8,
   });
+  await expectCardFillsNode(embedded);
+  await expectCardFillsNode(parent);
+  expect(await boxOf(parentFace, 'containing Card face during resize')).toEqual(parentFaceBefore);
   await page.mouse.up();
   await expect
     .poll(async () => (await boxOf(embedded, 'resized embedded Card')).width)
     .toBeGreaterThan(open.width + 15);
+  await expectCardFillsNode(embedded);
+  await expectCardFillsNode(parent);
+  expect(await boxOf(parentFace, 'containing Card face after target edits')).toEqual(
+    parentFaceBefore,
+  );
   const outerAfter = await boxOf(parent, 'containing Card after target edits');
   expect(outerAfter.width).toBeCloseTo(outerBefore.width, 0);
   expect(outerAfter.height).toBeCloseTo(outerBefore.height, 0);
 });
 
-test('Exit leaves the embedded drawing and editing reopens its target session', async ({
-  page,
-}) => {
-  await openSpaceCardOnItsLayout(page);
-  await page.getByRole('tab', { name: 'Architecture', exact: true }).click();
-  await page.getByRole('button', { name: 'Exit Space', exact: true }).click();
-  const embedded = embeddedNodes(page);
-  await expect(embedded).toHaveCount(1);
-  await expect(embedded.getByRole('button', { name: /Edit Card/ })).toHaveCount(0);
-  await embedded.click();
-  await embedded.hover();
-  await expect(embedded.getByRole('button', { name: 'Edit Card Card 1' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Architecture', exact: true })).toBeVisible();
-});
+/**
+ * Entering a Space names the one it was entered from, and Exit undoes it.
+ *
+ * **The bar names one step up rather than a whole path**, which is the
+ * arrangement's answer to width rather than an omission: the step a reader
+ * reaches for is the one above them, and everything further up is behind the
+ * Open Spaces disclosure. `ParentIcon` is the mark that says the named Space is
+ * *above* this one rather than beside it — the cube ticket `06` moved into
+ * `@project/ui` so the decision would live somewhere other than a story sheet,
+ * and this is the consumer that gives it a check.
+ */
+test(
+  'entering a Space names the Space it was entered from, and Exit returns',
+  { tag: '@parity:command-dock-marks-the-space-one-crossing-up' },
+  async ({ page }) => {
+    await openSpaceCardOnItsLayout(page);
+
+    // Two Spaces open and neither entered, so the bar carries the Open Spaces
+    // menu and no parent step: there is nothing above `Layout fixture`.
+    await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
+    await switchToSpace(page, 'Architecture');
+
+    // Entered, so the crossing is named — and named as the Space, with the
+    // parent glyph carrying the relation rather than a word.
+    const parent = page.getByRole('button', { name: 'Go to Layout fixture' });
+    await expect(parent).toBeVisible();
+    // The mark contributes nothing to the name: the cube is `aria-hidden`, so
+    // the control is named for the Space alone and the glyph carries the
+    // relation to it.
+    await expect(parent).toHaveAccessibleName('Go to Layout fixture');
+    await expect(parent).toContainText('Layout fixture');
+    await expect(parent.locator('svg[data-icon="parent"][aria-hidden="true"]')).toBeVisible();
+
+    await exitSpace(page);
+
+    await expect(showingSpace(page)).toContainText('Layout fixture');
+    await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
+    const embedded = embeddedNodes(page);
+    await expect(embedded).toHaveCount(1);
+    await expect(embedded.getByRole('button', { name: /Edit Card/ })).toHaveCount(0);
+    await embedded.click();
+    await embedded.hover();
+    await expect(embedded.getByRole('button', { name: 'Edit Card Card 1' })).toBeVisible();
+  },
+);
 
 test('a Space Card resizes to Close and remembers its Open Size', async ({ page }) => {
   const parent = await openSpaceCardOnItsLayout(page);
@@ -430,3 +515,36 @@ test('a Space Card resizes to Close and remembers its Open Size', async ({ page 
     .poll(async () => (await boxOf(parent, 'reopened Space Card')).height)
     .toBeCloseTo(open.height, 0);
 });
+
+test(
+  'the Dock names another open Space whose commit failed',
+  {
+    tag: '@parity:command-dock-names-an-unwell-open-space',
+  },
+  async ({ page }) => {
+    await openSpaceCardOnItsLayout(page);
+    await switchToSpace(page, 'Architecture');
+    await settled(page);
+    // Only the next Edit is failed, while Architecture is the working Space.
+    await page.route('**/api/spaces', async (route) => {
+      if (route.request().method() === 'POST') return route.abort('failed');
+      return route.continue();
+    });
+    const card = nodeByTitle(page, 'Card 1');
+    await card.focus();
+    await card.press('Enter');
+    await expect(page.getByTestId('persistence-failure')).toBeVisible();
+    await page.getByRole('button', { name: 'Go to Layout fixture', exact: true }).click();
+    const trigger = page.getByRole('button', { name: 'Spaces. 2 open, 1 needs attention.' });
+    await expect(trigger.locator('[data-unwell]')).toBeVisible();
+    await trigger.click({ delay: 120 });
+    const unwell = page.getByRole('menuitemradio', { name: /^Architecture/ });
+    await expect(unwell).toContainText('Save failed');
+    await expect(page.getByRole('menu').getByRole('button', { name: 'Retry' })).toHaveCount(0);
+    await unwell.click();
+    await expect(page.getByTestId('persistence-failure')).toBeVisible();
+    await page.unroute('**/api/spaces');
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByTestId('persistence-failure')).toBeHidden();
+  },
+);

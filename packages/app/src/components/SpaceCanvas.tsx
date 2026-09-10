@@ -29,6 +29,7 @@ import {
   type GraphId,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
+import type { EntityActionGroup } from '@project/ui';
 import {
   nodeTypes,
   GraphConnectionLine,
@@ -119,9 +120,15 @@ export const ADD_CARD_KEY = 'C';
  * the surfaces that carry no marker of their own — `CardSearchCombobox`'s popup
  * is `role="presentation"`, not `dialog`, because its input sits outside the
  * popup, so the marker rather than a role is what covers it.
+ *
+ * `[data-sidebar]` used to close the list: the registry `Sidebar` was the app's
+ * chrome and set that attribute on every part of itself. It went with ADR 0082,
+ * and the Command Dock that replaced it marks itself `.nokey` like every other
+ * chrome surface — so the entry was covering nothing and has gone rather than
+ * standing as a guard against a component the tree no longer contains.
  */
 const NOT_A_CANVAS_COMMAND =
-  '.nokey, input, textarea, select, button, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"], [data-sidebar]';
+  '.nokey, input, textarea, select, button, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]';
 
 /**
  * The Card a key came from, or `null` if it came from anywhere else.
@@ -163,7 +170,7 @@ export interface SpaceCanvasProps {
    * words: "This Card is unavailable while placement is pending." Any
    * availability answer would make it false somewhere — `connectOnCanvas`
    * announces "pending" over a placement that resolved long ago the moment an
-   * author begins an inline Layout rename in the Sidebar, which is a lie told
+   * author begins an inline Layout rename on the Dock, which is a lie told
    * to exactly the readers who depend on it, and told while the canvas behind
    * that rename is fully reachable (nothing about a chrome rename covers the
    * graph or traps focus).
@@ -242,6 +249,22 @@ export interface SpaceCanvasProps {
   activeGraphCardIds: ReadonlySet<string>;
   /** What each Space Card's target offers it, for the Cards of kind `space` on this canvas. */
   spaceCardTargets?: SpaceCardTargets;
+  /**
+   * What commands each Card on this canvas offers — copy an address, delete it
+   * — drawn on the Card's own rail (ADR 0073).
+   *
+   * Passed straight through to `useCanvasCardAuthoring`, which is where every
+   * other per-Card operation is attached. Absent on a canvas whose Cards have
+   * no such commands to run, which is how an embedded Layout draws none.
+   *
+   * A command list is built afresh on every render of the composition that owns
+   * it — an address and an Edit both read state that has just changed — so this
+   * widens the measured exception below from "the node wrappers rebuild
+   * whenever `nodes` changes identity" to "whenever this canvas renders".
+   * Correctness is unaffected, and closing it is the same per-node cache that
+   * note already names.
+   */
+  cardEntityActions?: (cardId: CardId) => readonly EntityActionGroup[];
 }
 
 export function SpaceCanvas({
@@ -274,6 +297,7 @@ export function SpaceCanvas({
   activeGraphId,
   activeGraphCardIds,
   spaceCardTargets,
+  cardEntityActions,
 }: SpaceCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
 
@@ -445,6 +469,7 @@ export function SpaceCanvas({
     cardResize,
     onSelectCard,
     spaceCardTargets,
+    cardEntityActions,
   });
   const { bodyEditing, openCard: onOpenCard, beginTitleEditing } = cardAuthoring;
 

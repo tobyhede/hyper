@@ -79,9 +79,9 @@ export function canvasProjection(space: Space, resolved: ResolvedLayout): Pendin
   const handles = filterHandlesByGraphs(buildCardHandles(space), drawnGraphIds);
   const edges = buildGraphRenderEdges(space).filter((edge) => visible.has(edge.graphId));
   // The Layout chooses the Cards it draws. In particular, a Layout's sparse
-  // placement omits Cards from its canvas; the Sidebar Cards collection is the
-  // surface that reveals those Cards without manufacturing positions (ADR 0040,
-  // ADR 0069).
+  // placement omits Cards from its canvas; the Cards drawer is the surface that
+  // reveals those Cards without manufacturing positions (ADR 0040, ADR 0069) —
+  // the Sidebar's Cards collection before ADR 0082, the Dock's drawer now.
   const cardIds = layoutCards(space, resolved.layout).map((card) => card.id);
   const authored = Placement.fromLayout(resolved.layout);
   const openCardIds = new Set([...authored].filter(([, at]) => at.open).map(([cardId]) => cardId));

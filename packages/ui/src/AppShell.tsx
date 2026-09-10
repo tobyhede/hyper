@@ -1,17 +1,10 @@
 import type { ReactNode } from 'react';
-import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/sidebar';
 
 export interface AppShellProps {
-  sidebarWidth?: string | undefined;
-  /** The application's own `Sidebar`: the persistent command surface (ADR 0053). */
-  sidebar: ReactNode;
-  /** What the canvas header says beside the sidebar trigger — the current canvas. */
-  header?: ReactNode;
   /**
-   * Standing chrome pinned to the top right of the main area, directly under
-   * the canvas header. For a condition the canvas stays usable through — one
-   * the chrome can only point at, and a dialog would overstate by blocking the
-   * work that caused it.
+   * Standing chrome pinned to the top right of the main area. For a condition
+   * the canvas stays usable through — one the chrome can only point at, and a
+   * dialog would overstate by blocking the work that caused it.
    */
   notice?: ReactNode;
   /**
@@ -23,64 +16,52 @@ export interface AppShellProps {
    * a Card the reader is dragging, the Graph key and a standing notice all
    * visible beside the panel instead of behind it. Any CSS length; omitted
    * means nothing overlays and the main area is full-bleed.
+   *
+   * **This is not the command surface taking room.** ADR 0082 binds that the
+   * Space's command surface takes no layout space from the canvas, and the
+   * Command Dock takes none — it floats over `.shell__area`. The strip is the
+   * Cards drawer's, a surface the author opens and closes rather than furniture
+   * standing on every screen.
    */
   insetEnd?: string | undefined;
-  /**
-   * Whether this shell is the one on screen.
-   *
-   * A session mounts one shell per open Space and shows one of them, so the
-   * sidebar's `Ctrl/Cmd-B` — a `window` listener — would otherwise toggle the
-   * sidebars of Spaces nobody is looking at. Omitted means there is only this
-   * one and it is showing.
-   */
-  active?: boolean | undefined;
   children: ReactNode;
 }
 
 /**
- * The app frame: a persistent sidebar beside a full-bleed canvas.
+ * The app frame: a full-bleed canvas, and the two things pinned over it.
  *
- * The header is the inset's, not the page's, so it survives the sidebar being
- * closed and keeps the one control that reopens it. It deliberately carries no
- * Space title: the sidebar header names the Space and this names what is
- * drawing it (ADR 0053).
+ * **It used to be a sidebar beside a canvas, and the sidebar is what went.**
+ * ADR 0053 put the Space's commands in a persistent left `Sidebar` and priced
+ * the gutter honestly — sixteen rem, "the real price and it is paid on every
+ * screen". ADR 0082 refuses that trade and binds the one spatial fact it kept:
+ * the command surface takes no layout space from the canvas. So the registry
+ * `Sidebar`, its `SidebarProvider`, its `Ctrl/Cmd-B` and the header row that
+ * carried its trigger are all gone, and the Command Dock floats over the area
+ * below instead.
+ *
+ * What is left is three things a canvas cannot do for itself: pin the viewport
+ * so the page never scrolls, yield the strip a drawer overlays, and give the
+ * standing notice a containing block that strip has already been taken out of.
+ * That is thinner than it was, and it is still the frame — the alternative is
+ * every mount repeating the same three rules around its own canvas.
  */
-export function AppShell({
-  sidebar,
-  header,
-  notice,
-  insetEnd,
-  sidebarWidth,
-  active = true,
-  children,
-}: AppShellProps) {
-  const style =
-    sidebarWidth === undefined ? undefined : { width: '100%', '--sidebar-width': sidebarWidth };
+export function AppShell({ notice, insetEnd, children }: AppShellProps) {
   return (
-    <SidebarProvider className="shell" style={style} active={active}>
-      {sidebar}
-      <SidebarInset className="min-h-0">
-        <header className="shell__header">
-          {/* React Flow's live Space-key pan activation subscription reaches
-              this chrome button outside the canvas, so `.nokey` excludes it. */}
-          <SidebarTrigger className="nokey" />
-          {header}
-        </header>
-        <div className="shell__main" style={{ paddingInlineEnd: insetEnd }}>
-          {/* The padding is the yielded strip, and this fills what is left of it.
-              An absolutely positioned box resolves against its containing block's
-              *padding* box, so the notice below would ignore that padding and sit
-              under the overlay — this element is what gives it a containing block
-              the strip has already been taken out of. */}
-          <div className="shell__area">
-            {children}
-            {/* The slot is unconditional and its own CSS hides it while the notice
-                renders nothing, so a caller passes one component for the whole
-                condition rather than repeating that component's own test here. */}
-            <div className="shell__notice">{notice}</div>
-          </div>
+    <div className="shell">
+      <div className="shell__main" style={{ paddingInlineEnd: insetEnd }}>
+        {/* The padding is the yielded strip, and this fills what is left of it.
+            An absolutely positioned box resolves against its containing block's
+            *padding* box, so the notice below would ignore that padding and sit
+            under the overlay — this element is what gives it a containing block
+            the strip has already been taken out of. */}
+        <div className="shell__area">
+          {children}
+          {/* The slot is unconditional and its own CSS hides it while the notice
+              renders nothing, so a caller passes one component for the whole
+              condition rather than repeating that component's own test here. */}
+          <div className="shell__notice">{notice}</div>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </div>
   );
 }

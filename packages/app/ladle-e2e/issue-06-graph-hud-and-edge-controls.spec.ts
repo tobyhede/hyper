@@ -204,13 +204,13 @@ test(
  * What the story fixes is the key beside it — every Graph the Layout draws,
  * each with its resolved colour, and exactly one emphasised. **Emphasis is not
  * filtering** (ADR 0040): the inactive Graphs stay listed and stay coloured.
- * That the emphasis *moves* with an activation, and that the Sidebar agrees
+ * That the emphasis *moves* with an activation, and that the Command Dock agrees
  * when it does, is the paired application evidence's claim — activation is the
- * Sidebar's command and a story-only button for it would prove nothing here.
+ * Dock's command and a story-only button for it would prove nothing here.
  */
 test(
   'the Graph HUD keys every Graph and emphasises the active one',
-  { tag: '@parity:graph-hud-and-sidebar-agree-on-the-active-graph' },
+  { tag: '@parity:graph-hud-and-dock-agree-on-the-active-graph' },
   async ({ page }) => {
     await page.goto(story('surfaces--graph-hud--retained'));
 

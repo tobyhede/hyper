@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nearestAlong, nearestEdge, type DockBox } from '../stories/review/dock-model';
+import { nearestAlong, nearestEdge, type DockBox } from '../src/dock-model';
 
 /**
  * A 1200x800 viewport, which is the only container the Dock ever measures

@@ -8,11 +8,11 @@ import {
   type InternalNode,
 } from '@xyflow/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId, inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
+import { AddCardControl } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import { edgeSelectionOf } from '../src/render-adapter';
@@ -21,7 +21,6 @@ import { useEdgeAuthoring } from '../src/edge-authoring-react';
 import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
-import { SpaceSidebar } from '../src/components/SpaceSidebar';
 import { CARD_SIZE } from '../src/card';
 
 /**
@@ -41,49 +40,8 @@ const CARD_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const LAYOUT_ONE_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
-/** The one row this chrome draws, named so `selected` can be that very value. */
-const LAYOUT_ONE: Layout = {
-  id: LAYOUT_ID,
-  title: 'Layout 1',
-  kind: 'positioned',
-  positions: {},
-  graphs: [{ id: LAYOUT_ONE_GRAPH_ID, title: 'Main', edges: [] }],
-};
-/** The real app chrome, composed as `App` composes it, outside the canvas. */
-const appChrome = (
-  <SidebarProvider>
-    <SpaceSidebar
-      spaceTitle="Space"
-      canvas={{
-        layouts: [LAYOUT_ONE],
-        selected: LAYOUT_ONE,
-        onSelect: () => undefined,
-      }}
-      graph={{
-        graphs: [],
-        colorByGraphId: {},
-        activeGraphId: null,
-        onActivate: () => undefined,
-        onPresent: () => undefined,
-        onExitPresenting: () => undefined,
-      }}
-      addCard={{
-        onAddCard: () => undefined,
-        onAddAlias: () => undefined,
-        onAddSpaceCard: () => undefined,
-      }}
-      createLayout={{ refusal: null, onCreate: () => undefined }}
-      persistence={{
-        control: <PersistenceIndicator state="settled" />,
-        state: 'settled',
-        acknowledgedRevision: 0n,
-      }}
-    />
-  </SidebarProvider>
-);
 /** The Graph and Edge an Edge operation is named by, which travel together. */
 const SUBJECT = { graphId: GRAPH_ID, edge: EDGE } as const;
 const ASIDE_EDGE = { from: CARD_B, to: CARD_C } as const;
@@ -689,23 +647,15 @@ describe("the app's canvas delete key", () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 
-  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches the sidebar', (key) => {
-    // The real control, mounted where the real one is: outside the flow
-    // entirely. The app-owned canvas command guard recognises the Sidebar
-    // ancestor rather than depending on a React Flow marker.
-    const { adapter, session } = mountCanvas(appChrome);
-    act(() => adapter.getState().selectEdge(SUBJECT));
-
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Layout 1' }), { key });
-
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
-  });
-
   it.each(DELETE_KEYS)(
     'leaves the Edge standing when %s reaches the Add Card menu trigger',
     (key) => {
-      // AddCardControl sits beside the Menubar in the real toolbar, outside the
-      // flow, with the same document-level exposure MenubarTrigger has.
+      // The real control, mounted where the real one is: outside the flow
+      // entirely, in chrome that marks itself `.nokey` — which is the marker
+      // the canvas guard reads rather than a list of its own. It carried a
+      // second case beside it, over a `SpaceSidebar` mounted the same way; the
+      // Sidebar is gone and the Command Dock that replaced it marks itself the
+      // same way, so what is left is one production control proving one guard.
       const { adapter, session } = mountCanvas(
         <AddCardControl onAddCard={NO_OP} onAddAlias={NO_OP} onAddSpaceCard={NO_OP} />,
       );

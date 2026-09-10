@@ -1,6 +1,10 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
-import type { CanvasCardBodyEditor, CanvasSpaceCardSelection } from '@project/ui';
+import type {
+  CanvasCardBodyEditor,
+  CanvasSpaceCardSelection,
+  EntityActionGroup,
+} from '@project/ui';
 import type { Card, CardId, LayoutPosition, GraphId } from '@project/core';
 import { inHandleId, outHandleId, resolveContentCard } from '@project/graph';
 import type {
@@ -161,6 +165,17 @@ export type CardNodeData = {
     onResizeEnd: () => void;
     onResizeCancel: () => void;
   };
+  /**
+   * This Card's own commands — copy an address it can be reached by, delete it
+   * — drawn as one more control on the Card's rail (ADR 0073, ADR 0082).
+   *
+   * Built by the composition and carried whole, exactly as the operations above
+   * are: an address comes from the product destination table and a deletion
+   * runs a completed Edit, neither of which this package can reach. Absent
+   * means no control rather than an empty menu, which is the rule `CanvasCard`
+   * already applies to the value it is handed.
+   */
+  entityActions?: readonly EntityActionGroup[];
   /** For an alias, the title of the card it shows — so the node can name what it
    *  redraws. Absent on non-alias cards. */
   aliasOf?: string;

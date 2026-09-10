@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newUuid } from '@project/core';
-import { trailControls, type OpenRow, type SpaceStep } from '../stories/review/dock-model';
+import { trailControls, type OpenRow, type SpaceStep } from '../src/dock-model';
 
 const step = (title: string): SpaceStep => ({ spaceId: newUuid(), title });
 

@@ -59,15 +59,24 @@ describe('DropdownMenu', () => {
   });
 
   /**
-   * A destructive item colours the row and lets its glyph follow.
+   * A destructive item is ink at rest, red where the reader is, and its glyph
+   * follows the row.
    *
-   * The registry drop painted `color` on the child `svg` as well, which a
-   * surface restating the row's resting colour could not reach past — a
-   * declared colour is not overridden by an ancestor's, however specific — so
-   * every consumer that wanted Delete to be ink at rest had to restate the
-   * glyph too. Nothing in the class list may target the glyph directly.
+   * Two registry defaults are gone and this is what holds them gone. The drop
+   * painted `color` on the child `svg`, which a surface restating the row's
+   * colour could not reach past — a declared colour is not overridden by an
+   * ancestor's, however specific — so a consumer that wanted Delete to be ink
+   * had to restate the glyph too and reach for `!important`. And the drop
+   * painted the row itself `text-destructive` at rest, so a menu with a Delete
+   * in it read as a warning about the menu rather than about the one command
+   * that removes something.
+   *
+   * Both were consumer overrides in the Command Dock's stylesheet until they
+   * were settled here (`.scratch/command-dock/issues/03`, `/07`). The test is
+   * what stops the second one coming back with the next registry sync: `focus:`
+   * may name `text-destructive`, and the resting class list may not.
    */
-  it('leaves a destructive item glyph following the row rather than colouring it', () => {
+  it('paints a destructive item only where the reader is, and lets its glyph follow', () => {
     render(
       <DropdownMenu>
         <DropdownMenuTrigger>Open</DropdownMenuTrigger>
@@ -81,7 +90,8 @@ describe('DropdownMenu', () => {
 
     const item = screen.getByRole('menuitem', { name: 'Delete' });
     expect(item).toHaveAttribute('data-variant', 'destructive');
-    expect(item.className).toContain('data-[variant=destructive]:text-destructive');
+    expect(item.className).toContain('data-[variant=destructive]:focus:text-destructive');
+    expect(item.className).not.toContain('data-[variant=destructive]:text-destructive');
     expect(item.className).not.toContain('data-[variant=destructive]:*:[svg]:text-destructive');
   });
 

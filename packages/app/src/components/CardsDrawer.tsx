@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent } from 'react';
+import { useMemo, useState, type DragEvent, type ReactElement, type ReactNode } from 'react';
 import type { Card, CardId, UUID } from '@project/core';
 import {
   Button,
@@ -40,6 +40,25 @@ export interface CardsDrawerProps {
   readonly onOpenChange: (open: boolean) => void;
   /** Withdraws the trigger without unmounting the surface it names. */
   readonly disabled?: boolean;
+  /**
+   * The control the trigger draws as, and what it says.
+   *
+   * **Trigger and panel stay one component, and this is what lets them.** The
+   * Command Dock's Cards cluster is where the trigger belongs now, and a toolbar
+   * has its own control treatment and its own roving order — a `Button` in there
+   * is a tab stop the toolbar does not know about. Splitting the component in
+   * two so the caller could draw its own trigger is the other way to do it and
+   * is the wrong one: the toggle's `disabled` and the surface it names would
+   * then be decided in two places, which is exactly what putting them together
+   * fixed.
+   *
+   * Omitted, it draws the secondary `Button` it always did — which is what the
+   * catalogue's own stories mount it as, standing on their own rather than
+   * inside a Dock.
+   */
+  readonly triggerRender?: ReactElement | undefined;
+  /** What the trigger says, when the caller's own treatment names it differently. */
+  readonly triggerLabel?: ReactNode;
   /** Returns a refusal that remains on this surface, or null after a completed Add. */
   readonly onAdd: (card: Card, activation: Activation) => string | null;
   readonly onDragStart: (cardId: CardId) => void;
@@ -138,6 +157,8 @@ export function CardsDrawer({
   open,
   onOpenChange,
   disabled = false,
+  triggerRender,
+  triggerLabel,
   onAdd,
   onDragStart,
   onDragEnd,
@@ -201,14 +222,16 @@ export function CardsDrawer({
       <DrawerTrigger
         disabled={disabled}
         render={
-          <Button
-            className="nokey ml-auto"
-            size="compact"
-            variant={open ? 'default' : 'secondary'}
-          />
+          triggerRender ?? (
+            <Button
+              className="nokey ml-auto"
+              size="compact"
+              variant={open ? 'default' : 'secondary'}
+            />
+          )
         }
       >
-        Cards
+        {triggerLabel ?? 'Cards'}
       </DrawerTrigger>
       <DrawerPortal>
         <DrawerViewport>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { openSpaceStatusLabel } from '@project/ui';
-import { exitReportSentence, unwellReport, type ExitOutcome } from '../stories/review/dock-model';
+import { exitReportSentence, unwellReport, type ExitOutcome } from '../src/dock-model';
 
 /**
  * What the Command Dock's Open Spaces menu says about an open Space that is not well.

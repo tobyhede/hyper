@@ -50,11 +50,6 @@ export const uncataloguedComponents = [
       'Startup composition. It renders one opened outcome by mounting the application, while `operational-feedback-startup-failure` catalogues its failure panel.',
   },
   {
-    module: 'packages/app/src/components/OpenSpaceSidebars.tsx',
-    reason:
-      'Production composition staged by `space-cards/09` under `stories/review`: issue 11 supplies the application path and promotes it with parity evidence. Until then a stable story would claim production reachability the application does not have.',
-  },
-  {
     module: 'packages/react-flow-adapter/src/CardNode.tsx',
     reason:
       "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-card-hover-reveals-actions-and-handles-together` mounts the real `CardNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",
@@ -65,9 +60,34 @@ export const uncataloguedComponents = [
       'Deliberately without a consumer, like `Select` above. It wraps cmdk, which ADR 0050 kept rather than migrating; `CardSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
   },
   {
-    module: 'packages/ui/src/components/breadcrumb.tsx',
+    module: 'packages/ui/src/AddCardControl.tsx',
     reason:
-      'The trail of Spaces a reader crossed, staged by the Command Dock prototype under `stories/review` while the arrangement is under review. A shadcn registry primitive taken as generated: markup and spacing, with every step rendered as a control the surface supplies, so there is no behaviour of its own for a story to press until an application path exists.',
+      "Without a consumer since ADR 0082: the Space Sidebar drew it, and the Command Dock's `CreateMenu` offers the three kinds as peers behind one trigger rather than as this split control, on grounds its own doc comment states. The two designs disagree deliberately, so this is not a component waiting to be re-mounted — but it is named by ADR 0050 and by `docs/agents/ui.md` as where the Base UI `Menu` and the `aria-keyshortcuts` convention are read from, so retiring it is a foundation decision rather than a surface one. `.scratch/command-dock/issues/08-retire-the-sidebar-era-primitives.md` owns taking it.",
+  },
+  {
+    module: 'packages/ui/src/components/sidebar.tsx',
+    reason:
+      'The registry `Sidebar`, whose Space-chrome consumer ADR 0082 retired: the gutter is gone, the command surface is a `Toolbar` over the canvas, and nothing composes `SidebarProvider`, `SidebarInset` or `SidebarTrigger` any more. Same owner as `AddCardControl` above — retiring a registry primitive an ADR names is a foundation decision, not this surface promotion.',
+  },
+  {
+    module: 'packages/ui/src/OpenSpaces.tsx',
+    reason:
+      'The vertical tab strip that drew the open set beside the Sidebar. ADR 0082 leaves *which* surface draws that set as treatment and the Command Dock draws it, as the tree the Opener makes — a strip as well would be a second place to switch Spaces, and it is the one that needs a permanent column to stand in. So `OpenSpacesApplication` stopped rendering it and nothing else does. It is listed here rather than deleted because the module also exports `openSpaceStatusLabel`, the words both surfaces spend, which `dock-model.ts` imports — and that import is exactly what let the module pass the ratchet unlisted, since a barrel name resolving here marks it rendered whether or not the *component* has a consumer. `.scratch/command-dock/issues/08-retire-the-sidebar-era-primitives.md` owns splitting the words out and taking the component with `tabs.tsx`, its only remaining dependency.',
+  },
+  {
+    module: 'packages/ui/src/components/tabs.tsx',
+    reason:
+      'Reached only from `OpenSpaces.tsx` above, and retired with it. Nothing else in the tree composes a tab list — the Dock discloses its sets from the bar.',
+  },
+  {
+    module: 'packages/ui/src/components/sheet.tsx',
+    reason:
+      "The registry `Sidebar`'s phone branch, and its only importer. The Dock has no Sheet on purpose — it never takes the canvas away, so there is nothing to dismiss before a command's result can be seen — so this stands or falls with `sidebar.tsx` above and is retired with it.",
+  },
+  {
+    module: 'packages/ui/src/components/skeleton.tsx',
+    reason:
+      "The registry `Sidebar`'s loading placeholder, reached only through `SidebarMenuSkeleton`, and its only importer. Stands or falls with `sidebar.tsx` above.",
   },
   {
     module: 'packages/ui/src/components/empty.tsx',

@@ -16,9 +16,9 @@
  * there is no Edit to refuse: the answers below are bare booleans with no
  * refusal code and no reason field, because no consumer can draw one.
  * `EntityActionsMenu` has no disabled item at all — a command the entity does
- * not have is simply absent — and the Sidebar's disabled controls carry no
- * reason surface. `layout-resolution.ts` records the same standing decision
- * against a `reason` union whose second arm has no thrower.
+ * not have is simply absent — and the Dock's own unavailable controls carry no
+ * reason surface either. `layout-resolution.ts` records the same standing
+ * decision against a `reason` union whose second arm has no thrower.
  *
  * A pure function rather than a hook, deliberately: the rules are then provable
  * in the node environment against a table rather than through a mounted
@@ -147,8 +147,10 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *   the whole graph area and a focus trap — so while it is open the canvas is
    *   covered and cannot be reached at all.
    * - A chrome title edit is *not* modal. It is an inline `InlineTitleEditor`
-   *   in a Sidebar row or the header: no dialog role, no backdrop, no focus
-   *   trap, and the canvas stays fully reachable behind it. It withdraws canvas
+   *   standing in the Dock's own name control: no dialog role, no backdrop, no
+   *   focus trap, and the canvas stays fully reachable behind it — the Dock
+   *   floats over the canvas and takes nothing away from it (ADR 0082). It
+   *   withdraws canvas
    *   authoring because a second authoring surface must not be startable over a
    *   live rename, not because anything is covering the graph.
    * - A canvas that is not the one being authored — a hidden Space, or an
@@ -233,7 +235,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *
    * Presenting draws the active Card's content *instead of* the Card, so a live
    * editor cannot survive it and the draft would go without one of ADR 0064's
-   * four exits being spent. It does not read `presenting` itself — the Sidebar
+   * four exits being spent. It does not read `presenting` itself — the surface
    * draws Stop rather than Present once a traversal is running — and it does
    * not read the two modal surfaces, which need nothing here: a creation pane
    * owns its own modality, and the editor is still there when it closes.

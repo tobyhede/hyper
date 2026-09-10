@@ -74,12 +74,20 @@ test(
       .fill('Edited in the embedded Layout');
     await embedded.getByRole('button', { name: 'Save Card Intake' }).click();
     await expect(embedded).toContainText('Edited in the embedded Layout');
-    await page.getByRole('tab', { name: 'Architecture', exact: true }).click();
-    await expect(
-      page
-        .getByRole('tabpanel', { name: 'Architecture', exact: true })
-        .getByText('Edited in the embedded Layout'),
-    ).toBeVisible();
+    // Crossing into the target Space to read the same edit there. The vertical
+    // tab strip that used to do this went with the Space Sidebar (ADR 0082), so
+    // the move is the Command Dock's Open Spaces menu — and the assertion is on
+    // the Space the Dock is now naming rather than on a panel beside it.
+    await page.getByRole('button', { name: /^Spaces\. \d+ open\.$/ }).click({ delay: 120 });
+    await page.getByRole('menuitemradio', { name: /^Architecture/ }).click();
+    // `:visible`, because every open Space stays mounted and only one is shown
+    // (`OpenSpacesApplication`). A role query already skips the hidden ones —
+    // they are out of the accessibility tree — but a test id does not.
+    await expect(page.locator('[data-testid="space-title"]:visible')).toContainText('Architecture');
+    const intake = page
+      .locator('.react-flow__node:visible')
+      .filter({ has: page.getByRole('heading', { name: 'Intake', exact: true }) });
+    await expect(intake).toContainText('Edited in the embedded Layout');
   },
 );
 

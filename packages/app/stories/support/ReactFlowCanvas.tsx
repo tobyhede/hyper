@@ -16,6 +16,7 @@ import {
   type Space,
 } from '@project/graph';
 import { nodeTypes, edgeTypes, ZoomSlider, type CardFlowNode } from '@project/react-flow-adapter';
+import { spaceEntityActions } from '#src/entity-actions';
 import { MAX_ZOOM, OVERVIEW_FIT } from '#src/camera';
 import {
   canvasProjection,
@@ -390,8 +391,19 @@ export function CanvasCardNodeSpecimen({
   const source = projected.nodes.find(({ id }) => id === cardId);
   if (source === undefined) throw new Error(`Missing fixture Card ${cardId}`);
 
+  const card = space.cards.find((candidate) => candidate.id === cardId);
+  const layout = space.layouts.find((candidate) => candidate.id === layoutId);
+  if (card === undefined || layout === undefined) throw new Error('Missing fixture Card or Layout');
+
   const data: CardFlowNode['data'] = {
     ...source.data,
+    entityActions: spaceEntityActions({
+      spaceId: space.id,
+      spaceTitle: space.title,
+      onCopy: () => true,
+      onRename: null,
+      onDeleteLayout: null,
+    })({ kind: 'card', card, layout }),
     readOnly,
     titleEditingEnabled: true,
     cardEditingEnabled: cardEditingEnabled ?? source.data.kind === 'markdown',

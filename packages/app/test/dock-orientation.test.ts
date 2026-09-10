@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { orientationOf } from '../stories/review/dock-model';
+import { orientationOf } from '../src/dock-model';
 
 /**
  * The axis each edge puts the Dock on.

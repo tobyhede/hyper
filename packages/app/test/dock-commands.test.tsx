@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { Default } from '../stories/review/command-dock.stories';
+import { Default, SaveFailedElsewhere } from '../stories/space/command-dock.stories';
 
 /**
  * What the Command Dock owes an author, held over the prototype that draws it.
@@ -285,5 +285,36 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
     fireEvent.click(grip);
 
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+});
+
+/**
+ * **A standing failure announces itself rather than waiting to be opened.**
+ *
+ * ADR 0082 binds the Dock to name which open Space is unwell, and adds the
+ * clause that decides where: "a report you have to go and find is not a
+ * report". The row inside the Open Spaces menu says *which* — that stays, and
+ * it is the whole of the detail — but a mark only reachable by disclosing the
+ * menu tells a reader who has no reason to open it nothing at all. The Sidebar
+ * badged the strip permanently; this is that obligation on the surface that
+ * replaced it.
+ */
+describe('an unwell Space the reader is not in', () => {
+  it('marks the Spaces trigger before anything is disclosed', () => {
+    render(<SaveFailedElsewhere />);
+
+    expect(screen.queryByRole('menu')).toBeNull();
+    const trigger = within(dock()).getByRole('button', { name: /^Spaces\./ });
+    expect(trigger).toHaveAccessibleName(/needs attention/i);
+    expect(trigger.querySelector('[data-unwell]')).not.toBeNull();
+  });
+
+  /** Nothing to say while every open Space is fine, which is most of the time. */
+  it('leaves the trigger unmarked while every open Space is well', () => {
+    render(<Default />);
+
+    const trigger = within(dock()).getByRole('button', { name: /^Spaces\./ });
+    expect(trigger).not.toHaveAccessibleName(/needs attention/i);
+    expect(trigger.querySelector('[data-unwell]')).toBeNull();
   });
 });

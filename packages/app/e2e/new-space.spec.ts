@@ -5,9 +5,11 @@ import {
   authoringHandle,
   connectHandles,
   connectToEmptyWithAlt,
+  createCardControl,
   dragBy,
   nodeByTitle,
   positionOf,
+  presentControl,
   selectedCanvas,
   settled,
 } from './graph';
@@ -110,7 +112,7 @@ test('starts in a complete authored Layout with its first empty Active Graph', a
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(page.getByRole('button', { name: 'Add Layout' })).toBeEnabled();
+  await expect(createCardControl(page)).not.toHaveAttribute('aria-disabled', 'true');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
@@ -269,7 +271,10 @@ test('an Alt-drop released off the canvas creates no Card', async ({ page }) => 
   // Leaving the canvas fires no move the graph can see, so the preview's last
   // eligible point survives the departure. Where the release *landed* is the
   // only thing that may author a Card.
-  const offCanvas = (await page.locator('.shell__header').boundingBox())!;
+  // Chrome over the canvas rather than beside it: the header this used went with
+  // the Sidebar (ADR 0082), and the Command Dock is the surface a release lands
+  // on without the flow ever seeing it.
+  const offCanvas = (await page.getByTestId('command-dock').boundingBox())!;
   await page.mouse.move(offCanvas.x + offCanvas.width / 2, offCanvas.y + offCanvas.height / 2);
   // The frozen half, asserted rather than assumed: the preview is *still* on
   // screen over a point that would author nothing. Without this the test would
@@ -333,7 +338,7 @@ test('the Graph the explicit Layout owns can be self-connected and presented', a
   // Every Card a fully cyclic Graph holds is arrived at, so it has no entry
   // Card. The control is enabled because a Graph *is* active, and presenting
   // used to return before changing anything — the click went nowhere.
-  await page.getByTestId('present-button').click();
+  await presentControl(page).click();
 
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await expect(activeCard(page)).toHaveAttribute('data-id', cardId!);
@@ -344,14 +349,16 @@ test('the Graph the explicit Layout owns can be self-connected and presented', a
 
 test(
   'shows the empty initial Graph and its graph HUD',
-  { tag: '@parity:space-sidebar-names-unauthored-state' },
+  { tag: '@parity:command-dock-names-a-new-spaces-initial-layout-and-graph' },
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
 
     await expect(activeGraph(page)).toHaveText('Graph 1');
     await expect(selectedCanvas(page)).toContainText('Layout 1');
-    await expect(page.getByTestId('present-button')).toBeDisabled();
+    // `aria-disabled` rather than the attribute — a toolbar item stays focusable
+    // while it is unavailable (ADR 0073).
+    await expect(presentControl(page)).toHaveAttribute('aria-disabled', 'true');
     await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
   },
 );

@@ -13,6 +13,7 @@ import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
+import { beginRename } from './command-dock';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -283,7 +284,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    */
   it('discards a Layout rename holding an uncompleted draft', async () => {
     const session = await mountedSpaceApp();
-    fireEvent.click(screen.getByRole('button', { name: 'Layout', pressed: true }));
+    await beginRename('selected-canvas');
     const name = screen.getByRole('textbox', { name: 'Layout name' });
     fireEvent.change(name, { target: { value: 'Name nobody pressed Enter on' } });
     expect(name).toHaveValue('Name nobody pressed Enter on');
