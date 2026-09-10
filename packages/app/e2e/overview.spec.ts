@@ -15,7 +15,9 @@ import {
 
 // The app loads the abstract layout fixture (packages/app/fixture) — two
 // disconnected collections sharing no Cards:
-//   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — graphs over one spine
+//   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — graphs over one spine,
+//      plus T, a member of that Layout no Edge reaches, whose Title is three
+//      lines (ADR 0083)
 //   2. Echo (E→F→G→H→E′) — a plain linear collection
 // Each collection is a Layout, because a Graph is a nested owned value of one
 // (ADR 0040) and these two share no Cards. The fixture opens in Collection 1,
@@ -52,8 +54,10 @@ test('draws every Graph in the selected Layout, each in its own color', async ({
   // Collection 1 owns three Graphs. A legend maps each to a color.
   await expect(page.getByTestId('graph-legend').locator('.legend__item')).toHaveCount(3);
 
-  // Five Cards, Long's four Edges plus Mid's three plus Short's two, and 18 handles.
-  await expect(page.locator('.react-flow__node')).toHaveCount(5);
+  // Six Cards — the five on the spine plus T, which joins no Graph — Long's four
+  // Edges plus Mid's three plus Short's two, and 18 handles. T draws none of
+  // those handles: a graph port is a Graph's, and T is in no Graph.
+  await expect(page.locator('.react-flow__node')).toHaveCount(6);
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   await expect(page.locator('.rf-card-node__port')).toHaveCount(18);
 
@@ -199,6 +203,55 @@ test(
   },
 );
 
+/**
+ * The Title ladder, on the real canvas, against the space the app actually
+ * loads.
+ *
+ * The Ladle story is where the front is reviewed whole; this is the half of that
+ * evidence a browser owns — the projection carrying a stored multiline Title
+ * through to a drawn Card, clamped inside the Card the author sized rather than
+ * growing it. `T` is the fixture's one such Title, one line of each role
+ * (packages/app/README.md), which is also why a regression here shows up in a
+ * failure screenshot rather than only in a unit test.
+ */
+test(
+  'a Card whose author wrote more than one line draws its Title as Title Lines',
+  { tag: '@parity:canvas-card-front-draws-only-its-title-lines' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+
+    const card = page.locator('.react-flow__node[data-id="00000000-0000-4000-8000-00000000000e"]');
+    await expect(card).toBeVisible();
+
+    const lines = card.locator('.canvas-card__title-line');
+    await expect(lines).toHaveCount(3);
+    expect(await lines.allInnerTexts()).toEqual(['T', 'a subtitle line', 'a caption line']);
+    expect(
+      await lines.evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute('data-role')),
+      ),
+    ).toEqual(['title', 'subtitle', 'caption']);
+
+    // Descending, and nothing else drawn on the front: the Card's own text is
+    // its Title Lines, which is what the two undecided reference lines failed.
+    const sizes = await lines.evaluateAll((elements) =>
+      elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+    );
+    expect(sizes[0]! > sizes[1]!).toBe(true);
+    expect(sizes[1]! > sizes[2]!).toBe(true);
+    await expect(card.locator('.canvas-card__body > *')).toHaveCount(1);
+    await expect(card.locator('.canvas-card__content')).toHaveCount(0);
+
+    // A Title never resizes a Card (ADR 0014, ADR 0083): three rungs draw in
+    // the same box every other Card on this Layout has.
+    const laddered = await boxOf(card, 'the multiline-Title Card');
+    const plain = await boxOf(nodeByTitle(page, 'B'), 'Card B');
+    expect(laddered.height).toBeCloseTo(plain.height, 0);
+    expect(laddered.width).toBeCloseTo(plain.width, 0);
+  },
+);
+
 test('handles stay measurable, so edges attach where the layout put them', async ({ page }) => {
   await page.goto('/');
 
@@ -231,7 +284,7 @@ test('selecting a graph keeps the others on screen', async ({ page }) => {
 
   // Selection is emphasis: it never hides the rest of the space.
   await activateGraph(page, 'Mid');
-  await expect(page.locator('.react-flow__node')).toHaveCount(5);
+  await expect(page.locator('.react-flow__node')).toHaveCount(6);
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   // Activating a graph changes emphasis, not the persisted document.
   await page.waitForTimeout(50);

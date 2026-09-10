@@ -36,6 +36,136 @@ test(
   },
 );
 
+/**
+ * What every front draws, kind by kind, and what none of them draws.
+ *
+ * The table is the point: one loop over every front the component declares, so
+ * a new kind cannot be added with its own story slice and reviewed on its own.
+ */
+const FRONTS = [
+  { label: 'markdown', kind: 'markdown', glyph: 'Markdown Card', border: 'solid' },
+  { label: 'alias', kind: 'alias', glyph: 'Alias', border: 'dotted' },
+  { label: 'space', kind: 'space', glyph: 'Space Card', border: 'solid' },
+  // The creation ghost is not a Card and takes the Markdown treatment, which is
+  // why it is checked against the Markdown kind and glyph rather than its own.
+  { label: 'creation ghost', kind: 'markdown', glyph: 'Markdown Card', border: 'solid' },
+] as const;
+
+const ONE_LINE = ['Strategies'];
+const THREE_LINES = ['Strategies', 'no strategy is privileged', 'elkjs is one member of a set'];
+
+/** The roles of a Card's drawn Title Lines, in the order they are drawn. */
+const rolesOf = (lines: Locator): Promise<readonly (string | null)[]> =>
+  lines.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-role')));
+
+/** The resolved font size of each drawn Title Line, in pixels. */
+const sizesOf = (lines: Locator): Promise<readonly number[]> =>
+  lines.evaluateAll((elements) =>
+    elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+  );
+
+/**
+ * The whole of what a Card front draws, and the whole of what it does not.
+ *
+ * This is the one place that states it. Every other Card story is a slice —
+ * states, kinds, hover, colours, opening, resizing — and two undecided elements
+ * lived on the front for months because the slice that drew them was not the
+ * slice anyone reviewed. So the assertions below are deliberately exhaustive
+ * over the Card's own box: the kind glyph, the border, one element per Title
+ * Line at the role the domain gave it, and **nothing beneath the Title** — no
+ * second line the application writes on the author's behalf, and no text on the
+ * Card that is not one of the Title Lines the author typed.
+ */
+test(
+  'every Card front draws its kind, its border and its Title Lines, and nothing beneath them',
+  { tag: '@parity:canvas-card-front-draws-only-its-title-lines' },
+  async ({ page }) => {
+    await page.goto('/?story=components--card--front&mode=preview');
+
+    for (const front of FRONTS) {
+      for (const [suffix, expected] of [
+        ['one line', ONE_LINE],
+        ['three lines', THREE_LINES],
+      ] as const) {
+        const card = specimen(page, `${front.label} · ${suffix}`).getByRole('article');
+        await expect(card).toHaveAttribute('data-kind', front.kind);
+        await expect(card).toHaveAttribute('data-state', 'rest');
+        await expect(card).toHaveAttribute('data-expanded', 'false');
+        await expect(card.getByRole('img', { name: front.glyph })).toBeVisible();
+        await expect(card).toHaveCSS('border-style', front.border);
+
+        // One block element per Title Line, carrying the role `titleLines` gave
+        // it — and exactly as many as the author typed.
+        const lines = card.locator('.canvas-card__title-line');
+        await expect(lines).toHaveCount(expected.length);
+        expect(await lines.allInnerTexts()).toEqual([...expected]);
+        expect(await rolesOf(lines)).toEqual(
+          expected.length === 1 ? ['title'] : ['title', 'subtitle', 'caption'],
+        );
+
+        // Nothing beneath the Title. The heading is the only thing in the body,
+        // no content surface is mounted on a closed Card, and the Card's own
+        // text is the Title Lines and nothing else — which is what the two
+        // undecided reference lines would fail.
+        await expect(card.locator('.canvas-card__body > *')).toHaveCount(1);
+        await expect(card.locator('.canvas-card__body > .canvas-card__title')).toHaveCount(1);
+        await expect(card.locator('.canvas-card__content')).toHaveCount(0);
+        const text = (await card.innerText())
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line !== '');
+        expect(text).toEqual([...expected]);
+      }
+    }
+
+    // The rungs descend, which is the register this feature adds. Read as
+    // resolved sizes rather than trusted to the eye: three independent
+    // declarations would draw the same picture and drift.
+    const ladder = specimen(page, 'markdown · three lines').getByRole('article');
+    const rungs = await sizesOf(ladder.locator('.canvas-card__title-line'));
+    expect(rungs[0]! > rungs[1]!).toBe(true);
+    expect(rungs[1]! > rungs[2]!).toBe(true);
+  },
+);
+
+/**
+ * The distinction ADR 0083 says a future reader is most likely to get wrong,
+ * drawn side by side: a break the **author** typed starts a rung and a break the
+ * **box** chose does not.
+ */
+// Untagged: the parity claim `canvas-card-front-draws-only-its-title-lines`
+// above already owns this story's evidence, and one claim takes exactly one
+// Ladle test. This is the same story's second reading and needs no second claim.
+test('a wrapped single-line Title stays one rung while an authored three-line Title draws three', async ({
+  page,
+}) => {
+  await page.goto('/?story=components--card--front&mode=preview');
+
+  const wrapped = specimen(page, 'one Title Line, wrapped')
+    .getByRole('article')
+    .locator('.canvas-card__title-line');
+  const authored = specimen(page, 'three Title Lines, authored')
+    .getByRole('article')
+    .locator('.canvas-card__title-line');
+
+  // One element, one role — however many visual lines the box took.
+  await expect(wrapped).toHaveCount(1);
+  expect(await rolesOf(wrapped)).toEqual(['title']);
+  const wrappedSizes = await sizesOf(wrapped);
+  const wrappedHeight = await wrapped.evaluate((element) => element.getBoundingClientRect().height);
+  // Taller than one line at its own size, which is what makes this a wrapped
+  // Title rather than a short one that would prove nothing.
+  expect(wrappedHeight).toBeGreaterThan(wrappedSizes[0]! * 2);
+
+  // Three elements, three roles, three sizes — and the top rung is the same
+  // size the wrapped Title draws every one of its visual lines at.
+  await expect(authored).toHaveCount(3);
+  expect(await rolesOf(authored)).toEqual(['title', 'subtitle', 'caption']);
+  const authoredSizes = await sizesOf(authored);
+  expect(authoredSizes[0]).toBeCloseTo(wrappedSizes[0]!, 2);
+  expect(new Set(authoredSizes).size).toBe(3);
+});
+
 test(
   "an Alias front's dotted border and a long Markdown title's three-line clamp are the kind's own presentation",
   { tag: '@parity:canvas-card-shows-kind-treatment' },

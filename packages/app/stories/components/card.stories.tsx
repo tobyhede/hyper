@@ -40,6 +40,94 @@ export const States: Story = () => (
   </div>
 );
 
+/**
+ * The one Title with no break in it: the ordinary case, and the Title Hyper has
+ * always drawn.
+ */
+const ONE_LINE_TITLE = 'Strategies';
+
+/**
+ * Three Title Lines the author typed — `title`, `subtitle`, `caption` (ADR
+ * 0083). Each is short enough to draw on one visual line, so what the ladder
+ * does to type is legible without any line also wrapping.
+ */
+const THREE_LINE_TITLE = 'Strategies\nno strategy is privileged\nelkjs is one member of a set';
+
+/**
+ * One Title Line, long enough that the box breaks it. A break the box chose is
+ * not a rung: every visual line of this is still the `title` role.
+ */
+const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuffles on every edit';
+
+/**
+ * Every front `CanvasCard` declares, with the label each specimen carries.
+ *
+ * The creation ghost is in the list and is not a Card: it is what the canvas
+ * draws while a new Card is being placed, and it takes the Markdown treatment
+ * without content or authored open state. Leaving it out would make this story
+ * "every front but one", which is the shape this story exists to stop.
+ */
+const FRONTS = [
+  { kind: 'markdown', label: 'markdown' },
+  { kind: 'alias', label: 'alias' },
+  { kind: 'space', label: 'space' },
+  { kind: 'preview', label: 'creation ghost' },
+] as const satisfies readonly { kind: CanvasCardFront['kind']; label: string }[];
+
+/**
+ * The whole of a Card front, at rest, for every front the component draws.
+ *
+ * This story exists because no other one showed a front entire: `States`,
+ * `Kinds`, `Hover`, `Colours`, `Open and close`, `Open Alias` and `Resize
+ * control` are each a slice, and two undecided elements lived on the front for
+ * months because the slice that drew them was not the slice anyone reviewed.
+ *
+ * What every specimen below draws, and all it draws: the kind glyph at the
+ * leading edge of the rail, the Card's border — dotted for an Alias, solid for
+ * every other front — and the Card's Title, as one `.canvas-card__title-line`
+ * per Title Line. Nothing is drawn beneath the Title: a closed Card's whole
+ * content is the Title its author wrote. No specimen is handed an authoring
+ * callback, so no rail actions are drawn either; `Hover` and `Actions` are
+ * where those live.
+ */
+export const Front: Story = () => (
+  <div className="inv inv-sheet" style={cardSizeVars}>
+    <CatalogueSection
+      title="Card front"
+      note="Every front CanvasCard draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its kind glyph, its border — dotted only for an Alias — and its Title Lines, and beneath the Title it draws nothing."
+    >
+      <div className="inv-row">
+        {FRONTS.map((front) => (
+          <Specimen key={front.label} label={`${front.label} · one line`}>
+            <CanvasCardSpecimen kind={front.kind} title={ONE_LINE_TITLE} />
+          </Specimen>
+        ))}
+      </div>
+      <div className="inv-row">
+        {FRONTS.map((front) => (
+          <Specimen key={front.label} label={`${front.label} · three lines`}>
+            <CanvasCardSpecimen kind={front.kind} title={THREE_LINE_TITLE} />
+          </Specimen>
+        ))}
+      </div>
+    </CatalogueSection>
+    <CatalogueSection
+      title="An authored break is not a wrapped break"
+      note="Left: one Title Line the box breaks over several visual lines — all of it the title role, at one size and one weight. Right: three Title Lines the author typed — title, then subtitle, then caption, descending in size and weight. Same component, same width; only the ladder tells them apart."
+    >
+      <div className="inv-row">
+        <Specimen label="one Title Line, wrapped">
+          <CanvasCardSpecimen title={WRAPPING_TITLE} />
+        </Specimen>
+        <Specimen label="three Title Lines, authored">
+          <CanvasCardSpecimen title={THREE_LINE_TITLE} />
+        </Specimen>
+      </div>
+    </CatalogueSection>
+  </div>
+);
+Front.storyName = 'Front';
+
 export const Kinds: Story = () => (
   <div className="inv inv-sheet" style={cardSizeVars}>
     <CatalogueSection

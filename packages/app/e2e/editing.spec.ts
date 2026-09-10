@@ -1730,7 +1730,7 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
     // Every Card offers a target on every side while a connection is in flight,
     // so the drop is never blocked by which side the author aimed at.
     await expect(targetHandles.first()).toHaveCSS('opacity', '1');
-    await expect(targetHandles).toHaveCount(6 * AUTHORING_HANDLE_SIDES);
+    await expect(targetHandles).toHaveCount(7 * AUTHORING_HANDLE_SIDES);
     const preview = page.locator('.react-flow__connection-path');
     await expect(preview).toBeVisible();
     await expect(preview).toHaveCSS('stroke', activeGraphColor);
