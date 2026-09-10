@@ -239,7 +239,7 @@
 
 /* The heading itself, which the activation control wraps rather than sits
    inside (ADR 0065, ADR 0083). A plain block, so inserting it between the
-   Title's box and its rungs changes no diagram: the box keeps the clamp and the
+   Title's box and its rungs reflows nothing: the box keeps the clamp and the
    type, and each rung keeps its own. */
 .canvas-card__title-heading {
   display: block;

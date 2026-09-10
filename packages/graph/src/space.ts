@@ -52,7 +52,7 @@ export interface Space {
   readonly graphs: readonly Graph[];
   /**
    * The positioned diagrams the author wrote, if any. Empty is the normal state
-   * of a hand-authored space: automatic diagrams carry no data, so they are
+   * of a hand-authored space: automatic strategies carry no data, so they are
    * declared nowhere (ADR 0025).
    */
   readonly diagrams: readonly Diagram[];

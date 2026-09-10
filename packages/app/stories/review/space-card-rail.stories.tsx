@@ -5,7 +5,7 @@
  *   - Rail controls are consistent in treatment — same box, same 22px icon
  *     button, same trailing cluster — without being the same set per kind.
  *   - A Space Card has no Edit control. Authoring the embedded Space is done by
- *     working in it, so Edit is implicit in the diagram rather than a command on
+ *     working in it, so Edit is implicit in the layout rather than a command on
  *     the band.
  *   - A Space Card's rail carries Select Diagram, Select Graph and Enter,
  *     all as icon buttons. The two selectors open dropdowns; the rail itself

@@ -122,7 +122,7 @@ if (typeof window !== 'undefined' && !('DOMMatrixReadOnly' in window)) {
 }
 
 /**
- * jsdom has no diagram, and so no `scrollIntoView` — cmdk calls one on the item
+ * jsdom has no layout, and so no `scrollIntoView` — cmdk calls one on the item
  * its arrow keys make active.
  *
  * A no-op is the whole of the right answer here: nothing in a headless DOM
@@ -169,7 +169,7 @@ if (typeof Element !== 'undefined' && !('scrollIntoView' in Element.prototype)) 
  *
  * Scoped to the one element d3-zoom measures — `ZoomPane`'s pane, which React
  * Flow renders as `react-flow__renderer`. Everything else keeps jsdom's zeroes,
- * so no test that asserts on diagram quietly changes meaning. Card geometry is
+ * so no test that asserts on layout quietly changes meaning. Card geometry is
  * unaffected regardless: `projection.ts` declares `measured` rather than letting
  * React Flow read it from the DOM.
  */
@@ -203,7 +203,7 @@ if (typeof window !== 'undefined') {
 
 /**
  * CodeMirror measures text ranges to size its viewport after an edit. jsdom
- * supplies `Range` but no diagram-backed rectangle methods, so the measurement
+ * supplies `Range` but no rectangle methods backed by layout, so the measurement
  * otherwise throws asynchronously after an editor test has already passed.
  * Empty geometry is the honest jsdom answer and keeps browser layout behavior
  * in Playwright, where the real methods exist.
@@ -229,7 +229,7 @@ if (typeof Range !== 'undefined' && !('getBoundingClientRect' in Range.prototype
  *
  * `useIsMobile` subscribes to `(max-width: 767px)` to decide whether the
  * app's chrome draws as a sidebar or as a Sheet (ADR 0053). jsdom has no
- * diagram and no media engine, so the honest answer is a query that never
+ * layout and no media engine, so the honest answer is a query that never
  * matches and never changes: every rendering test then exercises the desktop
  * sidebar, which is the surface those tests are about.
  *

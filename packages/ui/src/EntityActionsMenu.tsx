@@ -434,7 +434,7 @@ export interface EntityActionsProps {
  *
  * `display: contents` by default, because what this wraps is somebody else's
  * row. The trigger has to be an element to carry the handler, but it must not
- * become a box in the middle of a diagram that was written without it — a row
+ * become a box in the middle of a layout that was written without it — a row
  * positions its own trailing action against the row, not against a wrapper that
  * appeared underneath it. A geometry-sensitive entity instead supplies `render`
  * to compose the trigger onto its existing element; `contents` would still

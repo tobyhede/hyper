@@ -146,15 +146,15 @@ test('malformed and unresolved Space URLs have real host statuses', async ({ pag
   const unresolved = await page.goto(`/spaces/${encodeCompactUuid(MISSING_ID)}`);
   expect(unresolved?.status()).toBe(404);
 
-  const malformedView = await page.goto(
+  const malformedDiagram = await page.goto(
     `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/not-a-compact-uuid`,
   );
-  expect(malformedView?.status()).toBe(400);
+  expect(malformedDiagram?.status()).toBe(400);
 
-  const unresolvedView = await page.goto(
+  const unresolvedDiagram = await page.goto(
     `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(MISSING_ID)}`,
   );
-  expect(unresolvedView?.status()).toBe(404);
+  expect(unresolvedDiagram?.status()).toBe(404);
 
   const malformedGraph = await page.goto(
     `/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/not-a-compact-uuid`,
@@ -302,8 +302,8 @@ test('copy commands distinguish canonical Card identity from its current Diagram
   page,
 }) => {
   await installClipboard(page);
-  const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
-  await page.goto(view);
+  const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
+  await page.goto(diagram);
   const card = page.locator(`.react-flow__node[data-id="${CARD_A_ID}"]`);
   await card.click();
   // The rail reveals on hover, and it is the Card's own — no Space surface is
@@ -321,7 +321,7 @@ test('copy commands distinguish canonical Card identity from its current Diagram
   await copyFromMenu(page, 'Actions for Card A', /^Copy link/);
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe(`${new URL(page.url()).origin}${view}/cards/${encodeCompactUuid(CARD_A_ID)}`);
+    .toBe(`${new URL(page.url()).origin}${diagram}/cards/${encodeCompactUuid(CARD_A_ID)}`);
 });
 
 /**
@@ -386,15 +386,15 @@ test('canonical and contextual Graph links restore navigation context without au
 test('activating a Graph pushes a contextual destination restored by Back and Forward', async ({
   page,
 }) => {
-  const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
-  const mid = `${view}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
-  await page.goto(view);
+  const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
+  const mid = `${diagram}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
+  await page.goto(diagram);
 
   await page.getByRole('button', { name: /^Active Graph: /, exact: false }).click({ delay: 120 });
   await page.getByRole('menuitemradio', { name: 'Mid', exact: true }).click();
   await expect(page).toHaveURL(mid);
   await page.goBack();
-  await expect(page).toHaveURL(view);
+  await expect(page).toHaveURL(diagram);
   await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
   await page.goForward();
   await expect(page).toHaveURL(mid);
@@ -408,8 +408,8 @@ test(
   },
   async ({ page }) => {
     await installClipboard(page);
-    const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
-    await page.goto(view);
+    const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
+    await page.goto(diagram);
 
     await copyFromMenu(page, 'Active Graph: Long', /^Copy permanent link/);
     await expect
@@ -421,7 +421,7 @@ test(
     await copyFromMenu(page, 'Active Graph: Long', /^Copy link/);
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(`${new URL(page.url()).origin}${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
+      .toBe(`${new URL(page.url()).origin}${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
   },
 );
 
@@ -438,9 +438,9 @@ test('an incompatible contextual Diagram-and-Graph destination has a real 404', 
 test('an exact presentation link starts fresh at its Card and moves through browser history', async ({
   page,
 }) => {
-  const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
-  const atB = `${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(CARD_B_ID)}`;
-  const atC = `${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(CARD_C_ID)}`;
+  const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
+  const atB = `${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(CARD_B_ID)}`;
+  const atC = `${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(CARD_C_ID)}`;
   const before = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
@@ -467,7 +467,7 @@ test('an exact presentation link starts fresh at its Card and moves through brow
   await page.goForward();
   await expect(page).toHaveURL(atC);
   await page.getByTestId('exit-presenting').click();
-  await expect(page).toHaveURL(`${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
+  await expect(page).toHaveURL(`${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
 
   const after = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)

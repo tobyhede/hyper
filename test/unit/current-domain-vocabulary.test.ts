@@ -133,18 +133,7 @@ const isImplementationSource = (file: string): boolean =>
  * (`docs/agents/workflow.md`). These are trees rather than paths: a record that
  * moves inside one stays covered, and there is nothing to re-list.
  */
-const HISTORICAL_TREES = [
-  'docs/adr/',
-  'docs/superpowers/',
-  '.scratch/',
-  // Vendored third-party guidance, pinned by `skills-lock.json`. It is written
-  // in its own vocabulary — shadcn's component categories include a `Layout`
-  // one, and its styling rule is about CSS layout — so the retired word there
-  // is neither ours to sweep nor ours to report. The rename codemod excludes
-  // this tree for the same reason; sweeping it once corrupted the advice and
-  // made the lock record a provenance it no longer described.
-  '.agents/skills/',
-] as const;
+const HISTORICAL_TREES = ['docs/adr/', 'docs/superpowers/', '.scratch/'] as const;
 
 /**
  * Live files speaking a different library's routing vocabulary belong here.
@@ -1064,6 +1053,27 @@ const RETIRED_DIAGRAM_NAME = new RegExp(
     `(?<!-)\\b${retiredDiagramLower}s?["']?\\s*[:=]`,
     // ...and read back off a value.
     `\\.${retiredDiagramLower}s\\b`,
+    // The kebab-case compounds, which are the shape most of this rename was
+    // written in: refusal codes, completion kinds, test ids and CSS blocks. A
+    // hyphen is not a word character, so `\\b` lands either side of the retired
+    // word and every compound arm above reads straight past it. Qualified
+    // spellings are masked out before the scan rather than carved out here —
+    // see `withoutQualifiedSpellings`, which is where a path citation, a
+    // foreign glyph and the verb are separated from the entity.
+    `${retiredDiagramLower}-[a-z]`,
+    `[a-z]-${retiredDiagramLower}s?\\b`,
+    // The optional field. The key arm above cannot cross the `?`, and this is
+    // the declared shape of the Space Card frontmatter key ADR 0079 still owes.
+    `\\b${retiredDiagramLower}s?\\?\\s*:`,
+    // The callback binding this repo's own convention writes, where the retired
+    // word is the whole parameter and no capital follows it to end a compound.
+    `\\(\\s*${retiredDiagramLower}\\s*\\)\\s*=>`,
+    // The screaming constant with no trailing segment. The underscore arm above
+    // needs a following capital, so a bare `DEFAULT_` prefix went unseen behind
+    // it, an underscore being a word character. The lookbehind is the
+    // verb in the one screaming-case shape that keeps it, a CSS class group,
+    // in the same idiom `(?<!use)` separates React's hook above.
+    `(?<!GROUP)_${RETIRED_DIAGRAM_UPPER}\\b`,
   ].join('|'),
 );
 
@@ -1119,10 +1129,79 @@ const withoutForeignSpellings = (source: string): string =>
 const HISTORICAL_QUOTATIONS = [
   ['`default', 'View` → `default', 'Layout`'].join(''),
   ['elk', 'Layout` → `elkStrategy'].join(''),
+  // The module this rename moved, named in AGENTS.md's own account of the move
+  // — the sentence exists to tell a rebasing branch which similarity threshold
+  // git needs to follow it, so it has to spell where it came from.
+  `${retiredDiagramLower}-resolution`,
+  // The two addressing names that went with the retired gutter (ADR 0082): the
+  // continuation's control value and the row attribute beside it. Both are
+  // recorded as gone, in a document and in the test that pinned the behaviour.
+  `${retiredDiagramLower}-header`,
+  `data-${retiredDiagramLower}-id`,
 ] as const;
 
 const withoutHistoricalQuotations = (source: string): string =>
   HISTORICAL_QUOTATIONS.reduce((text, quotation) => text.split(quotation).join('history'), source);
+
+/**
+ * Spellings where the retired word is **qualified** — it names a path, a
+ * foreign glyph, the verb, or someone else's guidance about CSS — rather than
+ * naming the entity.
+ *
+ * The kebab arms exist because that is the shape this rename mostly carried, and
+ * they are the only arms broad enough to need this: a hyphen ends a word, so
+ * they see every hyphenated occurrence including the ones ADR 0085 deliberately
+ * leaves in the old spelling. Three kinds, and they are three different
+ * arguments:
+ *
+ *  - **A path is not vocabulary.** `.scratch/` and `docs/adr/` are trees this
+ *    rename does not rewrite, so a current-state document that cites one cites
+ *    it under the name it has on disk. Renaming a citation does not update a
+ *    record, it breaks a link — the failure this repository's own guards record
+ *    as having already happened twice. Masked by shape, as any run of
+ *    non-whitespace carrying a `/`, plus the `NNNN-` filename form an ADR row
+ *    and the roadmap generator both write bare.
+ *  - **A foreign glyph arrives with a dependency.** Lucide spells its two grid
+ *    icons with the retired word, and they are names in someone else's
+ *    catalogue rather than ours to sweep.
+ *  - **The verb keeps the word** (ADR 0014, ADR 0085), in the hyphenated shapes
+ *    the strategy contract and the prose about arranging a screen are written
+ *    in.
+ *
+ * Each is held below to still be earning itself, so a spelling that leaves the
+ * tree takes its mask with it rather than leaving a hole.
+ */
+const QUALIFIED_SPELLINGS: readonly string[] = [
+  // Lucide's two grid glyphs.
+  `${retiredDiagramLower}-grid`,
+  `${retiredDiagramLower}-dashboard`,
+  // The verb: the contract, the engine, the caller's own arranging, and the
+  // prose about re-running one.
+  `${retiredDiagramLower}-strategy`,
+  `graph-${retiredDiagramLower}`,
+  `caller-${retiredDiagramLower}`,
+  `re-${retiredDiagramLower}`,
+  // The tracked fixture's name. The unhyphenated phrase is already the verb by
+  // the rename script's own reckoning, which protects `${retiredDiagramLower} fixture`
+  // as prose about arranging rather than as the entity; the hyphenated form is
+  // the same phrase and takes the same reading.
+  `abstract-${retiredDiagramLower}`,
+  // Vendored third-party guidance, pinned by `skills-lock.json`: shadcn's rule
+  // about composing a form. It is the CSS sense, and a colon after the word is
+  // what makes the field arm read it as the retired key. This one spelling is
+  // the whole of what that tree needs forgiven — masked, so the rest of it stays
+  // governed, rather than skipped as a tree, which would have widened every
+  // block in this file and left a bump in the pinned skills invisible.
+  `Form ${retiredDiagramLower}:`,
+];
+
+const CITED_PATH = /\S*\/\S*|\b\d{4}-[a-z0-9-]+/g;
+
+const withoutQualifiedSpellings = (source: string): string =>
+  QUALIFIED_SPELLINGS.reduce(
+    (text, spelling) => text.split(spelling).join('qualified'),
+    source.replace(CITED_PATH, 'path'),
+  );
 
 /**
  * The files where the retired spelling is a **foreign** identifier rather than
@@ -1160,9 +1239,10 @@ describe('a Diagram is named once (ADR 0085)', () => {
       const foreign = FOREIGN_DIAGRAM_FILES.includes(file)
         ? withoutForeignSpellings(source)
         : source;
-      return hits(withoutHistoricalQuotations(foreign), RETIRED_DIAGRAM_NAME).map(
-        (hit) => `${file}:${hit}`,
-      );
+      return hits(
+        withoutQualifiedSpellings(withoutHistoricalQuotations(foreign)),
+        RETIRED_DIAGRAM_NAME,
+      ).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -1178,6 +1258,14 @@ describe('a Diagram is named once (ADR 0085)', () => {
     const everything = scanned.map((file) => readTracked(file) ?? '').join('\n');
     for (const quotation of HISTORICAL_QUOTATIONS) {
       expect(everything, `no document still quotes ${quotation}`).toContain(quotation);
+    }
+
+    // And for every qualified spelling: a mask outlives its reason the moment
+    // nothing writes the spelling it forgives, and a mask with no reason is a
+    // hole. Read against everything scanned, historical trees excluded — the
+    // same set the mask is applied to.
+    for (const spelling of QUALIFIED_SPELLINGS) {
+      expect(everything, `nothing tracked still writes ${spelling}`).toContain(spelling);
     }
   });
 
@@ -1218,6 +1306,24 @@ describe('a Diagram is named once (ADR 0085)', () => {
       `const DELETE_${RETIRED_DIAGRAM_UPPER}_ACTION_ID = 'x';`,
       `{ "${retiredDiagramLower}s": [], "default${RETIRED_DIAGRAM}": null }`,
       `for (const entry of space.${retiredDiagramLower}s) {`,
+      // The kebab-case shapes, which are most of what this rename actually
+      // carried: a refusal code, a completion kind, a test id, a CSS block. A
+      // hyphen is not a word character, but a compound arm anchored on a letter
+      // class either side of the word cannot see one, and the field arm rules a
+      // leading hyphen out by name.
+      `refusal: { code: '${retiredDiagramLower}-not-found' },`,
+      `return 'space-must-keep-${retiredDiagramLower}';`,
+      `<div data-testid="space-card-${retiredDiagramLower}">`,
+      `.${retiredDiagramLower}-header { display: flex; }`,
+      // The optional field, whose `?` the field arm's quote-then-colon cannot
+      // cross. This is the Space Card frontmatter key's own declared shape.
+      `readonly ${retiredDiagramLower}?: UUID;`,
+      // The callback binding, where the retired word is the whole parameter
+      // name and no capital follows it. This repo's own convention writes it.
+      `space.diagrams.map((${retiredDiagramLower}) => ${retiredDiagramLower}.id)`,
+      // The screaming constant with no trailing segment, which the underscore
+      // arm needs a following capital to see.
+      `const DEFAULT_${RETIRED_DIAGRAM_UPPER} = null;`,
     ];
 
     for (const line of retired) {

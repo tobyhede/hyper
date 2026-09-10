@@ -204,14 +204,22 @@ const PROTECTED = [
   // are the tracked spellings and not the titles the ADRs were renamed to.
   '0002-layout-view-separation.md',
   '0005-layout-is-a-strategy.md',
-  // The kept basename, wherever a test or a document names it bare.
-  'layout.ts',
+  // The kept basename, path-qualified. Bare, it also masked `embedded-layout.ts`
+  // — a module this rename does move — so a replay left a citation pointing at a
+  // filename that no longer exists.
+  '/layout.ts',
+  // The one place the basename is genuinely written bare: an assertion that
+  // finds the kept module by suffix.
+  "endsWith('layout.ts')",
 
   // --- Current-state documents that deliberately SAY the retired word. ---
   // A glossary entry that retires a noun has to spell the noun; so does the
   // AGENTS.md entry naming the change, and the guard's own rationale, which
   // quotes the senses it stays silent on.
-  'Card and Layout',
+  // Narrowed to the ADR entry's own title: the bare pair also masked a live
+  // doc comment ('the Space, Card and Layout identities'), which a replay then
+  // left in the retired spelling with no guard arm able to see it.
+  'names for Card and Layout',
   // The change's own name, this script's own filename, and the record of a
   // module rename — all three are AGENTS.md describing this very sweep.
   'Layout is Diagram',
@@ -251,6 +259,23 @@ const PROTECTED = [
   'spatial layout',
   're-layout',
   'react-use-layout-effect',
+
+  // --- The verb, in the bare prose review of change one found swept. ---
+  // Each names a CSS box, a browser engine or a control's arrangement. They are
+  // listed after the phrase rules above because a phrase that rewrites the
+  // sentence has to win over a mask that freezes it.
+  'a layout choice',
+  'has no layout, so',
+  'implicit in the layout',
+  'layout remains invariant',
+  'jsdom has no layout',
+  'asserts on layout',
+  'backed by layout',
+  'layout and no media engine',
+  'middle of a layout',
+  // The ellipsis-truncated ADR slug an assertion's own comment draws, which the
+  // full-slug mask above cannot see.
+  '0040-layouts-own-...',
 ];
 
 /**
@@ -271,13 +296,30 @@ const VERB_PHRASES = [
   ['the layout has not placed', 'the strategy has not placed'],
   ['the layout has placed', 'the strategy has placed'],
   ['a routing layout runs', 'a routing strategy runs'],
-  ['The size a layout arranges cards at', 'The size a strategy arranges cards at'],
+  ['The size a layout arranges cards at', 'The size a layout strategy arranges cards at'],
   ['The layout arranges cards at', 'The strategy arranges cards at'],
   ['looking like a layout bug', 'looking like a strategy bug'],
+  // Review of change one found these by reading the committed output against
+  // this table: each is the verb, and each reached the tree as the entity.
+  ['a routing layout (ELK) populates it', 'a routing strategy (ELK) populates it'],
+  ['automatic layouts carry no data', 'automatic strategies carry no data'],
+  ['edges attach where the layout put them', 'edges attach where the strategy put them'],
+  // Prose where naming the behaviour reads worse than dropping the noun.
+  ['and its rungs changes no layout', 'and its rungs reflows nothing'],
+  ["the layout's 16:9 frame", "the Card's 16:9 frame"],
+  ['no layout-backed rectangle methods', 'no rectangle methods backed by layout'],
+  // A historical record: no comment ever called the strategy by the new noun,
+  // so the sentence recalls the fact without spelling the retired name.
+  [
+    'Older comments call the *function* a Layout',
+    'Older comments call the *function* by the noun that is now the Diagram\u2019s',
+  ],
   // The repo's callback-binding convention, which is the domain initial. The
   // entity's initial changes with the entity, and the comment that documents
   // the convention is read by the guard that enforces it.
   ['`(l)` for layout', '`(d)` for diagram'],
+  ['duplicates(layouts.map((l) => l.id))', 'duplicates(diagrams.map((d) => d.id))'],
+  ['new Set(layouts.map((l) => l.id))', 'new Set(diagrams.map((d) => d.id))'],
   // The duplicate point type ADR 0038 collapsed only ever existed under the old
   // spelling, so renaming it would falsify a record — but naming it at all
   // costs the guard an exemption for a word nothing else writes. Both sentences

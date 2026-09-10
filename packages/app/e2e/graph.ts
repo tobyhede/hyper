@@ -49,9 +49,9 @@ export const FIXTURE_CARD_COUNT =
  * Diagram, because a Graph is a nested owned value of the one that holds it (ADR
  * 0040) and the fixture spreads four Graphs over two Diagrams.
  *
- * This is the count across the fixture's Diagrams,
- * Diagrams (ADR 0045). A *selected* Diagram draws only the Graphs it owns, so it
- * is not the number to assert after a conversion.
+ * This is the count across every Diagram the fixture holds. A *selected*
+ * Diagram draws only the Graphs it owns, so it is not the number to assert
+ * after a conversion.
  */
 export const FIXTURE_EDGE_COUNT =
   // SAFETY: `space.json` is this repo's own tracked E2E fixture, not user

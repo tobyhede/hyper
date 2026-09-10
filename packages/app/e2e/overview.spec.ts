@@ -263,7 +263,7 @@ test(
   },
 );
 
-test('handles stay measurable, so edges attach where the diagram put them', async ({ page }) => {
+test('handles stay measurable, so edges attach where the strategy put them', async ({ page }) => {
   await page.goto('/');
 
   // React Flow measures every handle's box to work out where an edge attaches,
@@ -411,7 +411,7 @@ test('cards are drawn at exactly the size the strategy placed them at', async ({
 
   // The layout strategy arranges cards at `card.ts`'s size and the stylesheet draws them
   // from the same numbers. If these drift, handles land where the card isn't —
-  // silently, and looking like a diagram bug.
+  // silently, and looking like a strategy bug.
   const declared = await page.evaluate(() => {
     const el = document.querySelector('.graph-area')!;
     const s = getComputedStyle(el);

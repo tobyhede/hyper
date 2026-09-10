@@ -326,7 +326,7 @@ export function CanvasCard(props: CanvasCardProps) {
       data-state={state}
       // Exposes authored state for the Card's public treatment and evidence.
       // The React Flow wrapper owns the moving rect, while the Markdown Title's
-      // diagram remains invariant; no wall-clock presentation state is allowed
+      // layout remains invariant; no wall-clock presentation state is allowed
       // to become a second expansion fact and move the Title mid-close.
       data-expanded={open}
       // The rail is normally revealed with the Card and hidden again at rest.

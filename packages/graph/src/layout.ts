@@ -78,7 +78,7 @@ export interface LayoutStrategyEdge {
   targetHandle: string;
   /**
    * The routed geometry, once a routing strategy has placed it. Optional like the
-   * cards' `x`/`y`: a routing diagram (ELK) populates it; a placement-only one
+   * cards' `x`/`y`: a routing strategy (ELK) populates it; a placement-only one
    * (grid) leaves it undefined and the render layer falls back to a plain curve.
    */
   sections?: LayoutStrategyEdgeSection[];
