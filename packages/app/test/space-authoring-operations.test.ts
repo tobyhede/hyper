@@ -379,7 +379,7 @@ describe('Expanded Card geometry', () => {
 });
 
 describe('Add Alias', () => {
-  it('creates and places an Alias on its Target, taking the Target title when none was typed', () => {
+  it('creates and places an Alias on its Target, minting a neutral title when none was typed', () => {
     const { authoring, session } = openPositioned();
 
     expect(authoring.complete({ kind: 'created-alias', target: CARD_A, anchor: CENTRE })).toEqual({
@@ -387,9 +387,11 @@ describe('Add Alias', () => {
       createdCardId: MINTED,
     });
 
+    // The Target's own Title is never copied: an Alias that arrived already
+    // named after its Target gave the Space two Cards with one name by default.
     expect(session.getState().working.cards[2]).toEqual({
       id: MINTED,
-      document: { title: 'A', kind: 'alias', target: CARD_A },
+      document: { title: 'Card 1', kind: 'alias', target: CARD_A },
     });
     expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[MINTED]).toEqual(CENTRE);
   });

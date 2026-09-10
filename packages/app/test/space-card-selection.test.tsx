@@ -285,16 +285,14 @@ afterAll(() => vi.unstubAllGlobals());
 
 describe('an Open Space Card', () => {
   /**
-   * The marker names the target whether the Card is Open or Closed — which
-   * Space this Card reaches is a fact about it — and Opening is what adds the
-   * two controls that say *which part* of that Space it shows.
+   * Opening is what adds the two controls that say *which part* of the target
+   * Space this Card shows.
    */
-  it('draws the Space it references and both of its selectors', async () => {
+  it('draws both of its selectors', async () => {
     const session = mount();
 
     const card = await openSpaceCard();
 
-    expect(within(card).getByTestId('space-marker')).toHaveTextContent('Architecture');
     expect(within(card).getByRole('combobox', { name: 'Layout' })).toBeEnabled();
     // Nothing is selected yet, so the Layout offers the target's two and the
     // Graph beside it has no Layout to draw from.
@@ -314,9 +312,9 @@ describe('an Open Space Card', () => {
    * Authoring is withdrawn from the whole canvas while a creation pane is up —
    * one authoring surface at a time — and the selectors go with it. What must
    * not go with it is the *answer*: a Card that has read its target and is
-   * showing the Space's name beside two controls cannot also be claiming it is
-   * still reading it. Unavailable and unknown are different states and the
-   * author can act on only one of them.
+   * drawing two controls over it cannot also be claiming it is still reading
+   * it. Unavailable and unknown are different states and the author can act on
+   * only one of them.
    */
   it('shows its selections unavailable rather than unread while a pane holds the canvas', async () => {
     const session = mount();
@@ -335,7 +333,6 @@ describe('an Open Space Card', () => {
     expect(within(card).queryByText('Reading the referenced Space…')).toBeNull();
     expect(within(card).getByTestId('space-card-layout')).toBeDisabled();
     expect(within(card).getByTestId('space-card-graph')).toBeDisabled();
-    expect(within(card).getByTestId('space-marker')).toHaveTextContent('Architecture');
     await settled(session);
   });
 
@@ -437,8 +434,8 @@ describe('an Open Space Card', () => {
   /**
    * The target is chosen once, at creation, and Space Authoring refuses a
    * changed one on its own account (ADR 0068) — so there is nothing on the Open
-   * Card that would even ask. Two controls, and the Space it names is read-only
-   * text beside them rather than a third.
+   * Card that would even ask. Two controls, and nothing beside them that would
+   * be a third.
    */
   it('offers no way to change the Space it references', async () => {
     const session = mount();
@@ -450,9 +447,6 @@ describe('an Open Space Card', () => {
     expect(within(card).getAllByRole('combobox')).toHaveLength(2);
     expect(within(card).getByRole('combobox', { name: 'Layout' })).toBeInTheDocument();
     expect(within(card).getByRole('combobox', { name: 'Graph' })).toBeInTheDocument();
-    // And the marker is text rather than a control, so the Space it names is
-    // not quietly a way in either.
-    expect(within(card).getByTestId('space-marker').closest('button')).toBeNull();
     await settled(session);
   });
 });

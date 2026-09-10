@@ -217,7 +217,6 @@ describe('the rail says whose command each one is', () => {
       <CanvasCard
         front={{
           kind: 'alias',
-          aliasOf: 'B',
           source: '',
           open: false,
           onOpenChange: () => 'completed',

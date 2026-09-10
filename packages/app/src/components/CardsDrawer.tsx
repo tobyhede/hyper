@@ -72,33 +72,23 @@ const KindFilterItem = DropdownMenuRadioItem<KindFilter>;
 const targetTitle = (card: Card, titleById: ReadonlyMap<CardId, string>): string =>
   card.kind === 'alias' ? (titleById.get(card.target) ?? '') : '';
 
-const frontOf = (
-  card: Card,
-  titleById: ReadonlyMap<CardId, string>,
-  spaceTitleById: ReadonlyMap<UUID, string>,
-) => {
-  if (card.kind === 'alias')
-    return {
-      kind: 'alias' as const,
-      aliasOf: targetTitle(card, titleById),
-      source: '',
-      open: false,
-    };
+const frontOf = (card: Card) => {
+  if (card.kind === 'alias') return { kind: 'alias' as const, source: '', open: false };
   // Closed, always: this list draws Cards that are *not* on the canvas, so no
   // entry here carries the Layout's Open state and none offers the selections
   // an Open Space Card authors.
-  if (card.kind === 'space')
-    return {
-      kind: 'space' as const,
-      spaceTitle: spaceTitleById.get(card.spaceId) ?? '',
-      open: false,
-    };
+  if (card.kind === 'space') return { kind: 'space' as const, open: false };
   return { kind: 'markdown' as const, source: card.body, open: false as const };
 };
 
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 
-/** The Card's own Title plus whatever second name its front draws, so search matches what the reader sees. */
+/**
+ * The Card's own Title plus the name of whatever it refers to, so a reader who
+ * recalls a Card by its Target or its Space finds it. Wider than what the row
+ * shows on purpose, the way `CardSearchCombobox` filters on a whole Title and
+ * displays the name.
+ */
 const searchableText = (
   card: Card,
   titleById: ReadonlyMap<CardId, string>,
@@ -296,7 +286,7 @@ export function CardsDrawer({
                       aria-label={`Add ${card.title} to Layout`}
                     >
                       <CanvasCard
-                        front={frontOf(card, titleById, spaceTitles)}
+                        front={frontOf(card)}
                         title={card.title}
                         state="rest"
                         graphColor={FALLBACK_GRAPH_COLOR}
