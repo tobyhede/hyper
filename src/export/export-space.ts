@@ -3,12 +3,12 @@ import { basename, dirname, join, resolve } from 'node:path';
 import {
   SPACE_FILE_VERSION,
   spaceSnapshotSchema,
-  type Card,
-  type CardPlacement,
+  type Thing,
+  type ThingPlacement,
   type SpaceFile,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, serializeCardFile } from '@project/graph';
+import { loadSpaceSnapshot, serializeThingFile } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import { readSingleSpace } from '../import/read-single-space';
 import type { SpaceRepository } from '../persistence/space-repository';
@@ -22,7 +22,7 @@ const compareOrdinal = (left: string, right: string): number =>
  * `jsonb` handed it back in. `Placement.point` establishes width-then-height as
  * the canonical order and this is the same order written to disk.
  */
-const canonicalPlacement = (point: CardPlacement): CardPlacement => {
+const canonicalPlacement = (point: ThingPlacement): ThingPlacement => {
   if (point.open) {
     return {
       x: point.x,
@@ -87,7 +87,7 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
           // a parsed document — the optionality is the `Partial<Record>` the
           // schema's key branding produces — and dropping it matches what
           // `JSON.stringify` already did with one.
-          .flatMap<readonly [string, CardPlacement]>(([id, point]) => {
+          .flatMap<readonly [string, ThingPlacement]>(([id, point]) => {
             if (point === undefined) return [];
             return [[id, canonicalPlacement(point)]];
           }),
@@ -109,24 +109,24 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     : { ...withDiagrams, defaultDiagram: snapshot.document.defaultDiagram };
 };
 
-const canonicalCard = (
+const canonicalThing = (
   id: UUID,
-  document: LoadedSpace['snapshot']['cards'][number]['document'],
-): Card => {
+  document: LoadedSpace['snapshot']['things'][number]['document'],
+): Thing => {
   const common = {
     id,
     title: document.title,
   };
   if (document.kind === 'alias') return { ...common, kind: 'alias', target: document.target };
   if (document.kind === 'space') {
-    const card: Extract<Card, { kind: 'space' }> = {
+    const thing: Extract<Thing, { kind: 'space' }> = {
       ...common,
       kind: 'space',
       spaceId: document.spaceId,
     };
-    if (document.diagram !== undefined) card.diagram = document.diagram;
-    if (document.graph !== undefined) card.graph = document.graph;
-    return card;
+    if (document.diagram !== undefined) thing.diagram = document.diagram;
+    if (document.graph !== undefined) thing.graph = document.graph;
+    return thing;
   }
   return { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
 };
@@ -164,21 +164,21 @@ const removeMarkdownFiles = async (directory: string): Promise<void> => {
 
 const prepareReplacement = async (stored: LoadedSpace, directory: string): Promise<void> => {
   await removeMarkdownFiles(directory);
-  await removeMarkdownFiles(join(directory, 'cards'));
+  await removeMarkdownFiles(join(directory, 'things'));
   await rm(join(directory, 'space.json'), { force: true });
 
-  const cardsDirectory = join(directory, 'cards');
-  await mkdir(cardsDirectory, { recursive: true });
+  const thingsDirectory = join(directory, 'things');
+  await mkdir(thingsDirectory, { recursive: true });
   await writeFile(
     join(directory, 'space.json'),
     `${JSON.stringify(canonicalSpaceFile(stored), null, 2)}\n`,
   );
-  for (const card of [...stored.snapshot.cards].sort((left, right) =>
+  for (const thing of [...stored.snapshot.things].sort((left, right) =>
     compareOrdinal(left.id, right.id),
   )) {
     await writeFile(
-      join(cardsDirectory, `${card.id}.md`),
-      serializeCardFile(canonicalCard(card.id, card.document)),
+      join(thingsDirectory, `${thing.id}.md`),
+      serializeThingFile(canonicalThing(thing.id, thing.document)),
     );
   }
 
@@ -186,7 +186,7 @@ const prepareReplacement = async (stored: LoadedSpace, directory: string): Promi
   const snapshot = spaceSnapshotSchema.parse({
     id: imported.id,
     document: imported.document,
-    cards: imported.cards,
+    things: imported.things,
   });
   const intake = loadSpaceSnapshot(snapshot);
   if (!intake.ok) {
@@ -243,10 +243,10 @@ export const exportSpace = async (
   const parent = dirname(destination);
   await mkdir(parent, { recursive: true });
   await rejectSymbolicLink(destination);
-  await rejectSymbolicLink(join(destination, 'cards'));
+  await rejectSymbolicLink(join(destination, 'things'));
   await Promise.all(
-    stored.snapshot.cards.map(({ id: cardId }) =>
-      rejectSymbolicLink(join(destination, 'cards', `${cardId}.md`)),
+    stored.snapshot.things.map(({ id: thingId }) =>
+      rejectSymbolicLink(join(destination, 'things', `${thingId}.md`)),
     ),
   );
   const stagingRoot = await mkdtemp(join(parent, `.${basename(destination)}.hyper-export-`));

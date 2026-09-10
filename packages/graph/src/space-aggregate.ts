@@ -17,9 +17,9 @@ export interface SpaceAggregate {
   readonly [SPACE_AGGREGATE_INTAKE]: true;
 }
 
-interface SpaceCardLocation {
+interface SpaceThingLocation {
   readonly spaceId: UUID;
-  readonly cardId: UUID;
+  readonly thingId: UUID;
   readonly targetSpaceId: UUID;
 }
 
@@ -35,24 +35,24 @@ export type SpaceAggregateError =
       readonly snapshotIndexes: readonly number[];
     }
   | {
-      readonly kind: 'duplicate-card-id';
-      readonly cardId: UUID;
+      readonly kind: 'duplicate-thing-id';
+      readonly thingId: UUID;
       readonly spaceIds: readonly UUID[];
     }
   | { readonly kind: 'meta-space-missing'; readonly metaSpaceId: UUID }
-  | ({ readonly kind: 'space-card-target-missing' } & SpaceCardLocation)
-  | ({ readonly kind: 'space-card-reference-cycle' } & SpaceCardLocation)
+  | ({ readonly kind: 'space-thing-target-missing' } & SpaceThingLocation)
+  | ({ readonly kind: 'space-thing-reference-cycle' } & SpaceThingLocation)
   | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: UUID }
   | ({
-      readonly kind: 'space-card-diagram-missing';
+      readonly kind: 'space-thing-diagram-missing';
       readonly diagramId: UUID;
-    } & SpaceCardLocation)
-  | ({ readonly kind: 'space-card-graph-missing'; readonly graphId: UUID } & SpaceCardLocation)
+    } & SpaceThingLocation)
+  | ({ readonly kind: 'space-thing-graph-missing'; readonly graphId: UUID } & SpaceThingLocation)
   | ({
-      readonly kind: 'space-card-graph-outside-diagram';
+      readonly kind: 'space-thing-graph-outside-diagram';
       readonly diagramId: UUID;
       readonly graphId: UUID;
-    } & SpaceCardLocation);
+    } & SpaceThingLocation);
 
 export type LoadSpaceAggregateResult =
   | { readonly ok: true; readonly aggregate: SpaceAggregate }
@@ -103,16 +103,16 @@ export function loadSpaceAggregate({
   }
   if (errors.length > 0) return { ok: false, errors };
 
-  const spaceIdsByCardId = new Map<UUID, UUID[]>();
+  const spaceIdsByThingId = new Map<UUID, UUID[]>();
   for (const space of spaces) {
-    for (const card of space.cards) {
-      const spaceIds = spaceIdsByCardId.get(card.id);
-      if (spaceIds === undefined) spaceIdsByCardId.set(card.id, [space.id]);
+    for (const thing of space.things) {
+      const spaceIds = spaceIdsByThingId.get(thing.id);
+      if (spaceIds === undefined) spaceIdsByThingId.set(thing.id, [space.id]);
       else spaceIds.push(space.id);
     }
   }
-  for (const [cardId, spaceIds] of spaceIdsByCardId) {
-    if (spaceIds.length > 1) errors.push({ kind: 'duplicate-card-id', cardId, spaceIds });
+  for (const [thingId, spaceIds] of spaceIdsByThingId) {
+    if (spaceIds.length > 1) errors.push({ kind: 'duplicate-thing-id', thingId, spaceIds });
   }
   if (errors.length > 0) return { ok: false, errors };
 
@@ -121,32 +121,32 @@ export function loadSpaceAggregate({
     return { ok: false, errors: [{ kind: 'meta-space-missing', metaSpaceId }] };
   }
   for (const space of spaces) {
-    for (const card of space.cards) {
-      if (card.kind !== 'space' || byId.has(card.spaceId)) continue;
+    for (const thing of space.things) {
+      if (thing.kind !== 'space' || byId.has(thing.spaceId)) continue;
       errors.push({
-        kind: 'space-card-target-missing',
+        kind: 'space-thing-target-missing',
         spaceId: space.id,
-        cardId: card.id,
-        targetSpaceId: card.spaceId,
+        thingId: thing.id,
+        targetSpaceId: thing.spaceId,
       });
     }
   }
   if (errors.length > 0) return { ok: false, errors };
 
   for (const space of spaces) {
-    for (const card of space.cards) {
-      if (card.kind !== 'space') continue;
-      const target = byId.get(card.spaceId);
+    for (const thing of space.things) {
+      if (thing.kind !== 'space') continue;
+      const target = byId.get(thing.spaceId);
       if (target === undefined) continue;
-      const diagramId = card.diagram ?? target.defaultDiagram;
+      const diagramId = thing.diagram ?? target.defaultDiagram;
       if (diagramId === undefined) {
-        if (card.graph !== undefined && target.lookup.graph(card.graph) === undefined) {
+        if (thing.graph !== undefined && target.lookup.graph(thing.graph) === undefined) {
           errors.push({
-            kind: 'space-card-graph-missing',
+            kind: 'space-thing-graph-missing',
             spaceId: space.id,
-            cardId: card.id,
+            thingId: thing.id,
             targetSpaceId: target.id,
-            graphId: card.graph,
+            graphId: thing.graph,
           });
         }
         continue;
@@ -154,34 +154,34 @@ export function loadSpaceAggregate({
       const resolvedDiagram = target.lookup.diagram(diagramId);
       if (resolvedDiagram === undefined) {
         errors.push({
-          kind: 'space-card-diagram-missing',
+          kind: 'space-thing-diagram-missing',
           spaceId: space.id,
-          cardId: card.id,
+          thingId: thing.id,
           targetSpaceId: target.id,
           diagramId,
         });
         continue;
       }
-      if (card.graph === undefined) continue;
-      if (target.lookup.graph(card.graph) === undefined) {
+      if (thing.graph === undefined) continue;
+      if (target.lookup.graph(thing.graph) === undefined) {
         errors.push({
-          kind: 'space-card-graph-missing',
+          kind: 'space-thing-graph-missing',
           spaceId: space.id,
-          cardId: card.id,
+          thingId: thing.id,
           targetSpaceId: target.id,
-          graphId: card.graph,
+          graphId: thing.graph,
         });
         continue;
       }
       const subjectGraphs = resolvedDiagram.diagram.graphs;
-      if (!subjectGraphs.some((graph) => graph.id === card.graph)) {
+      if (!subjectGraphs.some((graph) => graph.id === thing.graph)) {
         errors.push({
-          kind: 'space-card-graph-outside-diagram',
+          kind: 'space-thing-graph-outside-diagram',
           spaceId: space.id,
-          cardId: card.id,
+          thingId: thing.id,
           targetSpaceId: target.id,
           diagramId,
-          graphId: card.graph,
+          graphId: thing.graph,
         });
       }
     }
@@ -191,18 +191,18 @@ export function loadSpaceAggregate({
   const visitState = new Map<UUID, 'visiting' | 'visited'>();
   const visit = (space: Space): void => {
     visitState.set(space.id, 'visiting');
-    for (const card of space.cards) {
-      if (card.kind !== 'space') continue;
-      const target = byId.get(card.spaceId);
+    for (const thing of space.things) {
+      if (thing.kind !== 'space') continue;
+      const target = byId.get(thing.spaceId);
       // Missing targets were returned above, so this branch only preserves the
       // type-level boundary between Map lookup and the validated topology.
       if (target === undefined) continue;
       const state = visitState.get(target.id);
       if (state === 'visiting') {
         errors.push({
-          kind: 'space-card-reference-cycle',
+          kind: 'space-thing-reference-cycle',
           spaceId: space.id,
-          cardId: card.id,
+          thingId: thing.id,
           targetSpaceId: target.id,
         });
       } else if (state === undefined) {
@@ -219,8 +219,8 @@ export function loadSpaceAggregate({
 
   const referencedSpaceIds = new Set<UUID>();
   for (const space of spaces) {
-    for (const card of space.cards) {
-      if (card.kind === 'space') referencedSpaceIds.add(card.spaceId);
+    for (const thing of space.things) {
+      if (thing.kind === 'space') referencedSpaceIds.add(thing.spaceId);
     }
   }
   for (const space of spaces) {

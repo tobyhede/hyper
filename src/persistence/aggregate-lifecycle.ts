@@ -15,7 +15,7 @@ const canonicalAuthoredAggregate = (input: {
   metaSpaceId: input.metaSpaceId,
   spaces: [...input.spaces]
     .sort(ascendingById)
-    .map((snapshot) => ({ ...snapshot, cards: [...snapshot.cards].sort(ascendingById) })),
+    .map((snapshot) => ({ ...snapshot, things: [...snapshot.things].sort(ascendingById) })),
 });
 
 export const classifyInitializedAggregate = (

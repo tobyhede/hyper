@@ -191,7 +191,7 @@ export class MemorySpaceBackend implements SpaceBackend {
       const changed = new Set(request.changes.map(({ spaceId }) => spaceId));
       const incompleteDeletionIds = new Set(
         intake.errors.flatMap((error) =>
-          error.kind === 'space-card-target-missing' &&
+          error.kind === 'space-thing-target-missing' &&
           deleted.has(error.targetSpaceId) &&
           !changed.has(error.spaceId)
             ? [error.targetSpaceId]

@@ -8,13 +8,13 @@ import {
 } from '../src/index';
 
 const SPACE = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const diagramless: SpaceSnapshot = {
   id: SPACE,
   document: { version: 1, title: 'Imported' },
-  cards: [{ id: CARD, document: { title: 'A', kind: 'markdown', body: '' } }],
+  things: [{ id: THING, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 
 const loadWorkingSpace = (

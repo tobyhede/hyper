@@ -461,10 +461,13 @@ describe('production component coverage', () => {
 
   it('resolves a re-export alias by the name consumers import, not the local one', () => {
     const root = fixture();
-    // `packages/ui/src/index.ts` really does this: `CardContent` from one module
-    // and `CardContent as CardSection` from another. Reading `propertyName` on an
-    // export specifier takes the local name, so importing `CardContent` matched
-    // the aliased line too and catalogued a module the story never rendered.
+    // `packages/ui/src/index.ts` really did this, re-exporting the shadcn
+    // registry's content component under a second name because a domain
+    // component held the first one. Reading `propertyName` on an export
+    // specifier takes the local name, so importing either matched the aliased
+    // line too and catalogued a module the story never rendered. ADR 0085
+    // resolved that collision and the barrel aliases nothing today — which is
+    // why this fixture is synthetic rather than a quotation.
     write(
       root,
       'packages/ui/src/index.ts',
@@ -687,30 +690,30 @@ describe('hand-rolled application styles', () => {
   });
 
   /**
-   * A colocated component stylesheet is not inventory debt — `canvas-card.css` beside
-   * `CanvasCard` is the pattern, not the exception — so the *recorded block* half does
+   * A colocated component stylesheet is not inventory debt — `canvas-thing.css` beside
+   * `CanvasThing` is the pattern, not the exception — so the *recorded block* half does
    * not apply to it. The dead-rule half does: moving a block out of `styles.css` and
    * beside its component must not be a way to stop the ratchet reading it.
    */
   it('reports a dead rule in a stylesheet colocated with its component', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/canvas-card.css', '.canvas-card__ghost { color: red; }');
+    write(root, 'packages/ui/src/canvas-thing.css', '.canvas-thing__ghost { color: red; }');
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/ui\/src\/canvas-card\.css declares \.canvas-card__ghost, which no production module names/,
+      /packages\/ui\/src\/canvas-thing\.css declares \.canvas-thing__ghost, which no production module names/,
     );
   });
 
   it('asks a colocated stylesheet for no inventory entry', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/canvas-card.css', '.canvas-card__rail { color: red; }');
+    write(root, 'packages/ui/src/canvas-thing.css', '.canvas-thing__rail { color: red; }');
     write(
       root,
-      'packages/ui/src/CanvasCard.tsx',
-      'export const CanvasCard = () => <div className="canvas-card__rail" />;',
+      'packages/ui/src/CanvasThing.tsx',
+      'export const CanvasThing = () => <div className="canvas-thing__rail" />;',
     );
 
-    expect(() => buildUiCatalog(root)).not.toThrowError(/canvas-card__rail.*is not recorded/);
+    expect(() => buildUiCatalog(root)).not.toThrowError(/canvas-thing__rail.*is not recorded/);
   });
 
   it('reports a rule no production module names', () => {
@@ -834,7 +837,7 @@ describe('hand-rolled application styles', () => {
   });
 
   it.each([
-    ['[data-card-search-combobox]', 'data-card-search-combobox'],
+    ['[data-thing-search-combobox]', 'data-thing-search-combobox'],
     ['#root', 'root'],
     ['html,\nbody,\n#root', 'root'],
     ['*', '*'],
@@ -851,25 +854,25 @@ describe('hand-rolled application styles', () => {
 
   it('does not count a domain string that merely spells a class name', () => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '.card { color: red; }');
+    write(root, 'packages/app/src/styles.css', '.thing { color: red; }');
     // React Flow's node type, an Edge drop target, a refusal code — none of these
     // is a class name, and reading every string literal made them look like one.
     write(
       root,
       'packages/app/src/App.tsx',
-      "export const App = () => ({ kind: 'card', type: 'card' });",
+      "export const App = () => ({ kind: 'thing', type: 'thing' });",
     );
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
       inventory(
         [{ module: 'packages/app/src/App.tsx', reason: 'Composition root.' }],
-        [{ block: 'card', reason: 'React Flow card geometry.' }],
+        [{ block: 'thing', reason: 'React Flow thing geometry.' }],
       ),
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /styles\.css declares \.card, which no production module names/,
+      /styles\.css declares \.thing, which no production module names/,
     );
   });
 
@@ -903,7 +906,7 @@ describe('hand-rolled application styles', () => {
 
   it('does not read a class name out of a comment', () => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '/* .btn is gone; see .card-pane */\n');
+    write(root, 'packages/app/src/styles.css', '/* .btn is gone; see .thing-pane */\n');
 
     expect(buildUiCatalog(root).handRolledStyles).toEqual([]);
   });
@@ -912,10 +915,14 @@ describe('hand-rolled application styles', () => {
 describe('story support harnesses', () => {
   it('rejects a support stylesheet rule that is not catalogue furniture', () => {
     const root = fixture();
-    write(root, 'packages/app/stories/support/inventory.css', '.card-pane__panel { width: 10px; }');
+    write(
+      root,
+      'packages/app/stories/support/inventory.css',
+      '.thing-pane__panel { width: 10px; }',
+    );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/stories\/support\/inventory\.css declares \.card-pane__panel, which is not catalogue furniture/,
+      /packages\/app\/stories\/support\/inventory\.css declares \.thing-pane__panel, which is not catalogue furniture/,
     );
   });
 
@@ -928,30 +935,30 @@ describe('story support harnesses', () => {
 
   it('rejects a support harness that names a production class instead of rendering its owner', () => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '.card-pane { inset: 0; }');
+    write(root, 'packages/app/src/styles.css', '.thing-pane { inset: 0; }');
     write(
       root,
       'packages/app/src/App.tsx',
-      'export const App = () => <div className="card-pane" />;',
+      'export const App = () => <div className="thing-pane" />;',
     );
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
       inventory(
         [{ module: 'packages/app/src/App.tsx', reason: 'Composition root.' }],
-        [{ block: 'card-pane', reason: 'The pane React Flow is covered by.' }],
+        [{ block: 'thing-pane', reason: 'The pane React Flow is covered by.' }],
       ),
     );
     write(
       root,
       'packages/app/stories/support/Facsimile.tsx',
-      'export const Facsimile = () => <div className="card-pane" />;',
+      'export const Facsimile = () => <div className="thing-pane" />;',
     );
 
     // The reproduction is the whole complaint: production really does name the
     // class, so the rule is live and the harness is copying a real surface.
     expect(problemsOf(root)).toEqual([
-      'packages/app/stories/support/Facsimile.tsx names the production class card-pane — render the production component instead of reproducing it (ADR 0052)',
+      'packages/app/stories/support/Facsimile.tsx names the production class thing-pane — render the production component instead of reproducing it (ADR 0052)',
     ]);
   });
 });

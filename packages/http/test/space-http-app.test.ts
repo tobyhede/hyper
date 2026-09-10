@@ -12,14 +12,14 @@ import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } fro
 import { HTTPException } from 'hono/http-exception';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+  things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 const loaded = { snapshot, revision: 0n, exportedRevision: null };
 
@@ -69,7 +69,9 @@ const OVERSIZED_DETAIL = `Send a request body no larger than ${MAX_COMMIT_BODY_B
 
 const oversizedSnapshot: SpaceSnapshot = {
   ...snapshot,
-  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) } }],
+  things: [
+    { id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) } },
+  ],
 };
 
 describe('commit wire policy', () => {
@@ -308,8 +310,8 @@ describe('commit wire policy', () => {
   it('accepts a body of exactly the 1 MiB limit through both framings', async () => {
     const padded = (length: number): SpaceSnapshot => ({
       ...snapshot,
-      cards: [
-        { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(length) } },
+      things: [
+        { id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(length) } },
       ],
     });
     const overhead = commitBody(padded(0)).length;
@@ -574,9 +576,9 @@ describe('Space HTTP aggregate commit', () => {
 
   it('preserves stable aggregate-refusal identity and location fields', async () => {
     const error = {
-      kind: 'space-card-target-missing' as const,
+      kind: 'space-thing-target-missing' as const,
       spaceId: SPACE_ID,
-      cardId: CARD_ID,
+      thingId: THING_ID,
       targetSpaceId: TARGET_ID,
     };
     const response = await postCommit(
@@ -986,9 +988,9 @@ describe('Space HTTP response media', () => {
                   kind: 'aggregate-refused' as const,
                   errors: [
                     {
-                      kind: 'space-card-target-missing' as const,
+                      kind: 'space-thing-target-missing' as const,
                       spaceId: SPACE_ID,
-                      cardId: CARD_ID,
+                      thingId: THING_ID,
                       targetSpaceId: TARGET_ID,
                     },
                   ],

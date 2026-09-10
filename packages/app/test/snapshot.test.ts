@@ -4,21 +4,21 @@ import { loadSpaceSnapshot, Placement } from '@project/graph';
 import {
   snapshotFromSpace,
   updatePositionedDiagram,
-  withCardRemovedFromDiagrams,
+  withThingRemovedFromDiagrams,
 } from '../src/snapshot';
 
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
-/** A Card no Diagram in these fixtures places or connects. */
-const UNHELD_CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+/** A Thing no Diagram in these fixtures places or connects. */
+const UNHELD_THING = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
-const MAIN: Graph = { id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] };
+const MAIN: Graph = { id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_B }] };
 
-/** One Diagram owning one Graph over both its Cards — the first-public shape (ADR 0040). */
+/** One Diagram owning one Graph over both its Things — the first-public shape (ADR 0040). */
 const snapshot = spaceSnapshotSchema.parse({
   id: '00000000-0000-4000-8000-000000000001',
   document: {
@@ -30,16 +30,19 @@ const snapshot = spaceSnapshotSchema.parse({
         title: 'Diagram',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 0, y: 0, open: false },
-          [CARD_B]: { x: 200, y: 0, open: false },
+          [THING_A]: { x: 0, y: 0, open: false },
+          [THING_B]: { x: 200, y: 0, open: false },
         },
         graphs: [MAIN],
       },
     ],
   },
-  cards: [
-    { id: CARD_A, document: { title: 'Card', kind: 'markdown', body: 'Body' } },
-    { id: CARD_B, document: { title: 'Next', kind: 'markdown', body: 'More' } },
+  // Declared in Title order, because intake sorts and `snapshotFromSpace` is
+  // asserted to round-trip this array exactly. It used to read A-then-B: ADR
+  // 0085 renamed the first one's Title, and `Next` now sorts ahead of `Thing`.
+  things: [
+    { id: THING_B, document: { title: 'Next', kind: 'markdown', body: 'More' } },
+    { id: THING_A, document: { title: 'Thing', kind: 'markdown', body: 'Body' } },
   ],
 });
 
@@ -48,14 +51,14 @@ it('writes a Diagram that owns its Graphs as a complete valid persistence snapsh
     diagramId: DIAGRAM_ID,
     title: 'Diagram',
     positions: Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, open: false }],
-      [CARD_B, { x: 300, y: 40, open: false }],
+      [THING_A, { x: 10, y: 20, open: false }],
+      [THING_B, { x: 300, y: 40, open: false }],
     ]),
     graphs: [MAIN],
     activeGraphId: GRAPH_ID,
   });
 
-  expect(changed.cards).toEqual(snapshot.cards);
+  expect(changed.things).toEqual(snapshot.things);
   expect(changed.document.defaultDiagram).toBe(DIAGRAM_ID);
   expect(changed.document.diagrams).toEqual([
     {
@@ -63,8 +66,8 @@ it('writes a Diagram that owns its Graphs as a complete valid persistence snapsh
       title: 'Diagram',
       kind: 'positioned',
       positions: {
-        [CARD_A]: { x: 10, y: 20, open: false },
-        [CARD_B]: { x: 300, y: 40, open: false },
+        [THING_A]: { x: 10, y: 20, open: false },
+        [THING_B]: { x: 300, y: 40, open: false },
       },
       graphs: [MAIN],
       activeGraph: GRAPH_ID,
@@ -79,7 +82,7 @@ it('appends a Diagram owning its own Graph without touching the other Diagrams',
   const changed = updatePositionedDiagram(snapshot, {
     diagramId: OTHER_DIAGRAM_ID,
     title: 'Diagram 2',
-    positions: Placement.fromEntries([[CARD_A, { x: 1, y: 2, open: false }]]),
+    positions: Placement.fromEntries([[THING_A, { x: 1, y: 2, open: false }]]),
     graphs: [minted],
     activeGraphId: OTHER_GRAPH_ID,
   });
@@ -111,8 +114,8 @@ it('leaves unrelated diagrams standing while replacing placement', () => {
           id: OTHER_DIAGRAM_ID,
           title: 'Other',
           kind: 'positioned',
-          positions: { [CARD_A]: { x: 0, y: 400, open: false } },
-          graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: CARD_A, to: CARD_A }] }],
+          positions: { [THING_A]: { x: 0, y: 400, open: false } },
+          graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: THING_A, to: THING_A }] }],
         },
       ],
     },
@@ -122,8 +125,8 @@ it('leaves unrelated diagrams standing while replacing placement', () => {
     diagramId: DIAGRAM_ID,
     title: 'Diagram',
     positions: Placement.fromEntries([
-      [CARD_A, { x: 5, y: 6, open: false }],
-      [CARD_B, { x: 7, y: 8, open: false }],
+      [THING_A, { x: 5, y: 6, open: false }],
+      [THING_B, { x: 7, y: 8, open: false }],
     ]),
     graphs: [MAIN],
     activeGraphId: GRAPH_ID,
@@ -135,7 +138,7 @@ it('leaves unrelated diagrams standing while replacing placement', () => {
     OTHER_DIAGRAM_ID,
   ]);
   expect(changed.document.diagrams?.[1]).toEqual(withDiagrams.document.diagrams?.[1]);
-  expect(changed.cards).toEqual(snapshot.cards);
+  expect(changed.things).toEqual(snapshot.things);
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
 });
 
@@ -150,8 +153,8 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
     diagramId: DIAGRAM_ID,
     title: 'Diagram',
     positions: Placement.fromEntries([
-      [CARD_A, { x: 5, y: 6, open: false }],
-      [CARD_B, { x: 7, y: 8, open: false }],
+      [THING_A, { x: 5, y: 6, open: false }],
+      [THING_B, { x: 7, y: 8, open: false }],
     ]),
     graphs: [MAIN],
     activeGraphId: null,
@@ -164,8 +167,8 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
       diagramId: DIAGRAM_ID,
       title: 'Diagram',
       positions: Placement.fromEntries([
-        [CARD_A, { x: 5, y: 6, open: false }],
-        [CARD_B, { x: 7, y: 8, open: false }],
+        [THING_A, { x: 5, y: 6, open: false }],
+        [THING_B, { x: 7, y: 8, open: false }],
       ]),
       graphs: [MAIN],
       activeGraphId: GRAPH_ID,
@@ -174,8 +177,8 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
       diagramId: DIAGRAM_ID,
       title: 'Diagram',
       positions: Placement.fromEntries([
-        [CARD_A, { x: 9, y: 9, open: false }],
-        [CARD_B, { x: 7, y: 8, open: false }],
+        [THING_A, { x: 9, y: 9, open: false }],
+        [THING_B, { x: 7, y: 8, open: false }],
       ]),
       graphs: [MAIN],
       activeGraphId: null,
@@ -187,12 +190,12 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
 });
 
 /**
- * Deleting a Card from the Space is one Edit over every Diagram at once, and this
- * is the part of it no single-Diagram write can do: the Card's membership and its
+ * Deleting a Thing from the Space is one Edit over every Diagram at once, and this
+ * is the part of it no single-Diagram write can do: the Thing's membership and its
  * incident Edges leave every Diagram that held them, while empty Graphs and
  * Diagrams stay exactly where they were.
  */
-it('cascades a deleted Card out of every Diagram that held it', () => {
+it('cascades a deleted Thing out of every Diagram that held it', () => {
   const withDiagrams = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
@@ -204,16 +207,16 @@ it('cascades a deleted Card out of every Diagram that held it', () => {
           title: 'Other',
           kind: 'positioned',
           positions: {
-            [CARD_A]: { x: 0, y: 400, open: false },
-            [CARD_B]: { x: 0, y: 600, open: false },
+            [THING_A]: { x: 0, y: 400, open: false },
+            [THING_B]: { x: 0, y: 600, open: false },
           },
           graphs: [
             {
               id: OTHER_GRAPH_ID,
               title: 'Aside',
               edges: [
-                { from: CARD_A, to: CARD_A },
-                { from: CARD_B, to: CARD_A },
+                { from: THING_A, to: THING_A },
+                { from: THING_B, to: THING_A },
               ],
             },
           ],
@@ -222,38 +225,38 @@ it('cascades a deleted Card out of every Diagram that held it', () => {
     },
   });
 
-  const changed = withCardRemovedFromDiagrams(withDiagrams, CARD_A);
+  const changed = withThingRemovedFromDiagrams(withDiagrams, THING_A);
 
   expect(changed.document.diagrams?.[0]?.positions).toEqual({
-    [CARD_B]: { x: 200, y: 0, open: false },
+    [THING_B]: { x: 200, y: 0, open: false },
   });
   expect(changed.document.diagrams?.[0]?.graphs).toEqual([{ ...MAIN, edges: [] }]);
   expect(changed.document.diagrams?.[1]?.positions).toEqual({
-    [CARD_B]: { x: 0, y: 600, open: false },
+    [THING_B]: { x: 0, y: 600, open: false },
   });
   expect(changed.document.diagrams?.[1]?.graphs).toEqual([
     { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
   ]);
-  // The Card itself is the caller's to remove: this answers only what the
-  // Diagrams hold, so an intake over the result still names the Card it lists.
-  expect(changed.cards).toEqual(withDiagrams.cards);
+  // The Thing itself is the caller's to remove: this answers only what the
+  // Diagrams hold, so an intake over the result still names the Thing it lists.
+  expect(changed.things).toEqual(withDiagrams.things);
 });
 
-it('answers the snapshot it was given when no Diagram held the Card', () => {
-  expect(withCardRemovedFromDiagrams(snapshot, UNHELD_CARD)).toBe(snapshot);
+it('answers the snapshot it was given when no Diagram held the Thing', () => {
+  expect(withThingRemovedFromDiagrams(snapshot, UNHELD_THING)).toBe(snapshot);
 });
 
 /**
- * The cascade half of Delete Card from Space owes the reclaim the single-Diagram
+ * The cascade half of Delete Thing from Space owes the reclaim the single-Diagram
  * half owes (ADR 0084). Under the derivation ADR 0084 removed, dropping a
- * Card's entry dropped its displacement with it; now the room an Open Card
+ * Thing's entry dropped its displacement with it; now the room an Open Thing
  * holds is written into its neighbours' own coordinates, so a Diagram the Edit
- * is not drawing would keep that room forever — with no Card left on that
+ * is not drawing would keep that room forever — with no Thing left on that
  * canvas to Close and no Edit that could give it back.
  */
-it('reclaims the room an Open Card held in every Diagram it is deleted from', () => {
-  // CARD_A is Open at 800x600 in the second Diagram, so its growth of 540x454
-  // is already written into CARD_B's coordinates there: (100, 100) + (540, 454).
+it('reclaims the room an Open Thing held in every Diagram it is deleted from', () => {
+  // THING_A is Open at 800x600 in the second Diagram, so its growth of 540x454
+  // is already written into THING_B's coordinates there: (100, 100) + (540, 454).
   const withDiagrams = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
@@ -265,8 +268,8 @@ it('reclaims the room an Open Card held in every Diagram it is deleted from', ()
           title: 'Other',
           kind: 'positioned',
           positions: {
-            [CARD_A]: { x: 0, y: 0, open: true, openSize: { width: 800, height: 600 } },
-            [CARD_B]: { x: 640, y: 554, open: false },
+            [THING_A]: { x: 0, y: 0, open: true, openSize: { width: 800, height: 600 } },
+            [THING_B]: { x: 640, y: 554, open: false },
           },
           graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
         },
@@ -274,9 +277,9 @@ it('reclaims the room an Open Card held in every Diagram it is deleted from', ()
     },
   });
 
-  const changed = withCardRemovedFromDiagrams(withDiagrams, CARD_A);
+  const changed = withThingRemovedFromDiagrams(withDiagrams, THING_A);
 
   expect(changed.document.diagrams?.[1]?.positions).toEqual({
-    [CARD_B]: { x: 100, y: 100, open: false },
+    [THING_B]: { x: 100, y: 100, open: false },
   });
 });

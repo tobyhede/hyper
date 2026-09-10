@@ -10,12 +10,12 @@ import { repeatedGraphEdges } from '../src/graph-edges';
  * the first one a View hands back — so this is where the rule itself is pinned,
  * rather than twice in the vocabularies of the two things that ask it.
  */
-const card = (n: number): GraphEdge['from'] =>
+const thing = (n: number): GraphEdge['from'] =>
   uuidSchema.parse(`00000000-0000-4000-8000-${n.toString().padStart(12, '0')}`);
 
-const A = card(1);
-const B = card(2);
-const C = card(3);
+const A = thing(1);
+const B = thing(2);
+const C = thing(3);
 
 describe('repeatedGraphEdges', () => {
   it('finds nothing in a Graph whose Edges are all distinct', () => {

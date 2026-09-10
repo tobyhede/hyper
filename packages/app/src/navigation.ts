@@ -1,8 +1,8 @@
-import { titleName, type CardId, type GraphId, type DiagramId } from '@project/core';
+import { titleName, type ThingId, type GraphId, type DiagramId } from '@project/core';
 import {
-  graphCardIds,
+  graphThingIds,
   outgoingEdges,
-  graphStartCard,
+  graphStartThing,
   type ResolvedDiagram,
   type Space,
 } from '@project/graph';
@@ -10,21 +10,21 @@ import { createObservableState, type ObserverErrorReporter } from '@project/pers
 import { resolveDiagram } from './diagram-resolution';
 
 export interface Move {
-  readonly cardId: CardId;
+  readonly thingId: ThingId;
   readonly title: string;
   readonly selected: boolean;
 }
 
 /**
- * The Cards a presenter has passed through, in order, the last of them the one
+ * The Things a presenter has passed through, in order, the last of them the one
  * being presented.
  *
  * Non-empty, and by type rather than by convention: presenting begins on a
- * Graph's start Card and `retreat` keeps the first, so its Traversal history can
+ * Graph's start Thing and `retreat` keeps the first, so its Traversal history can
  * never be empty. Navigation excludes that state by construction rather than at
  * every read.
  */
-type TraversalHistory = readonly [CardId, ...CardId[]];
+type TraversalHistory = readonly [ThingId, ...ThingId[]];
 
 /** What navigation carries whatever it is doing. */
 interface NavigationBase {
@@ -53,16 +53,16 @@ export type NavigationState =
 
 /**
  * Where the reader is, as one value: the Diagram drawing, the Graph emphasised
- * and, while presenting, the Card being presented.
+ * and, while presenting, the Thing being presented.
  *
  * Navigation's own vocabulary and nothing else's (ADR 0081). It is not a URL,
- * does not name one, and carries no addressed Card — the Card a browser location
+ * does not name one, and carries no addressed Thing — the Thing a browser location
  * may name is read from that location by `app` and never written back here.
  */
 export interface NavigationAddress {
   readonly selectedDiagramId: DiagramId;
   readonly activeGraphId: GraphId | null;
-  readonly presentingCardId: CardId | null;
+  readonly presentingThingId: ThingId | null;
 }
 
 /**
@@ -71,34 +71,34 @@ export interface NavigationAddress {
  * **Derived, and never a field on the state.** A stored address would have to be
  * maintained at all six publish sites and could then disagree with the state it
  * describes; derived, it cannot. The mode is not repeated either: the presented
- * Card is the last of the Traversal history while presenting and `null` in
- * overview, so `presentingCardId !== null` *is* "presenting".
+ * Thing is the last of the Traversal history while presenting and `null` in
+ * overview, so `presentingThingId !== null` *is* "presenting".
  */
 export function navigationAddress(state: NavigationState): NavigationAddress {
   return {
     selectedDiagramId: state.selectedDiagramId,
     activeGraphId: state.activeGraphId,
-    presentingCardId: presentedCard(state),
+    presentingThingId: presentedThing(state),
   };
 }
 
 /**
- * The Card being presented, or `null` in overview.
+ * The Thing being presented, or `null` in overview.
  *
- * One definition, because two things are the same fact about it: `activeCardId`,
- * which App renders from, and {@link navigationAddress}'s `presentingCardId`.
+ * One definition, because two things are the same fact about it: `activeThingId`,
+ * which App renders from, and {@link navigationAddress}'s `presentingThingId`.
  * Written out twice they can drift, and the copy that drifts silently is the
- * address — App lists `activeCardId` as the render-time dependency standing in
- * for `presentingCardId`, so a rule added to one and not the other leaves the
- * dependency firing while the address still reports the Card before it, and the
+ * address — App lists `activeThingId` as the render-time dependency standing in
+ * for `presentingThingId`, so a rule added to one and not the other leaves the
+ * dependency firing while the address still reports the Thing before it, and the
  * browser sync deciding against a position the application is not at.
  */
-function presentedCard(state: NavigationState): CardId | null {
-  return state.mode === 'presenting' ? currentCard(state.traversalHistory) : null;
+function presentedThing(state: NavigationState): ThingId | null {
+  return state.mode === 'presenting' ? currentThing(state.traversalHistory) : null;
 }
 
 /**
- * Whether Traversal history holds a Card to go back to.
+ * Whether Traversal history holds a Thing to go back to.
  *
  * One rule, because two surfaces ask it: `App` draws the chrome over the real
  * Space and `PresentingChromeFixture` draws it over a story's. Written out twice
@@ -128,15 +128,15 @@ export interface Navigation {
   readonly continueInDiagram: (selection: DiagramId, activeGraphId: GraphId | null) => void;
   /** Open an addressed Graph in one compatible Diagram without authoring either selection. */
   readonly openGraph: (selection: DiagramId, graphId: GraphId) => void;
-  /** Start an addressed presentation at one exact Card with fresh Traversal history. */
-  readonly openPresentation: (selection: DiagramId, graphId: GraphId, cardId: CardId) => void;
+  /** Start an addressed presentation at one exact Thing with fresh Traversal history. */
+  readonly openPresentation: (selection: DiagramId, graphId: GraphId, thingId: ThingId) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   readonly present: () => void;
   readonly exitPresenting: () => void;
   readonly advance: () => void;
   readonly retreat: () => void;
   readonly selectBranch: (delta: number) => void;
-  readonly activeCardId: () => CardId | null;
+  readonly activeThingId: () => ThingId | null;
   readonly moves: () => readonly Move[];
 }
 
@@ -151,10 +151,10 @@ const reportToConsole = (error: unknown): void => {
 function outgoingEdgesFrom(
   space: Space,
   graphId: GraphId | null,
-  cardId: CardId | null | undefined,
+  thingId: ThingId | null | undefined,
 ) {
   const owned = graphId !== null ? space.lookup.graph(graphId) : undefined;
-  return owned !== undefined && cardId != null ? outgoingEdges(owned.graph, cardId) : [];
+  return owned !== undefined && thingId != null ? outgoingEdges(owned.graph, thingId) : [];
 }
 
 /**
@@ -179,17 +179,17 @@ const diagramShowsGraph = (resolved: ResolvedDiagram, graphId: GraphId): boolean
 export const openingGraphId = (resolved: ResolvedDiagram): GraphId => resolved.activeGraph.id;
 
 /**
- * The Card at the end of Traversal history, read in place.
+ * The Thing at the end of Traversal history, read in place.
  *
  * `noUncheckedIndexedAccess` widens a computed index to `| undefined` however
  * the tuple is declared, so the last element needs an answer for a case it
  * cannot reach; element 0 is a fixed tuple element and keeps its type, so the
- * Traversal history's guaranteed first Card supplies it. Both reads are indexes and neither
- * copies: this runs on every render through `activeCardId` and `moves`, and
+ * Traversal history's guaranteed first Thing supplies it. Both reads are indexes and neither
+ * copies: this runs on every render through `activeThingId` and `moves`, and
  * destructuring a tail to reach the end allocated a copy of the whole
  * accumulated history each time.
  */
-function currentCard(traversalHistory: TraversalHistory): CardId {
+function currentThing(traversalHistory: TraversalHistory): ThingId {
   return traversalHistory[traversalHistory.length - 1] ?? traversalHistory[0];
 }
 
@@ -236,7 +236,7 @@ export function createNavigation(
   const setState = (change: Partial<NavigationBase>): void => {
     observable.publish({ ...observable.getState(), ...change });
   };
-  const activeCardId = (): CardId | null => presentedCard(observable.getState());
+  const activeThingId = (): ThingId | null => presentedThing(observable.getState());
 
   return {
     getState: observable.getState,
@@ -278,7 +278,7 @@ export function createNavigation(
     // the adopted Diagram's own Active Graph moves the emphasis without being
     // asked, and this call is the one that must not interrupt a traversal: the
     // history being presented belongs to the Graph that was active, so silently
-    // naming another strands `moves()` on Edges out of Cards nothing is
+    // naming another strands `moves()` on Edges out of Things nothing is
     // presenting. Refusing leaves the traversal exactly as it was. Taking the
     // Graph as an argument is not that repair — the caller states its answer and
     // is held to it, rather than having one invented for it.
@@ -313,7 +313,7 @@ export function createNavigation(
         mode: 'overview',
       });
     },
-    openPresentation: (selection, graphId, cardId) => {
+    openPresentation: (selection, graphId, thingId) => {
       const space = currentSpace();
       if (space.lookup.graph(graphId) === undefined) {
         throw new Error(`The Graph ${graphId} does not exist.`);
@@ -322,14 +322,14 @@ export function createNavigation(
       if (!diagramShowsGraph(resolved, graphId)) {
         throw new Error(`The selected Diagram does not show the Graph ${graphId}.`);
       }
-      if (!graphCardIds(space, graphId).includes(cardId)) {
-        throw new Error(`The Graph ${graphId} does not contain the Card ${cardId}.`);
+      if (!graphThingIds(space, graphId).includes(thingId)) {
+        throw new Error(`The Graph ${graphId} does not contain the Thing ${thingId}.`);
       }
       observable.publish({
         selectedDiagramId: selection,
         activeGraphId: graphId,
         mode: 'presenting',
-        traversalHistory: [cardId],
+        traversalHistory: [thingId],
         branchIndex: 0,
       });
     },
@@ -386,7 +386,7 @@ export function createNavigation(
         mode: 'overview',
       });
     },
-    // Two refusals, and **both are reachable**. Each is a state with no Card to
+    // Two refusals, and **both are reachable**. Each is a state with no Thing to
     // begin at, and `GraphSelector` disables its control on exactly the union of
     // them, so the two agree — which is what stops either from being a click the
     // control accepts and silently drops. They used to be one guard, and a fully
@@ -400,7 +400,7 @@ export function createNavigation(
     // and its guard was type ceremony. It is now ordinary: creating a Diagram
     // creates its initial Active Graph *empty* in the same Edit (ADR 0040), and
     // every new Diagram sits here until the author draws an Edge.
-    // `graphStartCard` has no answer for such a Graph. Presenting has something
+    // `graphStartThing` has no answer for such a Graph. Presenting has something
     // real to decline.
     //
     // Between them, a Graph that is active *and* holds an Edge can always be
@@ -410,7 +410,7 @@ export function createNavigation(
       const owned =
         state.activeGraphId === null ? undefined : currentSpace().lookup.graph(state.activeGraphId);
       if (owned === undefined) return;
-      const start = graphStartCard(owned.graph);
+      const start = graphStartThing(owned.graph);
       if (start === undefined) return;
       observable.publish({
         ...baseOf(state),
@@ -421,16 +421,16 @@ export function createNavigation(
     },
     exitPresenting: () =>
       observable.publish({ ...baseOf(observable.getState()), mode: 'overview' }),
-    // The guard is the no-outgoing-Edge case — no active Graph, or a Card the
+    // The guard is the no-outgoing-Edge case — no active Graph, or a Thing the
     // Graph leaves by nothing — and not an out-of-range `branchIndex`. Overview
     // no longer reaches it and is no longer one of the cases it answers: the
     // Traversal history and the index are presenting's alone, so the mode is settled by the
     // narrowing a line below rather than by falling through to an empty Edge set.
     // **Don't clamp the index to the Edge count here.** Every write keeps it in
-    // range for the Card it was written against: `selectBranch` takes it modulo
+    // range for the Thing it was written against: `selectBranch` takes it modulo
     // the count, `retreat` uses a `findIndex` result, and every other write is
     // 0. Reaching a stale index needs the Edge set to shrink during a live traversal,
-    // which nothing does — an Edit only ever adds Edges, changing Graph or Card
+    // which nothing does — an Edit only ever adds Edges, changing Graph or Thing
     // rewrites the index, structural deletion is not built (ADR 0033), and
     // accepting the stored Space opens fresh navigation, which resets Traversal history
     // and the index with it. Clamping would also be
@@ -445,7 +445,7 @@ export function createNavigation(
       const edge = outgoingEdgesFrom(
         currentSpace(),
         state.activeGraphId,
-        currentCard(state.traversalHistory),
+        currentThing(state.traversalHistory),
       )[state.branchIndex];
       if (edge === undefined) return;
       const traversalHistory: TraversalHistory = [...state.traversalHistory, edge.to];
@@ -454,21 +454,21 @@ export function createNavigation(
     retreat: () => {
       const state = observable.getState();
       if (state.mode !== 'presenting' || state.traversalHistory.length < 2) return;
-      // Dropping the last Card cannot empty Traversal history, and this is where that
+      // Dropping the last Thing cannot empty Traversal history, and this is where that
       // stops being a fact about the length check above and becomes one about
-      // the value: the first Card is carried over as itself, so what comes back
+      // the value: the first Thing is carried over as itself, so what comes back
       // is non-empty Traversal history rather than an array that happens not to be. The
-      // rest-destructuring `currentCard` dropped stays here deliberately:
+      // rest-destructuring `currentThing` dropped stays here deliberately:
       // `slice` makes this O(n) in the history length, but it runs once per
       // user gesture rather than on every render, and the copy is what carries
       // the non-emptiness into the type instead of asserting it away.
       const [first, ...rest] = state.traversalHistory;
       const back: TraversalHistory = [first, ...rest.slice(0, -1)];
-      const to = currentCard(state.traversalHistory);
+      const to = currentThing(state.traversalHistory);
       const taken = outgoingEdgesFrom(
         currentSpace(),
         state.activeGraphId,
-        currentCard(back),
+        currentThing(back),
       ).findIndex((edge) => edge.to === to);
       observable.publish({ ...state, traversalHistory: back, branchIndex: taken < 0 ? 0 : taken });
     },
@@ -478,7 +478,7 @@ export function createNavigation(
       const count = outgoingEdgesFrom(
         currentSpace(),
         state.activeGraphId,
-        currentCard(state.traversalHistory),
+        currentThing(state.traversalHistory),
       ).length;
       if (count < 2) return;
       observable.publish({
@@ -486,29 +486,31 @@ export function createNavigation(
         branchIndex: (((state.branchIndex + delta) % count) + count) % count,
       });
     },
-    activeCardId,
+    activeThingId,
     // One read for the whole operation. Reading the Space costs a parse and
     // reindex of the working snapshot, and this runs during every App render —
     // a per-Edge read made a branching Graph pay that cost once per move.
     // Resolving once also keeps every title in the answer read from the same
     // Space as the Edges they name. Outside presentation there is no Traversal
-    // history to read: the moves are a presented Card's outgoing Edges, and
-    // there is no presented Card.
+    // history to read: the moves are a presented Thing's outgoing Edges, and
+    // there is no presented Thing.
     moves: () => {
       const state = observable.getState();
       if (state.mode !== 'presenting') return [];
       const space = currentSpace();
-      return outgoingEdgesFrom(space, state.activeGraphId, currentCard(state.traversalHistory)).map(
-        (edge, index) => ({
-          cardId: edge.to,
-          // The Card's name and never its whole Title: a move is a row in
-          // the presenting chrome and a control's accessible name, and a
-          // newline reaching either draws as a broken-looking label rather
-          // than as an error (ADR 0083).
-          title: titleName(space.lookup.card(edge.to)?.title ?? edge.to),
-          selected: index === state.branchIndex,
-        }),
-      );
+      return outgoingEdgesFrom(
+        space,
+        state.activeGraphId,
+        currentThing(state.traversalHistory),
+      ).map((edge, index) => ({
+        thingId: edge.to,
+        // The Thing's name and never its whole Title: a move is a row in
+        // the presenting chrome and a control's accessible name, and a
+        // newline reaching either draws as a broken-looking label rather
+        // than as an error (ADR 0083).
+        title: titleName(space.lookup.thing(edge.to)?.title ?? edge.to),
+        selected: index === state.branchIndex,
+      }));
     },
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardFrontmatterSchema, cardSchema, spaceFileSchema } from '../src/index';
+import { thingFrontmatterSchema, thingSchema, spaceFileSchema } from '../src/index';
 
 const MAIN = {
   id: '00000000-0000-4000-8000-000000000004',
@@ -9,7 +9,7 @@ const MAIN = {
   ],
 };
 
-/** The Diagram that owns `MAIN`; positions are its Card membership (ADR 0040). */
+/** The Diagram that owns `MAIN`; positions are its Thing membership (ADR 0040). */
 const WORKING = {
   id: '00000000-0000-4000-8000-000000000010',
   title: 'Working',
@@ -110,12 +110,12 @@ describe('space file schema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('holds no cards — a card exists because its file does (ADR 0020)', () => {
+  it('holds no things — a thing exists because its file does (ADR 0020)', () => {
     // Strict, so the array is refused rather than dropped, and nothing can
     // half-load from it.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      cards: [{ id: '00000000-0000-4000-8000-000000000002', title: 'A', content: 'cards/a.md' }],
+      things: [{ id: '00000000-0000-4000-8000-000000000002', title: 'A', content: 'things/a.md' }],
     });
     expect(result.success).toBe(false);
   });
@@ -205,7 +205,7 @@ describe('space file schema', () => {
     // Creating a Diagram creates its initial empty Active Graph in the same Edit
     // (ADR 0040), and the Flow view converts by returning exactly that (ADR
     // 0045), so an edge-less Graph is a state the product produces on the first
-    // Card the author moves. Deleting the last Edge of a Graph leaves the same
+    // Thing the author moves. Deleting the last Edge of a Graph leaves the same
     // shape. The superseded rule read a Graph as minted *by* drawing an Edge.
     const result = spaceFileSchema.safeParse(
       withGraphs([{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }]),
@@ -259,30 +259,30 @@ describe('space file schema', () => {
   });
 });
 
-describe('card frontmatter schema', () => {
-  it('rejects an empty card id', () => {
-    expect(cardFrontmatterSchema.safeParse({ id: '', title: 'A' }).success).toBe(false);
+describe('thing frontmatter schema', () => {
+  it('rejects an empty thing id', () => {
+    expect(thingFrontmatterSchema.safeParse({ id: '', title: 'A' }).success).toBe(false);
   });
 
-  it('defaults a card with no kind to markdown, so the common card declares neither', () => {
-    const card = cardFrontmatterSchema.parse({
+  it('defaults a thing with no kind to markdown, so the common thing declares neither', () => {
+    const thing = thingFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
     });
-    expect(card.kind).toBe('markdown');
+    expect(thing.kind).toBe('markdown');
   });
 
   it('holds no content key — the file the frontmatter sits in is the content', () => {
-    const card = cardFrontmatterSchema.parse({
+    const thing = thingFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
-      content: 'cards/a.md',
+      content: 'things/a.md',
     });
-    expect('content' in card).toBe(false);
+    expect('content' in thing).toBe(false);
   });
 
-  it('parses an alias card, which points at a target instead of holding content', () => {
-    const alias = cardFrontmatterSchema.parse({
+  it('parses an alias thing, which points at a target instead of holding content', () => {
+    const alias = thingFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
       kind: 'alias',
@@ -293,7 +293,7 @@ describe('card frontmatter schema', () => {
   });
 
   it('gives an alias no body field at all', () => {
-    const alias = cardSchema.parse({
+    const alias = thingSchema.parse({
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
       kind: 'alias',
@@ -303,8 +303,8 @@ describe('card frontmatter schema', () => {
     expect('body' in alias).toBe(false);
   });
 
-  it('parses a Space Card with optional Diagram and Graph selections', () => {
-    const selected = cardFrontmatterSchema.parse({
+  it('parses a Space Thing with optional Diagram and Graph selections', () => {
+    const selected = thingFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000006',
       title: 'Nested space',
       kind: 'space',
@@ -312,7 +312,7 @@ describe('card frontmatter schema', () => {
       diagram: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
     });
-    const inherited = cardFrontmatterSchema.parse({
+    const inherited = thingFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000010',
       title: 'Nested space with inherited selections',
       kind: 'space',
@@ -330,7 +330,7 @@ describe('card frontmatter schema', () => {
 
   it('rejects an alias with no target', () => {
     expect(
-      cardFrontmatterSchema.safeParse({
+      thingFrontmatterSchema.safeParse({
         id: '00000000-0000-4000-8000-000000000002',
         title: 'A',
         kind: 'alias',
@@ -338,13 +338,13 @@ describe('card frontmatter schema', () => {
     ).toBe(false);
   });
 
-  it('does not make Description part of the shared Card contract', () => {
-    const card = cardFrontmatterSchema.parse({
+  it('does not make Description part of the shared Thing contract', () => {
+    const thing = thingFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
       description: 'What A is',
     });
-    expect('description' in card).toBe(false);
+    expect('description' in thing).toBe(false);
   });
 });
 
@@ -368,7 +368,7 @@ describe('space file diagrams', () => {
     });
   });
 
-  it('requires an Expanded Card to be at least the Closed Card size', () => {
+  it('requires an Expanded Thing to be at least the Closed Thing size', () => {
     const positions = (width: number, height: number) => ({
       '00000000-0000-4000-8000-000000000002': {
         x: 0,
@@ -434,7 +434,7 @@ describe('space file diagrams', () => {
     }
   });
 
-  it('rejects a position keyed by an empty card id', () => {
+  it('rejects a position keyed by an empty thing id', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       diagrams: [{ ...working, positions: { '': { x: 0, y: 0, open: false } } }],

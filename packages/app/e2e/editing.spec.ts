@@ -1,9 +1,9 @@
 import {
-  COLLAPSED_CARD_SIZE,
+  COLLAPSED_THING_SIZE,
   DEFAULT_OPEN_SIZE,
   encodeCompactUuid,
   uuidSchema,
-  type CardPlacement,
+  type ThingPlacement,
 } from '@project/core';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
@@ -11,23 +11,23 @@ import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
 import {
   AUTHORING_HANDLE_SIDES,
   activateGraph,
-  activeCard,
+  activeThing,
   activeGraph,
   allPositions,
   authoringHandle,
   boxOf,
   connectHandles,
   connectToEmptyWithAlt,
-  createCard,
-  createCardControl,
+  createThing,
+  createThingControl,
   dock,
   dragBy,
-  expectCardFillsNode,
+  expectThingFillsNode,
   diagramChoices,
   diagramMenu,
   newDiagram,
   nodeByTitle,
-  openCard,
+  openThing,
   positionOf,
   presentControl,
   selectCanvas,
@@ -54,11 +54,11 @@ async function quiescent(page: Page): Promise<void> {
   await page.waitForTimeout(250);
 }
 
-async function addExistingCard(page: Page, title: string): Promise<void> {
-  await page.getByRole('button', { name: 'Cards', exact: true }).click();
+async function addExistingThing(page: Page, title: string): Promise<void> {
+  await page.getByRole('button', { name: 'Things', exact: true }).click();
   await page.getByRole('button', { name: `Add ${title} to Diagram` }).click();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
 }
 
 function sameEdgeGeometry(left: string | null, right: string | null): boolean {
@@ -87,7 +87,7 @@ async function emptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
     const hit = document.elementFromPoint(at.x, at.y);
     return hit !== null && hit.closest('.react-flow__node') === null;
   }, point);
-  expect(clear, 'the chosen point is over a Card rather than empty canvas').toBe(true);
+  expect(clear, 'the chosen point is over a Thing rather than empty canvas').toBe(true);
   return point;
 }
 
@@ -95,7 +95,7 @@ async function emptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
  * Drag one endpoint of a selected Edge to a screen point.
  *
  * The anchors are transparent circles React Flow draws only on a reconnectable
- * Edge, so the press is asserted to land on one — a Card handle drawn over it
+ * Edge, so the press is asserted to land on one — a Thing handle drawn over it
  * would otherwise read as a reconnection that silently never began. React Flow
  * starts the connection on the first move after mousedown and can swallow a
  * single jump, which is why the move is stepped, as in `connectHandles`.
@@ -124,7 +124,7 @@ async function dragEndpointTo(
   }
 }
 
-/** Drag one endpoint onto a Card's authoring target handle. */
+/** Drag one endpoint onto a Thing's authoring target handle. */
 async function reconnectOnto(
   page: Page,
   edge: Locator,
@@ -184,45 +184,45 @@ async function selectAnEdge(page: Page): Promise<string> {
 }
 
 test(
-  'inline title editing persists without moving or opening the Card',
-  { tag: '@parity:canvas-card-owns-title-editing-and-refusal' },
+  'inline title editing persists without moving or opening the Thing',
+  { tag: '@parity:canvas-thing-owns-title-editing-and-refusal' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
+    const thing = nodeByTitle(page, 'A').first();
+    await expect(thing).toBeVisible();
     await settled(page);
     const before = await allPositions(page);
 
-    const actions = card.getByTestId('canvas-card-actions');
+    const actions = thing.getByTestId('canvas-thing-actions');
     // Asserted on the container, not on the button: the reveal is
-    // `opacity`/`pointer-events` on `.canvas-card__actions`, and `opacity` does
+    // `opacity`/`pointer-events` on `.canvas-thing__actions`, and `opacity` does
     // not inherit — a computed `opacity` read off the button is `1` whether the
-    // Card is hovered or not, so the same assertion there cannot fail.
+    // Thing is hovered or not, so the same assertion there cannot fail.
     await expect(actions).toHaveCSS('opacity', '0');
-    await card.hover();
+    await thing.hover();
     await expect(actions).toHaveCSS('opacity', '1');
-    const edit = card.getByRole('button', { name: 'Open Card A' });
+    const edit = thing.getByRole('button', { name: 'Open Thing A' });
     // The affordance draws a glyph, so nothing about its own content keeps it in
     // shape or in place. Sized square in CSS and parked in the corner, clear of
     // the title — a name is what a screen reader gets, and the box is all a
     // pointer gets.
-    const editBox = await boxOf(edit, 'the Card affordance');
-    const cardBox = await boxOf(card, 'Card A');
-    const titleBox = await boxOf(card.getByRole('heading', { name: 'A' }), "Card A's title");
+    const editBox = await boxOf(edit, 'the Thing affordance');
+    const thingBox = await boxOf(thing, 'Thing A');
+    const titleBox = await boxOf(thing.getByRole('heading', { name: 'A' }), "Thing A's title");
     expect(Math.abs(editBox.width - editBox.height)).toBeLessThanOrEqual(1);
-    expect(editBox.x).toBeGreaterThanOrEqual(cardBox.x);
-    expect(editBox.x + editBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
-    expect(editBox.y).toBeGreaterThanOrEqual(cardBox.y);
+    expect(editBox.x).toBeGreaterThanOrEqual(thingBox.x);
+    expect(editBox.x + editBox.width).toBeLessThanOrEqual(thingBox.x + thingBox.width);
+    expect(editBox.y).toBeGreaterThanOrEqual(thingBox.y);
     expect(editBox.y + editBox.height).toBeLessThanOrEqual(titleBox.y);
 
     // The displayed Title is its own control (ADR 0065): activating it neither
-    // selects nor opens the Card around it.
+    // selects nor opens the Thing around it.
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-    await card.getByRole('button', { name: 'Edit Title A' }).click();
+    await thing.getByRole('button', { name: 'Edit Title A' }).click();
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-    await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
-    const title = page.getByRole('textbox', { name: 'Card title' });
+    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+    const title = page.getByRole('textbox', { name: 'Thing title' });
     await title.fill('Renamed A');
     await title.press('Enter');
 
@@ -232,16 +232,16 @@ test(
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
     expect(await allPositions(page)).toEqual(before);
 
-    await openCard(renamed, 'Renamed A');
-    await renamed.getByRole('button', { name: 'Close Card Renamed A' }).click();
+    await openThing(renamed, 'Renamed A');
+    await renamed.getByRole('button', { name: 'Close Thing Renamed A' }).click();
     await renamed.click();
     await page.keyboard.press('F2');
-    const keyboardTitle = page.getByRole('textbox', { name: 'Card title' });
+    const keyboardTitle = page.getByRole('textbox', { name: 'Thing title' });
     await expect(keyboardTitle).toBeVisible();
     await keyboardTitle.fill('');
     await nodeByTitle(page, 'B').first().click();
     await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
     await quiescent(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
     await keyboardTitle.focus();
@@ -252,70 +252,70 @@ test(
   },
 );
 
-test("a short Title control's hit-area hugs its text, not the whole Card body", async ({
+test("a short Title control's hit-area hugs its text, not the whole Thing body", async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
   await settled(page);
 
-  const cardBox = await boxOf(card, 'Card A');
+  const thingBox = await boxOf(thing, 'Thing A');
   const titleBox = await boxOf(
-    card.getByRole('button', { name: 'Edit Title A' }),
-    "Card A's Title",
+    thing.getByRole('button', { name: 'Edit Title A' }),
+    "Thing A's Title",
   );
 
   // Editing is the Title's own activation (ADR 0065), so its target
   // must claim only the pixels it draws — a one-letter title next to a much
-  // wider card is the case that tells a shrunk-to-fit title apart from one
-  // stretched to the card's full width.
-  expect(titleBox.width).toBeLessThan(cardBox.width - 40);
+  // wider thing is the case that tells a shrunk-to-fit title apart from one
+  // stretched to the thing's full width.
+  expect(titleBox.width).toBeLessThan(thingBox.width - 40);
 
-  // A point in the blank band to the title's right, still inside the card body
-  // and at the title's own height — over the card, but off its text.
+  // A point in the blank band to the title's right, still inside the thing body
+  // and at the title's own height — over the thing, but off its text.
   const blankSpace = {
-    x: (titleBox.x + titleBox.width + cardBox.x + cardBox.width) / 2,
+    x: (titleBox.x + titleBox.width + thingBox.x + thingBox.width) / 2,
     y: titleBox.y + titleBox.height / 2,
   };
   await page.mouse.click(blankSpace.x, blankSpace.y);
-  await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveCount(0);
-  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Thing title' })).toHaveCount(0);
+  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
 });
 
-test('a click selects a Card, and no pointer gesture on its body opens it', async ({ page }) => {
+test('a click selects a Thing, and no pointer gesture on its body opens it', async ({ page }) => {
   await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
   await settled(page);
   const transform = await viewportTransform(page);
 
-  await card.click();
-  await expect(card).toHaveClass(/selected/);
-  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
+  await thing.click();
+  await expect(thing).toHaveClass(/selected/);
+  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
 
   // Off the Title, which has its own control. React Flow zooms on a double click
-  // by default and its filter exempts only `.nopan`, which a Card is not.
-  await card.dblclick({ position: { x: 24, y: 12 } });
-  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
+  // by default and its filter exempts only `.nopan`, which a Thing is not.
+  await thing.dblclick({ position: { x: 24, y: 12 } });
+  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
   expect(await viewportTransform(page)).toEqual(transform);
 });
 
-test('the Card affordance opens rendered Markdown and edits it in place', async ({ page }) => {
+test('the Thing affordance opens rendered Markdown and edits it in place', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
   await settled(page);
 
-  await openCard(card, 'A');
+  await openThing(thing, 'A');
 
-  await expect(card).toContainText('entry point');
-  await card.getByRole('button', { name: 'Edit Card A' }).click();
+  await expect(thing).toContainText('entry point');
+  await thing.getByRole('button', { name: 'Edit Thing A' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown source of A' });
   await source.fill('Authored from the graph');
-  await card.getByRole('button', { name: 'Save Card A' }).click();
+  await thing.getByRole('button', { name: 'Save Thing A' }).click();
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await page.reload();
@@ -324,29 +324,29 @@ test('the Card affordance opens rendered Markdown and edits it in place', async 
 });
 
 test(
-  'the open Markdown Card owns exact source, cancellation and commit',
-  { tag: '@parity:open-markdown-card-owns-its-editing-lifecycle' },
+  'the open Markdown Thing owns exact source, cancellation and commit',
+  { tag: '@parity:open-markdown-thing-owns-its-editing-lifecycle' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const cardA = nodeByTitle(page, 'A').first();
+    const thingA = nodeByTitle(page, 'A').first();
     await settled(page);
-    await openCard(cardA, 'A');
-    await cardA.hover();
-    const bodyTarget = cardA.getByTestId('markdown-card-body-edit-target');
+    await openThing(thingA, 'A');
+    await thingA.hover();
+    const bodyTarget = thingA.getByTestId('markdown-thing-body-edit-target');
     await expect(bodyTarget).toHaveCSS('opacity', '0');
     await expect(bodyTarget.locator('svg')).toHaveCount(0);
     expect(
-      await cardA
-        .getByTestId('canvas-card-actions')
+      await thingA
+        .getByTestId('canvas-thing-actions')
         .getByRole('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
-      // The rail carries the Card's own actions menu between Edit and Close now:
-      // a Card's addresses and its deletion belong to the Card (ADR 0073), and
+      // The rail carries the Thing's own actions menu between Edit and Close now:
+      // a Thing's addresses and its deletion belong to the Thing (ADR 0073), and
       // the Space's command surface does not draw them at all (ADR 0082). The
       // list is asserted whole rather than by presence, so a control appearing
       // here is a decision rather than a drift.
-    ).toEqual(['Edit Card A', 'Actions for Card A', 'Close Card A']);
+    ).toEqual(['Edit Thing A', 'Actions for Thing A', 'Close Thing A']);
     await bodyTarget.click();
     const source = page.getByRole('textbox', { name: 'Markdown source of A' });
     await expect(source).toBeFocused();
@@ -355,8 +355,8 @@ test(
     const originalLineNumbers = await lineNumbers.elementHandle();
     expect(originalLineNumbers).not.toBeNull();
 
-    // A quarter of `--canvas-card-muted-color`, as Chrome serialises the
-    // `color-mix` in `markdown-card-body.css` — the Card's own muted ink,
+    // A quarter of `--canvas-thing-muted-color`, as Chrome serialises the
+    // `color-mix` in `markdown-thing-body.css` — the Thing's own muted ink,
     // washed. It was `--accent`, the chrome's highlighted-row fill, which on the
     // light theme is a near-white and would leave a selection nobody could see
     // on cream.
@@ -382,13 +382,13 @@ test(
     await expect(source).toBeVisible();
     await source.press('Escape');
     await expect(source).toHaveCount(0);
-    await expect(cardA).toContainText('entry point');
+    await expect(thingA).toContainText('entry point');
 
-    // Hovered first: the click on the pane above took the pointer off the Card,
+    // Hovered first: the click on the pane above took the pointer off the Thing,
     // and a rail nobody is pointing at takes no pointer events — which is what
     // the reload branch below already spells out.
-    await cardA.hover();
-    await cardA.getByRole('button', { name: 'Edit Card A' }).click();
+    await thingA.hover();
+    await thingA.getByRole('button', { name: 'Edit Thing A' }).click();
     const committedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
     await committedSource.fill(exact);
     await committedSource.press(`${PRIMARY_MODIFIER}+Enter`);
@@ -397,7 +397,7 @@ test(
     const persisted = nodeByTitle(page, 'A').first();
     await expect(persisted).toContainText('two spaces and code');
     await persisted.hover();
-    await persisted.getByRole('button', { name: 'Edit Card A' }).click();
+    await persisted.getByRole('button', { name: 'Edit Thing A' }).click();
     await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toContainText(
       'two spaces and `code`',
     );
@@ -416,24 +416,24 @@ test(
 test('the rail Cancel discards edited source', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const cardA = nodeByTitle(page, 'A').first();
+  const thingA = nodeByTitle(page, 'A').first();
   await settled(page);
 
-  await openCard(cardA, 'A');
-  await cardA.getByRole('button', { name: 'Edit Card A' }).click();
+  await openThing(thingA, 'A');
+  await thingA.getByRole('button', { name: 'Edit Thing A' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown source of A' });
   await expect(source).toContainText('entry point');
   await source.fill('Discarded rewrite');
   expect(await markdownSource(source)).toBe('Discarded rewrite');
-  await cardA.getByRole('button', { name: 'Cancel editing Card A' }).click();
-  await expect(cardA).toContainText('entry point');
-  await cardA.getByRole('button', { name: 'Edit Card A' }).click();
+  await thingA.getByRole('button', { name: 'Cancel editing Thing A' }).click();
+  await expect(thingA).toContainText('entry point');
+  await thingA.getByRole('button', { name: 'Edit Thing A' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toContainText(
     'entry point',
   );
 });
 
-test('the Markdown editor code loads only when a Markdown Card opens', async ({ page }) => {
+test('the Markdown editor code loads only when a Markdown Thing opens', async ({ page }) => {
   const editorRequests: string[] = [];
   page.on('request', (request) => {
     if (request.url().includes('MarkdownSourceEditor')) editorRequests.push(request.url());
@@ -441,21 +441,21 @@ test('the Markdown editor code loads only when a Markdown Card opens', async ({ 
 
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
   await settled(page);
   expect(editorRequests).toEqual([]);
 
   const alias = nodeByTitle(page, 'A′').first();
-  await openCard(alias, 'A′');
+  await openThing(alias, 'A′');
   await expect(alias).toContainText('entry point');
   await expect(alias.getByRole('textbox')).toHaveCount(0);
   expect(editorRequests).toEqual([]);
-  await alias.getByRole('button', { name: 'Close Card A′' }).click();
+  await alias.getByRole('button', { name: 'Close Thing A′' }).click();
 
-  await openCard(card, 'A');
+  await openThing(thing, 'A');
   expect(editorRequests).toEqual([]);
-  await card.getByRole('button', { name: 'Edit Card A' }).click();
+  await thing.getByRole('button', { name: 'Edit Thing A' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
   expect(editorRequests).toHaveLength(1);
 });
@@ -465,26 +465,26 @@ test('the Markdown editor code loads only when a Markdown Card opens', async ({ 
  * mono body that is the writing surface rather than a form control.
  *
  * Pinned because nothing else asserts it. The treatment's rules and the general
- * `.card-pane__panel` rules they override have equal specificity, so only source
+ * `.thing-pane__panel` rules they override have equal specificity, so only source
  * order separates them — the same cascade trap `presenting.spec.ts` pins for
- * `.card--full`. With the treatment colocated in its own stylesheet, that order
+ * `.thing--full`. With the treatment colocated in its own stylesheet, that order
  * is now a fact about the module graph rather than about one file's line
  * numbers, and a reordered import would silently return the editor to the
  * generic dark pane with every other assertion still green.
  */
-test('the opened Card draws Markdown and its editor on the same paper surface', async ({
+test('the opened Thing draws Markdown and its editor on the same paper surface', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
   await settled(page);
 
-  await openCard(card, 'A');
+  await openThing(thing, 'A');
 
-  await expect(card.getByTestId('card')).toHaveCSS('background-color', 'rgb(255, 250, 240)');
-  await card.getByRole('button', { name: 'Edit Card A' }).click();
+  await expect(thing.getByTestId('thing')).toHaveCSS('background-color', 'rgb(255, 250, 240)');
+  await thing.getByRole('button', { name: 'Edit Thing A' }).click();
 
   const source = page.locator('[data-slot="markdown-source-editor"]');
   await expect(source).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -492,8 +492,8 @@ test('the opened Card draws Markdown and its editor on the same paper surface', 
 
   // The gutter remains legible through the Markdown body component's own theme;
   // application CSS does not reach through to CodeMirror classes (ADR 0063).
-  // `#4a505c` is `--canvas-card-muted-color`, the Card's own muted ink: this is
-  // drawn on cream, so it takes the role held to AA against both Card faces
+  // `#4a505c` is `--canvas-thing-muted-color`, the Thing's own muted ink: this is
+  // drawn on cream, so it takes the role held to AA against both Thing faces
   // rather than the chrome's `--muted-foreground`, which is measured on paper.
   await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toHaveCSS(
     'color',
@@ -501,18 +501,18 @@ test('the opened Card draws Markdown and its editor on the same paper surface', 
   );
 });
 
-test('opened Markdown editing persists source while expansion displaces and restores Cards', async ({
+test('opened Markdown editing persists source while expansion displaces and restores Things', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
-  const openedId = await card.getAttribute('data-id');
+  const openedId = await thing.getAttribute('data-id');
 
-  await openCard(card, 'A');
+  await openThing(thing, 'A');
   const expanded = await allPositions(page);
   expect(expanded[openedId ?? '']).toEqual(before[openedId ?? '']);
   expect(
@@ -521,41 +521,41 @@ test('opened Markdown editing persists source while expansion displaces and rest
         id !== openedId && JSON.stringify(expanded[id]) !== JSON.stringify(position),
     ),
   ).toBe(true);
-  await card.getByRole('button', { name: 'Edit Card A' }).click();
+  await thing.getByRole('button', { name: 'Edit Thing A' }).click();
   await page.getByRole('textbox', { name: 'Markdown source of A' }).fill('# Edited\n\nNew source');
-  await card.getByRole('button', { name: 'Save Card A' }).click();
+  await thing.getByRole('button', { name: 'Save Thing A' }).click();
 
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(expanded);
 
-  await card.getByRole('button', { name: 'Close Card A' }).click();
+  await thing.getByRole('button', { name: 'Close Thing A' }).click();
   expect(await allPositions(page)).toEqual(before);
 
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
   await persisted.hover();
-  await persisted.getByRole('button', { name: 'Edit Card A' }).click();
+  await persisted.getByRole('button', { name: 'Edit Thing A' }).click();
   const persistedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
   await expect(persistedSource).toContainText('# Edited');
   await expect(persistedSource).toContainText('New source');
 });
 
 /**
- * Dragging a card writes its placement into the Diagram.
+ * Dragging a thing writes its placement into the Diagram.
  *
- * The fixture opens in its declared default Diagram. A Card goes where the
+ * The fixture opens in its declared default Diagram. A Thing goes where the
  * author puts it and nothing else moves.
  */
 
-test('a dragged card stays where it is dropped, and nothing else moves', async ({ page }) => {
+test('a dragged thing stays where it is dropped, and nothing else moves', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
 
   // Wait for the placement to resolve — before it does, the space is not yet
-  // draggable and every card sits at the origin.
+  // draggable and every thing sits at the origin.
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /./);
 
   await settled(page);
@@ -573,14 +573,14 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   const to = await positionOf(a);
   expect(to.y).toBeGreaterThan(from.y + 100);
 
-  // Every other card is exactly where it was. Not "roughly" — a global
+  // Every other thing is exactly where it was. Not "roughly" — a global
   // optimiser is what this rules out, and it moves things by pixels as readily
   // as by hundreds.
   const after = await allPositions(page);
   const draggedId = await a.getAttribute('data-id');
   for (const [id, position] of Object.entries(before)) {
     if (id === draggedId) continue;
-    expect(after[id], `card ${id} moved`).toEqual(position);
+    expect(after[id], `thing ${id} moved`).toEqual(position);
   }
 });
 
@@ -589,23 +589,23 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
 /* -------------------------------------------------------------------------- */
 
 /**
- * The room an Open Card makes for itself: its Open rect less the Closed one.
+ * The room an Open Thing makes for itself: its Open rect less the Closed one.
  *
  * Arithmetic over the domain's own two constants rather than the numbers they
  * currently are, so a change to either size moves these tests with it instead of
  * leaving them asserting a stale offset.
  */
 const OPEN_GROWTH = {
-  width: DEFAULT_OPEN_SIZE.width - COLLAPSED_CARD_SIZE.width,
-  height: DEFAULT_OPEN_SIZE.height - COLLAPSED_CARD_SIZE.height,
+  width: DEFAULT_OPEN_SIZE.width - COLLAPSED_THING_SIZE.width,
+  height: DEFAULT_OPEN_SIZE.height - COLLAPSED_THING_SIZE.height,
 } as const;
 
 /**
- * The fixture Cards the three geometries below place, by id and by title.
+ * The fixture Things the three geometries below place, by id and by title.
  *
  * Placed by id and read back by id, so none of this depends on the order
- * `snapshot.cards` happens to arrive in; the titles are the fixture's own, and
- * are what a Card's own controls are named for.
+ * `snapshot.things` happens to arrive in; the titles are the fixture's own, and
+ * are what a Thing's own controls are named for.
  */
 const SUBJECT = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000002'), title: 'A' };
 const NEIGHBOUR = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'), title: 'B' };
@@ -616,14 +616,14 @@ const BEHIND = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000005'), t
  *
  * The tracked fixture's Diagram is ELK-seeded, so a test written against it would
  * be reverse-engineering coordinates it never chose — and every claim below is
- * about a distance between two Cards. Seeding goes through the same HTTP
+ * about a distance between two Things. Seeding goes through the same HTTP
  * boundary the browser uses, so the Diagram the app opens is the one written
  * here.
  */
 async function seedGeometry(
   page: Page,
   title: string,
-  positions: Record<string, CardPlacement>,
+  positions: Record<string, ThingPlacement>,
 ): Promise<void> {
   const seeded = await seedPositionedDiagram(page, title, () => positions);
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
@@ -631,33 +631,33 @@ async function seedGeometry(
   await settled(page);
 }
 
-/** The node React Flow drew for one seeded Card. */
-const seededNode = (page: Page, card: { readonly id: string }): Locator =>
-  page.locator(`.react-flow__node[data-id="${card.id}"]`);
+/** The node React Flow drew for one seeded Thing. */
+const seededNode = (page: Page, thing: { readonly id: string }): Locator =>
+  page.locator(`.react-flow__node[data-id="${thing.id}"]`);
 
 /**
- * One seeded Card's position out of a frame `allPositions` read.
+ * One seeded Thing's position out of a frame `allPositions` read.
  *
- * Required rather than optional: a Card that is not on the canvas is a broken
+ * Required rather than optional: a Thing that is not on the canvas is a broken
  * seed, and saying so here beats an assertion against `undefined` several lines
  * later.
  */
 function at(
   positions: Record<string, { x: number; y: number }>,
-  card: { readonly id: string; readonly title: string },
+  thing: { readonly id: string; readonly title: string },
 ): { x: number; y: number } {
-  const position = positions[card.id];
-  if (position === undefined) throw new Error(`Card ${card.title} is not on the canvas.`);
+  const position = positions[thing.id];
+  if (position === undefined) throw new Error(`Thing ${thing.title} is not on the canvas.`);
   return position;
 }
 
 /**
- * The first of ADR 0084's two reported defects: an Open Card's size deciding
+ * The first of ADR 0084's two reported defects: an Open Thing's size deciding
  * where its neighbours are drawn.
  *
  * The neighbour is before the subject on both axes, so opening the subject
  * displaces nothing and what follows is about the drag alone. The rule is
- * per-axis, so the geometry only has to cross one: the Cards are a hundred and
+ * per-axis, so the geometry only has to cross one: the Things are a hundred and
  * twenty apart on `x` and far enough apart on `y` never to overlap, and a short
  * drag leftwards carries the subject across the neighbour's `x` and nothing
  * else. That is the discontinuity ADR 0084 measured — the derived rule answered
@@ -665,10 +665,10 @@ function at(
  * it back on the return. `whileDragging` is what makes the mid-gesture frame visible at
  * all, and the delta is chosen so the halfway move is already past the crossing.
  */
-test('dragging an Open Card across a neighbour moves nothing but the dragged Card', async ({
+test('dragging an Open Thing across a neighbour moves nothing but the dragged Thing', async ({
   page,
 }) => {
-  // Apart on `y` by more than a Card's height, so the two never overlap and
+  // Apart on `y` by more than a Thing's height, so the two never overlap and
   // the drag below crosses `x` alone.
   await seedGeometry(page, 'Drag Geometry', {
     [SUBJECT.id]: { x: 120, y: 400, open: false },
@@ -676,8 +676,8 @@ test('dragging an Open Card across a neighbour moves nothing but the dragged Car
   });
   const subject = seededNode(page, SUBJECT);
 
-  await openCard(subject, SUBJECT.title);
-  await expect(subject.getByRole('button', { name: `Close Card ${SUBJECT.title}` })).toBeVisible();
+  await openThing(subject, SUBJECT.title);
+  await expect(subject.getByRole('button', { name: `Close Thing ${SUBJECT.title}` })).toBeVisible();
   await settled(page);
 
   // The resting frame, read before any pointer goes down. Everything below is
@@ -721,12 +721,12 @@ test('dragging an Open Card across a neighbour moves nothing but the dragged Car
  * The second reported defect: a drop the old inverse could not answer for.
  *
  * `Placement.authoredPoint` inverted a derivation that is not onto — no authored
- * coordinate drew inside an Open Card's growth — so a drop that landed in that
- * band was answered with the near side, and the Card settled on the Open Card's
+ * coordinate drew inside an Open Thing's growth — so a drop that landed in that
+ * band was answered with the near side, and the Thing settled on the Open Thing's
  * origin instead of where the author released it. The band was one growth-step
  * wide beginning at that origin, so this drops half a step into it on both axes.
  */
-test('a closed Card released inside an Open Card lands at the drop point', async ({ page }) => {
+test('a closed Thing released inside an Open Thing lands at the drop point', async ({ page }) => {
   await seedGeometry(page, 'Drop Geometry', {
     [SUBJECT.id]: { x: 150, y: 150, open: false },
     [NEIGHBOUR.id]: { x: 0, y: 0, open: false },
@@ -734,8 +734,8 @@ test('a closed Card released inside an Open Card lands at the drop point', async
   const subject = seededNode(page, SUBJECT);
   const mover = seededNode(page, NEIGHBOUR);
 
-  await openCard(subject, SUBJECT.title);
-  await expect(subject.getByRole('button', { name: `Close Card ${SUBJECT.title}` })).toBeVisible();
+  await openThing(subject, SUBJECT.title);
+  await expect(subject.getByRole('button', { name: `Close Thing ${SUBJECT.title}` })).toBeVisible();
   await settled(page);
 
   // The resting frame, before the pointer goes down.
@@ -745,17 +745,17 @@ test('a closed Card released inside an Open Card lands at the drop point', async
   expect(open).toEqual({ x: 150, y: 150 });
   expect(from).toEqual({ x: 0, y: 0 });
 
-  // Inside the Open Card's drawn box, and inside the band: half a growth-step
+  // Inside the Open Thing's drawn box, and inside the band: half a growth-step
   // beyond its origin on each axis.
   const dropAt = { x: open.x + OPEN_GROWTH.width / 2, y: open.y + OPEN_GROWTH.height / 2 };
-  const openBox = await boxOf(subject, 'the Open Card');
+  const openBox = await boxOf(subject, 'the Open Thing');
   await dragBy(page, mover, dropAt.x - from.x, dropAt.y - from.y);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
-  // Drawn inside the Open Card, which is the premise the flow-space assertions
-  // below rest on — and the thing the clamp made unreachable, since a Card it
-  // answered for came to rest on the Open Card's own top-left corner.
-  const moverBox = await boxOf(mover, 'the dropped Card');
+  // Drawn inside the Open Thing, which is the premise the flow-space assertions
+  // below rest on — and the thing the clamp made unreachable, since a Thing it
+  // answered for came to rest on the Open Thing's own top-left corner.
+  const moverBox = await boxOf(mover, 'the dropped Thing');
   expect(moverBox.x).toBeGreaterThan(openBox.x);
   expect(moverBox.y).toBeGreaterThan(openBox.y);
   expect(moverBox.x).toBeLessThan(openBox.x + openBox.width);
@@ -765,23 +765,23 @@ test('a closed Card released inside an Open Card lands at the drop point', async
   expect(at(landed, NEIGHBOUR).x - from.x, 'the drag never started').toBeGreaterThan(
     OPEN_GROWTH.width / 4,
   );
-  // Where it was released, not the Open Card's origin.
+  // Where it was released, not the Open Thing's origin.
   expect(at(landed, NEIGHBOUR).x).toBeCloseTo(dropAt.x, -1);
   expect(at(landed, NEIGHBOUR).y).toBeCloseTo(dropAt.y, -1);
-  expect(at(landed, SUBJECT), 'the Open Card moved').toEqual(open);
+  expect(at(landed, SUBJECT), 'the Open Thing moved').toEqual(open);
 });
 
 /**
  * Once, and then not again (ADR 0084).
  *
  * Opening writes the room it takes into the Diagram, so the neighbour beyond the
- * subject on both axes moves by the growth and the Card behind it on both axes
+ * subject on both axes moves by the growth and the Thing behind it on both axes
  * does not move at all. From then on those are authored positions like any
- * other: dragging the Open Card past the neighbour is not a second Open, and the
+ * other: dragging the Open Thing past the neighbour is not a second Open, and the
  * room stays where the Open Edit put it. Under the derived rule the neighbour
  * came back to its authored point the moment the subject was dragged beyond it.
  */
-test('opening a Card displaces its neighbours once, and dragging it never displaces them again', async ({
+test('opening a Thing displaces its neighbours once, and dragging it never displaces them again', async ({
   page,
 }) => {
   await seedGeometry(page, 'Open Geometry', {
@@ -792,12 +792,12 @@ test('opening a Card displaces its neighbours once, and dragging it never displa
   const subject = seededNode(page, SUBJECT);
   const closed = await allPositions(page);
 
-  await openCard(subject, SUBJECT.title);
-  await expect(subject.getByRole('button', { name: `Close Card ${SUBJECT.title}` })).toBeVisible();
+  await openThing(subject, SUBJECT.title);
+  await expect(subject.getByRole('button', { name: `Close Thing ${SUBJECT.title}` })).toBeVisible();
   await settled(page);
 
   const opened = await allPositions(page);
-  expect(at(opened, SUBJECT), 'the opening Card moved').toEqual(at(closed, SUBJECT));
+  expect(at(opened, SUBJECT), 'the opening Thing moved').toEqual(at(closed, SUBJECT));
   expect(at(opened, NEIGHBOUR)).toEqual({
     x: at(closed, NEIGHBOUR).x + OPEN_GROWTH.width,
     y: at(closed, NEIGHBOUR).y + OPEN_GROWTH.height,
@@ -810,7 +810,7 @@ test('opening a Card displaces its neighbours once, and dragging it never displa
     expect(at(midGesture, NEIGHBOUR), 'the neighbour moved mid-drag').toEqual(
       at(opened, NEIGHBOUR),
     );
-    expect(at(midGesture, BEHIND), 'the Card behind moved mid-drag').toEqual(at(opened, BEHIND));
+    expect(at(midGesture, BEHIND), 'the Thing behind moved mid-drag').toEqual(at(opened, BEHIND));
   };
 
   // Past the neighbour's *authored* origin on both axes, which is the crossing
@@ -827,7 +827,7 @@ test('opening a Card displaces its neighbours once, and dragging it never displa
     -1,
   );
   expect(at(dragged, NEIGHBOUR), 'the neighbour moved at release').toEqual(at(opened, NEIGHBOUR));
-  expect(at(dragged, BEHIND), 'the Card behind moved at release').toEqual(at(opened, BEHIND));
+  expect(at(dragged, BEHIND), 'the Thing behind moved at release').toEqual(at(opened, BEHIND));
 
   await dragBy(page, subject, -340, -280, roomKept);
 
@@ -891,7 +891,7 @@ test(
 
     await expect(selectedCanvas(page)).toContainText('Diagram 1');
     await expect(persistence).toHaveAttribute('data-revision', '1');
-    await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
     expect(await allPositions(page)).toEqual({});
     await page.keyboard.press('Escape');
 
@@ -924,91 +924,91 @@ test(
 );
 
 test(
-  'resizing an open Card persists its authored rect through reload',
+  'resizing an open Thing persists its authored rect through reload',
   {
-    tag: '@parity:canvas-card-fills-authored-node-rect',
+    tag: '@parity:canvas-thing-fills-authored-node-rect',
   },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
-    await openCard(card, 'A');
-    await expectCardFillsNode(card);
-    await card.click({ position: { x: 8, y: 8 } });
+    const thing = nodeByTitle(page, 'A').first();
+    await expect(thing).toBeVisible();
+    await openThing(thing, 'A');
+    await expectThingFillsNode(thing);
+    await thing.click({ position: { x: 8, y: 8 } });
 
     const size = async () =>
-      card.evaluate((element) => ({
+      thing.evaluate((element) => ({
         width: Number.parseFloat(getComputedStyle(element).width),
         height: Number.parseFloat(getComputedStyle(element).height),
       }));
     const beforeSize = await size();
-    const beforePosition = await positionOf(card);
-    const handle = card.locator('.react-flow__resize-control.handle.bottom.right');
+    const beforePosition = await positionOf(thing);
+    const handle = thing.locator('.react-flow__resize-control.handle.bottom.right');
     await expect(handle).toBeVisible();
-    const box = await boxOf(handle, 'the bottom-right Card resize handle');
+    const box = await boxOf(handle, 'the bottom-right Thing resize handle');
 
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 6 });
-    await expectCardFillsNode(card);
+    await expectThingFillsNode(thing);
     await page.mouse.up();
 
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-    await card.evaluate(async (element) => {
+    await thing.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    await expectCardFillsNode(card);
+    await expectThingFillsNode(thing);
     const resized = await size();
     expect(resized.width).toBeGreaterThan(beforeSize.width);
     expect(resized.height).toBeGreaterThan(beforeSize.height);
-    expect(await positionOf(card)).toEqual(beforePosition);
+    expect(await positionOf(thing)).toEqual(beforePosition);
 
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A').first();
-    await expect(persisted.getByRole('button', { name: 'Close Card A' })).toBeVisible();
+    await expect(persisted.getByRole('button', { name: 'Close Thing A' })).toBeVisible();
     const persistedSize = await persisted.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
-    await expectCardFillsNode(persisted);
+    await expectThingFillsNode(persisted);
     expect(persistedSize).toEqual(resized);
     await persisted.hover();
-    await persisted.getByRole('button', { name: 'Close Card A', exact: true }).click();
+    await persisted.getByRole('button', { name: 'Close Thing A', exact: true }).click();
     await expect(persisted).toHaveCSS('width', '260px');
-    await expectCardFillsNode(persisted);
+    await expectThingFillsNode(persisted);
     await persisted.hover();
-    await persisted.getByRole('button', { name: 'Edit Card A', exact: true }).click();
+    await persisted.getByRole('button', { name: 'Edit Thing A', exact: true }).click();
     await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
-    await expectCardFillsNode(persisted);
+    await expectThingFillsNode(persisted);
     expect(await size()).toEqual(resized);
     expect(await positionOf(persisted)).toEqual(beforePosition);
   },
 );
 
 test(
-  'an Open Card offers one resize control, revealed on hover, that selects the Card and clears a Selected Edge without a second Edit',
-  { tag: '@parity:open-card-offers-one-resize-control' },
+  'an Open Thing offers one resize control, revealed on hover, that selects the Thing and clears a Selected Edge without a second Edit',
+  { tag: '@parity:open-thing-offers-one-resize-control' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const card = nodeByTitle(page, 'A').first();
+    const thing = nodeByTitle(page, 'A').first();
     const closed = nodeByTitle(page, 'B').first();
-    await expect(card).toBeVisible();
-    await openCard(card, 'A');
+    await expect(thing).toBeVisible();
+    await openThing(thing, 'A');
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveText('Persisted');
     const openedRevision = await persistence.getAttribute('data-revision');
-    const beforePosition = await positionOf(card);
-    // Opening grows the Card through a CSS transition, so its rect is still
+    const beforePosition = await positionOf(thing);
+    // Opening grows the Thing through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists. Settling it first is what
     // makes the mid-gesture growth below evidence of the drag rather than of
     // an animation that had not finished.
-    await card.evaluate(async (element) => {
+    await thing.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    const beforeSize = await card.evaluate((element) => ({
+    const beforeSize = await thing.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
@@ -1017,32 +1017,32 @@ test(
     const edgePath = page.locator('.react-flow__edge-path').first();
     const beforeEdgePath = await edgePath.getAttribute('d');
 
-    // A Closed Card offers no control at all.
+    // A Closed Thing offers no control at all.
     await expect(closed.locator('.react-flow__resize-control')).toHaveCount(0);
 
-    // The Open Card offers exactly one, at its bottom-right corner, and it is
-    // not visible until hovered — the actual reveal mechanism. `openCard` left
+    // The Open Thing offers exactly one, at its bottom-right corner, and it is
+    // not visible until hovered — the actual reveal mechanism. `openThing` left
     // keyboard focus on its own control, which is *also* a reveal condition
-    // (Card focus), so that focus is moved off the Card first to observe rest.
-    const control = card.locator('.react-flow__resize-control.handle.bottom.right');
-    await expect(card.locator('.react-flow__resize-control')).toHaveCount(1);
+    // (Thing focus), so that focus is moved off the Thing first to observe rest.
+    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
+    await expect(thing.locator('.react-flow__resize-control')).toHaveCount(1);
     await page.evaluate(() => {
       const focused = document.activeElement;
       if (focused instanceof HTMLElement) focused.blur();
     });
     await page.mouse.move(0, 0);
     await expect(control).toHaveCSS('opacity', '0');
-    await card.hover();
+    await thing.hover();
     await expect(control).toHaveCSS('opacity', '1');
 
-    // Select an Edge first, and leave the Card unselected, so the gesture below
-    // is proven to move both — not merely to arrive with the Card already
+    // Select an Edge first, and leave the Thing unselected, so the gesture below
+    // is proven to move both — not merely to arrive with the Thing already
     // Selected from an earlier click.
     await selectAnEdge(page);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
 
-    const box = await boxOf(control, "Card A's resize control");
+    const box = await boxOf(control, "Thing A's resize control");
     // A hit target a hand can find. React Flow's own two-class `.handle` rule
     // declares a 5px box and outranks a rule naming one class, so this is
     // asserted as a size rather than inferred from the drag below succeeding:
@@ -1052,12 +1052,12 @@ test(
     const hitTargetTolerance = 0.01;
     expect(Math.abs(box.width - 48)).toBeLessThanOrEqual(hitTargetTolerance);
     expect(Math.abs(box.height - 48)).toBeLessThanOrEqual(hitTargetTolerance);
-    const markLocator = card.locator('.rf-card-node__resize-mark');
+    const markLocator = thing.locator('.rf-thing-node__resize-mark');
     await expect.poll(async () => (await markLocator.boundingBox())?.width).toBeCloseTo(20, 1);
     const mark = await markLocator.boundingBox();
-    if (mark === null) throw new Error("Card A's resize control draws no mark");
+    if (mark === null) throw new Error("Thing A's resize control draws no mark");
     expect(mark.height).toBeCloseTo(20, 1);
-    const innerBox = await boxOf(card.locator('.rf-card-node__inner'), "Card A's inner box");
+    const innerBox = await boxOf(thing.locator('.rf-thing-node__inner'), "Thing A's inner box");
     expect(mark.x + mark.width).toBeGreaterThan(innerBox.x + innerBox.width);
     expect(mark.y + mark.height).toBeGreaterThan(innerBox.y + innerBox.height);
     await expect(markLocator).toHaveCSS('translate', '1px 1px');
@@ -1066,32 +1066,32 @@ test(
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 6 });
-    // Mid-gesture, before release: the Card is already following the pointer.
-    // Beginning a resize Selects the Card, and the selected Card is an input to
+    // Mid-gesture, before release: the Thing is already following the pointer.
+    // Beginning a resize Selects the Thing, and the selected Thing is an input to
     // the projection, so a reprojection lands mid-drag — the render adapter has
-    // to hold the live rect through it or every frame redraws the Card at the
+    // to hold the live rect through it or every frame redraws the Thing at the
     // size it had before the gesture and nothing moves until release. Polled
     // rather than sampled once: the last pointer move and the frame that paints
     // it are not the same tick, and a single read races that.
     await expect
       .poll(async () =>
-        card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+        thing.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
       )
       .toBeGreaterThan(beforeSize.width);
     // The neighbour does **not** move while the pointer is down (ADR 0084).
-    // The draft previews the resizing Card's own rect and nothing else, so
-    // every other Card is drawn from the authored placement until the Edit
-    // lands. This read alone would also pass if the Card were simply at rest,
+    // The draft previews the resizing Thing's own rect and nothing else, so
+    // every other Thing is drawn from the authored placement until the Edit
+    // lands. This read alone would also pass if the Thing were simply at rest,
     // so it is the pair with the assertion after release — where the neighbour
     // is required to have moved — that says the room is taken at the Edit and
     // not at the frame.
     await expect.poll(async () => positionOf(neighbour)).toEqual(beforeNeighbourPosition);
-    // The Edge does move, and it is the resizing Card's own growth that moves
+    // The Edge does move, and it is the resizing Thing's own growth that moves
     // it: A's handles travel with its rect, so the curve is redrawn from the
     // live draft while B stays exactly where it was authored.
     await expect.poll(async () => edgePath.getAttribute('d')).not.toBe(beforeEdgePath);
-    await expect(card.locator('.canvas-card__rail')).toHaveCSS('opacity', '0');
-    await expect(card.locator('.rf-card-node__authoring-handle--source').first()).toHaveCSS(
+    await expect(thing.locator('.canvas-thing__rail')).toHaveCSS('opacity', '0');
+    await expect(thing.locator('.rf-thing-node__authoring-handle--source').first()).toHaveCSS(
       'opacity',
       '0',
     );
@@ -1101,24 +1101,24 @@ test(
 
     await page.mouse.up();
 
-    // One drag both Selected the Card and cleared the Selected Edge — no
+    // One drag both Selected the Thing and cleared the Selected Edge — no
     // separate click, and Selection was never a second Edit.
-    await expect(card).toHaveClass(/selected/);
+    await expect(thing).toHaveClass(/selected/);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
     await expect(persistence).toHaveText('Persisted');
     await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
 
-    await card.evaluate(async (element) => {
+    await thing.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    const afterSize = await card.evaluate((element) => ({
+    const afterSize = await thing.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
     expect(afterSize.width).toBeGreaterThan(beforeSize.width);
     expect(afterSize.height).toBeGreaterThan(beforeSize.height);
     // The authored top-left origin is unchanged: only the box grew.
-    expect(await positionOf(card)).toEqual(beforePosition);
+    expect(await positionOf(thing)).toEqual(beforePosition);
 
     // Released, and only now does the neighbour take the room: the completed
     // Resize applied the difference between the old growth and the new one and
@@ -1129,7 +1129,7 @@ test(
     expect(afterNeighbourPosition).not.toEqual(beforeNeighbourPosition);
     const afterEdgePath = await edgePath.getAttribute('d');
     const completedRevision = await persistence.getAttribute('data-revision');
-    const secondBox = await boxOf(control, "Card A's resize control after completion");
+    const secondBox = await boxOf(control, "Thing A's resize control after completion");
     await page.mouse.move(secondBox.x + secondBox.width / 2, secondBox.y + secondBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(
@@ -1139,7 +1139,7 @@ test(
     );
     await expect
       .poll(async () =>
-        card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+        thing.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
       )
       .toBeGreaterThan(afterSize.width);
     await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel')));
@@ -1147,7 +1147,7 @@ test(
 
     await expect
       .poll(async () =>
-        card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+        thing.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
       )
       .toBe(afterSize.width);
     await expect.poll(async () => positionOf(neighbour)).toEqual(afterNeighbourPosition);
@@ -1194,7 +1194,7 @@ test.describe('resizing by touch', () => {
    *
    * `page.touchscreen` offers `tap()` and nothing else, and a `TouchEvent`
    * constructed inside `page.evaluate` arrives untrusted: Chromium derives no
-   * `pointerdown`/`pointerup` from it, so the release — the thing `CardNode`'s
+   * `pointerdown`/`pointerup` from it, so the release — the thing `ThingNode`'s
    * window listener answers with `finishResize` — would never happen. CDP's
    * `Input.dispatchTouchEvent` is what `touchscreen.tap()` uses underneath and
    * produces the real thing, compatibility pointer events included.
@@ -1229,40 +1229,40 @@ test.describe('resizing by touch', () => {
   }
 
   // No `@parity` tag: the reporter wants exactly one test per claim, and the
-  // mouse tests above already carry the two this Card's resize control owns.
-  test('a touch drag resizes an Open Card to the rect it dragged and commits one Edit on release', async ({
+  // mouse tests above already carry the two this Thing's resize control owns.
+  test('a touch drag resizes an Open Thing to the rect it dragged and commits one Edit on release', async ({
     page,
   }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
-    await openCard(card, 'A');
+    const thing = nodeByTitle(page, 'A').first();
+    await expect(thing).toBeVisible();
+    await openThing(thing, 'A');
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveText('Persisted');
     const openedRevision = await persistence.getAttribute('data-revision');
-    const beforePosition = await positionOf(card);
-    // Opening grows the Card through a CSS transition, so its rect is still
+    const beforePosition = await positionOf(thing);
+    // Opening grows the Thing through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what
     // makes the growth below evidence of the drag.
-    await card.evaluate(async (element) => {
+    await thing.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     const width = async () =>
-      card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width));
+      thing.evaluate((element) => Number.parseFloat(getComputedStyle(element).width));
     const size = async () =>
-      card.evaluate((element) => ({
+      thing.evaluate((element) => ({
         width: Number.parseFloat(getComputedStyle(element).width),
         height: Number.parseFloat(getComputedStyle(element).height),
       }));
     const beforeSize = await size();
 
-    await card.hover();
-    const control = card.locator('.react-flow__resize-control.handle.bottom.right');
-    const box = await boxOf(control, "Card A's resize control");
+    await thing.hover();
+    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
+    const box = await boxOf(control, "Thing A's resize control");
     const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 
-    // The drag is expressed in screen pixels and the Card's rect is in flow
+    // The drag is expressed in screen pixels and the Thing's rect is in flow
     // units, so the expected rect is the one the pointer described, divided
     // through the camera. Asserting the whole delta — not merely "bigger" —
     // is what makes every frame after the first load-bearing.
@@ -1276,7 +1276,7 @@ test.describe('resizing by touch', () => {
 
     const gesture = await beginTouchGesture(page, from.x, from.y);
     // The first frame is already the regression: against inline callbacks this
-    // poll never moves off the Card's opened width, because the re-render the
+    // poll never moves off the Thing's opened width, because the re-render the
     // gesture's own start schedules — `setResizeActive(true)`, before any
     // preview — lands before the browser delivers the next touch. The later
     // frames are not redundant, though: the rect asserted after release is
@@ -1293,18 +1293,18 @@ test.describe('resizing by touch', () => {
     await gesture.release();
 
     // Chromium raises `pointerup` from the touch release, which is the signal
-    // `CardNode` turns into the one completing Edit.
+    // `ThingNode` turns into the one completing Edit.
     await expect(persistence).toHaveText('Persisted');
     await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
 
-    await card.evaluate(async (element) => {
+    await thing.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     const resized = await size();
     expect(resized.width).toBeCloseTo(expected.width, 0);
     expect(resized.height).toBeCloseTo(expected.height, 0);
     // The authored top-left origin is unchanged: only the box grew.
-    expect(await positionOf(card)).toEqual(beforePosition);
+    expect(await positionOf(thing)).toEqual(beforePosition);
     // Exactly one Edit, not one-so-far: the revision assertion above succeeds on
     // its first poll, so only elapsed time can rule out a second arriving behind
     // it — and touch is the path where a stray `pointerup`/`touchend` pair could
@@ -1315,7 +1315,7 @@ test.describe('resizing by touch', () => {
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A').first();
-    await expect(persisted.getByRole('button', { name: 'Close Card A' })).toBeVisible();
+    await expect(persisted.getByRole('button', { name: 'Close Thing A' })).toBeVisible();
     await persisted.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
@@ -1345,7 +1345,7 @@ test.describe('resizing by touch', () => {
    * Nothing underneath answers that signal either. `shouldResize` always
    * returns false, so `XYResizer` never sets `resizeDetected` and its `end`
    * handler returns early every time — React Flow never calls `onResizeEnd`,
-   * and d3-drag contributes nothing to ending or cancelling. `CardNode`'s three
+   * and d3-drag contributes nothing to ending or cancelling. `ThingNode`'s three
    * `window` listeners are the entire lifecycle. Miss the cancellation and
    * `resizing.current` stays true with the draft still live, so the *next*
    * `pointerup` anywhere on the page finishes a gesture the author abandoned
@@ -1357,46 +1357,46 @@ test.describe('resizing by touch', () => {
   }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
-    await openCard(card, 'A');
+    const thing = nodeByTitle(page, 'A').first();
+    await expect(thing).toBeVisible();
+    await openThing(thing, 'A');
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveText('Persisted');
     const openedRevision = await persistence.getAttribute('data-revision');
-    const beforePosition = await positionOf(card);
-    // Opening grows the Card through a CSS transition, so its rect is still
+    const beforePosition = await positionOf(thing);
+    // Opening grows the Thing through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what
     // makes this the authored rect the cancellation has to restore.
-    await card.evaluate(async (element) => {
+    await thing.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     const size = async () =>
-      card.evaluate((element) => ({
+      thing.evaluate((element) => ({
         width: Number.parseFloat(getComputedStyle(element).width),
         height: Number.parseFloat(getComputedStyle(element).height),
       }));
     const authored = await size();
 
-    await card.hover();
-    const control = card.locator('.react-flow__resize-control.handle.bottom.right');
-    const box = await boxOf(control, "Card A's resize control");
+    await thing.hover();
+    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
+    const box = await boxOf(control, "Thing A's resize control");
     const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 
     const gesture = await beginTouchGesture(page, from.x, from.y);
     await gesture.moveTo(from.x + 70, from.y + 45);
     await gesture.moveTo(from.x + 140, from.y + 90);
     // The draft has to be live before it can be discarded: a cancellation of a
-    // gesture that never grew the Card would restore the authored rect by
+    // gesture that never grew the Thing would restore the authored rect by
     // having never left it, and prove nothing.
     await expect.poll(async () => (await size()).width).toBeGreaterThan(authored.width);
     await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
 
     await gesture.cancel();
 
-    // The draft is discarded: the Card is the rect it was authored at, not the
+    // The draft is discarded: the Thing is the rect it was authored at, not the
     // rect the finger dragged to, and its origin never moved either.
     await expect.poll(size).toEqual(authored);
-    expect(await positionOf(card)).toEqual(beforePosition);
+    expect(await positionOf(thing)).toEqual(beforePosition);
     await quiescent(page);
     await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
 
@@ -1419,12 +1419,12 @@ test(
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
-    await openCard(card, 'A');
+    const thing = nodeByTitle(page, 'A').first();
+    await expect(thing).toBeVisible();
+    await openThing(thing, 'A');
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveText('Persisted');
-    await card.evaluate(async (element) => {
+    await thing.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
 
@@ -1433,10 +1433,10 @@ test(
         width: Number.parseFloat(getComputedStyle(element).width),
         height: Number.parseFloat(getComputedStyle(element).height),
       }));
-    const initialSize = await size(card);
-    const control = card.locator('.react-flow__resize-control.handle.bottom.right');
-    await card.hover();
-    const growBox = await boxOf(control, "Card A's resize control before growing");
+    const initialSize = await size(thing);
+    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
+    await thing.hover();
+    const growBox = await boxOf(control, "Thing A's resize control before growing");
     await page.mouse.move(growBox.x + growBox.width / 2, growBox.y + growBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(
@@ -1446,16 +1446,16 @@ test(
     );
     await page.mouse.up();
     await expect(persistence).toHaveText('Persisted');
-    await card.evaluate(async (element) => {
+    await thing.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    const rememberedSize = await size(card);
+    const rememberedSize = await size(thing);
     expect(rememberedSize.width).toBeGreaterThan(initialSize.width);
     expect(rememberedSize.height).toBeGreaterThan(initialSize.height);
 
     const beforeCloseRevision = await persistence.getAttribute('data-revision');
     const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
-    const closeBox = await boxOf(control, "Card A's resize control before Closing");
+    const closeBox = await boxOf(control, "Thing A's resize control before Closing");
     await page.mouse.move(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(
@@ -1464,14 +1464,14 @@ test(
       { steps: 8 },
     );
 
-    await expect.poll(async () => size(card)).toEqual({ width: 260, height: 146 });
-    await expect(card.locator('.rf-card-node__inner')).toHaveAttribute('data-expanded', 'true');
+    await expect.poll(async () => size(thing)).toEqual({ width: 260, height: 146 });
+    await expect(thing.locator('.rf-thing-node__inner')).toHaveAttribute('data-expanded', 'true');
     await expect(persistence).toHaveAttribute('data-revision', beforeCloseRevision ?? '');
 
     await page.mouse.up();
 
-    await expect(card.locator('.rf-card-node__inner')).toHaveAttribute('data-expanded', 'false');
-    await expect(card.locator('.react-flow__resize-control')).toHaveCount(0);
+    await expect(thing.locator('.rf-thing-node__inner')).toHaveAttribute('data-expanded', 'false');
+    await expect(thing.locator('.react-flow__resize-control')).toHaveCount(0);
     await expect(persistence).toHaveText('Persisted');
     await expect(persistence).toHaveAttribute(
       'data-revision',
@@ -1481,8 +1481,8 @@ test(
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A').first();
-    await expect(persisted.getByRole('button', { name: 'Open Card A' })).toBeVisible();
-    await openCard(persisted, 'A');
+    await expect(persisted.getByRole('button', { name: 'Open Thing A' })).toBeVisible();
+    await openThing(persisted, 'A');
     await persisted.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
@@ -1491,29 +1491,29 @@ test(
 );
 
 test(
-  'an active Card resize does not animate its dimensions behind the pointer',
-  { tag: '@parity:active-card-resize-tracks-pointer-without-dimension-animation' },
+  'an active Thing resize does not animate its dimensions behind the pointer',
+  { tag: '@parity:active-thing-resize-tracks-pointer-without-dimension-animation' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
-    await openCard(card, 'A');
-    await card.evaluate(async (element) => {
+    const thing = nodeByTitle(page, 'A').first();
+    await expect(thing).toBeVisible();
+    await openThing(thing, 'A');
+    await thing.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
 
-    const control = card.locator('.react-flow__resize-control.handle.bottom.right');
-    await card.hover();
-    const box = await boxOf(control, "Card A's resize control");
+    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
+    await thing.hover();
+    const box = await boxOf(control, "Thing A's resize control");
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 45, box.y + box.height / 2 + 35, {
       steps: 2,
     });
-    await expect(card.locator('.rf-card-node__inner')).toHaveAttribute('data-resizing', 'true');
+    await expect(thing.locator('.rf-thing-node__inner')).toHaveAttribute('data-resizing', 'true');
 
-    const dimensionAnimationRunning = await card.evaluate((element) =>
+    const dimensionAnimationRunning = await thing.evaluate((element) =>
       element.getAnimations().some((animation) => {
         if (!(animation instanceof CSSTransition) || animation.playState !== 'running') {
           return false;
@@ -1528,16 +1528,16 @@ test(
   },
 );
 
-test('opening animates the Card wrapper and displaced neighbours from one duration token', async ({
+test('opening animates the Thing wrapper and displaced neighbours from one duration token', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await page.addStyleTag({
-    content: '.graph-area { --card-placement-duration: 10s !important; }',
+    content: '.graph-area { --thing-placement-duration: 10s !important; }',
   });
-  const card = nodeByTitle(page, 'A').first();
-  await openCard(card, 'A');
+  const thing = nodeByTitle(page, 'A').first();
+  await openThing(thing, 'A');
 
   const animatedProperties = async () =>
     page.locator('.react-flow__node').evaluateAll((nodes) =>
@@ -1551,7 +1551,7 @@ test('opening animates the Card wrapper and displaced neighbours from one durati
         }),
       })),
     );
-  const openedId = await card.getAttribute('data-id');
+  const openedId = await thing.getAttribute('data-id');
   await expect
     .poll(async () => (await animatedProperties()).some(({ properties }) => properties.length > 0))
     .toBe(true);
@@ -1564,7 +1564,7 @@ test('opening animates the Card wrapper and displaced neighbours from one durati
   ).toBe(true);
 });
 
-test('New Diagram creates an empty Diagram and leaves existing Cards in the Cards View', async ({
+test('New Diagram creates an empty Diagram and leaves existing Things in the Things View', async ({
   page,
 }) => {
   await page.goto('/');
@@ -1572,7 +1572,7 @@ test('New Diagram creates an empty Diagram and leaves existing Cards in the Card
 
   await expect(page.locator('.react-flow__node')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
-  await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
   await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
@@ -1586,14 +1586,14 @@ test('New Diagram creates an empty Diagram and leaves existing Cards in the Card
 });
 
 test(
-  'adding an existing Card from the Cards drawer authors Diagram membership',
-  { tag: '@parity:cards-drawer-adds-existing-diagram-members' },
+  'adding an existing Thing from the Things drawer authors Diagram membership',
+  { tag: '@parity:things-drawer-adds-existing-diagram-members' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await page.getByRole('button', { name: 'Cards' }).click();
+    await page.getByRole('button', { name: 'Things' }).click();
     const source = page.getByRole('button', { name: 'Add E to Diagram' });
     await expect(source).toBeVisible();
     await source.click();
@@ -1605,14 +1605,14 @@ test(
 );
 
 test(
-  'the Cards drawer names an empty Diagram after every absent Card is added',
-  { tag: '@parity:cards-drawer-distinguishes-an-empty-diagram' },
+  'the Things drawer names an empty Diagram after every absent Thing is added',
+  { tag: '@parity:things-drawer-distinguishes-an-empty-diagram' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await page.getByRole('button', { name: 'Cards' }).click();
+    await page.getByRole('button', { name: 'Things' }).click();
     const choices = page.getByRole('button', { name: /^Add .* to Diagram$/ });
     while ((await choices.count()) > 0) {
       const before = await choices.count();
@@ -1620,21 +1620,21 @@ test(
       await expect(choices).toHaveCount(before - 1);
     }
 
-    await expect(page.getByText('All Cards are in this Diagram.')).toBeVisible();
+    await expect(page.getByText('All Things are in this Diagram.')).toBeVisible();
   },
 );
 
 test(
-  'a long Cards list scrolls independently on a narrow screen',
-  { tag: '@parity:cards-drawer-scrolls-a-long-list-on-a-narrow-screen' },
+  'a long Things list scrolls independently on a narrow screen',
+  { tag: '@parity:things-drawer-scrolls-a-long-list-on-a-narrow-screen' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
     await page.setViewportSize({ width: 480, height: 360 });
 
-    await page.getByRole('button', { name: 'Cards' }).click();
-    await expect(page.getByRole('textbox', { name: 'Search cards' })).toBeVisible();
+    await page.getByRole('button', { name: 'Things' }).click();
+    await expect(page.getByRole('textbox', { name: 'Search things' })).toBeVisible();
     const list = page.locator('[data-base-ui-swipe-ignore]');
     expect(await list.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
       true,
@@ -1643,23 +1643,23 @@ test(
 );
 
 test(
-  'the Cards drawer dismisses on Escape and survives working on the canvas behind it',
-  { tag: '@parity:cards-drawer-opens-and-dismisses-without-locking-the-canvas' },
+  'the Things drawer dismisses on Escape and survives working on the canvas behind it',
+  { tag: '@parity:things-drawer-opens-and-dismisses-without-locking-the-canvas' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    const trigger = page.getByRole('button', { name: 'Cards' });
-    const drawer = page.getByRole('dialog', { name: 'Cards' });
+    const trigger = page.getByRole('button', { name: 'Things' });
+    const drawer = page.getByRole('dialog', { name: 'Things' });
 
     await expect(drawer).toHaveCount(0);
     await trigger.click();
     await expect(drawer).toBeVisible();
 
-    // Selecting a Card on the canvas is the ordinary press this drawer has to
-    // live through: it is how a Card is dropped, and a drawer that closed on it
-    // could only ever add one Card per opening.
+    // Selecting a Thing on the canvas is the ordinary press this drawer has to
+    // live through: it is how a Thing is dropped, and a drawer that closed on it
+    // could only ever add one Thing per opening.
     await nodeByTitle(page, 'A').click();
     await expect(nodeByTitle(page, 'A')).toHaveClass(/selected/);
     await expect(drawer).toBeVisible();
@@ -1670,7 +1670,7 @@ test(
   },
 );
 
-test('the open Cards drawer leaves the Graph key and overview visible beside it', async ({
+test('the open Things drawer leaves the Graph key and overview visible beside it', async ({
   page,
 }) => {
   await page.goto('/');
@@ -1681,15 +1681,15 @@ test('the open Cards drawer leaves the Graph key and overview visible beside it'
   const overview = page.getByRole('img', { name: 'Graph overview' });
   await expect(legend).toBeVisible();
 
-  await page.getByRole('button', { name: 'Cards' }).click();
-  const drawer = page.getByRole('dialog', { name: 'Cards' });
+  await page.getByRole('button', { name: 'Things' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Things' });
   await expect(drawer).toBeVisible();
 
   // The drawer overlays the end edge and the HUD is pinned to the same one, so
   // the shell yields the panel's width instead of letting it cover the Graph
   // key and the pannable overview. Geometry, because "visible" is true of an
   // element sitting underneath an opaque panel.
-  const panel = await boxOf(drawer, 'the Cards drawer');
+  const panel = await boxOf(drawer, 'the Things drawer');
   for (const [what, locator] of [
     ['the Graph key', legend],
     ['the Graph overview', overview],
@@ -1704,15 +1704,15 @@ test('the open Cards drawer leaves the Graph key and overview visible beside it'
   await expect(drawer).toBeVisible();
 });
 
-test('leaving a presentation closes the Cards drawer rather than reopening it over the canvas', async ({
+test('leaving a presentation closes the Things drawer rather than reopening it over the canvas', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  const drawer = page.getByRole('dialog', { name: 'Cards' });
-  await page.getByRole('button', { name: 'Cards' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Things' });
+  await page.getByRole('button', { name: 'Things' }).click();
   await expect(drawer).toBeVisible();
 
   await presentControl(page).click();
@@ -1721,21 +1721,21 @@ test('leaving a presentation closes the Cards drawer rather than reopening it ov
 
   // A drawer that sprang back would also take focus with it — `Drawer.Popup`
   // moves focus in on every open, however that open was caused — landing the
-  // reader in the Cards list instead of on the canvas they returned to.
+  // reader in the Things list instead of on the canvas they returned to.
   await page.getByTestId('exit-presenting').click();
   await expect(presentControl(page)).toBeVisible();
   await expect(drawer).toHaveCount(0);
   await expect(page.locator('[data-slot="drawer-popup"]')).toHaveCount(0);
 });
 
-test('keyboard placement moves focus from the Cards drawer to the added canvas Card', async ({
+test('keyboard placement moves focus from the Things drawer to the added canvas Thing', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  await page.getByRole('button', { name: 'Cards' }).click();
+  await page.getByRole('button', { name: 'Things' }).click();
   const source = page.getByRole('button', { name: 'Add E to Diagram' });
   await source.focus();
   await source.press('Enter');
@@ -1744,56 +1744,56 @@ test('keyboard placement moves focus from the Cards drawer to the added canvas C
 });
 
 /**
- * Deleting a Card is the Card rail's now (ADR 0073), so its withdrawal is read
+ * Deleting a Thing is the Thing rail's now (ADR 0073), so its withdrawal is read
  * there.
  *
- * The Sidebar drew a standing `Delete Card <title>` button for the selected
- * Card, and these tests read its presence. The Command Dock has no Card
+ * The Sidebar drew a standing `Delete Thing <title>` button for the selected
+ * Thing, and these tests read its presence. The Command Dock has no Thing
  * commands at all — that is its organising rule — so the command lives in the
- * Card's own actions menu, and "withdrawn" means the row is absent from that
+ * Thing's own actions menu, and "withdrawn" means the row is absent from that
  * menu rather than a button absent from the chrome.
  */
-const cardActions = async (page: Page, title: string): Promise<Locator> => {
-  const card = nodeByTitle(page, title).first();
-  await card.hover();
-  await card.getByRole('button', { name: `Actions for Card ${title}` }).click({ delay: 120 });
+const thingActions = async (page: Page, title: string): Promise<Locator> => {
+  const thing = nodeByTitle(page, title).first();
+  await thing.hover();
+  await thing.getByRole('button', { name: `Actions for Thing ${title}` }).click({ delay: 120 });
   const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
   return menu;
 };
 
-test('Delete Card confirms before removing the Card from the whole Space', async ({ page }) => {
+test('Delete Thing confirms before removing the Thing from the whole Space', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  const card = nodeByTitle(page, 'B');
-  await card.click();
-  await (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }).click();
+  const thing = nodeByTitle(page, 'B');
+  await thing.click();
+  await (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete Thing' }).click();
 
   // The dialog is drawn at the App root rather than in the menu that armed it:
   // the menu closes on the press and would take the question with it.
-  const confirmation = page.getByRole('alertdialog', { name: 'Delete Card B?' });
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete Thing B?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
-  await expect(card).toBeVisible();
+  await expect(thing).toBeVisible();
 
-  await (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }).click();
-  await confirmation.getByRole('button', { name: 'Delete Card' }).click();
+  await (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete Thing' }).click();
+  await confirmation.getByRole('button', { name: 'Delete Thing' }).click();
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Cards' }).click();
+  await page.getByRole('button', { name: 'Things' }).click();
   await expect(page.getByRole('button', { name: 'Add B to Diagram' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
-test('Delete Card is withdrawn while presenting', async ({ page }) => {
+test('Delete Thing is withdrawn while presenting', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
   await expect(
-    (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }),
+    (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete Thing' }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
 
@@ -1802,32 +1802,32 @@ test('Delete Card is withdrawn while presenting', async ({ page }) => {
 
   // The rail itself is withdrawn while presenting, so there is no menu to open:
   // the audience is looking at the Space, not at the tools. Asserted without
-  // hovering the Card, because the camera has closed in on the presented one and
+  // hovering the Thing, because the camera has closed in on the presented one and
   // `B` is off frame — which is the same reason the rail would be unreachable
   // even if it were drawn.
-  await expect(page.getByRole('button', { name: 'Actions for Card B' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Actions for Thing B' })).toHaveCount(0);
 });
 
-test('Delete Card is withdrawn while the selected Card is Open', async ({ page }) => {
+test('Delete Thing is withdrawn while the selected Thing is Open', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
   await expect(
-    (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }),
+    (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete Thing' }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
 
   await nodeByTitle(page, 'B').first().click();
-  await page.getByRole('button', { name: 'Open Card B' }).click();
-  await expect(nodeByTitle(page, 'B').getByRole('button', { name: 'Close Card B' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open Thing B' }).click();
+  await expect(nodeByTitle(page, 'B').getByRole('button', { name: 'Close Thing B' })).toBeVisible();
 
   await expect(
-    (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }),
+    (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete Thing' }),
   ).toHaveCount(0);
 });
 
-test('dragging from the Cards drawer uses transformed canvas coordinates then ordinary Card dragging', async ({
+test('dragging from the Things drawer uses transformed canvas coordinates then ordinary Thing dragging', async ({
   page,
 }) => {
   await page.goto('/');
@@ -1836,7 +1836,7 @@ test('dragging from the Cards drawer uses transformed canvas coordinates then or
   await page.getByRole('button', { name: 'Zoom in' }).click();
   await settled(page);
 
-  await page.getByRole('button', { name: 'Cards' }).click();
+  await page.getByRole('button', { name: 'Things' }).click();
   const source = page.getByRole('button', { name: 'Add E to Diagram' });
   const pane = page.locator('.react-flow__pane');
   const paneBox = await boxOf(pane, 'the React Flow pane');
@@ -1848,7 +1848,7 @@ test('dragging from the Cards drawer uses transformed canvas coordinates then or
   await expect(added).toBeVisible();
   // Zoomed in, so a screen pixel is a fraction of a flow unit — sub-pixel
   // rounding through that scale is expected, not evidence of a wrong drop.
-  const addedBox = await boxOf(added, 'the added Card');
+  const addedBox = await boxOf(added, 'the added Thing');
   expect(addedBox.x + addedBox.width / 2).toBeCloseTo(dropPoint.x, -1);
   expect(addedBox.y + addedBox.height / 2).toBeCloseTo(dropPoint.y, -1);
 
@@ -1863,16 +1863,16 @@ test('dragging from the Cards drawer uses transformed canvas coordinates then or
 });
 
 test(
-  'the Cards toggle is withdrawn while presenting, matching the drawer it controls',
+  'the Things toggle is withdrawn while presenting, matching the drawer it controls',
   {
-    tag: '@parity:cards-drawer-withdraws-while-authoring-is-unavailable',
+    tag: '@parity:things-drawer-withdraws-while-authoring-is-unavailable',
   },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    const toggle = dock(page).getByRole('button', { name: 'Cards' });
+    const toggle = dock(page).getByRole('button', { name: 'Things' });
     await expect(toggle).not.toHaveAttribute('aria-disabled', 'true');
 
     await presentControl(page).click();
@@ -1892,10 +1892,10 @@ test(
     await expect(surface).toBeAttached();
     await expect(surface).toBeHidden();
     await expect(
-      page.getByTestId('command-dock').locator('.command-dock__cards-trigger'),
+      page.getByTestId('command-dock').locator('.command-dock__things-trigger'),
     ).toHaveCount(1);
     await expect(toggle).toHaveCount(0);
-    await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
   },
 );
 
@@ -1971,15 +1971,15 @@ test(
 );
 
 /**
- * Dragged in an authored Diagram, because that is where a Card and the Edges
+ * Dragged in an authored Diagram, because that is where a Thing and the Edges
  * around it stay together.
  *
  * The fixture's own `Collection 1` owns Long,
  * Mid and Short over
  * the spine, so dragging A there updates that Diagram in place and its Edges are
- * still drawn around the Card that moved.
+ * still drawn around the Thing that moved.
  */
-test('edges follow a card that has been dragged', async ({ page }) => {
+test('edges follow a thing that has been dragged', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /./);
   await selectCanvas(page, 'Collection 1');
@@ -2000,9 +2000,9 @@ test('edges follow a card that has been dragged', async ({ page }) => {
   // masquerading as an edge that did not redraw.
   expect((await positionOf(a)).y).toBeGreaterThan(from.y + 100);
 
-  // Whatever geometry the placement computed described where the cards were,
+  // Whatever geometry the placement computed described where the things were,
   // so it is stale the moment one leaves it. The edge is redrawn between where
-  // the cards now are.
+  // the things now are.
   await expect.poll(edgePath).not.toBe(before);
 });
 
@@ -2026,7 +2026,7 @@ test('a completed drag persists automatically', async ({ page }) => {
   await expect(page.getByRole('button', { name: /save/i })).toHaveCount(0);
 });
 
-test('a selected Card exposes four circular handles coloured as the active Graph', async ({
+test('a selected Thing exposes four circular handles coloured as the active Graph', async ({
   page,
 }) => {
   await page.goto('/');
@@ -2041,7 +2041,7 @@ test('a selected Card exposes four circular handles coloured as the active Graph
   await a.click();
   await expect(a).toHaveClass(/selected/);
 
-  const handles = a.locator('.rf-card-node__authoring-handle--source');
+  const handles = a.locator('.rf-thing-node__authoring-handle--source');
   await expect(handles).toHaveCount(4);
   await expect(handles.first()).toHaveCSS('width', '24px');
   await expect(handles.first()).toHaveCSS('height', '24px');
@@ -2060,15 +2060,15 @@ test('a selected Card exposes four circular handles coloured as the active Graph
       elements.every((element) => getComputedStyle(element).borderRadius === '50%'),
     ),
   ).toBe(true);
-  await expect(a.locator('.rf-card-node__port').first()).toHaveCSS('opacity', '0');
+  await expect(a.locator('.rf-thing-node__port').first()).toHaveCSS('opacity', '0');
 });
 
-test('drawing between existing Cards persists one active-Graph Edge and selects the target', async ({
+test('drawing between existing Things persists one active-Graph Edge and selects the target', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingCard(page, 'E');
+  await addExistingThing(page, 'E');
   const source = nodeByTitle(page, 'A').first();
   const target = nodeByTitle(page, 'E').first();
   const initialEdgeCount = await page.locator('.react-flow__edge').count();
@@ -2082,7 +2082,7 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
 
   const sourceHandle = authoringHandle(source, 'source', 'right');
   const targetHandle = authoringHandle(target, 'target', 'top');
-  const targetHandles = page.locator('.rf-card-node__authoring-handle--target');
+  const targetHandles = page.locator('.rf-thing-node__authoring-handle--target');
   await expect(sourceHandle).toHaveCSS('opacity', '1');
   await expect(targetHandle).toHaveCSS('opacity', '0');
   // The Graph this Edge will join is the one conversion minted, and it is what
@@ -2094,12 +2094,12 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
   );
 
   await connectHandles(page, sourceHandle, targetHandle, async () => {
-    // Every Card offers a target on every side while a connection is in flight,
+    // Every Thing offers a target on every side while a connection is in flight,
     // so the drop is never blocked by which side the author aimed at.
     await expect(targetHandles.first()).toHaveCSS('opacity', '1');
     await expect(targetHandles).toHaveCount(7 * AUTHORING_HANDLE_SIDES);
     const preview = page.locator('.react-flow__connection-path');
-    // `toBeAttached`, not `toBeVisible`: a connection drawn between two Cards
+    // `toBeAttached`, not `toBeVisible`: a connection drawn between two Things
     // whose centres share a row is a horizontal `path`, and a zero-height
     // bounding box is what Playwright calls hidden. What the assertion is about
     // is the line's colour and its arrow, both read below.
@@ -2109,22 +2109,22 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
   });
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
-  // An Edge names its Cards and its Graph for a screen reader. Matched loosely
+  // An Edge names its Things and its Graph for a screen reader. Matched loosely
   // on the Graph, whose neutral title depends on how many the Space already had.
   await expect(page.getByLabel(/^Edge from A to E in /)).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  await expect(target.locator('.rf-card-node__authoring-handle--source').first()).toHaveCSS(
+  await expect(target.locator('.rf-thing-node__authoring-handle--source').first()).toHaveCSS(
     'opacity',
     '1',
   );
-  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
 });
 
 test('an authored Edge is immediately available when presenting the Graph', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingCard(page, 'E');
+  await addExistingThing(page, 'E');
   const source = nodeByTitle(page, 'E').first();
   const target = nodeByTitle(page, 'A').first();
   await expect(source).toBeVisible();
@@ -2148,22 +2148,31 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
 
   await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000008');
+  await expect(activeThing(page)).toHaveAttribute(
+    'data-id',
+    '00000000-0000-4000-8000-000000000008',
+  );
   await expect(page.getByTestId('presenting-moves').getByRole('button')).toHaveText('A');
 
   await page.keyboard.press('ArrowRight');
-  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000002');
+  await expect(activeThing(page)).toHaveAttribute(
+    'data-id',
+    '00000000-0000-4000-8000-000000000002',
+  );
   await page.keyboard.press('ArrowLeft');
-  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000008');
+  await expect(activeThing(page)).toHaveAttribute(
+    'data-id',
+    '00000000-0000-4000-8000-000000000008',
+  );
 });
 
-test('an Edge drawn from the presented Card is a move the presenter can take now', async ({
+test('an Edge drawn from the presented Thing is a move the presenter can take now', async ({
   page,
 }) => {
   const A = '00000000-0000-4000-8000-000000000002';
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingCard(page, 'E');
+  await addExistingThing(page, 'E');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
 
@@ -2172,14 +2181,14 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await settled(page);
-  // The gesture below is made from the presented Card, so A has to be selected
+  // The gesture below is made from the presented Thing, so A has to be selected
   // going in.
   await a.click();
   await expect(a).toHaveClass(/selected/);
 
   await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeCard(page)).toHaveAttribute('data-id', A);
+  await expect(activeThing(page)).toHaveAttribute('data-id', A);
   const moves = page.getByTestId('presenting-moves').getByRole('button');
   await expect(moves).toHaveText(['B']);
   // The presenting camera closes in over two animated moves; a handle box read
@@ -2187,16 +2196,16 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   await settled(page);
 
   // A self-Edge is valid authored structure (ADR 0032), and it is the Edge this
-  // gesture can reach: at a zoom where the active Card is legible every other
-  // Card is provably off frame (ADR 0027), so the presented Card's own handles
+  // gesture can reach: at a zoom where the active Thing is legible every other
+  // Thing is provably off frame (ADR 0027), so the presented Thing's own handles
   // are the only ones on screen.
   await connectHandles(
     page,
-    authoringHandle(activeCard(page), 'source', 'right'),
-    authoringHandle(activeCard(page), 'target', 'left'),
+    authoringHandle(activeThing(page), 'source', 'right'),
+    authoringHandle(activeThing(page), 'target', 'left'),
   );
 
-  // Attached rather than visible: with one Graph on the Card its inbound and
+  // Attached rather than visible: with one Graph on the Thing its inbound and
   // outbound handles sit at the same height, so a self-Edge is a flat line whose
   // box has no height — which Playwright reads as hidden. The moves below are
   // what prove it was authored.
@@ -2204,7 +2213,7 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   await expect(persistence).toHaveAttribute('data-revision', '2');
   await expect(persistence).toHaveText('Persisted');
 
-  // The chrome enumerates the active Card's outgoing Edges, so the Edge just
+  // The chrome enumerates the active Thing's outgoing Edges, so the Edge just
   // drawn is available without leaving and re-entering presentation.
   await expect(moves).toHaveText(['B', 'A']);
 });
@@ -2218,8 +2227,8 @@ test('drawing an Edge into an explicitly created Diagram then refuses its duplic
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingCard(page, 'E');
-  await addExistingCard(page, 'F');
+  await addExistingThing(page, 'E');
+  await addExistingThing(page, 'F');
   const source = nodeByTitle(page, 'A').first();
   const target = nodeByTitle(page, 'E').first();
   const initialEdgeCount = await page.locator('.react-flow__edge').count();
@@ -2262,10 +2271,10 @@ test('drawing an Edge into an explicitly created Diagram then refuses its duplic
 });
 
 /**
- * Two connections in one session, chained so the second starts from the Card the
+ * Two connections in one session, chained so the second starts from the Thing the
  * first selected.
  *
- * The second one is the whole point. A Card's declared handles (`projection.ts`)
+ * The second one is the whole point. A Thing's declared handles (`projection.ts`)
  * include every Graph id, not only the ones incident to it, so a completed
  * connection resolves in the same render that first makes its target incident.
  * Forcing React Flow to re-measure from the DOM replaces those declarations with
@@ -2273,15 +2282,15 @@ test('drawing an Edge into an explicitly created Diagram then refuses its duplic
  * the *next* connection then fails to resolve its source handle. One connection
  * cannot see it; the damage is done to the gesture after.
  *
- * Verified both ways against the fixture: with a forced remeasure in `CardNode`
+ * Verified both ways against the fixture: with a forced remeasure in `ThingNode`
  * this fails with six React Flow #008 warnings on the second connection, and
  * without one it passes.
  */
 test('a second connection drawn in the same session resolves its handles', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingCard(page, 'E');
-  await addExistingCard(page, 'F');
+  await addExistingThing(page, 'E');
+  await addExistingThing(page, 'F');
   const a = nodeByTitle(page, 'A').first();
   const e = nodeByTitle(page, 'E').first();
   const f = nodeByTitle(page, 'F').first();
@@ -2289,13 +2298,13 @@ test('a second connection drawn in the same session resolves its handles', async
   await expect(a).toBeVisible();
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  // Newly added Cards use the same initial placement. Separate F so its target
+  // Newly added Things use the same initial placement. Separate F so its target
   // handle is not covered by E during the chained gesture.
   await dragBy(page, f, 260, 0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
   await settled(page);
 
-  // The drag above left the pointer on `F`, and a handle reveals with the Card
+  // The drag above left the pointer on `F`, and a handle reveals with the Thing
   // it belongs to — an unrevealed handle takes no pointer events, so the press
   // that starts the connection would land on the pane instead.
   await a.hover();
@@ -2307,7 +2316,7 @@ test('a second connection drawn in the same session resolves its handles', async
   await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '4');
   await settled(page);
-  // The Card the connection reached is the selected one, which is what the
+  // The Thing the connection reached is the selected one, which is what the
   // chain above is named for and what the continuation `endPointerDrag`
   // requests is owed. Asserted rather than assumed, and *after* the barrier:
   // the deferral that used to hold this selection past React Flow's own
@@ -2340,7 +2349,7 @@ test('changing the active Graph recolours authoring handles without persisting o
   // Collection 1 owns several Graphs, so changing the active one recolours the
   // authored handles without changing which overview Edges are drawn.
   await source.hover();
-  const handle = source.locator('.rf-card-node__authoring-handle--source').first();
+  const handle = source.locator('.rf-thing-node__authoring-handle--source').first();
   const longColour = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
   const drawn = await page.locator('.react-flow__edge').count();
 
@@ -2357,25 +2366,25 @@ test('changing the active Graph recolours authoring handles without persisting o
  * The authoring handle is a drag affordance, and a click is not a drag.
  *
  * A press and release inside React Flow's drag threshold never starts a
- * connection, so the click reached the Card underneath and opened it to read —
+ * connection, so the click reached the Thing underneath and opened it to read —
  * from a control whose whole purpose is to begin an Edge.
  */
-test('clicking a Card authoring handle neither opens the Card nor draws an Edge', async ({
+test('clicking a Thing authoring handle neither opens the Thing nor draws an Edge', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /./);
   await settled(page);
-  await card.hover();
+  await thing.hover();
   const drawn = await page.locator('.react-flow__edge').count();
 
-  const handleBox = (await authoringHandle(card, 'source', 'right').boundingBox())!;
+  const handleBox = (await authoringHandle(thing, 'source', 'right').boundingBox())!;
   await page.mouse.click(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
 
-  await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
@@ -2392,7 +2401,7 @@ for (const key of ['Backspace', 'Delete'] as const) {
     // An Edge belongs to a Diagram's Graph, so an Edge Edit needs one selected.
     await selectCanvas(page, 'Collection 1');
     await settled(page);
-    const drawnCards = await page.locator('.react-flow__node').count();
+    const drawnThings = await page.locator('.react-flow__node').count();
     const drawn = await page.locator('.react-flow__edge').count();
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
@@ -2401,51 +2410,51 @@ for (const key of ['Backspace', 'Delete'] as const) {
     await page.keyboard.press(key);
 
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
-    await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards);
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnThings);
     await expect(persistence).toHaveAttribute('data-revision', '1');
     await expect(persistence).toHaveText('Persisted');
   });
 }
 
 /**
- * The app-owned canvas key removes a selected Card from this Diagram through the
- * completed Space Edit lifecycle. The Card still belongs to the Space; the
+ * The app-owned canvas key removes a selected Thing from this Diagram through the
+ * completed Space Edit lifecycle. The Thing still belongs to the Space; the
  * projection loses it and the Diagram-owned Edges incident to it together.
  */
 for (const key of ['Backspace', 'Delete'] as const) {
-  test(`${key} with a Card selected removes it and its Edges from this Diagram`, async ({
+  test(`${key} with a Thing selected removes it and its Edges from this Diagram`, async ({
     page,
   }) => {
     await page.goto('/');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
+    const thing = nodeByTitle(page, 'A').first();
+    await expect(thing).toBeVisible();
     await selectCanvas(page, 'Collection 1');
     await settled(page);
-    const drawnCards = await page.locator('.react-flow__node').count();
+    const drawnThings = await page.locator('.react-flow__node').count();
     const drawn = await page.locator('.react-flow__edge').count();
-    // Every Edge this Card is an endpoint of, counted before the Edit, so the
+    // Every Edge this Thing is an endpoint of, counted before the Edit, so the
     // assertion below is an exact remainder rather than "fewer than before" —
     // which passed while a single incident Edge went and the rest stayed.
     const incident = await page.getByLabel(/^Edge (from A to|from .* to A) /).count();
     expect(incident).toBeGreaterThan(0);
 
-    const cardBox = (await card.boundingBox())!;
-    await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
-    await expect(card).toHaveClass(/selected/);
+    const thingBox = (await thing.boundingBox())!;
+    await page.mouse.click(thingBox.x + thingBox.width / 2, thingBox.y + thingBox.height / 2);
+    await expect(thing).toHaveClass(/selected/);
 
     await page.keyboard.press(key);
     await quiescent(page);
 
-    await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards - 1);
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnThings - 1);
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - incident);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
-    await page.getByRole('button', { name: 'Cards' }).click();
+    await page.getByRole('button', { name: 'Things' }).click();
     const restoreMembership = page.getByRole('button', { name: 'Add A to Diagram' });
     await expect(restoreMembership).toBeVisible();
     await restoreMembership.click();
 
-    await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards);
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnThings);
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - incident);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   });
@@ -2457,12 +2466,12 @@ for (const key of ['Backspace', 'Delete'] as const) {
  * Both descriptions name the application-owned operations rather than React
  * Flow's disabled local deletion.
  */
-test('the graph advertises its Card and Edge delete commands', async ({ page }) => {
+test('the graph advertises its Thing and Edge delete commands', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
 
-  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/open a Card/i);
+  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/open a Thing/i);
   await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/remove.*Diagram/i);
   await expect(page.locator('[id^="react-flow__edge-desc"]')).toContainText(/delete/i);
 });
@@ -2552,7 +2561,7 @@ test(
     await expect(page.getByRole('button', { name: 'Delete this Edge' })).toBeVisible();
 
     // The endpoints, as the keyboard reaches them: two pickers over this Diagram's
-    // Cards, each showing the Card the Edge currently names.
+    // Things, each showing the Thing the Edge currently names.
     await page.getByRole('button', { name: 'Edit this Edge' }).click();
     await expect(page.getByRole('combobox', { name: 'From' })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'To' })).toBeVisible();
@@ -2628,7 +2637,7 @@ test(
     // the endpoint picker below, where B is disabled as a duplicate.
     const option = page.locator('[role="option"]:not([data-disabled])');
     // Read before the click, because the list goes with the completion: this is
-    // the only moment the chosen Card's title is on screen to be observed rather
+    // the only moment the chosen Thing's title is on screen to be observed rather
     // than derived from the code under test.
     const chosen = (await option.last().innerText()).trim();
     await option.last().click();
@@ -2657,7 +2666,7 @@ test(
     // by any of a dozen Edges — including one with these very endpoints in
     // another Graph. The decorated label carries all three facts the request is
     // made of (`edge-authoring-react.tsx`: `Edge from X to Y in G`), so naming
-    // the expected one pins the unmoved endpoint, the chosen Card and the Graph
+    // the expected one pins the unmoved endpoint, the chosen Thing and the Graph
     // together. `selected` and `chosen` are both read off the page, so this
     // asserts against observed values rather than recomputed ones.
     const reconnected = selected.replace(/ to .* in /, ` to ${chosen} in `);
@@ -2667,12 +2676,12 @@ test(
 );
 
 /**
- * A selected Edge's reconnect anchors sit over the Card's four authoring handles
+ * A selected Edge's reconnect anchors sit over the Thing's four authoring handles
  * where they overlap, and the anchors have to win.
  *
  * Reconnection is per-Edge and narrowed to the *selected* one for exactly this
  * reason: `edgesReconnectable` left globally true would put two transparent
- * anchors permanently live on every Edge, over every Card's handles.
+ * anchors permanently live on every Edge, over every Thing's handles.
  */
 test('reconnect anchors exist only on the selected Edge', async ({ page }) => {
   await page.goto('/');
@@ -2700,7 +2709,7 @@ test('reconnect anchors exist only on the selected Edge', async ({ page }) => {
  * `Long` is A→B→C→D→A′, so moving A→B's target onto D makes A→D, which is no
  * duplicate.
  */
-test('dragging an endpoint onto another Card moves it and keeps the Edge in its Graph', async ({
+test('dragging an endpoint onto another Thing moves it and keeps the Edge in its Graph', async ({
   page,
 }) => {
   await page.goto('/');
@@ -2764,12 +2773,12 @@ test('an Alt empty-drop still works after a reconnection', async ({ page }) => {
 
   // `connectToEmptyWithAlt` gates on the preview appearing, which is exactly the
   // state a raised flag starves — so a leak fails inside the helper rather than
-  // as a Card that mysteriously never arrived.
+  // as a Thing that mysteriously never arrived.
   const source = nodeByTitle(page, 'B').first();
   await source.hover();
   await connectToEmptyWithAlt(page, authoringHandle(source, 'source', 'right'));
 
-  await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
@@ -2793,7 +2802,7 @@ test('dragging the source endpoint moves the end the author took hold of', async
   await expect(edge).toHaveClass(/selected/);
 
   // A source-endpoint drag anchors at the Edge's target and looks for a new
-  // *source*, so the Card offers its source handles for this gesture alone.
+  // *source*, so the Thing offers its source handles for this gesture alone.
   await reconnectOnto(
     page,
     edge,
@@ -2904,11 +2913,11 @@ test('dragging an endpoint off the canvas restores the Edge', async ({ page }) =
 
 /**
  * The third `DropTarget` classification, and the reason the DOM half of the
- * empty-drop rule exists: a release over a Card's *body* is far enough from any
+ * empty-drop rule exists: a release over a Thing's *body* is far enough from any
  * handle that React Flow resolves no target, so without the hit-test an Alt-drop
- * there would author a Card on top of the one underneath.
+ * there would author a Thing on top of the one underneath.
  */
-test('an Alt-drop released over a Card body creates no Card', async ({ page }) => {
+test('an Alt-drop released over a Thing body creates no Thing', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const source = nodeByTitle(page, 'A').first();
@@ -2916,27 +2925,27 @@ test('an Alt-drop released over a Card body creates no Card', async ({ page }) =
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /./);
   await settled(page);
   await source.hover();
-  const drawnCards = await page.locator('.react-flow__node').count();
+  const drawnThings = await page.locator('.react-flow__node').count();
 
   const from = await boxOf(authoringHandle(source, 'source', 'right'), 'the source handle');
-  const over = await boxOf(nodeByTitle(page, 'C').first(), 'Card C');
+  const over = await boxOf(nodeByTitle(page, 'C').first(), 'Thing C');
   try {
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
     await page.mouse.down();
     await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
     await page.keyboard.down('Alt');
-    // The centre of a 260x146 Card is some 73px from its nearest handle, well
+    // The centre of a 260x146 Thing is some 73px from its nearest handle, well
     // outside React Flow's connection radius of 20 — so `toNode` is null here
-    // and only the DOM says this is a Card.
+    // and only the DOM says this is a Thing.
     await page.mouse.move(over.x + over.width / 2, over.y + over.height / 2, { steps: 4 });
-    await expect(page.getByTestId('new-card-preview')).toHaveCount(0);
+    await expect(page.getByTestId('new-thing-preview')).toHaveCount(0);
   } finally {
     await page.mouse.up();
     await page.keyboard.up('Alt');
   }
 
   await quiescent(page);
-  await expect(page.locator('.react-flow__node')).toHaveCount(drawnCards);
+  await expect(page.locator('.react-flow__node')).toHaveCount(drawnThings);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
@@ -2955,7 +2964,7 @@ test('an Alt-drop released over a Card body creates no Card', async ({ page }) =
 test('a duplicate Edge is marked invalid while the drag is still live', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingCard(page, 'E');
+  await addExistingThing(page, 'E');
   const source = nodeByTitle(page, 'A').first();
   const initialEdgeCount = await page.locator('.react-flow__edge').count();
   await expect(source).toBeVisible();
@@ -3005,23 +3014,23 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
 });
 
 /**
- * Add Card after explicit Diagram creation, and the naming that follows it.
+ * Add Thing after explicit Diagram creation, and the naming that follows it.
  *
- * Explicit creation happens exactly once and the created Card really is under
+ * Explicit creation happens exactly once and the created Thing really is under
  * the caret, in a browser where focus is the browser's to give.
  */
-test('Add Card names the new Card in place in the selected Diagram', async ({ page }) => {
+test('Add Thing names the new Thing in place in the selected Diagram', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
-  await expect(createCardControl(page)).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(createThingControl(page)).not.toHaveAttribute('aria-disabled', 'true');
 
-  await createCard(page, 'Markdown Card');
+  await createThing(page, 'Markdown Thing');
 
-  const title = page.getByRole('textbox', { name: 'Card title' });
+  const title = page.getByRole('textbox', { name: 'Thing title' });
   await expect(title).toBeFocused();
-  await expect(title).toHaveValue('Card 1');
+  await expect(title).toHaveValue('Thing 1');
   await expect(selectedCanvas(page)).toContainText('Collection 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   const after = await allPositions(page);
@@ -3038,7 +3047,7 @@ test('Add Card names the new Card in place in the selected Diagram', async ({ pa
 /**
  * The Alias creation state is local and creates nothing (ADR 0042).
  *
- * Cancelling it must leave the Space exactly as it was — no Card, no conversion,
+ * Cancelling it must leave the Space exactly as it was — no Thing, no conversion,
  * no commit — and must leave focus somewhere an author can carry on from. The
  * revision assertion needs `quiescent`: "still 0" passes instantly against a
  * commit that has not happened yet.
@@ -3052,7 +3061,7 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  await createCard(page, 'Alias');
+  await createThing(page, 'Alias');
   const search = page.getByRole('combobox', { name: 'Target' });
   await expect(search).toBeFocused();
   await search.fill('A');
@@ -3064,13 +3073,13 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await quiescent(page);
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-  await expect(createCardControl(page)).toBeFocused();
+  await expect(createThingControl(page)).toBeFocused();
 });
 
 /**
  * The pane's controls stay reachable when the pane cannot fit its content.
  *
- * `.card-pane__panel` is a fixed 16/9 frame whose width is clamped by viewport
+ * `.thing-pane__panel` is a fixed 16/9 frame whose width is clamped by viewport
  * height. The Alias creation pane therefore has to keep its fixed controls in
  * reach when the viewport is short.
  *
@@ -3083,7 +3092,7 @@ test('keeps the Alias pane’s controls reachable on a short viewport', async ({
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createCard(page, 'Alias');
+  await createThing(page, 'Alias');
   await expect(page.getByRole('button', { name: 'Cancel' })).toBeInViewport();
 });
 
@@ -3103,7 +3112,7 @@ test('Escape discards a typed Alias title and closes the pane', async ({ page })
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  await createCard(page, 'Alias');
+  await createThing(page, 'Alias');
   const title = page.getByTestId('new-alias-title');
   await title.fill('Recap');
 
@@ -3129,25 +3138,25 @@ test(
     await settled(page);
     const nodes = await page.locator('.react-flow__node').count();
 
-    await createCard(page, 'Alias');
+    await createThing(page, 'Alias');
     // No create action beside Cancel — the Target chosen is the completion, and
     // a second activation would confirm a choice already made.
     const pane = page.getByTestId('new-alias');
     await expect(pane.getByRole('button', { name: 'Cancel' })).toBeVisible();
     await expect(pane.getByRole('button', { name: /create|add|done|save/i })).toHaveCount(0);
     await page.getByRole('combobox', { name: 'Target' }).fill('B');
-    await page.getByRole('option', { name: 'Markdown Card B' }).click();
+    await page.getByRole('option', { name: 'Markdown Thing B' }).click();
 
     await expect(page.getByTestId('new-alias')).toHaveCount(0);
-    await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('Card 1');
+    await expect(page.getByRole('textbox', { name: 'Thing title' })).toHaveValue('Thing 1');
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
-    await page.getByRole('textbox', { name: 'Card title' }).press('Escape');
+    await page.getByRole('textbox', { name: 'Thing title' }).press('Escape');
 
-    // An unnamed Alias mints its own name like any other Card, so the Target is
-    // still the only Card called B and the Alias is the next `Card N`.
+    // An unnamed Alias mints its own name like any other Thing, so the Target is
+    // still the only Thing called B and the Alias is the next `Thing N`.
     await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
     await expect(nodeByTitle(page, 'B')).toHaveCount(1);
-    await expect(nodeByTitle(page, 'Card 1')).toHaveCount(1);
+    await expect(nodeByTitle(page, 'Thing 1')).toHaveCount(1);
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   },
@@ -3156,7 +3165,7 @@ test(
 /**
  * The whole gesture, and the reason the Title field had to exist.
  *
- * An unnamed Alias mints `Card N`, so creation leaves the author standing in a
+ * An unnamed Alias mints `Thing N`, so creation leaves the author standing in a
  * pane holding a name that says nothing about what they just made. Renaming has
  * to be reachable from where the author already is, has to reach the *Alias*,
  * and has to leave the Target's own title alone.
@@ -3169,18 +3178,18 @@ test('an Alias is renamed by the shared Title editor creation begins', async ({ 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createCard(page, 'Alias');
+  await createThing(page, 'Alias');
   await page.getByRole('combobox', { name: 'Target' }).fill('B');
-  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+  await page.getByRole('option', { name: 'Markdown Thing B' }).click();
 
-  const title = page.getByRole('textbox', { name: 'Card title' });
-  await expect(title).toHaveValue('Card 1');
+  const title = page.getByRole('textbox', { name: 'Thing title' });
+  await expect(title).toHaveValue('Thing 1');
   await expect(title).toBeFocused();
   await title.fill('Recap');
   await title.press('Enter');
 
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
-  // The Target keeps its own: one Card called B, the one that was always there.
+  // The Target keeps its own: one Thing called B, the one that was always there.
   await expect(nodeByTitle(page, 'B')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
@@ -3206,10 +3215,10 @@ test('Escape discards an Alias rename without undoing the Alias', async ({ page 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createCard(page, 'Alias');
+  await createThing(page, 'Alias');
   await page.getByRole('combobox', { name: 'Target' }).fill('B');
-  await page.getByRole('option', { name: 'Markdown Card B' }).click();
-  const title = page.getByRole('textbox', { name: 'Card title' });
+  await page.getByRole('option', { name: 'Markdown Thing B' }).click();
+  const title = page.getByRole('textbox', { name: 'Thing title' });
   await title.fill('Recap');
 
   await title.press('Escape');
@@ -3217,6 +3226,6 @@ test('Escape discards an Alias rename without undoing the Alias', async ({ page 
   await quiescent(page);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(0);
   await expect(nodeByTitle(page, 'B')).toHaveCount(1);
-  await expect(nodeByTitle(page, 'Card 1')).toHaveCount(1);
+  await expect(nodeByTitle(page, 'Thing 1')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });

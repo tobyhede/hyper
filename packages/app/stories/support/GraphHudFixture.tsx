@@ -1,12 +1,12 @@
 import type { Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { GraphId } from '@project/core';
-import { graphCardIds } from '@project/graph';
+import { graphThingIds } from '@project/graph';
 import { GraphHud } from '@project/react-flow-adapter';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
-import { CARD_SIZE } from '#src/card';
+import { THING_SIZE } from '#src/thing';
 import { graphColorMap } from '#src/colors';
 import { authoredSpace } from './spaces';
 import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
@@ -38,28 +38,28 @@ const openingGraph = (): GraphId => {
 };
 
 /**
- * Real React Flow nodes, one per Card of the story Space.
+ * Real React Flow nodes, one per Thing of the story Space.
  *
  * The MiniMap draws what the flow actually measured, so the geometry has to be
  * the framework's rather than a stand-in: these are ordinary nodes React Flow
  * lays out, measures and reports bounds for, at the size the application's own
- * `CARD_SIZE` declares. **The positions are the fixture's**, which is the one
+ * `THING_SIZE` declares. **The positions are the fixture's**, which is the one
  * thing a story is allowed to supply here — a Space's placement is a Diagram
  * strategy's answer, and running one to draw a HUD would put elkjs between this
  * story and the surface it is about. They are staggered so the minimap frame has
  * two dimensions to show rather than a single line.
  */
-const NODES: readonly Node[] = SPACE.cards.map((card, index) => ({
-  id: card.id,
+const NODES: readonly Node[] = SPACE.things.map((thing, index) => ({
+  id: thing.id,
   position: { x: index * 320, y: (index % 2) * 180 },
-  data: { label: card.title },
+  data: { label: thing.title },
   // Declared rather than left to be measured, as the production projection
   // declares its own: the MiniMap draws only nodes React Flow already has
   // dimensions for, so a node waiting on a ResizeObserver is one the minimap
   // silently omits.
-  width: CARD_SIZE.width,
-  height: CARD_SIZE.height,
-  style: { width: CARD_SIZE.width, height: CARD_SIZE.height },
+  width: THING_SIZE.width,
+  height: THING_SIZE.height,
+  style: { width: THING_SIZE.width, height: THING_SIZE.height },
 }));
 
 export interface GraphHudFixtureProps {
@@ -84,8 +84,8 @@ export interface GraphHudFixtureProps {
  * has no Space app around it to size one.
  */
 export function GraphHudFixture({ activeGraphId = openingGraph() }: GraphHudFixtureProps) {
-  const activeGraphCardIds = new Set(
-    activeGraphId === null ? [] : graphCardIds(SPACE, activeGraphId),
+  const activeGraphThingIds = new Set(
+    activeGraphId === null ? [] : graphThingIds(SPACE, activeGraphId),
   );
 
   return (
@@ -95,7 +95,7 @@ export function GraphHudFixture({ activeGraphId = openingGraph() }: GraphHudFixt
           graphs={SPACE.graphs}
           colorByGraphId={COLORS}
           activeGraphId={activeGraphId}
-          activeGraphCardIds={activeGraphCardIds}
+          activeGraphThingIds={activeGraphThingIds}
         />
       </StoryCanvas>
     </StoryCanvasFrame>

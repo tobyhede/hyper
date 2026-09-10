@@ -96,8 +96,8 @@ export async function openDockStory(scenario: DockScenario) {
     const snapshot = snapshotFromSpace(newSpaceFixture);
     const meta = {
       ...metaSnapshot,
-      cards: [
-        ...metaSnapshot.cards,
+      things: [
+        ...metaSnapshot.things,
         {
           id: newUuid(),
           document: {
@@ -160,15 +160,15 @@ export async function openDockStory(scenario: DockScenario) {
     }
     // A real Edit creates the failed commit; the same Diagram and title remain
     // on screen so recovery can be compared without changing the scenario.
-    const card = stored.working.cards[0];
-    if (card === undefined) throw new Error('The failure scenario needs an editable Card.');
+    const thing = stored.working.things[0];
+    if (thing === undefined) throw new Error('The failure scenario needs an editable Thing.');
     const result = target.app.authoring.complete({
-      kind: 'edited-card',
-      cardId: card.id,
+      kind: 'edited-thing',
+      thingId: thing.id,
       document:
-        card.document.kind === 'markdown'
-          ? { ...card.document, body: `${card.document.body}\nStory edit` }
-          : { ...card.document, title: `${card.document.title} edited` },
+        thing.document.kind === 'markdown'
+          ? { ...thing.document, body: `${thing.document.body}\nStory edit` }
+          : { ...thing.document, title: `${thing.document.title} edited` },
     });
     if (result.kind !== 'completed')
       throw new Error('The failure scenario did not complete an Edit.');

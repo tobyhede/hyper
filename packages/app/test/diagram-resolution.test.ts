@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema, type DiagramId } from '@project/core';
 import { loadSpace } from '@project/graph';
 import {
-  diagramCards,
+  diagramThings,
   DiagramNotFoundError,
   requireDefaultDiagram,
   resolveDiagram,
 } from '../src/diagram-resolution';
-import { cardFile } from './card-files';
+import { thingFile } from './thing-files';
 
 const PLACED = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const ALSO_PLACED = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -28,8 +28,8 @@ const load = (defaultDiagram: DiagramId | undefined) =>
           id: DIAGRAM,
           title: 'Diagram 1',
           kind: 'positioned',
-          // Declared out of the Space's Card order on purpose: the derivation
-          // answers in `space.cards` order, and a Placement that agreed with
+          // Declared out of the Space's Thing order on purpose: the derivation
+          // answers in `space.things` order, and a Placement that agreed with
           // that order could not tell the two apart.
           positions: {
             [ALSO_PLACED]: { x: 40, y: 50, open: false },
@@ -40,7 +40,7 @@ const load = (defaultDiagram: DiagramId | undefined) =>
         },
       ],
     },
-    [cardFile(PLACED), cardFile(ALSO_PLACED), cardFile(OMITTED)],
+    [thingFile(PLACED), thingFile(ALSO_PLACED), thingFile(OMITTED)],
   );
 
 const loaded = load(DIAGRAM);
@@ -74,17 +74,17 @@ describe('resolveDiagram', () => {
   });
 });
 
-describe('diagramCards', () => {
+describe('diagramThings', () => {
   /**
    * Membership and ordering in one assertion, because they are one guarantee:
-   * the Cards a Diagram places, as the Space's own objects, in the Space's Card
+   * the Things a Diagram places, as the Space's own objects, in the Space's Thing
    * order. No higher seam states the ordering, and the canvas reads it.
    */
-  it("answers the Space's own placed Cards in the Space's Card order", () => {
-    const cards = diagramCards(space, resolveDiagram(space).diagram);
+  it("answers the Space's own placed Things in the Space's Thing order", () => {
+    const things = diagramThings(space, resolveDiagram(space).diagram);
 
-    expect(cards.map(({ id }) => id)).toEqual([PLACED, ALSO_PLACED]);
-    expect(cards[0]).toBe(space.lookup.card(PLACED));
-    expect(cards[1]).toBe(space.lookup.card(ALSO_PLACED));
+    expect(things.map(({ id }) => id)).toEqual([PLACED, ALSO_PLACED]);
+    expect(things[0]).toBe(space.lookup.thing(PLACED));
+    expect(things[1]).toBe(space.lookup.thing(ALSO_PLACED));
   });
 });

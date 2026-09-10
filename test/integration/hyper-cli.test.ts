@@ -14,7 +14,7 @@ const UNRELATED_SPACE_ID = uuidSchema.parse('d3333333-3333-4333-8333-33333333333
 const EXACT_IMPORTED_SPACE_ID = uuidSchema.parse('d4444444-4444-4444-8444-444444444444');
 const FIRST_BATCH_SPACE_ID = uuidSchema.parse('d5555555-5555-4555-8555-555555555555');
 const SECOND_BATCH_SPACE_ID = uuidSchema.parse('d6666666-6666-4666-8666-666666666666');
-const EXPORTED_CARD_ID = uuidSchema.parse('d7777777-7777-4777-8777-777777777777');
+const EXPORTED_THING_ID = uuidSchema.parse('d7777777-7777-4777-8777-777777777777');
 
 interface CommandResult {
   status: number | null;
@@ -85,7 +85,7 @@ describe('hyper CLI', () => {
     const directory = await mkdtemp(join(tmpdir(), 'hyper-cli-integration-'));
     temporaryDirectories.add(directory);
     createdSpaceIds.add(spaceId);
-    await mkdir(join(directory, 'cards'));
+    await mkdir(join(directory, 'things'));
     await writeFile(
       join(directory, 'space.json'),
       JSON.stringify({ version: 1, id: spaceId, title }),
@@ -95,7 +95,7 @@ describe('hyper CLI', () => {
 
   const seedSpace = async (spaceId: UUID, title: string): Promise<void> => {
     const result = await repository.importSpaces(
-      [{ id: spaceId, document: { version: 1, title }, cards: [] }],
+      [{ id: spaceId, document: { version: 1, title }, things: [] }],
       'insert',
     );
     if (result.kind !== 'imported') throw new Error(`Could not seed space ${spaceId}`);
@@ -118,7 +118,7 @@ describe('hyper CLI', () => {
   afterEach(async () => {
     await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
     for (const spaceId of createdSpaceIds) {
-      await db.orm.public.Card.where({ spaceId }).deleteAll();
+      await db.orm.public.Thing.where({ spaceId }).deleteAll();
       await db.orm.public.Space.where({ id: spaceId }).delete();
     }
     createdSpaceIds.clear();
@@ -135,7 +135,7 @@ describe('hyper CLI', () => {
   it('imports through the real command and durably reports the stored space', async () => {
     const directory = await makeSpaceDirectory(IMPORTED_SPACE_ID);
     await writeFile(
-      join(directory, 'cards', 'opening.md'),
+      join(directory, 'things', 'opening.md'),
       '---\ntitle: Opening\n---\nDurable CLI body.\n',
     );
 
@@ -150,9 +150,9 @@ describe('hyper CLI', () => {
       version: 1,
       title: 'CLI imported talk',
     });
-    expect(stored?.snapshot.cards).toHaveLength(1);
-    expect(uuidSchema.safeParse(stored?.snapshot.cards[0]?.id).success).toBe(true);
-    expect(stored?.snapshot.cards[0]?.document).toEqual({
+    expect(stored?.snapshot.things).toHaveLength(1);
+    expect(uuidSchema.safeParse(stored?.snapshot.things[0]?.id).success).toBe(true);
+    expect(stored?.snapshot.things[0]?.document).toEqual({
       title: 'Opening',
       kind: 'markdown',
       body: 'Durable CLI body.\n',
@@ -171,11 +171,11 @@ describe('hyper CLI', () => {
     const snapshot = {
       id: IMPORTED_SPACE_ID,
       document: { version: 1 as const, title: 'CLI exported talk' },
-      cards: [
+      things: [
         {
-          id: EXPORTED_CARD_ID,
+          id: EXPORTED_THING_ID,
           document: {
-            title: 'Exported card',
+            title: 'Exported thing',
             kind: 'markdown' as const,
             body: 'Canonical export.\n',
           },
@@ -198,11 +198,11 @@ describe('hyper CLI', () => {
     await expect(readSingleSpace(destination)).resolves.toEqual({
       id: snapshot.id,
       document: snapshot.document,
-      cards: snapshot.cards,
+      things: snapshot.things,
     });
     await expect(
-      readFile(join(destination, 'cards', `${EXPORTED_CARD_ID}.md`), 'utf8'),
-    ).resolves.toContain(`id: ${EXPORTED_CARD_ID}`);
+      readFile(join(destination, 'things', `${EXPORTED_THING_ID}.md`), 'utf8'),
+    ).resolves.toContain(`id: ${EXPORTED_THING_ID}`);
     await expect(repository.loadSpace(IMPORTED_SPACE_ID)).resolves.toEqual({
       snapshot,
       revision: 0n,
@@ -223,15 +223,15 @@ describe('hyper CLI', () => {
     expect(result.stdout).toBe(`Opened space ${created.id} at revision 0\n`);
     expect(created.title).toBe('New space');
     const stored = await repository.loadSpace(created.id);
-    // A new Space begins complete: its Card is already placed in an authored
+    // A new Space begins complete: its Thing is already placed in an authored
     // default Diagram with one empty Active Graph (ADR 0079, ADR 0080). Every id
     // in it is minted, so the shape is asserted against the ones that arrived.
     const diagram = stored?.snapshot.document.diagrams?.[0];
     if (diagram === undefined) throw new Error('Expected the new space to arrive with its Diagram');
     const graph = diagram.graphs[0];
     if (graph === undefined) throw new Error('Expected the new Diagram to arrive with its Graph');
-    const cardId = stored?.snapshot.cards[0]?.id;
-    if (cardId === undefined) throw new Error('Expected the new space to arrive with its Card');
+    const thingId = stored?.snapshot.things[0]?.id;
+    if (thingId === undefined) throw new Error('Expected the new space to arrive with its Thing');
     expect(stored).toEqual({
       snapshot: {
         id: created.id,
@@ -243,24 +243,24 @@ describe('hyper CLI', () => {
               id: diagram.id,
               title: 'Diagram 1',
               kind: 'positioned',
-              positions: { [cardId]: { x: 0, y: 0, open: false } },
+              positions: { [thingId]: { x: 0, y: 0, open: false } },
               graphs: [{ id: graph.id, title: 'Graph 1', edges: [] }],
               activeGraph: graph.id,
             },
           ],
           defaultDiagram: diagram.id,
         },
-        cards: [
+        things: [
           {
-            id: cardId,
-            document: { title: 'Card 1', kind: 'markdown', body: '' },
+            id: thingId,
+            document: { title: 'Thing 1', kind: 'markdown', body: '' },
           },
         ],
       },
       revision: 0n,
       exportedRevision: null,
     });
-    for (const id of [cardId, diagram.id, graph.id]) {
+    for (const id of [thingId, diagram.id, graph.id]) {
       expect(uuidSchema.safeParse(id).success).toBe(true);
     }
   });
@@ -347,16 +347,16 @@ describe('hyper CLI', () => {
     });
   });
 
-  it('reports a malformed card path and stores no partial space', async () => {
+  it('reports a malformed thing path and stores no partial space', async () => {
     const directory = await makeSpaceDirectory(MALFORMED_SPACE_ID);
-    const cardPath = join(directory, 'cards', 'broken.md');
-    await writeFile(cardPath, 'Missing frontmatter.\n');
+    const thingPath = join(directory, 'things', 'broken.md');
+    await writeFile(thingPath, 'Missing frontmatter.\n');
 
     const result = await runHyperCommand([directory]);
 
     expect(result.status).not.toBe(0);
     expect(result.stdout).toBe('');
-    expect(result.stderr).toContain(cardPath);
+    expect(result.stderr).toContain(thingPath);
     await expect(repository.loadSpace(MALFORMED_SPACE_ID)).resolves.toBeUndefined();
   });
 });

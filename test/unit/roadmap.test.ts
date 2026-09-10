@@ -566,7 +566,7 @@ describe('release scope', () => {
     if (release === null) throw new Error('Expected a release.');
     const destination = writeReleaseSpace(root, buildRoadmap(root), release);
     if (destination === null) throw new Error('Expected a generated Space.');
-    expect(readdirSync(join(destination, 'cards'))).toHaveLength(1);
+    expect(readdirSync(join(destination, 'things'))).toHaveLength(1);
 
     // And once the work that outlived the gate settles too, the release is over
     // and there is nothing left to draw. Generating a Space is still the normal
@@ -578,14 +578,14 @@ describe('release scope', () => {
     );
     const emptied = writeReleaseSpace(root, buildRoadmap(root), release);
     if (emptied === null) throw new Error('Expected a generated Space.');
-    expect(readdirSync(join(emptied, 'cards'))).toHaveLength(0);
+    expect(readdirSync(join(emptied, 'things'))).toHaveLength(0);
 
     const imported = await readSingleSpace(emptied);
     const intake = loadSpaceSnapshot(
       spaceSnapshotSchema.parse({
         id: imported.id,
         document: imported.document,
-        cards: imported.cards,
+        things: imported.things,
       }),
     );
     expect(intake.ok ? [] : intake.errors).toEqual([]);
@@ -620,8 +620,8 @@ describe('release scope', () => {
     const destination = writeReleaseSpace(root, roadmap, release);
     if (destination === null) throw new Error('Expected a generated Space.');
 
-    expect(readdirSync(join(destination, 'cards'))).toHaveLength(3);
-    expect(readFileSync(join(destination, 'cards/parallel-01.md'), 'utf8')).toContain(
+    expect(readdirSync(join(destination, 'things'))).toHaveLength(3);
+    expect(readFileSync(join(destination, 'things/parallel-01.md'), 'utf8')).toContain(
       '- **Tags:** `release/v1`',
     );
     const written: unknown = JSON.parse(readFileSync(join(destination, 'space.json'), 'utf8'));
@@ -636,7 +636,7 @@ describe('release scope', () => {
       spaceSnapshotSchema.parse({
         id: imported.id,
         document: imported.document,
-        cards: imported.cards,
+        things: imported.things,
       }),
     );
     // Named with its errors rather than asserted bare: a regression in a

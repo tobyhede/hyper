@@ -36,7 +36,7 @@ describe('StatusFailure', () => {
     render(
       <StatusFailure
         title="Unable to arrange this view"
-        detail="No position for Card A"
+        detail="No position for Thing A"
         detailLabel="Placement failure detail"
       />,
     );
@@ -45,7 +45,7 @@ describe('StatusFailure', () => {
     detail.focus();
 
     expect(detail).toHaveFocus();
-    expect(detail).toHaveTextContent('No position for Card A');
+    expect(detail).toHaveTextContent('No position for Thing A');
   });
 
   it('exposes an optional test id on the announced alert', () => {
@@ -91,7 +91,7 @@ describe('StatusFailure', () => {
     render(
       <StatusFailure
         title="Unable to arrange this view"
-        detail="No position for Card A"
+        detail="No position for Thing A"
         detailLabel="Placement failure detail"
         boundedDetail
       />,

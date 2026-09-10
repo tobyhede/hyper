@@ -9,11 +9,11 @@ import {
 } from '@project/graph';
 import { usePlacementRendering } from '../src/placement-rendering';
 
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
 const strategyGraph: LayoutStrategyGraph = {
-  cards: [{ id: CARD_A, width: 240, height: 140, ports: [] }],
+  things: [{ id: THING_A, width: 240, height: 140, ports: [] }],
   edges: [],
 };
 
@@ -28,7 +28,7 @@ describe('usePlacementRendering', () => {
     expect(result.current).toEqual({
       kind: 'ready',
       strategyGraph: {
-        cards: [{ ...strategyGraph.cards[0]!, x: 0, y: 0 }],
+        things: [{ ...strategyGraph.things[0]!, x: 0, y: 0 }],
         edges: [],
       },
     });
@@ -40,7 +40,7 @@ describe('usePlacementRendering', () => {
       automaticCalls += 1;
       return new Promise(() => undefined);
     };
-    const authoredPositions = Placement.fromEntries([[CARD_A, { x: 80, y: 120, open: false }]]);
+    const authoredPositions = Placement.fromEntries([[THING_A, { x: 80, y: 120, open: false }]]);
     const { result } = renderHook(() =>
       usePlacementRendering(strategyGraph, neverResolves, authoredPositions),
     );
@@ -53,7 +53,7 @@ describe('usePlacementRendering', () => {
     expect(result.current).toEqual({
       kind: 'ready',
       strategyGraph: {
-        cards: [{ ...strategyGraph.cards[0]!, x: 80, y: 120 }],
+        things: [{ ...strategyGraph.things[0]!, x: 80, y: 120 }],
         edges: [],
       },
     });
@@ -67,14 +67,14 @@ describe('usePlacementRendering', () => {
     // back on every render, so only the strategyGraph half can produce the second
     // diagram run.
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 80, y: 120, open: false }],
-      [CARD_B, { x: 400, y: 260, open: false }],
+      [THING_A, { x: 80, y: 120, open: false }],
+      [THING_B, { x: 400, y: 260, open: false }],
     ]);
     const automatic = gridStrategy();
-    const gainedCard: LayoutStrategyGraph = {
-      cards: [
-        { id: CARD_A, width: 240, height: 140, ports: [] },
-        { id: CARD_B, width: 240, height: 140, ports: [] },
+    const gainedThing: LayoutStrategyGraph = {
+      things: [
+        { id: THING_A, width: 240, height: 140, ports: [] },
+        { id: THING_B, width: 240, height: 140, ports: [] },
       ],
       edges: [],
     };
@@ -84,15 +84,15 @@ describe('usePlacementRendering', () => {
     );
     await waitFor(() => expect(result.current.kind).toBe('ready'));
 
-    rerender({ input: gainedCard });
+    rerender({ input: gainedThing });
 
     await waitFor(() =>
       expect(result.current).toEqual({
         kind: 'ready',
         strategyGraph: {
-          cards: [
-            { ...gainedCard.cards[0]!, x: 80, y: 120 },
-            { ...gainedCard.cards[1]!, x: 400, y: 260 },
+          things: [
+            { ...gainedThing.things[0]!, x: 80, y: 120 },
+            { ...gainedThing.things[1]!, x: 400, y: 260 },
           ],
           edges: [],
         },
@@ -119,9 +119,9 @@ describe('usePlacementRendering', () => {
     // half of the freshness guard can hold the stale placement back.
     const strategy = gridStrategy();
     const nextGraph: LayoutStrategyGraph = {
-      cards: [
-        { id: CARD_A, width: 240, height: 140, ports: [] },
-        { id: CARD_B, width: 240, height: 140, ports: [] },
+      things: [
+        { id: THING_A, width: 240, height: 140, ports: [] },
+        { id: THING_B, width: 240, height: 140, ports: [] },
       ],
       edges: [],
     };
@@ -135,13 +135,13 @@ describe('usePlacementRendering', () => {
 
     expect(result.current).toEqual({ kind: 'pending' });
     await waitFor(() => expect(result.current.kind).toBe('ready'));
-    // Two 240-wide cards in a two-column grid with the default 80 gap.
+    // Two 240-wide things in a two-column grid with the default 80 gap.
     expect(result.current).toEqual({
       kind: 'ready',
       strategyGraph: {
-        cards: [
-          { ...nextGraph.cards[0]!, x: 0, y: 0 },
-          { ...nextGraph.cards[1]!, x: 320, y: 0 },
+        things: [
+          { ...nextGraph.things[0]!, x: 0, y: 0 },
+          { ...nextGraph.things[1]!, x: 320, y: 0 },
         ],
         edges: [],
       },
@@ -182,7 +182,7 @@ describe('usePlacementRendering', () => {
     const replacement: LayoutStrategy = (input) =>
       Promise.resolve({
         ...input,
-        cards: input.cards.map((card) => ({ ...card, x: 40, y: 60 })),
+        things: input.things.map((thing) => ({ ...thing, x: 40, y: 60 })),
       });
     const { result, rerender } = renderHook(
       ({ strategy }) => usePlacementRendering(strategyGraph, strategy, null),
@@ -197,20 +197,20 @@ describe('usePlacementRendering', () => {
     await waitFor(() => expect(result.current.kind).toBe('ready'));
     expect(result.current).toEqual({
       kind: 'ready',
-      strategyGraph: { ...strategyGraph, cards: [{ ...strategyGraph.cards[0]!, x: 40, y: 60 }] },
+      strategyGraph: { ...strategyGraph, things: [{ ...strategyGraph.things[0]!, x: 40, y: 60 }] },
     });
 
     await act(async () => {
       resolveObsolete({
         ...strategyGraph,
-        cards: [{ ...strategyGraph.cards[0]!, x: 900, y: 1000 }],
+        things: [{ ...strategyGraph.things[0]!, x: 900, y: 1000 }],
       });
       await Promise.resolve();
     });
 
     expect(result.current).toEqual({
       kind: 'ready',
-      strategyGraph: { ...strategyGraph, cards: [{ ...strategyGraph.cards[0]!, x: 40, y: 60 }] },
+      strategyGraph: { ...strategyGraph, things: [{ ...strategyGraph.things[0]!, x: 40, y: 60 }] },
     });
   });
 

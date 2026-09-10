@@ -12,11 +12,11 @@ import type { Move } from '../src/navigation';
  * what belongs here is what the interface promises — the semantics of the
  * controls, which callback each one runs, what is announced, where focus lands
  * when a control it owns destroys itself, and which keyboard commands the
- * guidance claims are available. Whether a traversal arrives at the right Card
+ * guidance claims are available. Whether a traversal arrives at the right Thing
  * is Navigation's own test (`navigation.test.ts`) and is not repeated here.
  */
 
-const CARD_IDS = [
+const THING_IDS = [
   '00000000-0000-4000-8000-000000000002',
   '00000000-0000-4000-8000-000000000003',
   '00000000-0000-4000-8000-000000000005',
@@ -26,9 +26,9 @@ const CARD_IDS = [
 /** The moves Navigation answers: the outgoing Edges in author order, one marked. */
 const movesTo = (titles: readonly string[], selectedIndex: number): readonly Move[] =>
   titles.map((title, index) => {
-    const cardId = CARD_IDS[index];
-    if (cardId === undefined) throw new Error('The fixture declares no id for this move.');
-    return { cardId, title, selected: index === selectedIndex };
+    const thingId = THING_IDS[index];
+    if (thingId === undefined) throw new Error('The fixture declares no id for this move.');
+    return { thingId, title, selected: index === selectedIndex };
   });
 
 const chrome = (props: Partial<PresentingChromeProps> = {}) => (
@@ -81,7 +81,7 @@ describe('PresentingChrome', () => {
       expect(button).not.toHaveAttribute('aria-checked');
       expect(button).not.toHaveAttribute('role');
     }
-    // The visible text stays the Card's title, so what is written on the control
+    // The visible text stays the Thing's title, so what is written on the control
     // is still sayable — the accessible name puts the verb in front of it.
     expect(moveButtons().map((button) => button.textContent)).toEqual(['B', 'C', 'D']);
   });
@@ -161,7 +161,7 @@ describe('PresentingChrome', () => {
 
   /**
    * One polite region over the moves and the end state, because they are one
-   * thing: what the presenter can do from the Card they are on. A changed choice
+   * thing: what the presenter can do from the Thing they are on. A changed choice
    * set is announced where it changed rather than by focus being moved to it.
    */
   it('announces the choice set and the end of the Graph in one polite region', () => {
@@ -200,7 +200,7 @@ describe('PresentingChrome', () => {
 
   /**
    * The control that performs a shortcut is the one that announces it
-   * (`docs/agents/ui.md`, as `CanvasCard`'s Save and Cancel rail actions do). The visible `Kbd` guidance is
+   * (`docs/agents/ui.md`, as `CanvasThing`'s Save and Cancel rail actions do). The visible `Kbd` guidance is
    * presentation only, so without this the binding reaches nobody who cannot see it.
    *
    * Only the non-native keys. Space and Enter activate any focused button by
@@ -260,7 +260,7 @@ describe('PresentingChrome', () => {
 
   /**
    * Advancing and retreating destroy the control that ran them — the move list
-   * is rebuilt from the Card arrived at — so the chrome owes focus to whatever
+   * is rebuilt from the Thing arrived at — so the chrome owes focus to whatever
    * took their place.
    */
   it('restores focus to the newly selected move after advancing from the chrome', () => {
@@ -316,7 +316,7 @@ describe('PresentingChrome', () => {
 
   /**
    * A Graph's out-degree has no bound, so the choices are one row that scrolls
-   * rather than a block that wraps over the Card being presented. A selection
+   * rather than a block that wraps over the Thing being presented. A selection
    * changed with the arrow keys can therefore be off screen, and the row brings
    * it back.
    */

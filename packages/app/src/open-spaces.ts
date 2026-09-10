@@ -13,23 +13,23 @@ import {
 import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
-import { createSpaceCardLifecycle, type SpaceCardAuthoring } from './space-card-lifecycle';
+import { createSpaceThingLifecycle, type SpaceThingAuthoring } from './space-thing-lifecycle';
 
 export interface OpenSpace {
   readonly id: UUID;
   readonly session: SpaceSession;
   readonly app: ComposedApp;
   /**
-   * Authoring the Space Cards this Space holds (ADR 0074, ADR 0076).
+   * Authoring the Space Things this Space holds (ADR 0074, ADR 0076).
    *
    * Carried on the entry rather than composed inside the app because it is
    * written over the *registry*, not over one session: creating, referencing
-   * and deleting a Space Card are Edits across several Spaces, and the registry
+   * and deleting a Space Thing are Edits across several Spaces, and the registry
    * is what holds the others. Every entry names the same one — which is why it
    * is required rather than optional, and why an app is never composed half
-   * able to author a Space Card.
+   * able to author a Space Thing.
    */
-  readonly spaceCards: SpaceCardAuthoring;
+  readonly spaceThings: SpaceThingAuthoring;
   /** Set when this Space's first working load authored its opening Diagram. */
   readonly initialization?: 'created-diagram';
 }
@@ -98,7 +98,7 @@ export interface OpenSpaces {
     spaceId: UUID,
     confirmation?: RejectedExitConfirmation,
   ) => Promise<ExitSpaceResult>;
-  readonly spaceCards: SpaceCardAuthoring;
+  readonly spaceThings: SpaceThingAuthoring;
   /**
    * The browser's location, following whichever Space is on the canvas.
    *
@@ -155,7 +155,7 @@ export function createOpenSpaces({
   // Opening a Space is a working load, so it initializes a stored diagramless
   // Space before anything composes against it (ADR 0079).
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
-  const spaceCards = createSpaceCardLifecycle({ backend, registry, newId });
+  const spaceThings = createSpaceThingLifecycle({ backend, registry, newId });
   const observable = createObservableState<OpenSpacesState>(
     { activeSpaceId: null, entries: [], openedFrom: new Map() },
     report,
@@ -315,7 +315,7 @@ export function createOpenSpaces({
       id: spaceId,
       session,
       app: composeApp({ spaceSession: session, selection, newId, reportObserverError: report }),
-      spaceCards,
+      spaceThings,
     };
     session.subscribe(() => {
       const state = observable.getState();
@@ -412,7 +412,7 @@ export function createOpenSpaces({
   /**
    * Open a target for embedded editing without taking the canvas off the Space
    * that embeds it, which is still a crossing: the target hangs off the Space
-   * whose Card reached it.
+   * whose Thing reached it.
    */
   const embed = async (spaceId: UUID): Promise<OpenSpace> => {
     const target = await compose(spaceId);
@@ -577,7 +577,7 @@ export function createOpenSpaces({
     enter,
     switchTo,
     exit,
-    spaceCards,
+    spaceThings,
     browserLocation,
   };
 }

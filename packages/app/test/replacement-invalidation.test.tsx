@@ -20,7 +20,7 @@ import { beginRename } from './command-dock';
  * Space is accepted is discarded with the Space it named.
  *
  * Three surfaces own a draft the author can actually reach today — the graph's
- * inline title field, the opened-Card pane, and React Flow's drag — and no one
+ * inline title field, the opened-Thing pane, and React Flow's drag — and no one
  * mechanism discards all three. Nothing held them to any of it before this file,
  * so all three held by construction and by reading.
  *
@@ -44,7 +44,7 @@ import { beginRename } from './command-dock';
  *
  * | case | K | R | K+R | N |
  * |---|---|---|---|---|
- * | opened-Card pane | passes | passes | passes | **fails** |
+ * | opened-Thing pane | passes | passes | passes | **fails** |
  * | in-flight drag | passes | **fails** | **fails** | passes |
  *
  * **What the modal does to a draft is the hazard this file kept walking into.**
@@ -72,24 +72,24 @@ import { beginRename } from './command-dock';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 /**
- * One positioned Card in a Diagram that owns one empty Graph — the smallest Space
- * that draws a Card, and one Card has nothing to connect (ADR 0040).
+ * One positioned Thing in a Diagram that owns one empty Graph — the smallest Space
+ * that draws a Thing, and one Thing has nothing to connect (ADR 0040).
  *
  * The local and remote snapshots below share every identity and differ only in
- * their values. That is the point: a draft naming a Card the replacement no
+ * their values. That is the point: a draft naming a Thing the replacement no
  * longer holds would be discarded by the lookup failing, which proves nothing.
- * Here the Card the author was editing still exists, still under the same id,
+ * Here the Thing the author was editing still exists, still under the same id,
  * and the draft must go anyway.
  */
 const snapshot = (
   title: string,
   diagramTitle: string,
-  cardTitle: string,
+  thingTitle: string,
   body: string,
   x: number,
   y: number,
@@ -104,17 +104,24 @@ const snapshot = (
           id: DIAGRAM_ID,
           title: diagramTitle,
           kind: 'positioned',
-          positions: { [CARD_ID]: { x, y, open: false } },
+          positions: { [THING_ID]: { x, y, open: false } },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
       defaultDiagram: DIAGRAM_ID,
     },
-    cards: [{ id: CARD_ID, document: { title: cardTitle, kind: 'markdown', body } }],
+    things: [{ id: THING_ID, document: { title: thingTitle, kind: 'markdown', body } }],
   });
 
-const LOCAL = snapshot('Local space', 'Local diagram', 'Local card', 'Local source', 10, 20);
-const REMOTE = snapshot('Remote space', 'Remote diagram', 'Remote card', 'Remote source', 900, 700);
+const LOCAL = snapshot('Local space', 'Local diagram', 'Local thing', 'Local source', 10, 20);
+const REMOTE = snapshot(
+  'Remote space',
+  'Remote diagram',
+  'Remote thing',
+  'Remote source',
+  900,
+  700,
+);
 
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);
@@ -129,13 +136,13 @@ const runtime = (value: SpaceSnapshot) => {
  * The conflict is raised *after* the draft is open rather than before, and the
  * order is load-bearing: a conflicted session draws its `Accept remote` in a
  * modal AlertDialog that marks the rest of the shell inert, so a Space app
- * mounted already-conflicted has no reachable Card to open a draft on.
+ * mounted already-conflicted has no reachable Thing to open a draft on.
  */
 async function mountedSpaceApp(): Promise<SpaceSession> {
   const backend = new MemorySpaceBackend([
     { snapshot: REMOTE, revision: 4n, exportedRevision: null },
   ]);
-  const { spaceSession: session, spaceCards } = openTestSpace(backend, {
+  const { spaceSession: session, spaceThings } = openTestSpace(backend, {
     snapshot: LOCAL,
     revision: 3n,
     exportedRevision: null,
@@ -143,15 +150,15 @@ async function mountedSpaceApp(): Promise<SpaceSession> {
 
   let view: RenderResult | undefined;
   mountSpace(
-    { id: runtime(LOCAL).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+    { id: runtime(LOCAL).id, session, app: composeApp({ spaceSession: session }), spaceThings },
     (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);
     },
   );
-  // Placement is asynchronous, so the Card arrives after the mount rather than
-  // with it. Every draft below starts from a drawn Card.
-  await screen.findByRole('heading', { name: 'Local card' });
+  // Placement is asynchronous, so the Thing arrives after the mount rather than
+  // with it. Every draft below starts from a drawn Thing.
+  await screen.findByRole('heading', { name: 'Local thing' });
   return session;
 }
 
@@ -172,11 +179,11 @@ const acceptRemote = (): void => {
 /**
  * The accepted Space is the one on screen — read off the shell's title, which is
  * the Space's own name and the one thing the replacement renames that no
- * draft, Card or placement is involved in.
+ * draft, Thing or placement is involved in.
  *
  * Waited for *before* each draft assertion so that a surviving draft fails on the
  * assertion naming it, rather than on some later expectation that could not find
- * the Card the open editor was covering.
+ * the Thing the open editor was covering.
  */
 const replacementLanded = async (): Promise<void> => {
   expect(await screen.findByText('Remote space')).toBeVisible();
@@ -262,16 +269,16 @@ afterEach(() => {
 
 describe('accepting a stored Space discards the open Interaction draft', () => {
   /**
-   * The inline Title draft lives inside the Canvas Card. Replacement remounts
+   * The inline Title draft lives inside the Canvas Thing. Replacement remounts
    * the keyed canvas subtree, so neither its caret nor its uncompleted value can
    * cross into the new Space. An open Markdown draft cannot be staged against
    * this fixture: opening is itself an authored commit and therefore raises the
    * fixture's deliberately waiting conflict before body editing can begin.
    */
-  it('discards a Card title editor holding an uncompleted draft', async () => {
+  it('discards a Thing title editor holding an uncompleted draft', async () => {
     const session = await mountedSpaceApp();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Title Local card' }));
-    const title = screen.getByRole('textbox', { name: 'Card title' });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title Local thing' }));
+    const title = screen.getByRole('textbox', { name: 'Thing title' });
     fireEvent.change(title, {
       target: { value: 'Title nobody pressed Enter on' },
     });
@@ -281,10 +288,10 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
     acceptRemote();
 
     await replacementLanded();
-    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Thing title' })).not.toBeInTheDocument();
     expect(screen.queryByText('Title nobody pressed Enter on')).not.toBeInTheDocument();
     expect(session.getState().working).toEqual(REMOTE);
-    expect(await screen.findByRole('heading', { name: 'Remote card' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Remote thing' })).toBeVisible();
   });
 
   /**
@@ -338,30 +345,30 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    *
    * A drag in flight is a draft in two places at once: the render adapter's
    * `dragOrigins` and the live node's position, which has left its authored
-   * place and has not been written anywhere. Accepting replaces both — the Card
+   * place and has not been written anywhere. Accepting replaces both — the Thing
    * is drawn where the accepted Space authored it, not where the pointer left
-   * it — and no `settled-card-movement` Edit is derived from a gesture that
+   * it — and no `settled-thing-movement` Edit is derived from a gesture that
    * never settled.
    *
    * The one case here that a single mutation breaks, and the reason is
-   * `reconcile`: a surviving Card takes its position from the *live* node, so a
+   * `reconcile`: a surviving Thing takes its position from the *live* node, so a
    * render adapter that kept its projection across the replacement would go on
-   * drawing this Card where the pointer left it, under the accepted Space's
+   * drawing this Thing where the pointer left it, under the accepted Space's
    * title. The unmount cannot cover that — it is a store the unmount does not
    * reach.
    *
    * The drag is left in flight on purpose and released by the `afterEach` above
    * rather than here, because releasing it is not part of what this pins. What a
    * late release *would* do was measured separately and is inert: no settled
-   * change is emitted after the replacement, so no `settled-card-movement`
+   * change is emitted after the replacement, so no `settled-thing-movement`
    * completion is derived and `working` does not move. That is React Flow's
    * doing, not ours — `render-adapter.ts:249` falls back to `beforeById` when
    * `dragOrigins` is empty, so nothing here refuses a stale settled change. The
    * ticket's section 5 has the bisection and treats it as an open question.
    */
-  it('drops an in-flight drag and redraws the Card where the accepted Space places it', async () => {
+  it('drops an in-flight drag and redraws the Thing where the accepted Space places it', async () => {
     const session = await mountedSpaceApp();
-    const dragged = nodeOf(CARD_ID);
+    const dragged = nodeOf(THING_ID);
     expect(dragged).toHaveStyle({ transform: 'translate(10px,20px)' });
 
     beginDrag(dragged);
@@ -376,9 +383,9 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
 
     await replacementLanded();
     await waitFor(() =>
-      expect(nodeOf(CARD_ID)).toHaveStyle({ transform: 'translate(900px,700px)' }),
+      expect(nodeOf(THING_ID)).toHaveStyle({ transform: 'translate(900px,700px)' }),
     );
     expect(session.getState().working).toEqual(REMOTE);
-    expect(await screen.findByRole('heading', { name: 'Remote card' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Remote thing' })).toBeVisible();
   });
 });

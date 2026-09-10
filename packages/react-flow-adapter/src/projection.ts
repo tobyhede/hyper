@@ -1,17 +1,17 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
 import type {
-  CanvasCardBodyEditor,
-  CanvasSpaceCardSelection,
+  CanvasThingBodyEditor,
+  CanvasSpaceThingSelection,
   EntityActionGroup,
 } from '@project/ui';
-import type { Card, CardId, GraphId } from '@project/core';
-import { inHandleId, outHandleId, resolveContentCard } from '@project/graph';
+import type { Thing, ThingId, GraphId } from '@project/core';
+import { inHandleId, outHandleId, resolveContentThing } from '@project/graph';
 import type {
-  CardHandleSet,
+  ThingHandleSet,
   GraphRenderEdge,
   GraphRenderHandleRef,
-  LayoutStrategyCard,
+  LayoutStrategyThing,
   LayoutStrategyEdge,
   LayoutStrategyGraph,
   Point,
@@ -41,7 +41,7 @@ export const OTHER_GRAPH_OPACITY = {
 
 /** A graph handle resolved for rendering: a color and a vertical offset (px from
  *  the node's top) matching where ELK placed the port. */
-export type CardHandle = {
+export type ThingHandle = {
   id: string;
   graphId: GraphId;
   color: string;
@@ -49,67 +49,67 @@ export type CardHandle = {
 };
 
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the
- *  new title was accepted — the same contract `CanvasCard`'s editor reads, where
+ *  new title was accepted — the same contract `CanvasThing`'s editor reads, where
  *  `null` keeps the editor closed and a string keeps it open beside the message. */
-export type CardTitleEditor = {
+export type ThingTitleEditor = {
   onComplete: (title: string) => string | null;
   onCancel: () => void;
 };
 
-/** Data carried by each custom card node. Kept as a type alias so it satisfies
+/** Data carried by each custom thing node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint, and it includes the
  *  handle arrays the ELK layout needs. */
-export type CardNodeData = {
-  cardId: CardId;
+export type ThingNodeData = {
+  thingId: ThingId;
   title: string;
-  /** Whether the Card's reusable component must withhold authoring affordances. */
+  /** Whether the Thing's reusable component must withhold authoring affordances. */
   readOnly: boolean;
   /** An embedded Space boundary offers no connection-authoring controls. */
   connectionAuthoringEnabled?: boolean;
   /**
-   * What kind of Card this is, drawn as a persistent glyph on the Front.
+   * What kind of Thing this is, drawn as a persistent glyph on the Front.
    *
    * Carried rather than inferred from whether this node's content resolved
-   * elsewhere: that answers the Card's kind by proxy, which is exactly what
+   * elsewhere: that answers the Thing's kind by proxy, which is exactly what
    * goes wrong for the next kind that resolves its content elsewhere too.
    */
-  kind: Card['kind'];
-  /** Local Card-authoring controls supplied by the application composition. */
+  kind: Thing['kind'];
+  /** Local Thing-authoring controls supplied by the application composition. */
   titleEditingEnabled?: boolean;
   /**
-   * Whether Card-level authoring is offered here: this Card is in the working
+   * Whether Thing-level authoring is offered here: this Thing is in the working
    * Space and the canvas is authorable.
    *
    * **Not "owns content to edit"**, which is what it meant while an Alias had no
-   * Open front. It gates `onEditCard`, and an Alias Opens and Closes through
+   * Open front. It gates `onEditThing`, and an Alias Opens and Closes through
    * that same operation (ADR 0070), so an Alias sets it exactly as a Markdown
-   * Card does. What separates the kinds is `onBeginBodyEditing`, which the
+   * Thing does. What separates the kinds is `onBeginBodyEditing`, which the
    * application withholds from everything but `markdown`.
    */
-  cardEditingEnabled?: boolean;
-  onEditCard?: (open: boolean) => 'completed' | 'retained';
+  thingEditingEnabled?: boolean;
+  onEditThing?: (open: boolean) => 'completed' | 'retained';
   onBeginTitleEditing?: () => void;
   /**
-   * The inline title editor this Card is currently showing, absent on one that
+   * The inline title editor this Thing is currently showing, absent on one that
    * is not being renamed. Its presence *is* the editing state, and it carries
    * the two operations that end the edit — so a composition cannot ask for the
    * editor without also saying what completes and cancels it.
    *
-   * This is the pairing `CanvasCardProps` already makes for its own
+   * This is the pairing `CanvasThingProps` already makes for its own
    * `state: 'editing'`, held one layer up. Split into a boolean and two
    * independent optional callbacks, the adapter had to manufacture total
    * functions out of partial data, and an absent completion answered `null` —
-   * which `CanvasCard` reads as *accepted*, closing the editor on a rename that
+   * which `CanvasThing` reads as *accepted*, closing the editor on a rename that
    * never happened.
    */
-  titleEditor?: CardTitleEditor;
+  titleEditor?: ThingTitleEditor;
   /**
-   * Whether the Diagram has Opened this Card, so it draws its content on the Card
+   * Whether the Diagram has Opened this Thing, so it draws its content on the Thing
    * rather than its title alone (ADR 0064).
    *
-   * Authored, not derived: it is a fact about the Diagram, and the Card's rect
+   * Authored, not derived: it is a fact about the Diagram, and the Thing's rect
    * follows from it rather than the other way round. The adapter cannot read it
-   * off the geometry — a Card is not Open just because it is large.
+   * off the geometry — a Thing is not Open just because it is large.
    *
    * An Open Alias draws its immutable Target's content through the same front.
    */
@@ -117,7 +117,7 @@ export type CardNodeData = {
   /** Present only when activating the Open body may place a caret. */
   onBeginBodyEditing?: () => void;
   /**
-   * The live body edit, absent on a Card whose rendered Markdown is at rest.
+   * The live body edit, absent on a Thing whose rendered Markdown is at rest.
    *
    * Its presence *is* the caret, carrying the two operations that end the edit —
    * the same pairing `titleEditor` above makes, for the same reason: a
@@ -131,28 +131,28 @@ export type CardNodeData = {
    * would undo every accepted save.
    *
    * Independent of `titleEditor` on purpose. Expansion is what the Diagram
-   * authored and the caret is a gesture the author just made, so a Card can be
+   * authored and the caret is a gesture the author just made, so a Thing can be
    * Expanded while its *title* is being renamed (ADR 0064).
    */
-  bodyEditor?: CanvasCardBodyEditor;
+  bodyEditor?: CanvasThingBodyEditor;
   /**
-   * Resizing this Expanded Card, absent on one that may not be resized.
+   * Resizing this Expanded Thing, absent on one that may not be resized.
    *
    * Presence is the capability and it carries its own floor, for the same reason
    * the two editors above carry their own completions: the collapsed size is
-   * `CARD_SIZE`, which belongs to the composition and not to this package —
+   * `THING_SIZE`, which belongs to the composition and not to this package —
    * an adapter that hardcoded a minimum would be a second opinion about a
    * constant `app` already owns.
    *
-   * `onResize` previews a size and no origin. Displacement moves Cards and does
+   * `onResize` previews a size and no origin. Displacement moves Things and does
    * not scale them, so a reported size needs no inversion — which is what keeps
    * this out of the family of gestures that must go back through the authored
-   * placement. If a resize is ever allowed to move the Card's top-left, it joins
+   * placement. If a resize is ever allowed to move the Thing's top-left, it joins
    * that family.
    *
    * The lifecycle travels as one capability: the composition supplies every
    * operation together because a resize gesture begun on an
-   * unselected Card has to select it before there is anything for `onResize`
+   * unselected Thing has to select it before there is anything for `onResize`
    * to complete against — one control, one drag, and Selection is not a second
    * Edit (ADR 0066).
    */
@@ -165,18 +165,18 @@ export type CardNodeData = {
     onResizeCancel: () => void;
   };
   /**
-   * This Card's own commands — copy an address it can be reached by, delete it
-   * — drawn as one more control on the Card's rail (ADR 0073, ADR 0082).
+   * This Thing's own commands — copy an address it can be reached by, delete it
+   * — drawn as one more control on the Thing's rail (ADR 0073, ADR 0082).
    *
    * Built by the composition and carried whole, exactly as the operations above
    * are: an address comes from the product destination table and a deletion
    * runs a completed Edit, neither of which this package can reach. Absent
-   * means no control rather than an empty menu, which is the rule `CanvasCard`
+   * means no control rather than an empty menu, which is the rule `CanvasThing`
    * already applies to the value it is handed.
    */
   entityActions?: readonly EntityActionGroup[];
   /**
-   * For a space card, what the Space it references offers its selections to be
+   * For a space thing, what the Space it references offers its selections to be
    * chosen from.
    *
    * Not derived here, and it could not be: it describes a *second* Space, which
@@ -184,26 +184,26 @@ export type CardNodeData = {
    * that read the target supplies it, exactly as it supplies every other
    * operation on this node (ADR 0068, ADR 0074).
    */
-  spaceSelection?: CanvasSpaceCardSelection;
+  spaceSelection?: CanvasSpaceThingSelection;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
   /**
-   * Draw the card's content rather than its title. ADR 0006 deferred a "show
+   * Draw the thing's content rather than its title. ADR 0006 deferred a "show
    * full content" view and left it a View's choice; presenting is that view (ADR
-   * 0027). Set on the active card alone, never on the whole graph.
+   * 0027). Set on the active thing alone, never on the whole graph.
    */
   showContent: boolean;
   /** The Markdown to draw when `showContent`, resolved through an alias to its
    *  target's body. Absent otherwise — content is not embedded in every node
-   *  (ADR 0006), which is the constraint that made this per-card.
+   *  (ADR 0006), which is the constraint that made this per-thing.
    *
-   *  **An Expanded Card carries one too.** ADR 0064 narrows ADR 0006 rather
-   *  than lifting it — an Expanded Card carries its source because the author
-   *  asked for that one, not because every Card does. `openCardIds` is what
-   *  tells this projection which Cards the Diagram Expanded, and `body` is
-   *  resolved for them in the same pass: `CardNode` reads `data.body ?? ''`, so
-   *  a Card resolved into one set and not the other would draw an empty
+   *  **An Expanded Thing carries one too.** ADR 0064 narrows ADR 0006 rather
+   *  than lifting it — an Expanded Thing carries its source because the author
+   *  asked for that one, not because every Thing does. `openThingIds` is what
+   *  tells this projection which Things the Diagram Expanded, and `body` is
+   *  resolved for them in the same pass: `ThingNode` reads `data.body ?? ''`, so
+   *  a Thing resolved into one set and not the other would draw an empty
    *  document over a working editor rather than fail. */
   body?: string;
   /** The graph being emphasised, if any. Drives handle dimming. */
@@ -211,29 +211,29 @@ export type CardNodeData = {
   /** The active Graph's colour, used by graph-independent authoring handles. */
   activeGraphColor: string;
   emphasis: GraphEmphasis;
-  sourceHandles: CardHandle[];
-  targetHandles: CardHandle[];
+  sourceHandles: ThingHandle[];
+  targetHandles: ThingHandle[];
 };
 
-export type CardFlowNode = Node<CardNodeData, 'card'>;
+export type ThingFlowNode = Node<ThingNodeData, 'thing'>;
 
 export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
 
-const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
+const EMPTY_HANDLES: ThingHandleSet = { sourceHandles: [], targetHandles: [] };
 
-export interface ProjectCardNodesOptions {
-  /** Draw Cards without any Card-owned authoring controls or handles. */
+export interface ProjectThingNodesOptions {
+  /** Draw Things without any Thing-owned authoring controls or handles. */
   readOnly?: boolean;
-  /** Card id reached during traversal, if any, to flag as active. */
-  activeCardId?: CardId | null;
+  /** Thing id reached during traversal, if any, to flag as active. */
+  activeThingId?: ThingId | null;
   /** Ordinary renderer selection used to expose continued-authoring handles. */
-  selectedCardId?: CardId | null;
+  selectedThingId?: ThingId | null;
   /**
-   * Draw the active card's content instead of its title — what presenting does
-   * (ADR 0027). Only the active card is affected, so this costs one card's body
-   * in the projection rather than every card's.
+   * Draw the active thing's content instead of its title — what presenting does
+   * (ADR 0027). Only the active thing is affected, so this costs one thing's body
+   * in the projection rather than every thing's.
    */
-  showActiveCardContent?: boolean;
+  showActiveThingContent?: boolean;
   /** The graph to emphasise, if any. */
   activeGraphId?: GraphId | null;
   /** The active Graph's resolved colour for graph authoring controls. */
@@ -243,18 +243,18 @@ export interface ProjectCardNodesOptions {
   strategyGraph?: LayoutStrategyGraph;
   /** Node height used to evenly distribute handles before the layout resolves. */
   nodeHeight?: number;
-  /** Restrict the projection to these card ids (e.g. one graph's cards). */
-  cardIds?: readonly CardId[];
-  /** Diagram-authored Expanded Cards whose Markdown body is drawn in place. */
-  openCardIds?: ReadonlySet<CardId>;
+  /** Restrict the projection to these thing ids (e.g. one graph's things). */
+  thingIds?: readonly ThingId[];
+  /** Diagram-authored Expanded Things whose Markdown body is drawn in place. */
+  openThingIds?: ReadonlySet<ThingId>;
 }
 
 function resolveHandles(
   refs: GraphRenderHandleRef[],
   colors: ColorByGraphId,
-  portsById: ReadonlyMap<string, LayoutStrategyCard['ports'][number]>,
+  portsById: ReadonlyMap<string, LayoutStrategyThing['ports'][number]>,
   nodeHeight: number,
-): CardHandle[] {
+): ThingHandle[] {
   const count = refs.length;
   return refs.map((ref, index) => {
     const port = portsById.get(ref.id);
@@ -271,10 +271,10 @@ function resolveHandles(
 }
 
 function declaredHandles(
-  sourceHandles: readonly CardHandle[],
-  targetHandles: readonly CardHandle[],
+  sourceHandles: readonly ThingHandle[],
+  targetHandles: readonly ThingHandle[],
   graphIds: readonly GraphId[],
-  card: LayoutStrategyCard,
+  thing: LayoutStrategyThing,
 ): NodeHandle[] {
   const radius = AUTHORING_HANDLE_DIAMETER / 2;
   const portRadius = GRAPH_PORT_DIAMETER / 2;
@@ -294,34 +294,34 @@ function declaredHandles(
   });
   const targetByGraph = new Map(targetHandles.map((handle) => [handle.graphId, handle]));
   const sourceByGraph = new Map(sourceHandles.map((handle) => [handle.graphId, handle]));
-  const fallbackOffset = (index: number) => ((index + 1) / (graphIds.length + 1)) * card.height;
+  const fallbackOffset = (index: number) => ((index + 1) / (graphIds.length + 1)) * thing.height;
   // The DOM renders only incident overview anchors. Declaring every existing
   // Graph id keeps a completed connection resolvable in the same render that
   // first makes its target incident, without exposing another visible control.
   //
-  // This is also why nothing may force a React Flow remeasure of a placed Card:
+  // This is also why nothing may force a React Flow remeasure of a placed Thing:
   // `parseHandles` prefers what is declared here, but a forced update rebuilds
   // the bounds from `getHandleBounds`, which sees only the anchors the DOM draws
   // — and the not-yet-incident declarations, the whole point of the loop below,
-  // are gone. `CardNode` records the same rule from the other side.
+  // are gone. `ThingNode` records the same rule from the other side.
   //
   // Order matters, and the authoring handles come first. React Flow picks the
   // closest declared handle within its connection radius and resolves an exact
   // distance tie by array order. A non-incident anchor's fallback offset can land
   // exactly on an authoring handle — with one Graph it always does, since the
-  // lone anchor sits at half the Card's height and so do the Left and Right
+  // lone anchor sits at half the Thing's height and so do the Left and Right
   // handles. The authoring handle is the one with a DOM element behind it, and a
   // release that resolves to an anchor with none is refused, so the tie has to
   // fall the other way.
   return [
-    authoring('source', Position.Top, card.width / 2 - radius, -radius),
-    authoring('source', Position.Right, card.width - radius, card.height / 2 - radius),
-    authoring('source', Position.Bottom, card.width / 2 - radius, card.height - radius),
-    authoring('source', Position.Left, -radius, card.height / 2 - radius),
-    authoring('target', Position.Top, card.width / 2 - radius, -radius),
-    authoring('target', Position.Right, card.width - radius, card.height / 2 - radius),
-    authoring('target', Position.Bottom, card.width / 2 - radius, card.height - radius),
-    authoring('target', Position.Left, -radius, card.height / 2 - radius),
+    authoring('source', Position.Top, thing.width / 2 - radius, -radius),
+    authoring('source', Position.Right, thing.width - radius, thing.height / 2 - radius),
+    authoring('source', Position.Bottom, thing.width / 2 - radius, thing.height - radius),
+    authoring('source', Position.Left, -radius, thing.height / 2 - radius),
+    authoring('target', Position.Top, thing.width / 2 - radius, -radius),
+    authoring('target', Position.Right, thing.width - radius, thing.height / 2 - radius),
+    authoring('target', Position.Bottom, thing.width / 2 - radius, thing.height - radius),
+    authoring('target', Position.Left, -radius, thing.height / 2 - radius),
     ...graphIds.map((graphId, index): NodeHandle => {
       const handle = targetByGraph.get(graphId);
       return {
@@ -340,7 +340,7 @@ function declaredHandles(
         id: handle?.id ?? outHandleId(graphId),
         type: 'source',
         position: Position.Right,
-        x: card.width - portRadius,
+        x: thing.width - portRadius,
         y: (handle?.offsetY ?? fallbackOffset(index)) - portRadius,
         width: GRAPH_PORT_DIAMETER,
         height: GRAPH_PORT_DIAMETER,
@@ -350,64 +350,65 @@ function declaredHandles(
 }
 
 /**
- * Map cards → React Flow card nodes, attaching per-graph handles positioned at
- * their ELK port offsets. The card id is the React Flow node id.
+ * Map things → React Flow thing nodes, attaching per-graph handles positioned at
+ * their ELK port offsets. The thing id is the React Flow node id.
  *
- * A node carries its card's *title*, not its content (ADR 0006) — the content is
- * loaded when a card is opened or presented, not embedded in every node.
+ * A node carries its thing's *title*, not its content (ADR 0006) — the content is
+ * loaded when a thing is opened or presented, not embedded in every node.
  */
-export function projectCardNodes(
+export function projectThingNodes(
   space: Space,
-  handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
+  handlesByThing: ReadonlyMap<ThingId, ThingHandleSet>,
   colors: ColorByGraphId,
-  options: ProjectCardNodesOptions = {},
-): CardFlowNode[] {
-  const activeCardId = options.activeCardId ?? null;
-  const showActiveCardContent = options.showActiveCardContent ?? false;
+  options: ProjectThingNodesOptions = {},
+): ThingFlowNode[] {
+  const activeThingId = options.activeThingId ?? null;
+  const showActiveThingContent = options.showActiveThingContent ?? false;
   const activeGraphId = options.activeGraphId ?? null;
   const emphasis = options.emphasis ?? 'equal';
   const nodeHeight = options.nodeHeight ?? DEFAULT_NODE_HEIGHT;
-  const visible = options.cardIds ? new Set(options.cardIds) : null;
-  const laidOut = new Map((options.strategyGraph?.cards ?? []).map((c) => [c.id, c]));
+  const visible = options.thingIds ? new Set(options.thingIds) : null;
+  const laidOut = new Map((options.strategyGraph?.things ?? []).map((t) => [t.id, t]));
 
-  const source = visible ? space.cards.filter((c) => visible.has(c.id)) : space.cards;
+  const source = visible ? space.things.filter((t) => visible.has(t.id)) : space.things;
 
-  return source.map((card) => {
-    const handles = handlesByCard.get(card.id) ?? EMPTY_HANDLES;
-    const placedCard = laidOut.get(card.id);
-    const active = card.id === activeCardId;
-    const showContent = active && showActiveCardContent;
-    // Every Card kind Opens, so the Diagram's Open set is the whole answer and
+  return source.map((thing) => {
+    const handles = handlesByThing.get(thing.id) ?? EMPTY_HANDLES;
+    const placedThing = laidOut.get(thing.id);
+    const active = thing.id === activeThingId;
+    const showContent = active && showActiveThingContent;
+    // Every Thing kind Opens, so the Diagram's Open set is the whole answer and
     // there is no kind guard beside it. The guard this replaced named the two
-    // kinds that had a front to draw when Open; a Space Card gained one with
+    // kinds that had a front to draw when Open; a Space Thing gained one with
     // `entity-url-addressability/07` (ADR 0068), which left the third arm the
-    // only thing standing between a stored Open state and the Card that state
+    // only thing standing between a stored Open state and the Thing that state
     // is about.
-    const open = options.openCardIds?.has(card.id) === true;
+    const open = options.openThingIds?.has(thing.id) === true;
     // An alias shows its target's content under its own title (ADR 0009).
-    const body = showContent || open ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
-    const portsById = new Map((placedCard?.ports ?? []).map((port) => [port.id, port]));
-    // The Card's own height once a strategy has placed it, and the constant only
-    // before one has. The two agree for every collapsed Card — the strategies
-    // arrange at `CARD_SIZE` — and differ exactly for an Open one, whose
+    const body =
+      showContent || open ? (resolveContentThing(space, thing.id)?.body ?? '') : undefined;
+    const portsById = new Map((placedThing?.ports ?? []).map((port) => [port.id, port]));
+    // The Thing's own height once a strategy has placed it, and the constant only
+    // before one has. The two agree for every collapsed Thing — the strategies
+    // arrange at `THING_SIZE` — and differ exactly for an Open one, whose
     // anchors have to spread down the box it actually occupies (ADR 0064).
     // Read from the same rect `declaredHandles` reasons about below, so a
     // Graph's drawn anchor and its declared one cannot land in different places.
-    const spread = placedCard?.height ?? nodeHeight;
+    const spread = placedThing?.height ?? nodeHeight;
     const sourceHandles = resolveHandles(handles.sourceHandles, colors, portsById, spread);
     const targetHandles = resolveHandles(handles.targetHandles, colors, portsById, spread);
 
-    const node: CardFlowNode = {
-      id: card.id,
-      type: 'card',
-      position: { x: placedCard?.x ?? 0, y: placedCard?.y ?? 0 },
+    const node: ThingFlowNode = {
+      id: thing.id,
+      type: 'thing',
+      position: { x: placedThing?.x ?? 0, y: placedThing?.y ?? 0 },
       data: {
-        cardId: card.id,
-        title: card.title,
+        thingId: thing.id,
+        title: thing.title,
         readOnly: options.readOnly ?? false,
-        kind: card.kind,
+        kind: thing.kind,
         active,
-        selectedForAuthoring: card.id === (options.selectedCardId ?? null),
+        selectedForAuthoring: thing.id === (options.selectedThingId ?? null),
         showContent,
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
@@ -415,10 +416,10 @@ export function projectCardNodes(
         sourceHandles,
         targetHandles,
       },
-      className: active ? 'rf-card-node rf-card-node--active' : 'rf-card-node',
+      className: active ? 'rf-thing-node rf-thing-node--active' : 'rf-thing-node',
     };
-    // Carry the diagram's dimensions through when it has placed the card. ELK
-    // (and the grid) work at a fixed `CARD_SIZE`, so declaring width/height
+    // Carry the diagram's dimensions through when it has placed the thing. ELK
+    // (and the grid) work at a fixed `THING_SIZE`, so declaring width/height
     // here means React Flow renders the node at exactly the size the diagram
     // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
     // view chooses one) resolves correctly on first paint. Absent before the
@@ -427,19 +428,19 @@ export function projectCardNodes(
     // `measured` is deliberately *not* set alongside them. React Flow documents
     // it as an output it writes after measuring, and it is redundant as an
     // input: `nodeHasDimensions` reads `measured?.width ?? width ?? initialWidth`,
-    // so width/height already answer it, and a Card counts as initialized on
+    // so width/height already answer it, and a Thing counts as initialized on
     // those plus its declared `handles`. What supplying it would change is that
     // React Flow preserves cached `handleBounds` instead of resetting them for
     // re-measure — a distinction with no meaning here, because the bounds come
     // from `declaredHandles` either way.
-    if (placedCard) {
-      node.width = placedCard.width;
-      node.height = placedCard.height;
+    if (placedThing) {
+      node.width = placedThing.width;
+      node.height = placedThing.height;
       node.handles = declaredHandles(
         sourceHandles,
         targetHandles,
         space.graphs.map((graph) => graph.id),
-        placedCard,
+        placedThing,
       );
     }
     if (body !== undefined) node.data.body = body;

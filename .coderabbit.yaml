@@ -84,15 +84,15 @@ reviews:
         route, ELK produces routed geometry, a URL has one, and `path`
         identifiers are filesystem paths, router URLs or React Flow's
         `edge-path` class. Other retired vocabulary: `manifest`, `Arrangement`,
-        a shared `Draft`, a `cards` array in the space file, an `edges` array
+        a shared `Draft`, a `things` array in the space file, an `edges` array
         beside Graphs.
 
         ADR 0040 is BUILT: `.scratch/first-public-aggregate/` landed it. A
         Diagram's `graphs` are nested owned values and its position keys are its
-        explicit Card membership; there is no Space-level Graph collection.
+        explicit Thing membership; there is no Space-level Graph collection.
         `validateReferences` in `packages/graph/src/validate.ts` checks every
-        owned Edge endpoint against that membership (`graph-edge-missing-card`,
-        `graph-edge-card-outside-diagram`). Do not report the aggregate as
+        owned Edge endpoint against that membership (`graph-edge-missing-thing`,
+        `graph-edge-thing-outside-diagram`). Do not report the aggregate as
         unbuilt or propose reverting to a Space-owned Graph collection.
 
     - path: 'packages/core/**'
@@ -127,8 +127,8 @@ reviews:
         Never suggest `display: none` to hide a handle — React Flow measures
         handles and reports 0x0, so edges attach to the wrong point; use
         `opacity` or `visibility`. ELK port constraints are `FIXED_SIDE`, not
-        `FIXED_ORDER` (clockwise ordering crosses every edge at a shared card).
-        ELK port ids are namespaced `<cardId>##<handleId>`; a bare handle id
+        `FIXED_ORDER` (clockwise ordering crosses every edge at a shared thing).
+        ELK port ids are namespaced `<thingId>##<handleId>`; a bare handle id
         mislays even a single-Graph graph. Handle ids stay `<graphId>::out` /
         `::in` — a per-side counter breaks React Flow's own resolution (#008).
         Do not tune global ELK options against the fixture screenshot.
@@ -179,7 +179,7 @@ reviews:
         write-back, and every completed Edit commits on its own. That is a
         different action from ADR 0064's Save, which replaces Edit while
         Markdown editing is live and is current — do not read either one as
-        evidence against the other. Card markdown stays behind DOMPurify.
+        evidence against the other. Thing markdown stays behind DOMPurify.
 
     - path: '{,packages/*/}*.config.ts'
       instructions: >-
@@ -302,7 +302,7 @@ reviews:
           New identifiers and prose use the vocabulary in CONTEXT.md. Retired
           terms must not reappear: the names ADR 0041 retired (Route and Walk,
           in any compound), `manifest`, `Arrangement`, a shared `Draft`, a
-          `cards` array in the space file, or an `edges` array beside Graphs.
+          `things` array in the space file, or an `edges` array beside Graphs.
           `test/unit/current-domain-vocabulary.test.ts` already enforces the
           first of those over every tracked file; this check covers the rest. A
           new domain term, or a renamed one, needs a CONTEXT.md entry in the

@@ -1,14 +1,14 @@
-import type { CardId, GraphEdge, GraphId } from '@project/core';
+import type { ThingId, GraphEdge, GraphId } from '@project/core';
 import type { Space } from './space';
 
 /**
  * Derives the render surface's ports and connections from the authored Graphs.
  *
- * The model: a card that a Graph leaves gets one outbound port
- * (`<graphId>::out`, on the right), a card a Graph arrives at gets one inbound
+ * The model: a thing that a Graph leaves gets one outbound port
+ * (`<graphId>::out`, on the right), a thing a Graph arrives at gets one inbound
  * port (`<graphId>::in`, on the left), and each authored `{ from, to }` Edge
  * becomes a port-to-port connection belonging to that Graph. One port per Graph
- * per side, however many Edges use it — a fork leaves a card by the same
+ * per side, however many Edges use it — a fork leaves a thing by the same
  * outbound port twice.
  *
  * This is what lets each Graph render as its own colored line across the
@@ -23,7 +23,7 @@ export interface GraphRenderHandleRef {
   graphId: GraphId;
 }
 
-export interface CardHandleSet {
+export interface ThingHandleSet {
   /** Outbound ports (right / EAST). */
   sourceHandles: GraphRenderHandleRef[];
   /** Inbound ports (left / WEST). */
@@ -40,8 +40,8 @@ export interface CardHandleSet {
 export interface GraphRenderEdge {
   id: string;
   graphId: GraphId;
-  source: CardId;
-  target: CardId;
+  source: ThingId;
+  target: ThingId;
   sourceHandle: string;
   targetHandle: string;
 }
@@ -62,21 +62,21 @@ export const inHandleId = (graphId: GraphId): string => `${graphId}::in`;
 export const graphRenderEdgeId = (graphId: GraphId, edge: GraphEdge): string =>
   `${graphId}::${edge.from}::${edge.to}`;
 
-/** Map each card id to the in/out ports contributed by the graphs through it. */
-export function buildCardHandles(space: Space): Map<CardId, CardHandleSet> {
-  const map = new Map<CardId, CardHandleSet>();
-  const ensure = (cardId: CardId): CardHandleSet => {
-    let set = map.get(cardId);
+/** Map each thing id to the in/out ports contributed by the graphs through it. */
+export function buildThingHandles(space: Space): Map<ThingId, ThingHandleSet> {
+  const map = new Map<ThingId, ThingHandleSet>();
+  const ensure = (thingId: ThingId): ThingHandleSet => {
+    let set = map.get(thingId);
     if (!set) {
       set = { sourceHandles: [], targetHandles: [] };
-      map.set(cardId, set);
+      map.set(thingId, set);
     }
     return set;
   };
 
-  // A card gets an outbound port because an edge leaves it and an inbound one
+  // A thing gets an outbound port because an edge leaves it and an inbound one
   // because an edge arrives — read off the edges directly rather than from a
-  // card's position in a list, so a fork's several outgoing edges share one
+  // thing's position in a list, so a fork's several outgoing edges share one
   // port and a graph's sinks get no outbound port because nothing leaves them.
   for (const graph of space.graphs) {
     for (const edge of graph.edges) {
@@ -98,23 +98,23 @@ export function buildCardHandles(space: Space): Map<CardId, CardHandleSet> {
 }
 
 /**
- * The distinct cards the given graphs touch — graphs in the order supplied,
+ * The distinct things the given graphs touch — graphs in the order supplied,
  * edges in authored order within each, and each edge's `from` before its `to`.
  *
- * A membership query, not a traversal: it answers *which* Cards, and the order is
+ * A membership query, not a traversal: it answers *which* Things, and the order is
  * only a stable one to list them in. A graph is a graph, so there is no single
  * order to visit them in and this does not claim one.
  *
- * A card shared by several graphs appears once. Which graphs a view shows is the
- * view's decision (ADR 0005); this only answers what cards that implies.
+ * A thing shared by several graphs appears once. Which graphs a view shows is the
+ * view's decision (ADR 0005); this only answers what things that implies.
  */
-export function cardIdsForGraphs(space: Space, graphIds: readonly GraphId[]): CardId[] {
-  const seen = new Set<CardId>();
-  const ids: CardId[] = [];
-  const add = (cardId: CardId): void => {
-    if (seen.has(cardId)) return;
-    seen.add(cardId);
-    ids.push(cardId);
+export function thingIdsForGraphs(space: Space, graphIds: readonly GraphId[]): ThingId[] {
+  const seen = new Set<ThingId>();
+  const ids: ThingId[] = [];
+  const add = (thingId: ThingId): void => {
+    if (seen.has(thingId)) return;
+    seen.add(thingId);
+    ids.push(thingId);
   };
 
   for (const graphId of graphIds) {
@@ -129,23 +129,23 @@ export function cardIdsForGraphs(space: Space, graphIds: readonly GraphId[]): Ca
   return ids;
 }
 
-/** The distinct cards a single graph touches. See {@link cardIdsForGraphs}. */
-export function graphCardIds(space: Space, graphId: GraphId): CardId[] {
-  return cardIdsForGraphs(space, [graphId]);
+/** The distinct things a single graph touches. See {@link thingIdsForGraphs}. */
+export function graphThingIds(space: Space, graphId: GraphId): ThingId[] {
+  return thingIdsForGraphs(space, [graphId]);
 }
 
 /** Keep only the handles belonging to the given graphs. */
 export function filterHandlesByGraphs(
-  handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
+  handlesByThing: ReadonlyMap<ThingId, ThingHandleSet>,
   graphIds: readonly GraphId[],
-): Map<CardId, CardHandleSet> {
+): Map<ThingId, ThingHandleSet> {
   const wanted = new Set(graphIds);
-  const filtered = new Map<CardId, CardHandleSet>();
-  for (const [cardId, set] of handlesByCard) {
+  const filtered = new Map<ThingId, ThingHandleSet>();
+  for (const [thingId, set] of handlesByThing) {
     const sourceHandles = set.sourceHandles.filter((h) => wanted.has(h.graphId));
     const targetHandles = set.targetHandles.filter((h) => wanted.has(h.graphId));
     if (sourceHandles.length || targetHandles.length) {
-      filtered.set(cardId, { sourceHandles, targetHandles });
+      filtered.set(thingId, { sourceHandles, targetHandles });
     }
   }
   return filtered;
@@ -153,10 +153,10 @@ export function filterHandlesByGraphs(
 
 /** Keep only the handles belonging to a single graph. */
 export function filterHandlesByGraph(
-  handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
+  handlesByThing: ReadonlyMap<ThingId, ThingHandleSet>,
   graphId: GraphId,
-): Map<CardId, CardHandleSet> {
-  return filterHandlesByGraphs(handlesByCard, [graphId]);
+): Map<ThingId, ThingHandleSet> {
+  return filterHandlesByGraphs(handlesByThing, [graphId]);
 }
 
 /**

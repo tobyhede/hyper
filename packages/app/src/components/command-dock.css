@@ -25,7 +25,7 @@
 
 /* Every dock shares one treatment so the variants differ by arrangement
    rather than by decoration. Chrome is *about* the canvas, so it reads as a
-   layer over it: translucent, blurred, and never the paper a Card is. */
+   layer over it: translucent, blurred, and never the paper a Thing is. */
 .command-dock__surface {
   display: flex;
   align-items: center;
@@ -56,7 +56,7 @@
    **Only while the dock is actually down there.** The offset is the Dock's to
    ask for, so it is asked for by the Dock: unconditional, it moved the Graph key
    and the zoom control up by 40px at every one of the twelve slots, which put
-   the key over the bottom-right corner of any Card drawn under it — and a Card's
+   the key over the bottom-right corner of any Thing drawn under it — and a Thing's
    resize control lives in exactly that corner.
 
    Written as an attribute test rather than `.bottom`, because `bottom` is a
@@ -319,7 +319,7 @@
 
    **Three tracks, and both verbs share the last.** A leading verb would need a
    fourth: Present would take a track of its own on every row, empty on the
-   three that have no verb, while Cards' Create still trailed — 84px of a 208px
+   three that have no verb, while Things' Create still trailed — 84px of a 208px
    column spent on gutters. Trailing, Present and Create sit in one track and
    the name keeps the width. `GraphControls` reorders its own JSX for this, so
    the Tab order still matches what the eye reads. */
@@ -345,29 +345,29 @@
   padding-inline-start: 0;
 }
 
-/* Cards is the one trigger carrying its own chevron, so it spans the name and
+/* Things is the one trigger carrying its own chevron, so it spans the name and
    disclosure tracks and pushes that chevron to the end of the span. The 6px is
    what an icon button spends on either side of a 16px glyph in a 28px track, so
    the chevron lands in the column rather than merely near it. */
 /* At the root the Open Spaces menu carries the word "Spaces", so it stands in the name
    track and pushes its own chevron into the disclosure column — the same
-   arrangement the Cards trigger has, and the same rule. */
+   arrangement the Things trigger has, and the same rule. */
 .command-dock__surface[data-orientation='vertical'] .command-dock__name-item,
 .command-dock__surface[data-orientation='vertical'] .command-dock__spaces-trigger,
-.command-dock__surface[data-orientation='vertical'] .command-dock__cards-trigger {
+.command-dock__surface[data-orientation='vertical'] .command-dock__things-trigger {
   padding-inline-end: 6px;
   grid-column: 1 / span 2;
 }
 
 .command-dock__surface[data-orientation='vertical'] .command-dock__spaces-trigger > svg:last-child,
-.command-dock__surface[data-orientation='vertical'] .command-dock__cards-trigger > svg:last-child {
+.command-dock__surface[data-orientation='vertical'] .command-dock__things-trigger > svg:last-child {
   margin-inline-start: auto;
 }
 
 /* ---------------------------------------------------------------- cluster */
 
 /* Diagram and Graph each read as one named entity carrying several commands,
-   which is what a Card rail is (ADR 0073) — so each is a `Toolbar`, drawn
+   which is what a Thing rail is (ADR 0073) — so each is a `Toolbar`, drawn
    tight, with the dock's own gap doing the separating between them. */
 .command-dock__cluster {
   display: inline-flex;
@@ -380,7 +380,7 @@
    edge whatever the title's length — which is what makes the two clusters line
    up under each other in the vertical dock instead of ending wherever the words
    happen to. In a horizontal dock there is no slack and this does nothing. */
-/* Every control that carries a name: the four identities, the Cards trigger and
+/* Every control that carries a name: the four identities, the Things trigger and
    the Open Spaces menu at the root. One gap, so a glyph, a name and a chevron sit the
    same distance apart wherever they appear — and a control with no glyph is
    simply one item short rather than one indent adrift. */
@@ -535,7 +535,7 @@
      container's width as the one term this element cannot say, so the viewport
      stands in for it. Nothing scrolls the page (`.shell` is `overflow: hidden`
      with no scrollbar to discount), so the two agree except for the strip the
-     Cards drawer yields, and the drawer is drawn over this notice rather than
+     Things drawer yields, and the drawer is drawn over this notice rather than
      beside it.
 
      The 32px is `EDGE_INSET` spent twice — the 16px the dock is held off its own

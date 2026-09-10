@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
-import type { CardChoice } from '@project/ui';
+import type { ThingChoice } from '@project/ui';
 import {
   SelectedEdgeControls,
   type SelectedEdgeControlsProps,
@@ -17,14 +17,14 @@ import {
  * pinned by `edge-authoring-react.test.tsx` and by the Playwright suite.
  */
 
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
-const CHOICES: readonly CardChoice[] = [
-  { id: CARD_A, title: 'A', kind: 'markdown' },
-  { id: CARD_B, title: 'B', kind: 'markdown' },
-  { id: CARD_C, title: 'C', kind: 'markdown', refusal: 'These Cards are already connected.' },
+const CHOICES: readonly ThingChoice[] = [
+  { id: THING_A, title: 'A', kind: 'markdown' },
+  { id: THING_B, title: 'B', kind: 'markdown' },
+  { id: THING_C, title: 'C', kind: 'markdown', refusal: 'These Things are already connected.' },
 ];
 
 beforeAll(() => {
@@ -53,8 +53,8 @@ const mount = (props: Partial<SelectedEdgeControlsProps> = {}) => {
   };
   const view = render(
     <SelectedEdgeControls
-      from={CARD_A}
-      to={CARD_B}
+      from={THING_A}
+      to={THING_B}
       editorOpen={false}
       endpointChoices={() => CHOICES}
       refusal={null}
@@ -87,7 +87,7 @@ describe('the controls a selected Edge offers', () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
-  it('shows both endpoints on the Cards they name when the editor stands', () => {
+  it('shows both endpoints on the Things they name when the editor stands', () => {
     mount({ editorOpen: true });
 
     expect(screen.getByRole('combobox', { name: 'From' })).toHaveValue('A');
@@ -109,8 +109,8 @@ describe('the controls a selected Edge offers', () => {
     const endpointChoices = vi.fn(() => CHOICES);
     const { rerender } = render(
       <SelectedEdgeControls
-        from={CARD_A}
-        to={CARD_B}
+        from={THING_A}
+        to={THING_B}
         editorOpen
         endpointChoices={endpointChoices}
         refusal={null}
@@ -124,8 +124,8 @@ describe('the controls a selected Edge offers', () => {
 
     rerender(
       <SelectedEdgeControls
-        from={CARD_A}
-        to={CARD_C}
+        from={THING_A}
+        to={THING_C}
         editorOpen
         endpointChoices={endpointChoices}
         refusal={null}
@@ -139,13 +139,13 @@ describe('the controls a selected Edge offers', () => {
     expect(endpointChoices).toHaveBeenCalledTimes(2);
   });
 
-  /** A refused Card stays visible with its reason rather than dropping out of the list. */
-  it('keeps an ineligible Card in the list, disabled, with the reason it cannot be chosen', () => {
+  /** A refused Thing stays visible with its reason rather than dropping out of the list. */
+  it('keeps an ineligible Thing in the list, disabled, with the reason it cannot be chosen', () => {
     mount({ editorOpen: true });
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'To' }), { key: 'ArrowDown' });
 
-    const refused = screen.getByRole('option', { name: /These Cards are already connected/ });
+    const refused = screen.getByRole('option', { name: /These Things are already connected/ });
     expect(refused).toHaveAttribute('aria-disabled', 'true');
     expect(refused).toHaveTextContent('C');
   });
@@ -185,7 +185,7 @@ describe('where a refused Edge Edit is said', () => {
       const describedBy = attempted.getAttribute('aria-describedby');
       expect(describedBy).not.toBeNull();
       expect(document.getElementById(describedBy ?? '')).toHaveTextContent(
-        'These Cards are already connected in this Graph.',
+        'These Things are already connected in this Graph.',
       );
       expect(screen.queryByTestId('edge-endpoint-refusal')).not.toBeInTheDocument();
     },

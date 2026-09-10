@@ -12,7 +12,7 @@ import { openTestSpace } from './opened-space';
  * everything else from its scale — `Background`'s pattern geometry included.
  *
  * `fitView` computes that scale by dividing the container's size by the bounds of
- * the nodes. Remounting the Space app runs it again, and a Card carries declared
+ * the nodes. Remounting the Space app runs it again, and a Thing carries declared
  * dimensions (`projection.ts`) so it is measured immediately — which means the
  * division can happen before the container has been measured at all. Zero over
  * zero is `NaN`, and a `NaN` scale renders the graph nowhere.
@@ -23,11 +23,11 @@ import { openTestSpace } from './opened-space';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
-const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
+const snapshot = (title: string, thingTitle: string, x: number, y: number): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: SPACE_ID,
     document: {
@@ -38,15 +38,15 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
           id: DIAGRAM_ID,
           title: 'Diagram',
           kind: 'positioned',
-          positions: { [CARD_ID]: { x, y, open: false } },
+          positions: { [THING_ID]: { x, y, open: false } },
           // A Diagram owns at least one Graph (ADR 0040); this one holds no
-          // Edges, which is all a single-Card Space has to connect.
+          // Edges, which is all a single-Thing Space has to connect.
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
         },
       ],
       defaultDiagram: DIAGRAM_ID,
     },
-    cards: [{ id: CARD_ID, document: { title: cardTitle, kind: 'markdown', body: cardTitle } }],
+    things: [{ id: THING_ID, document: { title: thingTitle, kind: 'markdown', body: thingTitle } }],
   });
 
 const runtime = (value: SpaceSnapshot) => {
@@ -79,12 +79,12 @@ const viewportTransform = (): string =>
 
 describe('graph viewport', () => {
   it('keeps a finite scale when accepted remote placement replaces live nodes', async () => {
-    const local = snapshot('Local space', 'Local card', 10, 20);
-    const remote = snapshot('Remote space', 'Remote card', 900, 700);
+    const local = snapshot('Local space', 'Local thing', 10, 20);
+    const remote = snapshot('Remote space', 'Remote thing', 900, 700);
     const backend = new MemorySpaceBackend([
       { snapshot: remote, revision: 4n, exportedRevision: null },
     ]);
-    const { spaceSession: session, spaceCards } = openTestSpace(backend, {
+    const { spaceSession: session, spaceThings } = openTestSpace(backend, {
       snapshot: local,
       revision: 3n,
       exportedRevision: null,
@@ -103,7 +103,7 @@ describe('graph viewport', () => {
 
     let view: RenderResult | undefined;
     mountSpace(
-      { id: runtime(local).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      { id: runtime(local).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => {
         if (view === undefined) view = render(app);
         else view.rerender(app);

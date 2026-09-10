@@ -44,11 +44,11 @@ it('keeps aggregate refusal identities and locations in the inferred 422 body', 
   >;
   type MissingTarget = Extract<
     AggregateRefusal['errors'][number],
-    { kind: 'space-card-target-missing' }
+    { kind: 'space-thing-target-missing' }
   >;
 
-  expectTypeOf<MissingTarget['kind']>().toEqualTypeOf<'space-card-target-missing'>();
+  expectTypeOf<MissingTarget['kind']>().toEqualTypeOf<'space-thing-target-missing'>();
   expectTypeOf<MissingTarget['spaceId']>().toEqualTypeOf<string>();
-  expectTypeOf<MissingTarget['cardId']>().toEqualTypeOf<string>();
+  expectTypeOf<MissingTarget['thingId']>().toEqualTypeOf<string>();
   expectTypeOf<MissingTarget['targetSpaceId']>().toEqualTypeOf<string>();
 });

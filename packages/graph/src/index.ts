@@ -5,21 +5,21 @@
  * when something outside the package calls into it, and then every type that
  * module exports comes with it — those types are the vocabulary of the calls
  * being made, nameable the moment a consumer wants a variable for one, which is
- * why `GridStrategyOptions`, `LayoutStrategyPort` and `CardFileErrorKind` are
+ * why `GridStrategyOptions`, `LayoutStrategyPort` and `ThingFileErrorKind` are
  * here with nothing importing them. Functions are named one at a time, and a
  * helper no consumer needs to write stays in its module. Usually it sits behind
- * an offered form that calls it — `graphCardIds` calls `cardIdsForGraphs`,
- * `graphStartCard` calls `graphEntryCards`. It runs the other way for
+ * an offered form that calls it — `graphThingIds` calls `thingIdsForGraphs`,
+ * `graphStartThing` calls `graphEntryThings`. It runs the other way for
  * `filterHandlesByGraph`, the single-Graph specialisation written on the offered
  * `filterHandlesByGraphs`.
  *
  * Two modules are absent whole for that reason and not by oversight.
- * `frontmatter` is how `card-file` reads a fence, and `parseCardFile` is the
+ * `frontmatter` is how `thing-file` reads a fence, and `parseThingFile` is the
  * intake it exists to serve. `validate` runs inside `loadSpace`, which ADR 0010
  * makes the one intake — a caller never checks references itself, so it never
  * names the check, its input or its errors. `SpaceReferenceError` is the edge
  * worth knowing, and not because a union nobody narrows hides it: `loadSpace`
- * returns `SpaceError`, `SpaceError` names it, and `CardFileError` sits in that
+ * returns `SpaceError`, `SpaceError` names it, and `ThingFileError` sits in that
  * same union and is offered. Reachability separates nothing; the module each
  * belongs to does. Narrowing `SpaceError` by `kind` still reaches the
  * branch — what a consumer cannot do is write the type's name.
@@ -28,14 +28,14 @@
  * produces to the same set of names.
  */
 
-export { parseCardFile, parseImportCardFile, serializeCardFile } from './card-file';
+export { parseThingFile, parseImportThingFile, serializeThingFile } from './thing-file';
 export type {
-  CardFile,
-  CardFileError,
-  CardFileErrorKind,
-  ParseCardFileResult,
-  ParseImportCardFileResult,
-} from './card-file';
+  ThingFile,
+  ThingFileError,
+  ThingFileErrorKind,
+  ParseThingFileResult,
+  ParseImportThingFileResult,
+} from './thing-file';
 
 // The rule for "the same Edge twice in one Graph" (ADR 0032).
 export { repeatedGraphEdges } from './graph-edges';
@@ -45,7 +45,7 @@ export type { GridStrategyOptions } from './grid';
 
 export { buildLayoutStrategyGraph } from './layout';
 export type {
-  LayoutStrategyCard,
+  LayoutStrategyThing,
   LayoutStrategyEdge,
   LayoutStrategyEdgeSection,
   LayoutStrategyGraph,
@@ -54,11 +54,11 @@ export type {
   Point,
 } from './layout';
 
-// `resolveContentCard` is the only function here: identity lookup is reached
+// `resolveContentThing` is the only function here: identity lookup is reached
 // through `space.lookup`, which the Space carries, so the shallow `get*` pairs
 // that used to sit beside it have no callers left to name.
-export { resolveContentCard } from './lookup';
-export type { OwnedGraph, ResolvedContentCard, ResolvedDiagram, SpaceLookup } from './lookup';
+export { resolveContentThing } from './lookup';
+export type { OwnedGraph, ResolvedContentThing, ResolvedDiagram, SpaceLookup } from './lookup';
 
 export { initializeSpace, newSpace } from './new-space';
 export type { InitializeSpaceOptions, NewSpace } from './new-space';
@@ -72,22 +72,22 @@ export { positionedStrategy } from './positioned';
 // `inHandleId` and `outHandleId` are offered although no consumer *has* to name
 // a handle id: they mint the `<graphId>::out`/`::in` format, and a second
 // producer of it is the defect. `react-flow-adapter` declares a handle for a
-// Graph not yet incident to a Card, so it needs the format for an id nothing
+// Graph not yet incident to a Thing, so it needs the format for an id nothing
 // here has built yet — one module owns it, and that is what makes the
 // prohibition on owner-qualifying a Graph reference checkable by reading one.
 // `graphRenderEdgeId` is here on the same grounds and no others: a test outside
 // this package that stands a projected Edge up by hand was spelling the format
 // out, which is the second producer the rule above forbids.
 export {
-  buildCardHandles,
+  buildThingHandles,
   buildGraphRenderEdges,
   filterHandlesByGraphs,
-  graphCardIds,
+  graphThingIds,
   graphRenderEdgeId,
   inHandleId,
   outHandleId,
 } from './graph-rendering';
-export type { CardHandleSet, GraphRenderEdge, GraphRenderHandleRef } from './graph-rendering';
+export type { ThingHandleSet, GraphRenderEdge, GraphRenderHandleRef } from './graph-rendering';
 
 // `documentRefusal` is offered although `loadSpace` asks it on every caller's
 // behalf: the file importer parses against import schemas that run ahead of
@@ -107,4 +107,4 @@ export type {
   SpaceAggregateLookup,
 } from './space-aggregate';
 
-export { outgoingEdges, graphStartCard } from './traversal';
+export { outgoingEdges, graphStartThing } from './traversal';

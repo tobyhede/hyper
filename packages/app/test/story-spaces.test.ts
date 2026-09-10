@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DiagramId } from '@project/core';
-import { graphStartCard, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
+import { graphStartThing, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
 import { requireDefaultDiagram } from '../src/diagram-resolution';
 import {
   authoredSnapshot,
@@ -43,11 +43,11 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * The Cards drawer's Refused story needs a Diagram that is *missing* Cards, and
+   * The Things drawer's Refused story needs a Diagram that is *missing* Things, and
    * it must not find one by indexing into `diagrams` — that follows array order,
    * so inserting a Diagram would silently move the story to a different one.
    */
-  it('opens the sparse authored Space on a Diagram some Cards are absent from', () => {
+  it('opens the sparse authored Space on a Diagram some Things are absent from', () => {
     const space = loadSpaceSnapshot(sparseAuthoredSnapshot);
     if (!space.ok) throw new Error('sparse story Space did not load');
     const opens = requireDefaultDiagram(space.space);
@@ -56,7 +56,7 @@ describe('the story Spaces', () => {
     const diagram = space.space.lookup.diagram(opens)?.diagram;
     expect(openedDiagramTitle(space.space, opens)).toBe('Collection 2');
     expect(
-      space.space.cards.filter((card) => diagram?.positions[card.id] === undefined),
+      space.space.things.filter((thing) => diagram?.positions[thing.id] === undefined),
     ).not.toHaveLength(0);
   });
 
@@ -117,7 +117,7 @@ describe('the story Spaces', () => {
       authoredSnapshot.id,
       ...[authoredSpace, edited.space, traversalSpace, deepDiveSpace, commandDockSpace].flatMap(
         (space) => [
-          ...space.cards.map((card) => card.id),
+          ...space.things.map((thing) => thing.id),
           ...space.diagrams.map((diagram) => diagram.id),
           ...space.graphs.map((graph) => graph.id),
         ],
@@ -174,15 +174,15 @@ describe('the story Spaces', () => {
    *
    * The E2E fixture's Graphs are deliberately all lines and the sidebar's Space
    * is four more of them, so nothing already in the tree gives the presenting
-   * chrome a Card with a real choice at it. This is the assertion that the fork
+   * chrome a Thing with a real choice at it. This is the assertion that the fork
    * story is a fork — and that the line beside it is still the degenerate one
    * rather than a second kind (ADR 0024).
    */
-  it('gives the fork story a Card with several ways on, and the line exactly one', () => {
+  it('gives the fork story a Thing with several ways on, and the line exactly one', () => {
     const outDegree = (space: Space): number => {
       const graph = space.graphs[0];
       if (graph === undefined) throw new Error('The traversal Space owns no Graph.');
-      const start = graphStartCard(graph);
+      const start = graphStartThing(graph);
       if (start === undefined) throw new Error('The traversal Space has nowhere to begin.');
       return outgoingEdges(graph, start).length;
     };
@@ -212,14 +212,14 @@ describe('the story Spaces', () => {
    *
    * The prototype it feeds compares list surfaces, Diagram switching and Graph
    * emphasis, and each of those needs a shape no other fixture has: **more
-   * unplaced Cards than a popover can comfortably hold**, **two Diagrams**, and
+   * unplaced Things than a popover can comfortably hold**, **two Diagrams**, and
    * **three Graphs over the opening one** so emphasis is a real choice rather
    * than a one-member list. Pinned here because all three are quietly easy to
-   * lose — a Card placed while adjusting the fixture empties the Cards list,
+   * lose — a Thing placed while adjusting the fixture empties the Things list,
    * and a Graph removed makes emphasis unjudgeable — and the loss would show up
    * as a prototype that reads fine and settles nothing.
    */
-  it('gives the Command Dock two Diagrams, three Graphs over the first, and Cards outside it', () => {
+  it('gives the Command Dock two Diagrams, three Graphs over the first, and Things outside it', () => {
     const opens = requireDefaultDiagram(commandDockSpace);
     const diagram = commandDockSpace.lookup.diagram(opens)?.diagram;
 
@@ -231,31 +231,31 @@ describe('the story Spaces', () => {
     ]);
     expect(diagram?.graphs.map((graph) => graph.title)).toEqual(['Long', 'Mid', 'Short']);
 
-    const unplaced = commandDockSpace.cards.filter(
-      (card) => diagram?.positions[card.id] === undefined,
+    const unplaced = commandDockSpace.things.filter(
+      (thing) => diagram?.positions[thing.id] === undefined,
     );
     expect(unplaced.length).toBeGreaterThan(Object.keys(diagram?.positions ?? {}).length * 4);
   });
 
   /**
-   * All three Card kinds, in one Space, on both sides of placement.
+   * All three Thing kinds, in one Space, on both sides of placement.
    *
-   * The Dock draws `CardKindIcon` on every list row while the canvas draws the
-   * production `CardNode`, so a fixture whose placed Cards were all markdown
+   * The Dock draws `ThingKindIcon` on every list row while the canvas draws the
+   * production `ThingNode`, so a fixture whose placed Things were all markdown
    * would let the list and the canvas disagree about a kind without either
    * being wrong.
    */
-  it('carries every Card kind on the Command Dock canvas and in its Cards list', () => {
+  it('carries every Thing kind on the Command Dock canvas and in its Things list', () => {
     const opens = requireDefaultDiagram(commandDockSpace);
     const diagram = commandDockSpace.lookup.diagram(opens)?.diagram;
-    const kinds = (cards: readonly { readonly kind: string }[]): readonly string[] =>
-      [...new Set(cards.map((card) => card.kind))].sort();
+    const kinds = (things: readonly { readonly kind: string }[]): readonly string[] =>
+      [...new Set(things.map((thing) => thing.kind))].sort();
 
-    const placed = commandDockSpace.cards.filter(
-      (card) => diagram?.positions[card.id] !== undefined,
+    const placed = commandDockSpace.things.filter(
+      (thing) => diagram?.positions[thing.id] !== undefined,
     );
-    const unplaced = commandDockSpace.cards.filter(
-      (card) => diagram?.positions[card.id] === undefined,
+    const unplaced = commandDockSpace.things.filter(
+      (thing) => diagram?.positions[thing.id] === undefined,
     );
 
     expect(kinds(placed)).toEqual(['alias', 'markdown', 'space']);

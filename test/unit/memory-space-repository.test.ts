@@ -9,17 +9,17 @@ spaceRepositoryContract('MemorySpaceRepository', () =>
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
-const OTHER_CARD_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
-const LINK_CARD_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const OTHER_THING_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+const LINK_THING_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 
-const importSpace = (id: UUID, cardId: UUID, title: string): ImportSpace => ({
+const importSpace = (id: UUID, thingId: UUID, title: string): ImportSpace => ({
   id,
   document: { version: 1, title },
-  cards: [
+  things: [
     {
-      id: cardId,
-      document: { title: `${title} card`, kind: 'markdown', body: '' },
+      id: thingId,
+      document: { title: `${title} thing`, kind: 'markdown', body: '' },
     },
   ],
 });
@@ -29,16 +29,16 @@ describe('MemorySpaceRepository', () => {
     {
       name: 'Space identity',
       batch: [
-        importSpace(SPACE_ID, CARD_ID, 'First'),
-        importSpace(SPACE_ID, OTHER_CARD_ID, 'Duplicate space'),
+        importSpace(SPACE_ID, THING_ID, 'First'),
+        importSpace(SPACE_ID, OTHER_THING_ID, 'Duplicate space'),
       ],
       code: 'duplicate-identity',
     },
     {
-      name: 'Card identity',
+      name: 'Thing identity',
       batch: [
-        importSpace(SPACE_ID, CARD_ID, 'First'),
-        importSpace(OTHER_SPACE_ID, CARD_ID, 'Duplicate card'),
+        importSpace(SPACE_ID, THING_ID, 'First'),
+        importSpace(OTHER_SPACE_ID, THING_ID, 'Duplicate thing'),
       ],
       code: 'duplicate-identity',
     },
@@ -51,49 +51,49 @@ describe('MemorySpaceRepository', () => {
     await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 
-  // A card repeated inside one batch is an identity collision, not an ownership
+  // A thing repeated inside one batch is an identity collision, not an ownership
   // conflict: no stored Space owns it yet. `PostgresSpaceRepository` decides this
   // in `duplicateIdentity` before its transaction opens, so the double has to
   // reject it the same way or the CLI's error differs by backend.
-  it('rejects a Card repeated within one batch as a duplicate identity', async () => {
+  it('rejects a Thing repeated within one batch as a duplicate identity', async () => {
     const repository = new MemorySpaceRepository();
 
     const result = await repository.importSpaces(
-      [importSpace(SPACE_ID, CARD_ID, 'First'), importSpace(OTHER_SPACE_ID, CARD_ID, 'Second')],
+      [importSpace(SPACE_ID, THING_ID, 'First'), importSpace(OTHER_SPACE_ID, THING_ID, 'Second')],
       'insert',
     );
 
     expect(result).toEqual({
       kind: 'rejected',
       code: 'duplicate-identity',
-      message: `Duplicate card identity "${CARD_ID}"`,
+      message: `Duplicate thing identity "${THING_ID}"`,
     });
     await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 
-  it('rejects a batch claiming a Card owned by a stored Space', async () => {
+  it('rejects a batch claiming a Thing owned by a stored Space', async () => {
     const repository = new MemorySpaceRepository();
-    await repository.importSpaces([importSpace(SPACE_ID, CARD_ID, 'Stored')], 'insert');
+    await repository.importSpaces([importSpace(SPACE_ID, THING_ID, 'Stored')], 'insert');
 
     const result = await repository.importSpaces(
-      [importSpace(OTHER_SPACE_ID, CARD_ID, 'Claims a stored card')],
+      [importSpace(OTHER_SPACE_ID, THING_ID, 'Claims a stored thing')],
       'insert',
     );
 
     expect(result).toEqual({
       kind: 'rejected',
-      code: 'card-ownership',
-      message: `Card ${CARD_ID} belongs to space ${SPACE_ID}`,
+      code: 'thing-ownership',
+      message: `Thing ${THING_ID} belongs to space ${SPACE_ID}`,
     });
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
   });
 
   it('clears stored Spaces before inserting a truncating batch', async () => {
     const repository = new MemorySpaceRepository();
-    await repository.importSpaces([importSpace(SPACE_ID, CARD_ID, 'Stored')], 'insert');
+    await repository.importSpaces([importSpace(SPACE_ID, THING_ID, 'Stored')], 'insert');
 
     const result = await repository.importSpaces(
-      [importSpace(OTHER_SPACE_ID, OTHER_CARD_ID, 'Replacement')],
+      [importSpace(OTHER_SPACE_ID, OTHER_THING_ID, 'Replacement')],
       'truncate',
     );
 
@@ -102,15 +102,15 @@ describe('MemorySpaceRepository', () => {
     await expect(repository.listSpaces()).resolves.toMatchObject([{ id: OTHER_SPACE_ID }]);
   });
 
-  // Truncation drops every stored Space, so a card a doomed Space owns is free.
+  // Truncation drops every stored Space, so a thing a doomed Space owns is free.
   // Ownership must be judged against what survives, not against what the same
   // call is about to delete.
-  it('accepts a truncating batch reusing a Card id owned by a cleared Space', async () => {
+  it('accepts a truncating batch reusing a Thing id owned by a cleared Space', async () => {
     const repository = new MemorySpaceRepository();
-    await repository.importSpaces([importSpace(SPACE_ID, CARD_ID, 'Stored')], 'insert');
+    await repository.importSpaces([importSpace(SPACE_ID, THING_ID, 'Stored')], 'insert');
 
     const result = await repository.importSpaces(
-      [importSpace(OTHER_SPACE_ID, CARD_ID, 'Reuses the card id')],
+      [importSpace(OTHER_SPACE_ID, THING_ID, 'Reuses the thing id')],
       'truncate',
     );
 
@@ -120,14 +120,14 @@ describe('MemorySpaceRepository', () => {
 
   it('rejects an explicitly identified Space already in the repository atomically', async () => {
     const repository = new MemorySpaceRepository();
-    const existing = importSpace(SPACE_ID, CARD_ID, 'Existing');
+    const existing = importSpace(SPACE_ID, THING_ID, 'Existing');
     await repository.importSpaces([existing], 'insert');
     const before = await repository.loadSpace(SPACE_ID);
 
     const result = await repository.importSpaces(
       [
-        importSpace(OTHER_SPACE_ID, OTHER_CARD_ID, 'Must roll back'),
-        importSpace(SPACE_ID, CARD_ID, 'Duplicate'),
+        importSpace(OTHER_SPACE_ID, OTHER_THING_ID, 'Must roll back'),
+        importSpace(SPACE_ID, THING_ID, 'Duplicate'),
       ],
       'insert',
     );
@@ -141,17 +141,17 @@ describe('MemorySpaceRepository', () => {
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
   });
 
-  it('rejects a commit that claims a Card owned by another Space', async () => {
+  it('rejects a commit that claims a Thing owned by another Space', async () => {
     const repository = new MemorySpaceRepository();
-    const meta = importSpace(SPACE_ID, CARD_ID, 'First');
+    const meta = importSpace(SPACE_ID, THING_ID, 'First');
     await repository.importSpaces(
       [
         {
           ...meta,
-          cards: [
-            ...meta.cards,
+          things: [
+            ...meta.things,
             {
-              id: LINK_CARD_ID,
+              id: LINK_THING_ID,
               document: {
                 title: 'Second',
                 kind: 'space',
@@ -160,7 +160,7 @@ describe('MemorySpaceRepository', () => {
             },
           ],
         },
-        importSpace(OTHER_SPACE_ID, OTHER_CARD_ID, 'Second'),
+        importSpace(OTHER_SPACE_ID, OTHER_THING_ID, 'Second'),
       ],
       'insert',
     );
@@ -169,10 +169,10 @@ describe('MemorySpaceRepository', () => {
 
     const claimed = {
       ...before.snapshot,
-      cards: [
+      things: [
         {
-          id: CARD_ID,
-          document: { title: 'Claimed card', kind: 'markdown' as const, body: '' },
+          id: THING_ID,
+          document: { title: 'Claimed thing', kind: 'markdown' as const, body: '' },
         },
       ],
     };
@@ -189,7 +189,7 @@ describe('MemorySpaceRepository', () => {
 
     expect(result).toMatchObject({
       kind: 'aggregate-refused',
-      errors: [{ kind: 'duplicate-card-id' }],
+      errors: [{ kind: 'duplicate-thing-id' }],
     });
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(before);
   });

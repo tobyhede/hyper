@@ -6,8 +6,8 @@ import { CanvasCentre, type VisibleCentre } from '../src/components/CanvasCentre
 /**
  * The reporter's lifetime, which is shorter than its reader's.
  *
- * `CanvasCentre` lives inside the canvas's `cards` branch, because it needs React
- * Flow's store. The controls that read it do not: the toolbar's Add Card and the
+ * `CanvasCentre` lives inside the canvas's `things` branch, because it needs React
+ * Flow's store. The controls that read it do not: the toolbar's Add Thing and the
  * Alias creation pane are both drawn outside that branch, so the getter outlives
  * the provider whose store it closes over whenever the canvas leaves that branch
  * — a placement failure, or a Space replaced under it.

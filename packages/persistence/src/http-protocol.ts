@@ -460,42 +460,42 @@ export interface CommitRefusalBody {
         readonly snapshotIndexes: readonly number[];
       }
     | {
-        readonly kind: 'duplicate-card-id';
-        readonly cardId: string;
+        readonly kind: 'duplicate-thing-id';
+        readonly thingId: string;
         readonly spaceIds: readonly string[];
       }
     | { readonly kind: 'meta-space-missing'; readonly metaSpaceId: string }
     | {
-        readonly kind: 'space-card-target-missing';
+        readonly kind: 'space-thing-target-missing';
         readonly spaceId: string;
-        readonly cardId: string;
+        readonly thingId: string;
         readonly targetSpaceId: string;
       }
     | {
-        readonly kind: 'space-card-reference-cycle';
+        readonly kind: 'space-thing-reference-cycle';
         readonly spaceId: string;
-        readonly cardId: string;
+        readonly thingId: string;
         readonly targetSpaceId: string;
       }
     | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: string }
     | {
-        readonly kind: 'space-card-diagram-missing';
+        readonly kind: 'space-thing-diagram-missing';
         readonly spaceId: string;
-        readonly cardId: string;
+        readonly thingId: string;
         readonly targetSpaceId: string;
         readonly diagramId: string;
       }
     | {
-        readonly kind: 'space-card-graph-missing';
+        readonly kind: 'space-thing-graph-missing';
         readonly spaceId: string;
-        readonly cardId: string;
+        readonly thingId: string;
         readonly targetSpaceId: string;
         readonly graphId: string;
       }
     | {
-        readonly kind: 'space-card-graph-outside-diagram';
+        readonly kind: 'space-thing-graph-outside-diagram';
         readonly spaceId: string;
-        readonly cardId: string;
+        readonly thingId: string;
         readonly targetSpaceId: string;
         readonly diagramId: string;
         readonly graphId: string;
@@ -545,28 +545,28 @@ const decodeSpaceError = (value: unknown): SpaceError => {
     case 'unterminated-frontmatter':
     case 'invalid-yaml':
     case 'invalid-frontmatter': {
-      const error = exactRecord(value, ['kind', 'path', 'message'], 'Card file error');
+      const error = exactRecord(value, ['kind', 'path', 'message'], 'Thing file error');
       return {
         kind,
-        path: requiredString(error['path'], 'Card file path'),
-        message: requiredString(error['message'], 'Card file message'),
+        path: requiredString(error['path'], 'Thing file path'),
+        message: requiredString(error['message'], 'Thing file message'),
       };
     }
-    case 'duplicate-card-id':
+    case 'duplicate-thing-id':
     case 'duplicate-graph-id':
     case 'duplicate-diagram-id':
-    case 'diagram-member-missing-card':
+    case 'diagram-member-missing-thing':
     case 'diagram-active-graph-missing':
     case 'diagram-active-graph-outside-diagram':
-    case 'graph-edge-missing-card':
-    case 'graph-edge-card-outside-diagram':
+    case 'graph-edge-missing-thing':
+    case 'graph-edge-thing-outside-diagram':
     case 'unresolved-default-diagram':
     case 'duplicate-graph-edge':
     case 'unresolved-alias-target':
     case 'alias-self-reference':
     case 'alias-targets-alias':
     case 'alias-target-must-own-content':
-    case 'space-card-reference-cycle': {
+    case 'space-thing-reference-cycle': {
       const error = exactRecord(value, ['kind', 'ref', 'message'], 'Space reference error');
       return {
         kind,
@@ -579,10 +579,10 @@ const decodeSpaceError = (value: unknown): SpaceError => {
   }
 };
 
-const decodeSpaceCardLocation = (record: Record<string, unknown>) => ({
-  spaceId: requiredUuid(record['spaceId'], 'Space Card Space id'),
-  cardId: requiredUuid(record['cardId'], 'Space Card id'),
-  targetSpaceId: requiredUuid(record['targetSpaceId'], 'Space Card target Space id'),
+const decodeSpaceThingLocation = (record: Record<string, unknown>) => ({
+  spaceId: requiredUuid(record['spaceId'], 'Space Thing Space id'),
+  thingId: requiredUuid(record['thingId'], 'Space Thing id'),
+  targetSpaceId: requiredUuid(record['targetSpaceId'], 'Space Thing target Space id'),
 });
 
 const decodeAggregateError = (value: unknown): SpaceAggregateError => {
@@ -620,67 +620,67 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
         ),
       };
     }
-    case 'duplicate-card-id': {
-      const error = exactRecord(value, ['kind', 'cardId', 'spaceIds'], 'duplicate Card refusal');
+    case 'duplicate-thing-id': {
+      const error = exactRecord(value, ['kind', 'thingId', 'spaceIds'], 'duplicate Thing refusal');
       if (!Array.isArray(error['spaceIds'])) throw new Error('Space ids must be an array');
       return {
         kind,
-        cardId: requiredUuid(error['cardId'], 'duplicate Card id'),
-        spaceIds: error['spaceIds'].map((id) => requiredUuid(id, 'duplicate Card Space id')),
+        thingId: requiredUuid(error['thingId'], 'duplicate Thing id'),
+        spaceIds: error['spaceIds'].map((id) => requiredUuid(id, 'duplicate Thing Space id')),
       };
     }
     case 'meta-space-missing': {
       const error = exactRecord(value, ['kind', 'metaSpaceId'], 'missing Meta Space refusal');
       return { kind, metaSpaceId: requiredUuid(error['metaSpaceId'], 'Meta Space id') };
     }
-    case 'space-card-target-missing':
-    case 'space-card-reference-cycle': {
+    case 'space-thing-target-missing':
+    case 'space-thing-reference-cycle': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'cardId', 'targetSpaceId'],
-        'Space Card refusal',
+        ['kind', 'spaceId', 'thingId', 'targetSpaceId'],
+        'Space Thing refusal',
       );
-      return { kind, ...decodeSpaceCardLocation(error) };
+      return { kind, ...decodeSpaceThingLocation(error) };
     }
     case 'ordinary-space-unreferenced': {
       const error = exactRecord(value, ['kind', 'spaceId'], 'unreferenced Space refusal');
       return { kind, spaceId: requiredUuid(error['spaceId'], 'unreferenced Space id') };
     }
-    case 'space-card-diagram-missing': {
+    case 'space-thing-diagram-missing': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'diagramId'],
-        'Space Card Diagram refusal',
+        ['kind', 'spaceId', 'thingId', 'targetSpaceId', 'diagramId'],
+        'Space Thing Diagram refusal',
       );
       return {
         kind,
-        ...decodeSpaceCardLocation(error),
-        diagramId: requiredUuid(error['diagramId'], 'Space Card Diagram id'),
+        ...decodeSpaceThingLocation(error),
+        diagramId: requiredUuid(error['diagramId'], 'Space Thing Diagram id'),
       };
     }
-    case 'space-card-graph-missing': {
+    case 'space-thing-graph-missing': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'graphId'],
-        'Space Card Graph refusal',
+        ['kind', 'spaceId', 'thingId', 'targetSpaceId', 'graphId'],
+        'Space Thing Graph refusal',
       );
       return {
         kind,
-        ...decodeSpaceCardLocation(error),
-        graphId: requiredUuid(error['graphId'], 'Space Card Graph id'),
+        ...decodeSpaceThingLocation(error),
+        graphId: requiredUuid(error['graphId'], 'Space Thing Graph id'),
       };
     }
-    case 'space-card-graph-outside-diagram': {
+    case 'space-thing-graph-outside-diagram': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'diagramId', 'graphId'],
-        'Space Card Graph membership refusal',
+        ['kind', 'spaceId', 'thingId', 'targetSpaceId', 'diagramId', 'graphId'],
+        'Space Thing Graph membership refusal',
       );
       return {
         kind,
-        ...decodeSpaceCardLocation(error),
-        diagramId: requiredUuid(error['diagramId'], 'Space Card Diagram id'),
-        graphId: requiredUuid(error['graphId'], 'Space Card Graph id'),
+        ...decodeSpaceThingLocation(error),
+        diagramId: requiredUuid(error['diagramId'], 'Space Thing Diagram id'),
+        graphId: requiredUuid(error['graphId'], 'Space Thing Graph id'),
       };
     }
     default:

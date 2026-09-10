@@ -13,16 +13,16 @@ import { mintingIds } from './minting';
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const UNOPENED_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const META_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const META_GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const META_GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
-const META_SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
-const MINTED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
+const META_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
+const MINTED_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 const SECOND_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
 const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e');
 /**
@@ -32,21 +32,21 @@ const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e')
  * three, because what it asserts is where the Space below the exited one lands.
  */
 const THIRD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000f');
-const THIRD_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
+const THIRD_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const THIRD_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
 const THIRD_GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const THIRD_GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
 
 /**
- * Two aggregate-valid Spaces. Every Card, Diagram and Graph id is distinct
- * across them, because a Space Card coordination validates the whole aggregate
+ * Two aggregate-valid Spaces. Every Thing, Diagram and Graph id is distinct
+ * across them, because a Space Thing coordination validates the whole aggregate
  * and refuses a duplicate id wherever it appears — and Meta carries the Space
- * Card that owns the ordinary Space, which the same intake requires.
+ * Thing that owns the ordinary Space, which the same intake requires.
  */
 const snapshot = (id: UUID, title: string): SpaceSnapshot => {
   const meta = id === META_ID;
   const third = id === THIRD_ID;
-  const cardId = meta ? CARD_ID : third ? THIRD_CARD_ID : OTHER_CARD_ID;
+  const thingId = meta ? THING_ID : third ? THIRD_THING_ID : OTHER_THING_ID;
   const diagramId = meta ? META_DIAGRAM_ID : third ? THIRD_DIAGRAM_ID : DIAGRAM_ID;
   const graphOne = meta ? META_GRAPH_ONE : third ? THIRD_GRAPH_ONE : GRAPH_ONE;
   const graphTwo = meta ? META_GRAPH_TWO : third ? THIRD_GRAPH_TWO : GRAPH_TWO;
@@ -63,10 +63,10 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
           kind: 'positioned',
           positions: meta
             ? {
-                [cardId]: { x: 0, y: 0, open: false },
-                [META_SPACE_CARD_ID]: { x: 0, y: 40, open: false },
+                [thingId]: { x: 0, y: 0, open: false },
+                [META_SPACE_THING_ID]: { x: 0, y: 40, open: false },
               }
-            : { [cardId]: { x: 0, y: 0, open: false } },
+            : { [thingId]: { x: 0, y: 0, open: false } },
           graphs: [
             { id: graphOne, title: 'One', edges: [] },
             { id: graphTwo, title: 'Two', edges: [] },
@@ -76,7 +76,7 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
         // A second Diagram, so a selection made in an open Space can differ from
         // the one an address proposes. Only the Space those tests use needs it,
         // and its ids are its own — every Diagram and Graph id is distinct across
-        // the three Spaces, because a Space Card coordination validates the
+        // the three Spaces, because a Space Thing coordination validates the
         // whole aggregate and refuses a duplicate wherever it appears.
         ...(id === OTHER_ID
           ? [
@@ -92,15 +92,15 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
           : []),
       ],
     },
-    cards: meta
+    things: meta
       ? [
-          { id: cardId, document: { title: 'Card', kind: 'markdown', body: '' } },
+          { id: thingId, document: { title: 'Thing', kind: 'markdown', body: '' } },
           {
-            id: META_SPACE_CARD_ID,
+            id: META_SPACE_THING_ID,
             document: { title: 'Other', kind: 'space', spaceId: OTHER_ID },
           },
         ]
-      : [{ id: cardId, document: { title: 'Card', kind: 'markdown', body: '' } }],
+      : [{ id: thingId, document: { title: 'Thing', kind: 'markdown', body: '' } }],
   };
 };
 
@@ -113,14 +113,14 @@ const loaded = (id: UUID, title: string) => ({
 /**
  * Two Spaces, or three where a test needs a crossing to be a tree.
  *
- * The third is opt-in rather than always present because a Space Card
+ * The third is opt-in rather than always present because a Space Thing
  * coordination is written over every Space the backend holds: a third one in
  * the default fixture changes what those tests are coordinating across, and
  * they assert on the requests it makes.
  */
 const setup = (
   control?: MemorySpaceBackendTestControl,
-  newId: () => UUID = () => CARD_ID,
+  newId: () => UUID = () => THING_ID,
   spaces: readonly (readonly [UUID, string])[] = [
     [META_ID, 'Meta'],
     [OTHER_ID, 'Other'],
@@ -144,7 +144,7 @@ const setup = (
   };
 };
 
-/** Distinct ids for a Space Card coordination, which mints several per call. */
+/** Distinct ids for a Space Thing coordination, which mints several per call. */
 const countingIds = (): (() => UUID) => {
   let next = 0x20;
   return () => uuidSchema.parse(`00000000-0000-4000-8000-0000000000${(next++).toString(16)}`);
@@ -162,14 +162,14 @@ describe('Open Spaces', () => {
     const before = target.session.getState().working;
     expect(
       target.app.authoring.completeInDiagram(DIAGRAM_ID, {
-        kind: 'opened-card',
-        cardId: OTHER_CARD_ID,
+        kind: 'opened-thing',
+        thingId: OTHER_THING_ID,
       }).kind,
     ).toBe('completed');
     const after = target.session.getState().working;
     expect(
       after.document.diagrams?.find((diagram) => diagram.id === DIAGRAM_ID)?.positions[
-        OTHER_CARD_ID
+        OTHER_THING_ID
       ]?.open,
     ).toBe(true);
     expect(after.document.diagrams?.find((diagram) => diagram.id === SECOND_DIAGRAM_ID)).toEqual(
@@ -328,14 +328,14 @@ describe('Open Spaces', () => {
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
   });
 
-  it('commits an edit queued behind a Space Card coordination before exiting', async () => {
+  it('commits an edit queued behind a Space Thing coordination before exiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const { backend, openSpaces } = setup(control, countingIds());
     await openSpaces.open(META_ID);
     const other = await openSpaces.open(OTHER_ID);
 
     const release = control.deferNextCommit();
-    const creating = openSpaces.spaceCards.create({
+    const creating = openSpaces.spaceThings.create({
       containingSpaceId: META_ID,
       diagramId: META_DIAGRAM_ID,
       title: 'Child',
@@ -370,7 +370,7 @@ describe('Open Spaces', () => {
     await openSpaces.open(OTHER_ID);
 
     const releaseFirst = control.deferNextCommit();
-    const first = openSpaces.spaceCards.create({
+    const first = openSpaces.spaceThings.create({
       containingSpaceId: META_ID,
       diagramId: META_DIAGRAM_ID,
       title: 'First child',
@@ -383,7 +383,7 @@ describe('Open Spaces', () => {
     // wait reports a retirable Space, and the second raises the barrier again
     // before the exit gets to retire it. Retiring has to survive that window.
     const exiting = openSpaces.exit(OTHER_ID);
-    const second = openSpaces.spaceCards.create({
+    const second = openSpaces.spaceThings.create({
       containingSpaceId: META_ID,
       diagramId: META_DIAGRAM_ID,
       title: 'Second child',
@@ -397,15 +397,15 @@ describe('Open Spaces', () => {
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
   });
 
-  it('mints a composed Space\u2019s Card identities from the minter it was given', async () => {
-    const { openSpaces } = setup(undefined, mintingIds(MINTED_CARD_ID));
+  it('mints a composed Space\u2019s Thing identities from the minter it was given', async () => {
+    const { openSpaces } = setup(undefined, mintingIds(MINTED_THING_ID));
     const other = await openSpaces.open(OTHER_ID);
 
     expect(
-      other.app.authoring.complete({ kind: 'created-card', anchor: { x: 100, y: 100 } }),
-    ).toEqual({ kind: 'completed', createdCardId: MINTED_CARD_ID });
+      other.app.authoring.complete({ kind: 'created-thing', anchor: { x: 100, y: 100 } }),
+    ).toEqual({ kind: 'completed', createdThingId: MINTED_THING_ID });
 
-    expect(other.session.getState().working.cards.map(({ id }) => id)).toContain(MINTED_CARD_ID);
+    expect(other.session.getState().working.things.map(({ id }) => id)).toContain(MINTED_THING_ID);
   });
 
   it('never reinstates a superseded Space when the one being left settles', async () => {
@@ -601,7 +601,7 @@ describe('Open Spaces', () => {
   it('accepts the baseline for a participant the conflict never named', async () => {
     const control = new MemorySpaceBackendTestControl();
     // The conflict names the cascade's target only. Meta is a participant
-    // because the same edit removes its Space Card, but the repository never
+    // because the same edit removes its Space Thing, but the repository never
     // complained about it, so it has no remote snapshot of its own. The named
     // Space carries a revision of its own so that Meta keeping 1n below is
     // evidence it held its own baseline rather than adopting the reported one.
@@ -616,18 +616,18 @@ describe('Open Spaces', () => {
     // *stored* is the claim under test, so it is not named for the conclusion.
     const beforeCascade = meta.session.getState().working;
 
-    await openSpaces.spaceCards.delete({
+    await openSpaces.spaceThings.delete({
       containingSpaceId: META_ID,
-      cardId: META_SPACE_CARD_ID,
+      thingId: META_SPACE_THING_ID,
     });
     await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('conflicted'));
-    expect(meta.session.getState().working.cards.map((card) => card.id)).not.toContain(
-      META_SPACE_CARD_ID,
+    expect(meta.session.getState().working.things.map((thing) => thing.id)).not.toContain(
+      META_SPACE_THING_ID,
     );
     const before = meta.app.authoring.getState().replacementEpoch;
 
     // Reload is reachable here precisely because the baseline is what is
-    // stored: the cascade never committed, so accepting it puts the Space Card
+    // stored: the cascade never committed, so accepting it puts the Space Thing
     // the edit removed back.
     expect(meta.app.authoring.acceptStoredSpace()).toBeNull();
 
@@ -636,8 +636,8 @@ describe('Open Spaces', () => {
       acknowledgedRevision: 1n,
       persistence: { kind: 'settled' },
     });
-    expect(meta.session.getState().working.cards.map((card) => card.id)).toContain(
-      META_SPACE_CARD_ID,
+    expect(meta.session.getState().working.things.map((thing) => thing.id)).toContain(
+      META_SPACE_THING_ID,
     );
     expect(meta.app.authoring.getState().replacementEpoch).toBe(before + 1);
   });
@@ -674,7 +674,7 @@ describe('Open Spaces', () => {
    * was entered from it (ADR 0068), which is the next test but one.
    */
   const crossing = () =>
-    setup(undefined, () => CARD_ID, [
+    setup(undefined, () => THING_ID, [
       [META_ID, 'Meta'],
       [OTHER_ID, 'Other'],
       [THIRD_ID, 'Third'],
@@ -783,7 +783,7 @@ describe('Open Spaces', () => {
   it('joins a Space reopened while its exit was still waiting at the root', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
-    const { openSpaces } = setup(control, () => CARD_ID, [
+    const { openSpaces } = setup(control, () => THING_ID, [
       [META_ID, 'Meta'],
       [OTHER_ID, 'Other'],
       [THIRD_ID, 'Third'],

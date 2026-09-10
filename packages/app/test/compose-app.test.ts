@@ -18,8 +18,8 @@ import { createConnectionCompletion } from '../src/connection-completion';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
@@ -34,17 +34,17 @@ const snapshot: SpaceSnapshot = {
         title: 'Diagram 1',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 10, y: 20, open: false },
-          [CARD_B]: { x: 300, y: 40, open: false },
+          [THING_A]: { x: 10, y: 20, open: false },
+          [THING_B]: { x: 300, y: 40, open: false },
         },
-        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_B }] }],
       },
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
 
@@ -73,14 +73,14 @@ describe('the composed working Space', () => {
 
     expect(
       authoring.complete({
-        kind: 'edited-card',
-        cardId: CARD_A,
+        kind: 'edited-thing',
+        thingId: THING_A,
         document: { title: 'Renamed', kind: 'markdown', body: 'A' },
       }),
     ).toMatchObject({ kind: 'completed' });
 
     expect(currentSpace()).not.toBe(before);
-    expect(currentSpace().lookup.card(CARD_A)?.title).toBe('Renamed');
+    expect(currentSpace().lookup.thing(THING_A)?.title).toBe('Renamed');
   });
 
   /** The reader is returned as well as closed over, so the render path shares it. */
@@ -104,8 +104,8 @@ describe('what the composition opens on', () => {
 
     expect(authoring.authoredPlacement()).toEqual(
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, open: false }],
-        [CARD_B, { x: 300, y: 40, open: false }],
+        [THING_A, { x: 10, y: 20, open: false }],
+        [THING_B, { x: 300, y: 40, open: false }],
       ]),
     );
   });

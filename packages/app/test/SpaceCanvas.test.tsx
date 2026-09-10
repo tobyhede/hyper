@@ -3,17 +3,17 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { CardFlowNode } from '@project/react-flow-adapter';
-import { CARD_DRAG_TYPE } from '../src/components/CardsDrawer';
+import type { ThingFlowNode } from '@project/react-flow-adapter';
+import { THING_DRAG_TYPE } from '../src/components/ThingsDrawer';
 import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
 import type { EdgeAuthoring } from '../src/edge-authoring';
-import { CARD_SIZE } from '../src/card';
-import type { CardResize } from '../src/render-adapter';
+import { THING_SIZE } from '../src/thing';
+import type { ThingResize } from '../src/render-adapter';
 
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -30,8 +30,8 @@ const snapshot = spaceSnapshotSchema.parse({
         title: 'Diagram',
         kind: 'positioned',
         positions: {
-          [CARD_ID]: { x: 0, y: 0, open: false },
-          [OTHER_CARD_ID]: { x: 300, y: 0, open: false },
+          [THING_ID]: { x: 0, y: 0, open: false },
+          [OTHER_THING_ID]: { x: 300, y: 0, open: false },
           [ALIAS_ID]: { x: 600, y: 0, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
@@ -39,27 +39,31 @@ const snapshot = spaceSnapshotSchema.parse({
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  cards: [
-    { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: OTHER_CARD_ID, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: ALIAS_ID, document: { title: 'A again', kind: 'alias', target: CARD_ID } },
+  things: [
+    { id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: OTHER_THING_ID, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: ALIAS_ID, document: { title: 'A again', kind: 'alias', target: THING_ID } },
   ],
 });
 
 /**
- * `width`/`height` are declared for the same reason `projectCardNodes` declares
+ * `width`/`height` are declared for the same reason `projectThingNodes` declares
  * them: React Flow keeps an unmeasured node hidden from the accessibility tree,
  * and a headless DOM measures nothing.
  */
-const cardNode = (title: string, id: typeof CARD_ID = CARD_ID, selected = false): CardFlowNode => ({
+const thingNode = (
+  title: string,
+  id: typeof THING_ID = THING_ID,
+  selected = false,
+): ThingFlowNode => ({
   id,
-  type: 'card',
+  type: 'thing',
   position: { x: 0, y: 0 },
-  width: CARD_SIZE.width,
-  height: CARD_SIZE.height,
+  width: THING_SIZE.width,
+  height: THING_SIZE.height,
   selected,
   data: {
-    cardId: id,
+    thingId: id,
     title,
     readOnly: false,
     kind: 'markdown',
@@ -76,22 +80,22 @@ const cardNode = (title: string, id: typeof CARD_ID = CARD_ID, selected = false)
 
 interface Harness {
   readonly view: RenderResult;
-  readonly openCard: ReturnType<typeof vi.fn>;
-  readonly addCard: ReturnType<typeof vi.fn>;
-  /** Re-render with Card authoring on or off, everything else unchanged. */
+  readonly openThing: ReturnType<typeof vi.fn>;
+  readonly addThing: ReturnType<typeof vi.fn>;
+  /** Re-render with Thing authoring on or off, everything else unchanged. */
   readonly setTitleEditing: (enabled: boolean) => void;
   /** Re-render with nothing changed at all, the way a parent's render does. */
   readonly rerender: () => void;
   /** Re-render over a different projection, the way a completed Edit does. */
-  readonly setNodes: (next: CardFlowNode[]) => void;
+  readonly setNodes: (next: ThingFlowNode[]) => void;
   /** Every change React Flow proposed to the node array. */
   readonly nodesChanged: ReturnType<typeof vi.fn>;
-  /** What the canvas told its parent about a live Card title edit. */
+  /** What the canvas told its parent about a live Thing title edit. */
   readonly titleEditingChanged: ReturnType<typeof vi.fn>;
 }
 
 /**
- * An Edge Authoring that answers nothing, so these Card-authoring tests are not
+ * An Edge Authoring that answers nothing, so these Thing-authoring tests are not
  * also exercising the Edge lifecycle. Its own behaviour is covered by
  * `edge-authoring.test.ts` and `edge-authoring-react.test.tsx`.
  */
@@ -110,7 +114,7 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     accepts: () => false,
     beginPointerConnect: () => undefined,
     connect: () => undefined,
-    createConnectedCard: () => undefined,
+    createConnectedThing: () => undefined,
     endPointerDrag: () => undefined,
     beginPointerReconnect: () => undefined,
     openEdgeEditor: () => undefined,
@@ -123,9 +127,9 @@ function inertEdgeAuthoring(): EdgeAuthoring {
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
 function mountGraph(
-  initialNodes: CardFlowNode[] = [cardNode('A')],
-  onSelectCard: (cardId: string) => void = () => undefined,
-  cardResize: CardResize = {
+  initialNodes: ThingFlowNode[] = [thingNode('A')],
+  onSelectThing: (thingId: string) => void = () => undefined,
+  thingResize: ThingResize = {
     beginResize: () => undefined,
     previewResize: () => undefined,
     finishResize: () => undefined,
@@ -133,8 +137,8 @@ function mountGraph(
   },
   editable = true,
 ): Harness {
-  const openCard = vi.fn();
-  const addCard = vi.fn();
+  const openThing = vi.fn();
+  const addThing = vi.fn();
   const titleEditingChanged = vi.fn();
   const nodesChanged = vi.fn();
   let nodes = initialNodes;
@@ -146,7 +150,7 @@ function mountGraph(
   const testedAuthoring = {
     ...authoring,
     complete: (completion: Parameters<typeof authoring.complete>[0]) => {
-      if (completion.kind === 'opened-card') openCard(completion.cardId);
+      if (completion.kind === 'opened-thing') openThing(completion.thingId);
       return authoring.complete(completion);
     },
   };
@@ -156,7 +160,7 @@ function mountGraph(
         nodes={nodes}
         edges={[]}
         projectedNodes={null}
-        activeCardId={null}
+        activeThingId={null}
         presenting={false}
         placementReady={editable}
         // The facts a mounted canvas is given, turned into answers by the one
@@ -165,10 +169,10 @@ function mountGraph(
         availability={authoringAvailability({
           editable,
           presenting: false,
-          creatingCard: !titleEditing,
-          editingCardBody: false,
-          editingCardTitle: false,
-          cardIsOpen: false,
+          creatingThing: !titleEditing,
+          editingThingBody: false,
+          editingThingTitle: false,
+          thingIsOpen: false,
           editingChromeTitle: false,
           spaceOnCanvas: true,
           editingEmbeddedDiagram: false,
@@ -177,31 +181,31 @@ function mountGraph(
         onEdgesChange={() => undefined}
         edgeAuthoring={edgeAuthoring}
         selection={{ kind: 'none' }}
-        onSelectCard={onSelectCard}
+        onSelectThing={onSelectThing}
         onSelectEdge={() => undefined}
-        placedCards={[]}
-        newCardTitle="Card 2"
-        onAddCard={addCard}
-        onAddExistingCard={() => undefined}
+        placedThings={[]}
+        newThingTitle="Thing 2"
+        onAddThing={addThing}
+        onAddExistingThing={() => undefined}
         nameOnCreation={null}
         authoring={testedAuthoring}
         spaceSession={spaceSession}
         onBodyEditingChange={() => undefined}
         onTitleEditingChange={titleEditingChanged}
-        cardResize={cardResize}
+        thingResize={thingResize}
         reportEmbeddedDiagramEditing={() => undefined}
         graphs={[]}
         colorByGraphId={{}}
         activeGraphId={null}
-        activeGraphCardIds={new Set()}
+        activeGraphThingIds={new Set()}
       />
     </ReactFlowProvider>
   );
   const view = render(graph());
   return {
     view,
-    openCard,
-    addCard,
+    openThing,
+    addThing,
     titleEditingChanged,
     nodesChanged,
     setNodes: (next) => {
@@ -232,13 +236,13 @@ function nodeOf(id: string): HTMLElement {
  * graph — A's own affordance is hidden while its title is being renamed.
  */
 function refuseTitleEdit(settle: 'enter' | 'blur' = 'enter'): Harness {
-  const harness = mountGraph([cardNode('A', CARD_ID, true), cardNode('B', OTHER_CARD_ID)]);
+  const harness = mountGraph([thingNode('A', THING_ID, true), thingNode('B', OTHER_THING_ID)]);
   fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
-  const input = screen.getByRole('textbox', { name: 'Card title' });
+  const input = screen.getByRole('textbox', { name: 'Thing title' });
   fireEvent.change(input, { target: { value: '' } });
   if (settle === 'enter') fireEvent.keyDown(input, { key: 'Enter' });
   else fireEvent.blur(input);
-  expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+  expect(screen.getByRole('alert')).toHaveTextContent('A Thing title is required.');
   return harness;
 }
 
@@ -262,95 +266,95 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 /**
- * Leaving a refused title used to open the Card underneath, because the click
- * that blurred the field was also the click that selected the Card — so the
+ * Leaving a refused title used to open the Thing underneath, because the click
+ * that blurred the field was also the click that selected the Thing — so the
  * graph carried a ref that ate exactly one click to stop it. The field now
- * contains its own events, while the Card body keeps selection (ADR 0065).
+ * contains its own events, while the Thing body keeps selection (ADR 0065).
  */
 describe('a title Edit the graph refused', () => {
-  it('does not open a Card on the click that blurred it', () => {
-    const { openCard } = refuseTitleEdit('blur');
+  it('does not open a Thing on the click that blurred it', () => {
+    const { openThing } = refuseTitleEdit('blur');
 
-    fireEvent.click(nodeOf(CARD_ID));
+    fireEvent.click(nodeOf(THING_ID));
 
-    expect(openCard).not.toHaveBeenCalled();
+    expect(openThing).not.toHaveBeenCalled();
   });
 
   it('leaves the rest of the graph working', () => {
-    const { openCard } = refuseTitleEdit('blur');
+    const { openThing } = refuseTitleEdit('blur');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Card B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Thing B' }));
 
-    expect(openCard).toHaveBeenCalledWith(OTHER_CARD_ID);
+    expect(openThing).toHaveBeenCalledWith(OTHER_THING_ID);
   });
 });
 
 /**
- * No pointer gesture on a Card's body opens it (ADR 0036). A Card centres its
+ * No pointer gesture on a Thing's body opens it (ADR 0036). A Thing centres its
  * title, so a body gesture and the title's rename want the same pixels; opening
- * moved to the Card's own control and the keyboard instead.
+ * moved to the Thing's own control and the keyboard instead.
  */
-describe('opening a Card', () => {
+describe('opening a Thing', () => {
   it.each([
     ['a single click', (node: HTMLElement) => fireEvent.click(node)],
     ['a double click', (node: HTMLElement) => fireEvent.doubleClick(node)],
-  ])('does not happen on %s of the Card body', (_name, gesture) => {
-    const { openCard } = mountGraph();
+  ])('does not happen on %s of the Thing body', (_name, gesture) => {
+    const { openThing } = mountGraph();
 
-    gesture(nodeOf(CARD_ID));
+    gesture(nodeOf(THING_ID));
 
-    expect(openCard).not.toHaveBeenCalled();
+    expect(openThing).not.toHaveBeenCalled();
   });
 
-  it('happens from the Card affordance', () => {
-    const { openCard } = mountGraph();
+  it('happens from the Thing affordance', () => {
+    const { openThing } = mountGraph();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Thing A' }));
 
-    expect(openCard).toHaveBeenCalledWith(CARD_ID);
+    expect(openThing).toHaveBeenCalledWith(THING_ID);
   });
 
-  it('leaves the Title control free to rename without Opening the Card', () => {
-    const { openCard } = mountGraph();
+  it('leaves the Title control free to rename without Opening the Thing', () => {
+    const { openThing } = mountGraph();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
-    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
-    expect(openCard).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Thing title' })).toHaveValue('A');
+    expect(openThing).not.toHaveBeenCalled();
   });
 });
 
 /**
- * `F2` renames the *selected* Card, so it must not fire while a control has
+ * `F2` renames the *selected* Thing, so it must not fire while a control has
  * focus — the author is then working on that control, and the selection may
- * belong to another Card entirely. The graph used to answer the key twice: a
+ * belong to another Thing entirely. The graph used to answer the key twice: a
  * React Flow `onKeyDown` branch that ran first and asked nothing about the
  * target, and a window listener that declined for a focused control and never
  * got the chance.
  */
 describe('F2 while a control has focus', () => {
-  it('does not rename the selected Card from a control on a different Card', () => {
-    mountGraph([cardNode('A', CARD_ID, true), cardNode('B', OTHER_CARD_ID)]);
+  it('does not rename the selected Thing from a control on a different Thing', () => {
+    mountGraph([thingNode('A', THING_ID, true), thingNode('B', OTHER_THING_ID)]);
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Open Card B' }), { key: 'F2' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Open Thing B' }), { key: 'F2' });
 
-    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Thing title' })).not.toBeInTheDocument();
   });
 
-  it('renames the selected Card when the key is not typed into a control', () => {
-    mountGraph([cardNode('A', CARD_ID, true), cardNode('B', OTHER_CARD_ID)]);
+  it('renames the selected Thing when the key is not typed into a control', () => {
+    mountGraph([thingNode('A', THING_ID, true), thingNode('B', OTHER_THING_ID)]);
 
     fireEvent.keyDown(document.body, { key: 'F2' });
 
-    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+    expect(screen.getByRole('textbox', { name: 'Thing title' })).toHaveValue('A');
   });
 });
 
 /**
- * The Card affordance is a real button in the tab order, revealed by
+ * The Thing affordance is a real button in the tab order, revealed by
  * `:focus-visible`, so a keyboard author reaches it without a pointer. Its
- * activation keys are the same two the graph reads as "open this Card", and the
- * graph's handler sits on the ancestor that sees them first — it opened the Card
+ * activation keys are the same two the graph reads as "open this Thing", and the
+ * graph's handler sits on the ancestor that sees them first — it opened the Thing
  * for reading and called `preventDefault`, which in a browser also cancels the
  * activation the button never got. The button was unusable by the input it is
  * there for, and its whole point is to open something the plain open does not.
@@ -361,76 +365,76 @@ describe('F2 while a control has focus', () => {
 describe.each([
   ['Enter', 'Enter', 'native'],
   ['Space', ' ', 'composite'],
-] as const)('%s on the focused Card affordance', (_name, key, activation) => {
-  it('opens the Card once through the button rather than the graph', () => {
-    const { openCard } = mountGraph();
-    const button = screen.getByRole('button', { name: 'Open Card A' });
+] as const)('%s on the focused Thing affordance', (_name, key, activation) => {
+  it('opens the Thing once through the button rather than the graph', () => {
+    const { openThing } = mountGraph();
+    const button = screen.getByRole('button', { name: 'Open Thing A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
     if (activation === 'native') fireEvent.click(button);
 
-    expect(openCard).toHaveBeenCalledTimes(1);
-    expect(openCard).toHaveBeenCalledWith(CARD_ID);
+    expect(openThing).toHaveBeenCalledTimes(1);
+    expect(openThing).toHaveBeenCalledWith(THING_ID);
   });
 });
 
 it.each(['Enter', ' '])('opens a focused Alias with %s', (key) => {
-  const alias = cardNode('A again', ALIAS_ID);
+  const alias = thingNode('A again', ALIAS_ID);
   alias.data.kind = 'alias';
-  const { openCard } = mountGraph([alias]);
+  const { openThing } = mountGraph([alias]);
 
   const focusedAlias = nodeOf(ALIAS_ID);
   focusedAlias.focus();
   fireEvent.keyDown(focusedAlias, { key });
 
-  expect(openCard).toHaveBeenCalledWith(ALIAS_ID);
+  expect(openThing).toHaveBeenCalledWith(ALIAS_ID);
 });
 
 describe.each([
-  ['Card', cardNode('A'), CARD_ID],
+  ['Thing', thingNode('A'), THING_ID],
   [
     'Alias',
     {
-      ...cardNode('A again', ALIAS_ID),
-      data: { ...cardNode('A again', ALIAS_ID).data, kind: 'alias' as const },
+      ...thingNode('A again', ALIAS_ID),
+      data: { ...thingNode('A again', ALIAS_ID).data, kind: 'alias' as const },
     },
     ALIAS_ID,
   ],
 ] as const)('a focused %s while placement is pending', (_kind, projected, id) => {
   it.each(['Enter', ' '])('does not open with %s', (key) => {
-    const { openCard } = mountGraph([projected], undefined, undefined, false);
+    const { openThing } = mountGraph([projected], undefined, undefined, false);
     const focused = nodeOf(id);
     focused.focus();
 
     fireEvent.keyDown(focused, { key });
 
-    expect(openCard).not.toHaveBeenCalled();
+    expect(openThing).not.toHaveBeenCalled();
   });
 
   it('does not announce authoring keyboard commands', () => {
     mountGraph([projected], undefined, undefined, false);
 
     expect(nodeOf(id)).toHaveAccessibleDescription(
-      'This Card is unavailable while placement is pending.',
+      'This Thing is unavailable while placement is pending.',
     );
   });
 });
 
-describe('the Card affordance', () => {
-  it('opens the Card rather than renaming its title on the graph', () => {
-    const { openCard } = mountGraph();
+describe('the Thing affordance', () => {
+  it('opens the Thing rather than renaming its title on the graph', () => {
+    const { openThing } = mountGraph();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Thing A' }));
 
-    expect(openCard).toHaveBeenCalledWith(CARD_ID);
-    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+    expect(openThing).toHaveBeenCalledWith(THING_ID);
+    expect(screen.queryByRole('textbox', { name: 'Thing title' })).not.toBeInTheDocument();
   });
 });
 
-describe('withdrawing canvas authoring from an Expanded Card', () => {
+describe('withdrawing canvas authoring from an Expanded Thing', () => {
   it('withdraws body editing and resize through the same complete gate', () => {
-    const expanded = cardNode('A', CARD_ID, true);
+    const expanded = thingNode('A', THING_ID, true);
     expanded.data.expanded = true;
     expanded.data.body = '# A';
     const { view, setTitleEditing } = mountGraph([expanded]);
@@ -445,12 +449,12 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
   });
 
   it.each(['Enter', ' '])(
-    'does not Open a Card with %s while its body is being edited',
+    'does not Open a Thing with %s while its body is being edited',
     async (key) => {
-      const expanded = cardNode('A', CARD_ID, true);
+      const expanded = thingNode('A', THING_ID, true);
       expanded.data.expanded = true;
       expanded.data.body = '# A';
-      const { openCard } = mountGraph([expanded]);
+      const { openThing } = mountGraph([expanded]);
       fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
 
       const editor = await screen.findByRole('textbox', { name: 'Markdown source of A' });
@@ -458,21 +462,21 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
       expect(editor).toBe(document.activeElement);
       fireEvent.keyDown(editor, { key });
 
-      expect(openCard).not.toHaveBeenCalled();
+      expect(openThing).not.toHaveBeenCalled();
     },
   );
 });
 
-test('reports a live Card title edit so Space chrome can withdraw', () => {
-  const { titleEditingChanged } = mountGraph([cardNode('A', CARD_ID, true)]);
+test('reports a live Thing title edit so Space chrome can withdraw', () => {
+  const { titleEditingChanged } = mountGraph([thingNode('A', THING_ID, true)]);
 
   fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
   expect(titleEditingChanged).toHaveBeenLastCalledWith(true);
 });
 
-test('returns Space chrome when it unmounts over a live Card title edit', () => {
-  const { titleEditingChanged, view } = mountGraph([cardNode('A', CARD_ID, true)]);
+test('returns Space chrome when it unmounts over a live Thing title edit', () => {
+  const { titleEditingChanged, view } = mountGraph([thingNode('A', THING_ID, true)]);
 
   fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
   expect(titleEditingChanged).toHaveBeenLastCalledWith(true);
@@ -514,10 +518,10 @@ function touchEventOnControl(
   return event;
 }
 
-/** The one bottom-right control the Open Card draws. */
+/** The one bottom-right control the Open Thing draws. */
 function resizeControl(): Element {
   const control = document.querySelector('.react-flow__resize-control.bottom.right');
-  if (control === null) throw new Error('No resize control is drawn for Card A.');
+  if (control === null) throw new Error('No resize control is drawn for Thing A.');
   return control;
 }
 
@@ -545,14 +549,14 @@ function dragResizeControlTo(clientX: number, clientY: number): void {
 }
 
 /**
- * Resize is Card behaviour rather than kind behaviour (ADR 0066): a Card owns
+ * Resize is Thing behaviour rather than kind behaviour (ADR 0066): a Thing owns
  * the surrounding rect and the resize interaction, while a kind owns only what
  * fills an Open front. Alias has no Open front yet, but that is content
  * ownership and must not read back as a second resize gate.
  */
-describe('resize belongs to Card rather than to a Card kind', () => {
-  it('offers a resize operation to an Open Card whatever its kind', () => {
-    const alias = cardNode('Alias', CARD_ID, false);
+describe('resize belongs to Thing rather than to a Thing kind', () => {
+  it('offers a resize operation to an Open Thing whatever its kind', () => {
+    const alias = thingNode('Alias', THING_ID, false);
     alias.data.kind = 'alias';
     alias.data.expanded = true;
     const { view } = mountGraph([alias]);
@@ -560,42 +564,42 @@ describe('resize belongs to Card rather than to a Card kind', () => {
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
   });
 
-  it('offers no resize operation to a Closed Card', () => {
-    const { view } = mountGraph([cardNode('A')]);
+  it('offers no resize operation to a Closed Thing', () => {
+    const { view } = mountGraph([thingNode('A')]);
 
     expect(view.container.querySelector('.react-flow__resize-control')).toBeNull();
   });
 
   /**
    * `onResizeStart` is what the composition put on the node's data
-   * (`projection.ts`'s `CardNodeData.resize`); a mouse press on the drawn
+   * (`projection.ts`'s `ThingNodeData.resize`); a mouse press on the drawn
    * control is what invokes it, through the real `NodeResizeControl` rather
-   * than a stand-in for it. One drag both selects the Card and grows it —
+   * than a stand-in for it. One drag both selects the Thing and grows it —
    * never a separate click first.
    */
   it('routes one resize lifecycle from the control to the canvas capability', () => {
-    const expanded = cardNode('A', CARD_ID, false);
+    const expanded = thingNode('A', THING_ID, false);
     expanded.data.expanded = true;
     expanded.data.body = '# A';
-    const onSelectCard = vi.fn();
-    const cardResize: CardResize = {
+    const onSelectThing = vi.fn();
+    const thingResize: ThingResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    mountGraph([expanded], onSelectCard, cardResize);
+    mountGraph([expanded], onSelectThing, thingResize);
 
     pressResizeControl();
 
-    expect(onSelectCard).toHaveBeenCalledWith(CARD_ID);
-    expect(cardResize.beginResize).toHaveBeenCalledWith(CARD_ID);
+    expect(onSelectThing).toHaveBeenCalledWith(THING_ID);
+    expect(thingResize.beginResize).toHaveBeenCalledWith(THING_ID);
 
     dragResizeControlTo(80, 60);
-    expect(cardResize.previewResize).toHaveBeenCalledWith(CARD_ID, expect.any(Object));
+    expect(thingResize.previewResize).toHaveBeenCalledWith(THING_ID, expect.any(Object));
 
     fireEvent.pointerUp(window);
-    expect(cardResize.finishResize).toHaveBeenCalledWith(CARD_ID);
+    expect(thingResize.finishResize).toHaveBeenCalledWith(THING_ID);
   });
 
   /**
@@ -603,22 +607,22 @@ describe('resize belongs to Card rather than to a Card kind', () => {
    * Flow's own node array.
    *
    * `NodeResizeControl` asks `shouldResize` before it emits anything, and the
-   * Card answers `false` to every frame while still handing the proposed rect
-   * on (`CardNode`). So the only producer of a `dimensions` change never runs,
+   * Thing answers `false` to every frame while still handing the proposed rect
+   * on (`ThingNode`). So the only producer of a `dimensions` change never runs,
    * and there is no node-only rect for anything downstream to have to reject:
-   * the next projected draft publishes the resized Card, its displaced
+   * the next projected draft publishes the resized Thing, its displaced
    * neighbours, handles and Edges together.
    */
   it('proposes no node change to React Flow while it resizes', () => {
-    const expanded = cardNode('A', CARD_ID, false);
+    const expanded = thingNode('A', THING_ID, false);
     expanded.data.expanded = true;
-    const cardResize: CardResize = {
+    const thingResize: ThingResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    const { nodesChanged } = mountGraph([expanded], () => undefined, cardResize);
+    const { nodesChanged } = mountGraph([expanded], () => undefined, thingResize);
     nodesChanged.mockClear();
 
     pressResizeControl();
@@ -626,26 +630,26 @@ describe('resize belongs to Card rather than to a Card kind', () => {
     dragResizeControlTo(160, 120);
     fireEvent.pointerUp(window);
 
-    expect(cardResize.previewResize).toHaveBeenCalledTimes(2);
+    expect(thingResize.previewResize).toHaveBeenCalledTimes(2);
     expect(nodesChanged).not.toHaveBeenCalled();
   });
 
   it('routes loss of an active resize to cancellation', () => {
-    const expanded = cardNode('A', CARD_ID, false);
+    const expanded = thingNode('A', THING_ID, false);
     expanded.data.expanded = true;
-    const cardResize: CardResize = {
+    const thingResize: ThingResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    mountGraph([expanded], () => undefined, cardResize);
+    mountGraph([expanded], () => undefined, thingResize);
     pressResizeControl();
 
     fireEvent.blur(window);
 
-    expect(cardResize.cancelResize).toHaveBeenCalledWith(CARD_ID);
-    expect(cardResize.finishResize).not.toHaveBeenCalled();
+    expect(thingResize.cancelResize).toHaveBeenCalledWith(THING_ID);
+    expect(thingResize.finishResize).not.toHaveBeenCalled();
   });
 
   /**
@@ -665,26 +669,26 @@ describe('resize belongs to Card rather than to a Card kind', () => {
    * between the first frame and the second.
    */
   it('keeps a touch gesture alive across the projection its own frames publish', () => {
-    const expanded = cardNode('A', CARD_ID, false);
+    const expanded = thingNode('A', THING_ID, false);
     expanded.data.expanded = true;
-    const cardResize: CardResize = {
+    const thingResize: ThingResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    const { setNodes } = mountGraph([expanded], () => undefined, cardResize);
+    const { setNodes } = mountGraph([expanded], () => undefined, thingResize);
 
     touchResizeControl('touchstart');
-    expect(cardResize.beginResize).toHaveBeenCalledWith(CARD_ID);
+    expect(thingResize.beginResize).toHaveBeenCalledWith(THING_ID);
 
-    const republished = cardNode('A', CARD_ID, false);
+    const republished = thingNode('A', THING_ID, false);
     republished.data.expanded = true;
     setNodes([republished]);
 
     touchResizeControl('touchmove', 80, 60);
 
-    expect(cardResize.previewResize).toHaveBeenCalledWith(CARD_ID, expect.any(Object));
+    expect(thingResize.previewResize).toHaveBeenCalledWith(THING_ID, expect.any(Object));
   });
 });
 
@@ -694,12 +698,12 @@ describe('resize belongs to Card rather than to a Card kind', () => {
  * key pressed anywhere else in the app never reaches.
  */
 describe('the C shortcut', () => {
-  it('adds a Card from a focused Card', () => {
-    const { addCard } = mountGraph();
+  it('adds a Thing from a focused Thing', () => {
+    const { addThing } = mountGraph();
 
-    fireEvent.keyDown(nodeOf(CARD_ID), { key: 'c' });
+    fireEvent.keyDown(nodeOf(THING_ID), { key: 'c' });
 
-    expect(addCard).toHaveBeenCalledTimes(1);
+    expect(addThing).toHaveBeenCalledTimes(1);
   });
 
   /**
@@ -709,12 +713,12 @@ describe('the C shortcut', () => {
    * whatever text entry the canvas gains next.
    */
   it('is a letter while the caret is in the title editor', () => {
-    const { addCard } = mountGraph();
+    const { addThing } = mountGraph();
     fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Card title' }), { key: 'c' });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Thing title' }), { key: 'c' });
 
-    expect(addCard).not.toHaveBeenCalled();
+    expect(addThing).not.toHaveBeenCalled();
   });
 
   /**
@@ -723,8 +727,8 @@ describe('the C shortcut', () => {
    * wanted it.
    */
   it('ignores a modified press and a key repeat', () => {
-    const { addCard } = mountGraph();
-    const node = nodeOf(CARD_ID);
+    const { addThing } = mountGraph();
+    const node = nodeOf(THING_ID);
 
     fireEvent.keyDown(node, { key: 'c', metaKey: true });
     fireEvent.keyDown(node, { key: 'c', ctrlKey: true });
@@ -736,7 +740,7 @@ describe('the C shortcut', () => {
     // key, and this is the guard that makes that announcement true.
     fireEvent.keyDown(node, { key: 'C', shiftKey: true });
 
-    expect(addCard).not.toHaveBeenCalled();
+    expect(addThing).not.toHaveBeenCalled();
   });
 
   /**
@@ -744,20 +748,20 @@ describe('the C shortcut', () => {
    * so the shortcut has to keep working with it on.
    */
   it('answers an unmodified C typed with Caps Lock on', () => {
-    const { addCard } = mountGraph();
+    const { addThing } = mountGraph();
 
-    fireEvent.keyDown(nodeOf(CARD_ID), { key: 'C' });
+    fireEvent.keyDown(nodeOf(THING_ID), { key: 'C' });
 
-    expect(addCard).toHaveBeenCalledTimes(1);
+    expect(addThing).toHaveBeenCalledTimes(1);
   });
 
-  it('is withdrawn along with every other Card authoring control', () => {
-    const { addCard, setTitleEditing } = mountGraph();
+  it('is withdrawn along with every other Thing authoring control', () => {
+    const { addThing, setTitleEditing } = mountGraph();
 
     setTitleEditing(false);
-    fireEvent.keyDown(nodeOf(CARD_ID), { key: 'c' });
+    fireEvent.keyDown(nodeOf(THING_ID), { key: 'c' });
 
-    expect(addCard).not.toHaveBeenCalled();
+    expect(addThing).not.toHaveBeenCalled();
   });
 
   /**
@@ -765,17 +769,17 @@ describe('the C shortcut', () => {
    * bound to, so its buttons are somewhere a `c` can be pressed while the graph
    * is still the event's path. A button is not text entry, but it is a control
    * answering keys of its own, and the F2 guard beside this one already says so
-   * — the two disagreed, and the narrower one is a canvas that adds a Card when
+   * — the two disagreed, and the narrower one is a canvas that adds a Thing when
    * the author meant to press Zoom in.
    */
   it.each(['Zoom in', 'Zoom out', 'Fit view'] as const)(
     'is a keypress on the %s control rather than a command',
     async (name) => {
-      const { addCard } = mountGraph();
+      const { addThing } = mountGraph();
 
       fireEvent.keyDown(await screen.findByRole('button', { name }), { key: 'c' });
 
-      expect(addCard).not.toHaveBeenCalled();
+      expect(addThing).not.toHaveBeenCalled();
     },
   );
 
@@ -790,14 +794,14 @@ describe('the C shortcut', () => {
    * React Flow's own subscriptions, which the canvas guard now reads too.
    */
   it('is a keypress on the zoom slider rather than a command', async () => {
-    const { addCard } = mountGraph();
+    const { addThing } = mountGraph();
     const slider = await screen.findByLabelText('Zoom');
     expect(slider).toHaveAttribute('type', 'range');
     expect(slider.closest('.nokey')).not.toBeNull();
 
     fireEvent.keyDown(slider, { key: 'c' });
 
-    expect(addCard).not.toHaveBeenCalled();
+    expect(addThing).not.toHaveBeenCalled();
   });
 });
 
@@ -832,10 +836,10 @@ describe("React Flow's document key subscriptions", () => {
 });
 
 /**
- * Opening is a command of the *canvas*, and a Card now contains the text control
+ * Opening is a command of the *canvas*, and a Thing now contains the text control
  * its content is edited in. The `C` shortcut already asks this question; the
- * open key did not, and a Space typed into an Expanded Card's editor is a
- * character rather than a request to open the Card it is inside.
+ * open key did not, and a Space typed into an Expanded Thing's editor is a
+ * character rather than a request to open the Thing it is inside.
  *
  * Modelled with a plain `contenteditable` rather than the real editor because
  * `MarkdownSourceEditor` is reached by dynamic import: the rule under test is
@@ -844,27 +848,27 @@ describe("React Flow's document key subscriptions", () => {
 describe.each([
   ['Enter', 'Enter'],
   ['Space', ' '],
-] as const)('%s typed into a text control inside a Card', (_name, key) => {
-  it('is a keypress rather than a request to open that Card', () => {
-    const { openCard } = mountGraph();
+] as const)('%s typed into a text control inside a Thing', (_name, key) => {
+  it('is a keypress rather than a request to open that Thing', () => {
+    const { openThing } = mountGraph();
     const field = document.createElement('div');
     field.setAttribute('contenteditable', 'true');
-    nodeOf(CARD_ID).append(field);
+    nodeOf(THING_ID).append(field);
 
     fireEvent.keyDown(field, { key });
 
-    expect(openCard).not.toHaveBeenCalled();
+    expect(openThing).not.toHaveBeenCalled();
   });
 });
 
-describe('dragging a Card from the Cards drawer over canvas chrome', () => {
+describe('dragging a Thing from the Things drawer over canvas chrome', () => {
   it('does not offer a drop the pane will refuse', () => {
     mountGraph();
     const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
     expect(zoomIn.closest('.react-flow__pane')).toBeNull();
 
     const dataTransfer = {
-      types: [CARD_DRAG_TYPE],
+      types: [THING_DRAG_TYPE],
       dropEffect: 'none',
       setData: () => undefined,
       getData: () => '',

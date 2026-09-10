@@ -1,4 +1,4 @@
-import type { Card, CardId, Graph, GraphId, Diagram, UUID } from '@project/core';
+import type { Thing, ThingId, Graph, GraphId, Diagram, UUID } from '@project/core';
 import type { Space } from './space';
 
 /**
@@ -6,7 +6,7 @@ import type { Space } from './space';
  *
  * A Diagram owns its Graphs (ADR 0040) and `space.graphs` is a flatten across
  * every Diagram (ADR 0045), so an id taken off that collection has lost the one
- * thing ownership adds — which Diagram's Cards its Edges are closed over, and
+ * thing ownership adds — which Diagram's Things its Edges are closed over, and
  * which Diagram an Edit to it belongs in. Every answer here therefore arrives
  * with its context already resolved, rather than as a bare value a caller has to
  * go looking for the rest of.
@@ -48,30 +48,33 @@ export interface OwnedGraph {
  * to.
  */
 export interface SpaceLookup {
-  card(id: CardId): Card | undefined;
+  thing(id: ThingId): Thing | undefined;
   diagram(id: UUID): ResolvedDiagram | undefined;
   graph(id: GraphId): OwnedGraph | undefined;
 }
 
-/** A card that owns content rather than pointing at another card's content. */
-export type ResolvedContentCard = Extract<Card, { kind: 'markdown' }>;
+/** A thing that owns content rather than pointing at another thing's content. */
+export type ResolvedContentThing = Extract<Thing, { kind: 'markdown' }>;
 
 /**
- * The card whose content `cardId` shows. A markdown card is its own content
- * card; an alias resolves to its target (ADR 0009). Aliasing is a single hop —
+ * The thing whose content `thingId` shows. A markdown thing is its own content
+ * thing; an alias resolves to its target (ADR 0009). Aliasing is a single hop —
  * validation guarantees a target is never itself an alias — so this follows at
- * most one link. Returns `undefined` if the card or its target does not resolve.
+ * most one link. Returns `undefined` if the thing or its target does not resolve.
  *
  * A domain operation rather than an identity lookup, which is why it stays a
  * function beside `SpaceLookup` rather than becoming a fourth method on it: what
  * it answers is *content*, and the hop it follows is Alias semantics.
  */
-export function resolveContentCard(space: Space, cardId: CardId): ResolvedContentCard | undefined {
-  const card = space.lookup.card(cardId);
-  if (card?.kind === 'markdown') return card;
-  if (card?.kind !== 'alias') return undefined;
+export function resolveContentThing(
+  space: Space,
+  thingId: ThingId,
+): ResolvedContentThing | undefined {
+  const thing = space.lookup.thing(thingId);
+  if (thing?.kind === 'markdown') return thing;
+  if (thing?.kind !== 'alias') return undefined;
 
-  const target = space.lookup.card(card.target);
+  const target = space.lookup.thing(thing.target);
   return target?.kind === 'markdown' ? target : undefined;
 }
 
@@ -99,7 +102,7 @@ type SpaceLookupResult =
  * lookup.diagram(ownerId)` hold as identity rather than as equality.
  */
 export function buildSpaceLookup(input: {
-  readonly cards: readonly Card[];
+  readonly things: readonly Thing[];
   readonly diagrams: readonly Diagram[];
 }): SpaceLookupResult {
   const resolvedDiagrams = new Map<UUID, ResolvedDiagram>();
@@ -117,11 +120,11 @@ export function buildSpaceLookup(input: {
     }
   }
 
-  const cards = new Map<CardId, Card>(input.cards.map((card) => [card.id, card]));
+  const things = new Map<ThingId, Thing>(input.things.map((thing) => [thing.id, thing]));
   return {
     ok: true,
     lookup: {
-      card: (id) => cards.get(id),
+      thing: (id) => things.get(id),
       diagram: (id) => resolvedDiagrams.get(id),
       graph: (id) => ownedGraphs.get(id),
     },

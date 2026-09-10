@@ -54,7 +54,7 @@ const idAt = (seed: number, offset: number): UUID =>
     `00000000-0000-4000-8000-${(seed * 256 + offset).toString(16).padStart(12, '0')}`,
   );
 
-const spaceCard = (id: UUID, title: string, spaceId: UUID) => ({
+const spaceThing = (id: UUID, title: string, spaceId: UUID) => ({
   id,
   document: { title, kind: 'space' as const, spaceId },
 });
@@ -91,25 +91,25 @@ const fixtureFor = ({
     idAt(seed, 11 + index),
   );
   const newSpaceId = idAt(seed, 15);
-  const newSpaceCardId = idAt(seed, 240);
+  const newSpaceThingId = idAt(seed, 240);
 
   const meta: SpaceSnapshot = {
     id: metaSpaceId,
     document: { version: 1, title: `Meta ${seed}` },
-    cards: [
+    things: [
       ...parentSpaceIds.map((spaceId, index) =>
-        spaceCard(idAt(seed, 20 + index), `Parent ${index}`, spaceId),
+        spaceThing(idAt(seed, 20 + index), `Parent ${index}`, spaceId),
       ),
       ...extraSpaceIds.map((spaceId, index) =>
-        spaceCard(idAt(seed, 30 + index), `Extra ${index}`, spaceId),
+        spaceThing(idAt(seed, 30 + index), `Extra ${index}`, spaceId),
       ),
     ],
   };
   const parents: SpaceSnapshot[] = parentSpaceIds.map((id, parentIndex) => ({
     id,
     document: { version: 1, title: `Parent ${parentIndex} seed ${seed}` },
-    cards: Array.from({ length: referencesPerParent }, (_, referenceIndex) =>
-      spaceCard(
+    things: Array.from({ length: referencesPerParent }, (_, referenceIndex) =>
+      spaceThing(
         idAt(seed, 40 + parentIndex * 10 + referenceIndex),
         `Shared ${referenceIndex}`,
         sharedSpaceId,
@@ -124,12 +124,12 @@ const fixtureFor = ({
   const shared: SpaceSnapshot = {
     id: sharedSpaceId,
     document: { version: 1, title: `Shared ${seed}` },
-    cards: [],
+    things: [],
   };
   const extras: SpaceSnapshot[] = extraSpaceIds.map((id, index) => ({
     id,
     document: { version: 1, title: `Extra ${index} seed ${seed}` },
-    cards: [],
+    things: [],
   }));
   const snapshots = [meta, ...parents, shared, ...extras];
   const update = (snapshot: SpaceSnapshot) => ({
@@ -158,13 +158,13 @@ const fixtureFor = ({
       const created: SpaceSnapshot = {
         id: newSpaceId,
         document: { version: 1, title: `Created ${seed}` },
-        cards: [],
+        things: [],
       };
       commit = {
         changes: orderedChanges(
           update({
             ...meta,
-            cards: [...meta.cards, spaceCard(newSpaceCardId, 'Created', newSpaceId)],
+            things: [...meta.things, spaceThing(newSpaceThingId, 'Created', newSpaceId)],
           }),
           [{ kind: 'create', spaceId: newSpaceId, snapshot: created }],
           reverseChanges,
@@ -195,9 +195,9 @@ const fixtureFor = ({
     case 'complete-deletion':
       commit = {
         changes: orderedChanges(
-          update({ ...firstParent, cards: [] }),
+          update({ ...firstParent, things: [] }),
           [
-            ...parents.slice(1).map((parent) => update({ ...parent, cards: [] })),
+            ...parents.slice(1).map((parent) => update({ ...parent, things: [] })),
             { kind: 'delete', spaceId: sharedSpaceId, expectedRevision: 0n },
           ],
           reverseChanges,
@@ -212,7 +212,7 @@ const fixtureFor = ({
             document: { ...firstParent.document, title: `Still linked ${seed}` },
           }),
           [
-            ...parents.slice(1).map((parent) => update({ ...parent, cards: [] })),
+            ...parents.slice(1).map((parent) => update({ ...parent, things: [] })),
             { kind: 'delete', spaceId: sharedSpaceId, expectedRevision: 0n },
           ],
           reverseChanges,

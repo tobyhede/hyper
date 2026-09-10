@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
  * survive only in historical records and in qualified HTTP or graph-layout
  * prose. Nothing was reading for that. `tsc` catches a reference to a name
  * nothing declares, but not a name reintroduced together with its declaration,
- * and it never opens a Markdown document, a `space.json` fixture or a card file
+ * and it never opens a Markdown document, a `space.json` fixture or a thing file
  * — which is most of what the rename touched.
  *
  * This reads the tracked files themselves, in the idiom
@@ -48,7 +48,7 @@ const upper = ENTITY.toUpperCase();
  * pattern safe to run over prose as well as code.
  *
  * The bare English words are unavoidable and legitimate: Hono routes requests,
- * ELK routes an edge around a card, TanStack Router owns a URL route, and the
+ * ELK routes an edge around a thing, TanStack Router owns a URL route, and the
  * ADRs and CONTEXT.md have to name what was retired in order to retire it. A
  * word-level ban on those would be enforced by an ever-growing list of
  * exceptions. A compound is different — nothing writes one of these by
@@ -65,7 +65,7 @@ const RETIRED_COMPOUND = new RegExp(
     `${ENTITY}[A-Z]`,
     // Compounds ending in it: the active one, the getter, the factory.
     `[A-Za-z]${ENTITY}\\b`,
-    // camelCase compounds opening with it: its card ids, its id.
+    // camelCase compounds opening with it: its thing ids, its id.
     `\\b${lower}[A-Z]`,
     // The screaming-case constants — the bare word, its plural, its palette.
     `\\b${upper}S?\\b`,
@@ -101,7 +101,7 @@ const RETIRED_BARE = new RegExp(`\\b(?:${ENTITY}|${TRAVERSAL})\\b`);
  * legitimately a result, a row, a request or a repository, and the deny-list
  * that follows would never stop growing. Requiring the Graph collection on the
  * same line is what removes that cost entirely — the repo's convention is the
- * domain initial (`(c)` for card, `(d)` for diagram, `(e)` for edge), so a
+ * domain initial (`(t)` for thing, `(d)` for diagram, `(e)` for edge), so a
  * binding introduced over `graphs` has exactly one correct letter and the
  * retired name's is not it. This is the answer to the open question in
  * `.scratch/graph-rename/issues/03-...`: worth reading, once scoped this way.
@@ -337,7 +337,7 @@ describe('the vocabulary that guard reads', () => {
       `import type { ${ENTITY}Edge } from '@project/core';`,
       `const active${ENTITY} = diagram.active${ENTITY};`,
       `export const get${ENTITY} = (space: Space) => space.${lower}s[0];`,
-      `const ${lower}CardIds = new Set();`,
+      `const ${lower}ThingIds = new Set();`,
       `const ${upper}_PALETTE = ['#000'];`,
       `{ "${lower}s": [] }`,
       `const ${TRAVERSAL}History = [];`,
@@ -347,7 +347,7 @@ describe('the vocabulary that guard reads', () => {
       expect(RETIRED_COMPOUND.test(line), line).toBe(true);
     }
     expect(RETIRED_BARE.test(`export type ${ENTITY} = { id: string };`)).toBe(true);
-    expect(RETIRED_BARE.test(`export interface ${TRAVERSAL} { cards: string[] }`)).toBe(true);
+    expect(RETIRED_BARE.test(`export interface ${TRAVERSAL} { things: string[] }`)).toBe(true);
   });
 
   it('reports the retired initial only where a Graph collection introduces it', () => {
@@ -384,7 +384,7 @@ describe('the vocabulary that guard reads', () => {
       `repositories.forEach((${initial}) => ${initial}.close());`,
       // The collection without a binding, and a binding without the collection.
       `const all = space.graphs.map((graph) => graph.id);`,
-      `const ids = cards.map((${initial}) => ${initial}.id);`,
+      `const ids = things.map((${initial}) => ${initial}.id);`,
       // The one the unconstrained form got wrong: a correct Graph callback, then
       // a later callback over a *derived* collection on the same line. The
       // letter there is bound by `rows`, not by anything this guard governs.
@@ -402,7 +402,7 @@ describe('the vocabulary that guard reads', () => {
     const kept = [
       // ELK's routed geometry and its component (AGENTS.md).
       `import { ${ENTITY}dEdge } from './${ENTITY}dEdge';`,
-      `// a single layout pass ${lower}s them around the cards`,
+      `// a single layout pass ${lower}s them around the things`,
       // Hono and the HTTP application.
       `// the portable ${lower} module quietly depends on`,
       // The historical scratch path, and ordinary English.
@@ -605,7 +605,7 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
     // and its own class, and the function type that renders a React element.
     const kept = [
       `export function SelectedDiagramName({ diagram }: { readonly diagram: Diagram }) {`,
-      `import { resolveDiagram, diagramCards } from '../diagram-resolution';`,
+      `import { resolveDiagram, diagramThings } from '../diagram-resolution';`,
       `const selected = diagrams.find((diagram) => diagram.id === selectedDiagramId);`,
       `<button data-diagram-id={diagram.id} data-testid="diagram-row" />`,
       `navigation.selectDiagram(diagramId); navigation.continueInDiagram(diagramId, graphId);`,
@@ -938,7 +938,7 @@ const RETIRED_SURFACE_NAME = new RegExp(RETIRED_SURFACE, 'i');
  * `CONTEXT.md` has to name what it retires, which is the carve-out every block
  * above already makes for the document that does the retiring.
  *
- * The space-card prototype's variant control — the retired word carrying a
+ * The space-thing prototype's variant control — the retired word carrying a
  * `Variant` prefix — moves that prototype between its own story variants. It
  * switches variants rather than Spaces, so ADR 0082 and
  * `CONTEXT.md` have nothing to say about it, and the scan cannot tell the two
@@ -952,8 +952,8 @@ const RETIRED_SURFACE_NAME = new RegExp(RETIRED_SURFACE, 'i');
  */
 const RETIRED_SURFACE_FILES: readonly string[] = [
   'CONTEXT.md',
-  'packages/app/stories/review/space-card-canvas-prototype.stories.tsx',
-  'packages/app/stories/review/space-card-canvas-prototype.css',
+  'packages/app/stories/review/space-thing-canvas-prototype.stories.tsx',
+  'packages/app/stories/review/space-thing-canvas-prototype.css',
 ];
 
 describe('the retired name for the surface over the open set is gone', () => {
@@ -996,7 +996,7 @@ describe('the retired name for the surface over the open set is gone', () => {
  * second retires the other noun and gains its own block here.
  *
  * The shape rule transfers from ADR 0041 exactly, and for the same reason: the
- * bare English word is legitimate — a strategy lays cards out, the Command Dock
+ * bare English word is legitimate — a strategy lays things out, the Command Dock
  * takes no layout space, React Flow's docs have a layouting page — while a
  * compound is unambiguous. Nothing writes the retired id, the retired
  * collection or the retired opening field by accident.
@@ -1037,7 +1037,7 @@ const RETIRED_DIAGRAM_NAME = new RegExp(
     // `with`, `stored` and `Arb` ones this rename actually carried — was
     // invisible to this arm until it was there.
     `[A-Za-z]${RETIRED_DIAGRAM}s?\\b`,
-    // camelCase compounds opening with it: its id, its cards, its title.
+    // camelCase compounds opening with it: its id, its things, its title.
     `\\b${retiredDiagramLower}(?!Strategy)[A-Z]`,
     // The screaming-case constants: the bare word, its plural, its fixtures.
     `\\b${RETIRED_DIAGRAM_UPPER}S?\\b`,
@@ -1046,7 +1046,7 @@ const RETIRED_DIAGRAM_NAME = new RegExp(
     // was written in — the retired word between two underscores — goes unseen.
     `${RETIRED_DIAGRAM_UPPER}_[A-Z]`,
     // The retired field, singular and plural, in a document or an object
-    // literal. The singular is the Space Card frontmatter key, which ADR 0079's
+    // literal. The singular is the Space Thing frontmatter key, which ADR 0079's
     // still-open Ticket 04 is the next work to touch.
     // `(?<!-)` because a hyphen makes it a different word, and prose about
     // re-running a strategy ends the clause with a colon exactly as a key does.
@@ -1063,7 +1063,7 @@ const RETIRED_DIAGRAM_NAME = new RegExp(
     `${retiredDiagramLower}-[a-z]`,
     `[a-z]-${retiredDiagramLower}s?\\b`,
     // The optional field. The key arm above cannot cross the `?`, and this is
-    // the declared shape of the Space Card frontmatter key ADR 0079 still owes.
+    // the declared shape of the Space Thing frontmatter key ADR 0079 still owes.
     `\\b${retiredDiagramLower}s?\\?\\s*:`,
     // The callback binding this repo's own convention writes, where the retired
     // word is the whole parameter and no capital follows it to end a compound.
@@ -1300,7 +1300,7 @@ describe('a Diagram is named once (ADR 0085)', () => {
       `export type ${RETIRED_DIAGRAM}Id = string;`,
       `import { ${RETIRED_DIAGRAM}NotFoundError } from './${retiredDiagramLower}-resolution';`,
       `const selected${RETIRED_DIAGRAM} = space.${retiredDiagramLower}s[0];`,
-      `const ${retiredDiagramLower}Cards = resolve${RETIRED_DIAGRAM}(space, id);`,
+      `const ${retiredDiagramLower}Things = resolve${RETIRED_DIAGRAM}(space, id);`,
       `const ${RETIRED_DIAGRAM_UPPER}_ID = uuidSchema.parse('...');`,
       `const SECOND_${RETIRED_DIAGRAM_UPPER}_ID = uuidSchema.parse('...');`,
       `const DELETE_${RETIRED_DIAGRAM_UPPER}_ACTION_ID = 'x';`,
@@ -1313,10 +1313,10 @@ describe('a Diagram is named once (ADR 0085)', () => {
       // leading hyphen out by name.
       `refusal: { code: '${retiredDiagramLower}-not-found' },`,
       `return 'space-must-keep-${retiredDiagramLower}';`,
-      `<div data-testid="space-card-${retiredDiagramLower}">`,
+      `<div data-testid="space-thing-${retiredDiagramLower}">`,
       `.${retiredDiagramLower}-header { display: flex; }`,
       // The optional field, whose `?` the field arm's quote-then-colon cannot
-      // cross. This is the Space Card frontmatter key's own declared shape.
+      // cross. This is the Space Thing frontmatter key's own declared shape.
       `readonly ${retiredDiagramLower}?: UUID;`,
       // The callback binding, where the retired word is the whole parameter
       // name and no capital follows it. This repo's own convention writes it.

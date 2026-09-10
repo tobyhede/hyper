@@ -15,7 +15,7 @@ export interface PresentingChromeFixtureProps {
   /**
    * How many production `advance()` calls the story opens with.
    *
-   * A sink is not a state a Graph can be authored into — every Card a traversal
+   * A sink is not a state a Graph can be authored into — every Thing a traversal
    * may begin at has an Edge leaving it — so the only way to show one is to traverse
    * there. These are Navigation's own moves made once at composition, so the
    * Traversal history behind the story is one Navigation really traversed rather

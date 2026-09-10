@@ -26,7 +26,7 @@ import { unavailable } from './command-dock';
  *
  * Three of ADR 0082's obligations and one of ADR 0073's are assertable without
  * a browser, and each of them is a claim the prototype failed before this file
- * existed: a Card could only be placed by dragging it, the Open Spaces menu's
+ * existed: a Thing could only be placed by dragging it, the Open Spaces menu's
  * accessible name did not contain the word on its face, and the bar was four
  * toolbars where the ADR draws one.
  *
@@ -125,15 +125,15 @@ const visibleLabel = (control: HTMLElement): string => control.textContent.trim(
 const accessibleName = (control: HTMLElement): string =>
   control.getAttribute('aria-label') ?? visibleLabel(control);
 
-describe('placing a Card into a Diagram without a pointer (ADR 0082)', () => {
+describe('placing a Thing into a Diagram without a pointer (ADR 0082)', () => {
   /**
    * The rows were `<div draggable>` — no role, no tab stop, no activation — so
-   * an HTML5 drag was the only way to add a Card to the Diagram. ADR 0082 says a
+   * an HTML5 drag was the only way to add a Thing to the Diagram. ADR 0082 says a
    * drag may be *a* way and never the only one.
    */
-  it('offers each Card in the list as a focusable button', async () => {
+  it('offers each Thing in the list as a focusable button', async () => {
     await renderDock(<Default />);
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Cards' }));
+    fireEvent.click(within(dock()).getByRole('button', { name: 'Things' }));
 
     const row = screen.getByRole('button', { name: 'Add Constraints to Diagram' });
 
@@ -148,15 +148,15 @@ describe('placing a Card into a Diagram without a pointer (ADR 0082)', () => {
 
   /**
    * **The same completion, not a parallel one.** Activating a row spends the
-   * `onPlace` the canvas's own `onDrop` spends, so the Card lands on the
+   * `onPlace` the canvas's own `onDrop` spends, so the Thing lands on the
    * selected Diagram and the canvas draws it — which is the observable a drop
    * would have produced.
    */
-  it('adds the Card to the drawing Diagram, as the drop does', async () => {
+  it('adds the Thing to the drawing Diagram, as the drop does', async () => {
     await renderDock(<Default />);
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Cards' }));
+    fireEvent.click(within(dock()).getByRole('button', { name: 'Things' }));
 
-    // `Collection 1` places five of the fixture's Cards and `Constraints` is
+    // `Collection 1` places five of the fixture's Things and `Constraints` is
     // not one of them. The canvas resolves its placement asynchronously, so the
     // count is waited for rather than read on the spot.
     const placed = (): number =>
@@ -168,7 +168,7 @@ describe('placing a Card into a Diagram without a pointer (ADR 0082)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Constraints to Diagram' }));
 
     await waitFor(() => expect(placed()).toBe(6));
-    // The list is not dismissed by the placement: adding several Cards costs
+    // The list is not dismissed by the placement: adding several Things costs
     // one disclosure, exactly as the drag out of it does.
     expect(screen.getByRole('button', { name: 'Add Prior art to Diagram' })).toBeInTheDocument();
   });
@@ -237,7 +237,7 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
       'Space',
       'Diagram',
       'Graph',
-      'Cards',
+      'Things',
     ]);
     // No toolbar inside the toolbar: the clusters are groups now.
     expect(within(dock()).queryAllByRole('toolbar')).toHaveLength(0);
@@ -536,12 +536,12 @@ function TwoSpacesWithAnUnwellParent() {
         );
         const openedParent = await spaces.open(parent.id);
         control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'Unavailable' });
-        const card = parent.cards[0];
-        if (card === undefined) throw new Error('The parent needs a Card');
+        const thing = parent.things[0];
+        if (thing === undefined) throw new Error('The parent needs a Thing');
         const edit = openedParent.app.authoring.complete({
-          kind: 'edited-card',
-          cardId: card.id,
-          document: { ...card.document, title: 'An edited Card' },
+          kind: 'edited-thing',
+          thingId: thing.id,
+          document: { ...thing.document, title: 'An edited Thing' },
         });
         // A refused Edit commits nothing, so the wait below would spend its
         // whole timeout and then report the persistence state rather than the

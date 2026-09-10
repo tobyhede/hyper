@@ -37,8 +37,8 @@ vi.mock('@xyflow/react', () => ({
 
 const { OverviewCamera, PresentingCamera } = await import('../src/components/cameras');
 
-const CARD = { id: 'a', position: { x: 0, y: 0 }, width: 200, height: 100 };
-const OTHER_CARD = { id: 'b', position: { x: 600, y: 0 }, width: 200, height: 100 };
+const THING = { id: 'a', position: { x: 0, y: 0 }, width: 200, height: 100 };
+const OTHER_THING = { id: 'b', position: { x: 600, y: 0 }, width: 200, height: 100 };
 
 const fits = () => flow.fitView.mock.calls;
 
@@ -46,16 +46,16 @@ beforeEach(() => {
   flow.fitView.mockClear();
   flow.viewport = { width: 1000, height: 800 };
   flow.getNode.mockImplementation((id: string) =>
-    id === CARD.id ? CARD : id === OTHER_CARD.id ? OTHER_CARD : undefined,
+    id === THING.id ? THING : id === OTHER_THING.id ? OTHER_THING : undefined,
   );
 });
 
 describe('the presenting camera', () => {
-  it('frames the active Card in one move', () => {
-    render(<PresentingCamera activeCardId={CARD.id} />);
+  it('frames the active Thing in one move', () => {
+    render(<PresentingCamera activeThingId={THING.id} />);
 
     expect(fits()).toHaveLength(1);
-    expect(fits()[0]?.[0].nodes).toEqual([{ id: CARD.id }]);
+    expect(fits()[0]?.[0].nodes).toEqual([{ id: THING.id }]);
     expect(fits()[0]?.[0].duration).toBeGreaterThan(0);
   });
 
@@ -67,19 +67,19 @@ describe('the presenting camera', () => {
    * proves.
    */
   it('issues the next arrival without waiting for the last to settle', () => {
-    const view = render(<PresentingCamera activeCardId={CARD.id} />);
+    const view = render(<PresentingCamera activeThingId={THING.id} />);
 
-    view.rerender(<PresentingCamera activeCardId={OTHER_CARD.id} />);
+    view.rerender(<PresentingCamera activeThingId={OTHER_THING.id} />);
 
     expect(fits()).toHaveLength(2);
-    expect(fits()[1]?.[0].nodes).toEqual([{ id: OTHER_CARD.id }]);
+    expect(fits()[1]?.[0].nodes).toEqual([{ id: OTHER_THING.id }]);
   });
 
-  it('re-frames the same Card when the viewport is resized', () => {
-    const view = render(<PresentingCamera activeCardId={CARD.id} />);
+  it('re-frames the same Thing when the viewport is resized', () => {
+    const view = render(<PresentingCamera activeThingId={THING.id} />);
 
     flow.viewport = { width: 500, height: 400 };
-    view.rerender(<PresentingCamera activeCardId={CARD.id} />);
+    view.rerender(<PresentingCamera activeThingId={THING.id} />);
 
     expect(fits()).toHaveLength(2);
   });
@@ -90,8 +90,8 @@ describe('the presenting camera', () => {
    * guards exist to keep the camera away from that.
    */
   it.each([
-    ['no Card is active', { activeCardId: null }],
-    ['the active Card is not on the canvas yet', { activeCardId: 'missing' }],
+    ['no Thing is active', { activeThingId: null }],
+    ['the active Thing is not on the canvas yet', { activeThingId: 'missing' }],
   ])('does not move the camera when %s', (_name, props) => {
     render(<PresentingCamera {...props} />);
 
@@ -101,7 +101,7 @@ describe('the presenting camera', () => {
   it('does not move the camera before the container has been measured', () => {
     flow.viewport = { width: 0, height: 0 };
 
-    render(<PresentingCamera activeCardId={CARD.id} />);
+    render(<PresentingCamera activeThingId={THING.id} />);
 
     expect(fits()).toHaveLength(0);
   });

@@ -1,13 +1,13 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { normalizeTitle, titleLines, type Card } from '@project/core';
-import { parseCardFile, serializeCardFile } from '../src/index';
-import { uuid } from './card-files';
+import { normalizeTitle, titleLines, type Thing } from '@project/core';
+import { parseThingFile, serializeThingFile } from '../src/index';
+import { uuid } from './thing-files';
 
 /**
- * A multiline Title survives a Card file round trip (ADR 0083).
+ * A multiline Title survives a Thing file round trip (ADR 0083).
  *
- * The newlines in a Title are load-bearing — the first line names the Card and
+ * The newlines in a Title are load-bearing — the first line names the Thing and
  * the lines after it qualify it — and the only thing between an authored Title
  * and a stored one is `stringify`/`parse` inside the frontmatter fence. The
  * `yaml` package writes a multiline string as a block scalar, so this is
@@ -27,17 +27,17 @@ const SPACE_ID = uuid('00000000-0000-4000-8000-000000000103');
 const DIAGRAM_ID = uuid('00000000-0000-4000-8000-000000000104');
 const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000105');
 
-type CardKind = Card['kind'];
+type ThingKind = Thing['kind'];
 
-const EVERY_KIND: readonly CardKind[] = ['markdown', 'alias', 'space'];
+const EVERY_KIND: readonly ThingKind[] = ['markdown', 'alias', 'space'];
 
 /**
- * The same Title on each Card kind. Every kind writes its Title through the one
- * `cardTitleSchema`, so a Title that only survived on a Markdown Card would be
+ * The same Title on each Thing kind. Every kind writes its Title through the one
+ * `thingTitleSchema`, so a Title that only survived on a Markdown Thing would be
  * a fence or a field-order fault rather than a schema one — which is a thing
  * only writing all three out can tell us.
  */
-function cardOf(kind: CardKind, title: string): Card {
+function thingOf(kind: ThingKind, title: string): Thing {
   switch (kind) {
     case 'markdown':
       return { id: ID, title, kind, body: 'The body, which is not the Title.\n' };
@@ -49,58 +49,58 @@ function cardOf(kind: CardKind, title: string): Card {
 }
 
 /**
- * The Title the Card file gives back, or a failure naming the file that failed.
+ * The Title the Thing file gives back, or a failure naming the file that failed.
  *
  * A round trip that does not even parse is the more likely break of the two —
  * a block scalar whose indentation the fence reader mistakes for the closing
  * `---` produces errors, not a mangled string — so the file itself goes into
  * the message. Reading it is how anyone tells the two apart.
  */
-function roundTrippedTitle(card: Card): string {
-  const text = serializeCardFile(card);
-  const parsed = parseCardFile({ path: 'cards/multiline-title.md', text });
+function roundTrippedTitle(thing: Thing): string {
+  const text = serializeThingFile(thing);
+  const parsed = parseThingFile({ path: 'things/multiline-title.md', text });
   if (!parsed.ok) {
     const errors = parsed.errors.map((error) => error.message).join('\n');
-    throw new Error(`this Card file did not parse back:\n${text}\n${errors}`);
+    throw new Error(`this Thing file did not parse back:\n${text}\n${errors}`);
   }
-  return parsed.card.title;
+  return parsed.thing.title;
 }
 
-function expectTitleSurvives(kind: CardKind, title: string): void {
-  expect(titleLines(roundTrippedTitle(cardOf(kind, title)))).toEqual(titleLines(title));
+function expectTitleSurvives(kind: ThingKind, title: string): void {
+  expect(titleLines(roundTrippedTitle(thingOf(kind, title)))).toEqual(titleLines(title));
 }
 
-describe('a multiline Title survives a Card file round trip', () => {
-  it.each(EVERY_KIND)('keeps all three lines of a three-line Title on a %s Card', (kind) => {
-    expectTitleSurvives(kind, 'The data model\nHow a Card is stored\nADR 0020, ADR 0083');
+describe('a multiline Title survives a Thing file round trip', () => {
+  it.each(EVERY_KIND)('keeps all three lines of a three-line Title on a %s Thing', (kind) => {
+    expectTitleSurvives(kind, 'The data model\nHow a Thing is stored\nADR 0020, ADR 0083');
   });
 
-  it.each(EVERY_KIND)('keeps an interior blank line on a %s Card', (kind) => {
+  it.each(EVERY_KIND)('keeps an interior blank line on a %s Thing', (kind) => {
     // The one shape normalization deliberately preserves — an author who left a
     // gap meant it — and the one a block scalar is most likely to lose, since a
     // blank line inside one is written with no indentation at all.
     expectTitleSurvives(kind, 'The data model\n\nADR 0020');
   });
 
-  it.each(EVERY_KIND)('keeps the leading spaces on a line of a %s Card', (kind) => {
+  it.each(EVERY_KIND)('keeps the leading spaces on a line of a %s Thing', (kind) => {
     // Leading whitespace is a line's own and normalization leaves it alone. A
     // block scalar spends indentation on its own nesting, so the writer has to
     // say how much of it is the scalar's and how much is the author's.
-    expectTitleSurvives(kind, 'The data model\n  How a Card is stored\n    ADR 0020');
+    expectTitleSurvives(kind, 'The data model\n  How a Thing is stored\n    ADR 0020');
   });
 
-  it.each(EVERY_KIND)('keeps a leading space on the first line of a %s Card', (kind) => {
+  it.each(EVERY_KIND)('keeps a leading space on the first line of a %s Thing', (kind) => {
     // The first line is the case that needs an explicit indentation indicator
     // (`|2-`): without one a reader takes the deepest common indent as the
     // scalar's own and every line loses two spaces.
-    expectTitleSurvives(kind, '  The data model\nHow a Card is stored');
+    expectTitleSurvives(kind, '  The data model\nHow a Thing is stored');
   });
 
-  it.each(EVERY_KIND)('keeps Title Lines that read as YAML syntax on a %s Card', (kind) => {
+  it.each(EVERY_KIND)('keeps Title Lines that read as YAML syntax on a %s Thing', (kind) => {
     // A leading `-` is a sequence entry, a trailing `:` is a mapping key, `---`
     // is a document break and `#` opens a comment. Inside a block scalar all
     // four are text, and this is what says so.
-    expectTitleSurvives(kind, '- The data model\nHow a Card is stored:\n---\n# ADR 0020');
+    expectTitleSurvives(kind, '- The data model\nHow a Thing is stored:\n---\n# ADR 0020');
   });
 });
 
@@ -131,7 +131,7 @@ const drawnTitleArb = fc
   .array(titleLineArb, { minLength: 1, maxLength: 6 })
   .chain((lines) => fc.constantFrom('\n', '\r\n').map((lineBreak) => lines.join(lineBreak)));
 
-const kindArb: fc.Arbitrary<CardKind> = fc.constantFrom(...EVERY_KIND);
+const kindArb: fc.Arbitrary<ThingKind> = fc.constantFrom(...EVERY_KIND);
 
 /**
  * How many generated Titles carried each of the cases the examples above name.
@@ -166,7 +166,7 @@ describe('the property over generated Titles', () => {
       fc.property(drawnTitleArb, kindArb, (drawn, kind) => {
         const title = normalizeTitle(drawn);
         // A Title that normalizes to nothing carries no name and the schema
-        // refuses it, so there is no stored Card for it to round-trip as.
+        // refuses it, so there is no stored Thing for it to round-trip as.
         fc.pre(title.length > 0);
 
         const lines = title.split('\n');
@@ -176,7 +176,7 @@ describe('the property over generated Titles', () => {
         if (lines.some(readsAsYamlSyntax)) reached.aLineThatReadsAsYamlSyntax += 1;
         if (drawn !== title) reached.aTitleNormalizationChanged += 1;
 
-        expect(titleLines(roundTrippedTitle(cardOf(kind, title)))).toEqual(titleLines(title));
+        expect(titleLines(roundTrippedTitle(thingOf(kind, title)))).toEqual(titleLines(title));
       }),
       { numRuns: 1000 },
     );

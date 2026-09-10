@@ -4,13 +4,13 @@ import { MemorySpaceBackend } from '../src/memory';
 import { createSpaceSessionRegistry } from '../src/session-registry';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 const loaded = {
   snapshot: {
     id: SPACE_ID,
     document: { version: 1 as const, title: 'Space' },
-    cards: [{ id: CARD_ID, document: { title: 'Card', kind: 'markdown' as const, body: '' } }],
+    things: [{ id: THING_ID, document: { title: 'Thing', kind: 'markdown' as const, body: '' } }],
   },
   revision: 3n,
   exportedRevision: null,
@@ -45,7 +45,7 @@ describe('Space session registry', () => {
     // after awaiting that turn. Releasing inside the window between the two
     // retires a session the coordination is about to name as a participant.
     const linking = registry
-      .spaceCards(() => CARD_ID)
+      .spaceThings(() => THING_ID)
       .link({
         containingSpaceId: SPACE_ID,
         diagramId: uuidSchema.parse('00000000-0000-4000-8000-000000000009'),
@@ -59,9 +59,9 @@ describe('Space session registry', () => {
     expect(registry.session(SPACE_ID)).toBeDefined();
   });
 
-  it('offers Space Card coordination only through the three lifecycle operations', () => {
+  it('offers Space Thing coordination only through the three lifecycle operations', () => {
     const registry = createSpaceSessionRegistry(new MemorySpaceBackend(SPACE_ID, [loaded]));
-    const lifecycle = registry.spaceCards(() => CARD_ID);
+    const lifecycle = registry.spaceThings(() => THING_ID);
 
     expect(Object.keys(lifecycle).sort()).toEqual(['create', 'delete', 'link']);
     expect(Object.keys(registry).sort()).toEqual([
@@ -69,7 +69,7 @@ describe('Space session registry', () => {
       'open',
       'release',
       'session',
-      'spaceCards',
+      'spaceThings',
       'waitUntilRetirable',
     ]);
   });

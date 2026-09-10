@@ -33,7 +33,7 @@ export type RepositoryImportResult =
   | { kind: 'imported'; spaces: readonly LoadedSpace[] }
   | {
       kind: 'rejected';
-      code: 'invalid-snapshot' | 'duplicate-identity' | 'card-ownership';
+      code: 'invalid-snapshot' | 'duplicate-identity' | 'thing-ownership';
       message: string;
     };
 

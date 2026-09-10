@@ -38,12 +38,12 @@ body {
 }
 
 /* `padding-inline-end` is the strip yielded to a surface overlaying the end
-   edge — the Cards drawer.
+   edge — the Things drawer.
 
    Deliberately not animated, although the panel beside it slides. React Flow
    re-measures this container continuously, so an animated width moves the
-   canvas under a pointer that is already dragging a Card out of the drawer, and
-   the Card lands somewhere other than where it was dropped. The strip is taken
+   canvas under a pointer that is already dragging a Thing out of the drawer, and
+   the Thing lands somewhere other than where it was dropped. The strip is taken
    in one step, which is also what the flex layout this replaced did. */
 .shell__main {
   flex: 1;
@@ -101,57 +101,57 @@ body {
 
 /* ---- Graph area ---- */
 .graph-area {
-  --card-placement-duration: 200ms;
-  --card-placement-easing: ease;
+  --thing-placement-duration: 200ms;
+  --thing-placement-easing: ease;
   position: relative;
 }
 
-/* ---- Card node ---- */
-.rf-card-node {
+/* ---- Thing node ---- */
+.rf-thing-node {
   border-radius: 10px;
   transition:
-    width var(--card-placement-duration) var(--card-placement-easing),
-    height var(--card-placement-duration) var(--card-placement-easing),
-    transform var(--card-placement-duration) var(--card-placement-easing);
+    width var(--thing-placement-duration) var(--thing-placement-easing),
+    height var(--thing-placement-duration) var(--thing-placement-easing),
+    transform var(--thing-placement-duration) var(--thing-placement-easing);
 }
 
-.rf-card-node:has(> .rf-card-node__inner[data-resizing='true']) {
+.rf-thing-node:has(> .rf-thing-node__inner[data-resizing='true']) {
   transition-property: transform;
 }
 
-.rf-card-node__inner {
+.rf-thing-node__inner {
   position: relative;
   width: 100%;
   height: 100%;
 }
 
-/* An Expanded Card is whatever rect the Diagram authored, so the node's own
+/* An Expanded Thing is whatever rect the Diagram authored, so the node's own
    subtree stops declaring the collapsed constant and fills the box React Flow
    sized from `node.width`/`node.height` (ADR 0064). The declared width stays the
-   default because a Card is drawn before any layout resolves, and 100% of an
+   default because a Thing is drawn before any layout resolves, and 100% of an
    unsized wrapper is nothing. */
-.rf-card-node__inner > .canvas-card {
+.rf-thing-node__inner > .canvas-thing {
   width: 100%;
   height: 100%;
 }
 
-.react-flow__node[class~='dragging'].rf-card-node {
+.react-flow__node[class~='dragging'].rf-thing-node {
   transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .graph-area {
-    --card-placement-duration: 1ms;
+    --thing-placement-duration: 1ms;
   }
 
-  .rf-card-node__inner .react-flow__resize-control.rf-card-node__resize-control {
+  .rf-thing-node__inner .react-flow__resize-control.rf-thing-node__resize-control {
     transition: none;
   }
 }
 
-/* React Flow's own `NodeResizeControl`, in the Card's palette: one bottom-right
-   control, and here rather than beside `CanvasCard` because the control is the
-   framework's — the Card being resized knows nothing about it.
+/* React Flow's own `NodeResizeControl`, in the Thing's palette: one bottom-right
+   control, and here rather than beside `CanvasThing` because the control is the
+   framework's — the Thing being resized knows nothing about it.
 
    **The wrapper is named to win the cascade, not for reach.** The default
    variant carries React Flow's own `.handle`, and `.react-flow__resize-control.handle`
@@ -162,31 +162,31 @@ body {
    bare `.handle`, which belongs to React Flow and which no module here names.
 
    The control is the hit target and the mark is only what it draws, and the
-   whole interactive box stays inside the Card: `translate` is overridden rather
+   whole interactive box stays inside the Thing: `translate` is overridden rather
    than left as React Flow's centring of the box on the corner it resizes from.
    Centred, three quarters of the target lay over the pane while `opacity` kept
    it invisible, and hover is no answer to a pointer that has none — a touch
-   beside an unselected Open Card's bottom-right corner began a resize on a
+   beside an unselected Open Thing's bottom-right corner began a resize on a
    control nothing had revealed. The inert mark keeps its corner anchor; its
    visual adjustment is CSS-only and changes no layout or interaction geometry.
 
    Anchoring it inside is what makes `z-index` load-bearing. The control is
-   rendered before the Card so `canvas-card.css` can reach the authoring handles
+   rendered before the Thing so `canvas-thing.css` can reach the authoring handles
    with `~`, and a positioned later sibling otherwise paints over it — with the
-   overhang gone, every point of the control lay under `.canvas-card` and the
-   press landed on the Card body instead. It takes the same layer the authoring
+   overhang gone, every point of the control lay under `.canvas-thing` and the
+   press landed on the Thing body instead. It takes the same layer the authoring
    handles take, for the same reason.
 
    `pointer-events` is gated on reveal, as the authoring handles gate theirs.
    Against the centred box that deadlocked the gesture outright — a pointer
-   arriving on the overhang hit the pane, the Card stopped being hovered, and
+   arriving on the overhang hit the pane, the Thing stopped being hovered, and
    the control the hover was revealing was withheld from under it, so
-   `onResizeStart` never fired. Inside the Card the gate cannot do that: being
-   on the control is being on the Card, so the hover the reveal reads is already
+   `onResizeStart` never fired. Inside the Thing the gate cannot do that: being
+   on the control is being on the Thing, so the hover the reveal reads is already
    true. What the gate buys is the corner back — invisible and always grabbable,
-   it would otherwise swallow every press on the Card's own bottom-right, the
+   it would otherwise swallow every press on the Thing's own bottom-right, the
    caret included. */
-.rf-card-node__inner .react-flow__resize-control.rf-card-node__resize-control {
+.rf-thing-node__inner .react-flow__resize-control.rf-thing-node__resize-control {
   z-index: 1;
   width: 48px;
   height: 48px;
@@ -203,41 +203,42 @@ body {
   transition: opacity 100ms ease;
 }
 
-.rf-card-node__resize-mark {
+.rf-thing-node__resize-mark {
   position: absolute;
   translate: 1px 1px;
   transform-origin: right bottom;
   width: 20px;
   height: 20px;
   background: #000;
-  border: 2px solid var(--canvas-card-ink-color);
+  border: 2px solid var(--canvas-thing-ink-color);
   opacity: 0;
   pointer-events: none;
   transition: opacity 100ms ease;
 }
 
 /* Hover discovers the control, Selection keeps it stable for touch (no hover
-   state to reveal it), and keyboard-visible Card focus offers the same authoring
-   affordance — three independent ways an Open Card is "in play" (ADR 0066).
+   state to reveal it), and keyboard-visible Thing focus offers the same authoring
+   affordance — three independent ways an Open Thing is "in play" (ADR 0066).
    Pointer focus alone must not keep the control up after Open/Close and departure.
    Hover and focus are read off `.react-flow__node`, the element React Flow
    itself makes hoverable and focusable; Selected is read off `data-selected`,
-   which only `.rf-card-node__inner` carries. */
-.react-flow__node:hover .react-flow__resize-control.rf-card-node__resize-control,
-.rf-card-node__inner[data-selected='true'] .react-flow__resize-control.rf-card-node__resize-control,
+   which only `.rf-thing-node__inner` carries. */
+.react-flow__node:hover .react-flow__resize-control.rf-thing-node__resize-control,
+.rf-thing-node__inner[data-selected='true']
+  .react-flow__resize-control.rf-thing-node__resize-control,
 .react-flow__node:is(:focus-visible, :has(:focus-visible))
-  .react-flow__resize-control.rf-card-node__resize-control {
+  .react-flow__resize-control.rf-thing-node__resize-control {
   opacity: 1;
   pointer-events: auto;
 }
 
-.react-flow__node:hover .rf-card-node__resize-mark,
-.rf-card-node__inner[data-selected='true'] .rf-card-node__resize-mark,
-.react-flow__node:is(:focus-visible, :has(:focus-visible)) .rf-card-node__resize-mark {
+.react-flow__node:hover .rf-thing-node__resize-mark,
+.rf-thing-node__inner[data-selected='true'] .rf-thing-node__resize-mark,
+.react-flow__node:is(:focus-visible, :has(:focus-visible)) .rf-thing-node__resize-mark {
   opacity: 1;
 }
 
-.new-card-preview {
+.new-thing-preview {
   position: absolute;
   opacity: 0.55;
   pointer-events: none;
@@ -250,48 +251,48 @@ body {
 
    Existing Edge attachment geometry stays measurable for React Flow but is not
    presented as an authoring control (ADR 0033). */
-.rf-card-node__port.react-flow__handle {
+.rf-thing-node__port.react-flow__handle {
   border: 1px solid #0b0d11;
   pointer-events: none;
 }
 
-.rf-card-node__authoring-handle.react-flow__handle {
+.rf-thing-node__authoring-handle.react-flow__handle {
   z-index: 1;
   border: 3px solid #0b0d11;
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--card-hover-duration) var(--card-hover-easing);
+  transition: opacity var(--thing-hover-duration) var(--thing-hover-easing);
 }
 
-/* Idle, a Card offers where an Edge may start; mid-drag, it offers whichever
+/* Idle, a Thing offers where an Edge may start; mid-drag, it offers whichever
    end the drag is looking for — a target for an ordinary connection, and a
    source for a reconnection that has taken hold of an Edge's `from` end. The
    role is read off the drag rather than assumed, so the second gesture has
    somewhere to land. */
 .react-flow__node:hover
-  .rf-card-node__inner[data-connection-in-progress='false']
-  .rf-card-node__authoring-handle--source,
-.rf-card-node__inner[data-selected='true'][data-connection-in-progress='false']
-  .rf-card-node__authoring-handle--source,
-.rf-card-node__inner[data-connection-seeking='target'] .rf-card-node__authoring-handle--target,
-.rf-card-node__inner[data-connection-seeking='source'] .rf-card-node__authoring-handle--source {
+  .rf-thing-node__inner[data-connection-in-progress='false']
+  .rf-thing-node__authoring-handle--source,
+.rf-thing-node__inner[data-selected='true'][data-connection-in-progress='false']
+  .rf-thing-node__authoring-handle--source,
+.rf-thing-node__inner[data-connection-seeking='target'] .rf-thing-node__authoring-handle--target,
+.rf-thing-node__inner[data-connection-seeking='source'] .rf-thing-node__authoring-handle--source {
   opacity: 1;
   pointer-events: auto;
 }
 
-/* Resizing is the Card's one active authoring gesture. The resize control stays
+/* Resizing is the Thing's one active authoring gesture. The resize control stays
    reachable until release, while the rail and Edge-authoring handles withdraw
    so no second operation competes with the pointer or remains visually armed. */
-.react-flow__node .rf-card-node__inner[data-resizing='true'] .canvas-card__rail,
+.react-flow__node .rf-thing-node__inner[data-resizing='true'] .canvas-thing__rail,
 .react-flow__node
-  .rf-card-node__inner[data-resizing='true']
-  .rf-card-node__authoring-handle.react-flow__handle {
+  .rf-thing-node__inner[data-resizing='true']
+  .rf-thing-node__authoring-handle.react-flow__handle {
   opacity: 0;
   pointer-events: none;
 }
 
-.card {
+.thing {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -299,14 +300,14 @@ body {
   overflow: hidden;
 }
 
-/* The production Card front's own appearance — kind and interaction-state
+/* The production Thing front's own appearance — kind and interaction-state
    treatment, title, actions, title editor — lives with the production
-   `CanvasCard` module in `@project/ui`, as real CSS in the colocated
-   `canvas-card.css`, not here. `.canvas-card` survives here only as a stable
+   `CanvasThing` module in `@project/ui`, as real CSS in the colocated
+   `canvas-thing.css`, not here. `.canvas-thing` survives here only as a stable
    selector for this one rule: React Flow's own "this is the actively
-   presented Card" fact, which is adapter/app state and has no reason to be
+   presented Thing" fact, which is adapter/app state and has no reason to be
    known inside the design-system package. */
-.rf-card-node--active :is(.card, .canvas-card) {
+.rf-thing-node--active :is(.thing, .canvas-thing) {
   border-color: var(--accent);
   outline: 2px solid var(--primary);
 }
@@ -345,42 +346,42 @@ body {
   transform: translateX(-50%);
 }
 
-.card__title {
+.thing__title {
   margin: 0 0 0.4rem;
   font-size: 0.95rem;
 }
 
-/* `CardContent` always emits `card card--full`, so these are its own base
+/* `ThingContent` always emits `thing thing--full`, so these are its own base
    appearance, and they sit here rather than after the traversal block below on
-   purpose. `.card--full .card__title` and `.rf-card-node__content .card__title`
+   purpose. `.thing--full .thing__title` and `.rf-thing-node__content .thing__title`
    have the same specificity, so whichever is written second wins — and with
-   these last, a presented Card's title took a fixed 1.3rem and stopped scaling
+   these last, a presented Thing's title took a fixed 1.3rem and stopped scaling
    with the frame, which is exactly what the comment below forbids. */
-.card--full {
+.thing--full {
   background: transparent;
   border: none;
   padding: 0.5rem 0;
 }
 
-.card--full .card__title {
+.thing--full .thing__title {
   font-size: 1.3rem;
 }
 
-/* ---- The Card reached during traversal ---- */
-/* Presenting draws the active card's content instead of its title (ADR 0027).
-   Same box as every other card — the Card's 16:9 frame, which the camera then
+/* ---- The Thing reached during traversal ---- */
+/* Presenting draws the active thing's content instead of its title (ADR 0027).
+   Same box as every other thing — the Thing's 16:9 frame, which the camera then
    fills the screen with — so the type is sized in *container* units and scales
    with the frame. Setting it in pixels would size it against a box that is about
    to be magnified by an arbitrary factor. Content that still overflows is
-   clipped: the frame is fixed and a card that does not fit it is an authoring
+   clipped: the frame is fixed and a thing that does not fit it is an authoring
    problem, exactly as a slide would be. */
-.rf-card-node__content {
+.rf-thing-node__content {
   container-type: size;
-  width: var(--card-width);
-  height: var(--card-height);
+  width: var(--thing-width);
+  height: var(--thing-height);
 }
 
-.rf-card-node__content .card--full {
+.rf-thing-node__content .thing--full {
   width: 100%;
   height: 100%;
   padding: 4cqw 5cqw;
@@ -393,46 +394,46 @@ body {
   line-height: 1.5;
 }
 
-.rf-card-node__content .card__title {
+.rf-thing-node__content .thing__title {
   margin: 0 0 2cqw;
   font-size: 5cqw;
   line-height: 1.2;
 }
 
-.rf-card-node__content .card__body > * {
+.rf-thing-node__content .thing__body > * {
   margin: 0 0 2cqw;
 }
 
-.rf-card-node__content .card__body :is(h1, h2, h3, h4) {
+.rf-thing-node__content .thing__body :is(h1, h2, h3, h4) {
   margin: 0 0 1.6cqw;
   font-size: 4.2cqw;
   line-height: 1.25;
 }
 
-.rf-card-node__content .card__body :is(ul, ol) {
+.rf-thing-node__content .thing__body :is(ul, ol) {
   padding-left: 4cqw;
 }
 
-.rf-card-node__content .card__body :is(code, pre) {
+.rf-thing-node__content .thing__body :is(code, pre) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
 }
 
-.rf-card-node__content .card__body pre {
+.rf-thing-node__content .thing__body pre {
   overflow-x: auto;
   padding: 2cqw;
   border-radius: 4px;
   background: var(--secondary);
 }
 
-/* ---- Card pane ---- */
-/* The covering surface a Card is authored on, named for `CardPane` because both
-   panes are that component: the opened-Card editor, where a Card's content is
+/* ---- Thing pane ---- */
+/* The covering surface a Thing is authored on, named for `ThingPane` because both
+   panes are that component: the opened-Thing editor, where a Thing's content is
    edited (ADR 0037) rather than read off the graph, which shows titles
-   (ADR 0006); and the Alias creation state, which authors a Card that does not
+   (ADR 0006); and the Alias creation state, which authors a Thing that does not
    exist yet. An element only one of them draws still belongs to this block —
    what varies is the pane's contents, not which surface it is. */
-.card-pane {
+.thing-pane {
   position: absolute;
   inset: 0;
   z-index: 40;
@@ -448,7 +449,7 @@ body {
    canvas as something to black out; on sand it has to recede the canvas without
    extinguishing it, which is what tells the reader the pane is over a Space
    rather than replacing it. */
-.card-pane__backdrop {
+.thing-pane__backdrop {
   position: absolute;
   inset: 0;
   background: rgb(31 41 51 / 10%);
@@ -456,16 +457,16 @@ body {
 }
 
 @supports (backdrop-filter: blur(2px)) {
-  .card-pane__backdrop {
+  .thing-pane__backdrop {
     backdrop-filter: blur(2px);
   }
 }
 
-/* The card frame. 16:9, matching `card.ts` — a card in the graph and the same
-   card opened or presented share a silhouette. The width is clamped by the
+/* The thing frame. 16:9, matching `thing.ts` — a thing in the graph and the same
+   thing opened or presented share a silhouette. The width is clamped by the
    viewport's height as well as its width, so the frame letterboxes on a viewport
    that is not 16:9 rather than silently changing the shape of the content. */
-.card-pane__panel {
+.thing-pane__panel {
   position: relative;
   z-index: 1;
   background: var(--card);
@@ -487,7 +488,7 @@ body {
   pointer-events: auto;
 }
 
-.card-pane__editor {
+.thing-pane__editor {
   display: flex;
   flex: 1;
   min-height: 0;
@@ -496,7 +497,7 @@ body {
 }
 
 /* Fields scroll independently so Cancel and Done stay reachable. */
-.card-pane__fields {
+.thing-pane__fields {
   display: flex;
   flex: 1;
   min-height: 0;
@@ -510,24 +511,24 @@ body {
    its explanation, so the name leads and the sentence reads under it — and a
    sentence in the second half of a space-between row would be cramped against
    the frame anyway. */
-.card-pane__heading {
+.thing-pane__heading {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   font-size: 0.8rem;
 }
 
-.card-pane__heading span:first-child {
+.thing-pane__heading span:first-child {
   color: var(--foreground);
   font-weight: 600;
 }
 
-.card-pane__heading span:last-child {
+.thing-pane__heading span:last-child {
   color: var(--muted-foreground);
   line-height: 1.35;
 }
 
-.card-pane__field {
+.thing-pane__field {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -535,8 +536,8 @@ body {
   font-size: 0.8rem;
 }
 
-.card-pane__field input,
-.card-pane__field textarea {
+.thing-pane__field input,
+.thing-pane__field textarea {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.55rem 0.65rem;
@@ -545,10 +546,10 @@ body {
   font: inherit;
 }
 
-.card-pane__field textarea {
+.thing-pane__field textarea {
   flex: 1;
   /* A floor low enough that the pane above it does not have to scroll in the
-     ordinary case. The scroll on `.card-pane__fields` is the fallback for a
+     ordinary case. The scroll on `.thing-pane__fields` is the fallback for a
      genuinely small window, not the normal state of a full-screen editor. */
   min-height: 4rem;
   resize: none;
@@ -558,12 +559,12 @@ body {
 
 /* The one refusal red, rather than a second one. `#fca5a5` was picked to carry
    on a near-black pane and is barely a tint on the light one. */
-.card-pane__field-error {
+.thing-pane__field-error {
   color: var(--destructive);
   font-size: 0.8rem;
 }
 
-.card-pane__hint {
+.thing-pane__hint {
   margin: 0;
   color: var(--muted-foreground);
   font-size: 0.78rem;
@@ -572,8 +573,8 @@ body {
 
 /* The editor's content scrolls within the frame and this does not, so the
    actions never scroll away — Cancel and Done have to stay reachable at any
-   point in a long card. */
-.card-pane__actions {
+   point in a long thing. */
+.thing-pane__actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;

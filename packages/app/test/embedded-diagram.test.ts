@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { SPACE_CARD_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
+import { SPACE_THING_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
-import type { CardFlowNode } from '@project/react-flow-adapter';
+import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection } from '../src/canvas-projection';
 import {
   clipEmbeddedNode,
@@ -45,7 +45,7 @@ async function projection(open = false) {
           },
         ],
       },
-      cards: [
+      things: [
         { id: A, document: { kind: 'markdown', title: 'A', body: 'Target content' } },
         { id: B, document: { kind: 'markdown', title: 'B', body: '' } },
         { id: ALIAS, document: { kind: 'alias', title: 'Alias', target: A } },
@@ -59,28 +59,28 @@ async function projection(open = false) {
     await positionedStrategy(Placement.fromDiagram(resolved.diagram))(pending.strategyGraph),
     {
       activeGraphId: GRAPH,
-      activeCardId: null,
-      selectedCardId: null,
+      activeThingId: null,
+      selectedThingId: null,
       presenting: false,
       moved: false,
     },
   );
 }
 
-const parent = (source: CardFlowNode, width = 1000, height = 1000): CardFlowNode => ({
+const parent = (source: ThingFlowNode, width = 1000, height = 1000): ThingFlowNode => ({
   ...source,
   id: PARENT,
   width,
   height,
   position: { x: 800, y: 900 },
   zIndex: 10,
-  data: { ...source.data, cardId: PARENT, kind: 'space' },
+  data: { ...source.data, thingId: PARENT, kind: 'space' },
 });
 
 async function draw(open = false, width = 1000, height = 1000) {
   const projected = await projection(open);
   const first = projected.nodes[0];
-  if (first === undefined) throw new Error('No fixture Card');
+  if (first === undefined) throw new Error('No fixture Thing');
   return {
     projected,
     parent: parent(first, width, height),
@@ -93,9 +93,9 @@ async function draw(open = false, width = 1000, height = 1000) {
   };
 }
 
-const embedded = (nodes: readonly CardFlowNode[], cardId: string): CardFlowNode => {
-  const node = nodes.find((candidate) => candidate.data.cardId === cardId);
-  if (node === undefined) throw new Error('No embedded Card');
+const embedded = (nodes: readonly ThingFlowNode[], thingId: string): ThingFlowNode => {
+  const node = nodes.find((candidate) => candidate.data.thingId === thingId);
+  if (node === undefined) throw new Error('No embedded Thing');
   return node;
 };
 
@@ -104,16 +104,16 @@ const view = (parent: {
   readonly width?: number | undefined;
   readonly height?: number | undefined;
 }) => ({
-  top: SPACE_CARD_EMBED_INSET.top,
-  left: SPACE_CARD_EMBED_INSET.left,
-  right: (parent.width ?? 0) - SPACE_CARD_EMBED_INSET.right,
-  bottom: (parent.height ?? 0) - SPACE_CARD_EMBED_INSET.bottom,
+  top: SPACE_THING_EMBED_INSET.top,
+  left: SPACE_THING_EMBED_INSET.left,
+  right: (parent.width ?? 0) - SPACE_THING_EMBED_INSET.right,
+  bottom: (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
 });
 
 describe('an embedded production projection', () => {
-  it('parents Cards and translates their authored positions without moving the source', async () => {
+  it('parents Things and translates their authored positions without moving the source', async () => {
     const { drawn, projected } = await draw();
-    expect(drawn.nodes.find((node) => node.data.cardId === B)).toMatchObject({
+    expect(drawn.nodes.find((node) => node.data.thingId === B)).toMatchObject({
       id: embeddedNodeId(PARENT, B),
       parentId: PARENT,
       position: { x: 416, y: 42 },
@@ -122,20 +122,20 @@ describe('an embedded production projection', () => {
       focusable: true,
       connectable: false,
     });
-    expect(projected.nodes.find((node) => node.data.cardId === B)?.position).toEqual({
+    expect(projected.nodes.find((node) => node.data.thingId === B)?.position).toEqual({
       x: 400,
       y: 0,
     });
   });
 
-  it('draws a Card beyond the containing bounds where it was authored, clipped rather than moved', async () => {
+  it('draws a Thing beyond the containing bounds where it was authored, clipped rather than moved', async () => {
     // React Flow applies a numeric `extent` in `adoptUserNodes`, which is
     // rendering and not only dragging, so an extent narrower than the authored
-    // placement silently redraws the Diagram. Clipping is what a Card that no
+    // placement silently redraws the Diagram. Clipping is what a Thing that no
     // longer fits gets; the containing bounds constrain gesture proposals
     // instead (`constrainEmbeddedPosition`).
     const { drawn } = await draw(false, 400, 400);
-    const beyond = drawn.nodes.find((node) => node.data.cardId === B);
+    const beyond = drawn.nodes.find((node) => node.data.thingId === B);
     expect(beyond?.position).toEqual({ x: 416, y: 42 });
     expect(beyond?.extent).toBeUndefined();
     expect(beyond?.style?.clipPath).toBe('inset(0px 292px 0px 0px)');
@@ -143,8 +143,8 @@ describe('an embedded production projection', () => {
 
   it('constrains a gesture proposal to the drawn region, not the containing box', () => {
     // These expectations used to clamp into `[0, width] x [0, height]`, which is
-    // the containing Card's own box rather than what it draws: the bands
-    // `SPACE_CARD_EMBED_INSET` reserves are its rail, border and footer, and a
+    // the containing Thing's own box rather than what it draws: the bands
+    // `SPACE_THING_EMBED_INSET` reserves are its rail, border and footer, and a
     // proposal accepted inside them is clipped rather than drawn (below).
     const drawn = view({ width: 700, height: 500 });
     expect(constrainEmbeddedPosition({ x: 600, y: 120 }, drawn)).toEqual({ x: 600, y: 120 });
@@ -154,8 +154,8 @@ describe('an embedded production projection', () => {
 
   it('holds a proposal inside bounds an ancestor has narrowed', () => {
     // A nested embedding is clipped by every ancestor as well as by its own
-    // containing Card, and `SpaceCanvas` hands that intersection down as the
-    // request's bounds. Clamped into the containing Card's own region instead,
+    // containing Thing, and `SpaceCanvas` hands that intersection down as the
+    // request's bounds. Clamped into the containing Thing's own region instead,
     // a proposal is accepted where the ancestor's clip then hides it — the same
     // defect as the corner case above, one level in.
     const narrowed = { left: 16, top: 42, right: 300, bottom: 200 };
@@ -166,10 +166,10 @@ describe('an embedded production projection', () => {
     const { drawn, parent } = await draw(false, 700, 500);
     const node = embedded(drawn.nodes, B);
     const held = constrainEmbeddedPosition({ x: 900, y: 640 }, view(parent));
-    // 260x146 of Card, of which the sliver keeps 24 on each axis inside the
+    // 260x146 of Thing, of which the sliver keeps 24 on each axis inside the
     // view: right 660 + 260 - 684, bottom 296 + 146 - 320. Clamped to the
-    // containing box instead, both clips exceeded the Card's own extent and the
-    // committed Card vanished from the embedded view altogether.
+    // containing box instead, both clips exceeded the Thing's own extent and the
+    // committed Thing vanished from the embedded view altogether.
     expect(clipEmbeddedNode({ ...node, position: held }, view(parent)).style?.clipPath).toBe(
       'inset(0px 236px 122px 0px)',
     );
@@ -184,26 +184,29 @@ describe('an embedded production projection', () => {
     );
   });
 
-  it('clips a partial Card instead of removing it when the containing Card gets smaller', async () => {
+  it('clips a partial Thing instead of removing it when the containing Thing gets smaller', async () => {
     const { drawn } = await draw(false, 560, 420);
     expect(drawn.nodes).toHaveLength(3);
-    expect(drawn.nodes.find((node) => node.data.cardId === B)?.style?.clipPath).toBe(
+    expect(drawn.nodes.find((node) => node.data.thingId === B)?.style?.clipPath).toBe(
       'inset(0px 132px 0px 0px)',
     );
   });
 
   it('uses the target projection for Open Alias content and its authored placement', async () => {
     const { drawn } = await draw(true);
-    expect(drawn.nodes.find((node) => node.data.cardId === ALIAS)).toMatchObject({
+    expect(drawn.nodes.find((node) => node.data.thingId === ALIAS)).toMatchObject({
       width: 560,
       height: 420,
       data: { expanded: true, body: 'Target content', kind: 'alias' },
     });
     // B sits at the target Diagram's authored 400 plus the embedding offset, and
     // the Open Alias below it moves nothing: displacement is applied by the Edit
-    // that opens a Card, so it is already in the coordinates the target Space
+    // that opens a Thing, so it is already in the coordinates the target Space
     // stores (ADR 0084).
-    expect(drawn.nodes.find((node) => node.data.cardId === B)?.position).toEqual({ x: 416, y: 42 });
+    expect(drawn.nodes.find((node) => node.data.thingId === B)?.position).toEqual({
+      x: 416,
+      y: 42,
+    });
   });
 
   it('remaps Edge endpoints while preserving the production handle declarations', async () => {

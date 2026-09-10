@@ -6,12 +6,12 @@ import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 const snapshot = (id = META_ID, title = 'Meta'): SpaceSnapshot => ({
   id,
   document: { version: 1, title },
-  cards: [],
+  things: [],
 });
 
 const loaded = (id = META_ID, revision = 3n): LoadedSpace => ({
@@ -122,9 +122,9 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     const backend = new MemorySpaceBackend(META_ID, [loaded()]);
     const linkedMeta: SpaceSnapshot = {
       ...snapshot(),
-      cards: [
+      things: [
         {
-          id: SPACE_CARD_ID,
+          id: SPACE_THING_ID,
           document: { title: 'Other', kind: 'space', spaceId: OTHER_ID },
         },
       ],
@@ -178,9 +178,9 @@ describe('MemorySpaceBackend aggregate persistence', () => {
   it('conflicts an incomplete deletion when authoritative state still references the Space', async () => {
     const linkedMeta: SpaceSnapshot = {
       ...snapshot(),
-      cards: [
+      things: [
         {
-          id: SPACE_CARD_ID,
+          id: SPACE_THING_ID,
           document: { title: 'Other', kind: 'space', spaceId: OTHER_ID },
         },
       ],

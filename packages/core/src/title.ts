@@ -1,14 +1,14 @@
 /**
- * Reading a Card's Title (ADR 0083).
+ * Reading a Thing's Title (ADR 0083).
  *
  * A Title is one or more **Title Lines**, stored as it always was — one string
- * on the Card document — with the newlines inside it load-bearing. The first
- * line is the Card's **name**; the lines after it qualify it on the Card front.
+ * on the Thing document — with the newlines inside it load-bearing. The first
+ * line is the Thing's **name**; the lines after it qualify it on the Thing front.
  *
  * The structure therefore lives in a `string` and nothing in the type says so,
  * which is exactly why the reading of one is a named domain operation here
  * rather than a `split('\n')` at each of the surfaces that draw, list or search
- * a Card. The roles below are domain knowledge and not a renderer's positional
+ * a Thing. The roles below are domain knowledge and not a renderer's positional
  * convention: what an author's second line means is settled once, in this
  * module.
  */
@@ -38,7 +38,7 @@ export interface TitleLine {
  * that reason — a message is prose, and prose here would be a sentence no
  * surface could reword.
  */
-export const CARD_TITLE_REQUIRED = 'card-title-required';
+export const THING_TITLE_REQUIRED = 'thing-title-required';
 
 /** Which rung of the ladder the line at `index` takes. */
 const roleAt = (index: number): TitleLineRole =>
@@ -48,7 +48,7 @@ const roleAt = (index: number): TitleLineRole =>
  * The Title as it is stored, from the Title as it was typed or written down.
  *
  * Normalization belongs to the boundary a Title is *parsed* at — the schemas in
- * `schema.ts`, and through them `loadSpace` and the Card file parser — so a
+ * `schema.ts`, and through them `loadSpace` and the Thing file parser — so a
  * stored Title and an imported one get the same answer and no consumer
  * normalizes again on the way to a screen.
  *
@@ -58,7 +58,7 @@ const roleAt = (index: number): TitleLineRole =>
  * who left a gap meant it. Leading whitespace is a line's own and survives.
  *
  * A Title of nothing but whitespace normalizes to the empty string, which is
- * what {@link CARD_TITLE_REQUIRED} refuses. Answering that rather than throwing
+ * what {@link THING_TITLE_REQUIRED} refuses. Answering that rather than throwing
  * keeps this operation total: a draft mid-edit is a legitimate value to ask
  * about, and the refusal is the schema's to raise.
  */
@@ -79,7 +79,7 @@ export const normalizeTitle = (title: string): string => {
  * The Title read as its lines, each with its role.
  *
  * Written for a Title that has come through the schema, which is every Title on
- * a Card in a loaded Space. It does not normalize: normalization is the
+ * a Thing in a loaded Space. It does not normalize: normalization is the
  * boundary's, and doing it again here would be the same rule living in two
  * places, which is the thing this module exists to prevent.
  */
@@ -87,10 +87,10 @@ export const titleLines = (title: string): readonly TitleLine[] =>
   title.split('\n').map((text, index) => ({ role: roleAt(index), text }));
 
 /**
- * The Card's name: the first line of its Title.
+ * The Thing's name: the first line of its Title.
  *
  * Nearly every consumer wants this one and no other — every surface that lists
- * or refers to a Card shows the name, and only the Card front draws the ladder
+ * or refers to a Thing shows the name, and only the Thing front draws the ladder
  * (ADR 0083). It exists so that nobody writes `titleLines(title)[0].text`, an
  * expression that is both a positional convention restated and, under
  * `noUncheckedIndexedAccess`, a possibly-undefined value at every call site.

@@ -64,7 +64,7 @@ describe('GraphHud', () => {
         ]}
         colorByGraphId={{ [activeGraphId]: '#6ea8fe' }}
         activeGraphId={activeGraphId}
-        activeGraphCardIds={new Set([uuid('00000000-0000-4000-8000-000000000001')])}
+        activeGraphThingIds={new Set([uuid('00000000-0000-4000-8000-000000000001')])}
       />,
     );
 
@@ -103,7 +103,7 @@ describe('GraphHud', () => {
         ]}
         colorByGraphId={{ [activeGraphId]: '#123456' }}
         activeGraphId={activeGraphId}
-        activeGraphCardIds={new Set()}
+        activeGraphThingIds={new Set()}
       />,
     );
 
@@ -135,7 +135,7 @@ describe('GraphHud', () => {
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
-        activeGraphCardIds={new Set()}
+        activeGraphThingIds={new Set()}
       />,
     );
 

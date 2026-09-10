@@ -53,24 +53,24 @@ spaceRepositoryContract('PostgresSpaceRepository', async () => {
 });
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
-const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-const OMITTED_CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+const OMITTED_THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const MISSING_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const GRAPH_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
-const MISSING_CARD_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+const MISSING_THING_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
 const OTHER_SPACE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
-const OTHER_CARD_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
+const OTHER_THING_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
 const CONCURRENT_SPACE_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
-const CONCURRENT_CARD_ID = uuidSchema.parse('9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a');
-const MIXED_FIRST_CARD_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-const MIXED_SECOND_CARD_ID = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
-const UNRESOLVED_CARD_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+const CONCURRENT_THING_ID = uuidSchema.parse('9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a');
+const MIXED_FIRST_THING_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+const MIXED_SECOND_THING_ID = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+const UNRESOLVED_THING_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 const ORDERED_SPACE_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
-const ALL_IDLESS_CARD_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
-const SECOND_IDLESS_CARD_ID = uuidSchema.parse('fefefefe-fefe-4fef-8fef-fefefefefefe');
+const ALL_IDLESS_THING_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
+const SECOND_IDLESS_THING_ID = uuidSchema.parse('fefefefe-fefe-4fef-8fef-fefefefefefe');
 const DIAGRAM_ID = uuidSchema.parse('0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a');
 const OTHER_DIAGRAM_ID = uuidSchema.parse('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
-const ORDERED_CARD_IDS = [
+const ORDERED_THING_IDS = [
   uuidSchema.parse('eeeeeeee-1111-4eee-8eee-eeeeeeeeeeee'),
   uuidSchema.parse('eeeeeeee-2222-4eee-8eee-eeeeeeeeeeee'),
   uuidSchema.parse('eeeeeeee-3333-4eee-8eee-eeeeeeeeeeee'),
@@ -82,19 +82,19 @@ const snapshot: SpaceSnapshot = {
     version: 1,
     title: 'Repository space',
   },
-  cards: [
+  things: [
     {
-      id: CARD_ID,
+      id: THING_ID,
       document: {
-        title: 'Stored card',
+        title: 'Stored thing',
         kind: 'markdown',
         body: 'Stored through the repository.',
       },
     },
     {
-      id: OMITTED_CARD_ID,
+      id: OMITTED_THING_ID,
       document: {
-        title: 'Card to remove',
+        title: 'Thing to remove',
         kind: 'markdown',
         body: 'Runtime commits are authoritative.',
       },
@@ -108,11 +108,11 @@ const otherSnapshot: SpaceSnapshot = {
     version: 1,
     title: 'Other space',
   },
-  cards: [
+  things: [
     {
-      id: OTHER_CARD_ID,
+      id: OTHER_THING_ID,
       document: {
-        title: 'Other card',
+        title: 'Other thing',
         kind: 'markdown',
         body: 'Owned by the other space.',
       },
@@ -126,11 +126,11 @@ const concurrentSnapshot: SpaceSnapshot = {
     version: 1,
     title: 'Concurrent space',
   },
-  cards: [
+  things: [
     {
-      id: CONCURRENT_CARD_ID,
+      id: CONCURRENT_THING_ID,
       document: {
-        title: 'Concurrent card',
+        title: 'Concurrent thing',
         kind: 'markdown',
         body: 'Owned by the concurrent space.',
       },
@@ -147,45 +147,45 @@ const mixedImport: ImportSpace = {
         title: 'Mixed diagram',
         kind: 'positioned',
         positions: {
-          [MIXED_FIRST_CARD_ID]: { x: 40, y: 80, open: false },
-          [MIXED_SECOND_CARD_ID]: { x: 300, y: 80, open: false },
+          [MIXED_FIRST_THING_ID]: { x: 40, y: 80, open: false },
+          [MIXED_SECOND_THING_ID]: { x: 300, y: 80, open: false },
         },
         graphs: [
           {
-            title: 'Explicit card graph',
-            edges: [{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }],
+            title: 'Explicit thing graph',
+            edges: [{ from: MIXED_FIRST_THING_ID, to: MIXED_SECOND_THING_ID }],
           },
         ],
       },
     ],
   },
-  cards: [
+  things: [
     {
-      id: MIXED_FIRST_CARD_ID,
-      document: { title: 'First explicit card', kind: 'markdown', body: 'First.' },
+      id: MIXED_FIRST_THING_ID,
+      document: { title: 'First explicit thing', kind: 'markdown', body: 'First.' },
     },
     {
-      id: MIXED_SECOND_CARD_ID,
-      document: { title: 'Second explicit card', kind: 'markdown', body: 'Second.' },
+      id: MIXED_SECOND_THING_ID,
+      document: { title: 'Second explicit thing', kind: 'markdown', body: 'Second.' },
     },
     {
-      document: { title: 'Generated card', kind: 'markdown', body: 'Generated.' },
+      document: { title: 'Generated thing', kind: 'markdown', body: 'Generated.' },
     },
   ],
 };
 
 /**
  * Every id an import may leave out, left out — which under version 1 is
- * everything except the card an edge names.
+ * everything except the thing an edge names.
  *
  * A diagram owns at least one graph, a graph holds at least one edge, and an
- * edge names its endpoints by id, so a card an edge reaches cannot be id-less
+ * edge names its endpoints by id, so a thing an edge reaches cannot be id-less
  * and still be reachable: there would be no value to write in the edge. The
- * card id is therefore the one identity supplied, and it is a parameter because
- * cards are rows — a second import reusing it would collide on the primary key
+ * thing id is therefore the one identity supplied, and it is a parameter because
+ * things are rows — a second import reusing it would collide on the primary key
  * and be rejected, which is a different fact from the one below.
  */
-const idlessImport = (cardId: UUID): ImportSpace => ({
+const idlessImport = (thingId: UUID): ImportSpace => ({
   document: {
     version: 1,
     title: 'All generated identities',
@@ -193,15 +193,15 @@ const idlessImport = (cardId: UUID): ImportSpace => ({
       {
         title: 'Generated diagram',
         kind: 'positioned',
-        positions: { [cardId]: { x: 0, y: 0, open: false } },
-        graphs: [{ title: 'Generated graph', edges: [{ from: cardId, to: cardId }] }],
+        positions: { [thingId]: { x: 0, y: 0, open: false } },
+        graphs: [{ title: 'Generated graph', edges: [{ from: thingId, to: thingId }] }],
       },
     ],
   },
-  cards: [
+  things: [
     {
-      id: cardId,
-      document: { title: 'Generated only card', kind: 'markdown', body: 'Generated.' },
+      id: thingId,
+      document: { title: 'Generated only thing', kind: 'markdown', body: 'Generated.' },
     },
   ],
 });
@@ -222,13 +222,13 @@ describe('PostgresSpaceRepository', () => {
   afterEach(async () => {
     await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
     for (const id of createdSpaceIds) {
-      await db.orm.public.Card.where({ spaceId: id }).deleteAll();
+      await db.orm.public.Thing.where({ spaceId: id }).deleteAll();
       await db.orm.public.Space.where({ id }).delete();
     }
     createdSpaceIds.clear();
-    await db.orm.public.Card.where({ spaceId: SPACE_ID }).deleteAll();
-    await db.orm.public.Card.where({ spaceId: OTHER_SPACE_ID }).deleteAll();
-    await db.orm.public.Card.where({ spaceId: CONCURRENT_SPACE_ID }).deleteAll();
+    await db.orm.public.Thing.where({ spaceId: SPACE_ID }).deleteAll();
+    await db.orm.public.Thing.where({ spaceId: OTHER_SPACE_ID }).deleteAll();
+    await db.orm.public.Thing.where({ spaceId: CONCURRENT_SPACE_ID }).deleteAll();
     await db.orm.public.Space.where({ id: SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: OTHER_SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: CONCURRENT_SPACE_ID }).delete();
@@ -282,7 +282,7 @@ describe('PostgresSpaceRepository', () => {
     ]);
   });
 
-  it('classifies initialization when a concurrent winner takes a shared Card identity', async () => {
+  it('classifies initialization when a concurrent winner takes a shared Thing identity', async () => {
     const winnerReady = Promise.withResolvers<undefined>();
     const releaseWinner = Promise.withResolvers<undefined>();
     const winner = db.transaction(async ({ orm }) => {
@@ -291,8 +291,8 @@ describe('PostgresSpaceRepository', () => {
         document: { version: 1, title: 'Winner' },
         revision: 0,
       });
-      await orm.public.Card.create({
-        id: CARD_ID,
+      await orm.public.Thing.create({
+        id: THING_ID,
         spaceId: SPACE_ID,
         document: { title: 'Shared', kind: 'markdown', body: 'Winner' },
       });
@@ -305,9 +305,9 @@ describe('PostgresSpaceRepository', () => {
     const proposal: SpaceSnapshot = {
       id: CONCURRENT_SPACE_ID,
       document: { version: 1, title: 'Loser' },
-      cards: [
+      things: [
         {
-          id: CARD_ID,
+          id: THING_ID,
           document: { title: 'Shared', kind: 'markdown', body: 'Loser' },
         },
       ],
@@ -474,10 +474,10 @@ describe('PostgresSpaceRepository', () => {
         {
           id: CONCURRENT_SPACE_ID,
           document: { version: 1, title: 'Truncating import' },
-          cards: [
+          things: [
             {
-              id: CONCURRENT_CARD_ID,
-              document: { title: 'Imported card', kind: 'markdown', body: 'Imported.' },
+              id: CONCURRENT_THING_ID,
+              document: { title: 'Imported thing', kind: 'markdown', body: 'Imported.' },
             },
           ],
         },
@@ -637,10 +637,10 @@ describe('PostgresSpaceRepository', () => {
   it('refuses a multi-Space write whose row moved after the conflict check read it', async () => {
     const linked: SpaceSnapshot = {
       ...snapshot,
-      cards: [
-        ...snapshot.cards,
+      things: [
+        ...snapshot.things,
         {
-          id: MISSING_CARD_ID,
+          id: MISSING_THING_ID,
           document: { title: 'Link', kind: 'space', spaceId: OTHER_SPACE_ID },
         },
       ],
@@ -722,7 +722,7 @@ describe('PostgresSpaceRepository', () => {
             snapshot: {
               id: OTHER_SPACE_ID,
               document: { version: 1, title: 'Moved by the unlocked writer' },
-              cards: otherSnapshot.cards,
+              things: otherSnapshot.things,
             },
             revision: 1n,
             exportedRevision: null,
@@ -740,11 +740,11 @@ describe('PostgresSpaceRepository', () => {
     const changed: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Committed space' },
-      cards: [
+      things: [
         {
-          id: CARD_ID,
+          id: THING_ID,
           document: {
-            title: 'Changed card',
+            title: 'Changed thing',
             kind: 'markdown',
             body: 'The newer complete snapshot wins.',
           },
@@ -816,14 +816,14 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
-  it('loads the space document and cards from one aggregate revision', async () => {
+  it('loads the space document and things from one aggregate revision', async () => {
     const atRevision = (revision: number): SpaceSnapshot => ({
       ...snapshot,
       document: { ...snapshot.document, title: `Revision ${revision}` },
-      cards: [
+      things: [
         {
-          ...snapshot.cards[0]!,
-          document: { ...snapshot.cards[0]!.document, title: `Revision ${revision}` },
+          ...snapshot.things[0]!,
+          document: { ...snapshot.things[0]!.document, title: `Revision ${revision}` },
         },
       ],
     });
@@ -847,29 +847,29 @@ describe('PostgresSpaceRepository', () => {
 
         const marker = `Revision ${loaded.revision}`;
         expect(loaded.snapshot.document.title).toBe(marker);
-        expect(loaded.snapshot.cards).toHaveLength(1);
-        expect(loaded.snapshot.cards[0]?.document.title).toBe(marker);
+        expect(loaded.snapshot.things).toHaveLength(1);
+        expect(loaded.snapshot.things[0]?.document.title).toBe(marker);
       }
     };
 
     await Promise.all([writeRevisions(), ...Array.from({ length: 4 }, readRevisions)]);
   });
 
-  it('returns cards in id order however they were stored', async () => {
-    // Card order is now the include aggregate's ORDER BY rather than a separate
+  it('returns things in id order however they were stored', async () => {
+    // Thing order is now the include aggregate's ORDER BY rather than a separate
     // query's, so it needs pinning at the one place that can tell the
-    // difference: cards supplied in reverse id order. Every other fixture here
+    // difference: things supplied in reverse id order. Every other fixture here
     // supplies them already sorted, where an unordered aggregate would pass.
-    const [first, second, third] = ORDERED_CARD_IDS;
-    const card = (id: UUID, title: string) => ({
+    const [first, second, third] = ORDERED_THING_IDS;
+    const thing = (id: UUID, title: string) => ({
       id,
       document: { title, kind: 'markdown' as const, body: title },
     });
     const result = await repository.importSpaces([
       {
         id: ORDERED_SPACE_ID,
-        document: { version: 1, title: 'Ordered cards' },
-        cards: [card(third, 'Third'), card(second, 'Second'), card(first, 'First')],
+        document: { version: 1, title: 'Ordered things' },
+        things: [thing(third, 'Third'), thing(second, 'Second'), thing(first, 'First')],
       },
     ]);
     trackImported(result);
@@ -877,8 +877,8 @@ describe('PostgresSpaceRepository', () => {
     if (result.kind !== 'imported') throw new Error(result.message);
 
     const order = (stored: LoadedSpace) => ({
-      ids: stored.snapshot.cards.map((card) => card.id),
-      titles: stored.snapshot.cards.map((card) => card.document.title),
+      ids: stored.snapshot.things.map((thing) => thing.id),
+      titles: stored.snapshot.things.map((thing) => thing.document.title),
     });
     const ascending = { ids: [first, second, third], titles: ['First', 'Second', 'Third'] };
 
@@ -898,7 +898,7 @@ describe('PostgresSpaceRepository', () => {
     const missing: SpaceSnapshot = {
       id: MISSING_SPACE_ID,
       document: { version: 1, title: 'Missing space' },
-      cards: [],
+      things: [],
     };
 
     expect(await commitSpace(missing, 0n)).toEqual({
@@ -919,12 +919,12 @@ describe('PostgresSpaceRepository', () => {
             id: DIAGRAM_ID,
             title: 'Owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+            positions: { [THING_ID]: { x: 0, y: 0, open: false } },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Dangling graph',
-                edges: [{ from: CARD_ID, to: MISSING_CARD_ID }],
+                edges: [{ from: THING_ID, to: MISSING_THING_ID }],
               },
             ],
           },
@@ -942,13 +942,13 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
-  it('rejects a card owned by another space and rolls back the whole commit', async () => {
+  it('rejects a thing owned by another space and rolls back the whole commit', async () => {
     const linked: SpaceSnapshot = {
       ...snapshot,
-      cards: [
-        ...snapshot.cards,
+      things: [
+        ...snapshot.things,
         {
-          id: MISSING_CARD_ID,
+          id: MISSING_THING_ID,
           document: { title: 'Other Space', kind: 'space', spaceId: OTHER_SPACE_ID },
         },
       ],
@@ -957,7 +957,7 @@ describe('PostgresSpaceRepository', () => {
     const claimed: SpaceSnapshot = {
       ...linked,
       document: { ...linked.document, title: 'Must roll back' },
-      cards: [...linked.cards, otherSnapshot.cards[0]!],
+      things: [...linked.things, otherSnapshot.things[0]!],
     };
 
     await expect(commitSpace(claimed, 0n)).resolves.toMatchObject({
@@ -982,19 +982,19 @@ describe('PostgresSpaceRepository', () => {
     const firstTarget: SpaceSnapshot = {
       id: OTHER_SPACE_ID,
       document: { version: 1, title: 'First target' },
-      cards: [],
+      things: [],
     };
     const secondTarget: SpaceSnapshot = {
       id: CONCURRENT_SPACE_ID,
       document: { version: 1, title: 'Second target' },
-      cards: [],
+      things: [],
     };
     const firstLinked: SpaceSnapshot = {
       ...snapshot,
-      cards: [
-        ...snapshot.cards,
+      things: [
+        ...snapshot.things,
         {
-          id: MISSING_CARD_ID,
+          id: MISSING_THING_ID,
           document: {
             title: 'First link',
             kind: 'space',
@@ -1005,10 +1005,10 @@ describe('PostgresSpaceRepository', () => {
     };
     const secondLinked: SpaceSnapshot = {
       ...snapshot,
-      cards: [
-        ...snapshot.cards,
+      things: [
+        ...snapshot.things,
         {
-          id: UNRESOLVED_CARD_ID,
+          id: UNRESOLVED_THING_ID,
           document: {
             title: 'Second link',
             kind: 'space',
@@ -1078,17 +1078,17 @@ describe('PostgresSpaceRepository', () => {
   it('rejects an existing space identity without changing stored content', async () => {
     await repository.importSpaces([snapshot]);
     await repository.importSpaces([otherSnapshot]);
-    const suppliedCard = {
-      ...snapshot.cards[0]!,
+    const suppliedThing = {
+      ...snapshot.things[0]!,
       document: {
-        ...snapshot.cards[0]!.document,
+        ...snapshot.things[0]!.document,
         title: 'Updated by import',
       },
     };
     const reimported: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Reimported space' },
-      cards: [suppliedCard],
+      things: [suppliedThing],
     };
 
     // An identity rejection, not a conflict. Insert-only import runs no
@@ -1112,13 +1112,13 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
-  it('replaces every stored space and card in truncate mode', async () => {
+  it('replaces every stored space and thing in truncate mode', async () => {
     await repository.importSpaces([snapshot]);
     await repository.importSpaces([otherSnapshot]);
     const replacement: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Only remaining space' },
-      cards: [snapshot.cards[0]!],
+      things: [snapshot.things[0]!],
     };
 
     await expect(repository.importSpaces([replacement], 'truncate')).resolves.toEqual({
@@ -1155,13 +1155,13 @@ describe('PostgresSpaceRepository', () => {
             graphs: [
               {
                 title: 'Dangling graph',
-                edges: [{ from: UNRESOLVED_CARD_ID, to: MISSING_CARD_ID }],
+                edges: [{ from: UNRESOLVED_THING_ID, to: MISSING_THING_ID }],
               },
             ],
           },
         ],
       },
-      cards: [],
+      things: [],
     };
 
     await expect(
@@ -1192,37 +1192,37 @@ describe('PostgresSpaceRepository', () => {
     expect(diagram).toBeDefined();
     if (diagram === undefined) throw new Error('Generated diagram was not returned');
     const graph = diagram.graphs[0]!;
-    const generatedCard = stored.snapshot.cards.find(
-      ({ id }) => id !== MIXED_FIRST_CARD_ID && id !== MIXED_SECOND_CARD_ID,
+    const generatedThing = stored.snapshot.things.find(
+      ({ id }) => id !== MIXED_FIRST_THING_ID && id !== MIXED_SECOND_THING_ID,
     );
-    expect(generatedCard).toBeDefined();
-    if (generatedCard === undefined) throw new Error('Generated card was not returned');
-    const generatedIds = [stored.snapshot.id, generatedCard.id, graph.id, diagram.id];
+    expect(generatedThing).toBeDefined();
+    if (generatedThing === undefined) throw new Error('Generated thing was not returned');
+    const generatedIds = [stored.snapshot.id, generatedThing.id, graph.id, diagram.id];
 
     for (const id of generatedIds) expect(uuidSchema.safeParse(id).success).toBe(true);
     expect(new Set(generatedIds).size).toBe(4);
-    expect(generatedIds).not.toContain(MIXED_FIRST_CARD_ID);
-    expect(generatedIds).not.toContain(MIXED_SECOND_CARD_ID);
-    expect(new Set(stored.snapshot.cards.map(({ id }) => id))).toEqual(
-      new Set([MIXED_FIRST_CARD_ID, MIXED_SECOND_CARD_ID, generatedCard.id]),
+    expect(generatedIds).not.toContain(MIXED_FIRST_THING_ID);
+    expect(generatedIds).not.toContain(MIXED_SECOND_THING_ID);
+    expect(new Set(stored.snapshot.things.map(({ id }) => id))).toEqual(
+      new Set([MIXED_FIRST_THING_ID, MIXED_SECOND_THING_ID, generatedThing.id]),
     );
-    expect(graph.edges).toEqual([{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }]);
+    expect(graph.edges).toEqual([{ from: MIXED_FIRST_THING_ID, to: MIXED_SECOND_THING_ID }]);
     expect(diagram.positions).toEqual({
-      [MIXED_FIRST_CARD_ID]: { x: 40, y: 80, open: false },
-      [MIXED_SECOND_CARD_ID]: { x: 300, y: 80, open: false },
+      [MIXED_FIRST_THING_ID]: { x: 40, y: 80, open: false },
+      [MIXED_SECOND_THING_ID]: { x: 300, y: 80, open: false },
     });
     await expect(repository.loadSpace(stored.snapshot.id)).resolves.toEqual(stored);
   });
 
   it('mints a fresh identity per import for every id the input omits', async () => {
-    const first = await repository.importSpaces([idlessImport(ALL_IDLESS_CARD_ID)]);
+    const first = await repository.importSpaces([idlessImport(ALL_IDLESS_THING_ID)]);
     trackImported(first);
     expect(first.kind).toBe('imported');
     if (first.kind !== 'imported') {
       throw new Error(first.message);
     }
 
-    const second = await repository.importSpaces([idlessImport(SECOND_IDLESS_CARD_ID)]);
+    const second = await repository.importSpaces([idlessImport(SECOND_IDLESS_THING_ID)]);
     trackImported(second);
     expect(second.kind).toBe('imported');
     if (second.kind !== 'imported') {
@@ -1230,7 +1230,7 @@ describe('PostgresSpaceRepository', () => {
     }
 
     // The three the input omitted, and the graph is reached through its owner
-    // because that is where the minting now happens. The card id is deliberately
+    // because that is where the minting now happens. The thing id is deliberately
     // not among them: it was supplied, so asserting it was minted would assert
     // the opposite of what the fixture says.
     const minted = (stored: LoadedSpace): UUID[] => {
@@ -1244,11 +1244,11 @@ describe('PostgresSpaceRepository', () => {
     }
     // Six, so nothing is memoized across imports of identical structure.
     expect(new Set([...firstIds, ...secondIds]).size).toBe(6);
-    expect([...firstIds, ...secondIds]).not.toContain(ALL_IDLESS_CARD_ID);
-    expect([...firstIds, ...secondIds]).not.toContain(SECOND_IDLESS_CARD_ID);
+    expect([...firstIds, ...secondIds]).not.toContain(ALL_IDLESS_THING_ID);
+    expect([...firstIds, ...secondIds]).not.toContain(SECOND_IDLESS_THING_ID);
   });
 
-  it('rejects reuse of explicit cards by a generated space and rolls back the batch', async () => {
+  it('rejects reuse of explicit things by a generated space and rolls back the batch', async () => {
     await repository.importSpaces([snapshot]);
     const first = await repository.importSpaces([mixedImport]);
     trackImported(first);
@@ -1262,9 +1262,9 @@ describe('PostgresSpaceRepository', () => {
     const second = await repository.importSpaces([otherSnapshot, mixedImport]);
     trackImported(second);
 
-    expect(second).toMatchObject({ kind: 'rejected', code: 'card-ownership' });
+    expect(second).toMatchObject({ kind: 'rejected', code: 'thing-ownership' });
     if (second.kind !== 'rejected') throw new Error('Conflicting import was not rejected');
-    expect(second.message).toContain(MIXED_FIRST_CARD_ID);
+    expect(second.message).toContain(MIXED_FIRST_THING_ID);
     await expect(repository.listSpaces()).resolves.toEqual(catalogBefore);
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
     await expect(repository.loadSpace(firstStored.snapshot.id)).resolves.toEqual(firstStored);
@@ -1292,15 +1292,15 @@ describe('PostgresSpaceRepository', () => {
             graphs: [
               {
                 title: 'Unresolved graph',
-                edges: [{ from: UNRESOLVED_CARD_ID, to: MISSING_CARD_ID }],
+                edges: [{ from: UNRESOLVED_THING_ID, to: MISSING_THING_ID }],
               },
             ],
           },
         ],
       },
-      cards: [
+      things: [
         {
-          document: { title: 'Id-less card', kind: 'markdown', body: 'Cannot be referenced.' },
+          document: { title: 'Id-less thing', kind: 'markdown', body: 'Cannot be referenced.' },
         },
       ],
     };
@@ -1310,7 +1310,7 @@ describe('PostgresSpaceRepository', () => {
 
     expect(result).toMatchObject({ kind: 'rejected', code: 'invalid-snapshot' });
     if (result.kind !== 'rejected') throw new Error('Invalid import was not rejected');
-    expect(result.message).toContain(UNRESOLVED_CARD_ID);
+    expect(result.message).toContain(UNRESOLVED_THING_ID);
     await expect(repository.listSpaces()).resolves.toEqual(catalogBefore);
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(knownSpaceBefore);
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(otherSpaceBefore);
@@ -1329,7 +1329,7 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
   });
 
-  it('rejects a cross-space card in an import and rolls back the whole batch', async () => {
+  it('rejects a cross-space thing in an import and rolls back the whole batch', async () => {
     await repository.importSpaces([snapshot]);
     await repository.importSpaces([otherSnapshot]);
     const changedFirst: SpaceSnapshot = {
@@ -1338,7 +1338,7 @@ describe('PostgresSpaceRepository', () => {
     };
     const claimedByOther: SpaceSnapshot = {
       ...otherSnapshot,
-      cards: [...otherSnapshot.cards, snapshot.cards[0]!],
+      things: [...otherSnapshot.things, snapshot.things[0]!],
     };
 
     await expect(repository.importSpaces([changedFirst, claimedByOther])).resolves.toMatchObject({
@@ -1398,10 +1398,10 @@ describe('PostgresSpaceRepository', () => {
     // is what makes the space the scope (ADR 0045). Two spaces reusing one is
     // therefore fine.
     // There is no graphs table and no diagrams table (ADR 0030 keeps both nested),
-    // and every query in the repository is by space id or card id, so no lookup
-    // anywhere can be made ambiguous by the reuse below. Space and card ids are
+    // and every query in the repository is by space id or thing id, so no lookup
+    // anywhere can be made ambiguous by the reuse below. Space and thing ids are
     // rows and stay globally unique — enforced by their primary keys, which the
-    // duplicate-identity and card-ownership tests cover.
+    // duplicate-identity and thing-ownership tests cover.
     //
     // Guards a decision, not a bug: scanning every stored document to reject
     // this would cost a full table read per import and protect nothing.
@@ -1416,22 +1416,22 @@ describe('PostgresSpaceRepository', () => {
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [CARD_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_CARD_ID]: { x: 300, y: 0, open: false },
+              [THING_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Shared graph id',
-                edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }],
+                edges: [{ from: THING_ID, to: OMITTED_THING_ID }],
               },
             ],
           },
         ],
       },
-      cards: [
-        { id: CARD_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
-        { id: OMITTED_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
+      things: [
+        { id: THING_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
+        { id: OMITTED_THING_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
       ],
     };
     const second: SpaceSnapshot = {
@@ -1445,22 +1445,22 @@ describe('PostgresSpaceRepository', () => {
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [OTHER_CARD_ID]: { x: 0, y: 0, open: false },
-              [MIXED_FIRST_CARD_ID]: { x: 300, y: 0, open: false },
+              [OTHER_THING_ID]: { x: 0, y: 0, open: false },
+              [MIXED_FIRST_THING_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Same graph id, other space',
-                edges: [{ from: OTHER_CARD_ID, to: MIXED_FIRST_CARD_ID }],
+                edges: [{ from: OTHER_THING_ID, to: MIXED_FIRST_THING_ID }],
               },
             ],
           },
         ],
       },
-      cards: [
-        { id: OTHER_CARD_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
-        { id: MIXED_FIRST_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'Second.' } },
+      things: [
+        { id: OTHER_THING_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
+        { id: MIXED_FIRST_THING_ID, document: { title: 'To', kind: 'markdown', body: 'Second.' } },
       ],
     };
 
@@ -1496,22 +1496,22 @@ describe('PostgresSpaceRepository', () => {
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [CARD_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_CARD_ID]: { x: 300, y: 0, open: false },
+              [THING_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Shared graph id',
-                edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }],
+                edges: [{ from: THING_ID, to: OMITTED_THING_ID }],
               },
             ],
           },
         ],
       },
-      cards: [
-        { id: CARD_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
-        { id: OMITTED_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
+      things: [
+        { id: THING_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
+        { id: OMITTED_THING_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
       ],
     };
     const second: SpaceSnapshot = {
@@ -1525,22 +1525,22 @@ describe('PostgresSpaceRepository', () => {
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [OTHER_CARD_ID]: { x: 0, y: 0, open: false },
-              [MIXED_FIRST_CARD_ID]: { x: 300, y: 0, open: false },
+              [OTHER_THING_ID]: { x: 0, y: 0, open: false },
+              [MIXED_FIRST_THING_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Same graph id',
-                edges: [{ from: OTHER_CARD_ID, to: MIXED_FIRST_CARD_ID }],
+                edges: [{ from: OTHER_THING_ID, to: MIXED_FIRST_THING_ID }],
               },
             ],
           },
         ],
       },
-      cards: [
-        { id: OTHER_CARD_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
-        { id: MIXED_FIRST_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'Second.' } },
+      things: [
+        { id: OTHER_THING_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
+        { id: MIXED_FIRST_THING_ID, document: { title: 'To', kind: 'markdown', body: 'Second.' } },
       ],
     };
 
@@ -1551,50 +1551,50 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });
 
-  it('imports a Space whose graph id equals one of its card ids', async () => {
+  it('imports a Space whose graph id equals one of its thing ids', async () => {
     // Entity kinds do not share an identity space. Intake checks each kind
-    // separately — cards among cards, graphs among graphs — so a UUID naming
-    // both a card and a graph names two different things unambiguously.
+    // separately — things among things, graphs among graphs — so a UUID naming
+    // both a thing and a graph names two different things unambiguously.
     const shared: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
         version: 1,
-        title: 'Graph id equals card id',
+        title: 'Graph id equals thing id',
         diagrams: [
           {
             id: DIAGRAM_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [CARD_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_CARD_ID]: { x: 300, y: 0, open: false },
+              [THING_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
-                id: CARD_ID,
-                title: 'Graph named like a card',
-                edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }],
+                id: THING_ID,
+                title: 'Graph named like a thing',
+                edges: [{ from: THING_ID, to: OMITTED_THING_ID }],
               },
             ],
           },
         ],
       },
-      cards: [
-        { id: CARD_ID, document: { title: 'From', kind: 'markdown', body: 'Shared.' } },
-        { id: OMITTED_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'Shared.' } },
+      things: [
+        { id: THING_ID, document: { title: 'From', kind: 'markdown', body: 'Shared.' } },
+        { id: OMITTED_THING_ID, document: { title: 'To', kind: 'markdown', body: 'Shared.' } },
       ],
     };
 
     expect((await repository.importSpaces([shared])).kind).toBe('imported');
   });
 
-  it('rejects a batch whose Spaces claim the same card id', async () => {
-    // Cards are rows, so their ids must stay unique across the database. Caught
+  it('rejects a batch whose Spaces claim the same thing id', async () => {
+    // Things are rows, so their ids must stay unique across the database. Caught
     // before any write rather than as a late primary-key violation.
     const claimant: SpaceSnapshot = {
       id: OTHER_SPACE_ID,
-      document: { version: 1, title: 'Claims the first space card' },
-      cards: [{ id: CARD_ID, document: { title: 'Taken', kind: 'markdown', body: 'Taken.' } }],
+      document: { version: 1, title: 'Claims the first space thing' },
+      things: [{ id: THING_ID, document: { title: 'Taken', kind: 'markdown', body: 'Taken.' } }],
     };
 
     await expect(repository.importSpaces([snapshot, claimant])).resolves.toMatchObject({
@@ -1620,11 +1620,11 @@ describe('PostgresSpaceRepository', () => {
             title: 'First owner',
             kind: 'positioned',
             positions: {
-              [CARD_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_CARD_ID]: { x: 300, y: 0, open: false },
+              [THING_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
-              { id: GRAPH_ID, title: 'First', edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }] },
+              { id: GRAPH_ID, title: 'First', edges: [{ from: THING_ID, to: OMITTED_THING_ID }] },
             ],
           },
           {
@@ -1632,11 +1632,11 @@ describe('PostgresSpaceRepository', () => {
             title: 'Second owner',
             kind: 'positioned',
             positions: {
-              [CARD_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_CARD_ID]: { x: 300, y: 0, open: false },
+              [THING_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
-              { id: GRAPH_ID, title: 'Second', edges: [{ from: OMITTED_CARD_ID, to: CARD_ID }] },
+              { id: GRAPH_ID, title: 'Second', edges: [{ from: OMITTED_THING_ID, to: THING_ID }] },
             ],
           },
         ],
@@ -1665,7 +1665,7 @@ describe('PostgresSpaceRepository', () => {
     const firstSnapshot: SpaceSnapshot = {
       id: CONCURRENT_SPACE_ID,
       document: { version: 1, title: 'First concurrent insert' },
-      cards: [],
+      things: [],
     };
     const secondSnapshot: SpaceSnapshot = {
       ...firstSnapshot,

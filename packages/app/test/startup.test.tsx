@@ -10,14 +10,14 @@ import { recordingHistory } from './browser-history';
 import { startApplication } from '../src/startup';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
   document: { version: 1, title: 'Stored space' },
-  cards: [
+  things: [
     {
-      id: CARD_ID,
+      id: THING_ID,
       document: { title: 'Start here', kind: 'markdown', body: 'Stored body' },
     },
   ],
@@ -51,7 +51,7 @@ it('opens once under StrictMode and mounts without interpreting the browser path
   const spaces = createOpenSpaces({
     backend,
     metaSpaceId: SPACE_ID,
-    newId: () => CARD_ID,
+    newId: () => THING_ID,
     history: recordingHistory(),
   });
   const opened = await spaces.open(SPACE_ID);

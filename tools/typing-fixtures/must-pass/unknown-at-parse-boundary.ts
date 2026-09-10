@@ -1,4 +1,4 @@
-interface CardTitle {
+interface ThingTitle {
   readonly title: string;
 }
 
@@ -12,9 +12,9 @@ const isString = (value: unknown): value is string => typeof value === 'string';
  * predicates rather than by an assertion. This is the shape the assertion rules
  * exist to push code towards, so rejecting it would defeat them.
  */
-export const parseCardTitle = (value: unknown): CardTitle => {
-  if (!isRecord(value)) throw new Error('a Card must be an object');
+export const parseThingTitle = (value: unknown): ThingTitle => {
+  if (!isRecord(value)) throw new Error('a Thing must be an object');
   const title = value['title'];
-  if (!isString(title)) throw new Error('a Card must carry a string title');
+  if (!isString(title)) throw new Error('a Thing must carry a string title');
   return { title };
 };

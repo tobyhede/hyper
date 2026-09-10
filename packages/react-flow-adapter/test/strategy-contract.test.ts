@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { CardId, GraphId } from '@project/core';
+import type { ThingId, GraphId } from '@project/core';
 import {
   buildLayoutStrategyGraph,
   gridStrategy,
   Placement,
   positionedStrategy,
-  type CardHandleSet,
+  type ThingHandleSet,
   type GraphRenderEdge,
   type LayoutStrategyGraph,
   type LayoutStrategy,
@@ -22,7 +22,7 @@ import { uuid } from './uuid';
  * which is the whole reason the seam exists. docs/agents/rendering.md says `gridStrategy` is
  * kept "partly to keep the seam honest"; this is what makes that true.
  *
- * A strategy is free to put cards anywhere. What it may not do is lose one,
+ * A strategy is free to put things anywhere. What it may not do is lose one,
  * invent one, drop an edge, rewrite an identity, or return something other than
  * a promise. `elkStrategy` runs the real elkjs here — it is the implementation
  * most able to violate this, being the one that does not simply arrange in a
@@ -31,15 +31,15 @@ import { uuid } from './uuid';
 
 const SIZE = { width: 320, height: 180 };
 
-/** A card with one inbound and one outbound handle, as `buildLayoutStrategyGraph` makes
+/** A thing with one inbound and one outbound handle, as `buildLayoutStrategyGraph` makes
  *  them from a graph's edges. */
-const handles = (graphId: GraphId): CardHandleSet => ({
+const handles = (graphId: GraphId): ThingHandleSet => ({
   targetHandles: [{ id: `${graphId}::in`, graphId }],
   sourceHandles: [{ id: `${graphId}::out`, graphId }],
 });
 
 /**
- * A fork and a merge over five cards — deliberately not a line, since a line is
+ * A fork and a merge over five things — deliberately not a line, since a line is
  * the degenerate case and every fixture graph already is one.
  *
  *      b
@@ -49,7 +49,7 @@ const handles = (graphId: GraphId): CardHandleSet => ({
  *      c
  */
 function sampleGraph(): LayoutStrategyGraph {
-  const cardIds = [
+  const thingIds = [
     '00000000-0000-4000-8000-000000000002',
     '00000000-0000-4000-8000-000000000003',
     '00000000-0000-4000-8000-000000000005',
@@ -57,8 +57,8 @@ function sampleGraph(): LayoutStrategyGraph {
     '00000000-0000-4000-8000-000000000008',
   ].map(uuid);
   const graphId = uuid('00000000-0000-4000-8000-000000000004');
-  const handlesByCard = new Map(cardIds.map((id) => [id, handles(graphId)]));
-  const connections: readonly [CardId, CardId][] = [
+  const handlesByThing = new Map(thingIds.map((id) => [id, handles(graphId)]));
+  const connections: readonly [ThingId, ThingId][] = [
     [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
     [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000005')],
     [uuid('00000000-0000-4000-8000-000000000003'), uuid('00000000-0000-4000-8000-000000000006')],
@@ -74,14 +74,14 @@ function sampleGraph(): LayoutStrategyGraph {
     targetHandle: `${graphId}::in`,
   }));
 
-  return buildLayoutStrategyGraph(cardIds, handlesByCard, edges, () => SIZE);
+  return buildLayoutStrategyGraph(thingIds, handlesByThing, edges, () => SIZE);
 }
 
 /**
  * Positions for `positionedStrategy`, which reads an authored Diagram.
  *
- * Also covers `00000000...0099`, the single card `arranges a single card with
- * no edges` below builds ad hoc: `positionedStrategy` only draws a card its
+ * Also covers `00000000...0099`, the single thing `arranges a single thing with
+ * no edges` below builds ad hoc: `positionedStrategy` only draws a thing its
  * Placement names (ADR 0040), so the shared cross-strategy contract needs this
  * Diagram to have authored a position for it too.
  */
@@ -110,11 +110,11 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
     await result;
   });
 
-  it('conserves every card, by id, adding and losing none', async () => {
+  it('conserves every thing, by id, adding and losing none', async () => {
     const input = sampleGraph();
     const output = await make()(input);
 
-    expect(output.cards.map((c) => c.id).sort()).toEqual([
+    expect(output.things.map((t) => t.id).sort()).toEqual([
       '00000000-0000-4000-8000-000000000002',
       '00000000-0000-4000-8000-000000000003',
       '00000000-0000-4000-8000-000000000005',
@@ -123,23 +123,23 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
     ]);
   });
 
-  it('places every card at finite coordinates', async () => {
+  it('places every thing at finite coordinates', async () => {
     const output = await make()(sampleGraph());
 
-    for (const card of output.cards) {
-      expect(Number.isFinite(card.x), `${card.id} has no finite x`).toBe(true);
-      expect(Number.isFinite(card.y), `${card.id} has no finite y`).toBe(true);
+    for (const thing of output.things) {
+      expect(Number.isFinite(thing.x), `${thing.id} has no finite x`).toBe(true);
+      expect(Number.isFinite(thing.y), `${thing.id} has no finite y`).toBe(true);
     }
   });
 
-  it('preserves each card’s declared size', async () => {
+  it('preserves each thing’s declared size', async () => {
     const output = await make()(sampleGraph());
 
-    // A strategy arranges; it does not resize. The view decides how big a card
+    // A strategy arranges; it does not resize. The view decides how big a thing
     // is and passes it in.
-    for (const card of output.cards) {
-      expect(card.width).toBe(SIZE.width);
-      expect(card.height).toBe(SIZE.height);
+    for (const thing of output.things) {
+      expect(thing.width).toBe(SIZE.width);
+      expect(thing.height).toBe(SIZE.height);
     }
   });
 
@@ -155,12 +155,12 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
     expect(identity(output)).toEqual(identity(input));
   });
 
-  it('keeps every card’s ports, by id and side', async () => {
+  it('keeps every thing’s ports, by id and side', async () => {
     const input = sampleGraph();
     const output = await make()(input);
 
     const ports = (g: LayoutStrategyGraph) =>
-      g.cards.flatMap((c) => c.ports.map((p) => `${c.id}/${p.id}/${p.side}`)).sort();
+      g.things.flatMap((t) => t.ports.map((p) => `${t.id}/${p.id}/${p.side}`)).sort();
 
     // A handle a strategy dropped is an edge React Flow cannot resolve — its
     // warning #008, and an edge drawn to the wrong point.
@@ -178,14 +178,14 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
   });
 
   it('arranges an empty graph without complaint', async () => {
-    const output = await make()({ cards: [], edges: [] });
+    const output = await make()({ things: [], edges: [] });
 
-    // A new space has one card and no graphs, and reaches this on first paint.
-    expect(output.cards).toEqual([]);
+    // A new space has one thing and no graphs, and reaches this on first paint.
+    expect(output.things).toEqual([]);
     expect(output.edges).toEqual([]);
   });
 
-  it('arranges a single card with no edges', async () => {
+  it('arranges a single thing with no edges', async () => {
     const only = buildLayoutStrategyGraph(
       [uuid('00000000-0000-4000-8000-000000000099')],
       new Map(),
@@ -194,17 +194,17 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
     );
     const output = await make()(only);
 
-    expect(output.cards).toHaveLength(1);
-    expect(Number.isFinite(output.cards[0]?.x)).toBe(true);
-    expect(Number.isFinite(output.cards[0]?.y)).toBe(true);
+    expect(output.things).toHaveLength(1);
+    expect(Number.isFinite(output.things[0]?.x)).toBe(true);
+    expect(Number.isFinite(output.things[0]?.y)).toBe(true);
   });
 
-  it('separates cards rather than stacking them', async () => {
+  it('separates things rather than stacking them', async () => {
     const output = await make()(sampleGraph());
-    const at = output.cards.map((c) => `${String(c.x)},${String(c.y)}`);
+    const at = output.things.map((t) => `${String(t.x)},${String(t.y)}`);
 
-    // Any two cards sharing a coordinate is the failure that looks like a
-    // missing card on screen.
-    expect(new Set(at).size).toBe(output.cards.length);
+    // Any two things sharing a coordinate is the failure that looks like a
+    // missing thing on screen.
+    expect(new Set(at).size).toBe(output.things.length);
   });
 });

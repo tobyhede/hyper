@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 const CODEMIRROR_SELECTOR = /^[^@/*]*\.cm-[\w-]+/m;
 
 /**
- * The editor's one dynamic-import boundary. `MarkdownCardBody` lives in `ui`,
+ * The editor's one dynamic-import boundary. `MarkdownThingBody` lives in `ui`,
  * so `ui` owns the lazy module and names the editor by relative path. A static
  * import from anywhere in that tree would put the CodeMirror stack in the
  * barrel, and from the barrel into the adapter and every other consumer.

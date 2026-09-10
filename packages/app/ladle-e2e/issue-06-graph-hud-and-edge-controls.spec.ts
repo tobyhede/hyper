@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
  * The selected Edge's controls and the canvas HUD, on the rendered stories.
  *
  * Ladle proves the control semantics: what the two buttons do, that Edit and
- * nothing else opens the editor, that a refused Card keeps its place disabled,
+ * nothing else opens the editor, that a refused Thing keeps its place disabled,
  * and that each refusal lands on the channel ADR 0057 assigns it. The spatial
  * half — these controls over the real routed Edge, gated on selection and the
  * Active Graph — is the application suite's, in `editing.spec.ts`.
@@ -55,16 +55,16 @@ test(
 
     const from = page.getByRole('combobox', { name: 'From' });
     const to = page.getByRole('combobox', { name: 'To' });
-    await expect(from).toHaveValue('Card 1');
-    await expect(to).toHaveValue('Card 2');
+    await expect(from).toHaveValue('Thing 1');
+    await expect(to).toHaveValue('Thing 2');
 
-    // Choosing a Card is the completion, and it settles the editor.
+    // Choosing a Thing is the completion, and it settles the editor.
     await to.press('ArrowDown');
-    await page.getByRole('option', { name: /Card 4/ }).click();
+    await page.getByRole('option', { name: /Thing 4/ }).click();
 
     await expect(page.getByTestId('edge-editor')).toHaveCount(0);
     await page.getByRole('button', { name: 'Edit this Edge' }).click();
-    await expect(page.getByRole('combobox', { name: 'To' })).toHaveValue('Card 4');
+    await expect(page.getByRole('combobox', { name: 'To' })).toHaveValue('Thing 4');
 
     // Escape dismisses the open list first, then the editor above it — two
     // layers, one press each (ADR 0048).
@@ -98,10 +98,10 @@ test(
     await page.getByRole('combobox', { name: 'To' }).press('ArrowDown');
 
     const refused = page.getByRole('option', {
-      name: /These Cards are already connected in this Graph/,
+      name: /These Things are already connected in this Graph/,
     });
     await expect(refused).toHaveAttribute('aria-disabled', 'true');
-    await expect(refused).toContainText('Card 3');
+    await expect(refused).toContainText('Thing 3');
     // Still offered rather than filtered out: an author searching for it finds
     // it, and finds out why it cannot be taken.
     await expect(page.getByRole('option')).toHaveCount(5);
@@ -131,7 +131,7 @@ test(
     const describedBy = await attempted.getAttribute('aria-describedby');
     expect(describedBy).not.toBeNull();
     await expect(page.locator(`#${describedBy ?? ''}`)).toHaveText(
-      'These Cards are already connected in this Graph.',
+      'These Things are already connected in this Graph.',
     );
     await expect(page.getByTestId('edge-endpoint-refusal')).toHaveCount(0);
   },
@@ -153,7 +153,7 @@ test(
     const describedBy = await attempted.getAttribute('aria-describedby');
     expect(describedBy).not.toBeNull();
     await expect(page.locator(`#${describedBy ?? ''}`)).toHaveText(
-      'These Cards are already connected in this Graph.',
+      'These Things are already connected in this Graph.',
     );
     await expect(page.getByTestId('edge-endpoint-refusal')).toHaveCount(0);
   },

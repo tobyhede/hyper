@@ -1,0 +1,37 @@
+/* The band across the top of a Thing, beside the component that draws it.
+
+   Geometry and colour only. A Thing that hides its own rail at rest — the canvas
+   Thing does, revealing it with the Thing itself — overrides these from its own
+   stylesheet, because when the rail shows is the Thing's state and not the rail's.
+
+   `--thing-rail-graph` is published by `ThingRail` from its `graphColor` prop, so
+   the rail does not depend on which Thing mounted it. */
+.thing-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 0;
+  background: var(--thing-rail-graph);
+  transition: background-color var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
+}
+
+.thing-rail__kind {
+  display: flex;
+  align-items: center;
+  color: inherit;
+  transition: opacity var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
+}
+
+.thing-rail__kind [data-thing-kind] {
+  color: currentcolor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thing-rail,
+  .thing-rail__kind {
+    transition: none;
+  }
+}

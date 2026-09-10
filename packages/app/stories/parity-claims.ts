@@ -16,8 +16,8 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
-    id: 'card-rail-reveal-distinguishes-pointer-and-keyboard',
-    storyFile: 'components/card.stories.tsx',
+    id: 'thing-rail-reveal-distinguishes-pointer-and-keyboard',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'OpenAndClose',
     claim:
       'Pointer Open and Close allow the rail to hide on departure; keyboard activation keeps the focused command visible across both transitions.',
@@ -30,201 +30,201 @@ export const parityClaims: readonly ParityClaim[] = [
       'Space, Diagram and Graph names share typography; Space remains a non-interactive label, while Diagram opens its rename editor and returns focus on Escape.',
   },
   {
-    id: 'cards-drawer-adds-existing-diagram-members',
-    storyFile: 'surfaces/cards-drawer.stories.tsx',
-    storyExport: 'AvailableCards',
+    id: 'things-drawer-adds-existing-diagram-members',
+    storyFile: 'surfaces/things-drawer.stories.tsx',
+    storyExport: 'AvailableThings',
     claim:
-      'The right Cards drawer shows full production Card fronts without canvas handles, filters the Cards absent from a Diagram, and activates an existing Card through the application Add to Diagram path.',
+      'The right Things drawer shows full production Thing fronts without canvas handles, filters the Things absent from a Diagram, and activates an existing Thing through the application Add to Diagram path.',
   },
   {
-    id: 'cards-drawer-opens-and-dismisses-without-locking-the-canvas',
-    storyFile: 'surfaces/cards-drawer.stories.tsx',
-    storyExport: 'AvailableCards',
+    id: 'things-drawer-opens-and-dismisses-without-locking-the-canvas',
+    storyFile: 'surfaces/things-drawer.stories.tsx',
+    storyExport: 'AvailableThings',
     claim:
-      'The Cards drawer opens from its own trigger as a dialog named Cards, dismisses on Escape with focus returning to that trigger, and leaves the surface behind it both live and undismissing — which is what dropping a Card onto the canvas is.',
+      'The Things drawer opens from its own trigger as a dialog named Things, dismisses on Escape with focus returning to that trigger, and leaves the surface behind it both live and undismissing — which is what dropping a Thing onto the canvas is.',
   },
   {
-    id: 'cards-drawer-distinguishes-an-empty-diagram',
-    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    id: 'things-drawer-distinguishes-an-empty-diagram',
+    storyFile: 'surfaces/things-drawer.stories.tsx',
     storyExport: 'Empty',
-    claim: 'A Diagram containing every Space Card names that empty Cards View explicitly.',
+    claim: 'A Diagram containing every Space Thing names that empty Things View explicitly.',
   },
   {
-    id: 'cards-drawer-scrolls-a-long-list-on-a-narrow-screen',
-    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    id: 'things-drawer-scrolls-a-long-list-on-a-narrow-screen',
+    storyFile: 'surfaces/things-drawer.stories.tsx',
     storyExport: 'LongList',
     claim:
-      'A long Cards list remains searchable and independently scrollable inside the viewport on a narrow screen.',
+      'A long Things list remains searchable and independently scrollable inside the viewport on a narrow screen.',
   },
   {
-    id: 'cards-drawer-withdraws-while-authoring-is-unavailable',
-    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    id: 'things-drawer-withdraws-while-authoring-is-unavailable',
+    storyFile: 'surfaces/things-drawer.stories.tsx',
     storyExport: 'Disabled',
     claim:
-      'The Cards trigger is disabled while the Diagram cannot accept membership edits — presenting, an open Card, or Alias creation.',
+      'The Things trigger is disabled while the Diagram cannot accept membership edits — presenting, an open Thing, or Alias creation.',
   },
   {
-    id: 'cards-drawer-keeps-an-add-refusal-on-its-surface',
-    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    id: 'things-drawer-keeps-an-add-refusal-on-its-surface',
+    storyFile: 'surfaces/things-drawer.stories.tsx',
     storyExport: 'Refused',
-    claim: 'A refused Add remains visible in the open Cards drawer that asked for it.',
+    claim: 'A refused Add remains visible in the open Things drawer that asked for it.',
     applicationEvidence:
-      'No browser gesture reaches a repeated Add. Completing the first one removes the Card from `cardsOutsideSelectedDiagram`, so the row unmounts before a second click can land on it, and only two events dispatched inside one task reach the refusal at all. The story is driven to the state instead, through the production Authoring composition, so the sentence it draws is the one `describeAuthoringRefusal` gives the application.',
+      'No browser gesture reaches a repeated Add. Completing the first one removes the Thing from `thingsOutsideSelectedDiagram`, so the row unmounts before a second click can land on it, and only two events dispatched inside one task reach the refusal at all. The story is driven to the state instead, through the production Authoring composition, so the sentence it draws is the one `describeAuthoringRefusal` gives the application.',
   },
   {
-    id: 'cards-drawer-coexists-with-persistence-failure',
-    storyFile: 'surfaces/cards-drawer.stories.tsx',
+    id: 'things-drawer-coexists-with-persistence-failure',
+    storyFile: 'surfaces/things-drawer.stories.tsx',
     storyExport: 'PersistenceFailure',
     claim:
-      'A failed membership save leaves the Cards drawer available beside the standing retryable persistence notice.',
+      'A failed membership save leaves the Things drawer available beside the standing retryable persistence notice.',
   },
   {
-    id: 'canvas-card-fills-authored-node-rect',
-    storyFile: 'components/card.stories.tsx',
+    id: 'canvas-thing-fills-authored-node-rect',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'The production CanvasCard fills a React Flow node whose authored rect differs from the collapsed default.',
+      'The production CanvasThing fills a React Flow node whose authored rect differs from the collapsed default.',
   },
   {
-    id: 'open-card-offers-one-resize-control',
-    storyFile: 'components/card.stories.tsx',
+    id: 'open-thing-offers-one-resize-control',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'Every Open Card exposes one bottom-right resize control revealed by hover, selection or focus, and a Closed Card exposes none.',
+      'Every Open Thing exposes one bottom-right resize control revealed by hover, selection or focus, and a Closed Thing exposes none.',
   },
   {
     id: 'resize-preview-snaps-to-closed-rect',
-    storyFile: 'components/card.stories.tsx',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'A resize proposal entering the complete Close range previews the exact Closed rect while the active gesture still owns an Open Card.',
+      'A resize proposal entering the complete Close range previews the exact Closed rect while the active gesture still owns an Open Thing.',
   },
   {
-    id: 'active-card-resize-tracks-pointer-without-dimension-animation',
-    storyFile: 'components/card.stories.tsx',
+    id: 'active-thing-resize-tracks-pointer-without-dimension-animation',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'An active Card resize applies each proposed width and height directly, without animating either dimension behind the pointer.',
+      'An active Thing resize applies each proposed width and height directly, without animating either dimension behind the pointer.',
   },
   {
-    id: 'markdown-card-opens-and-closes-in-place',
-    storyFile: 'components/card.stories.tsx',
+    id: 'markdown-thing-opens-and-closes-in-place',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'OpenAndClose',
     claim:
-      'A Markdown Card opens and closes inside its production React Flow node with authoring handles present, retaining one Card and Title treatment; its content fades out inertly before unmounting while its Title stays bottom-anchored for the whole closing motion.',
+      'A Markdown Thing opens and closes inside its production React Flow node with authoring handles present, retaining one Thing and Title treatment; its content fades out inertly before unmounting while its Title stays bottom-anchored for the whole closing motion.',
   },
   {
-    id: 'open-markdown-card-owns-its-editing-lifecycle',
-    storyFile: 'components/card-editing.stories.tsx',
+    id: 'open-markdown-thing-owns-its-editing-lifecycle',
+    storyFile: 'components/thing-editing.stories.tsx',
     storyExport: 'Markdown',
     claim:
-      'An open Markdown Card begins editing from its rendered body or rail without a second visible affordance, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter while Close remains disabled.',
+      'An open Markdown Thing begins editing from its rendered body or rail without a second visible affordance, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter while Close remains disabled.',
   },
   {
-    id: 'canvas-card-exposes-kind-and-keyboard-actions',
-    storyFile: 'components/card.stories.tsx',
+    id: 'canvas-thing-exposes-kind-and-keyboard-actions',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'Actions',
-    claim: 'The production canvas Card exposes Alias identity and keyboard-focusable actions.',
+    claim: 'The production canvas Thing exposes Alias identity and keyboard-focusable actions.',
   },
   {
-    id: 'canvas-card-shows-rest-selected-and-dragging-states',
-    storyFile: 'components/card.stories.tsx',
+    id: 'canvas-thing-shows-rest-selected-and-dragging-states',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'States',
     claim:
       'Rest, selected and dragging are visually distinct states for both the Markdown and Alias front.',
-    // React Flow's own selection/dragging booleans, and CardNode's translation
-    // of them into CanvasCard's four-value `state`, are unit-tested directly
-    // (`CardNode.test.tsx`, "translates React Flow selection and dragging into
-    // shared visual states"). Dragging a real Card is exercised throughout
+    // React Flow's own selection/dragging booleans, and ThingNode's translation
+    // of them into CanvasThing's four-value `state`, are unit-tested directly
+    // (`ThingNode.test.tsx`, "translates React Flow selection and dragging into
+    // shared visual states"). Dragging a real Thing is exercised throughout
     // `editing.spec.ts`'s drag-and-drop coverage, and selection through
-    // `canvas-card-exposes-kind-and-keyboard-actions`'s own application
+    // `canvas-thing-exposes-kind-and-keyboard-actions`'s own application
     // evidence above. What this story adds beyond those is the *visual*
     // pairing of state with treatment (box-shadow ring, rotated drop shadow)
-    // side by side for review — and it renders through `CanvasCardSpecimen`,
-    // a thin pass-through to the shipped `CanvasCard`, so there is no
+    // side by side for review — and it renders through `CanvasThingSpecimen`,
+    // a thin pass-through to the shipped `CanvasThing`, so there is no
     // facsimile that could drift from what the translated state actually
     // draws.
     applicationEvidence:
-      'React Flow selection/dragging and their translation into state are covered by CardNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-card-exposes-kind-and-keyboard-actions. This story renders the shipped CanvasCard through CanvasCardSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
+      'React Flow selection/dragging and their translation into state are covered by ThingNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-thing-exposes-kind-and-keyboard-actions. This story renders the shipped CanvasThing through CanvasThingSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
   },
   {
-    id: 'canvas-card-front-draws-only-its-title-lines',
-    storyFile: 'components/card.stories.tsx',
+    id: 'canvas-thing-front-draws-only-its-title-lines',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'Front',
     claim:
-      'Every Card front draws its kind glyph, its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
+      'Every Thing front draws its kind glyph, its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
   },
   {
-    id: 'canvas-card-shows-kind-treatment',
-    storyFile: 'components/card.stories.tsx',
+    id: 'canvas-thing-shows-kind-treatment',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'Kinds',
     claim:
       "An Alias front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
   },
   {
-    id: 'canvas-card-shows-active-graph-colour',
-    storyFile: 'components/card.stories.tsx',
+    id: 'canvas-thing-shows-active-graph-colour',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'Colours',
-    claim: "A selected Card's rail carries the Active Graph's own colour.",
+    claim: "A selected Thing's rail carries the Active Graph's own colour.",
   },
   {
-    id: 'canvas-card-hover-reveals-actions-and-handles-together',
-    storyFile: 'components/card.stories.tsx',
+    id: 'canvas-thing-hover-reveals-actions-and-handles-together',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'Hover',
     claim:
-      "Hovering the real React Flow node reveals CanvasCard's own rail actions and the adapter's Edge handles together.",
+      "Hovering the real React Flow node reveals CanvasThing's own rail actions and the adapter's Edge handles together.",
     // The two halves of this claim already have real application evidence
-    // separately: hover revealing CanvasCard's rail actions is asserted in
+    // separately: hover revealing CanvasThing's rail actions is asserted in
     // `editing.spec.ts` ("inline title editing persists without moving or
-    // opening the Card", `await card.hover(); ... toHaveCSS('opacity', '1')`
+    // opening the Thing", `await thing.hover(); ... toHaveCSS('opacity', '1')`
     // on the Edit control), and hover/selection revealing the adapter's
     // authoring handles is asserted in `overview.spec.ts` ("handles stay
-    // measurable...") and unit-tested in CardNode.test.tsx. What this story
-    // adds is mounting both through the same real `CardNode` in a real
+    // measurable...") and unit-tested in ThingNode.test.tsx. What this story
+    // adds is mounting both through the same real `ThingNode` in a real
     // `ReactFlow` instance side by side, which is exactly what
-    // `CanvasCardNodeSpecimen` does — not a facsimile of
+    // `CanvasThingNodeSpecimen` does — not a facsimile of
     // either half.
     applicationEvidence:
-      "Hover revealing CanvasCard's rail actions is covered by editing.spec.ts (asserted on the `canvas-card-actions` container, which is where the reveal's opacity lives — `opacity` does not inherit, so the same assertion on a button could not fail); hover/selection revealing the adapter's authoring handles is covered by overview.spec.ts and CardNode.test.tsx. This story mounts the real CardNode in a real ReactFlow instance (CanvasCardNodeSpecimen, no facsimile) to show both together, which is not a distinct browser-observable behaviour beyond those two.",
+      "Hover revealing CanvasThing's rail actions is covered by editing.spec.ts (asserted on the `canvas-thing-actions` container, which is where the reveal's opacity lives — `opacity` does not inherit, so the same assertion on a button could not fail); hover/selection revealing the adapter's authoring handles is covered by overview.spec.ts and ThingNode.test.tsx. This story mounts the real ThingNode in a real ReactFlow instance (CanvasThingNodeSpecimen, no facsimile) to show both together, which is not a distinct browser-observable behaviour beyond those two.",
   },
   {
-    id: 'canvas-card-owns-title-editing-and-refusal',
-    storyFile: 'components/card-editing.stories.tsx',
+    id: 'canvas-thing-owns-title-editing-and-refusal',
+    storyFile: 'components/thing-editing.stories.tsx',
     storyExport: 'Title',
     claim:
-      "The canvas Card's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
+      "The canvas Thing's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
   },
   {
-    id: 'new-space-card-completes-on-a-labelled-create',
-    storyFile: 'components/space-card-panes.stories.tsx',
-    storyExport: 'NewSpaceCardPane',
+    id: 'new-space-thing-completes-on-a-labelled-create',
+    storyFile: 'components/space-thing-panes.stories.tsx',
+    storyExport: 'NewSpaceThingPane',
     // The clause about the target list says "a new Space or an existing one"
     // rather than naming a Space, because the list a real repository offers is
     // whatever is stored and the story's is fixed.
     claim:
-      'Adding a Space Card offers Title and a target that is either a new Space or an existing one, and completes on a labelled Create that stays disabled until the Card is titled.',
+      'Adding a Space Thing offers Title and a target that is either a new Space or an existing one, and completes on a labelled Create that stays disabled until the Thing is titled.',
   },
   {
-    id: 'new-space-card-keeps-a-refused-attempt-on-its-target-field',
-    storyFile: 'components/space-card-panes.stories.tsx',
-    storyExport: 'NewSpaceCardPaneRefused',
+    id: 'new-space-thing-keeps-a-refused-attempt-on-its-target-field',
+    storyFile: 'components/space-thing-panes.stories.tsx',
+    storyExport: 'NewSpaceThingPaneRefused',
     claim:
-      'A Space Card creation refused for a reference cycle keeps the pane open and puts the reason on the Target field rather than closing over it.',
+      'A Space Thing creation refused for a reference cycle keeps the pane open and puts the reason on the Target field rather than closing over it.',
     // A cycle needs a Space that already references the containing one, and the
-    // only gesture that could author it is a Space Card created from *inside* an
+    // only gesture that could author it is a Space Thing created from *inside* an
     // entered Space — which `entity-url-addressability/08` builds. Until then
     // the refusal is unreachable in a browser, so the story is handed the
     // structured refusal and this claim takes the documented exemption.
     applicationEvidence:
-      'A reference cycle cannot be authored through a browser gesture yet: it needs a Space Card created inside an entered Space, and Entering is `entity-url-addressability/08`. `packages/app/test/space-card-authoring.test.tsx` proves the refusal through the application path meanwhile.',
+      'A reference cycle cannot be authored through a browser gesture yet: it needs a Space Thing created inside an entered Space, and Entering is `entity-url-addressability/08`. `packages/app/test/space-thing-authoring.test.tsx` proves the refusal through the application path meanwhile.',
   },
   {
     id: 'new-alias-completes-on-the-target-chosen',
-    storyFile: 'components/card-and-alias-panes.stories.tsx',
+    storyFile: 'components/thing-and-alias-panes.stories.tsx',
     storyExport: 'NewAliasPane',
     // Deliberately says nothing about the title the pane carries. The Ladle test
     // types one and reads it back, while the application test leaves it empty
-    // and reads back the `Card N` Authoring mints for an unnamed Alias (ADR 0083
+    // and reads back the `Thing N` Authoring mints for an unnamed Alias (ADR 0083
     // refines ADR 0046) — so a clause about a typed title would have one proof
     // rather than the two ADR 0052 requires.
     claim:
@@ -232,7 +232,7 @@ export const parityClaims: readonly ParityClaim[] = [
   },
   {
     id: 'open-alias-shows-target-markdown-read-only',
-    storyFile: 'components/card.stories.tsx',
+    storyFile: 'components/thing.stories.tsx',
     storyExport: 'OpenAlias',
     claim:
       'An Open Alias keeps its own Title, renders its Target Markdown read-only, and offers Close without Target or source-edit controls.',
@@ -267,10 +267,10 @@ export const parityClaims: readonly ParityClaim[] = [
    * claim below states one obligation in the Dock's own words, so a reader
    * comparing them to the old set reads two surfaces rather than one renamed.
    *
-   * **Two obligations left rather than moved.** A Card's Copy link, Copy
-   * permanent link and Delete belong to the Card rail (ADR 0073) and not to
-   * this surface — the Dock's organising rule is that a Card's own commands are
-   * absent — so `space-sidebar-copies-card-destinations` and
+   * **Two obligations left rather than moved.** A Thing's Copy link, Copy
+   * permanent link and Delete belong to the Thing rail (ADR 0073) and not to
+   * this surface — the Dock's organising rule is that a Thing's own commands are
+   * absent — so `space-sidebar-copies-thing-destinations` and
    * `space-sidebar-entity-actions-menu` have no successor here. They keep their
    * browser evidence in `space-routing.spec.ts` and `link-actions.spec.ts`
    * untagged, and they gain a claim of their own when the rail's story sheet
@@ -294,7 +294,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'New Diagram sits in the Diagram menu beside the list it adds to, and creates and selects an empty Diagram without implicitly placing Cards.',
+      'New Diagram sits in the Diagram menu beside the list it adds to, and creates and selects an empty Diagram without implicitly placing Things.',
   },
   {
     id: 'command-dock-copies-graph-destinations',
@@ -394,7 +394,7 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'presenting-sink-ends-the-graph-and-can-retreat',
     storyFile: 'components/presenting-chrome.stories.tsx',
     storyExport: 'Sink',
-    claim: 'A sink announces the end of the Graph and Back recovers the Card before it.',
+    claim: 'A sink announces the end of the Graph and Back recovers the Thing before it.',
   },
   {
     id: 'presenting-narrow-keeps-choices-and-controls',
@@ -440,7 +440,7 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'operational-feedback-placement-pending',
     storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Arranging',
-    claim: 'The canvas shows a busy state while a strategy is still arranging Cards.',
+    claim: 'The canvas shows a busy state while a strategy is still arranging Things.',
     applicationEvidence:
       'The positioned strategy settles before Playwright can deterministically observe the pending frame. Covered by packages/app/test/placement-rendering.test.tsx.',
   },
@@ -455,7 +455,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/selected-edge-controls.stories.tsx',
     storyExport: 'EndpointEditor',
     claim:
-      'The endpoint editor names both endpoints, completes on the Card chosen, and dismisses its list then itself on Escape.',
+      'The endpoint editor names both endpoints, completes on the Thing chosen, and dismisses its list then itself on Escape.',
   },
   {
     id: 'selected-edge-endpoint-refusal-disables-its-choice',
@@ -515,18 +515,18 @@ export const parityClaims: readonly ParityClaim[] = [
       'The themed canvas control continuously zooms with its slider, zooms with its buttons and fits the real React Flow viewport.',
   },
   {
-    id: 'open-space-card-draws-its-selected-diagram',
-    storyFile: 'surfaces/space-card-embedded-diagram.stories.tsx',
+    id: 'open-space-thing-draws-its-selected-diagram',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      "An Open Space Card draws the Diagram it selects — the target Space's own Cards and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Card's own rect.",
+      "An Open Space Thing draws the Diagram it selects — the target Space's own Things and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Thing's own rect.",
   },
   {
-    id: 'embedded-diagram-cards-author-target',
-    storyFile: 'surfaces/space-card-embedded-diagram.stories.tsx',
+    id: 'embedded-diagram-things-author-target',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      'Editing a Card inside an Open Space Card authors its target Space and updates both canvases; cross-Space connection handles remain unavailable.',
+      'Editing a Thing inside an Open Space Thing authors its target Space and updates both canvases; cross-Space connection handles remain unavailable.',
   },
   {
     id: 'graph-hud-and-dock-agree-on-the-active-graph',

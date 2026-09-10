@@ -1,6 +1,6 @@
 import {
   SPACE_FILE_VERSION,
-  type CardId,
+  type ThingId,
   type Graph,
   type GraphId,
   type SpaceSnapshot,
@@ -58,7 +58,7 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => {
   return {
     id: space.id,
     document,
-    cards: space.cards.map(({ id, ...rest }) => ({
+    things: space.things.map(({ id, ...rest }) => ({
       id,
       document: rest,
     })),
@@ -66,56 +66,59 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => {
 };
 
 /**
- * The graphs a Card has left, with every Edge incident to it gone.
+ * The graphs a Thing has left, with every Edge incident to it gone.
  *
- * A Card that is not a member of a Diagram cannot be an endpoint of a Graph that
+ * A Thing that is not a member of a Diagram cannot be an endpoint of a Graph that
  * Diagram owns (ADR 0040), so this is what both removals owe: Remove from
- * Diagram, which applies it to the one Diagram the Edit writes, and Delete Card
+ * Diagram, which applies it to the one Diagram the Edit writes, and Delete Thing
  * from Space, which applies it to every Diagram through
- * {@link withCardRemovedFromDiagrams}. One rule, in one place, so the two
+ * {@link withThingRemovedFromDiagrams}. One rule, in one place, so the two
  * scopes of the same deletion cannot come to disagree about what an incident
  * Edge is. The graphs themselves stay, empty ones included: deleting a graph is
  * its own action.
  */
-export const withoutIncidentEdges = (graphs: readonly Graph[], cardId: CardId): Graph[] =>
+export const withoutIncidentEdges = (graphs: readonly Graph[], thingId: ThingId): Graph[] =>
   graphs.map((graph) => ({
     ...graph,
-    edges: graph.edges.filter((edge) => edge.from !== cardId && edge.to !== cardId),
+    edges: graph.edges.filter((edge) => edge.from !== thingId && edge.to !== thingId),
   }));
 
 /**
- * The snapshot with one Card gone from every Diagram: its membership, its
+ * The snapshot with one Thing gone from every Diagram: its membership, its
  * position and every Edge incident to it, in every Graph every Diagram owns.
  *
- * The cascade half of Delete Card from Space, and the one write in this module
+ * The cascade half of Delete Thing from Space, and the one write in this module
  * that is not about a single Diagram — which is exactly why it is here rather
- * than folded into {@link updatePositionedDiagram}. The Card itself stays in
- * `cards`: this answers what the Diagrams hold, and removing the Card is the
+ * than folded into {@link updatePositionedDiagram}. The Thing itself stays in
+ * `things`: this answers what the Diagrams hold, and removing the Thing is the
  * caller's own statement in the same Edit. Empty Graphs and empty Diagrams
- * remain, because deleting a Card is not an instruction to delete either
+ * remain, because deleting a Thing is not an instruction to delete either
  * (ADR 0040).
  *
- * Every Diagram that held the Card **Open** also gets the room it was holding
+ * Every Diagram that held the Thing **Open** also gets the room it was holding
  * back, through the same `Placement.reclaim` the single-Diagram removal uses.
  * Under the derivation ADR 0084 removed, dropping the entry dropped its
  * displacement with it and this could be a filter; now the room lives in the
  * neighbours' own stored coordinates, so a Diagram the Edit is not drawing would
- * otherwise keep it forever — with no Card left on that canvas to Close and no
+ * otherwise keep it forever — with no Thing left on that canvas to Close and no
  * Edit that could give it back. Open/Closed is Diagram-owned (ADR 0064), so
  * whether there is any room to reclaim is asked of each Diagram separately and
  * is not what the drawing one answered.
  *
- * Answers the snapshot it was given when no Diagram held the Card, so a deletion
+ * Answers the snapshot it was given when no Diagram held the Thing, so a deletion
  * that only ever affected the current Diagram — which the caller writes
  * separately — does not rebuild every other Diagram to say nothing about them.
  */
-export const withCardRemovedFromDiagrams = (base: SpaceSnapshot, cardId: CardId): SpaceSnapshot => {
+export const withThingRemovedFromDiagrams = (
+  base: SpaceSnapshot,
+  thingId: ThingId,
+): SpaceSnapshot => {
   const diagrams = base.document.diagrams ?? [];
   const affected = diagrams.some(
     (diagram) =>
-      Object.hasOwn(diagram.positions, cardId) ||
+      Object.hasOwn(diagram.positions, thingId) ||
       diagram.graphs.some((graph) =>
-        graph.edges.some((edge) => edge.from === cardId || edge.to === cardId),
+        graph.edges.some((edge) => edge.from === thingId || edge.to === thingId),
       ),
   );
   if (!affected) return base;
@@ -126,9 +129,9 @@ export const withCardRemovedFromDiagrams = (base: SpaceSnapshot, cardId: CardId)
       diagrams: diagrams.map((diagram) => ({
         ...diagram,
         positions: Placement.toPositions(
-          Placement.remove(Placement.reclaim(Placement.fromDiagram(diagram), cardId), cardId),
+          Placement.remove(Placement.reclaim(Placement.fromDiagram(diagram), thingId), thingId),
         ),
-        graphs: withoutIncidentEdges(diagram.graphs, cardId),
+        graphs: withoutIncidentEdges(diagram.graphs, thingId),
       })),
     },
   };

@@ -16,7 +16,7 @@ import { DEFAULT_ELK_LAYOUT_OPTIONS, elkPortId, PORT_ID_SEPARATOR } from './layo
  * all a strategy is (ADR 0005) — and the engine is injectable so the seam can be
  * tested without running elkjs.
  *
- * Automatic: it computes placement from the cards and graphs without naming a
+ * Automatic: it computes placement from the things and graphs without naming a
  * selectable Diagram. It remains a non-addressable capability.
  */
 
@@ -55,13 +55,13 @@ export function elkStrategy(
     const elkGraph: ElkGraphNode = {
       id: 'root',
       layoutOptions,
-      children: strategyGraph.cards.map((card) => ({
-        id: card.id,
-        width: card.width,
-        height: card.height,
+      children: strategyGraph.things.map((thing) => ({
+        id: thing.id,
+        width: thing.width,
+        height: thing.height,
         layoutOptions: { 'org.eclipse.elk.portConstraints': 'FIXED_SIDE' },
-        ports: card.ports.map((port): ElkPort => ({
-          id: elkPortId(card.id, port.id),
+        ports: thing.ports.map((port): ElkPort => ({
+          id: elkPortId(thing.id, port.id),
           layoutOptions: {
             'org.eclipse.elk.port.side': port.side === 'in' ? 'WEST' : 'EAST',
           },
@@ -99,12 +99,12 @@ export function elkStrategy(
     }
 
     return {
-      cards: strategyGraph.cards.map((card) => {
-        const child = byId.get(card.id);
-        if (!child) return card;
+      things: strategyGraph.things.map((thing) => {
+        const child = byId.get(thing.id);
+        if (!child) return thing;
 
-        // Undo the per-card namespacing so ports keep the ids the render layer knows.
-        const prefix = `${card.id}${PORT_ID_SEPARATOR}`;
+        // Undo the per-thing namespacing so ports keep the ids the render layer knows.
+        const prefix = `${thing.id}${PORT_ID_SEPARATOR}`;
         const offsets = new Map(
           (child.ports ?? []).map((port) => [
             port.id.startsWith(prefix) ? port.id.slice(prefix.length) : port.id,
@@ -113,12 +113,12 @@ export function elkStrategy(
         );
 
         return {
-          ...card,
+          ...thing,
           x: child.x ?? 0,
           y: child.y ?? 0,
-          width: child.width ?? card.width,
-          height: child.height ?? card.height,
-          ports: card.ports.map((port) => ({ ...port, ...offsets.get(port.id) })),
+          width: child.width ?? thing.width,
+          height: child.height ?? thing.height,
+          ports: thing.ports.map((port) => ({ ...port, ...offsets.get(port.id) })),
         };
       }),
       // Carry ELK's routed geometry back onto the edges so the render layer can

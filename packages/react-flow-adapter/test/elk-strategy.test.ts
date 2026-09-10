@@ -5,7 +5,7 @@ import { elkStrategy, type ElkEngine } from '../src/index';
 import { uuid } from './uuid';
 
 const graph: LayoutStrategyGraph = {
-  cards: [
+  things: [
     {
       id: uuid('00000000-0000-4000-8000-000000000002'),
       width: 150,
@@ -79,7 +79,7 @@ describe('elkStrategy', () => {
     expect(b.ports![0]!.layoutOptions?.['org.eclipse.elk.port.side']).toBe('WEST');
   });
 
-  it('namespaces edge endpoints by card id', async () => {
+  it('namespaces edge endpoints by thing id', async () => {
     const spy = spyEngine();
     await elkStrategy(undefined, spy.engine)(graph);
     expect(spy.seen().edges).toEqual([
@@ -91,15 +91,15 @@ describe('elkStrategy', () => {
     ]);
   });
 
-  it('puts positions and port offsets onto the cards it was given', async () => {
+  it('puts positions and port offsets onto the things it was given', async () => {
     const laid = await elkStrategy()(graph);
 
-    for (const card of laid.cards) {
-      expect(Number.isFinite(card.x)).toBe(true);
-      expect(Number.isFinite(card.y)).toBe(true);
+    for (const thing of laid.things) {
+      expect(Number.isFinite(thing.x)).toBe(true);
+      expect(Number.isFinite(thing.y)).toBe(true);
     }
 
-    const [a, b] = laid.cards;
+    const [a, b] = laid.things;
     // Direction RIGHT: b lands to the right of a.
     expect(b!.x!).toBeGreaterThan(a!.x!);
 
@@ -125,25 +125,25 @@ describe('elkStrategy', () => {
   });
 });
 
-describe('routes a back-edge around the cards', () => {
+describe('routes a back-edge around the things', () => {
   // We hand the adapter a graph that contains a back-edge directly: it lays out a
   // LayoutStrategyGraph and does not enforce domain rules, so this is the level to test
   // back-edge *rendering*. Cyclic Graphs are valid authored structure (ADR
   // 0032). The edges below (`… → C → B`, target B laid left of source C) are
-  // the simplest deterministic back-edge; ELK routes it around the cards and
+  // the simplest deterministic back-edge; ELK routes it around the things and
   // issue 03 draws that instead of a bezier stub.
-  const CARDS = [
+  const THINGS = [
     uuid('00000000-0000-4000-8000-00000000000a'),
     uuid('00000000-0000-4000-8000-00000000000b'),
     uuid('00000000-0000-4000-8000-00000000000c'),
   ];
   const backConnections = [
-    ['loop::0', CARDS[0]!, CARDS[1]!],
-    ['loop::1', CARDS[1]!, CARDS[2]!],
-    ['loop::2', CARDS[2]!, CARDS[1]!],
+    ['loop::0', THINGS[0]!, THINGS[1]!],
+    ['loop::1', THINGS[1]!, THINGS[2]!],
+    ['loop::2', THINGS[2]!, THINGS[1]!],
   ] as const;
   const backEdge: LayoutStrategyGraph = {
-    cards: CARDS.map((id) => ({
+    things: THINGS.map((id) => ({
       id,
       width: 260,
       height: 300,
@@ -167,14 +167,14 @@ describe('routes a back-edge around the cards', () => {
     const [section] = back.sections ?? [];
     expect(section).toBeDefined();
     // A forward edge between adjacent layers is straight; a back-edge has to turn
-    // out, run past the cards and back in — which ELK expresses as bend points.
+    // out, run past the things and back in — which ELK expresses as bend points.
     expect(section!.bendPoints?.length ?? 0).toBeGreaterThan(0);
   });
 });
 
 describe('port id collision', () => {
-  // Every card on a graph carries the *same* handle ids (`00000000-0000-4000-8000-000000000004::in`/`00000000-0000-4000-8000-000000000004::out`),
-  // so using bare handle ids as ELK port ids left ELK unable to tell which card
+  // Every thing on a graph carries the *same* handle ids (`00000000-0000-4000-8000-000000000004::in`/`00000000-0000-4000-8000-000000000004::out`),
+  // so using bare handle ids as ELK port ids left ELK unable to tell which thing
   // an edge attached to — collapsing layers even for a single graph.
   const CHAIN = [
     uuid('00000000-0000-4000-8000-00000000000a'),
@@ -185,7 +185,7 @@ describe('port id collision', () => {
   ];
 
   const chain: LayoutStrategyGraph = {
-    cards: CHAIN.map((id, i) => ({
+    things: CHAIN.map((id, i) => ({
       id,
       width: 260,
       height: 300,
@@ -205,7 +205,7 @@ describe('port id collision', () => {
     })),
   };
 
-  it('gives every card a distinct ELK port id', async () => {
+  it('gives every thing a distinct ELK port id', async () => {
     const spy = spyEngine();
     await elkStrategy(undefined, spy.engine)(chain);
     const ids = spy.seen().children!.flatMap((c) => c.ports!.map((p) => p.id));
@@ -214,7 +214,7 @@ describe('port id collision', () => {
 
   it('lays a single graph out as a strictly left-to-right chain', async () => {
     const laid = await elkStrategy()(chain);
-    const xs = laid.cards.map((c) => c.x!);
+    const xs = laid.things.map((t) => t.x!);
     for (let i = 1; i < xs.length; i += 1) {
       expect(xs[i]!).toBeGreaterThan(xs[i - 1]!);
     }
@@ -222,7 +222,7 @@ describe('port id collision', () => {
 
   it('still exposes port offsets under the bare handle id', async () => {
     const laid = await elkStrategy()(chain);
-    const b = laid.cards.find((c) => c.id === CHAIN[1])!;
+    const b = laid.things.find((t) => t.id === CHAIN[1])!;
     expect(
       Number.isFinite(b.ports.find((p) => p.id === '00000000-0000-4000-8000-000000000004::in')!.y),
     ).toBe(true);
@@ -232,14 +232,14 @@ describe('port id collision', () => {
   });
 });
 
-describe('shared cards keep each graph on one line', () => {
-  // Two graphs running through the same cards. Under FIXED_ORDER, ELK orders
+describe('shared things keep each graph on one line', () => {
+  // Two graphs running through the same things. Under FIXED_ORDER, ELK orders
   // ports *clockwise* — EAST top-to-bottom but WEST bottom-to-top — so handing
   // both sides the same list order put a graph's outbound handle at the top of
-  // one card and its inbound handle at the bottom of the next, crossing the two
-  // graphs at every shared card. FIXED_SIDE lets ELK order within each side.
+  // one thing and its inbound handle at the bottom of the next, crossing the two
+  // graphs at every shared thing. FIXED_SIDE lets ELK order within each side.
   const shared: LayoutStrategyGraph = {
-    cards: [
+    things: [
       '00000000-0000-4000-8000-000000000002',
       '00000000-0000-4000-8000-000000000003',
       '00000000-0000-4000-8000-000000000005',
@@ -281,17 +281,17 @@ describe('shared cards keep each graph on one line', () => {
     ),
   };
 
-  it('puts a graph at the same offset on both sides of every card', async () => {
+  it('puts a graph at the same offset on both sides of every thing', async () => {
     const laid = await elkStrategy()(shared);
-    const offset = (cardId: string, handleId: string) =>
-      laid.cards.find((c) => c.id === cardId)!.ports.find((p) => p.id === handleId)!.y;
+    const offset = (thingId: string, handleId: string) =>
+      laid.things.find((t) => t.id === thingId)!.ports.find((p) => p.id === handleId)!.y;
 
     for (const graph of [
       '00000000-0000-4000-8000-000000000032',
       '00000000-0000-4000-8000-000000000033',
     ]) {
-      // Leaving a card and arriving at the next must be the same height, or the
-      // two graphs swap places between every pair of cards.
+      // Leaving a thing and arriving at the next must be the same height, or the
+      // two graphs swap places between every pair of things.
       expect(offset('00000000-0000-4000-8000-000000000002', `${graph}::out`)).toBe(
         offset('00000000-0000-4000-8000-000000000003', `${graph}::in`),
       );
@@ -303,7 +303,7 @@ describe('shared cards keep each graph on one line', () => {
 
   it('keeps the two graphs apart', async () => {
     const laid = await elkStrategy()(shared);
-    const b = laid.cards.find((c) => c.id === '00000000-0000-4000-8000-000000000003')!;
+    const b = laid.things.find((t) => t.id === '00000000-0000-4000-8000-000000000003')!;
     const at = (id: string) => b.ports.find((p) => p.id === id)!.y;
     expect(at('00000000-0000-4000-8000-000000000032::in')).not.toBe(
       at('00000000-0000-4000-8000-000000000033::in'),

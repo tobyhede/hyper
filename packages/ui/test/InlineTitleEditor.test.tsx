@@ -13,7 +13,7 @@ const titleField = (name = 'Title'): HTMLInputElement | HTMLTextAreaElement => {
 const noop = (): void => undefined;
 
 /**
- * A Title written on more than one line is a Card's and no other surface's
+ * A Title written on more than one line is a Thing's and no other surface's
  * (ADR 0083), so the capability is a prop its mounting surface sets.
  *
  * Both halves are the claim: the multiline field is genuinely a `Textarea` and
@@ -27,7 +27,7 @@ describe('InlineTitleEditor multiline capability', () => {
       <InlineTitleEditor
         title="Auth"
         label="Title"
-        variant="card"
+        variant="thing"
         multiline
         onComplete={() => null}
         onCancel={noop}
@@ -37,7 +37,7 @@ describe('InlineTitleEditor multiline capability', () => {
     expect(titleField()).toBeInstanceOf(HTMLTextAreaElement);
     unmount();
 
-    for (const variant of ['card', 'header'] as const) {
+    for (const variant of ['thing', 'header'] as const) {
       const single = render(
         <InlineTitleEditor
           title="Auth"
@@ -64,7 +64,7 @@ describe('InlineTitleEditor multiline capability', () => {
       <InlineTitleEditor
         title={'Auth\nThe service, not the screen'}
         label="Title"
-        variant="card"
+        variant="thing"
         multiline
         onComplete={() => null}
         onCancel={noop}
@@ -84,7 +84,7 @@ describe('InlineTitleEditor multiline capability', () => {
       <InlineTitleEditor
         title={title}
         label="Title"
-        variant="card"
+        variant="thing"
         multiline
         onComplete={() => null}
         onCancel={noop}
@@ -113,7 +113,7 @@ describe('InlineTitleEditor multiline capability', () => {
       <InlineTitleEditor
         title="Auth"
         label="Title"
-        variant="card"
+        variant="thing"
         multiline
         onComplete={onComplete}
         onCancel={noop}
@@ -158,13 +158,13 @@ describe('InlineTitleEditor multiline capability', () => {
   it('cancels on Escape, completes on blur and keeps a refused multiline draft', () => {
     const onCancel = vi.fn();
     const onComplete = vi.fn((draft: string) =>
-      draft.trim() === '' ? 'A Card title is required.' : null,
+      draft.trim() === '' ? 'A Thing title is required.' : null,
     );
     render(
       <InlineTitleEditor
         title="Auth"
         label="Title"
-        variant="card"
+        variant="thing"
         multiline
         onComplete={onComplete}
         onCancel={onCancel}
@@ -176,7 +176,7 @@ describe('InlineTitleEditor multiline capability', () => {
     fireEvent.change(field, { target: { value: '\n  \n' } });
     fireEvent.blur(field);
     expect(onComplete).toHaveBeenLastCalledWith('\n  \n');
-    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    expect(screen.getByRole('alert')).toHaveTextContent('A Thing title is required.');
     expect(field).toHaveValue('\n  \n');
     expect(field).toHaveFocus();
 

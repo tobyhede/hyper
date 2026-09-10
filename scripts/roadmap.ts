@@ -649,13 +649,13 @@ const stableRoadmapUuid = (name: string): string => {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 };
 
-const markdownCard = (
+const markdownThing = (
   id: string,
   planned: PlannedReleaseIssue,
-  cardsDirectory: string,
+  thingsDirectory: string,
   scratchRoot: string,
 ): string => {
-  const issuePath = relative(cardsDirectory, join(scratchRoot, planned.issue.path)).replaceAll(
+  const issuePath = relative(thingsDirectory, join(scratchRoot, planned.issue.path)).replaceAll(
     sep,
     '/',
   );
@@ -702,19 +702,19 @@ export const writeReleaseSpace = (
   const idByReference = new Map(
     issues.map(({ reference }) => [reference, stableRoadmapUuid(`issue:${reference}`)]),
   );
-  const cardId = (reference: string): string => {
+  const thingId = (reference: string): string => {
     const id = idByReference.get(reference);
-    if (id === undefined) throw new Error(`No roadmap Card for ${reference}.`);
+    if (id === undefined) throw new Error(`No roadmap Thing for ${reference}.`);
     return id;
   };
 
-  const cardsDirectory = join(destination, 'cards');
-  rmSync(cardsDirectory, { recursive: true, force: true });
-  mkdirSync(cardsDirectory, { recursive: true });
+  const thingsDirectory = join(destination, 'things');
+  rmSync(thingsDirectory, { recursive: true, force: true });
+  mkdirSync(thingsDirectory, { recursive: true });
   for (const planned of issues) {
     writeFileSync(
-      join(cardsDirectory, `${planned.reference.replace('/', '-')}.md`),
-      markdownCard(cardId(planned.reference), planned, cardsDirectory, scratchRoot),
+      join(thingsDirectory, `${planned.reference.replace('/', '-')}.md`),
+      markdownThing(thingId(planned.reference), planned, thingsDirectory, scratchRoot),
     );
   }
 
@@ -722,12 +722,12 @@ export const writeReleaseSpace = (
   const criticalEdges = plan.criticalSubgraph.flatMap((issue) =>
     issue.issue.unmetBlockers
       .filter((blocker) => criticalReferences.has(blocker))
-      .map((blocker) => ({ from: cardId(blocker), to: cardId(issue.reference) })),
+      .map((blocker) => ({ from: thingId(blocker), to: thingId(issue.reference) })),
   );
   const criticalKeys = new Set(criticalEdges.map(({ from, to }) => `${from}\u0000${to}`));
   const parallelEdges = issues.flatMap((planned) =>
     planned.issue.unmetBlockers.flatMap((blocker) => {
-      const edge = { from: cardId(blocker), to: cardId(planned.reference) };
+      const edge = { from: thingId(blocker), to: thingId(planned.reference) };
       return criticalKeys.has(`${edge.from}\u0000${edge.to}`) ? [] : [edge];
     }),
   );
@@ -739,12 +739,12 @@ export const writeReleaseSpace = (
       if (criticalReferences.has(planned.reference)) {
         const slot = criticalSlotByDepth.get(planned.depth) ?? 0;
         criticalSlotByDepth.set(planned.depth, slot + 1);
-        return [cardId(planned.reference), { x: slot * 420, y: planned.depth * 300, open: false }];
+        return [thingId(planned.reference), { x: slot * 420, y: planned.depth * 300, open: false }];
       }
       const slot = parallelSlotByDepth.get(planned.depth) ?? 0;
       parallelSlotByDepth.set(planned.depth, slot + 1);
       return [
-        cardId(planned.reference),
+        thingId(planned.reference),
         { x: 460 + slot * 420, y: planned.depth * 300, open: false },
       ];
     }),

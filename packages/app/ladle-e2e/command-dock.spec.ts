@@ -90,7 +90,7 @@ test(
  *
  * The Sidebar had room for a permanent Add Diagram button; the Dock finds room by
  * disclosure. What did not change is that the command creates and selects a
- * Diagram with no Cards placed in it through production Space Authoring.
+ * Diagram with no Things placed in it through production Space Authoring.
  */
 test(
   'New Diagram creates and selects an empty Diagram from the Diagram menu',
@@ -273,7 +273,7 @@ test(
       'Collection 1',
     );
     await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText('Long');
-    await expect(surface(page).getByRole('button', { name: 'Cards' })).toBeVisible();
+    await expect(surface(page).getByRole('button', { name: 'Things' })).toBeVisible();
 
     const menu = await disclose(page, 'Diagram: Collection 1');
     const frame = await dock(page).boundingBox();
@@ -387,11 +387,11 @@ test(
 
     // Nothing is withdrawn at a width: all four names are in the strip, and the
     // last of them is reached by scrolling it rather than by opening anything.
-    await strip.getByRole('button', { name: 'Cards' }).scrollIntoViewIfNeeded();
+    await strip.getByRole('button', { name: 'Things' }).scrollIntoViewIfNeeded();
     for (const testId of ['space-title', 'selected-canvas', 'active-graph'])
       await expect(strip.getByTestId(testId)).toBeAttached();
-    await expect(strip.getByRole('button', { name: 'Cards' })).toBeVisible();
-    await expect(strip.getByRole('button', { name: 'Create Card' })).toBeVisible();
+    await expect(strip.getByRole('button', { name: 'Things' })).toBeVisible();
+    await expect(strip.getByRole('button', { name: 'Create Thing' })).toBeVisible();
 
     // And a command runs from the strip with nothing dismissed first: the menu
     // opens over the canvas, the choice lands, and the strip is still there.

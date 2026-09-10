@@ -3,7 +3,7 @@ import { uuidSchema } from '@project/core';
 import type { LoadedSpace, SpaceBackend } from '../src/index';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
@@ -20,13 +20,13 @@ export const contractLoaded: LoadedSpace = {
           id: DIAGRAM_ID,
           title: 'Diagram 1',
           kind: 'positioned',
-          positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+          positions: { [THING_ID]: { x: 0, y: 0, open: false } },
           graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
           activeGraph: GRAPH_ID,
         },
       ],
     },
-    cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
+    things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
   },
   revision: 9_007_199_254_740_993n,
   exportedRevision: 9_007_199_254_740_992n,
@@ -110,7 +110,7 @@ export const spaceBackendContract = (
     const harness = await createHarness([contractLoaded]);
     try {
       // Shape-valid and domain-invalid: a graph reaches intake only through the
-      // diagram that owns it now (ADR 0040), and its edge endpoints must be cards
+      // diagram that owns it now (ADR 0040), and its edge endpoints must be things
       // of *that* diagram, so the dangling end is one the positions omit.
       const invalid = structuredClone(contractLoaded.snapshot);
       invalid.document.diagrams = [
@@ -118,8 +118,10 @@ export const spaceBackendContract = (
           id: DIAGRAM_ID,
           title: 'Owner',
           kind: 'positioned',
-          positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
-          graphs: [{ id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_ID }] }],
+          positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+          graphs: [
+            { id: GRAPH_ID, title: 'Dangling', edges: [{ from: THING_ID, to: MISSING_ID }] },
+          ],
         },
       ];
       await expect(

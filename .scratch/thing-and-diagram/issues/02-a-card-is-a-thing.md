@@ -1,6 +1,6 @@
 # 02 — A Card is a Thing
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 
 **What to build:** The Card → Thing sweep — ADR 0085's second and larger change,
@@ -133,3 +133,93 @@ Recorded here rather than guessed. Each has a recommendation.
    the retired word. **Recommendation: do not rename it**, and protect the
    `issue-03-card-and-alias-panes` spelling in the mask list with that reason,
    in the idiom change one used for every other citation into a historical tree.
+
+## Answer
+
+Resolved by `.scratch/thing-and-diagram/rename-card-to-thing.mjs`: **365 files
+rewritten, 100 paths renamed**, plus five hand edits the script deliberately does
+not produce because none of them is a spelling. Its header records the mask list
+and the arguments behind it.
+
+### The two open decisions
+
+**The 27 `(c) =>` bindings: hand edit, as recommended.** Twenty-five of them, over
+ten files, and the two that were *not* touched are the finding: `elk-strategy.test.ts`
+binds `(c)` over `spy.seen().children`, which is elkjs's collection and not ours.
+The convention is the *domain* initial, so a foreign collection has no domain
+initial to take. The convention line the guard documents reads `(t)` for thing now.
+
+**`issue-03-card-and-alias-panes.spec.ts`: renamed, against the recommendation.**
+The argument for keeping it was that its filename encodes
+`.scratch/design-system-baseline/issues/03-recompose-card-and-alias-panes-…`,
+which keeps the retired word. Two things beat it once looked at. Nothing cites
+the filename — the correspondence is `issue-03` plus a subject, and `03` is what
+actually locates the record, so renaming the subject half loses nothing a reader
+uses. And the subject is a *live* surface being renamed in this very change,
+sitting in a directory where `space-card-panes.spec.ts` and `card-expand.spec.ts`
+both move — leaving it would half-sweep the directory to protect a correspondence
+the number already carries.
+
+### What the sweep needed that change one did not
+
+**Regex citation masks instead of a literal list.** Change one masked bare
+feature names (`layout-seam`, `layout-only-v1`) because Layout's citations had no
+live homonyms. Card's do: `card-authoring` is both a `.scratch/` effort and the
+stem of a live test file, so a bare mask would have frozen the file that had to
+move. Only the citation *shape* is forgiven — a path under `.scratch/`, or an ADR
+slug, which is the one thing in this repository that opens with four digits and a
+hyphen.
+
+That is not sufficient on its own and the gap is worth recording: a `.scratch/`
+effort cited **without** its prefix is invisible to it, and two survived into the
+first run — `docs/agents/issue-tracker.md` listing seven efforts in backticks, and
+`docs/agents/ui.md`'s `space-cards/04`. Both were found by scanning for the swept
+spellings of every card-named `.scratch/` directory and reading each hit, which is
+the check to repeat rather than the mask to widen.
+
+**Per-file masks.** The registry exports five names spelled identically to domain
+ones — `Card` is the domain type in `@project/core`, `CardContent` a domain
+component with its own module — so a global mask would have frozen the half that
+had to move. `FILE_PROTECTED` names the registry usage at each of the five sites
+that also carry domain vocabulary, in the exact shape it appears: an import
+specifier, a closing tag, or an opening tag plus the character after it, which is
+what separates `<Card` from `<CardRail` and the registry's `<CardContent className=`
+in `CanvasThing` from the domain's `<CardContent title=` in `ThingNode`.
+
+**The alias is deleted, not swept.** `packages/ui/src/index.ts` no longer
+re-exports `CardContent as CardSection`; the domain component is `ThingContent`,
+so the registry's own name is free and its five consumers now import it directly.
+The barrel aliases nothing at all today, which cost the two `ui-catalog` comments
+that used it as their worked example — the resolution rule still holds and its
+fixtures are synthetic, so both comments now say so.
+
+### Two fixture orderings the rename moved
+
+Neither is a behaviour change and both would have been easy to "fix" in the wrong
+place:
+
+- `test/unit/read-single-space.test.ts` asserts a **global** sort over relative
+  paths. `cards/` sorted before `root.md`; `things/` sorts after it, so the two
+  inventory files moved to the end of the expected array.
+- `packages/app/test/snapshot.test.ts` round-trips a snapshot whose things intake
+  sorts by Title. The first fixture's Title was `Card`, ahead of `Next`; as
+  `Thing` it follows. The array is declared in Title order now, with the reason
+  written down.
+
+### Verification
+
+`pnpm verify:static` green — all seven commands. `pnpm e2e` **180 passed**,
+`pnpm e2e:ladle` **82 passed**, both on the first run.
+
+`pnpm test` is **one test red, and it is 03's**:
+`test/unit/prisma-foundation.test.ts > reaches the emitted contract from the
+existing migration head`. `pnpm contract:check` is red for the same reason, and it
+is a CI step in the static job.
+
+**That coupling is real and is not a sequencing mistake.** The sweep rewrites
+`src/prisma/contract.prisma` because a Prisma model is a domain declaration like
+any other, and it rewrites `src/persistence/postgres-space-repository.ts`, which
+typechecks against the emitted contract. Reverting either half would break the
+other, so the model rename lands with the sweep and the forward migration that
+makes the head reach it is 03 — which needs a live database to generate, since
+`prisma-next migrate` refuses without a connection.

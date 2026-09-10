@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Card } from '@project/core';
+import { uuidSchema, type Thing } from '@project/core';
 import { NewAlias } from '../src/components/NewAlias';
 import { presentNewAliasRefusal } from '../src/authoring-refusal';
 
@@ -9,14 +9,14 @@ import { presentNewAliasRefusal } from '../src/authoring-refusal';
  * cannot reach.
  *
  * A refused creation needs the Space to have changed under an open pane — the
- * picker only ever offers eligible non-Alias Cards, so nothing an author does
+ * picker only ever offers eligible non-Alias Things, so nothing an author does
  * to this surface can produce a refusal from it. The message's *lifetime* is
  * still this component's contract, and it is the half that was wrong.
  */
 
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
-const targets: readonly Card[] = [
+const targets: readonly Thing[] = [
   { id: TARGET_ID, title: 'A', kind: 'markdown', body: 'A source' },
 ];
 
@@ -92,7 +92,7 @@ describe('NewAlias', () => {
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('That Target is no longer part of the Space.');
-    expect(alert.closest('.card-pane__fields')).not.toBeNull();
+    expect(alert.closest('.thing-pane__fields')).not.toBeNull();
     expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
       'aria-invalid',
       'true',
@@ -120,7 +120,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal={presentNewAliasRefusal({ code: 'card-title-required' })}
+        refusal={presentNewAliasRefusal({ code: 'thing-title-required' })}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={() => undefined}
@@ -128,13 +128,13 @@ describe('NewAlias', () => {
     );
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('A Card title is required.');
+    expect(alert).toHaveTextContent('A Thing title is required.');
     expect(alert.closest('[data-slot="field"]')).toContainElement(
       screen.getByTestId('new-alias-title'),
     );
     expect(screen.getByTestId('new-alias-title')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByTestId('new-alias-title')).toHaveAccessibleDescription(
-      'A Card title is required.',
+      'A Thing title is required.',
     );
     expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
       'aria-invalid',
@@ -155,7 +155,7 @@ describe('NewAlias', () => {
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('This Diagram is no longer part of the Space.');
-    expect(alert.closest('.card-pane__fields')).toBeNull();
+    expect(alert.closest('.thing-pane__fields')).toBeNull();
     expect(screen.getByTestId('new-alias-title')).toHaveAttribute('aria-invalid', 'false');
     expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
       'aria-invalid',
@@ -166,8 +166,8 @@ describe('NewAlias', () => {
   /**
    * The hint is the pane's one sentence about what finishing does, so it has to
    * describe the Edit that actually runs. An empty title mints the same neutral
-   * `Card N` every other created Card gets — the Target's own Title is never
-   * copied, because that gave the Space two Cards with one name by default
+   * `Thing N` every other created Thing gets — the Target's own Title is never
+   * copied, because that gave the Space two Things with one name by default
    * (ADR 0083's refinement of ADR 0046).
    */
   it('says an untitled Alias is named for the author, not after its Target', () => {
@@ -182,7 +182,7 @@ describe('NewAlias', () => {
     );
 
     expect(screen.getByText(/Choosing a Target creates the Alias/)).toHaveTextContent(
-      'Choosing a Target creates the Alias. Leave the title empty and it is named for you; renaming continues on the Card.',
+      'Choosing a Target creates the Alias. Leave the title empty and it is named for you; renaming continues on the Thing.',
     );
   });
 

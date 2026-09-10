@@ -64,7 +64,7 @@ function AlertDialogContent({
             // footer can spend it back: a footer that carries a fill and a rule
             // has to reach the popup's edges, and a second literal `4` in the
             // margin that negates this one is a drift waiting to happen. Same
-            // arrangement `Card` uses for the same band (`card.tsx`).
+            // arrangement `Thing` uses for the same band (`thing.tsx`).
             'group/alert-dialog-content data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-(--alert-dialog-spacing) text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 outline-none [--alert-dialog-spacing:--spacing(4)] data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm',
             className,
           )}
@@ -94,7 +94,7 @@ function AlertDialogFooter({ className, ...props }: React.ComponentProps<'div'>)
       data-slot="alert-dialog-footer"
       // The band spends the popup's padding back on both sides and its bottom,
       // so it meets the popup's edges and takes its bottom corners. Inset, the
-      // fill read as a grey card floating inside the dialog with a white strip
+      // fill read as a grey thing floating inside the dialog with a white strip
       // beneath it — invisible while `bg-muted/50` was a dark grey on a dark
       // popup, and the first thing the eye lands on once both went light.
       className={cn(

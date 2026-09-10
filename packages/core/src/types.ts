@@ -1,9 +1,9 @@
 import type { z } from 'zod';
 import type {
-  cardFrontmatterSchema,
-  cardPlacementSchema,
-  cardDocumentSchema,
-  cardSchema,
+  thingFrontmatterSchema,
+  thingPlacementSchema,
+  thingDocumentSchema,
+  thingSchema,
   importSpaceFileSchema,
   importSpaceSchema,
   diagramPositionSchema,
@@ -19,21 +19,21 @@ import type {
 
 /** Domain types are derived from the Zod schemas so they can never drift apart. */
 
-export type Card = z.infer<typeof cardSchema>;
+export type Thing = z.infer<typeof thingSchema>;
 export type UUID = z.infer<typeof uuidSchema>;
-export type CardDocument = z.infer<typeof cardDocumentSchema>;
+export type ThingDocument = z.infer<typeof thingDocumentSchema>;
 export type SpaceDocument = z.infer<typeof spaceDocumentSchema>;
 export type SpaceSnapshot = z.infer<typeof spaceSnapshotSchema>;
-export type ImportCard = z.infer<typeof importSpaceSchema>['cards'][number];
+export type ImportThing = z.infer<typeof importSpaceSchema>['things'][number];
 export type ImportSpaceFile = z.infer<typeof importSpaceFileSchema>;
 export type ImportSpace = z.infer<typeof importSpaceSchema>;
 
 /**
- * The kind-specific fields stored before a card file's closing frontmatter
- * fence (ADR 0020). A markdown `Card` adds its body; an alias `Card` is already
+ * The kind-specific fields stored before a thing file's closing frontmatter
+ * fence (ADR 0020). A markdown `Thing` adds its body; an alias `Thing` is already
  * complete because its content resolves through `target` (ADR 0009).
  */
-export type CardFrontmatter = z.infer<typeof cardFrontmatterSchema>;
+export type ThingFrontmatter = z.infer<typeof thingFrontmatterSchema>;
 /**
  * One `{ from, to }` connection a graph is made of (ADR 0032). The authored
  * element — distinct from `@project/graph`'s `GraphRenderEdge`, which is this plus the
@@ -42,19 +42,19 @@ export type CardFrontmatter = z.infer<typeof cardFrontmatterSchema>;
 export type GraphEdge = z.infer<typeof graphEdgeSchema>;
 export type Graph = z.infer<typeof graphSchema>;
 export type DiagramPosition = z.infer<typeof diagramPositionSchema>;
-export type CardPlacement = z.infer<typeof cardPlacementSchema>;
+export type ThingPlacement = z.infer<typeof thingPlacementSchema>;
 export type PositionedDiagram = z.infer<typeof positionedDiagramSchema>;
 
 /**
- * A **Diagram**: the authored card-to-position map a space carries (ADR 0014).
- * It is data, not behaviour — what arranges Cards is a
+ * A **Diagram**: the authored thing-to-position map a space carries (ADR 0014).
+ * It is data, not behaviour — what arranges Things is a
  * `LayoutStrategy` in `@project/graph`, and `positionedStrategy` is the one that
  * reads this. Only authored diagrams exist as values; an automatic strategy has
  * no Diagram behind it (ADR 0025).
  */
 export type Diagram = z.infer<typeof diagramSchema>;
 
-export type CardId = Card['id'];
+export type ThingId = Thing['id'];
 export type GraphId = Graph['id'];
 export type DiagramId = Diagram['id'];
 

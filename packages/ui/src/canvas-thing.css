@@ -1,0 +1,539 @@
+.canvas-thing {
+  --canvas-thing-ink: var(--canvas-thing-ink-color);
+  --canvas-thing-face: var(--canvas-thing-face-rest);
+  --canvas-thing-active-face: var(--canvas-thing-face-active);
+  --canvas-thing-title: var(--canvas-thing-title-color);
+  --canvas-thing-muted: var(--canvas-thing-muted-color);
+  --canvas-thing-error: var(--canvas-thing-error-color);
+
+  /* The Title ladder (ADR 0083). One size and one leading are authored — the
+     `title` role's, which is the Title Hyper has always drawn — and the two
+     rungs below it are ratios of that size rather than sizes of their own. A
+     change to the top of the scale therefore moves the whole ladder, and a
+     single-line Title, which is only ever the `title` role, is untouched by
+     any of it.
+
+     0.78 and 0.67 draw 14px and 12px against an 18px name. Both keep
+     `--canvas-thing-title` as their ink: the size and the weight step are
+     already saying "descending", and dimming on top of that would be two
+     mechanisms for one meaning on a front where the Graph colour is carrying
+     information of its own. */
+  --canvas-thing-title-size: 18px;
+  --canvas-thing-title-leading: 1.12;
+  --canvas-thing-subtitle-ratio: 0.78;
+  --canvas-thing-caption-ratio: 0.67;
+
+  /* The ladder's ceiling, in lines of the `title` role. Placement is authored,
+     so a Title is clamped to the room available and never accommodated (ADR
+     0014, ADR 0066, ADR 0083) — a Title with more lines than fit is clipped.
+
+     A number rather than the room the Thing happens to have, because the ladder
+     has to draw the same whether the Thing is Open or Closed: room-relative
+     clipping would reveal more rungs on Opening and teach an author that
+     Opening edits the Title. The number is chosen to fit inside the body of a
+     Closed Thing, which is the smaller of the two and the authored default;
+     `packages/ui/test/canvas-thing-title-ladder.test.ts` holds it to that
+     Thing's own geometry. */
+  --canvas-thing-title-ladder-lines: 4;
+
+  position: relative;
+  box-sizing: border-box;
+  width: var(--thing-width);
+  height: var(--thing-height);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 4px solid var(--canvas-thing-ink);
+  border-radius: 0;
+  background: var(--canvas-thing-face);
+  background-clip: padding-box;
+  box-shadow: none;
+  transition:
+    box-shadow var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease),
+    transform var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease),
+    background-color var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
+}
+
+.canvas-thing[data-kind='alias'] {
+  border-style: dotted;
+}
+
+/* `hover` is no longer a `data-state` value the adapter computes (it is real
+   pointer/focus state, owned here) — `:hover` stands in for it alongside the
+   remaining "not resting" states. The adapter's four spatial source handles
+   sit outside this element's own box (centred on the border, half in and half
+   out) so a pointer moving from the thing onto one leaves `.canvas-thing`'s own
+   box without leaving the Thing visually or gesturally — `:has(~ … :hover)`
+   reads that as the same hover rather than losing it. All eight handles match,
+   source and target alike: a connection in flight reveals the target ones, and
+   a pointer arriving to complete an Edge must not drop the Thing it is aiming
+   at back to its rest face. `~` reaches following siblings only, so `ThingNode`
+   renders every authoring handle after the Thing and a unit test pins that. Its class name is the
+   adapter's, but the coupling is a CSS selector string, not an import — no
+   React Flow reaches this package, and this rule degrades to plain `:hover`
+   wherever no such sibling exists (every Ladle story in this file). */
+.canvas-thing:is(
+  :hover,
+  :has(~ .rf-thing-node__authoring-handle:hover),
+  :not([data-state='rest']),
+  [data-content-editing='true']
+) {
+  background: var(--canvas-thing-active-face);
+}
+
+.canvas-thing[data-kind='alias']:is(
+    :hover,
+    :has(~ .rf-thing-node__authoring-handle:hover),
+    :not([data-state='rest'])
+  ) {
+  border-style: solid;
+}
+
+.canvas-thing[data-state='selected'],
+.canvas-thing[data-state='editing'] {
+  box-shadow: 0 0 0 3px var(--canvas-thing-ink);
+}
+
+.canvas-thing[data-state='dragging'] {
+  box-shadow: 7px 7px 0 var(--canvas-thing-ink);
+  transform: rotate(-1deg);
+}
+
+/* The rail's geometry and its Active-Graph band are `ThingRail`'s, in
+   `thing-rail.css`. What belongs to the canvas Thing is *when* it shows: a resting
+   Thing on the canvas is quiet, and reveals its rail with itself. That is this
+   Thing's state, not the rail's, so the resting case is written here as the
+   negation of the same "not resting" set the face and the glyph use — a Thing at
+   rest that no pointer is over, that no authoring handle of its own is under,
+   **and that is not running an edit**. Everything else, selection and dragging
+   included, leaves the rail as `ThingRail` draws it.
+
+   A running edit belongs in that set because it outlives every other reason the
+   rail is up. The caret is in the body, so no hover, selection or focus of the
+   rail's own is true — and a blur ends nothing (ADR 0064), so deselecting a Thing
+   mid-edit used to quiet the band and the glyph while leaving Save, Cancel and
+   Close lit on top of nothing. The exits stay visible because the ADR says they
+   do; this is what stops them being the only thing left. */
+.canvas-thing[data-state='rest']:not(:hover):not(
+    :has(~ .rf-thing-node__authoring-handle:hover)
+  ):not([data-content-editing='true'])
+  .thing-rail {
+  background: transparent;
+}
+
+.canvas-thing .thing-rail__kind {
+  color: var(--canvas-thing-ink);
+}
+
+.canvas-thing[data-state='rest']:not(:hover):not(
+    :has(~ .rf-thing-node__authoring-handle:hover)
+  ):not([data-content-editing='true'])
+  .thing-rail__kind {
+  opacity: 0.28;
+}
+
+.canvas-thing__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
+}
+
+/* Pointer focus survives Open/Close. Only keyboard-visible focus should keep
+   an unhovered, unselected Thing's commands revealed. */
+.canvas-thing:is(
+    :hover,
+    :has(~ .rf-thing-node__authoring-handle:hover),
+    [data-state='selected'],
+    [data-content-editing='true']
+  )
+  .canvas-thing__actions,
+.canvas-thing__actions:has(:focus-visible) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.canvas-thing .thing__rail-action {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--canvas-thing-ink);
+  border-radius: 0;
+  padding: 0;
+  background: var(--canvas-thing-face);
+  color: var(--canvas-thing-ink);
+  transition:
+    color var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease),
+    background-color var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
+}
+
+/* Unavailable, at any rail colour.
+
+   Matched on `aria-disabled`, not `:disabled`. A rail control is a toolbar item
+   (ADR 0073) and a toolbar item stays focusable while unavailable, so it carries
+   the attribute rather than the native property — `:disabled` matches none of
+   them, and `Button`'s own `disabled:` utilities do not apply either.
+
+   Two things go wrong on a coloured band and both are fixed the same way. First,
+   a semi-transparent control lets the rail's Active-Graph colour through — the
+   paper and the ink both take that colour on, and the result reads as a
+   differently-coloured control rather than an unavailable one. Second, a border
+   pulled close to the paper leaves an edgeless square floating on the band,
+   which washes out against a mid-tone rail and disappears entirely against a
+   pale one.
+
+   So: full opacity, opaque paper, and a border that is still unambiguously an
+   edge. Every value is mixed from the Thing's own **ink** and **paper** and
+   nothing is mixed from the rail, which is what makes one rule hold for every
+   Graph colour the Space has. The quieting is a step down from the ink the
+   enabled controls use, not a step toward whatever is behind. */
+.canvas-thing .thing__rail-action[aria-disabled='true'],
+.canvas-thing .thing__rail-action[aria-disabled='true']:hover {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--canvas-thing-ink) 45%, var(--canvas-thing-face));
+  background: var(--canvas-thing-face);
+  color: color-mix(in srgb, var(--canvas-thing-ink) 32%, var(--canvas-thing-face));
+  cursor: not-allowed;
+}
+
+.canvas-thing .thing__rail-action:not([aria-disabled='true']):hover {
+  border-color: var(--canvas-thing-ink);
+  background: var(--canvas-thing-ink);
+  color: var(--canvas-thing-graph);
+}
+
+.canvas-thing .thing__rail-action:focus-visible {
+  outline: 2px solid var(--canvas-thing-ink);
+  outline-offset: 2px;
+}
+
+.canvas-thing__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 0;
+  padding: 10px 12px;
+}
+
+/* The heading box holds the ladder and caps it. Its own type is the `title`
+   role's, so the Title Lines below it inherit the leading, the tracking and the
+   ink from one place, and a Title with no break in it is drawn by exactly the
+   declarations that drew it before there was a ladder at all. */
+.canvas-thing__title {
+  display: block;
+  max-height: calc(
+    var(--canvas-thing-title-size) * var(--canvas-thing-title-leading) *
+      var(--canvas-thing-title-ladder-lines)
+  );
+  margin: 0;
+  overflow: hidden;
+  color: var(--canvas-thing-title);
+  font-size: var(--canvas-thing-title-size);
+  font-weight: 600;
+  line-height: var(--canvas-thing-title-leading);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* The heading itself, which the activation control wraps rather than sits
+   inside (ADR 0065, ADR 0083). A plain block, so inserting it between the
+   Title's box and its rungs reflows nothing: the box keeps the clamp and the
+   type, and each rung keeps its own. */
+.canvas-thing__title-heading {
+  display: block;
+}
+
+/* One Title Line, drawn as its own block so the break the author typed is the
+   only thing that starts a new rung (ADR 0083). A break the *box* chooses is
+   not a rung: a line wraps freely inside its own role, so a subtitle that takes
+   two visual lines is one subtitle and a long single-line Title is still all
+   `title`. That is what the clamp counts — visual lines, per role.
+
+   `white-space: normal` because ADR 0065 puts this ladder inside the shared
+   `Button`, whose base class is `whitespace-nowrap`. Wrapping within a role is
+   the rule; the control the rule is drawn inside does not get to withdraw it. */
+.canvas-thing__title-line {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+}
+
+/* An interior blank line is a gap the author meant and the schema keeps
+   verbatim (ADR 0083). An empty block box has no height of its own to draw one
+   with, so it is given the line it stands for. */
+.canvas-thing__title-line:empty {
+  min-height: 1lh;
+}
+
+/* The three rungs. The first restates the heading's own type rather than
+   inheriting it silently, so the ladder reads as a ladder at the one place a
+   reader looks for it. */
+.canvas-thing__title-line[data-role='title'] {
+  font-size: var(--canvas-thing-title-size);
+  font-weight: 600;
+  -webkit-line-clamp: 3;
+}
+
+.canvas-thing__title-line[data-role='subtitle'] {
+  font-size: calc(var(--canvas-thing-title-size) * var(--canvas-thing-subtitle-ratio));
+  font-weight: 500;
+  -webkit-line-clamp: 2;
+}
+
+.canvas-thing__title-line[data-role='caption'] {
+  font-size: calc(var(--canvas-thing-title-size) * var(--canvas-thing-caption-ratio));
+  font-weight: 400;
+  -webkit-line-clamp: 1;
+}
+
+/* The Title's one-activation control (ADR 0065) must claim only the pixels it
+   draws. Its wrapper still spans the editor's full width so the hover treatment
+   previews the field that replaces it without making that whole band clickable. */
+.canvas-thing__title[data-editable='true'] {
+  width: 100%;
+  max-width: 100%;
+}
+
+.canvas-thing__title-control {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  cursor: default;
+}
+
+.canvas-thing__title:has(.canvas-thing__title-control:hover) {
+  background: color-mix(in srgb, var(--canvas-thing-graph) 10%, transparent);
+  box-shadow: inset 0 -2px 0 var(--canvas-thing-graph);
+}
+
+.canvas-thing__title-control:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--canvas-thing-graph);
+  outline-offset: 2px;
+}
+
+/* The stand-in while the referenced Space has not been read. Sized and coloured
+   as the selectors that replace it so the Thing does not change shape when they
+   arrive. */
+.canvas-thing__space-note {
+  margin: 8px 0 0;
+  color: var(--canvas-thing-muted);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.canvas-thing__space-selectors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Label above field rather than beside it. A Thing is narrow and both labels are
+   one short word, so a row would spend the width the titles need on two columns
+   that never fill. */
+.canvas-thing__space-selector {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Through the enclosing selector for the reason given on the trigger below:
+   `Label` brings its own equal-specificity type scale. */
+.canvas-thing__space-selector .canvas-thing__space-selector-label {
+  color: var(--canvas-thing-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The trigger's own palette is the toolbar's — dark panel, dark text — and this
+   Thing is cream. So it takes the Thing's ink and paper, exactly as the rail's
+   controls do, rather than carrying the surrounding theme onto the one surface
+   that is not in it.
+
+   Written through the enclosing selector for the same reason `thing__rail-action`
+   is: `SelectTrigger` carries Tailwind utilities of equal specificity, and one
+   class against one class is decided by whichever stylesheet the bundler
+   happened to emit last. */
+.canvas-thing__space-selector .canvas-thing__space-selector-trigger {
+  width: 100%;
+  min-width: 0;
+  border-color: var(--canvas-thing-ink);
+  background: var(--canvas-thing-face);
+  color: var(--canvas-thing-title);
+  font-size: 12px;
+}
+
+/* The selected title, which is as long as an author's Diagram names are and the
+   Thing is as wide as a Thing. */
+.canvas-thing__space-selector .canvas-thing__space-selector-trigger > span:first-of-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-thing__space-selector .canvas-thing__space-selector-trigger:disabled {
+  color: var(--canvas-thing-muted);
+}
+
+.canvas-thing__space-selector .canvas-thing__space-selector-trigger:focus-visible {
+  outline: 2px solid var(--canvas-thing-graph);
+  outline-offset: 2px;
+}
+
+/* An Open Space Thing draws the Diagram it selects (ADR 0068), and that view
+   is React Flow sub-flow nodes painted *over* this Thing rather than DOM inside
+   it — so nothing here can lay out around them, and the room they get has to be
+   a number both sides agree on. The Thing's own passengers take a footer of
+   exactly `SPACE_THING_FOOTER_HEIGHT`, leaving the region above it for the view.
+   `packages/ui/test/canvas-thing-embedded-diagram.test.ts` holds this rule and that
+   constant to the same number.
+
+   `flex: none` with `margin-top: auto` rather than the `flex: 1` the body
+   normally takes: bottom-aligning the content of a body that fills the Thing
+   leaves the free region above it a different size on every Thing, which is the
+   one thing a projection reading a constant cannot survive. */
+.canvas-thing[data-kind='space'][data-expanded='true'] .canvas-thing__body {
+  height: 176px;
+  flex: none;
+  margin-top: auto;
+}
+
+/* A Title is the same bottom passenger before, during and after the React Flow
+   wrapper moves. Opening adds the content surface above it; it never switches
+   the Title's layout in the middle of that motion. Both kinds that draw content
+   claim it, so an Open Alias reads exactly as an Open Markdown Thing does
+   (ADR 0070) — the `space` kind has no content front to sit above a Title. */
+.canvas-thing:is([data-kind='markdown'], [data-kind='alias']) .canvas-thing__body {
+  order: 2;
+  flex: none;
+  margin-top: auto;
+}
+
+.canvas-thing__content {
+  order: 1;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  border-bottom: 2px solid var(--canvas-thing-ink);
+  /* The Thing's ink, not the ambient `--foreground`. A Thing's face is its own
+     paper and a body drawn in the surrounding theme's text colour is the one
+     part of an Expanded Thing that would not look like the Thing. */
+  color: var(--canvas-thing-title);
+  opacity: 1;
+  transition-property: opacity;
+  transition-duration: calc(var(--thing-placement-duration, 200ms) * 0.4);
+  transition-timing-function: var(--thing-placement-easing, ease);
+}
+
+/* Markdown enters over the tail of the node's growth, after its reflow has
+   mostly settled. It leaves immediately and is gone before the node finishes
+   shrinking. The border belongs to this container, so it travels with the
+   document rather than appearing as a separate full-strength line. */
+.canvas-thing__content[data-presence='entering'],
+.canvas-thing__content[data-presence='leaving'] {
+  opacity: 0;
+}
+
+.canvas-thing__content[data-presence='entering'] {
+  transition-delay: calc(var(--thing-placement-duration, 200ms) * 0.6);
+}
+
+.canvas-thing__content[data-presence='leaving'] {
+  pointer-events: none;
+  transition-delay: 0ms;
+}
+
+.canvas-thing .thing__title-editor,
+.canvas-thing .thing__title-input {
+  width: 100%;
+}
+
+.canvas-thing .thing__title-editor {
+  display: block;
+}
+
+/* The field an author writes the Title in, drawn as the Title it is replacing.
+   Its type comes from the same two tokens the heading and the rungs take, so
+   there is one size and one leading on this Thing and not two — restated here,
+   the field kept 18px while a change to `--canvas-thing-title-size` moved
+   everything around it, and the Title jumped size and baseline at the one
+   moment the drawn Title and the field are meant to be indistinguishable.
+
+   And it stops growing where the drawn ladder stops. `field-sizing: content`
+   is what makes the field exactly as tall as the Title being written, and
+   uncapped that is a box with no limit inside a Thing whose height is authored
+   (ADR 0014, ADR 0083): at the fifth line the body — bottom-pinned, so it
+   grows upward — pushes the rail off the top of a Closed Thing, where the
+   Thing's own `overflow: hidden` takes the kind glyph, the Actions menu and
+   Open with it while the author is still typing. The ceiling is the ladder's
+   own, so what an author can see while writing is what the Thing will draw.
+   Scrolled rather than clipped, because the field is the one place the whole
+   Title has to stay reachable however many lines it has. */
+.canvas-thing .thing__title-input {
+  display: block;
+  height: auto;
+  min-height: 0;
+  max-height: calc(
+    var(--canvas-thing-title-size) * var(--canvas-thing-title-leading) *
+      var(--canvas-thing-title-ladder-lines)
+  );
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  overflow-y: auto;
+  background: transparent;
+  box-shadow: inset 0 -3px 0 var(--canvas-thing-graph);
+  color: var(--canvas-thing-title);
+  font: inherit;
+  font-size: var(--canvas-thing-title-size);
+  font-weight: 600;
+  line-height: var(--canvas-thing-title-leading);
+  letter-spacing: -0.02em;
+  text-align: left;
+}
+
+.canvas-thing .thing__field-error {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--canvas-thing-error);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-thing,
+  .canvas-thing__actions,
+  .canvas-thing__content,
+  .canvas-thing .thing__rail-action {
+    transition: none;
+  }
+
+  .canvas-thing__content {
+    transition-delay: 0ms;
+  }
+
+  /* The content cross-fade reads the placement token rather than a transition
+     of its own, so it is withdrawn through the token — the same one the
+     application sets on `.graph-area`. Declared here as well so a Thing mounted
+     outside that container, which every story is, honours the preference. */
+  .canvas-thing {
+    --thing-placement-duration: 1ms;
+  }
+}

@@ -27,7 +27,7 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  *    through `String.localeCompare` and the other through PostgreSQL's ordering
  *    of the `uuid` type. Those agree for canonical lowercase UUIDs by a property
  *    of ICU collation, not by anything either implementation promises, so the
- *    contract compares catalogs as sets. The Cards *inside* a Space are a
+ *    contract compares catalogs as sets. The Things *inside* a Space are a
  *    different matter: both order them by id on every read, by codepoint over
  *    the canonical text on one side and by the `uuid` bytes on the other, which
  *    are the same comparison — so the whole-snapshot `toEqual` comparisons below
@@ -42,24 +42,24 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
 const SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000002');
 const MISSING_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000003');
-const CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000010');
-const SECOND_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
-const OTHER_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
-const LINK_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
-const MISSING_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
-const THIRD_SPACE_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000014');
-const FOURTH_SPACE_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000015');
+const THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000010');
+const SECOND_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
+const OTHER_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
+const LINK_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
+const MISSING_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
+const THIRD_SPACE_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000014');
+const FOURTH_SPACE_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000015');
 const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
 const DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
 const SECOND_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000022');
 const SECOND_DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000023');
 
-const card = (id: UUID, title: string) => ({
+const thing = (id: UUID, title: string) => ({
   id,
   document: { title, kind: 'markdown' as const, body: title },
 });
 
-const spaceCard = (
+const spaceThing = (
   id: UUID,
   target: UUID,
   selection: { readonly diagram?: UUID; readonly graph?: UUID } = {},
@@ -69,22 +69,22 @@ const spaceCard = (
 });
 
 /**
- * A Space with cards and no structure — no diagrams, and so no graphs, which is
+ * A Space with things and no structure — no diagrams, and so no graphs, which is
  * one statement under version 1 (ADR 0040). Most of this suite is about
  * identity, rollback and revisions rather than about structure, so the cases
  * that need a graph build a diagram to own it rather than every case carrying an
  * empty collection.
  */
-const space = (id: UUID, title: string, cardIds: readonly UUID[]): SpaceSnapshot => ({
+const space = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceSnapshot => ({
   id,
   document: { version: 1, title },
-  cards: cardIds.map((cardId) => card(cardId, `${title} card`)),
+  things: thingIds.map((thingId) => thing(thingId, `${title} thing`)),
 });
 
 /**
  * A Space whose one diagram owns one graph with one edge out of the diagram.
  *
- * Under version 1 an edge endpoint must name a card of the diagram that owns the
+ * Under version 1 an edge endpoint must name a thing of the diagram that owns the
  * graph, so "dangling" is now a membership failure rather than a space-wide
  * lookup miss — and a graph can only reach domain intake through a diagram, so
  * the failure cannot be built without one.
@@ -101,7 +101,7 @@ const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSn
         kind: 'positioned',
         positions: { [memberId]: { x: 0, y: 0, open: false } },
         graphs: [
-          { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_CARD_ID }] },
+          { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_THING_ID }] },
         ],
       },
     ],
@@ -163,7 +163,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} initializes and replaces only through explicit Meta-rooted aggregates`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
       await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
       await expect(
         repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
@@ -193,10 +193,10 @@ export const spaceRepositoryContract = (
 
   it(`${name} classifies canonical initialization and invalid lifecycle proposals`, async () => {
     await withHarness(async (repository) => {
-      const child = space(OTHER_SPACE_ID, 'Child', [OTHER_CARD_ID]);
+      const child = space(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
       const meta = {
-        ...space(SPACE_ID, 'Meta', [CARD_ID]),
-        cards: [card(CARD_ID, 'Meta card'), spaceCard(LINK_CARD_ID, OTHER_SPACE_ID)],
+        ...space(SPACE_ID, 'Meta', [THING_ID]),
+        things: [thing(THING_ID, 'Meta thing'), spaceThing(LINK_THING_ID, OTHER_SPACE_ID)],
       };
       const input = { metaSpaceId: SPACE_ID, spaces: [meta, child] };
       const [first, second] = await Promise.all([
@@ -225,20 +225,20 @@ export const spaceRepositoryContract = (
       const first: SpaceSnapshot = {
         id: SPACE_ID,
         document: { version: 1, title: 'Meta' },
-        cards: [
+        things: [
           {
-            id: CARD_ID,
-            document: { title: 'Card', kind: 'markdown', body: 'Body' },
+            id: THING_ID,
+            document: { title: 'Thing', kind: 'markdown', body: 'Body' },
           },
         ],
       };
       const reordered: SpaceSnapshot = {
         id: SPACE_ID,
         document: { title: 'Meta', version: 1 },
-        cards: [
+        things: [
           {
-            id: CARD_ID,
-            document: { body: 'Body', kind: 'markdown', title: 'Card' },
+            id: THING_ID,
+            document: { body: 'Body', kind: 'markdown', title: 'Thing' },
           },
         ],
       };
@@ -254,8 +254,8 @@ export const spaceRepositoryContract = (
 
   it(`${name} lets only one different concurrent initialization establish state`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'First', [CARD_ID]);
-      const second = space(OTHER_SPACE_ID, 'Second', [OTHER_CARD_ID]);
+      const first = space(SPACE_ID, 'First', [THING_ID]);
+      const second = space(OTHER_SPACE_ID, 'Second', [OTHER_THING_ID]);
       const results = await Promise.all([
         repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
         repository.initializeAggregate({ metaSpaceId: OTHER_SPACE_ID, spaces: [second] }),
@@ -270,7 +270,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} rolls back a refused replacement`, async () => {
     await withHarness(async (repository) => {
-      const initial = space(SPACE_ID, 'Initial', [CARD_ID]);
+      const initial = space(SPACE_ID, 'Initial', [THING_ID]);
       await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
       await expect(
         repository.replaceAggregate(
@@ -287,7 +287,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses replacement before initialization`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
       await expect(
         repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [meta] }, SPACE_ID),
       ).resolves.toEqual({ kind: 'uninitialized' });
@@ -297,9 +297,9 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a replacement authorized against a superseded Meta identity`, async () => {
     await withHarness(async (repository) => {
-      const initial = space(SPACE_ID, 'Initial', [CARD_ID]);
-      const first = space(OTHER_SPACE_ID, 'First replacement', [OTHER_CARD_ID]);
-      const second = space(MISSING_SPACE_ID, 'Second replacement', [MISSING_CARD_ID]);
+      const initial = space(SPACE_ID, 'Initial', [THING_ID]);
+      const first = space(OTHER_SPACE_ID, 'First replacement', [OTHER_THING_ID]);
+      const second = space(MISSING_SPACE_ID, 'Second replacement', [MISSING_THING_ID]);
       await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
 
       await expect(
@@ -334,7 +334,7 @@ export const spaceRepositoryContract = (
    */
   it(`${name} becomes committable from an empty store`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
 
       await expect(repository.loadAggregate()).resolves.toEqual({
@@ -351,7 +351,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} imports a Space, then lists, loads and commits it`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
 
       await expect(repository.importSpaces([first], 'insert')).resolves.toEqual({
         kind: 'imported',
@@ -375,14 +375,14 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses to create a new unreachable Space by removing its last reference alone`, async () => {
     await withHarness(async (repository) => {
-      const target = space(OTHER_SPACE_ID, 'Target', [OTHER_CARD_ID]);
+      const target = space(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]);
       const linkedMeta: SpaceSnapshot = {
-        ...space(SPACE_ID, 'Meta', [CARD_ID]),
-        cards: [card(CARD_ID, 'Meta card'), spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID)],
+        ...space(SPACE_ID, 'Meta', [THING_ID]),
+        things: [thing(THING_ID, 'Meta thing'), spaceThing(SECOND_THING_ID, OTHER_SPACE_ID)],
       };
       await seed(repository, linkedMeta, target);
 
-      const unlinked = { ...linkedMeta, cards: [card(CARD_ID, 'Meta card')] };
+      const unlinked = { ...linkedMeta, things: [thing(THING_ID, 'Meta thing')] };
       await expect(commitUpdate(repository, unlinked, 0n)).resolves.toEqual({
         kind: 'aggregate-refused',
         errors: [{ kind: 'ordinary-space-unreferenced', spaceId: OTHER_SPACE_ID }],
@@ -394,15 +394,15 @@ export const spaceRepositoryContract = (
 
   it(`${name} atomically creates, links, reads, converges on, and deletes a Space`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
       await seed(repository, meta);
-      const child = space(OTHER_SPACE_ID, 'Child', [OTHER_CARD_ID]);
+      const child = space(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
       const linked = {
         ...meta,
-        cards: [
-          ...meta.cards,
-          spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID),
-          spaceCard(LINK_CARD_ID, OTHER_SPACE_ID),
+        things: [
+          ...meta.things,
+          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID),
+          spaceThing(LINK_THING_ID, OTHER_SPACE_ID),
         ],
       };
 
@@ -452,7 +452,7 @@ export const spaceRepositoryContract = (
        */
       const halfUnlinked = {
         ...meta,
-        cards: [...meta.cards, spaceCard(LINK_CARD_ID, OTHER_SPACE_ID)],
+        things: [...meta.things, spaceThing(LINK_THING_ID, OTHER_SPACE_ID)],
       };
       await expect(
         repository.commit({
@@ -492,10 +492,10 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses an authored commit that deletes the Meta Space`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
       await seed(repository, meta);
 
-      // The one Space no Space Card creates and no deletion reaches. A commit
+      // The one Space no Space Thing creates and no deletion reaches. A commit
       // that removes it leaves an aggregate the Meta identity no longer names,
       // which complete intake refuses by identity rather than by cardinality.
       await expect(
@@ -513,12 +513,12 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} round trips every optional Space Card selection combination across a later default change`, async () => {
+  it(`${name} round trips every optional Space Thing selection combination across a later default change`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
       await seed(repository, meta);
       const target: SpaceSnapshot = {
-        ...space(OTHER_SPACE_ID, 'Target', [OTHER_CARD_ID]),
+        ...space(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]),
         document: {
           version: 1,
           title: 'Target',
@@ -528,34 +528,34 @@ export const spaceRepositoryContract = (
               id: DIAGRAM_ID,
               title: 'First view',
               kind: 'positioned',
-              positions: { [OTHER_CARD_ID]: { x: 0, y: 0, open: false } },
+              positions: { [OTHER_THING_ID]: { x: 0, y: 0, open: false } },
               graphs: [{ id: GRAPH_ID, title: 'First graph', edges: [] }],
             },
             {
               id: SECOND_DIAGRAM_ID,
               title: 'Second view',
               kind: 'positioned',
-              positions: { [OTHER_CARD_ID]: { x: 100, y: 100, open: false } },
+              positions: { [OTHER_THING_ID]: { x: 100, y: 100, open: false } },
               graphs: [{ id: SECOND_GRAPH_ID, title: 'Second graph', edges: [] }],
             },
           ],
         },
       };
-      const unselected = spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID);
-      const selectedView = spaceCard(LINK_CARD_ID, OTHER_SPACE_ID, {
+      const unselected = spaceThing(SECOND_THING_ID, OTHER_SPACE_ID);
+      const selectedView = spaceThing(LINK_THING_ID, OTHER_SPACE_ID, {
         diagram: SECOND_DIAGRAM_ID,
       });
-      const selectedGraphWithDefaultView = spaceCard(THIRD_SPACE_CARD_ID, OTHER_SPACE_ID, {
+      const selectedGraphWithDefaultView = spaceThing(THIRD_SPACE_THING_ID, OTHER_SPACE_ID, {
         graph: GRAPH_ID,
       });
-      const selectedViewAndGraph = spaceCard(FOURTH_SPACE_CARD_ID, OTHER_SPACE_ID, {
+      const selectedViewAndGraph = spaceThing(FOURTH_SPACE_THING_ID, OTHER_SPACE_ID, {
         diagram: SECOND_DIAGRAM_ID,
         graph: SECOND_GRAPH_ID,
       });
       const linked = {
         ...meta,
-        cards: [
-          ...meta.cards,
+        things: [
+          ...meta.things,
           unselected,
           selectedView,
           selectedGraphWithDefaultView,
@@ -583,11 +583,11 @@ export const spaceRepositoryContract = (
 
       const linkedToLaterDefault: SpaceSnapshot = {
         ...linked,
-        cards: [
-          ...meta.cards,
+        things: [
+          ...meta.things,
           unselected,
           selectedView,
-          spaceCard(THIRD_SPACE_CARD_ID, OTHER_SPACE_ID, { graph: SECOND_GRAPH_ID }),
+          spaceThing(THIRD_SPACE_THING_ID, OTHER_SPACE_ID, { graph: SECOND_GRAPH_ID }),
           selectedViewAndGraph,
         ],
       };
@@ -623,10 +623,10 @@ export const spaceRepositoryContract = (
         metaSpaceId: SPACE_ID,
         spaces: [stored(linkedToLaterDefault, 2n, null), stored(retargetedDefault, 1n, null)],
       });
-      const storedSpaceCard = aggregate.spaces[0]?.snapshot.cards.find(
-        ({ id }) => id === SECOND_CARD_ID,
+      const storedSpaceThing = aggregate.spaces[0]?.snapshot.things.find(
+        ({ id }) => id === SECOND_THING_ID,
       );
-      expect(storedSpaceCard?.document).toStrictEqual({
+      expect(storedSpaceThing?.document).toStrictEqual({
         title: `Open ${OTHER_SPACE_ID}`,
         kind: 'space',
         spaceId: OTHER_SPACE_ID,
@@ -636,9 +636,9 @@ export const spaceRepositoryContract = (
 
   it(`${name} reports every conflict and rolls back every refused aggregate`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [CARD_ID]);
+      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
       await seed(repository, meta);
-      const orphan = space(OTHER_SPACE_ID, 'Orphan', [OTHER_CARD_ID]);
+      const orphan = space(OTHER_SPACE_ID, 'Orphan', [OTHER_THING_ID]);
 
       await expect(
         repository.commit({
@@ -672,7 +672,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} answers a stale expected revision with the current aggregate`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
       const committed = retitled(first, 'Committed');
       await commitUpdate(repository, committed, 0n);
@@ -687,9 +687,9 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a commit that fails domain intake and stores nothing`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
-      const dangling = spaceWithDanglingEdge(SPACE_ID, 'One', CARD_ID);
+      const dangling = spaceWithDanglingEdge(SPACE_ID, 'One', THING_ID);
 
       await expect(commitUpdate(repository, dangling, 0n)).resolves.toMatchObject({
         kind: 'aggregate-refused',
@@ -712,7 +712,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a commit whose Space id differs from its snapshot id`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
 
       await expect(
@@ -733,7 +733,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a commit that names one Space more than once`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
 
       await expect(
@@ -758,18 +758,18 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} refuses a commit claiming a Card another Space owns`, async () => {
+  it(`${name} refuses a commit claiming a Thing another Space owns`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
-      const other = space(OTHER_SPACE_ID, 'Other', [OTHER_CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const other = space(OTHER_SPACE_ID, 'Other', [OTHER_THING_ID]);
       const linked = {
         ...first,
-        cards: [...first.cards, spaceCard(LINK_CARD_ID, OTHER_SPACE_ID)],
+        things: [...first.things, spaceThing(LINK_THING_ID, OTHER_SPACE_ID)],
       };
       await seed(repository, linked, other);
       const claiming: SpaceSnapshot = {
         ...retitled(other, 'Must roll back'),
-        cards: [...other.cards, card(CARD_ID, 'Claimed')],
+        things: [...other.things, thing(THING_ID, 'Claimed')],
       };
 
       await expect(commitUpdate(repository, claiming, 0n)).resolves.toMatchObject({
@@ -780,11 +780,11 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} keeps the Cards a commit names and drops the ones it omits`, async () => {
+  it(`${name} keeps the Things a commit names and drops the ones it omits`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID, SECOND_CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID, SECOND_THING_ID]);
       await seed(repository, first);
-      const narrowed: SpaceSnapshot = { ...first, cards: [card(CARD_ID, 'Kept')] };
+      const narrowed: SpaceSnapshot = { ...first, things: [thing(THING_ID, 'Kept')] };
 
       await expect(commitUpdate(repository, narrowed, 0n)).resolves.toMatchObject({
         kind: 'committed',
@@ -793,11 +793,11 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} drops every Card when a commit omits them all`, async () => {
+  it(`${name} drops every Thing when a commit omits them all`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID, SECOND_CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID, SECOND_THING_ID]);
       await seed(repository, first);
-      const empty: SpaceSnapshot = { ...first, cards: [] };
+      const empty: SpaceSnapshot = { ...first, things: [] };
 
       await expect(commitUpdate(repository, empty, 0n)).resolves.toMatchObject({
         kind: 'committed',
@@ -807,7 +807,7 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * `loadSpaceAggregate` orders the PostgreSQL aggregate's cards by id, on the
+   * `loadSpaceAggregate` orders the PostgreSQL aggregate's things by id, on the
    * read inside an import transaction and on the one outside it alike, so
    * ascending id order is what every read path answers with — and the
    * whole-snapshot `toEqual` comparisons throughout this suite are
@@ -815,10 +815,10 @@ export const spaceRepositoryContract = (
    * every other case supplies them already sorted, where an unordered
    * implementation passes.
    */
-  it(`${name} returns a Space's Cards in ascending id order however they were supplied`, async () => {
+  it(`${name} returns a Space's Things in ascending id order however they were supplied`, async () => {
     await withHarness(async (repository) => {
-      const descending = space(SPACE_ID, 'Unordered', [OTHER_CARD_ID, SECOND_CARD_ID, CARD_ID]);
-      const ascending = space(SPACE_ID, 'Unordered', [CARD_ID, SECOND_CARD_ID, OTHER_CARD_ID]);
+      const descending = space(SPACE_ID, 'Unordered', [OTHER_THING_ID, SECOND_THING_ID, THING_ID]);
+      const ascending = space(SPACE_ID, 'Unordered', [THING_ID, SECOND_THING_ID, OTHER_THING_ID]);
 
       await expect(repository.importSpaces([descending], 'insert')).resolves.toEqual({
         kind: 'imported',
@@ -835,7 +835,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} records an exported revision and carries it across later commits`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
 
       await repository.markExported(SPACE_ID, 0n);
@@ -859,8 +859,8 @@ export const spaceRepositoryContract = (
   it(`${name} refuses a batch that repeats a Space identity, storing none of it`, async () => {
     await withHarness(async (repository) => {
       const batch = [
-        space(SPACE_ID, 'First', [CARD_ID]),
-        space(SPACE_ID, 'Repeat', [OTHER_CARD_ID]),
+        space(SPACE_ID, 'First', [THING_ID]),
+        space(SPACE_ID, 'Repeat', [OTHER_THING_ID]),
       ];
 
       await expect(repository.importSpaces(batch, 'insert')).resolves.toMatchObject({
@@ -872,36 +872,36 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * A Card repeated inside one batch is an identity collision; a Card already
+   * A Thing repeated inside one batch is an identity collision; a Thing already
    * owned by a stored Space is an ownership conflict. Two distinct codes for two
    * distinct facts, and the pair is the reason this suite exists — the memory
    * double folded them together twice before, which made it reject valid input
    * under a code the real backend never returns for it.
    */
-  it(`${name} refuses a batch that repeats a Card identity, storing none of it`, async () => {
+  it(`${name} refuses a batch that repeats a Thing identity, storing none of it`, async () => {
     await withHarness(async (repository) => {
       const batch = [
-        space(SPACE_ID, 'First', [CARD_ID]),
-        space(OTHER_SPACE_ID, 'Second', [CARD_ID]),
+        space(SPACE_ID, 'First', [THING_ID]),
+        space(OTHER_SPACE_ID, 'Second', [THING_ID]),
       ];
 
       await expect(repository.importSpaces(batch, 'insert')).resolves.toEqual({
         kind: 'rejected',
         code: 'duplicate-identity',
-        message: `Duplicate card identity "${CARD_ID}"`,
+        message: `Duplicate thing identity "${THING_ID}"`,
       });
       expect(await repository.listSpaces()).toEqual([]);
     });
   });
 
-  it(`${name} refuses a batch claiming a Card a stored Space owns`, async () => {
+  it(`${name} refuses a batch claiming a Thing a stored Space owns`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
 
       await expect(
-        repository.importSpaces([space(OTHER_SPACE_ID, 'Claimant', [CARD_ID])], 'insert'),
-      ).resolves.toMatchObject({ kind: 'rejected', code: 'card-ownership' });
+        repository.importSpaces([space(OTHER_SPACE_ID, 'Claimant', [THING_ID])], 'insert'),
+      ).resolves.toMatchObject({ kind: 'rejected', code: 'thing-ownership' });
       await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
     });
@@ -909,10 +909,10 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a Space identity it already stores, without touching it`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [CARD_ID]);
+      const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
       const later = [
-        space(OTHER_SPACE_ID, 'Must roll back', [OTHER_CARD_ID]),
+        space(OTHER_SPACE_ID, 'Must roll back', [OTHER_THING_ID]),
         retitled(first, 'Reimported'),
       ];
 
@@ -928,8 +928,8 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses an import that fails domain intake, storing none of the batch`, async () => {
     await withHarness(async (repository) => {
-      const valid = space(SPACE_ID, 'Must roll back', [CARD_ID]);
-      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_CARD_ID);
+      const valid = space(SPACE_ID, 'Must roll back', [THING_ID]);
+      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_THING_ID);
 
       await expect(repository.importSpaces([valid, dangling], 'insert')).resolves.toMatchObject({
         kind: 'rejected',
@@ -949,8 +949,8 @@ export const spaceRepositoryContract = (
    */
   it(`${name} answers a batch that is both duplicated and domain-invalid with the duplicate`, async () => {
     await withHarness(async (repository) => {
-      const dangling = spaceWithDanglingEdge(SPACE_ID, 'Dangling', CARD_ID);
-      const repeated = space(SPACE_ID, 'Repeat', [OTHER_CARD_ID]);
+      const dangling = spaceWithDanglingEdge(SPACE_ID, 'Dangling', THING_ID);
+      const repeated = space(SPACE_ID, 'Repeat', [OTHER_THING_ID]);
 
       await expect(repository.importSpaces([dangling, repeated], 'insert')).resolves.toMatchObject({
         kind: 'rejected',
@@ -961,14 +961,14 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * Truncation drops every stored Space, so a Card a doomed Space owns is free.
+   * Truncation drops every stored Space, so a Thing a doomed Space owns is free.
    * Ownership is judged against what survives the call, never against what the
    * same call is about to delete.
    */
-  it(`${name} replaces everything stored in truncate mode, freeing the Card ids it clears`, async () => {
+  it(`${name} replaces everything stored in truncate mode, freeing the Thing ids it clears`, async () => {
     await withHarness(async (repository) => {
-      await seed(repository, space(SPACE_ID, 'Cleared', [CARD_ID]));
-      const replacement = space(OTHER_SPACE_ID, 'Replacement', [CARD_ID]);
+      await seed(repository, space(SPACE_ID, 'Cleared', [THING_ID]));
+      const replacement = space(OTHER_SPACE_ID, 'Replacement', [THING_ID]);
 
       await expect(repository.importSpaces([replacement], 'truncate')).resolves.toEqual({
         kind: 'imported',
@@ -984,7 +984,7 @@ export const spaceRepositoryContract = (
   /*
    * A graph id is minted where the graph now lives — under the diagram that owns
    * it — and in the same pass as that diagram's own id, before the snapshot faces
-   * domain intake and before the first card is written. Two id-less diagrams,
+   * domain intake and before the first thing is written. Two id-less diagrams,
    * because minting under one owner reads the same whether the pass walks
    * diagrams or flattens them, and only a second owner tells those apart.
    */
@@ -999,24 +999,30 @@ export const spaceRepositoryContract = (
               title: 'Minted diagram',
               kind: 'positioned',
               positions: {
-                [CARD_ID]: { x: 4, y: 8, open: false },
-                [SECOND_CARD_ID]: { x: 12, y: 16, open: false },
+                [THING_ID]: { x: 4, y: 8, open: false },
+                [SECOND_THING_ID]: { x: 12, y: 16, open: false },
               },
-              graphs: [{ title: 'Explicit cards', edges: [{ from: CARD_ID, to: SECOND_CARD_ID }] }],
+              graphs: [
+                { title: 'Explicit things', edges: [{ from: THING_ID, to: SECOND_THING_ID }] },
+              ],
             },
             {
               title: 'Second minted diagram',
               kind: 'positioned',
-              positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+              positions: { [THING_ID]: { x: 0, y: 0, open: false } },
               graphs: [
-                { id: GRAPH_ID, title: 'Explicit graph', edges: [{ from: CARD_ID, to: CARD_ID }] },
+                {
+                  id: GRAPH_ID,
+                  title: 'Explicit graph',
+                  edges: [{ from: THING_ID, to: THING_ID }],
+                },
               ],
             },
           ],
         },
-        cards: [
-          card(CARD_ID, 'First'),
-          card(SECOND_CARD_ID, 'Second'),
+        things: [
+          thing(THING_ID, 'First'),
+          thing(SECOND_THING_ID, 'Second'),
           { document: { title: 'Minted', kind: 'markdown', body: 'Minted' } },
         ],
       };
@@ -1027,9 +1033,11 @@ export const spaceRepositoryContract = (
       const [only] = result.spaces;
       if (only === undefined) throw new Error('Import returned no Space');
 
-      const minted = only.snapshot.cards.find(({ id }) => id !== CARD_ID && id !== SECOND_CARD_ID);
+      const minted = only.snapshot.things.find(
+        ({ id }) => id !== THING_ID && id !== SECOND_THING_ID,
+      );
       const [diagram, second] = only.snapshot.document.diagrams ?? [];
-      if (minted === undefined) throw new Error('The id-less card kept no identity');
+      if (minted === undefined) throw new Error('The id-less thing kept no identity');
       if (diagram === undefined || second === undefined)
         throw new Error('Structure was not stored');
       const graph = diagram.graphs[0];
@@ -1038,10 +1046,10 @@ export const spaceRepositoryContract = (
       const identities = [only.snapshot.id, minted.id, graph.id, diagram.id, second.id];
       for (const id of identities) expect(uuidSchema.safeParse(id).success).toBe(true);
       expect(new Set(identities).size).toBe(identities.length);
-      expect(graph.edges).toEqual([{ from: CARD_ID, to: SECOND_CARD_ID }]);
+      expect(graph.edges).toEqual([{ from: THING_ID, to: SECOND_THING_ID }]);
       expect(diagram.positions).toEqual({
-        [CARD_ID]: { x: 4, y: 8, open: false },
-        [SECOND_CARD_ID]: { x: 12, y: 16, open: false },
+        [THING_ID]: { x: 4, y: 8, open: false },
+        [SECOND_THING_ID]: { x: 12, y: 16, open: false },
       });
       // The explicit graph id is kept, and kept under its own owner rather than
       // pooled with the minted one.

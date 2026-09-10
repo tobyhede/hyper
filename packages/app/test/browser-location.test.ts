@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   uuidSchema,
-  type CardId,
+  type ThingId,
   type GraphId,
   type DiagramId,
   type SpaceSnapshot,
@@ -28,8 +28,8 @@ import { recordingHistory } from './browser-history';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
@@ -49,11 +49,11 @@ const snapshot: SpaceSnapshot = {
         title: 'Diagram',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 10, y: 20, open: false },
-          [CARD_B]: { x: 300, y: 20, open: false },
+          [THING_A]: { x: 10, y: 20, open: false },
+          [THING_B]: { x: 300, y: 20, open: false },
         },
         graphs: [
-          { id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_A, to: CARD_B }] },
+          { id: GRAPH_ID, title: 'Graph', edges: [{ from: THING_A, to: THING_B }] },
           { id: SECOND_GRAPH_ID, title: 'Second Graph', edges: [] },
         ],
       },
@@ -61,19 +61,19 @@ const snapshot: SpaceSnapshot = {
         id: OTHER_DIAGRAM_ID,
         title: 'Other Diagram',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 0, y: 0, open: false } },
+        positions: { [THING_A]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
       },
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
 
-/** One Card whose Graph leaves it by an Edge back to itself. */
+/** One Thing whose Graph leaves it by an Edge back to itself. */
 const selfEdge: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
@@ -84,13 +84,13 @@ const selfEdge: SpaceSnapshot = {
         id: DIAGRAM_ID,
         title: 'Diagram',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 10, y: 20, open: false } },
-        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_A, to: CARD_A }] }],
+        positions: { [THING_A]: { x: 10, y: 20, open: false } },
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: THING_A, to: THING_A }] }],
       },
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  cards: [{ id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
+  things: [{ id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
 };
 
 const compose = (opened: SpaceSnapshot = snapshot) => {
@@ -109,11 +109,11 @@ const presentationPath = productDestinationPath({
   spaceId: SPACE_ID,
   diagramId: DIAGRAM_ID,
   graphId: GRAPH_ID,
-  cardId: CARD_A,
+  thingId: THING_A,
 });
 
-const cardPath = (diagramId: DiagramId, cardId: CardId): string =>
-  productDestinationPath({ kind: 'diagram-card', spaceId: SPACE_ID, diagramId, cardId });
+const thingPath = (diagramId: DiagramId, thingId: ThingId): string =>
+  productDestinationPath({ kind: 'diagram-thing', spaceId: SPACE_ID, diagramId, thingId });
 
 const deadPath = diagramPath(MISSING_DIAGRAM_ID);
 
@@ -284,7 +284,7 @@ describe('the browser location', () => {
 
   /**
    * Activating a Graph makes the same deliberate move a Diagram choice does — it
-   * clears the addressed Card and answers the report — and differs in exactly
+   * clears the addressed Thing and answers the report — and differs in exactly
    * one thing, which is the reason it may not simply call the same operation:
    * it does not change the Diagram, so the published projection stays.
    */
@@ -292,22 +292,22 @@ describe('the browser location', () => {
     const app = compose();
     const history = recordingHistory(
       productDestinationPath({
-        kind: 'diagram-card',
+        kind: 'diagram-thing',
         spaceId: SPACE_ID,
         diagramId: DIAGRAM_ID,
-        cardId: CARD_A,
+        thingId: THING_A,
       }),
     );
     const location = createBrowserLocation(history);
     location.follow(app);
     app.adapter.getState().syncProjection([], []);
-    expect(location.getState().addressedCardId).toBe(CARD_A);
+    expect(location.getState().addressedThingId).toBe(THING_A);
     history.popTo(deadPath);
     expect(location.getState().destinationNotFound).toBe(true);
 
     location.activateGraph(SECOND_GRAPH_ID);
 
-    expect(location.getState()).toEqual({ addressedCardId: null, destinationNotFound: false });
+    expect(location.getState()).toEqual({ addressedThingId: null, destinationNotFound: false });
     expect(history.writes).toEqual([
       { method: 'push', path: diagramGraphPath(DIAGRAM_ID, SECOND_GRAPH_ID) },
     ]);
@@ -344,15 +344,15 @@ describe('the browser location', () => {
   /**
    * The Back that lands somewhere real, which every other Back here does not.
    *
-   * It is the one path that both moves Navigation and names a Card, so it is
-   * where the order of the two matters: the Card is known the moment the
+   * It is the one path that both moves Navigation and names a Thing, so it is
+   * where the order of the two matters: the Thing is known the moment the
    * restoration resolves, and moving Navigation before recording it would
-   * notify against a position still carrying the Card the reader is leaving.
+   * notify against a position still carrying the Thing the reader is leaving.
    * The sync that notification triggers would then see an address that moved
    * and take an entry over the one the browser has just navigated to — which is
    * the entry ADR 0081's `none` outcome exists to refuse.
    */
-  it('restores a Back onto a resolvable Card location without earning an entry', () => {
+  it('restores a Back onto a resolvable Thing location without earning an entry', () => {
     const app = compose();
     const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const location = createBrowserLocation(history);
@@ -360,10 +360,10 @@ describe('the browser location', () => {
     location.chooseDiagram(OTHER_DIAGRAM_ID);
     expect(history.writes).toEqual([{ method: 'push', path: diagramPath(OTHER_DIAGRAM_ID) }]);
 
-    history.popTo(cardPath(DIAGRAM_ID, CARD_B));
+    history.popTo(thingPath(DIAGRAM_ID, THING_B));
 
     expect(app.navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
-    expect(location.getState().addressedCardId).toBe(CARD_B);
+    expect(location.getState().addressedThingId).toBe(THING_B);
     expect(location.getState().destinationNotFound).toBe(false);
     expect(history.writes).toEqual([{ method: 'push', path: diagramPath(OTHER_DIAGRAM_ID) }]);
     location.dispose();
@@ -405,25 +405,25 @@ describe('the browser location', () => {
   });
 
   /**
-   * The location follows exactly one Space, and the Card it addresses is a fact
+   * The location follows exactly one Space, and the Thing it addresses is a fact
    * about that pair rather than about a mounted component's lifetime.
    */
-  it('reads the addressed Card off the location of the Space it follows', () => {
+  it('reads the addressed Thing off the location of the Space it follows', () => {
     const app = compose();
     const location = createBrowserLocation(
       recordingHistory(
         productDestinationPath({
-          kind: 'diagram-card',
+          kind: 'diagram-thing',
           spaceId: SPACE_ID,
           diagramId: DIAGRAM_ID,
-          cardId: CARD_B,
+          thingId: THING_B,
         }),
       ),
     );
 
     location.follow(app);
 
-    expect(location.getState().addressedCardId).toBe(CARD_B);
+    expect(location.getState().addressedThingId).toBe(THING_B);
     location.dispose();
   });
 });

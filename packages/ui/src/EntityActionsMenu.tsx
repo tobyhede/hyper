@@ -63,9 +63,9 @@ export type EntityActionOutcome = 'done' | 'failed';
  * surface was a Sheet over the shell, so a report pinned in the corner was
  * behind it and a reader on a phone never saw it. ADR 0082 retired that Sheet
  * and the Command Dock covers nothing, so the Dock's own menus pass no words
- * and report through the standing notice instead. What keeps this is the Card
- * rail: it is a menu on the canvas, over the Cards, and a reader whose eyes are
- * on the Card they pressed is not looking at the shell's corner.
+ * and report through the standing notice instead. What keeps this is the Thing
+ * rail: it is a menu on the canvas, over the Things, and a reader whose eyes are
+ * on the Thing they pressed is not looking at the shell's corner.
  */
 export type EntityActionReport = Readonly<Record<EntityActionOutcome, string>>;
 
@@ -131,7 +131,7 @@ export type EntityActionGroup = readonly EntityAction[];
  *
  * `w-80` rather than the `w-72` this started at: the leading icon column and
  * its gap take a little over 20px off the text, and at `w-72` the longest
- * destination sentence a Card or Graph produces — "Always opens <title> on its
+ * destination sentence a Thing or Graph produces — "Always opens <title> on its
  * own, wherever it is placed" — went from two lines to three. The extra 32px
  * buys that line back and still leaves the popup inside the canvas it opens
  * over, which is the width that mattered when the menu opened against a
@@ -352,7 +352,7 @@ export interface EntityActionsTriggerProps {
   /** Names the control for assistive technology — "Golden path actions". */
   readonly label: string;
   /**
-   * The control the menu hangs off. A Card rail passes its `CardRailAction` —
+   * The control the menu hangs off. A Thing rail passes its `ThingRailAction` —
    * the Space Sidebar's rows passed their `SidebarMenuAction` before ADR 0082 —
    * so the trigger takes the treatment of the cluster it sits in rather than
    * importing a second one.
@@ -363,7 +363,7 @@ export interface EntityActionsTriggerProps {
    * what the trigger sits beside rather than on this component.
    *
    * A row that stands alone passes `<EntityActionsIcon />`, the conventional
-   * "more" glyph, as the Sidebar's rows did. A Card rail sits in a cluster where
+   * "more" glyph, as the Sidebar's rows did. A Thing rail sits in a cluster where
    * every other control names its own command, and keeps `LinkActionsIcon` —
    * which is the default here for exactly one reason: the rail is the only
    * caller left, so leaving the default alone is what leaves the rail alone.

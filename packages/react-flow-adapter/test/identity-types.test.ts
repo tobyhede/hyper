@@ -1,47 +1,50 @@
 import { describe, expectTypeOf, it } from 'vitest';
-import type { CardId, GraphId } from '@project/core';
-import type { CardHandleSet } from '@project/graph';
+import type { ThingId, GraphId } from '@project/core';
+import type { ThingHandleSet } from '@project/graph';
 import type {
   elkPortId,
-  projectCardNodes,
-  CardHandle,
-  CardNodeData,
-  ProjectCardNodesOptions,
+  projectThingNodes,
+  ThingHandle,
+  ThingNodeData,
+  ProjectThingNodesOptions,
   ProjectGraphEdgesOptions,
   RoutedEdgeData,
 } from '@project/react-flow-adapter';
 
 describe('React Flow adapter identity types', () => {
   it('preserves validated domain identities through the public projection contract', () => {
-    expectTypeOf<CardHandle['graphId']>().toEqualTypeOf<GraphId>();
-    expectTypeOf<CardNodeData['cardId']>().toEqualTypeOf<CardId>();
-    expectTypeOf<CardNodeData['activeGraphId']>().toEqualTypeOf<GraphId | null>();
-    expectTypeOf<ProjectCardNodesOptions['activeCardId']>().toEqualTypeOf<
-      CardId | null | undefined
+    expectTypeOf<ThingHandle['graphId']>().toEqualTypeOf<GraphId>();
+    expectTypeOf<ThingNodeData['thingId']>().toEqualTypeOf<ThingId>();
+    expectTypeOf<ThingNodeData['activeGraphId']>().toEqualTypeOf<GraphId | null>();
+    expectTypeOf<ProjectThingNodesOptions['activeThingId']>().toEqualTypeOf<
+      ThingId | null | undefined
     >();
-    expectTypeOf<ProjectCardNodesOptions['activeGraphId']>().toEqualTypeOf<
+    expectTypeOf<ProjectThingNodesOptions['activeGraphId']>().toEqualTypeOf<
       GraphId | null | undefined
     >();
-    expectTypeOf<ProjectCardNodesOptions['cardIds']>().toEqualTypeOf<
-      readonly CardId[] | undefined
+    expectTypeOf<ProjectThingNodesOptions['thingIds']>().toEqualTypeOf<
+      readonly ThingId[] | undefined
     >();
     expectTypeOf<ProjectGraphEdgesOptions['activeGraphId']>().toEqualTypeOf<
       GraphId | null | undefined
     >();
     expectTypeOf<RoutedEdgeData['graphId']>().toEqualTypeOf<GraphId>();
-    expectTypeOf<Parameters<typeof elkPortId>[0]>().toEqualTypeOf<CardId>();
-    expectTypeOf<Parameters<typeof projectCardNodes>[1]>().toEqualTypeOf<
-      ReadonlyMap<CardId, CardHandleSet>
+    expectTypeOf<Parameters<typeof elkPortId>[0]>().toEqualTypeOf<ThingId>();
+    expectTypeOf<Parameters<typeof projectThingNodes>[1]>().toEqualTypeOf<
+      ReadonlyMap<ThingId, ThingHandleSet>
     >();
 
     // @ts-expect-error Plain strings cannot key a domain-bearing handle map.
-    const handlesByCard: Parameters<typeof projectCardNodes>[1] = new Map<string, CardHandleSet>();
+    const handlesByThing: Parameters<typeof projectThingNodes>[1] = new Map<
+      string,
+      ThingHandleSet
+    >();
     // @ts-expect-error A plain string has not crossed the UUID validation seam.
-    const activeGraphId: CardNodeData['activeGraphId'] = 'graph';
-    // @ts-expect-error A synthetic port id may be a string; its card namespace may not.
-    const portCardId: Parameters<typeof elkPortId>[0] = 'card';
-    void handlesByCard;
+    const activeGraphId: ThingNodeData['activeGraphId'] = 'graph';
+    // @ts-expect-error A synthetic port id may be a string; its thing namespace may not.
+    const portThingId: Parameters<typeof elkPortId>[0] = 'thing';
+    void handlesByThing;
     void activeGraphId;
-    void portCardId;
+    void portThingId;
   });
 });

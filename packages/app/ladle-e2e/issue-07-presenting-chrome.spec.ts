@@ -41,9 +41,9 @@ test(
  * The global Traversal keys and a focused control on one press.
  *
  * A button activates itself on Space, and the global `keydown` sees the press
- * first. Advancing there as well moved two Cards for one press; preventing the
+ * first. Advancing there as well moved two Things for one press; preventing the
  * default instead stopped the button firing at all. Landing on `Wrap up` is the
- * first defect and landing nowhere is the second, so the assertion is the Card
+ * first defect and landing nowhere is the second, so the assertion is the Thing
  * one move on.
  */
 test(
@@ -103,14 +103,14 @@ test(
     await page.getByRole('button', { name: 'Go to Failure modes' }).click();
 
     // Committed down the branch chosen and no other. Each branch of this Graph
-    // ends where it arrives, so the Card reached is a sink.
+    // ends where it arrives, so the Thing reached is a sink.
     await expect(page.getByTestId('presenting-end')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Back' })).toBeFocused();
   },
 );
 
 test(
-  'a sink announces the end of the Graph and Back recovers the Card before it',
+  'a sink announces the end of the Graph and Back recovers the Thing before it',
   { tag: '@parity:presenting-sink-ends-the-graph-and-can-retreat' },
   async ({ page }) => {
     await page.goto(story('sink'));
@@ -153,11 +153,11 @@ test(
     await expect(guidance(page)).toHaveText(['↑↓choose', '→go', 'Escoverview']);
 
     // The choices are not collapsed into a menu, and not wrapped into a block
-    // over the presented Card either: one bounded row that scrolls.
+    // over the presented Thing either: one bounded row that scrolls.
     const moves = page.getByTestId('presenting-moves');
     await expect(moves.getByRole('button')).toHaveCount(4);
 
-    // A Card's title has no length limit, so the longest choice is ellipsized
+    // A Thing's title has no length limit, so the longest choice is ellipsized
     // inside its own button rather than overflowing past both ends of it. The
     // full title stays in the accessible name.
     const longest = page.getByRole('button', {

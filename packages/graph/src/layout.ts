@@ -1,5 +1,5 @@
 /**
- * The LayoutStrategy contract: a named strategy for arranging a space's cards.
+ * The LayoutStrategy contract: a named strategy for arranging a space's things.
  *
  * A strategy is behaviour; a **Diagram** (`@project/core`) is the authored data
  * one of them reads. ADR 0005 gave the strategy the noun that is now the
@@ -7,32 +7,32 @@
  * you can hold.
  *
  * Modelled on how ELK does it, deliberately. Geometry lives as *optional fields
- * on the elements* — a card carries `x`/`y`, a port carries its offset — and a
+ * on the elements* — a thing carries `x`/`y`, a port carries its offset — and a
  * strategy takes a layout-strategy graph and returns the same value with those fields populated.
  * There is no separate arranged-result type; `CONTEXT.md` lists "arrangement"
  * under _Avoid_ and ADR 0005 records why.
  *
- * Which cards a strategy arranges is decided by the view before it runs. A
+ * Which things a strategy arranges is decided by the view before it runs. A
  * strategy is free to ignore parts of the graph it has no use for — a grid never
  * looks at the edges, exactly as ELK's own algorithms differ in what they
  * consume.
  */
 
-import type { CardId } from '@project/core';
-import type { CardHandleSet, GraphRenderEdge } from './graph-rendering';
+import type { ThingId } from '@project/core';
+import type { ThingHandleSet, GraphRenderEdge } from './graph-rendering';
 
-/** A port on a card, by the handle id the render layer knows it by. */
+/** A port on a thing, by the handle id the render layer knows it by. */
 export interface LayoutStrategyPort {
   id: string;
-  /** Inbound ports sit on the card's left, outbound on its right. */
+  /** Inbound ports sit on the thing's left, outbound on its right. */
   side: 'in' | 'out';
-  /** Offset from the card's top-left corner, once a strategy has placed it. */
+  /** Offset from the thing's top-left corner, once a strategy has placed it. */
   x?: number;
   y?: number;
 }
 
-export interface LayoutStrategyCard {
-  id: CardId;
+export interface LayoutStrategyThing {
+  id: ThingId;
   width: number;
   height: number;
   ports: LayoutStrategyPort[];
@@ -61,7 +61,7 @@ export interface Point {
 /**
  * A routed span of an edge: where it starts, where it ends, and the corners it
  * turns through in between. Mirrors ELK's `ElkEdgeSection` — an orthogonal
- * back-edge routes *around* the cards as a channel rather than cutting straight
+ * back-edge routes *around* the things as a channel rather than cutting straight
  * across them, and the bend points are how it does that.
  */
 export interface LayoutStrategyEdgeSection {
@@ -72,20 +72,20 @@ export interface LayoutStrategyEdgeSection {
 
 export interface LayoutStrategyEdge {
   id: string;
-  source: CardId;
-  target: CardId;
+  source: ThingId;
+  target: ThingId;
   sourceHandle: string;
   targetHandle: string;
   /**
    * The routed geometry, once a routing strategy has placed it. Optional like the
-   * cards' `x`/`y`: a routing strategy (ELK) populates it; a placement-only one
+   * things' `x`/`y`: a routing strategy (ELK) populates it; a placement-only one
    * (grid) leaves it undefined and the render layer falls back to a plain curve.
    */
   sections?: LayoutStrategyEdgeSection[];
 }
 
 export interface LayoutStrategyGraph {
-  cards: LayoutStrategyCard[];
+  things: LayoutStrategyThing[];
   edges: LayoutStrategyEdge[];
 }
 
@@ -102,25 +102,25 @@ export interface LayoutStrategyGraph {
 export type LayoutStrategy = (strategyGraph: LayoutStrategyGraph) => Promise<LayoutStrategyGraph>;
 
 /**
- * Assemble the graph to arrange, from cards the view has already chosen plus the
+ * Assemble the graph to arrange, from things the view has already chosen plus the
  * handles and edges derived from the graphs running through them.
  */
 export function buildLayoutStrategyGraph(
-  cardIds: readonly CardId[],
-  handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
+  thingIds: readonly ThingId[],
+  handlesByThing: ReadonlyMap<ThingId, ThingHandleSet>,
   edges: readonly GraphRenderEdge[],
-  sizeOf: (cardId: CardId) => { width: number; height: number },
+  sizeOf: (thingId: ThingId) => { width: number; height: number },
 ): LayoutStrategyGraph {
-  const visible = new Set(cardIds);
+  const visible = new Set(thingIds);
 
   return {
-    cards: cardIds.map((id) => {
-      const handles = handlesByCard.get(id);
-      const cardSize = sizeOf(id);
+    things: thingIds.map((id) => {
+      const handles = handlesByThing.get(id);
+      const thingSize = sizeOf(id);
       return {
         id,
-        width: cardSize.width,
-        height: cardSize.height,
+        width: thingSize.width,
+        height: thingSize.height,
         ports: [
           ...(handles?.targetHandles ?? []).map((h) => ({ id: h.id, side: 'in' as const })),
           ...(handles?.sourceHandles ?? []).map((h) => ({ id: h.id, side: 'out' as const })),

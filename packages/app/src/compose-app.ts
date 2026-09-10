@@ -51,7 +51,7 @@ export interface ComposeCoreDependencies {
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
   /**
-   * Mints the identity of every Card, Diagram and Graph a completed Edit creates
+   * Mints the identity of every Thing, Diagram and Graph a completed Edit creates
    * (ADR 0016).
    *
    * Passed explicitly so `createSpaceAuthoring` cannot fall back to its own and

@@ -29,7 +29,7 @@ if (typeof document !== 'undefined') {
  * re-measures a node's handles. Under jsdom that throws — and it throws inside a
  * `requestAnimationFrame` callback, so the error never reaches a test body:
  * Vitest prints every test as passing and then exits 1 on the unhandled error.
- * `CardNode` deliberately never calls `updateNodeInternals` — see AGENTS.md — but
+ * `ThingNode` deliberately never calls `updateNodeInternals` — see AGENTS.md — but
  * React Flow's own `useResizeObserver` reaches the same call with `force: true`,
  * so any test rendering a real `<ReactFlow>` can hit it without anyone asking.
  *
@@ -169,7 +169,7 @@ if (typeof Element !== 'undefined' && !('scrollIntoView' in Element.prototype)) 
  *
  * Scoped to the one element d3-zoom measures — `ZoomPane`'s pane, which React
  * Flow renders as `react-flow__renderer`. Everything else keeps jsdom's zeroes,
- * so no test that asserts on layout quietly changes meaning. Card geometry is
+ * so no test that asserts on layout quietly changes meaning. Thing geometry is
  * unaffected regardless: `projection.ts` declares `measured` rather than letting
  * React Flow read it from the DOM.
  */
@@ -238,7 +238,7 @@ if (typeof Range !== 'undefined' && !('getBoundingClientRect' in Range.prototype
  * **This outlived the Sidebar it was written for.**
  * `.scratch/command-dock/issues/08` deleted `hooks/use-mobile.ts` and recorded
  * that the shim existed solely for it. It did not: removing the shim turned
- * `space-card-embedded-diagram.test.tsx`'s embedded-persistence case red, and
+ * `space-thing-embedded-diagram.test.tsx`'s embedded-persistence case red, and
  * `@codemirror/view` and Base UI's `unstable-use-media-query` read it too. The
  * consumer named above is the one a bisect actually found, and it is why this
  * is not a stub waiting for its reason to be deleted again.
@@ -282,7 +282,7 @@ if (typeof window !== 'undefined' && typeof declaredMatchMedia !== 'function') {
  * key's modifier state, which `HTMLElement.click()` always reports as
  * unpressed (`dispatchClickWithModifiers`). It builds that event as a
  * `PointerEvent`, and under jsdom the constructor is simply absent — so the
- * Card rail's controls, which are toolbar items under ADR 0070, throw on
+ * Thing rail's controls, which are toolbar items under ADR 0070, throw on
  * `Space` inside a `dispatchEvent` no test body can catch. Vitest then prints
  * every test as passing and exits 1 on the unhandled error.
  *

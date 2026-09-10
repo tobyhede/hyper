@@ -32,12 +32,12 @@ export function createEmbeddedAuthoring(
   );
   const complete = (completion: AuthoringCompletion): AuthoringResult => {
     if (
-      completion.kind === 'opened-card' ||
-      completion.kind === 'closed-card' ||
-      completion.kind === 'resized-card' ||
-      completion.kind === 'edited-card' ||
-      completion.kind === 'settled-card-movement' ||
-      completion.kind === 'removed-card-from-diagram'
+      completion.kind === 'opened-thing' ||
+      completion.kind === 'closed-thing' ||
+      completion.kind === 'resized-thing' ||
+      completion.kind === 'edited-thing' ||
+      completion.kind === 'settled-thing-movement' ||
+      completion.kind === 'removed-thing-from-diagram'
     ) {
       return entry.app.authoring.completeInDiagram(diagramId, completion);
     }
@@ -46,15 +46,15 @@ export function createEmbeddedAuthoring(
      *
      * The six kinds above are the whole of what the surfaces holding this
      * `authoring` produce — `EmbeddedDiagramAuthoring`, the render adapter's
-     * resize and movement settlements, and Canvas Card Authoring — and Edge
+     * resize and movement settlements, and Canvas Thing Authoring — and Edge
      * Authoring is never composed over an embedded adapter. So a seventh kind
      * arriving here is a wiring defect, and `AuthoringResult`'s own rule
      * (`space-authoring.ts`) says a broken invariant "throws, or is reported
      * through the non-throwing reporter — dressing a programming defect as a
      * refusal would put it in front of the author as their own mistake". The
      * refusal that used to stand here did exactly that, and with an unrelated
-     * sentence: `edge-card-outside-diagram` presents as "An Edge can only join
-     * Cards in this Diagram."
+     * sentence: `edge-thing-outside-diagram` presents as "An Edge can only join
+     * Things in this Diagram."
      *
      * Reported rather than thrown, under the canvas-wide rule recorded once in
      * `docs/agents/rendering.md` ("React Flow itself") and argued in

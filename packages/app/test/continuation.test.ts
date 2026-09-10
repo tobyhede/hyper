@@ -16,12 +16,12 @@ import { staysOwed, type PendingContinuation } from '../src/continuation';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
-const EDGE = { from: CARD_A, to: CARD_B } as const;
+const EDGE = { from: THING_A, to: THING_B } as const;
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -34,23 +34,23 @@ const snapshot: SpaceSnapshot = {
         title: 'Diagram 1',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 10, y: 20, open: false },
-          [CARD_B]: { x: 300, y: 40, open: false },
+          [THING_A]: { x: 10, y: 20, open: false },
+          [THING_B]: { x: 300, y: 40, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [EDGE] }],
       },
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
 
 const placement = Placement.fromEntries([
-  [CARD_A, { x: 10, y: 20, open: false }],
-  [CARD_B, { x: 300, y: 40, open: false }],
+  [THING_A, { x: 10, y: 20, open: false }],
+  [THING_B, { x: 300, y: 40, open: false }],
 ]);
 
 function open(stored: SpaceSnapshot = snapshot, revision = 0n) {
@@ -66,12 +66,12 @@ function open(stored: SpaceSnapshot = snapshot, revision = 0n) {
 }
 
 const NAME_A: PendingContinuation = {
-  target: { kind: 'card', cardId: CARD_A },
+  target: { kind: 'thing', thingId: THING_A },
   select: true,
   then: 'rename',
 };
-const FOCUS_ADD_CARD: PendingContinuation = {
-  target: { kind: 'control', name: 'add-card' },
+const FOCUS_ADD_THING: PendingContinuation = {
+  target: { kind: 'control', name: 'add-thing' },
   select: false,
   then: 'focus',
 };
@@ -97,9 +97,9 @@ describe('the one pending continuation', () => {
     const { continuation } = open();
     continuation.request(NAME_A);
 
-    continuation.request(FOCUS_ADD_CARD);
+    continuation.request(FOCUS_ADD_THING);
 
-    expect(continuation.getState().pending).toEqual(FOCUS_ADD_CARD);
+    expect(continuation.getState().pending).toEqual(FOCUS_ADD_THING);
   });
 
   it('yields a continuation once and leaves none behind', () => {
@@ -151,7 +151,7 @@ describe('invalidation', () => {
 
   it('discards a pending continuation when presenting begins', () => {
     const { navigation, continuation } = open();
-    continuation.request(FOCUS_ADD_CARD);
+    continuation.request(FOCUS_ADD_THING);
 
     navigation.present();
 
@@ -171,12 +171,12 @@ describe('invalidation', () => {
 
   it('stops answering its collaborator once disposed', () => {
     const { navigation, continuation } = open();
-    continuation.request(FOCUS_ADD_CARD);
+    continuation.request(FOCUS_ADD_THING);
 
     continuation.dispose();
     navigation.present();
 
-    expect(continuation.getState().pending).toEqual(FOCUS_ADD_CARD);
+    expect(continuation.getState().pending).toEqual(FOCUS_ADD_THING);
   });
 });
 
@@ -189,7 +189,7 @@ describe('invalidation', () => {
  */
 describe('the wait policy', () => {
   it.each([
-    ['a created or added Card', { kind: 'card', cardId: CARD_A } as const],
+    ['a created or added Thing', { kind: 'thing', thingId: THING_A } as const],
     ['a reconnected Edge', { kind: 'edge', graphId: GRAPH_ID, edge: EDGE } as const],
   ])('keeps %s owed until it is drawn', (_name, target) => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(true);
@@ -197,16 +197,16 @@ describe('the wait policy', () => {
 
   it.each([
     ['the canvas', { kind: 'canvas' } as const],
-    ['a control', { kind: 'control', name: 'add-card' } as const],
+    ['a control', { kind: 'control', name: 'add-thing' } as const],
   ])('falls through on %s', (_name, target) => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(false);
   });
 
-  /** A Card waits whatever it was going to do there — Add to Diagram is a `focus`. */
+  /** A Thing waits whatever it was going to do there — Add to Diagram is a `focus`. */
   it.each(['nothing', 'focus', 'reveal', 'rename'] as const)(
-    'keeps a Card owed whose continuation is %s',
+    'keeps a Thing owed whose continuation is %s',
     (then) => {
-      expect(staysOwed({ target: { kind: 'card', cardId: CARD_A }, select: false, then })).toBe(
+      expect(staysOwed({ target: { kind: 'thing', thingId: THING_A }, select: false, then })).toBe(
         true,
       );
     },

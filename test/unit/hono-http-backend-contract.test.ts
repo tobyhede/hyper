@@ -8,7 +8,7 @@ import {
 } from '@project/persistence';
 import { spaceBackendContract } from '@project/persistence/test-support';
 import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
-import { CARD_ID, SPACE_ID, oneCardSnapshot as snapshot } from '../support/space-fixtures';
+import { THING_ID, SPACE_ID, oneThingSnapshot as snapshot } from '../support/space-fixtures';
 
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
@@ -24,7 +24,7 @@ const loaded: LoadedSpace = {
           id: DIAGRAM_ID,
           title: 'Diagram 1',
           kind: 'positioned',
-          positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+          positions: { [THING_ID]: { x: 0, y: 0, open: false } },
           graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
           activeGraph: GRAPH_ID,
         },

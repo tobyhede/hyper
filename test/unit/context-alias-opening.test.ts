@@ -42,7 +42,7 @@ const definitionOf = (term: string): string => {
 };
 
 /**
- * The Opening definition names each Card kind in its own semicolon-separated
+ * The Opening definition names each Thing kind in its own semicolon-separated
  * clause. Reading the Alias one alone is what keeps the assertions honest: the
  * Markdown clause beside it legitimately says *title*, so a whole-paragraph
  * match for that word would pass while saying nothing about an Alias at all.
@@ -76,7 +76,7 @@ describe('CONTEXT.md on opening an Alias', () => {
     expect(clause).toMatch(/target/i);
   });
 
-  it('sends an author to the Target Card itself to author its content', () => {
+  it('sends an author to the Target Thing itself to author its content', () => {
     expect(aliasClause(definitionOf('Opening'))).toMatch(/explicit/i);
   });
 

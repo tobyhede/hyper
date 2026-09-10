@@ -18,7 +18,7 @@ import { openTestSpace } from './opened-space';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
@@ -32,13 +32,13 @@ const snapshot: SpaceSnapshot = {
         id: DIAGRAM_ID,
         title: 'Diagram 1',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 10, y: 20, open: false } },
+        positions: { [THING_A]: { x: 10, y: 20, open: false } },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
       },
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  cards: [{ id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
+  things: [{ id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
 };
 
 const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
@@ -48,7 +48,7 @@ const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
     id: SPACE_ID,
     session: opened.spaceSession,
     app: composeApp({ spaceSession: opened.spaceSession, reportObserverError }),
-    spaceCards: opened.spaceCards,
+    spaceThings: opened.spaceThings,
   };
 };
 
@@ -73,25 +73,25 @@ describe('a completion an embedded Diagram does not support', () => {
     const { composition, reported } = embedded();
 
     const result = composition.authoring.complete({
-      kind: 'created-card',
+      kind: 'created-thing',
       anchor: { x: 0, y: 0 },
     });
 
-    expect(result).not.toMatchObject({ refusal: { code: 'edge-card-outside-diagram' } });
+    expect(result).not.toMatchObject({ refusal: { code: 'edge-thing-outside-diagram' } });
     expect(result).toEqual({ kind: 'unchanged' });
     expect(reported).toHaveLength(1);
     expect(reported[0]).toBeInstanceOf(Error);
-    expect(String(reported[0])).toContain('created-card');
+    expect(String(reported[0])).toContain('created-thing');
   });
 
   /** The same for a second kind, so the arm reads as a fallthrough and not a case. */
   it('reports every unsupported kind, naming the one that arrived', () => {
     const { composition, reported } = embedded();
 
-    const result = composition.authoring.complete({ kind: 'deleted-card', cardId: CARD_A });
+    const result = composition.authoring.complete({ kind: 'deleted-thing', thingId: THING_A });
 
     expect(result).toEqual({ kind: 'unchanged' });
-    expect(String(reported[0])).toContain('deleted-card');
+    expect(String(reported[0])).toContain('deleted-thing');
   });
 
   /** Reporting is a diagnostic, never the gesture's failure path. */
@@ -101,7 +101,7 @@ describe('a completion an embedded Diagram does not support', () => {
     });
     const composition = createEmbeddedAuthoring(entry, DIAGRAM_ID, entry.app.reportObserverError);
 
-    expect(composition.authoring.complete({ kind: 'deleted-card', cardId: CARD_A })).toEqual({
+    expect(composition.authoring.complete({ kind: 'deleted-thing', thingId: THING_A })).toEqual({
       kind: 'unchanged',
     });
   });
@@ -130,7 +130,9 @@ describe('a completion an embedded Diagram does not support', () => {
   it('still forwards a supported kind into the Diagram', () => {
     const { composition, reported } = embedded();
 
-    expect(composition.authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toMatchObject({
+    expect(
+      composition.authoring.complete({ kind: 'opened-thing', thingId: THING_A }),
+    ).toMatchObject({
       kind: 'completed',
     });
     expect(reported).toEqual([]);

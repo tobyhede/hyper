@@ -16,11 +16,11 @@ export default { title: 'Space/Command Dock' };
  *
  * The whole command set at rest: which Space, which Diagram and which Graph, each
  * naming the current one, disclosing the set and promoting at most one verb —
- * then the Cards. The parent step names one Space back and the Open Spaces menu
+ * then the Things. The parent step names one Space back and the Open Spaces menu
  * holds the rest.
  *
- * Drag a Card out of the Cards popover onto the canvas, or press the row where
- * it stands. Both are real and both are the same Edit: the Card joins the
+ * Drag a Thing out of the Things popover onto the canvas, or press the row where
+ * it stands. Both are real and both are the same Edit: the Thing joins the
  * Diagram and the popover stays open, so the next one costs nothing either way.
  * Drag the dock by its grip to any edge, or press the grip and pick a slot.
  */

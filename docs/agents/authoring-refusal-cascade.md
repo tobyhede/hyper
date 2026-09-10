@@ -37,21 +37,21 @@ Every action asks the applicable guards before its own checks:
 
 Guards above are omitted below.
 
-### Card edits
+### Thing edits
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `edited-card` | `card-not-found` → `card-kind-immutable` → `alias-target-immutable` → `space-card-target-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
-| `created-card` | none → completed |
+| `edited-thing` | `thing-not-found` → `thing-kind-immutable` → `alias-target-immutable` → `space-thing-target-immutable` → `thing-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
+| `created-thing` | none → completed |
 | `created-alias` | `alias-target-not-found` → `alias-target-must-own-content` → completed |
-| `opened-card` | `card-not-in-diagram` → (already Open ⇒ `unchanged`) → completed |
-| `closed-card` | `card-not-in-diagram` → (already Closed ⇒ `unchanged`) → completed |
-| `resized-card` | `card-not-in-diagram` → `card-not-expanded` → (same size ⇒ `unchanged`) → completed |
-| `added-card-to-diagram` | `card-not-found` → `card-already-in-diagram` → completed |
-| `removed-card-from-diagram` | `card-not-in-diagram` → completed |
-| `deleted-card` | `card-not-found` → `space-card-deletion-unsupported` → `card-has-aliases` → completed |
+| `opened-thing` | `thing-not-in-diagram` → (already Open ⇒ `unchanged`) → completed |
+| `closed-thing` | `thing-not-in-diagram` → (already Closed ⇒ `unchanged`) → completed |
+| `resized-thing` | `thing-not-in-diagram` → `thing-not-expanded` → (same size ⇒ `unchanged`) → completed |
+| `added-thing-to-diagram` | `thing-not-found` → `thing-already-in-diagram` → completed |
+| `removed-thing-from-diagram` | `thing-not-in-diagram` → completed |
+| `deleted-thing` | `thing-not-found` → `space-thing-deletion-unsupported` → `thing-has-aliases` → completed |
 
-`card-not-expanded` is the code `resized-card` raises for a Card that is
+`thing-not-expanded` is the code `resized-thing` raises for a Thing that is
 **Closed**. The prose in this file speaks `CONTEXT.md`'s Open/Closed vocabulary;
 every code string is quoted exactly as `AuthoringRefusal['code']` declares it,
 retired wording included. A refusal code is a stable identity across the seam
@@ -63,9 +63,9 @@ that has not been decided.
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `create-and-connect` | `edge-card-outside-diagram` → `diagram-active-graph-required` → completed |
-| `connected-cards` | `edge-card-outside-diagram` → `diagram-active-graph-required` → `edge-already-exists` → completed |
-| `reconnected-edge` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Card ⇒ `unchanged`) → `edge-card-outside-diagram` → `edge-already-exists` → completed |
+| `create-and-connect` | `edge-thing-outside-diagram` → `diagram-active-graph-required` → completed |
+| `connected-things` | `edge-thing-outside-diagram` → `diagram-active-graph-required` → `edge-already-exists` → completed |
+| `reconnected-edge` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Thing ⇒ `unchanged`) → `edge-thing-outside-diagram` → `edge-already-exists` → completed |
 | `deleted-edge` | `graph-not-owned` → `edge-not-found` → completed |
 
 ### Graph edits
@@ -102,7 +102,7 @@ survivor: the selected Diagram if it survived, else the first, which is also wha
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `settled-card-movement` | none → completed |
+| `settled-thing-movement` | none → completed |
 
 ## The 24 codes
 
@@ -111,13 +111,13 @@ none is produced anywhere else. 21 of those 22 are tabulated above;
 `diagram-required` is declared and presented but currently raised nowhere, so it
 appears in no row.
 Count the codes, not the cells: several serve more than one action —
-`card-not-found`, `card-not-in-diagram`, `graph-not-owned`,
-`edge-card-outside-diagram` and the two `alias-target-*` each appear in more than
+`thing-not-found`, `thing-not-in-diagram`, `graph-not-owned`,
+`edge-thing-outside-diagram` and the two `alias-target-*` each appear in more than
 one row.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
 code gets its copy, and the exhaustive placement records beside it are the one
 place each surface's field mapping lives: the domain names the code, the
-application owns the sentence. Five surfaces map it today — Markdown Card
+application owns the sentence. Five surfaces map it today — Markdown Thing
 editing (`title`), Alias editing and Alias creation (`title` / `target`),
 Edge endpoint editing (the attempted `from` or `to`, never both) and Edge
 deletion (form only). Every record is

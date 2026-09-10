@@ -12,7 +12,7 @@ export default { title: 'Review/Selected Edge On Canvas' };
  * wrong for every question about the surface itself. `EdgeLabelRenderer` draws
  * these controls inside the flow's transformed layer, so they are rendered at
  * the viewport's scale, sit on the Edge, pan and zoom with it, and compete for
- * pixels with the Cards and the HUD. A component story at 1:1 shows none of that
+ * pixels with the Things and the HUD. A component story at 1:1 shows none of that
  * and quietly flatters the result.
  *
  * `Review/` deliberately: these carry no parity claim and assert nothing. They
@@ -35,7 +35,7 @@ CloseIn.meta = { iframed: true };
  * `EdgeLabelRenderer` and so is painted at the viewport's zoom, while the
  * popover is portalled to the document by Base UI and is painted at 1:1. At the
  * opening zoom the editor is several times the size of the control that opened
- * it, and covers the two Cards the Edge runs between. Left as a thing to look
+ * it, and covers the two Things the Edge runs between. Left as a thing to look
  * at rather than fixed here.
  */
 export const EditorOnCanvas: Story = () => <SelectedEdgeCanvasFixture editorOpen />;

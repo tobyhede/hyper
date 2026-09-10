@@ -1,4 +1,4 @@
-import type { CardId, GraphId, DiagramId } from '@project/core';
+import type { ThingId, GraphId, DiagramId } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import { openingPlacement, type ComposedApp } from './compose-app';
@@ -40,8 +40,8 @@ export interface HistoryApi {
  * what the private bookkeeping exists to prevent.
  */
 export interface BrowserLocationState {
-  /** The Card the location names, or `null` once a deliberate move leaves it. */
-  readonly addressedCardId: CardId | null;
+  /** The Thing the location names, or `null` once a deliberate move leaves it. */
+  readonly addressedThingId: ThingId | null;
   /** Whether the location the reader arrived at failed to resolve. */
   readonly destinationNotFound: boolean;
 }
@@ -84,7 +84,7 @@ export function createBrowserLocation(
 ): BrowserLocation {
   let followed: ComposedApp | null = null;
   let unfollow: (() => void) | null = null;
-  let addressedCardId: CardId | null = null;
+  let addressedThingId: ThingId | null = null;
   let destinationNotFound = false;
   /**
    * The position the browser was last told about.
@@ -107,24 +107,24 @@ export function createBrowserLocation(
   let syncedUnresolved = false;
 
   const observable = createObservableState<BrowserLocationState>(
-    { addressedCardId, destinationNotFound },
+    { addressedThingId, destinationNotFound },
     reportObserverError,
   );
 
   const publish = (): void => {
     const published = observable.getState();
     if (
-      published.addressedCardId === addressedCardId &&
+      published.addressedThingId === addressedThingId &&
       published.destinationNotFound === destinationNotFound
     ) {
       return;
     }
-    observable.publish({ addressedCardId, destinationNotFound });
+    observable.publish({ addressedThingId, destinationNotFound });
   };
 
   const positionOf = (app: ComposedApp): AddressedPosition => ({
     ...navigationAddress(app.navigation.getState()),
-    addressedCardId,
+    addressedThingId,
   });
 
   /**
@@ -207,13 +207,13 @@ export function createBrowserLocation(
     const resolved = resolveDiagram(app.currentSpace(), opening.selection);
     const changesDiagram = app.navigation.getState().selectedDiagramId !== opening.selection;
     if (opening.graphId === null) app.navigation.selectDiagram(opening.selection);
-    else if (opening.presentationCardId === null) {
+    else if (opening.presentationThingId === null) {
       app.navigation.openGraph(opening.selection, opening.graphId);
     } else {
       app.navigation.openPresentation(
         opening.selection,
         opening.graphId,
-        opening.presentationCardId,
+        opening.presentationThingId,
       );
     }
     // A current row can be chosen again. Its UUID is already the Navigation
@@ -226,7 +226,7 @@ export function createBrowserLocation(
   };
 
   /**
-   * A move the reader made: it clears the addressed Card and answers the report.
+   * A move the reader made: it clears the addressed Thing and answers the report.
    *
    * Shared rather than written out per operation, because the two that make one
    * — choosing a Diagram row and activating a Graph — differed only in that one
@@ -236,7 +236,7 @@ export function createBrowserLocation(
    * the published projection.
    */
   const deliberateMove = (move: () => void): void => {
-    addressedCardId = null;
+    addressedThingId = null;
     destinationNotFound = false;
     move();
     settle();
@@ -256,8 +256,8 @@ export function createBrowserLocation(
       arriveAt({
         selection: diagramId,
         graphId: null,
-        presentationCardId: null,
-        cardId: null,
+        presentationThingId: null,
+        thingId: null,
       });
     });
   };
@@ -286,10 +286,10 @@ export function createBrowserLocation(
       settle();
       return;
     }
-    // Before `arriveAt`, not after: the Card is known the moment the
+    // Before `arriveAt`, not after: the Thing is known the moment the
     // restoration resolves, and moving Navigation first would notify against a
-    // position carrying the Card the reader is leaving.
-    addressedCardId = restoration.opening.cardId;
+    // position carrying the Thing the reader is leaving.
+    addressedThingId = restoration.opening.thingId;
     destinationNotFound = false;
     arriveAt(restoration.opening);
     settle();
@@ -339,7 +339,7 @@ export function createBrowserLocation(
    * The position recorded here is the one the application is already at, which
    * is what makes following decide nothing at all: startup read the location
    * once and composed from it, so correcting the location here could only undo
-   * a Back the reader took before this listener existed. The addressed Card is
+   * a Back the reader took before this listener existed. The addressed Thing is
    * read off that same location rather than carried in — it is a fact about the
    * location and the Space now shown, not about a mounted component's lifetime.
    */
@@ -352,7 +352,7 @@ export function createBrowserLocation(
       app.authoring.getState().session.working,
       history.pathname(),
     );
-    addressedCardId = restoration.kind === 'opening' ? restoration.opening.cardId : null;
+    addressedThingId = restoration.kind === 'opening' ? restoration.opening.thingId : null;
     destinationNotFound = false;
     syncedUnresolved = false;
     syncedPosition = positionOf(app);

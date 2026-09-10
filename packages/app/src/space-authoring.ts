@@ -1,16 +1,16 @@
 import {
-  type CardDocument,
-  type CardId,
-  type CardPlacement,
-  COLLAPSED_CARD_SIZE,
+  type ThingDocument,
+  type ThingId,
+  type ThingPlacement,
+  COLLAPSED_THING_SIZE,
   DEFAULT_OPEN_SIZE,
-  DEFAULT_SPACE_CARD_OPEN_SIZE,
+  DEFAULT_SPACE_THING_OPEN_SIZE,
   type Graph,
   type GraphEdge,
   type GraphId,
   type DiagramId,
   type DiagramPosition,
-  CARD_TITLE_REQUIRED,
+  THING_TITLE_REQUIRED,
   normalizeTitle,
   type SpaceSnapshot,
   titleName,
@@ -34,10 +34,10 @@ import { nextGraphColor } from './colors';
 import type { Navigation, NavigationState } from './navigation';
 import {
   updatePositionedDiagram,
-  withCardRemovedFromDiagrams,
+  withThingRemovedFromDiagrams,
   withoutIncidentEdges,
 } from './snapshot';
-import { nextCardTitle, nextGraphTitle, nextDiagramTitle } from './titles';
+import { nextThingTitle, nextGraphTitle, nextDiagramTitle } from './titles';
 import { requireDefaultDiagram, resolveDiagram } from './diagram-resolution';
 
 /** Which end of an Edge a reconnection replaces. */
@@ -51,30 +51,30 @@ export type EdgeEndpoint = 'from' | 'to';
  * over one value the surface built once. A gesture the canvas offers therefore
  * cannot be one the Edit silently drops — and, because a proposal carries
  * reconnect's *original* Edge and the endpoint being replaced, returning that
- * endpoint to the Card it came from is eligible rather than looking like an
+ * endpoint to the Thing it came from is eligible rather than looking like an
  * Edge that already exists.
  *
  * `create-and-connect` names no target because the Option/Alt empty drop has
- * none yet (ADR 0033); the Card it would author is minted by the Edit.
+ * none yet (ADR 0033); the Thing it would author is minted by the Edit.
  */
 export type EdgeProposal =
-  | { readonly kind: 'connect'; readonly from: CardId; readonly to: CardId }
-  | { readonly kind: 'create-and-connect'; readonly from: CardId }
+  | { readonly kind: 'connect'; readonly from: ThingId; readonly to: ThingId }
+  | { readonly kind: 'create-and-connect'; readonly from: ThingId }
   | {
       readonly kind: 'reconnect';
       readonly graphId: GraphId;
       readonly edge: GraphEdge;
       readonly endpoint: EdgeEndpoint;
-      readonly cardId: CardId;
+      readonly thingId: ThingId;
     };
 
 /**
  * Whether a proposal may be offered, and why not.
  *
  * Two states rather than three: a reconnect returning an endpoint to its
- * original Card is **eligible**, and settles as `unchanged` when it completes.
+ * original Thing is **eligible**, and settles as `unchanged` when it completes.
  * Eligibility answers what the author may still do, not what the Edit will
- * turn out to have changed — a picker that greyed out the Card an endpoint
+ * turn out to have changed — a picker that greyed out the Thing an endpoint
  * already names would show the current value as the one forbidden choice.
  */
 export type EdgeEligibility =
@@ -100,64 +100,64 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
  * finished, and every read of current state, every eligibility question and the
  * whole derivation of the next Space happen on this side of the seam. Three
  * kinds carry `rendered` because a pointer gesture is the only thing that knows
- * where React Flow has drawn the Cards; the rest are written into the placement
+ * where React Flow has drawn the Things; the rest are written into the placement
  * already installed.
  */
 export type AuthoringCompletion =
   | { readonly kind: 'created-diagram' }
   | {
-      readonly kind: 'settled-card-movement';
+      readonly kind: 'settled-thing-movement';
       readonly rendered: Placement;
-      readonly placed: readonly CardId[];
+      readonly placed: readonly ThingId[];
     }
-  | { readonly kind: 'opened-card'; readonly cardId: CardId }
-  | { readonly kind: 'closed-card'; readonly cardId: CardId }
+  | { readonly kind: 'opened-thing'; readonly thingId: ThingId }
+  | { readonly kind: 'closed-thing'; readonly thingId: ThingId }
   | {
-      readonly kind: 'resized-card';
-      readonly cardId: CardId;
+      readonly kind: 'resized-thing';
+      readonly thingId: ThingId;
       readonly size: { readonly width: number; readonly height: number };
     }
   | {
-      readonly kind: 'connected-cards';
-      readonly from: CardId;
-      readonly to: CardId;
+      readonly kind: 'connected-things';
+      readonly from: ThingId;
+      readonly to: ThingId;
       readonly rendered: Placement;
     }
   | {
-      readonly kind: 'edited-card';
-      readonly cardId: CardId;
-      readonly document: CardDocument;
+      readonly kind: 'edited-thing';
+      readonly thingId: ThingId;
+      readonly document: ThingDocument;
     }
   | {
       readonly kind: 'create-and-connect';
-      readonly from: CardId;
+      readonly from: ThingId;
       readonly position: DiagramPosition;
       readonly rendered: Placement;
     }
-  /** Add Card: a detached Markdown Card at the visible centre, neutrally titled. */
-  | { readonly kind: 'created-card'; readonly anchor: DiagramPosition }
+  /** Add Thing: a detached Markdown Thing at the visible centre, neutrally titled. */
+  | { readonly kind: 'created-thing'; readonly anchor: DiagramPosition }
   /**
    * Add Alias: created only once its Target is chosen, because an Alias without
-   * one is not a valid Card. An empty title mints `Card N` like any other Card
-   * rather than copying the Target's, which is what stopped two Cards arriving
+   * one is not a valid Thing. An empty title mints `Thing N` like any other Thing
+   * rather than copying the Target's, which is what stopped two Things arriving
    * with one name (ADR 0083 refines ADR 0046).
    */
   | {
       readonly kind: 'created-alias';
-      readonly target: CardId;
+      readonly target: ThingId;
       readonly title?: string;
       readonly anchor: DiagramPosition;
     }
-  /** Add to Diagram: membership and a first position for a Card already in the Space. */
+  /** Add to Diagram: membership and a first position for a Thing already in the Space. */
   | {
-      readonly kind: 'added-card-to-diagram';
-      readonly cardId: CardId;
+      readonly kind: 'added-thing-to-diagram';
+      readonly thingId: ThingId;
       readonly anchor: DiagramPosition;
     }
   /** Remove from Diagram: membership, position and incident Edges, in this Diagram only. */
-  | { readonly kind: 'removed-card-from-diagram'; readonly cardId: CardId }
-  /** Delete Card from Space: the same removal, cascaded through every Diagram. */
-  | { readonly kind: 'deleted-card'; readonly cardId: CardId }
+  | { readonly kind: 'removed-thing-from-diagram'; readonly thingId: ThingId }
+  /** Delete Thing from Space: the same removal, cascaded through every Diagram. */
+  | { readonly kind: 'deleted-thing'; readonly thingId: ThingId }
   | { readonly kind: 'renamed-diagram'; readonly diagramId: UUID; readonly title: string }
   | { readonly kind: 'deleted-diagram'; readonly diagramId: UUID }
   | { readonly kind: 'added-graph' }
@@ -169,7 +169,7 @@ export type AuthoringCompletion =
       readonly graphId: GraphId;
       readonly edge: GraphEdge;
       readonly endpoint: EdgeEndpoint;
-      readonly cardId: CardId;
+      readonly thingId: ThingId;
     }
   | { readonly kind: 'deleted-edge'; readonly graphId: GraphId; readonly edge: GraphEdge };
 
@@ -191,7 +191,7 @@ export type AuthoringCompletion =
 export type AuthoringResult =
   | {
       readonly kind: 'completed';
-      readonly createdCardId?: CardId;
+      readonly createdThingId?: ThingId;
       readonly createdGraphId?: GraphId;
     }
   | { readonly kind: 'unchanged' }
@@ -200,11 +200,11 @@ export type AuthoringResult =
 
 type DiagramRequiredOperation = Extract<
   AuthoringCompletion,
-  | { readonly kind: 'added-card-to-diagram' }
-  | { readonly kind: 'removed-card-from-diagram' }
-  | { readonly kind: 'opened-card' }
-  | { readonly kind: 'closed-card' }
-  | { readonly kind: 'resized-card' }
+  | { readonly kind: 'added-thing-to-diagram' }
+  | { readonly kind: 'removed-thing-from-diagram' }
+  | { readonly kind: 'opened-thing' }
+  | { readonly kind: 'closed-thing' }
+  | { readonly kind: 'resized-thing' }
   | { readonly kind: 'renamed-diagram' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
@@ -234,31 +234,31 @@ export type AuthoringRefusal =
   | { readonly code: 'placement-pending' }
   | { readonly code: 'diagram-not-found' }
   | { readonly code: 'diagram-required'; readonly operation: DiagramRequiredOperation }
-  | { readonly code: 'card-not-found' }
-  | { readonly code: 'card-kind-immutable' }
+  | { readonly code: 'thing-not-found' }
+  | { readonly code: 'thing-kind-immutable' }
   | { readonly code: 'alias-target-immutable' }
-  | { readonly code: 'space-card-target-immutable' }
-  | { readonly code: 'space-card-deletion-unsupported' }
+  | { readonly code: 'space-thing-target-immutable' }
+  | { readonly code: 'space-thing-deletion-unsupported' }
   // The one code here the domain owns rather than this module: `@project/core`
-  // raises it from the Card schema, so both ends spell it from one constant.
-  | { readonly code: typeof CARD_TITLE_REQUIRED }
+  // raises it from the Thing schema, so both ends spell it from one constant.
+  | { readonly code: typeof THING_TITLE_REQUIRED }
   | { readonly code: 'diagram-title-required' }
   | { readonly code: 'space-must-keep-diagram' }
-  | { readonly code: 'alias-target-not-found'; readonly targetId: CardId }
-  | { readonly code: 'alias-target-must-own-content'; readonly targetId: CardId }
-  | { readonly code: 'card-already-in-diagram' }
-  | { readonly code: 'card-not-in-diagram' }
-  | { readonly code: 'card-not-expanded' }
+  | { readonly code: 'alias-target-not-found'; readonly targetId: ThingId }
+  | { readonly code: 'alias-target-must-own-content'; readonly targetId: ThingId }
+  | { readonly code: 'thing-already-in-diagram' }
+  | { readonly code: 'thing-not-in-diagram' }
+  | { readonly code: 'thing-not-expanded' }
   | {
-      readonly code: 'card-has-aliases';
-      /** The Aliases by **name**, which is what a sentence listing Cards says (ADR 0083). */
+      readonly code: 'thing-has-aliases';
+      /** The Aliases by **name**, which is what a sentence listing Things says (ADR 0083). */
       readonly aliasTitles: readonly string[];
     }
   | { readonly code: 'graph-title-required' }
   | { readonly code: 'diagram-must-keep-graph' }
   | { readonly code: 'graph-not-owned' }
   | { readonly code: 'edge-not-found' }
-  | { readonly code: 'edge-card-outside-diagram' }
+  | { readonly code: 'edge-thing-outside-diagram' }
   | { readonly code: 'edge-already-exists' }
   | { readonly code: 'diagram-active-graph-required' };
 
@@ -307,16 +307,16 @@ export interface SpaceAuthoring {
    *
    * The one eligibility query for every Edge path — connect, create-and-connect
    * and reconnect — asked by the live preview, by React Flow's
-   * `isValidConnection` during a drag, and by a picker deciding which Cards to
+   * `isValidConnection` during a drag, and by a picker deciding which Things to
    * disable. Completion validates the same proposal again, because the Space can
    * change while a preview or a picker is open.
    */
   readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
-  /** Complete an embedded Card gesture without moving this Space's Navigation. */
+  /** Complete an embedded Thing gesture without moving this Space's Navigation. */
   readonly completeInDiagram: (
     diagramId: UUID,
-    completion: EmbeddedCardCompletion,
+    completion: EmbeddedThingCompletion,
   ) => AuthoringResult;
   readonly retryPersistence: () => void;
   /**
@@ -366,7 +366,7 @@ interface CompletedEdit {
    * about the Diagram this Edit wrote and not a separate consequence.
    */
   readonly nextActiveGraphId: GraphId | null;
-  readonly createdCardId?: CardId;
+  readonly createdThingId?: ThingId;
   readonly createdGraphId?: GraphId;
 }
 
@@ -400,16 +400,16 @@ interface ReportedCompletion {
   readonly embeddedDiagramId?: UUID | undefined;
 }
 
-export type EmbeddedCardCompletion = Extract<
+export type EmbeddedThingCompletion = Extract<
   AuthoringCompletion,
   {
     kind:
-      | 'opened-card'
-      | 'closed-card'
-      | 'resized-card'
-      | 'edited-card'
-      | 'settled-card-movement'
-      | 'removed-card-from-diagram';
+      | 'opened-thing'
+      | 'closed-thing'
+      | 'resized-thing'
+      | 'edited-thing'
+      | 'settled-thing-movement'
+      | 'removed-thing-from-diagram';
   }
 >;
 
@@ -436,7 +436,7 @@ interface SpaceAuthoringDependencies {
   readonly initialPlacement?: Placement | null;
   readonly reportObserverError?: ObserverErrorReporter | undefined;
   /**
-   * Mints the identity of every Card, Diagram and Graph a completed Edit creates.
+   * Mints the identity of every Thing, Diagram and Graph a completed Edit creates.
    *
    * Taken here, once, rather than at each `newUuid()` call inside the derivation,
    * so a test supplies the ids it is about to assert on instead of reaching past
@@ -462,14 +462,14 @@ interface SpaceAuthoringDependencies {
   readonly newId: () => UUID;
 }
 
-/** The Cards a snapshot carries, in the shape a snapshot carries them. */
-type SnapshotCards = SpaceSnapshot['cards'];
+/** The Things a snapshot carries, in the shape a snapshot carries them. */
+type SnapshotThings = SpaceSnapshot['things'];
 
 /**
- * How far a Card creation steps when the anchor it was given is taken, and in
+ * How far a Thing creation steps when the anchor it was given is taken, and in
  * which direction.
  *
- * A visible stack rather than collision avoidance: existing Cards never move,
+ * A visible stack rather than collision avoidance: existing Things never move,
  * and partial overlap of the 260×146 Front is deliberate. Only an *exact*
  * anchor collision steps, which is what a repeated centre-add produces and a
  * pointer drop essentially never does.
@@ -480,7 +480,7 @@ const freeAnchor = (placement: Placement, anchor: DiagramPosition): DiagramPosit
   const taken = new Set([...placement.values()].map(({ x, y }) => `${x},${y}`));
   let at = anchor;
   // Terminates: each step is a distinct point on one diagonal, and the taken
-  // set is finite, so at most one step per placed Card can be occupied.
+  // set is finite, so at most one step per placed Thing can be occupied.
   for (let step = 1; taken.has(`${at.x},${at.y}`); step += 1) {
     at = { x: anchor.x + STACK_STEP * step, y: anchor.y + STACK_STEP * step };
   }
@@ -495,24 +495,24 @@ const freeAnchor = (placement: Placement, anchor: DiagramPosition): DiagramPosit
 type Extent = { readonly width: number; readonly height: number };
 
 /**
- * The room a Card's neighbours gain when its rect goes from one Open Size to
+ * The room a Thing's neighbours gain when its rect goes from one Open Size to
  * another: the difference between the two growths, per axis (ADR 0084).
  *
  * Resize's alone. Close hands its whole growth back rather than a difference,
- * and says so in one place — `Placement.reclaim` — which is where a Card that
- * leaves a Diagram and a Card deleted from the Space say it too.
+ * and says so in one place — `Placement.reclaim` — which is where a Thing that
+ * leaves a Diagram and a Thing deleted from the Space say it too.
  *
- * Negative on an axis the Card shrank on, which is legitimate and is the whole
+ * Negative on an axis the Thing shrank on, which is legitimate and is the whole
  * of a shrinking Resize. It is **not** the involution the Open/Close pair is,
  * and the bound `Placement.growth` documents does not extend to it: a negative
- * room reverses a growth only for the Cards that growth was applied to, and a
- * Card the author placed beyond the subject *after* the Open was never one of
- * them. Such a Card can be carried back across the subject — subject Open at
- * `x = 0`, a Card dropped at `x = 1`, a shrink of 200 — and growing back skips
+ * room reverses a growth only for the Things that growth was applied to, and a
+ * Thing the author placed beyond the subject *after* the Open was never one of
+ * them. Such a Thing can be carried back across the subject — subject Open at
+ * `x = 0`, a Thing dropped at `x = 1`, a shrink of 200 — and growing back skips
  * it as no longer beyond, so it keeps the 200. That is the same memorylessness
- * ADR 0084 chose for Close, which reclaims from every Card currently beyond the
- * closing Card including the ones the author moved there; remembering which
- * Cards a growth actually pushed is the per-Card history the ADR rejected.
+ * ADR 0084 chose for Close, which reclaims from every Thing currently beyond the
+ * closing Thing including the ones the author moved there; remembering which
+ * Things a growth actually pushed is the per-Thing history the ADR rejected.
  */
 const roomBetween = (from: Extent, to: Extent): Extent => {
   const before = Placement.growth(from);
@@ -521,7 +521,7 @@ const roomBetween = (from: Extent, to: Extent): Extent => {
 };
 
 /**
- * The placement after a Card's own entry changes and the room it holds changes
+ * The placement after a Thing's own entry changes and the room it holds changes
  * with it: one Edit, and the whole of displacement at the Edit (ADR 0084).
  *
  * **Order.** The entry is written first and the displacement runs over the
@@ -536,65 +536,65 @@ const roomBetween = (from: Extent, to: Extent): Extent => {
  */
 const withRoomFor = (
   placement: Placement,
-  cardId: CardId,
-  at: CardPlacement,
+  thingId: ThingId,
+  at: ThingPlacement,
   room: Extent,
-): Placement => Placement.displace(Placement.place(placement, cardId, at), cardId, room);
+): Placement => Placement.displace(Placement.place(placement, thingId, at), thingId, room);
 
 /**
- * The placement after a Card Closes: Closed on its own entry, and the room it
+ * The placement after a Thing Closes: Closed on its own entry, and the room it
  * held given back by `Placement.reclaim`.
  *
- * Both ways a Card closes end here — the Close completion, and a resize
+ * Both ways a Thing closes end here — the Close completion, and a resize
  * proposal the magnet has taken to the collapsed size (ADR 0066) — so this
  * Diagram's two Close gestures reach the shared rule through one line rather
  * than each restating it. That matters most for the magnetic one, which is
  * where a restatement would reclaim the collapsed proposal's zero growth
- * instead of the growth of the size the Card was actually Open at.
+ * instead of the growth of the size the Thing was actually Open at.
  *
  * The reclaim runs first and the Closed entry is written over the result,
  * because `Placement.reclaim` reads the Open Size off the entry it is given and
  * a Closed entry no longer holds any room. The coordinates do not depend on the
- * order — `displace` moves every Card against the subject's own `x`/`y`, and
+ * order — `displace` moves every Thing against the subject's own `x`/`y`, and
  * neither step moves the subject — so this is about what each step can still
  * see, not about where anything lands. The remembered Open Size rides through
  * untouched (ADR 0066), which is what makes the next Open apply exactly what
  * this gives back.
  */
-const closedCard = (
+const closedThing = (
   placement: Placement,
-  cardId: CardId,
-  at: Extract<CardPlacement, { readonly open: true }>,
+  thingId: ThingId,
+  at: Extract<ThingPlacement, { readonly open: true }>,
 ): Placement =>
-  Placement.place(Placement.reclaim(placement, cardId), cardId, { ...at, open: false });
+  Placement.place(Placement.reclaim(placement, thingId), thingId, { ...at, open: false });
 
 /**
- * The placement after a Card leaves this Diagram, with the room it held given
+ * The placement after a Thing leaves this Diagram, with the room it held given
  * back.
  *
- * Leaving is a Close the Card does not come back from, so it reclaims exactly
- * as {@link closedCard} does — and it has to, because the room is no longer
- * derived from the Card's own entry. Under the derivation ADR 0084 removed,
+ * Leaving is a Close the Thing does not come back from, so it reclaims exactly
+ * as {@link closedThing} does — and it has to, because the room is no longer
+ * derived from the Thing's own entry. Under the derivation ADR 0084 removed,
  * dropping the entry dropped the displacement with it; now the room is written
  * into the neighbours' own coordinates, and a removal that only drops the entry
  * leaves a hole with nothing on the canvas left to explain it and no Edit that
  * can give it back.
  *
  * The reclaim runs **before** the removal, because `Placement.reclaim` reads
- * the Card's own entry — after `Placement.remove` there is neither an Open Size
+ * the Thing's own entry — after `Placement.remove` there is neither an Open Size
  * to read nor a subject to compare the neighbours against.
  *
- * Two of the three ways a Card leaves end here — `removed-card-from-diagram`,
+ * Two of the three ways a Thing leaves end here — `removed-thing-from-diagram`,
  * and the deletion applied with the other membership changes below — and both
  * of those write *this* Diagram. The third is the same deletion cascading into
  * every other Diagram, which no single-Diagram write can reach;
- * `withCardRemovedFromDiagrams` performs it, and reaches the same rule through
+ * `withThingRemovedFromDiagrams` performs it, and reaches the same rule through
  * `Placement.reclaim` rather than through this function.
  */
-const removedCard = (placement: Placement, cardId: CardId): Placement =>
-  Placement.remove(Placement.reclaim(placement, cardId), cardId);
+const removedThing = (placement: Placement, thingId: ThingId): Placement =>
+  Placement.remove(Placement.reclaim(placement, thingId), thingId);
 
-/** Two Edges are the same Edge when they join the same Cards the same way (ADR 0032). */
+/** Two Edges are the same Edge when they join the same Things the same way (ADR 0032). */
 const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>
   left.from === right.from && left.to === right.to;
 
@@ -614,7 +614,7 @@ type ReconnectOutcome =
  * Both callers need the same four answers and one of them needs the resulting
  * Edge, so this returns it rather than a boolean the completion would have to
  * recompute. The order is deliberate: **unchanged is decided before
- * membership**, because a Card that is already this Edge's endpoint is by
+ * membership**, because a Thing that is already this Edge's endpoint is by
  * definition in this Diagram, and asking the placement first would refuse a
  * dragged endpoint dropped back where it started on a Diagram still arranging.
  */
@@ -624,19 +624,19 @@ const reconnectOutcome = (
     readonly graphId: GraphId;
     readonly edge: GraphEdge;
     readonly endpoint: EdgeEndpoint;
-    readonly cardId: CardId;
+    readonly thingId: ThingId;
   },
   placement: Placement,
   /**
-   * Whether the Space still holds the Card, which the placement does not answer.
+   * Whether the Space still holds the Thing, which the placement does not answer.
    *
    * The same second condition `connectable` applies to a connection, and the
-   * asymmetry was a latent trap rather than a nicety: an Edge naming a Card the
+   * asymmetry was a latent trap rather than a nicety: an Edge naming a Thing the
    * Space has lost derives a snapshot intake rejects, and this derivation answers
    * an unloadable Space by *throwing* — putting a defect in front of the author
    * as their own mistake. A picker open across such a deletion is the way there.
    */
-  holdsCard: (cardId: CardId) => boolean,
+  holdsThing: (thingId: ThingId) => boolean,
 ): ReconnectOutcome => {
   // Ownership, not existence: a Graph a *second* Diagram owns exists and is
   // still not one this Edit may write (ADR 0040).
@@ -651,13 +651,13 @@ const reconnectOutcome = (
   }
   const reconnected: GraphEdge =
     proposal.endpoint === 'from'
-      ? { from: proposal.cardId, to: proposal.edge.to }
-      : { from: proposal.edge.from, to: proposal.cardId };
+      ? { from: proposal.thingId, to: proposal.edge.to }
+      : { from: proposal.edge.from, to: proposal.thingId };
   if (sameEdge(proposal.edge, reconnected)) return UNCHANGED;
   // Checked together and after `unchanged`, so an endpoint returned to its own
-  // Card is still eligible on a Diagram that has not finished arranging.
-  if (!placement.has(proposal.cardId) || !holdsCard(proposal.cardId)) {
-    return { kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } };
+  // Thing is still eligible on a Diagram that has not finished arranging.
+  if (!placement.has(proposal.thingId) || !holdsThing(proposal.thingId)) {
+    return { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } };
   }
   if (indexOfEdge(graph.edges, reconnected) !== -1) {
     return { kind: 'refused', refusal: { code: 'edge-already-exists' } };
@@ -666,7 +666,7 @@ const reconnectOutcome = (
 };
 
 /**
- * Why a Card document's Alias Target may not be authored, or `null`.
+ * Why a Thing document's Alias Target may not be authored, or `null`.
  *
  * This is the creation-time rule for choosing an Alias Target. Existing Alias
  * Targets are immutable and are refused before this validation is reached. It
@@ -676,12 +676,12 @@ const reconnectOutcome = (
  * deserves a sentence rather than an exception. A markdown document has no
  * Target and nothing to refuse.
  */
-const aliasTargetRefusal = (space: Space, document: CardDocument): AuthoringRefusal | null => {
+const aliasTargetRefusal = (space: Space, document: ThingDocument): AuthoringRefusal | null => {
   if (document.kind !== 'alias') return null;
-  const target = space.lookup.card(document.target);
+  const target = space.lookup.thing(document.target);
   if (target === undefined) return { code: 'alias-target-not-found', targetId: document.target };
   // Single-hop by construction (ADR 0009): the Target must own Markdown
-  // content, so neither another Alias nor a Space Card can be targeted.
+  // content, so neither another Alias nor a Space Thing can be targeted.
   if (target.kind !== 'markdown') {
     return { code: 'alias-target-must-own-content', targetId: document.target };
   }
@@ -689,31 +689,31 @@ const aliasTargetRefusal = (space: Space, document: CardDocument): AuthoringRefu
 };
 
 /**
- * A Card an Edit is creating, held rather than placed.
+ * A Thing an Edit is creating, held rather than placed.
  *
  * Its position waits here until the complete next Diagram is assembled.
  */
-interface CreatedCard {
-  readonly id: CardId;
+interface CreatedThing {
+  readonly id: ThingId;
   readonly position: DiagramPosition;
   /**
-   * Step off a position another Card already occupies exactly. A gesture that
-   * dropped on empty canvas aimed at its point and keeps it; a Card created from
+   * Step off a position another Thing already occupies exactly. A gesture that
+   * dropped on empty canvas aimed at its point and keeps it; a Thing created from
    * a menu has no aimed-at point and would otherwise stack.
    */
   readonly avoidingOverlap: boolean;
 }
 
-/** The Aliases pointing at a Card, which are what block deleting it from the Space. */
-const incomingAliases = (cards: SnapshotCards, cardId: CardId): SnapshotCards =>
-  cards.filter((card) => card.document.kind === 'alias' && card.document.target === cardId);
+/** The Aliases pointing at a Thing, which are what block deleting it from the Space. */
+const incomingAliases = (things: SnapshotThings, thingId: ThingId): SnapshotThings =>
+  things.filter((thing) => thing.document.kind === 'alias' && thing.document.target === thingId);
 
 /**
  * A single-line title normalized for authorship, or `null` when it has no name.
  *
  * Diagrams and Graphs only. Their titles are single-line by ADR 0083, so the
- * whole string is one line and trimming it is the whole rule. A Card's Title is
- * Title Lines and normalizes by a rule of its own — {@link namedCardTitle}.
+ * whole string is one line and trimming it is the whole rule. A Thing's Title is
+ * Title Lines and normalizes by a rule of its own — {@link namedThingTitle}.
  */
 const trimmedNonBlankTitle = (title: string): string | null => {
   const trimmed = title.trim();
@@ -721,18 +721,18 @@ const trimmedNonBlankTitle = (title: string): string | null => {
 };
 
 /**
- * A Card Title normalized as the schema normalizes it, or `null` when it
+ * A Thing Title normalized as the schema normalizes it, or `null` when it
  * carries no name.
  *
  * `normalizeTitle` and not `trim()`, because on a Title of more than one line
  * the two give different answers: a whole-string trim cannot reach the trailing
  * whitespace on an interior line, and it strips a first line's leading
  * whitespace, which ADR 0083 says is that line's own. A write path that
- * disagreed with the parse boundary would store a Card whose Title differs from
+ * disagreed with the parse boundary would store a Thing whose Title differs from
  * the one intake mints from the same bytes — derived state disagreeing with the
  * code that derives it, which this repo fixes at the source.
  */
-const namedCardTitle = (title: string): string | null => {
+const namedThingTitle = (title: string): string | null => {
   const normalized = normalizeTitle(title);
   return normalized.length === 0 ? null : normalized;
 };
@@ -861,17 +861,17 @@ export function createSpaceAuthoring({
    * not write.
    *
    * Space Authoring installs the placement for every Edit it completes, so this
-   * is about the Edits it does not: a Space Card lifecycle operation is one
+   * is about the Edits it does not: a Space Thing lifecycle operation is one
    * atomic Edit across several Spaces and installs the containing Space's
    * snapshot through the session directly (ADR 0076). The Diagram it wrote then
-   * holds a Card this placement has never heard of, and every operation keyed on
+   * holds a Thing this placement has never heard of, and every operation keyed on
    * placement membership — Opening it, resizing it, removing it from the Diagram
-   * — refuses `card-not-in-diagram` for a Card plainly on the canvas. Read the
-   * other way, a Card the cascade deleted would linger as a position naming no
-   * Card, which is a reference error the next Edit's intake would throw on.
+   * — refuses `thing-not-in-diagram` for a Thing plainly on the canvas. Read the
+   * other way, a Thing the cascade deleted would linger as a position naming no
+   * Thing, which is a reference error the next Edit's intake would throw on.
    *
-   * **Membership only.** A Card the Diagram has gained takes the position the
-   * Diagram authored for it, one it has lost is dropped, and every Card both
+   * **Membership only.** A Thing the Diagram has gained takes the position the
+   * Diagram authored for it, one it has lost is dropped, and every Thing both
    * still hold keeps the value the placement holds — which is what stops a
    * reconciliation discarding a live drag, an Open state or a resize the stored
    * snapshot has not caught up with.
@@ -931,11 +931,11 @@ export function createSpaceAuthoring({
       return;
     }
     let merged = placement;
-    for (const [cardId, at] of authored) {
-      if (!merged.has(cardId)) merged = Placement.place(merged, cardId, at);
+    for (const [thingId, at] of authored) {
+      if (!merged.has(thingId)) merged = Placement.place(merged, thingId, at);
     }
-    for (const cardId of [...merged.keys()]) {
-      if (!authored.has(cardId)) merged = Placement.remove(merged, cardId);
+    for (const thingId of [...merged.keys()]) {
+      if (!authored.has(thingId)) merged = Placement.remove(merged, thingId);
     }
     install(merged);
   };
@@ -979,25 +979,25 @@ export function createSpaceAuthoring({
   };
 
   /**
-   * Whether a Card is one an Edge this gesture authors may name at all.
+   * Whether a Thing is one an Edge this gesture authors may name at all.
    *
-   * Two conditions, and the second is ADR 0040's closure read forwards. A Card
-   * of the Space is not necessarily a Card of the Diagram the Edit writes: a
+   * Two conditions, and the second is ADR 0040's closure read forwards. A Thing
+   * of the Space is not necessarily a Thing of the Diagram the Edit writes: a
    * Diagram's members **are** its position keys, and the completed placement is
-   * what those keys are about to become. An Edge naming a Card outside it
+   * what those keys are about to become. An Edge naming a Thing outside it
    * derives a Space intake rejects, and `deriveCompletedEdit` answers an
    * unloadable Space by throwing — right for a bug, wrong for an eligibility
    * query. Refusing here keeps the interaction boundary closed over the Diagram
-   * even if a stale caller names a Card outside it.
+   * even if a stale caller names a Thing outside it.
    *
    * Reading the installed placement rather than the stored Diagram is deliberate.
    * It is the same value the completion reports, so the preview and the
    * completion cannot disagree.
    */
-  const connectable = (cardId: CardId): boolean =>
+  const connectable = (thingId: ThingId): boolean =>
     placement !== null &&
-    placement.has(cardId) &&
-    session.getState().working.cards.some((card) => card.id === cardId);
+    placement.has(thingId) &&
+    session.getState().working.things.some((thing) => thing.id === thingId);
 
   /**
    * Why an Edge this gesture would author cannot be authored, or `null`.
@@ -1005,16 +1005,16 @@ export function createSpaceAuthoring({
    * One answer for the live preview, the release and the completed Edit, so a
    * gesture the canvas offers cannot be one the completion silently drops — and
    * the completion says *which* rule it hit, which a boolean could not.
-   * `to === null` is the Option/Alt empty drop, whose target Card does not exist
+   * `to === null` is the Option/Alt empty drop, whose target Thing does not exist
    * yet (ADR 0033).
    *
    * An exact duplicate within one Graph is what intake rejects (ADR 0032), so it
    * can only be a duplicate of an Edge in the Graph the Edge is about to join.
-   * A created Card cannot duplicate anything, which is why the callers differ.
+   * A created Thing cannot duplicate anything, which is why the callers differ.
    */
-  const connectRefusal = (from: CardId, to: CardId | null): AuthoringRefusal | null => {
+  const connectRefusal = (from: ThingId, to: ThingId | null): AuthoringRefusal | null => {
     if (!connectable(from) || (to !== null && !connectable(to))) {
-      return { code: 'edge-card-outside-diagram' };
+      return { code: 'edge-thing-outside-diagram' };
     }
     const graph = targetGraph();
     if (graph === null) return { code: 'diagram-active-graph-required' };
@@ -1047,8 +1047,8 @@ export function createSpaceAuthoring({
         refusal: { code: 'placement-pending' },
       };
     }
-    const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, placement, (cardId) =>
-      session.getState().working.cards.some((card) => card.id === cardId),
+    const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, placement, (thingId) =>
+      session.getState().working.things.some((thing) => thing.id === thingId),
     );
     return outcome.kind === 'refused' ? outcome : ELIGIBLE;
   };
@@ -1063,7 +1063,7 @@ export function createSpaceAuthoring({
    * lets the shell below be a sequence of statements rather than a transaction.
    *
    * Neither `unchanged` nor `refused` is a failure: an Edit that changes
-   * nothing, names a Card the Space no longer holds, or targets a Diagram that
+   * nothing, names a Thing the Space no longer holds, or targets a Diagram that
    * has gone is simply not an Edit, and the two say which of those it was.
    * Producing an unloadable Space *is* a failure, and it throws — here, where
    * the collaborators are all still level.
@@ -1163,53 +1163,53 @@ export function createSpaceAuthoring({
     /**
      * What this Edit does to the placement, held rather than applied.
      *
-     * Card additions and removals wait here until the complete next Diagram is
+     * Thing additions and removals wait here until the complete next Diagram is
      * assembled.
      */
-    let createdCard: CreatedCard | null = null;
-    let unplacedCardId: CardId | undefined;
-    let deletedCardId: CardId | undefined;
+    let createdThing: CreatedThing | null = null;
+    let unplacedThingId: ThingId | undefined;
+    let deletedThingId: ThingId | undefined;
     let connection: GraphEdge | null = null;
     let completedPlacement = reportedPlacement;
-    // The one way a Card is added: mint it, place it at a free anchor, append it.
-    // Add Card and Add Alias differ in the document they carry and in nothing
+    // The one way a Thing is added: mint it, place it at a free anchor, append it.
+    // Add Thing and Add Alias differ in the document they carry and in nothing
     // else — neither creates an Edge, and neither adds a Graph to a Diagram that
     // already has one.
-    // Returns rather than assigns: `createdCard` is read further down, and a
+    // Returns rather than assigns: `createdThing` is read further down, and a
     // `let` written only from inside a closure keeps its initial narrowing.
-    const createCard = (
-      document: CardDocument,
+    const createThing = (
+      document: ThingDocument,
       at: DiagramPosition,
       avoidingOverlap = true,
-    ): CreatedCard => {
+    ): CreatedThing => {
       const id = newId();
-      snapshot = { ...snapshot, cards: [...snapshot.cards, { id, document }] };
+      snapshot = { ...snapshot, things: [...snapshot.things, { id, document }] };
       return { id, position: at, avoidingOverlap };
     };
-    if (completion.kind === 'edited-card') {
-      const cardIndex = snapshot.cards.findIndex((card) => card.id === completion.cardId);
-      const card = snapshot.cards[cardIndex];
-      if (card === undefined) return refuse({ code: 'card-not-found' });
-      // Kind is fixed for a Card's lifetime, and changing it is out of scope for
-      // version 1. Everything else the editor holds — a Markdown Card's Title
+    if (completion.kind === 'edited-thing') {
+      const thingIndex = snapshot.things.findIndex((thing) => thing.id === completion.thingId);
+      const thing = snapshot.things[thingIndex];
+      if (thing === undefined) return refuse({ code: 'thing-not-found' });
+      // Kind is fixed for a Thing's lifetime, and changing it is out of scope for
+      // version 1. Everything else the editor holds — a Markdown Thing's Title
       // and body, or an Alias's Title and Target — is one ordinary Edit of
-      // this Card.
-      if (card.document.kind !== completion.document.kind) {
-        return refuse({ code: 'card-kind-immutable' });
+      // this Thing.
+      if (thing.document.kind !== completion.document.kind) {
+        return refuse({ code: 'thing-kind-immutable' });
       }
       if (
-        card.document.kind === 'alias' &&
+        thing.document.kind === 'alias' &&
         completion.document.kind === 'alias' &&
-        card.document.target !== completion.document.target
+        thing.document.target !== completion.document.target
       ) {
         return refuse({ code: 'alias-target-immutable' });
       }
       if (
-        card.document.kind === 'space' &&
+        thing.document.kind === 'space' &&
         completion.document.kind === 'space' &&
-        card.document.spaceId !== completion.document.spaceId
+        thing.document.spaceId !== completion.document.spaceId
       ) {
-        return refuse({ code: 'space-card-target-immutable' });
+        return refuse({ code: 'space-thing-target-immutable' });
       }
       // Normalized and refused *here* rather than only at the surface that
       // typed it. A blank title is the empty case wearing different bytes, and
@@ -1217,53 +1217,53 @@ export function createSpaceAuthoring({
       // by throwing, and an author's mistake may not throw. Every caller of
       // this operation is covered by one rule instead of each remembering it,
       // and that one rule is the schema's own (ADR 0083).
-      const title = namedCardTitle(completion.document.title);
-      if (title === null) return refuse({ code: CARD_TITLE_REQUIRED });
-      const document: CardDocument = { ...completion.document, title };
-      if (sameValue(card.document, document)) return UNCHANGED;
+      const title = namedThingTitle(completion.document.title);
+      if (title === null) return refuse({ code: THING_TITLE_REQUIRED });
+      const document: ThingDocument = { ...completion.document, title };
+      if (sameValue(thing.document, document)) return UNCHANGED;
       const refusal = aliasTargetRefusal(space, document);
       if (refusal !== null) return refuse(refusal);
-      const cards = [...snapshot.cards];
-      cards[cardIndex] = { id: card.id, document };
-      snapshot = { ...snapshot, cards };
-    } else if (completion.kind === 'opened-card') {
-      const at = completedPlacement.get(completion.cardId);
-      if (at === undefined) return refuse({ code: 'card-not-in-diagram' });
+      const things = [...snapshot.things];
+      things[thingIndex] = { id: thing.id, document };
+      snapshot = { ...snapshot, things };
+    } else if (completion.kind === 'opened-thing') {
+      const at = completedPlacement.get(completion.thingId);
+      if (at === undefined) return refuse({ code: 'thing-not-in-diagram' });
       if (at.open) return UNCHANGED;
-      // The size the Card is actually opening at: the one it remembers, or the
+      // The size the Thing is actually opening at: the one it remembers, or the
       // default for its kind. The room it takes is that size's growth, so the
       // Close that reverses this reads the same number back off the entry.
       const openSize =
         at.openSize ??
-        (space.lookup.card(completion.cardId)?.kind === 'space'
-          ? DEFAULT_SPACE_CARD_OPEN_SIZE
+        (space.lookup.thing(completion.thingId)?.kind === 'space'
+          ? DEFAULT_SPACE_THING_OPEN_SIZE
           : DEFAULT_OPEN_SIZE);
       completedPlacement = withRoomFor(
         completedPlacement,
-        completion.cardId,
+        completion.thingId,
         { ...at, open: true, openSize },
         Placement.growth(openSize),
       );
-    } else if (completion.kind === 'closed-card') {
-      const at = completedPlacement.get(completion.cardId);
-      if (at === undefined) return refuse({ code: 'card-not-in-diagram' });
+    } else if (completion.kind === 'closed-thing') {
+      const at = completedPlacement.get(completion.thingId);
+      if (at === undefined) return refuse({ code: 'thing-not-in-diagram' });
       if (!at.open) return UNCHANGED;
-      // Read as the Diagram stands, with no record of who this Card's Open
-      // pushed: everything currently beyond it moves back, the Cards the author
+      // Read as the Diagram stands, with no record of who this Thing's Open
+      // pushed: everything currently beyond it moves back, the Things the author
       // dragged there while it was open included (ADR 0084).
-      completedPlacement = closedCard(completedPlacement, completion.cardId, at);
-    } else if (completion.kind === 'resized-card') {
-      const at = completedPlacement.get(completion.cardId);
-      if (at === undefined) return refuse({ code: 'card-not-in-diagram' });
-      if (!at.open) return refuse({ code: 'card-not-expanded' });
+      completedPlacement = closedThing(completedPlacement, completion.thingId, at);
+    } else if (completion.kind === 'resized-thing') {
+      const at = completedPlacement.get(completion.thingId);
+      if (at === undefined) return refuse({ code: 'thing-not-in-diagram' });
+      if (!at.open) return refuse({ code: 'thing-not-expanded' });
       if (
-        completion.size.width === COLLAPSED_CARD_SIZE.width &&
-        completion.size.height === COLLAPSED_CARD_SIZE.height
+        completion.size.width === COLLAPSED_THING_SIZE.width &&
+        completion.size.height === COLLAPSED_THING_SIZE.height
       ) {
         // The magnetic Close (ADR 0066). It is a Close, so it takes the Close
         // path rather than restating it — reclaiming the growth of the size the
-        // Card was Open at, not the zero growth of the rect being proposed.
-        completedPlacement = closedCard(completedPlacement, completion.cardId, at);
+        // Thing was Open at, not the zero growth of the rect being proposed.
+        completedPlacement = closedThing(completedPlacement, completion.thingId, at);
       } else if (
         at.openSize.width === completion.size.width &&
         at.openSize.height === completion.size.height
@@ -1272,104 +1272,104 @@ export function createSpaceAuthoring({
       } else {
         completedPlacement = withRoomFor(
           completedPlacement,
-          completion.cardId,
+          completion.thingId,
           { ...at, openSize: completion.size },
           roomBetween(at.openSize, completion.size),
         );
       }
-    } else if (completion.kind === 'created-card') {
-      createdCard = createCard(
-        { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
+    } else if (completion.kind === 'created-thing') {
+      createdThing = createThing(
+        { title: nextThingTitle(snapshot), kind: 'markdown', body: '' },
         completion.anchor,
       );
     } else if (completion.kind === 'created-alias') {
-      // An empty title mints the same neutral `Card N` every other created Card
+      // An empty title mints the same neutral `Thing N` every other created Thing
       // gets; text the author already entered is never overwritten. `??` cannot
       // express this — the empty string is a value the picker really sends, and
       // the whole point is that it does not count as one. Copying the Target's
-      // Title is what this replaced: it produced two Cards with one name by
+      // Title is what this replaced: it produced two Things with one name by
       // default, and the creation flow asks for a name at this moment anyway
       // (ADR 0070).
       // Normalized the way a rename is, and for the same reason: creation and
       // renaming write one field, so the same typed bytes have to reach the
       // same stored document whichever path wrote them (ADR 0083).
-      const entered = namedCardTitle(completion.title ?? '');
-      const document: CardDocument = {
-        title: entered ?? nextCardTitle(snapshot),
+      const entered = namedThingTitle(completion.title ?? '');
+      const document: ThingDocument = {
+        title: entered ?? nextThingTitle(snapshot),
         kind: 'alias',
         target: completion.target,
       };
       const refusal = aliasTargetRefusal(space, document);
       if (refusal !== null) return refuse(refusal);
-      createdCard = createCard(document, completion.anchor);
-    } else if (completion.kind === 'added-card-to-diagram') {
-      if (space.lookup.card(completion.cardId) === undefined) {
-        return refuse({ code: 'card-not-found' });
+      createdThing = createThing(document, completion.anchor);
+    } else if (completion.kind === 'added-thing-to-diagram') {
+      if (space.lookup.thing(completion.thingId) === undefined) {
+        return refuse({ code: 'thing-not-found' });
       }
-      if (completedPlacement.has(completion.cardId)) {
-        return refuse({ code: 'card-already-in-diagram' });
+      if (completedPlacement.has(completion.thingId)) {
+        return refuse({ code: 'thing-already-in-diagram' });
       }
-      // Membership and a position, and nothing else: a re-added Card is detached,
+      // Membership and a position, and nothing else: a re-added Thing is detached,
       // and the Edges it once had are never inferred back.
       // The anchor is taken as given: a canvas coordinate is an authored one
       // (ADR 0084).
       completedPlacement = Placement.place(
         completedPlacement,
-        completion.cardId,
+        completion.thingId,
         freeAnchor(completedPlacement, completion.anchor),
       );
-    } else if (completion.kind === 'removed-card-from-diagram') {
-      if (!completedPlacement.has(completion.cardId)) {
-        return refuse({ code: 'card-not-in-diagram' });
+    } else if (completion.kind === 'removed-thing-from-diagram') {
+      if (!completedPlacement.has(completion.thingId)) {
+        return refuse({ code: 'thing-not-in-diagram' });
       }
-      unplacedCardId = completion.cardId;
-      completedPlacement = removedCard(completedPlacement, completion.cardId);
-    } else if (completion.kind === 'deleted-card') {
-      const deleted = space.lookup.card(completion.cardId);
+      unplacedThingId = completion.thingId;
+      completedPlacement = removedThing(completedPlacement, completion.thingId);
+    } else if (completion.kind === 'deleted-thing') {
+      const deleted = space.lookup.thing(completion.thingId);
       if (deleted === undefined) {
-        return refuse({ code: 'card-not-found' });
+        return refuse({ code: 'thing-not-found' });
       }
-      // A Space Card owns the Space it names (ADR 0058), so deleting it deletes
+      // A Space Thing owns the Space it names (ADR 0058), so deleting it deletes
       // that Space and everything below it — one coordinated multi-Space Edit,
-      // which is Space Card lifecycle through the session registry and not
+      // which is Space Thing lifecycle through the session registry and not
       // a single-Space update this seam can make. Completing it here would store
       // a Space whose target is unreachable, and aggregate intake refuses that
-      // commit permanently with the Card already gone from the working state.
+      // commit permanently with the Thing already gone from the working state.
       if (deleted.kind === 'space') {
-        return refuse({ code: 'space-card-deletion-unsupported' });
+        return refuse({ code: 'space-thing-deletion-unsupported' });
       }
-      // An Alias whose Target vanished is not a Card intake accepts, so the Space
-      // cannot lose one out from under its Aliases. Removing that Card from a
+      // An Alias whose Target vanished is not a Thing intake accepts, so the Space
+      // cannot lose one out from under its Aliases. Removing that Thing from a
       // single Diagram is never blocked this way — only deleting it outright.
-      const incoming = incomingAliases(snapshot.cards, completion.cardId);
+      const incoming = incomingAliases(snapshot.things, completion.thingId);
       if (incoming.length > 0) {
         return refuse({
-          code: 'card-has-aliases',
+          code: 'thing-has-aliases',
           // Named, not Titled: the wording joins these into one sentence, and
           // a Title's later lines would break the list across it (ADR 0083).
           aliasTitles: incoming.map((alias) => titleName(alias.document.title)),
         });
       }
       // Deferred like a creation so the complete Diagram changes atomically.
-      unplacedCardId = completion.cardId;
-      deletedCardId = completion.cardId;
+      unplacedThingId = completion.thingId;
+      deletedThingId = completion.thingId;
       snapshot = {
         ...snapshot,
-        cards: snapshot.cards.filter((card) => card.id !== completion.cardId),
+        things: snapshot.things.filter((thing) => thing.id !== completion.thingId),
       };
     } else if (completion.kind === 'create-and-connect') {
       const refusal = connectRefusal(completion.from, null);
       if (refusal !== null) return refuse(refusal);
       // The drop point is aimed at, so it is kept exactly: the gesture only
-      // offers an empty-canvas release, and stepping off it would move the Card
+      // offers an empty-canvas release, and stepping off it would move the Thing
       // away from where the author watched the preview sit.
-      createdCard = createCard(
-        { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
+      createdThing = createThing(
+        { title: nextThingTitle(snapshot), kind: 'markdown', body: '' },
         completion.position,
         false,
       );
-      connection = { from: completion.from, to: createdCard.id };
-    } else if (completion.kind === 'connected-cards') {
+      connection = { from: completion.from, to: createdThing.id };
+    } else if (completion.kind === 'connected-things') {
       const refusal = connectRefusal(completion.from, completion.to);
       if (refusal !== null) return refuse(refusal);
       connection = { from: completion.from, to: completion.to };
@@ -1413,19 +1413,19 @@ export function createSpaceAuthoring({
       diagramTitle = title;
     }
     // Apply membership changes together to the completed Diagram.
-    if (createdCard !== null) {
+    if (createdThing !== null) {
       // As above: the drop point is authorship, not a coordinate to convert
       // (ADR 0084).
       completedPlacement = Placement.place(
         completedPlacement,
-        createdCard.id,
-        createdCard.avoidingOverlap
-          ? freeAnchor(completedPlacement, createdCard.position)
-          : createdCard.position,
+        createdThing.id,
+        createdThing.avoidingOverlap
+          ? freeAnchor(completedPlacement, createdThing.position)
+          : createdThing.position,
       );
     }
-    if (deletedCardId !== undefined) {
-      completedPlacement = removedCard(completedPlacement, deletedCardId);
+    if (deletedThingId !== undefined) {
+      completedPlacement = removedThing(completedPlacement, deletedThingId);
     }
     if (connection !== null) {
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === activeGraphId);
@@ -1436,11 +1436,11 @@ export function createSpaceAuthoring({
       const graphs = [...ownedGraphs];
       graphs[graphIndex] = { ...graph, edges: [...graph.edges, connection] };
       ownedGraphs = graphs;
-    } else if (unplacedCardId !== undefined) {
-      // A Card that has left this Diagram cannot be an endpoint of a Graph this
+    } else if (unplacedThingId !== undefined) {
+      // A Thing that has left this Diagram cannot be an endpoint of a Graph this
       // Diagram owns (ADR 0040), so its incident Edges leave with it. The Graphs
       // themselves stay, empty ones included: deletion is their own action.
-      ownedGraphs = withoutIncidentEdges(ownedGraphs, unplacedCardId);
+      ownedGraphs = withoutIncidentEdges(ownedGraphs, unplacedThingId);
     } else if (completion.kind === 'added-graph') {
       const graph: Graph = {
         id: newId(),
@@ -1468,7 +1468,7 @@ export function createSpaceAuthoring({
       const replacing = (next: Graph): readonly Graph[] =>
         ownedGraphs.map((existing, index) => (index === graphIndex ? next : existing));
       if (completion.kind === 'renamed-graph') {
-        // Trimmed, for the reason a Card title is: `z.string().min(1)` counts
+        // Trimmed, for the reason a Thing title is: `z.string().min(1)` counts
         // characters, so blank is the empty case wearing different bytes.
         const title = trimmedNonBlankTitle(completion.title);
         if (title === null) {
@@ -1502,13 +1502,13 @@ export function createSpaceAuthoring({
         // The same rule `edgeEligibility` offered the gesture under, asked again
         // because the Space can have changed since — and answering with the
         // resulting Edge rather than a boolean, so there is nothing to rederive.
-        const outcome = reconnectOutcome(graph, completion, completedPlacement, (cardId) =>
-          snapshot.cards.some((card) => card.id === cardId),
+        const outcome = reconnectOutcome(graph, completion, completedPlacement, (thingId) =>
+          snapshot.things.some((thing) => thing.id === thingId),
         );
         if (outcome.kind !== 'edge') return outcome;
         const edgeIndex = indexOfEdge(graph.edges, completion.edge);
         // In place, so reconnecting does not reorder a Graph's Edges — that order
-        // is what a branching Card's moves are offered in (ADR 0024).
+        // is what a branching Thing's moves are offered in (ADR 0024).
         ownedGraphs = replacing({
           ...graph,
           edges: graph.edges.map((edge, index) => (index === edgeIndex ? outcome.edge : edge)),
@@ -1517,9 +1517,11 @@ export function createSpaceAuthoring({
     }
     const next = updatePositionedDiagram(
       // The cascade first, then this Diagram written whole over the top of it.
-      // Delete Card from Space is one Edit over every Diagram (ADR 0040), and the
+      // Delete Thing from Space is one Edit over every Diagram (ADR 0040), and the
       // current one is simply the Diagram this Edit was also going to write.
-      deletedCardId === undefined ? snapshot : withCardRemovedFromDiagrams(snapshot, deletedCardId),
+      deletedThingId === undefined
+        ? snapshot
+        : withThingRemovedFromDiagrams(snapshot, deletedThingId),
       {
         diagramId,
         title: diagramTitle,
@@ -1530,8 +1532,8 @@ export function createSpaceAuthoring({
     );
     if (sameSnapshot(previousSnapshot, next)) return UNCHANGED;
     assertValidAuthoredSnapshot(next);
-    const created: { createdCardId?: CardId; createdGraphId?: GraphId } = {};
-    if (createdCard !== null) created.createdCardId = createdCard.id;
+    const created: { createdThingId?: ThingId; createdGraphId?: GraphId } = {};
+    if (createdThing !== null) created.createdThingId = createdThing.id;
     if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
     return {
       kind: 'completed',
@@ -1562,7 +1564,7 @@ export function createSpaceAuthoring({
    * took already carries `completedPlacement` inside its Diagram, so the local
    * placement is merely stale and the next projection re-derives it; installing
    * first would instead leave the placement describing an Edit the session
-   * never took, and for a created Card, a position for a Card that does not
+   * never took, and for a created Thing, a position for a Thing that does not
    * exist. That is the strand `b091623` inverted this order to close.
    *
    * **The Diagram is adopted with the Active Graph that belongs to it**, and
@@ -1603,7 +1605,7 @@ export function createSpaceAuthoring({
     // `unchanged` and `refused` are already the answer — the core and the
     // interface share one vocabulary rather than translating between two.
     if (derived.kind !== 'completed') return derived;
-    const { createdCardId, createdGraphId } = derived.edit;
+    const { createdThingId, createdGraphId } = derived.edit;
     if (reported.embeddedDiagramId === undefined) {
       installCompletedEdit(derived.edit);
     } else {
@@ -1622,8 +1624,8 @@ export function createSpaceAuthoring({
         }
       });
     }
-    const created: { createdCardId?: CardId; createdGraphId?: GraphId } = {};
-    if (createdCardId !== undefined) created.createdCardId = createdCardId;
+    const created: { createdThingId?: ThingId; createdGraphId?: GraphId } = {};
+    if (createdThingId !== undefined) created.createdThingId = createdThingId;
     if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
     return { kind: 'completed', ...created };
   };
@@ -1631,7 +1633,7 @@ export function createSpaceAuthoring({
   let completing = false;
   const queued: QueuedCompletion[] = [];
   const complete = (completion: AuthoringCompletion, embeddedDiagramId?: UUID): AuthoringResult => {
-    // A pointer gesture reports where React Flow has drawn the Cards, and that
+    // A pointer gesture reports where React Flow has drawn the Things, and that
     // report is merged under `Placement.next`'s rules. Every other operation is
     // written into the placement already installed — there is no second source
     // of geometry for a rename or a deletion to disagree with.
@@ -1649,7 +1651,7 @@ export function createSpaceAuthoring({
         ? Placement.next(
             embeddedDiagram === undefined ? mergeBase() : base,
             completion.rendered,
-            completion.kind === 'settled-card-movement' ? completion.placed : [],
+            completion.kind === 'settled-thing-movement' ? completion.placed : [],
           )
         : base;
     if (embeddedDiagramId === undefined) install(completedPlacement);
@@ -1675,7 +1677,7 @@ export function createSpaceAuthoring({
       while (queued.length > 0) {
         const next = queued.shift();
         if (next === undefined) continue;
-        // ADR 0042: an entry was derived from identities, positions and Card
+        // ADR 0042: an entry was derived from identities, positions and Thing
         // values read out of the Space that was current when it was queued, and
         // an observer may accept the stored Space from inside the very
         // publication this queue fills during. An entry the epoch has outlived

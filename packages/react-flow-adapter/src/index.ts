@@ -1,10 +1,10 @@
 import type { EdgeTypes, NodeTypes } from '@xyflow/react';
-import { CardNode } from './CardNode';
+import { ThingNode } from './ThingNode';
 import { RoutedEdge } from './RoutedEdge';
 
 export * from './projection';
 export * from './elk';
-export { CardNode } from './CardNode';
+export { ThingNode } from './ThingNode';
 export {
   RoutedEdge,
   routedEdgeGeometry,
@@ -20,7 +20,7 @@ export type { GraphHudProps } from './GraphHud';
 
 /** Register the custom node type(s) with React Flow. */
 export const nodeTypes: NodeTypes = {
-  card: CardNode,
+  thing: ThingNode,
 };
 
 /** Register the custom edge type(s) with React Flow. */

@@ -12,7 +12,7 @@ import {
 import type { AuthoringRefusal } from '../src/space-authoring';
 
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
-const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const MISSING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 
 /** One transport sentence, so any copy that leaked it is visible as a collision. */
 const WIRE = 'the transport said this';
@@ -21,28 +21,28 @@ const WIRE = 'the transport said this';
 const EVERY_REFUSAL = {
   'placement-pending': { code: 'placement-pending' },
   'diagram-not-found': { code: 'diagram-not-found' },
-  'diagram-required': { code: 'diagram-required', operation: 'added-card-to-diagram' },
-  'card-not-found': { code: 'card-not-found' },
-  'card-kind-immutable': { code: 'card-kind-immutable' },
+  'diagram-required': { code: 'diagram-required', operation: 'added-thing-to-diagram' },
+  'thing-not-found': { code: 'thing-not-found' },
+  'thing-kind-immutable': { code: 'thing-kind-immutable' },
   'alias-target-immutable': { code: 'alias-target-immutable' },
-  'space-card-target-immutable': { code: 'space-card-target-immutable' },
-  'card-title-required': { code: 'card-title-required' },
+  'space-thing-target-immutable': { code: 'space-thing-target-immutable' },
+  'thing-title-required': { code: 'thing-title-required' },
   'diagram-title-required': { code: 'diagram-title-required' },
   'alias-target-not-found': { code: 'alias-target-not-found', targetId: TARGET_ID },
   'alias-target-must-own-content': { code: 'alias-target-must-own-content', targetId: TARGET_ID },
-  'card-already-in-diagram': { code: 'card-already-in-diagram' },
-  'card-not-in-diagram': { code: 'card-not-in-diagram' },
-  'card-not-expanded': { code: 'card-not-expanded' },
-  'card-has-aliases': { code: 'card-has-aliases', aliasTitles: ['Recap'] },
+  'thing-already-in-diagram': { code: 'thing-already-in-diagram' },
+  'thing-not-in-diagram': { code: 'thing-not-in-diagram' },
+  'thing-not-expanded': { code: 'thing-not-expanded' },
+  'thing-has-aliases': { code: 'thing-has-aliases', aliasTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },
   'diagram-must-keep-graph': { code: 'diagram-must-keep-graph' },
   'space-must-keep-diagram': { code: 'space-must-keep-diagram' },
   'graph-not-owned': { code: 'graph-not-owned' },
   'edge-not-found': { code: 'edge-not-found' },
-  'edge-card-outside-diagram': { code: 'edge-card-outside-diagram' },
+  'edge-thing-outside-diagram': { code: 'edge-thing-outside-diagram' },
   'edge-already-exists': { code: 'edge-already-exists' },
   'diagram-active-graph-required': { code: 'diagram-active-graph-required' },
-  'space-card-deletion-unsupported': { code: 'space-card-deletion-unsupported' },
+  'space-thing-deletion-unsupported': { code: 'space-thing-deletion-unsupported' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;
 
 /**
@@ -58,7 +58,7 @@ const EVERY_REFUSAL = {
  * no Target to keep, so that refusal names no field on this pane.
  */
 describe('New Alias creation places every refusal on the field that owns it', () => {
-  const onTheTitle: readonly AuthoringRefusal['code'][] = ['card-title-required'];
+  const onTheTitle: readonly AuthoringRefusal['code'][] = ['thing-title-required'];
   const onTheTarget: readonly AuthoringRefusal['code'][] = [
     'alias-target-not-found',
     'alias-target-must-own-content',
@@ -85,9 +85,9 @@ describe('describeAuthoringRefusal', () => {
     expect(
       describeAuthoringRefusal({
         code: 'placement-failed',
-        error: new Error('No position for Card A'),
+        error: new Error('No position for Thing A'),
       }),
-    ).toBe('This view could not place its Cards: No position for Card A');
+    ).toBe('This view could not place its Things: No position for Thing A');
   });
 });
 
@@ -98,17 +98,17 @@ describe('describeAuthoringRefusal', () => {
  * that names it; a stale Diagram, Graph or Edge belongs on the form, because no
  * choice in the picker would answer it (ADR 0057).
  */
-const CORRECTABLE_BY_CHOOSING_ANOTHER_CARD = [
-  'edge-card-outside-diagram',
+const CORRECTABLE_BY_CHOOSING_ANOTHER_THING = [
+  'edge-thing-outside-diagram',
   'edge-already-exists',
 ] as const;
 
 /** The same list, widened once so the loops below can ask it about any code. */
-const correctable: ReadonlySet<string> = new Set(CORRECTABLE_BY_CHOOSING_ANOTHER_CARD);
+const correctable: ReadonlySet<string> = new Set(CORRECTABLE_BY_CHOOSING_ANOTHER_THING);
 
 describe('presentEdgeEndpointRefusal', () => {
   it.each(['from', 'to'] as const)('marks only the attempted %s Field invalid', (endpoint) => {
-    for (const code of CORRECTABLE_BY_CHOOSING_ANOTHER_CARD) {
+    for (const code of CORRECTABLE_BY_CHOOSING_ANOTHER_THING) {
       const refusal = EVERY_REFUSAL[code];
       expect(presentEdgeEndpointRefusal(refusal, endpoint)).toEqual({
         fields: { [endpoint]: describeAuthoringRefusal(refusal) },
@@ -196,7 +196,7 @@ describe('describePersistenceFailure', () => {
    *
    * What it must not do is misdescribe the limit or the recovery. `MAX_COMMIT_
    * BODY_BYTES` is checked over the whole serialised snapshot, so a Space can
-   * exceed it on Card *count* with no long Card anywhere — and the rejection
+   * exceed it on Thing *count* with no long Thing anywhere — and the rejection
    * dialog offers only Continue editing, since `PersistenceNotice`, which owns
    * Retry, draws nothing for `rejected`.
    */
@@ -211,8 +211,8 @@ describe('describePersistenceFailure', () => {
     expect(description).not.toBe(
       'The application and the server disagree about how changes are saved.',
     );
-    // Not one Card: the limit is on the whole change.
-    expect(description).not.toMatch(/\ba (long )?card\b/i);
+    // Not one Thing: the limit is on the whole change.
+    expect(description).not.toMatch(/\ba (long )?thing\b/i);
     // Not a retry: this dialog has no such control.
     expect(description).not.toMatch(/try again|retry/i);
   });
@@ -258,9 +258,9 @@ describe('describeStoredSpaceRefusal', () => {
    */
   it('caps how many references it recites and says how many it left out', () => {
     const errors = Array.from({ length: 7 }, (_, index) => ({
-      kind: 'graph-edge-missing-card' as const,
+      kind: 'graph-edge-missing-thing' as const,
       ref: `00000000-0000-4000-8000-00000000000${index}`,
-      message: 'graph edge references unknown card',
+      message: 'graph edge references unknown thing',
     }));
 
     const description = describeStoredSpaceRefusal({ code: 'stored-space-invalid', errors });
@@ -275,15 +275,15 @@ describe('describeStoredSpaceRefusal', () => {
       code: 'stored-space-invalid',
       errors: [
         {
-          kind: 'graph-edge-missing-card',
-          ref: MISSING_CARD_ID,
-          message: 'graph edge references unknown card',
+          kind: 'graph-edge-missing-thing',
+          ref: MISSING_THING_ID,
+          message: 'graph edge references unknown thing',
         },
       ],
     });
 
     expect(description).toContain('The remote space is invalid and was not accepted');
-    expect(description).toContain(MISSING_CARD_ID);
-    expect(description).not.toContain('graph edge references unknown card');
+    expect(description).toContain(MISSING_THING_ID);
+    expect(description).not.toContain('graph edge references unknown thing');
   });
 });
