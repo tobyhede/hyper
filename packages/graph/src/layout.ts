@@ -18,7 +18,7 @@
  * consume.
  */
 
-import type { CardId, DiagramPosition } from '@project/core';
+import type { CardId } from '@project/core';
 import type { CardHandleSet, GraphRenderEdge } from './graph-rendering';
 
 /** A port on a card, by the handle id the render layer knows it by. */
@@ -41,25 +41,33 @@ export interface LayoutStrategyCard {
 }
 
 /**
+ * A coordinate a strategy computed. Engine output, not authored content: no
+ * author wrote one, no schema parses one, and nothing round-trips one to disk.
+ *
+ * Deliberately **not** `core`'s `DiagramPosition`, which is what an author
+ * stored in a Diagram. The two were one type until ADR 0083 split them, and the
+ * comment that used to stand here recorded why that was wrong while deferring
+ * the call: a constraint added to `diagramPositionSchema` for the sake of
+ * authored placement — a bound, an integer, a non-negative x — would have
+ * landed here too, silently, on geometry the constraint has nothing to say
+ * about. ADR 0038 said a point has one type and this does not reopen it; these
+ * were never one point.
+ */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
  * A routed span of an edge: where it starts, where it ends, and the corners it
  * turns through in between. Mirrors ELK's `ElkEdgeSection` — an orthogonal
  * back-edge routes *around* the cards as a channel rather than cutting straight
  * across them, and the bend points are how it does that.
- *
- * These points are computed by a strategy, and they are `core`'s
- * `DiagramPosition` — the same schema-derived type an author's Diagram stores.
- * That is what collapsing the duplicate point type ADR 0038 named bought, and it is worth
- * knowing which way the sharing runs: a constraint added to `diagramPositionSchema`
- * for the sake of authored placement (a bound, an integer, a non-negative x)
- * would land here too, on geometry no author wrote and no schema parses. The
- * schema is bare `{x, y}` today and nothing checks these against it. Constrain
- * authored positions somewhere that only authored positions pass through, or
- * split the two again deliberately.
  */
 export interface LayoutStrategyEdgeSection {
-  startPoint: DiagramPosition;
-  endPoint: DiagramPosition;
-  bendPoints?: DiagramPosition[];
+  startPoint: Point;
+  endPoint: Point;
+  bendPoints?: Point[];
 }
 
 export interface LayoutStrategyEdge {

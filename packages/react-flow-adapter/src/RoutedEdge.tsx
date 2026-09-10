@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import { BaseEdge, getBezierPath, type Edge, type EdgeProps } from '@xyflow/react';
-import type { DiagramPosition, GraphId } from '@project/core';
+import type { GraphId } from '@project/core';
+import type { Point } from '@project/graph';
 
 /**
  * React Flow custom edge that draws the polyline ELK routed, not a bezier.
@@ -22,7 +23,7 @@ import type { DiagramPosition, GraphId } from '@project/core';
 export type RoutedEdgeData = {
   graphId: GraphId;
   /** ELK's routed path, start → bends → end. Absent until a routing strategy runs. */
-  points?: DiagramPosition[];
+  points?: Point[];
 };
 
 /**
@@ -37,7 +38,7 @@ function roundCoordinate(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-function polyline(points: DiagramPosition[]): string {
+function polyline(points: Point[]): string {
   return points
     .map(
       (point, index) =>
@@ -48,7 +49,7 @@ function polyline(points: DiagramPosition[]): string {
 
 /** Where a routed polyline reads as its middle: the point half its length along,
  *  interpolated within whichever segment spans it rather than snapped to a bend. */
-function polylineMidpoint(points: DiagramPosition[]): DiagramPosition {
+function polylineMidpoint(points: Point[]): Point {
   const lengths = points.map((point, index) => {
     const previous = points[index - 1];
     if (previous === undefined) return 0;

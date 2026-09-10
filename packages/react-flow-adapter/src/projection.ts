@@ -5,7 +5,7 @@ import type {
   CanvasSpaceCardSelection,
   EntityActionGroup,
 } from '@project/ui';
-import type { Card, CardId, DiagramPosition, GraphId } from '@project/core';
+import type { Card, CardId, GraphId } from '@project/core';
 import { inHandleId, outHandleId, resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
@@ -14,6 +14,7 @@ import type {
   LayoutStrategyCard,
   LayoutStrategyEdge,
   LayoutStrategyGraph,
+  Point,
   Space,
 } from '@project/graph';
 import type { RoutedEdgeData } from './RoutedEdge';
@@ -460,9 +461,9 @@ export interface ProjectGraphEdgesOptions {
 }
 
 /** Flatten an edge's routed sections into one point list: start → bends → end. */
-function routedPoints(edge: LayoutStrategyEdge | undefined): DiagramPosition[] | undefined {
+function routedPoints(edge: LayoutStrategyEdge | undefined): Point[] | undefined {
   if (!edge?.sections?.length) return undefined;
-  const points: DiagramPosition[] = [];
+  const points: Point[] = [];
   for (const section of edge.sections) {
     points.push(section.startPoint, ...(section.bendPoints ?? []), section.endPoint);
   }

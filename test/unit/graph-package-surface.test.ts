@@ -82,6 +82,7 @@ const OFFERED_TYPES = [
   'NewSpace',
   'ParseCardFileResult',
   'ParseImportCardFileResult',
+  'Point',
   'OwnedGraph',
   'ResolvedContentCard',
   'ResolvedDiagram',

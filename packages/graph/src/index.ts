@@ -51,6 +51,7 @@ export type {
   LayoutStrategyGraph,
   LayoutStrategyPort,
   LayoutStrategy,
+  Point,
 } from './layout';
 
 // `resolveContentCard` is the only function here: identity lookup is reached
