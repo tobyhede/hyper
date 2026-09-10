@@ -20,6 +20,7 @@ import {
 } from '@xyflow/react';
 import {
   SPACE_CARD_EMBED_INSET,
+  titleName,
   uuidSchema,
   type LayoutPosition,
   type LayoutId,
@@ -1025,7 +1026,7 @@ export function SpaceCanvas({
           ? []
           : [
               <span key={parent.id} role="alert" className="canvas-refusal">
-                {`${parent.data.title}: ${message}`}
+                {`${titleName(parent.data.title)}: ${message}`}
               </span>,
             ];
       })}

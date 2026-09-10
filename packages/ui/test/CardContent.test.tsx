@@ -16,6 +16,20 @@ describe('CardContent', () => {
   });
 
   /**
+   * The Title ladder is the Card front's and nothing else's (ADR 0083). A
+   * presented Card is a different surface with a different frame around it, so
+   * it draws the Card's **name** — and a heading is a single line of text
+   * whatever the string handed to it contains, so a Title reaching one whole
+   * would draw its lines run together with a space between them.
+   */
+  it('heads a presented Card with the Card’s name', () => {
+    render(<CardContent title={'Auth\nHow a session begins'} markdown="Body." />);
+
+    expect(screen.getByRole('heading', { name: 'Auth' })).toBeInTheDocument();
+    expect(screen.queryByText(/How a session begins/u)).toBeNull();
+  });
+
+  /**
    * The HTML goes in through `dangerouslySetInnerHTML`, so what `marked` emits
    * reaches the DOM. `marked` has had no `sanitize` option since v5 and passes
    * inline HTML through verbatim, which made every one of these live.

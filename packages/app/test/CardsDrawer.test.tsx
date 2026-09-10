@@ -148,6 +148,34 @@ describe('CardsDrawer', () => {
     expect(screen.queryByRole('button', { name: 'Add Alpha to Layout' })).not.toBeInTheDocument();
   });
 
+  /**
+   * A row names the Card it adds, so it names it by the Card's **name** — while
+   * the search behind it still reads the whole Title (ADR 0083).
+   *
+   * The two halves are the same division `CardSearchCombobox` makes and for the
+   * same reason: an author's recall does not respect which line they typed a
+   * word on, and a control called `Add Auth\nHow a session begins to Layout` is
+   * a broken-looking label.
+   */
+  it('adds a Card by name and finds it by any line of its Title', async () => {
+    const laddered: readonly Card[] = [
+      { id: id('000000000005'), title: 'Auth\nHow a session begins', kind: 'markdown', body: '' },
+      ...CARDS,
+    ];
+    render(<Fixture cards={laddered} allCards={laddered} />);
+    await openDrawer();
+
+    expect(screen.getByRole('button', { name: 'Add Auth to Layout' })).toBeVisible();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search cards' }), {
+      target: { value: 'session begins' },
+    });
+
+    expect(cardButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Add Auth to Layout',
+    ]);
+  });
+
   it('keeps an authoring refusal in the drawer that asked for the Card', async () => {
     render(<Fixture onAdd={() => 'This Card is no longer available.'} />);
     await openDrawer();

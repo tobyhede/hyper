@@ -41,6 +41,12 @@ const CHOICES: readonly CardChoice[] = [
   { id: CARD_C, title: 'Gamma', kind: 'markdown', refusal: 'That Edge already exists.' },
 ];
 
+/** A Card whose Title runs to more than one line (ADR 0083). */
+const LADDERED: readonly CardChoice[] = [
+  { id: CARD_A, title: 'Auth\nHow a session begins\nOAuth only', kind: 'markdown' },
+  { id: CARD_B, title: 'Beta', kind: 'markdown' },
+];
+
 function open(onValueChange = vi.fn()) {
   render(
     <CardSearchCombobox
@@ -180,5 +186,48 @@ describe('CardSearchCombobox', () => {
       'aria-describedby',
       'target-error',
     );
+  });
+
+  /**
+   * The one surface where a Card's name and its Title come apart (ADR 0083).
+   * An author's recall does not respect which line they typed a word on, so a
+   * word from a subtitle finds the Card — while the row and the field still say
+   * the name, because a newline in a row draws as a broken-looking label.
+   */
+  describe('a Title written on more than one line', () => {
+    it('shows the Card’s name in the field and in the row', () => {
+      render(
+        <CardSearchCombobox
+          label="Target"
+          choices={LADDERED}
+          value={CARD_A}
+          onValueChange={() => undefined}
+        />,
+      );
+
+      const field = screen.getByRole('combobox', { name: 'Target' });
+      expect(field).toHaveValue('Auth');
+
+      fireEvent.keyDown(field, { key: 'ArrowDown' });
+      expect(screen.getByRole('option', { name: 'Markdown Card Auth' })).toBeInTheDocument();
+    });
+
+    it('finds the Card by a word from a line below the name', () => {
+      render(
+        <CardSearchCombobox
+          label="Target"
+          choices={LADDERED}
+          value={null}
+          onValueChange={() => undefined}
+        />,
+      );
+
+      const field = screen.getByRole('combobox', { name: 'Target' });
+      fireEvent.keyDown(field, { key: 'ArrowDown' });
+      fireEvent.change(field, { target: { value: 'session' } });
+
+      expect(screen.getByRole('option', { name: 'Markdown Card Auth' })).toBeInTheDocument();
+      expect(screen.queryByRole('option', { name: /Beta/ })).not.toBeInTheDocument();
+    });
   });
 });

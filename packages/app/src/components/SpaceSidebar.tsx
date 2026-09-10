@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import {
+  titleName,
   type Card,
   type Graph,
   type GraphId,
@@ -209,11 +210,12 @@ const DELETION_DESCRIPTIONS = {
 } satisfies Record<Card['kind'], string>;
 
 function DeleteCardControl({
-  title,
+  name,
   kind,
   onDelete,
 }: {
-  readonly title: string;
+  /** The Card's name, which is how a control names a Card (ADR 0083). */
+  readonly name: string;
   readonly kind: Card['kind'];
   readonly onDelete: () => string | null | Promise<string | null>;
 }) {
@@ -238,11 +240,11 @@ function DeleteCardControl({
       <AlertDialogTrigger
         render={<Button variant="destructive" size="compact" className="w-full" />}
       >
-        Delete Card {title}
+        Delete Card {name}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Card {title}?</AlertDialogTitle>
+          <AlertDialogTitle>Delete Card {name}?</AlertDialogTitle>
           <AlertDialogDescription>{DELETION_DESCRIPTIONS[kind]}</AlertDialogDescription>
         </AlertDialogHeader>
         {refusal === null ? null : (
@@ -851,7 +853,7 @@ export function SpaceSidebar({
                 <EntityActionsRow
                   entity={{ kind: 'card', card: selectedCard.card, layout: canvas.selected }}
                   entityActions={canvasAwareEntityActions}
-                  label={`Actions for Card ${selectedCard.card.title}`}
+                  label={`Actions for Card ${titleName(selectedCard.card.title)}`}
                   editing={false}
                 >
                   <SidebarMenuButton
@@ -860,14 +862,17 @@ export function SpaceSidebar({
                     data-card={selectedCard.card.id}
                   >
                     <CardKindIcon kind={selectedCard.card.kind} />
-                    <span>{selectedCard.card.title}</span>
+                    {/* The Card's name. The Sidebar lists Cards; the ladder
+                        below the name is drawn on the Card front and nowhere
+                        else (ADR 0083). */}
+                    <span>{titleName(selectedCard.card.title)}</span>
                   </SidebarMenuButton>
                 </EntityActionsRow>
               </SidebarMenuItem>
             </SidebarMenu>
             {selectedCard.onDelete !== undefined && (
               <DeleteCardControl
-                title={selectedCard.card.title}
+                name={titleName(selectedCard.card.title)}
                 kind={selectedCard.card.kind}
                 /* `onCanvas` by hand rather than by the helper: only a
                    *completed* Delete has a canvas result to dismiss the sheet

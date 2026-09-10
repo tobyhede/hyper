@@ -1,8 +1,15 @@
 import { useMemo } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { titleName } from '@project/core';
 
 export interface CardContentProps {
+  /**
+   * The Card's Title, whole. Presenting draws its **name** — the first line —
+   * because the Title ladder belongs to the Card front and nothing else
+   * (ADR 0083), and a presented Card is a different surface with a different
+   * frame around it.
+   */
   title: string;
   markdown: string;
 }
@@ -59,7 +66,7 @@ export function RenderedMarkdown({ markdown, className }: RenderedMarkdownProps)
 export function CardContent({ title, markdown }: CardContentProps) {
   return (
     <article className="card card--full" data-testid="card-content">
-      <h2 className="card__title">{title}</h2>
+      <h2 className="card__title">{titleName(title)}</h2>
       <RenderedMarkdown className="card__body" markdown={markdown} />
     </article>
   );

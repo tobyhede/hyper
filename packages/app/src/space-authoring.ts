@@ -10,6 +10,7 @@ import {
   type LayoutId,
   type LayoutPosition,
   type SpaceSnapshot,
+  titleName,
   type UUID,
 } from '@project/core';
 import {
@@ -243,6 +244,7 @@ export type AuthoringRefusal =
   | { readonly code: 'card-not-expanded' }
   | {
       readonly code: 'card-has-aliases';
+      /** The Aliases by **name**, which is what a sentence listing Cards says (ADR 0083). */
       readonly aliasTitles: readonly string[];
     }
   | { readonly code: 'graph-title-required' }
@@ -1187,7 +1189,9 @@ export function createSpaceAuthoring({
       if (incoming.length > 0) {
         return refuse({
           code: 'card-has-aliases',
-          aliasTitles: incoming.map((alias) => alias.document.title),
+          // Named, not Titled: the wording joins these into one sentence, and
+          // a Title's later lines would break the list across it (ADR 0083).
+          aliasTitles: incoming.map((alias) => titleName(alias.document.title)),
         });
       }
       // Deferred like a creation so the complete Layout changes atomically.
