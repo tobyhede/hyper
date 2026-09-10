@@ -378,8 +378,12 @@ test(
 
     const failure = page.getByTestId('persistence-failure');
     await expect(failure).toBeVisible();
-    // The sentence is the transport's own, carried through unchanged.
-    await expect(failure).toContainText('The space could not be reached.');
+    // **The sentence is the application's, not the transport's** (ADR 0057).
+    // The story's failure carries `message: 'The space could not be reached.'`
+    // and that string reaches no surface: `problem.detail` and a thrown
+    // `Error`'s text are diagnostics, and `authoring-refusal.ts` owns what the
+    // author reads, keyed by the stable code — here `network`.
+    await expect(failure).toContainText('Your device could not reach the server.');
     // Beside, never inside.
     await expect(surface(page).getByTestId('persistence-failure')).toHaveCount(0);
     await expect(dock(page).getByTestId('persistence-failure')).toHaveCount(1);
@@ -419,7 +423,9 @@ test(
     await expect(
       page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' }),
     ).toBeVisible();
-    await expect(page.getByText('Permission denied')).toBeVisible();
+    // `forbidden`'s application-owned sentence, for the reason above: the
+    // story's `message: 'Permission denied'` is the wire's and is never drawn.
+    await expect(page.getByText('You do not have permission to save this space.')).toBeVisible();
     await page.getByRole('button', { name: 'Continue editing' }).click();
     await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
   },

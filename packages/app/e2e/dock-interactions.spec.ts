@@ -66,6 +66,14 @@ test(
     // Middle item is the left edge's midpoint.
     await page.getByRole('menuitemradio', { name: 'Middle', exact: true }).nth(1).click();
     await expect(dock(page)).toHaveAttribute('data-orientation', 'vertical');
+    // **The grip's own menu has to be gone before the next trigger is pressed.**
+    // At most one Dock disclosure is open at a time — one open id under the
+    // whole row — so a press landing while the slot menu is still closing is an
+    // *outside* press, which Base UI spends on the dismissal, and the menu this
+    // asks for never opens. The assertions above usually cover the gap and that
+    // is exactly the problem: this failed on CI's first attempt and passed on
+    // retry #1, which `failOnFlakyTests` correctly refuses to call a pass.
+    await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(page.getByTestId('space-title')).toHaveText('Layout fixture');
     await expect(page.getByTestId('selected-canvas')).toHaveText('Collection 1');
     await expect(page.getByTestId('active-graph')).toHaveText('Long');
