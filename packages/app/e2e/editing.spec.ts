@@ -1,3 +1,10 @@
+import {
+  COLLAPSED_CARD_SIZE,
+  DEFAULT_OPEN_SIZE,
+  encodeCompactUuid,
+  uuidSchema,
+  type CardPlacement,
+} from '@project/core';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
@@ -28,6 +35,7 @@ import {
   settled,
   viewportTransform,
 } from './graph';
+import { seedPositionedLayout } from './seed';
 
 /**
  * The barrier a *negative* assertion needs.
@@ -576,6 +584,259 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   }
 });
 
+/* -------------------------------------------------------------------------- */
+/* Displacement is applied by the Edit that causes it (ADR 0084)               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The room an Open Card makes for itself: its Open rect less the Closed one.
+ *
+ * Arithmetic over the domain's own two constants rather than the numbers they
+ * currently are, so a change to either size moves these tests with it instead of
+ * leaving them asserting a stale offset.
+ */
+const OPEN_GROWTH = {
+  width: DEFAULT_OPEN_SIZE.width - COLLAPSED_CARD_SIZE.width,
+  height: DEFAULT_OPEN_SIZE.height - COLLAPSED_CARD_SIZE.height,
+} as const;
+
+/**
+ * The fixture Cards the three geometries below place, by id and by title.
+ *
+ * Placed by id and read back by id, so none of this depends on the order
+ * `snapshot.cards` happens to arrive in; the titles are the fixture's own, and
+ * are what a Card's own controls are named for.
+ */
+const SUBJECT = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000002'), title: 'A' };
+const NEIGHBOUR = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'), title: 'B' };
+const BEHIND = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000005'), title: 'C' };
+
+/**
+ * Open the Space in a Layout whose geometry the test states.
+ *
+ * The tracked fixture's Layout is ELK-seeded, so a test written against it would
+ * be reverse-engineering coordinates it never chose — and every claim below is
+ * about a distance between two Cards. Seeding goes through the same HTTP
+ * boundary the browser uses, so the Layout the app opens is the one written
+ * here.
+ */
+async function seedGeometry(
+  page: Page,
+  title: string,
+  positions: Record<string, CardPlacement>,
+): Promise<void> {
+  const seeded = await seedPositionedLayout(page, title, () => positions);
+  await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
+  await expect(selectedCanvas(page)).toContainText(title);
+  await settled(page);
+}
+
+/** The node React Flow drew for one seeded Card. */
+const seededNode = (page: Page, card: { readonly id: string }): Locator =>
+  page.locator(`.react-flow__node[data-id="${card.id}"]`);
+
+/**
+ * One seeded Card's position out of a frame `allPositions` read.
+ *
+ * Required rather than optional: a Card that is not on the canvas is a broken
+ * seed, and saying so here beats an assertion against `undefined` several lines
+ * later.
+ */
+function at(
+  positions: Record<string, { x: number; y: number }>,
+  card: { readonly id: string; readonly title: string },
+): { x: number; y: number } {
+  const position = positions[card.id];
+  if (position === undefined) throw new Error(`Card ${card.title} is not on the canvas.`);
+  return position;
+}
+
+/**
+ * The first of ADR 0084's two reported defects: an Open Card's size deciding
+ * where its neighbours are drawn.
+ *
+ * The neighbour is before the subject on both axes, so opening the subject
+ * displaces nothing and what follows is about the drag alone. The rule is
+ * per-axis, so the geometry only has to cross one: the Cards are a hundred and
+ * twenty apart on `x` and far enough apart on `y` never to overlap, and a short
+ * drag leftwards carries the subject across the neighbour's `x` and nothing
+ * else. That is the discontinuity ADR 0084 measured — the derived rule answered
+ * the crossing by moving the neighbour a whole growth-step sideways, and moved
+ * it back on the return. `whileDragging` is what makes the mid-gesture frame visible at
+ * all, and the delta is chosen so the halfway move is already past the crossing.
+ */
+test('dragging an Open Card across a neighbour moves nothing but the dragged Card', async ({
+  page,
+}) => {
+  // Apart on `y` by more than a Card's height, so the two never overlap and
+  // the drag below crosses `x` alone.
+  await seedGeometry(page, 'Drag Geometry', {
+    [SUBJECT.id]: { x: 120, y: 400, open: false },
+    [NEIGHBOUR.id]: { x: 0, y: 0, open: false },
+  });
+  const subject = seededNode(page, SUBJECT);
+
+  await openCard(subject, SUBJECT.title);
+  await expect(subject.getByRole('button', { name: `Close Card ${SUBJECT.title}` })).toBeVisible();
+  await settled(page);
+
+  // The resting frame, read before any pointer goes down. Everything below is
+  // measured against it, including whether the drag started at all.
+  const resting = await allPositions(page);
+  expect(at(resting, SUBJECT)).toEqual({ x: 120, y: 400 });
+  expect(at(resting, NEIGHBOUR)).toEqual({ x: 0, y: 0 });
+
+  const neighbourStill = async (): Promise<void> => {
+    const midGesture = await allPositions(page);
+    expect(at(midGesture, NEIGHBOUR), 'the neighbour moved mid-drag').toEqual(
+      at(resting, NEIGHBOUR),
+    );
+  };
+
+  // 280 puts the halfway move at x = -20, already past the neighbour's origin,
+  // which is where the derived rule used to fire.
+  await dragBy(page, subject, -280, 0, neighbourStill);
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  const crossed = await allPositions(page);
+  expect(at(crossed, SUBJECT).x, 'the drag never started').toBeCloseTo(
+    at(resting, SUBJECT).x - 280,
+    -1,
+  );
+  expect(at(crossed, SUBJECT).y).toBeCloseTo(at(resting, SUBJECT).y, -1);
+  expect(at(crossed, NEIGHBOUR), 'the neighbour moved at release').toEqual(at(resting, NEIGHBOUR));
+
+  // And back. The return crosses the same origin the other way, so a rule that
+  // fired on the way out fires again here.
+  await dragBy(page, subject, 280, 0, neighbourStill);
+
+  const returned = await allPositions(page);
+  expect(at(returned, SUBJECT).x).toBeCloseTo(at(resting, SUBJECT).x, -1);
+  expect(at(returned, NEIGHBOUR), 'the neighbour moved on the return').toEqual(
+    at(resting, NEIGHBOUR),
+  );
+});
+
+/**
+ * The second reported defect: a drop the old inverse could not answer for.
+ *
+ * `Placement.authoredPoint` inverted a derivation that is not onto — no authored
+ * coordinate drew inside an Open Card's growth — so a drop that landed in that
+ * band was answered with the near side, and the Card settled on the Open Card's
+ * origin instead of where the author released it. The band was one growth-step
+ * wide beginning at that origin, so this drops half a step into it on both axes.
+ */
+test('a closed Card released inside an Open Card lands at the drop point', async ({ page }) => {
+  await seedGeometry(page, 'Drop Geometry', {
+    [SUBJECT.id]: { x: 150, y: 150, open: false },
+    [NEIGHBOUR.id]: { x: 0, y: 0, open: false },
+  });
+  const subject = seededNode(page, SUBJECT);
+  const mover = seededNode(page, NEIGHBOUR);
+
+  await openCard(subject, SUBJECT.title);
+  await expect(subject.getByRole('button', { name: `Close Card ${SUBJECT.title}` })).toBeVisible();
+  await settled(page);
+
+  // The resting frame, before the pointer goes down.
+  const resting = await allPositions(page);
+  const open = at(resting, SUBJECT);
+  const from = at(resting, NEIGHBOUR);
+  expect(open).toEqual({ x: 150, y: 150 });
+  expect(from).toEqual({ x: 0, y: 0 });
+
+  // Inside the Open Card's drawn box, and inside the band: half a growth-step
+  // beyond its origin on each axis.
+  const dropAt = { x: open.x + OPEN_GROWTH.width / 2, y: open.y + OPEN_GROWTH.height / 2 };
+  const openBox = await boxOf(subject, 'the Open Card');
+  await dragBy(page, mover, dropAt.x - from.x, dropAt.y - from.y);
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  // Drawn inside the Open Card, which is the premise the flow-space assertions
+  // below rest on — and the thing the clamp made unreachable, since a Card it
+  // answered for came to rest on the Open Card's own top-left corner.
+  const moverBox = await boxOf(mover, 'the dropped Card');
+  expect(moverBox.x).toBeGreaterThan(openBox.x);
+  expect(moverBox.y).toBeGreaterThan(openBox.y);
+  expect(moverBox.x).toBeLessThan(openBox.x + openBox.width);
+  expect(moverBox.y).toBeLessThan(openBox.y + openBox.height);
+
+  const landed = await allPositions(page);
+  expect(at(landed, NEIGHBOUR).x - from.x, 'the drag never started').toBeGreaterThan(
+    OPEN_GROWTH.width / 4,
+  );
+  // Where it was released, not the Open Card's origin.
+  expect(at(landed, NEIGHBOUR).x).toBeCloseTo(dropAt.x, -1);
+  expect(at(landed, NEIGHBOUR).y).toBeCloseTo(dropAt.y, -1);
+  expect(at(landed, SUBJECT), 'the Open Card moved').toEqual(open);
+});
+
+/**
+ * Once, and then not again (ADR 0084).
+ *
+ * Opening writes the room it takes into the Layout, so the neighbour beyond the
+ * subject on both axes moves by the growth and the Card behind it on both axes
+ * does not move at all. From then on those are authored positions like any
+ * other: dragging the Open Card past the neighbour is not a second Open, and the
+ * room stays where the Open Edit put it. Under the derived rule the neighbour
+ * came back to its authored point the moment the subject was dragged beyond it.
+ */
+test('opening a Card displaces its neighbours once, and dragging it never displaces them again', async ({
+  page,
+}) => {
+  await seedGeometry(page, 'Open Geometry', {
+    [SUBJECT.id]: { x: 0, y: 0, open: false },
+    [NEIGHBOUR.id]: { x: 300, y: 250, open: false },
+    [BEHIND.id]: { x: -200, y: -150, open: false },
+  });
+  const subject = seededNode(page, SUBJECT);
+  const closed = await allPositions(page);
+
+  await openCard(subject, SUBJECT.title);
+  await expect(subject.getByRole('button', { name: `Close Card ${SUBJECT.title}` })).toBeVisible();
+  await settled(page);
+
+  const opened = await allPositions(page);
+  expect(at(opened, SUBJECT), 'the opening Card moved').toEqual(at(closed, SUBJECT));
+  expect(at(opened, NEIGHBOUR)).toEqual({
+    x: at(closed, NEIGHBOUR).x + OPEN_GROWTH.width,
+    y: at(closed, NEIGHBOUR).y + OPEN_GROWTH.height,
+  });
+  // Strictly before the subject on both axes, so it takes no room at all.
+  expect(at(opened, BEHIND)).toEqual(at(closed, BEHIND));
+
+  const roomKept = async (): Promise<void> => {
+    const midGesture = await allPositions(page);
+    expect(at(midGesture, NEIGHBOUR), 'the neighbour moved mid-drag').toEqual(
+      at(opened, NEIGHBOUR),
+    );
+    expect(at(midGesture, BEHIND), 'the Card behind moved mid-drag').toEqual(at(opened, BEHIND));
+  };
+
+  // Past the neighbour's *authored* origin on both axes, which is the crossing
+  // the derived rule reversed at.
+  await dragBy(page, subject, 340, 280, roomKept);
+
+  const dragged = await allPositions(page);
+  expect(at(dragged, SUBJECT).x, 'the drag never started').toBeCloseTo(
+    at(opened, SUBJECT).x + 340,
+    -1,
+  );
+  expect(at(dragged, SUBJECT).y, 'the drag never started').toBeCloseTo(
+    at(opened, SUBJECT).y + 280,
+    -1,
+  );
+  expect(at(dragged, NEIGHBOUR), 'the neighbour moved at release').toEqual(at(opened, NEIGHBOUR));
+  expect(at(dragged, BEHIND), 'the Card behind moved at release').toEqual(at(opened, BEHIND));
+
+  await dragBy(page, subject, -340, -280, roomKept);
+
+  const returned = await allPositions(page);
+  expect(at(returned, SUBJECT).x).toBeCloseTo(at(opened, SUBJECT).x, -1);
+  expect(at(returned, NEIGHBOUR)).toEqual(at(opened, NEIGHBOUR));
+  expect(at(returned, BEHIND)).toEqual(at(opened, BEHIND));
+});
+
 test(
   'selecting Layouts is navigation and does not persist',
   { tag: '@parity:command-dock-marks-one-current-layout' },
@@ -817,7 +1078,17 @@ test(
         card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
       )
       .toBeGreaterThan(beforeSize.width);
-    await expect.poll(async () => positionOf(neighbour)).not.toEqual(beforeNeighbourPosition);
+    // The neighbour does **not** move while the pointer is down (ADR 0084).
+    // The draft previews the resizing Card's own rect and nothing else, so
+    // every other Card is drawn from the authored placement until the Edit
+    // lands. This read alone would also pass if the Card were simply at rest,
+    // so it is the pair with the assertion after release — where the neighbour
+    // is required to have moved — that says the room is taken at the Edit and
+    // not at the frame.
+    await expect.poll(async () => positionOf(neighbour)).toEqual(beforeNeighbourPosition);
+    // The Edge does move, and it is the resizing Card's own growth that moves
+    // it: A's handles travel with its rect, so the curve is redrawn from the
+    // live draft while B stays exactly where it was authored.
     await expect.poll(async () => edgePath.getAttribute('d')).not.toBe(beforeEdgePath);
     await expect(card.locator('.canvas-card__rail')).toHaveCSS('opacity', '0');
     await expect(card.locator('.rf-card-node__authoring-handle--source').first()).toHaveCSS(
@@ -849,7 +1120,13 @@ test(
     // The authored top-left origin is unchanged: only the box grew.
     expect(await positionOf(card)).toEqual(beforePosition);
 
+    // Released, and only now does the neighbour take the room: the completed
+    // Resize applied the difference between the old growth and the new one and
+    // wrote B's position into the Layout (ADR 0084). This is the other half of
+    // the mid-gesture assertion above — together they place the movement at the
+    // Edit rather than at the frame.
     const afterNeighbourPosition = await positionOf(neighbour);
+    expect(afterNeighbourPosition).not.toEqual(beforeNeighbourPosition);
     const afterEdgePath = await edgePath.getAttribute('d');
     const completedRevision = await persistence.getAttribute('data-revision');
     const secondBox = await boxOf(control, "Card A's resize control after completion");

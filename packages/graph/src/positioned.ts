@@ -1,5 +1,5 @@
 import type { LayoutStrategyGraph, LayoutStrategy } from './layout';
-import { Placement } from './placement';
+import type { Placement } from './placement';
 
 /**
  * The positioned strategy: the cards go where the author put them.
@@ -8,9 +8,13 @@ import { Placement } from './placement';
  * computing it — placement is authored content, not an artifact of an algorithm
  * (ADR 0025). It is the one strategy with a **Layout** behind it: the Placement
  * it takes is that Layout's, and `Placement.fromLayoutStrategyGraph` is this same
- * conversion run backwards. Like `gridStrategy` it consumes only the cards: it never looks at
- * the edges, places no ports, and populates no edge sections, leaving the render
- * layer to spread handles evenly and draw a plain curve. If this file ever needs
+ * conversion run backwards. The Placement is read exactly as authored — an Open
+ * Card's neighbours were moved by the Edit that opened it (ADR 0084), so there
+ * is no derived layer between those positions and the ones drawn, and this reads
+ * an Open Card's rect off its own entry alone. Like `gridStrategy` it consumes
+ * only the cards: it never looks at the edges, places no ports, and populates no
+ * edge sections, leaving the render layer to spread handles evenly and draw a
+ * plain curve. If this file ever needs
  * to know about ports or routing, the seam has leaked.
  *
  * Positions are deliberately **sparse**. A space can hold several positioned
@@ -24,10 +28,9 @@ export function positionedStrategy(positions: Placement): LayoutStrategy {
   // Uniformly-async contract (ADR 0005); there is nothing to await.
   // eslint-disable-next-line @typescript-eslint/require-await
   return async (strategyGraph: LayoutStrategyGraph): Promise<LayoutStrategyGraph> => {
-    const drawn = Placement.drawn(positions);
     return {
       cards: strategyGraph.cards.flatMap((card) => {
-        const at = drawn.get(card.id);
+        const at = positions.get(card.id);
         return at === undefined
           ? []
           : [

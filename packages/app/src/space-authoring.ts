@@ -1,6 +1,7 @@
 import {
   type CardDocument,
   type CardId,
+  type CardPlacement,
   COLLAPSED_CARD_SIZE,
   DEFAULT_OPEN_SIZE,
   DEFAULT_SPACE_CARD_OPEN_SIZE,
@@ -485,6 +486,79 @@ const freeAnchor = (placement: Placement, anchor: LayoutPosition): LayoutPositio
   }
   return at;
 };
+
+/**
+ * A width and a height together: an Open Size, the collapsed constant, or the
+ * difference between two growths. Local, and shaped as `Placement.growth`'s own
+ * parameter is, because none of the three is a domain entity.
+ */
+type Extent = { readonly width: number; readonly height: number };
+
+/**
+ * The room a Card's neighbours gain when its rect goes from one size to
+ * another: the difference between the two growths, per axis (ADR 0084).
+ *
+ * Negative on an axis the Card shrank on, which is legitimate. It is the whole
+ * of a shrinking Resize, and it is also the whole of Close — the collapsed
+ * rect's growth is zero, so closing is simply the move to it. That is why Close
+ * and the magnetic snap (ADR 0066) share one code path below rather than each
+ * stating the rule: a second copy is exactly where a snapped Close comes to
+ * reclaim the collapsed proposal's zero growth instead of the growth of the
+ * size the Card was actually Open at.
+ *
+ * The nonnegative bound `Placement.growth` documents is about the Open/Close
+ * pair, not about this difference. Every negative room produced here reverses
+ * part of a growth a previous Edit already applied, so the Cards it reclaims
+ * from are still beyond the subject when it runs.
+ */
+const roomBetween = (from: Extent, to: Extent): Extent => {
+  const before = Placement.growth(from);
+  const after = Placement.growth(to);
+  return { width: after.width - before.width, height: after.height - before.height };
+};
+
+/**
+ * The placement after a Card's own entry changes and the room it holds changes
+ * with it: one Edit, and the whole of displacement at the Edit (ADR 0084).
+ *
+ * **Order.** The entry is written first and the displacement runs over the
+ * result. The coordinates are the same either way, because `displace` compares
+ * every neighbour against the *subject's* `x`/`y` and neither writing the entry
+ * nor displacing moves the subject. But `place` and `displace` each answer a
+ * new map, so one of them has to be second, and it must be the one that has to
+ * see the whole map — the displacement. Writing the entry first also settles
+ * what `displace` needs in order to do anything at all: it answers the
+ * placement unchanged for a subject the map does not hold, and after `place`
+ * the subject is certainly held.
+ */
+const withRoomFor = (
+  placement: Placement,
+  cardId: CardId,
+  at: CardPlacement,
+  room: Extent,
+): Placement => Placement.displace(Placement.place(placement, cardId, at), cardId, room);
+
+/**
+ * The placement after a Card Closes: Closed on its own entry, and the whole
+ * growth of the size it was Open at given back to every Card beyond it.
+ *
+ * Both ways a Card closes end here — the Close completion, and a resize
+ * proposal the magnet has taken to the collapsed size (ADR 0066) — so the rule
+ * has one statement. The remembered Open Size rides through untouched
+ * (ADR 0066), which is what makes the next Open apply exactly what this gives
+ * back.
+ */
+const closedCard = (
+  placement: Placement,
+  cardId: CardId,
+  at: Extract<CardPlacement, { readonly open: true }>,
+): Placement =>
+  withRoomFor(
+    placement,
+    cardId,
+    { ...at, open: false },
+    roomBetween(at.openSize, COLLAPSED_CARD_SIZE),
+  );
 
 /** Two Edges are the same Edge when they join the same Cards the same way (ADR 0032). */
 const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>
@@ -1122,23 +1196,28 @@ export function createSpaceAuthoring({
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
       if (at.open) return UNCHANGED;
-      completedPlacement = Placement.place(completedPlacement, completion.cardId, {
-        ...at,
-        open: true,
-        openSize:
-          at.openSize ??
-          (space.lookup.card(completion.cardId)?.kind === 'space'
-            ? DEFAULT_SPACE_CARD_OPEN_SIZE
-            : DEFAULT_OPEN_SIZE),
-      });
+      // The size the Card is actually opening at: the one it remembers, or the
+      // default for its kind. The room it takes is that size's growth, so the
+      // Close that reverses this reads the same number back off the entry.
+      const openSize =
+        at.openSize ??
+        (space.lookup.card(completion.cardId)?.kind === 'space'
+          ? DEFAULT_SPACE_CARD_OPEN_SIZE
+          : DEFAULT_OPEN_SIZE);
+      completedPlacement = withRoomFor(
+        completedPlacement,
+        completion.cardId,
+        { ...at, open: true, openSize },
+        Placement.growth(openSize),
+      );
     } else if (completion.kind === 'closed-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
       if (!at.open) return UNCHANGED;
-      completedPlacement = Placement.place(completedPlacement, completion.cardId, {
-        ...at,
-        open: false,
-      });
+      // Read as the Layout stands, with no record of who this Card's Open
+      // pushed: everything currently beyond it moves back, the Cards the author
+      // dragged there while it was open included (ADR 0084).
+      completedPlacement = closedCard(completedPlacement, completion.cardId, at);
     } else if (completion.kind === 'resized-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
@@ -1147,20 +1226,22 @@ export function createSpaceAuthoring({
         completion.size.width === COLLAPSED_CARD_SIZE.width &&
         completion.size.height === COLLAPSED_CARD_SIZE.height
       ) {
-        completedPlacement = Placement.place(completedPlacement, completion.cardId, {
-          ...at,
-          open: false,
-        });
+        // The magnetic Close (ADR 0066). It is a Close, so it takes the Close
+        // path rather than restating it — reclaiming the growth of the size the
+        // Card was Open at, not the zero growth of the rect being proposed.
+        completedPlacement = closedCard(completedPlacement, completion.cardId, at);
       } else if (
         at.openSize.width === completion.size.width &&
         at.openSize.height === completion.size.height
       ) {
         return UNCHANGED;
       } else {
-        completedPlacement = Placement.place(completedPlacement, completion.cardId, {
-          ...at,
-          openSize: completion.size,
-        });
+        completedPlacement = withRoomFor(
+          completedPlacement,
+          completion.cardId,
+          { ...at, openSize: completion.size },
+          roomBetween(at.openSize, completion.size),
+        );
       }
     } else if (completion.kind === 'created-card') {
       createdCard = createCard(
@@ -1196,11 +1277,12 @@ export function createSpaceAuthoring({
       }
       // Membership and a position, and nothing else: a re-added Card is detached,
       // and the Edges it once had are never inferred back.
-      const authoredAnchor = Placement.authoredPoint(completedPlacement, completion.anchor);
+      // The anchor is taken as given: a canvas coordinate is an authored one
+      // (ADR 0084).
       completedPlacement = Placement.place(
         completedPlacement,
         completion.cardId,
-        freeAnchor(completedPlacement, authoredAnchor),
+        freeAnchor(completedPlacement, completion.anchor),
       );
     } else if (completion.kind === 'removed-card-from-layout') {
       if (!completedPlacement.has(completion.cardId)) {
@@ -1298,13 +1380,14 @@ export function createSpaceAuthoring({
     }
     // Apply membership changes together to the completed Layout.
     if (createdCard !== null) {
-      const authoredPosition = Placement.authoredPoint(completedPlacement, createdCard.position);
+      // As above: the drop point is authorship, not a coordinate to convert
+      // (ADR 0084).
       completedPlacement = Placement.place(
         completedPlacement,
         createdCard.id,
         createdCard.avoidingOverlap
-          ? freeAnchor(completedPlacement, authoredPosition)
-          : authoredPosition,
+          ? freeAnchor(completedPlacement, createdCard.position)
+          : createdCard.position,
       );
     }
     if (deletedCardId !== undefined) {

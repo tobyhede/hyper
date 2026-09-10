@@ -343,8 +343,26 @@ export async function boxOf(
   return box;
 }
 
-/** Drag by a flow-space delta, scaled through the current zoom. */
-export async function dragBy(page: Page, node: Locator, dx: number, dy: number): Promise<void> {
+/**
+ * Drag by a flow-space delta, scaled through the current zoom.
+ *
+ * Anything a caller wants to assert *while* the Card is being dragged goes in
+ * `whileDragging`, which runs between the two moves — the same shape
+ * `connectHandles` uses above, and for the same kind of reason. What a drag does
+ * to the rest of the canvas mid-flight is invisible from either resting frame:
+ * the defect ADR 0084 removes moved a neighbour as the dragged Card crossed its
+ * origin and moved it back before release, so a test that reads only the before
+ * and after sees a gesture that did nothing. The callback runs after the first
+ * move, so the Card is already past the halfway point of the delta — a crossing
+ * a caller wants observed belongs in the first half of the drag.
+ */
+export async function dragBy(
+  page: Page,
+  node: Locator,
+  dx: number,
+  dy: number,
+  whileDragging?: () => Promise<void>,
+): Promise<void> {
   await settled(page);
   const box = (await node.boundingBox())!;
   const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
@@ -353,11 +371,23 @@ export async function dragBy(page: Page, node: Locator, dx: number, dy: number):
   // and the ports sit at the edges.
   await page.mouse.move(box.x + box.width / 2, box.y + 12);
   await page.mouse.down();
-  // React Flow starts a drag on the first move after mousedown; a single jump
-  // can be swallowed, so move twice.
+  // The opening nudge is its own move, and it is the difference between a Card
+  // that lands where the delta says and one that lands ninety per cent of the
+  // way there. React Flow begins the drag at the first pointer event past
+  // `nodeDragThreshold` (1px at the pinned 12.11.2) and measures the Card's
+  // travel from *that* position, so everything covered before it is lost — and a
+  // `steps: 5` move to the halfway point spends a tenth of the whole delta on
+  // its first event. Spending two pixels here instead leaves an error the
+  // flow-coordinate assertions can ignore rather than one that scales with the
+  // drag.
+  await page.mouse.move(box.x + box.width / 2 + Math.sign(dx) * 2, box.y + 12 + Math.sign(dy) * 2);
+  // A single jump can still be swallowed, so the travel itself moves twice.
   await page.mouse.move(box.x + box.width / 2 + (dx * zoom) / 2, box.y + 12 + (dy * zoom) / 2, {
     steps: 5,
   });
+
+  await whileDragging?.();
+
   await page.mouse.move(box.x + box.width / 2 + dx * zoom, box.y + 12 + dy * zoom, { steps: 5 });
   await page.mouse.up();
 }
