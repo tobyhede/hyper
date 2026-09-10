@@ -32,6 +32,7 @@ under `superseded/`.
 | [0020](0020-a-card-is-a-markdown-file-with-frontmatter.md) | A Card is one Markdown file. The directory is the inventory. |
 | [0038](0038-a-point-has-one-type.md) | `LayoutPosition` is the one representation of a point. |
 | [0051](0051-card-kinds-own-everything-beyond-the-title.md) | A Card kind owns everything past the Title. |
+| [0083](0083-a-card-title-is-title-lines.md) | A Card Title is one or more Title Lines, and the first line is the Card's name. |
 | [0009](0009-alias-resolution-is-lazy-and-single-hop.md) | An Alias resolves lazily and in one hop. |
 | [0039](0039-an-alias-delegates-content-authoring-to-its-target.md) | An Alias gives content authoring to its Target. |
 | [0046](0046-an-occurrence-authors-its-own-title-and-target.md) | An occurrence authors its own Title and Target in the pane that opens it. |
