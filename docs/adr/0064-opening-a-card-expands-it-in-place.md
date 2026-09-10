@@ -3,7 +3,7 @@
 Status: accepted
 Supersedes: 0006, 0011, 0037
 Refines: 0048, 0063
-Refined by: 0066, 0070, 0073, 0079
+Refined by: 0066, 0070, 0073, 0079, 0084
 Related: 0024, 0025, 0027, 0036, 0040, 0045, 0051, 0058, 0065
 
 Opening a Card draws its content **on the Card**, by growing that Card on the
@@ -51,10 +51,15 @@ same rule applies on `y`. Growth is summed over every Expanded Card, with every
 comparison reading authored coordinates so the result is independent of visit
 order.
 
-That displacement is derived and never written to the Layout. Closing removes it
-exactly; the authored positions remain what the author wrote. The accepted cost
-is a step boundary: a Card crossing an Expanded Card's authored origin may jump
-between the two sides of the displacement rule.
+**ADR 0084 reverses how that rule runs.** It was derived at render and never
+written to the Layout, and the accepted cost was a step boundary: a Card crossing
+an Expanded Card's authored origin could jump between the two sides of the rule.
+That cost turned out to be three defects rather than one boundary — an Open
+Card's size deciding where every other Card was drawn, a one-pixel move
+displacing a neighbour by its whole growth, and a drop inside the growth having
+no authored coordinate to land on. The rule above is unchanged; it is now applied
+**once, by the Edit that causes it**, writing the neighbours' new positions into
+the Layout. Read 0084 before this section.
 
 ## One Card, one renderer and one editor
 
@@ -102,6 +107,8 @@ Open/Close and Edit/Save/Cancel are separate state machines with one composition
 Edit may open first, but opening never begins an edit by itself. During an edit,
 Close stays visible and disabled, and blur leaves the draft and editor intact.
 
-Neighbour displacement remains derived. Expanded geometry remains authored. No
+Neighbour displacement is applied by the Edit that causes it (ADR 0084, which
+reverses the "remains derived" this line carried). Expanded geometry remains
+authored. No
 content measurement, camera follow, 16:9 constraint or permanent wheel-containment
 hole is introduced by opening a Card.
