@@ -668,6 +668,57 @@ describe('Expanded Card geometry', () => {
       openSize: { width: 860, height: 720 },
     });
   });
+
+  /**
+   * A Card that leaves the Layout takes its room with it.
+   *
+   * Under the derived model this reclaimed itself: the entry carried the Open
+   * state, so removing the entry removed the displacement. Now the room is
+   * written into the neighbours' own coordinates, and a removal that only drops
+   * the entry leaves a hole with nothing left on the canvas to explain it and no
+   * Edit that can give it back. Leaving the Layout is a Close the Card does not
+   * come back from, so it reclaims exactly as Close does (ADR 0084).
+   */
+  it('reclaims the room an Open Card held when it is removed from the Layout', () => {
+    const { authoring, session } = openDisplacement();
+    const before = originsOf(session);
+
+    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    expect(authoring.complete({ kind: 'removed-card-from-layout', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    const { [CARD_A]: removed, ...remaining } = before;
+    expect(removed).toBeDefined();
+    expect(originsOf(session)).toEqual(remaining);
+  });
+
+  it('reclaims the room an Open Card held when it is deleted', () => {
+    const { authoring, session } = openDisplacement();
+    const before = originsOf(session);
+
+    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    const { [CARD_A]: deleted, ...remaining } = before;
+    expect(deleted).toBeDefined();
+    expect(originsOf(session)).toEqual(remaining);
+  });
+
+  it('moves nobody when the Card leaving the Layout was Closed', () => {
+    const { authoring, session } = openDisplacement();
+    const before = originsOf(session);
+
+    expect(authoring.complete({ kind: 'removed-card-from-layout', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    const { [CARD_A]: removed, ...remaining } = before;
+    expect(removed).toBeDefined();
+    expect(originsOf(session)).toEqual(remaining);
+  });
 });
 
 describe('Add Alias', () => {
