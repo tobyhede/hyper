@@ -461,12 +461,12 @@ describe('CanvasCard title', () => {
     );
 
     const heading = screen.getByRole('heading', { name: 'A' });
-    expect(heading).toHaveAttribute('data-editable', 'false');
+    expect(heading.closest('.canvas-card__title')).toHaveAttribute('data-editable', 'false');
     fireEvent.click(heading);
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
 
-  it('exposes the editable Title as a named control inside its heading', () => {
+  it('wraps its heading in the Title’s one-activation control', () => {
     const onBeginTitleEdit = vi.fn();
     render(
       <CanvasCard
@@ -479,10 +479,14 @@ describe('CanvasCard title', () => {
     );
 
     const heading = screen.getByRole('heading', { name: 'A' });
-    expect(heading).toHaveAttribute('data-editable', 'true');
+    expect(heading.closest('.canvas-card__title')).toHaveAttribute('data-editable', 'true');
     expect(heading).toHaveAccessibleName('A');
     const control = screen.getByRole('button', { name: 'Edit Title A' });
-    expect(heading).toContainElement(control);
+    // The control wraps the heading and not the other way round. An accessible
+    // name comes from an element's own label first and its content second, so a
+    // heading *containing* a labelled control is named by that control and the
+    // Title Lines are reachable through nothing (ADR 0065, ADR 0083).
+    expect(control).toContainElement(heading);
 
     fireEvent.click(control);
     expect(onBeginTitleEdit).toHaveBeenCalledOnce();
@@ -647,8 +651,8 @@ describe('CanvasCard Title ladder', () => {
   });
 
   /**
-   * Every accessible name on the Card is the Card's **name** (ADR 0083), while
-   * the ladder stays the heading's visible text.
+   * Every **control** on the Card is named by the Card's name (ADR 0083), and
+   * the heading is named by the Title Lines it draws.
    *
    * Read as one render rather than a case apiece, because the claim is about
    * the set: the Card, its rail, each command on it and the heading are the
@@ -678,7 +682,6 @@ describe('CanvasCard Title ladder', () => {
 
     const { unmount } = render(card(false));
     for (const name of [
-      'Strategies',
       'Card Strategies',
       'Edit Card Strategies',
       'Open Card Strategies',
@@ -688,11 +691,16 @@ describe('CanvasCard Title ladder', () => {
       expect(screen.getAllByLabelText(name), name).not.toHaveLength(0);
     }
 
-    // The name is what is announced; the ladder is what is read.
-    expect(screen.getByRole('heading')).toHaveAccessibleName('Strategies');
+    // The heading carries no label of its own, so it is named by the Title
+    // Lines it draws and a reader reaches every one of them. The name a browser
+    // computes from them is asserted in `ladle-e2e/card.spec.ts`: jsdom and
+    // Chromium join the rungs differently, and only one of them is the truth.
+    expect(screen.getByRole('heading')).not.toHaveAttribute('aria-label');
     expect(screen.getByRole('heading').textContent).toBe(
       'StrategiesNo strategy is privilegedADR 0014',
     );
+    // And no control took the whole Title on the way to that.
+    expect(screen.queryByLabelText(/No strategy is privileged/u)).toBeNull();
     unmount();
 
     // Opening reveals two more names and changes a third; none of them grows a

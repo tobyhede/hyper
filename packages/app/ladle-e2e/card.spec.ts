@@ -353,15 +353,27 @@ test(
     await expect(heading).toContainText('Draft entry', {
       timeout: 20_000,
     });
+
+    // The nesting, proved where accessible names are real (ADR 0065, ADR 0083).
+    // The control wraps the heading, so the control keeps the short action name
+    // and the heading is named by the Title Lines it draws. With the heading
+    // outside, its name became the control's and the Title Lines were reachable
+    // through nothing. jsdom computes this differently from a browser, so this
+    // is the assertion that holds it.
+    await expect(control).toHaveAccessibleName('Edit Title Draft entry');
+    await expect(heading).toHaveAccessibleName('Draft entry');
+    expect(await heading.evaluate((element) => element.closest('button') !== null)).toBe(true);
+
     await control.hover();
-    // The pointer is on the control, but the treatment is the Title's:
+    // The pointer is on the control, but the treatment is the Title's box:
     // `canvas-card.css` draws it on `.canvas-card__title:has(…__title-control:hover)`
-    // so the tint and rule span the whole heading rather than the text's own box.
+    // so the tint and rule span the whole Title rather than the text's own box.
+    const titleBand = group.locator('.canvas-card__title');
     await expect
-      .poll(() => heading.evaluate((element) => getComputedStyle(element).boxShadow))
+      .poll(() => titleBand.evaluate((element) => getComputedStyle(element).boxShadow))
       .not.toBe('none');
     await expect
-      .poll(() => heading.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .poll(() => titleBand.evaluate((element) => getComputedStyle(element).backgroundColor))
       .not.toBe('rgba(0, 0, 0, 0)');
     await control.focus();
     await expect(control).toHaveCSS('outline-style', 'solid');

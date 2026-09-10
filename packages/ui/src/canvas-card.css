@@ -235,6 +235,14 @@
   text-wrap: balance;
 }
 
+/* The heading itself, which the activation control wraps rather than sits
+   inside (ADR 0065, ADR 0083). A plain block, so inserting it between the
+   Title's box and its rungs changes no layout: the box keeps the clamp and the
+   type, and each rung keeps its own. */
+.canvas-card__title-heading {
+  display: block;
+}
+
 /* One Title Line, drawn as its own block so the break the author typed is the
    only thing that starts a new rung (ADR 0083). A break the *box* chooses is
    not a rung: a line wraps freely inside its own role, so a subtitle that takes

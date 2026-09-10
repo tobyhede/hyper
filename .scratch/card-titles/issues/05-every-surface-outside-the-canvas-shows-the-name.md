@@ -46,27 +46,28 @@ The first checkbox names `CardsDrawer`. Its **row label and ordering** read `tit
 
 That deviation was raised and **decided: no fix**. The Cards drawer is being removed by `.scratch/*/07-promote-the-dock`, so a surface that is going away does not earn either a rewording of this checkbox or a change to how it draws. The box is ticked on that basis, not because the drawer draws the name.
 
-### The heading's accessible name — attempted, reverted, needs a new decision
+### The heading's accessible name — decided and fixed
 
-Review found `aria-label={name}` on the `role="heading"` element. A label replaces an element's accessible name, so that label is what stops a screen reader reaching the lines below the name — contradicting the comment three lines above it, which says a reader can read the heading to get them.
+Review found `aria-label={name}` on the heading. A label replaces an element's accessible name, so that label was what stopped a screen reader reaching the lines below the name — contradicting the comment three lines above it, which said a reader could read the heading to get them.
 
-Removing the label was decided and tried. **It does not work, and the reason is structural.** ADR 0065 puts the Title's one-activation control *inside* the heading, wrapping the whole Title, and that control carries `aria-label={`Edit Title ${name}`}`. With no label of its own, the heading computes its name from its one child — the control — so it is named `Edit Title <name>` rather than by the Title Lines it draws. Playwright's snapshot says it plainly:
+**Removing the label alone does not work**, and the first attempt proved it. ADR 0065 put the Title's activation control *inside* the heading, and that control carries `aria-label={`Edit Title ${name}`}`. An accessible name comes from an element's own label first and its content second, so an unlabelled heading took its one child's name and read `Edit Title <name>`. 111 E2E lookups failed on it. jsdom resolved the Title Lines instead and stayed green, so the unit suite agreed with the intent and only a browser disagreed.
+
+**The fix is to invert the nesting.** The control now wraps the heading:
 
 ```
-- heading "Edit Title Elsewhere" [level=2]:
-  - button "Edit Title Elsewhere":
-    - generic: Elsewhere
+- button "Edit Title Draft entry":
+  - heading "Draft entry" [level=2]
 ```
 
-111 E2E tests failed, every one of them a `getByRole('heading', { name })` lookup. jsdom did not catch it: `toHaveAccessibleName` there resolved the ladder text, so the unit suite stayed green and only a real browser disagreed. **Any future attempt at this must be proved in `e2e` or `ladle-e2e`, not in a unit test.**
+The control keeps the short action name ADR 0065 asks for. The heading is named by the Title Lines it draws, so a reader reaches every one of them. Both were measured in Chromium across all four arrangements before anything was written; the heading survives inside the button un-ignored, with all its text nodes.
 
-Reverted. The heading keeps `aria-label={name}` and the code comment above it remains inaccurate about what a reader can reach.
+`TitleHeading` is a `span` and not a `div` or an `h2`, because a `button`'s content model is phrasing content and neither of those is phrasing content. `role="heading"` with `aria-level` is the ARIA spelling of what a native `h2` would say, taken because the native element cannot legally go where this one has to. `.canvas-card__title` keeps `data-editable`, the clamp, the type and the hover treatment; only the heading moved.
 
-The three options that remain, none of them free:
+`ladle-e2e/card.spec.ts` owns the proof, deliberately: it asserts both accessible names and that the heading sits inside a `button`. **A unit test cannot hold this** — jsdom and Chromium compute the name differently, and only one of them is the truth.
 
-1. **Keep the label.** The heading announces the name. The lines below it are drawn but are not separately announced. This is what is in the tree.
-2. **Take the label off the control instead**, so it is named by its content and the heading inherits the Title Lines. This gives a *control* a name of up to N lines, which is the case ADR 0083's rule exists to prevent, and it changes every `Edit Title <name>` lookup.
-3. **Move the control out of the heading**, so the heading holds only text. This is a change to ADR 0065's shape — the control covers the whole Title and claims only the pixels it draws — and it means hand-rolled positioning, which ADR 0047 and ADR 0050 make a last resort.
+### Still unproved
+
+The accessibility tree is right. How a real screen reader **reads** a heading nested inside a button is a separate question, and some screen readers treat a button as one stop in browse mode. NVDA, JAWS and VoiceOver were not tested. If that reading turns out to be wrong, the remaining option is to move the control out of the heading entirely, which changes ADR 0065's shape and needs hand-made positioning.
 
 ### Verification
 
