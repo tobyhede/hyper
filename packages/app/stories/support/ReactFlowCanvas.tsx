@@ -8,7 +8,7 @@ import {
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
-import type { CardId, GraphId, LayoutId } from '@project/core';
+import type { CardId, GraphId, DiagramId } from '@project/core';
 import {
   Placement,
   positionedStrategy,
@@ -24,37 +24,37 @@ import {
   type CanvasNodesAndEdges,
 } from '#src/canvas-projection';
 import { CARD_SIZE, cardSizeVars } from '#src/card';
-import { resolveLayout } from '#src/layout-resolution';
-import { cardIds, graphIds, layoutId, space } from './fixture';
+import { resolveDiagram } from '#src/diagram-resolution';
+import { cardIds, graphIds, diagramId, space } from './fixture';
 
 /**
- * Which authored Layout of which Space a fixture draws.
+ * Which authored Diagram of which Space a fixture draws.
  *
  * A parameter rather than a module constant because the catalogue now draws
  * more than one Space: the inventory's own fixture answers most stories, and
- * the Command Dock's prototype needs a Space with two Layouts and three Graphs
+ * the Command Dock's prototype needs a Space with two Diagrams and three Graphs
  * over one of them. Both go through the same derivation, so a story cannot draw
  * a canvas the application would build differently.
  */
-export interface DrawnLayout {
+export interface DrawnDiagram {
   readonly space: Space;
-  readonly layoutId: LayoutId;
+  readonly diagramId: DiagramId;
 }
 
-/** What a fixture draws unless it names another Layout. */
-const INVENTORY_LAYOUT: DrawnLayout = { space, layoutId };
+/** What a fixture draws unless it names another Diagram. */
+const INVENTORY_DIAGRAM: DrawnDiagram = { space, diagramId };
 
 interface Derivation {
   readonly pending: ReturnType<typeof canvasProjection>;
   readonly laidOut: Promise<LayoutStrategyGraph>;
 }
 
-const derive = ({ space: drawn, layoutId: id }: DrawnLayout): Derivation => {
-  const resolved = resolveLayout(drawn, id);
+const derive = ({ space: drawn, diagramId: id }: DrawnDiagram): Derivation => {
+  const resolved = resolveDiagram(drawn, id);
   const pending = canvasProjection(drawn, resolved);
   return {
     pending,
-    laidOut: positionedStrategy(Placement.fromLayout(resolved.layout))(pending.strategyGraph),
+    laidOut: positionedStrategy(Placement.fromDiagram(resolved.diagram))(pending.strategyGraph),
   };
 };
 
@@ -89,18 +89,18 @@ export interface FixtureCanvasCard {
 function useProjection(
   activeGraphId: GraphId | null,
   selectedCardId: CardId | null = null,
-  drawn: DrawnLayout = INVENTORY_LAYOUT,
+  drawn: DrawnDiagram = INVENTORY_DIAGRAM,
 ): ProjectedCanvas | Error | null {
   const [projected, setProjected] = useState<ProjectedCanvas | Error | null>(null);
   // Keyed on the two things that decide the whole derivation, so a story that
   // re-renders on every Active Graph change does not lay the Space out again.
   // Destructured first because the identity of `drawn` itself is not what
   // decides a re-layout, and a dependency on the object would make an inline
-  // `{ space, layoutId }` at a call site lay the Space out on every render.
-  const { space: drawnSpace, layoutId: drawnLayoutId } = drawn;
+  // `{ space, diagramId }` at a call site lay the Space out on every render.
+  const { space: drawnSpace, diagramId: drawnDiagramId } = drawn;
   const { pending, laidOut } = useMemo(
-    () => derive({ space: drawnSpace, layoutId: drawnLayoutId }),
-    [drawnSpace, drawnLayoutId],
+    () => derive({ space: drawnSpace, diagramId: drawnDiagramId }),
+    [drawnSpace, drawnDiagramId],
   );
 
   useEffect(() => {
@@ -160,7 +160,7 @@ export interface StoryCanvasProps {
  * The one real React Flow instance every canvas-hosting story mounts.
  *
  * Every fixture that puts nodes on a real canvas — the HUD, the selected Edge
- * controls, the Card specimens, the zoom control, the Layout preview — goes
+ * controls, the Card specimens, the zoom control, the Diagram preview — goes
  * through this rather than instantiating `<ReactFlow>` itself. `Background`,
  * `minZoom`/`maxZoom` defaults, `proOptions` and whether `ReactFlowProvider`
  * wraps the flow are this component's decisions so a new fixture cannot drift
@@ -294,28 +294,28 @@ export function ZoomSliderSpecimen() {
  *
  * `drawn` and `activeGraphId` default to the inventory's own Space and its Long
  * Graph, which is what every story here drew when there was only one Space to
- * draw. A story that names another Layout — the Command Dock's, which switches
+ * draw. A story that names another Diagram — the Command Dock's, which switches
  * between two of them — gets the same derivation over its own Space rather than
  * a second canvas beside this one, and switching the Active Graph re-projects
  * without laying the Space out again.
  *
  * The camera is {@link StoryCanvasViewport} rather than an optional `zoom`,
- * because a default and "fit this Layout to the frame" are both spelled
+ * because a default and "fit this Diagram to the frame" are both spelled
  * `undefined` in that shape — a full-viewport story asking to fit would silently
  * get the pinned camera instead.
  */
 /** Where the application-framed canvas sits when a story does not say. */
-const PINNED_LAYOUT_VIEWPORT: StoryCanvasViewport = { fit: false, x: 0, y: 0, zoom: 0.65 };
+const PINNED_DIAGRAM_VIEWPORT: StoryCanvasViewport = { fit: false, x: 0, y: 0, zoom: 0.65 };
 
-export function LayoutCanvasFixture({
+export function DiagramCanvasFixture({
   cards = [],
   drawn,
   activeGraphId = graphIds.long,
-  viewport = PINNED_LAYOUT_VIEWPORT,
+  viewport = PINNED_DIAGRAM_VIEWPORT,
 }: {
   readonly cards?: readonly FixtureCanvasCard[];
-  /** Which Layout of which Space; the inventory's own when absent. */
-  readonly drawn?: DrawnLayout;
+  /** Which Diagram of which Space; the inventory's own when absent. */
+  readonly drawn?: DrawnDiagram;
   /** The Graph the canvas emphasises, or `null` for none. */
   readonly activeGraphId?: GraphId | null;
   /** The camera, through the same union `StoryCanvas` takes. */
@@ -392,8 +392,9 @@ export function CanvasCardNodeSpecimen({
   if (source === undefined) throw new Error(`Missing fixture Card ${cardId}`);
 
   const card = space.cards.find((candidate) => candidate.id === cardId);
-  const layout = space.layouts.find((candidate) => candidate.id === layoutId);
-  if (card === undefined || layout === undefined) throw new Error('Missing fixture Card or Layout');
+  const diagram = space.diagrams.find((candidate) => candidate.id === diagramId);
+  if (card === undefined || diagram === undefined)
+    throw new Error('Missing fixture Card or Diagram');
 
   const data: CardFlowNode['data'] = {
     ...source.data,
@@ -402,8 +403,8 @@ export function CanvasCardNodeSpecimen({
       spaceTitle: space.title,
       onCopy: () => true,
       onRename: null,
-      onDeleteLayout: null,
-    })({ kind: 'card', card, layout }),
+      onDeleteDiagram: null,
+    })({ kind: 'card', card, diagram }),
     readOnly,
     titleEditingEnabled: true,
     cardEditingEnabled: cardEditingEnabled ?? source.data.kind === 'markdown',

@@ -14,7 +14,7 @@ import { HTTPException } from 'hono/http-exception';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -369,7 +369,7 @@ describe('commit wire policy', () => {
 
 describe('Space HTTP reads', () => {
   it('retains collection listing and lazy resource loading', async () => {
-    const ids = [LAYOUT_ID, GRAPH_ID];
+    const ids = [DIAGRAM_ID, GRAPH_ID];
     const base = repository();
     const commit = vi.fn((request: Parameters<typeof base.commit>[0]) => base.commit(request));
     const app = createSpaceHttpApp(repository({ commit }), {
@@ -389,23 +389,23 @@ describe('Space HTTP reads', () => {
         ...snapshot,
         document: {
           ...snapshot.document,
-          layouts: [
+          diagrams: [
             {
-              id: LAYOUT_ID,
-              title: 'Layout 1',
+              id: DIAGRAM_ID,
+              title: 'Diagram 1',
               kind: 'positioned',
               positions: {},
               graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
               activeGraph: GRAPH_ID,
             },
           ],
-          defaultLayout: LAYOUT_ID,
+          defaultDiagram: DIAGRAM_ID,
         },
       },
       revision: '1',
       exportedRevision: null,
     });
-    expect(resource.headers.get('x-hyper-space-initialization')).toBe('created-layout');
+    expect(resource.headers.get('x-hyper-space-initialization')).toBe('created-diagram');
     expect(commit).toHaveBeenCalledOnce();
     expect(collection.headers.get('cache-control')).toBe('no-store');
     expect(resource.headers.get('content-type')).toBe('application/json; charset=utf-8');

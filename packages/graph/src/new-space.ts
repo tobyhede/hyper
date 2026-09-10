@@ -2,7 +2,7 @@ import { SPACE_FILE_VERSION, type Card, type SpaceFile, type UUID } from '@proje
 import { serializeCardFile, type CardFile } from './card-file';
 
 /**
- * A new Space: one Card in one complete default Layout (ADRs 0018 and 0080).
+ * A new Space: one Card in one complete default Diagram (ADRs 0018 and 0080).
  *
  * The default when there is nothing else to open — not the fixture, which is a
  * purpose-shaped test bed, and not an empty canvas, which offers no gesture a
@@ -31,7 +31,7 @@ export interface InitializeSpaceOptions {
   readonly title: string;
   /**
    * The composition-owned identity source. A complete new Space needs four:
-   * the Space, its first Card, its default Layout and that Layout's Graph.
+   * the Space, its first Card, its default Diagram and that Diagram's Graph.
    */
   readonly newId: () => UUID;
 }
@@ -41,7 +41,7 @@ export interface InitializeSpaceOptions {
  * other Space.
  *
  * A normal Space begins complete: one Markdown Card in its default authored
- * Layout, with one empty Active Graph. Meta bootstrap, ordinary startup and
+ * Diagram, with one empty Active Graph. Meta bootstrap, ordinary startup and
  * Space Card creation share this shape.
  *
  * The supplied title names the **Space** and nothing else. Its first Card takes
@@ -54,7 +54,7 @@ export interface InitializeSpaceOptions {
 export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSpace {
   const spaceId = newId();
   const cardId = newId();
-  const layoutId = newId();
+  const diagramId = newId();
   const graphId = newId();
   const card: Card = { id: cardId, title: FIRST_CARD_TITLE, kind: 'markdown', body: '' };
 
@@ -63,17 +63,17 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
       version: SPACE_FILE_VERSION,
       id: spaceId,
       title,
-      layouts: [
+      diagrams: [
         {
-          id: layoutId,
-          title: 'Layout 1',
+          id: diagramId,
+          title: 'Diagram 1',
           kind: 'positioned',
           positions: { [cardId]: { x: 0, y: 0, open: false } },
           graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
           activeGraph: graphId,
         },
       ],
-      defaultLayout: layoutId,
+      defaultDiagram: diagramId,
     },
     cardFiles: [{ path: `cards/${card.id}.md`, text: serializeCardFile(card) }],
   };

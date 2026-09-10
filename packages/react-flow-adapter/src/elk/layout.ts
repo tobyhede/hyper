@@ -46,7 +46,7 @@ export const PORT_ID_SEPARATOR = '##';
  * ELK port ids must be unique across the whole graph, but a handle id
  * (`<graphId>::out`) is the *same* on every card the graph passes through.
  * Handing ELK the bare handle id leaves it unable to tell which card an edge
- * attaches to, so it resolves arbitrarily and the layout collapses — badly
+ * attaches to, so it resolves arbitrarily and the diagram collapses — badly
  * enough to mislay even a single graph. Namespacing by card id is what makes the
  * endpoint unambiguous. The render layer never sees these; `elkStrategy` strips the
  * prefix back off, so ports keep their bare ids.

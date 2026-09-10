@@ -31,7 +31,7 @@ disagreeing with the function.
 Every action asks the applicable guards before its own checks:
 
 1. Placement reported? → `placement-pending`
-2. Does the selected Layout still exist? → `layout-not-found`
+2. Does the selected Diagram still exist? → `diagram-not-found`
 
 ## Per-action checks
 
@@ -44,11 +44,11 @@ Guards above are omitted below.
 | `edited-card` | `card-not-found` → `card-kind-immutable` → `alias-target-immutable` → `space-card-target-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
 | `created-card` | none → completed |
 | `created-alias` | `alias-target-not-found` → `alias-target-must-own-content` → completed |
-| `opened-card` | `card-not-in-layout` → (already Open ⇒ `unchanged`) → completed |
-| `closed-card` | `card-not-in-layout` → (already Closed ⇒ `unchanged`) → completed |
-| `resized-card` | `card-not-in-layout` → `card-not-expanded` → (same size ⇒ `unchanged`) → completed |
-| `added-card-to-layout` | `card-not-found` → `card-already-in-layout` → completed |
-| `removed-card-from-layout` | `card-not-in-layout` → completed |
+| `opened-card` | `card-not-in-diagram` → (already Open ⇒ `unchanged`) → completed |
+| `closed-card` | `card-not-in-diagram` → (already Closed ⇒ `unchanged`) → completed |
+| `resized-card` | `card-not-in-diagram` → `card-not-expanded` → (same size ⇒ `unchanged`) → completed |
+| `added-card-to-diagram` | `card-not-found` → `card-already-in-diagram` → completed |
+| `removed-card-from-diagram` | `card-not-in-diagram` → completed |
 | `deleted-card` | `card-not-found` → `space-card-deletion-unsupported` → `card-has-aliases` → completed |
 
 `card-not-expanded` is the code `resized-card` raises for a Card that is
@@ -63,9 +63,9 @@ that has not been decided.
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `create-and-connect` | `edge-card-outside-layout` → `layout-active-graph-required` → completed |
-| `connected-cards` | `edge-card-outside-layout` → `layout-active-graph-required` → `edge-already-exists` → completed |
-| `reconnected-edge` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Card ⇒ `unchanged`) → `edge-card-outside-layout` → `edge-already-exists` → completed |
+| `create-and-connect` | `edge-card-outside-diagram` → `diagram-active-graph-required` → completed |
+| `connected-cards` | `edge-card-outside-diagram` → `diagram-active-graph-required` → `edge-already-exists` → completed |
+| `reconnected-edge` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Card ⇒ `unchanged`) → `edge-card-outside-diagram` → `edge-already-exists` → completed |
 | `deleted-edge` | `graph-not-owned` → `edge-not-found` → completed |
 
 ### Graph edits
@@ -75,28 +75,28 @@ that has not been decided.
 | `added-graph` | none → completed |
 | `renamed-graph` | `graph-not-owned` → `graph-title-required` → (same title ⇒ `unchanged`) → completed |
 | `recolored-graph` | `graph-not-owned` → (same color ⇒ `unchanged`) → completed |
-| `deleted-graph` | `graph-not-owned` → `layout-must-keep-graph` → completed |
+| `deleted-graph` | `graph-not-owned` → `diagram-must-keep-graph` → completed |
 
-### Layout edits
+### Diagram edits
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `renamed-layout` | `layout-not-found` → `layout-title-required` → (same title ⇒ `unchanged`) → completed |
-| `deleted-layout` | `layout-not-found` → `space-must-keep-layout` → completed |
+| `renamed-diagram` | `diagram-not-found` → `diagram-title-required` → (same title ⇒ `unchanged`) → completed |
+| `deleted-diagram` | `diagram-not-found` → `space-must-keep-diagram` → completed |
 
-`layout-not-found` here is not the universal gate 2 check: it is the action
-naming a Layout other than the one the Edit resolved, which is an author's stale
+`diagram-not-found` here is not the universal gate 2 check: it is the action
+naming a Diagram other than the one the Edit resolved, which is an author's stale
 gesture rather than a broken invariant.
 
-`deleted-layout` refuses the last Layout (ADR 0079) and otherwise completes on a
-survivor: the selected Layout if it survived, else the first, which is also what
-`defaultLayout` becomes when the deleted Layout was it.
+`deleted-diagram` refuses the last Diagram (ADR 0079) and otherwise completes on a
+survivor: the selected Diagram if it survived, else the first, which is also what
+`defaultDiagram` becomes when the deleted Diagram was it.
 
-### Layout creation
+### Diagram creation
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `created-layout` | none → completed |
+| `created-diagram` | none → completed |
 
 ### Movement
 
@@ -106,13 +106,13 @@ survivor: the selected Layout if it survived, else the first, which is also what
 
 ## The 24 codes
 
-2 contextual (`placement-pending`, `layout-not-found`) plus 22 action-specific —
+2 contextual (`placement-pending`, `diagram-not-found`) plus 22 action-specific —
 none is produced anywhere else. 21 of those 22 are tabulated above;
-`layout-required` is declared and presented but currently raised nowhere, so it
+`diagram-required` is declared and presented but currently raised nowhere, so it
 appears in no row.
 Count the codes, not the cells: several serve more than one action —
-`card-not-found`, `card-not-in-layout`, `graph-not-owned`,
-`edge-card-outside-layout` and the two `alias-target-*` each appear in more than
+`card-not-found`, `card-not-in-diagram`, `graph-not-owned`,
+`edge-card-outside-diagram` and the two `alias-target-*` each appear in more than
 one row.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
 code gets its copy, and the exhaustive placement records beside it are the one

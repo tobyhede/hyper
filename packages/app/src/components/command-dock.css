@@ -249,7 +249,7 @@
 
 /* --------------------------------------------------------------- identity */
 
-/* Which Layout and which Graph are active. The name is always drawn — the
+/* Which Diagram and which Graph are active. The name is always drawn — the
    three collapse modes a narrow dock was compared through are gone, because a
    vertical dock stacks into named rows rather than shrinking into a rail. */
 /* **The gap belongs to the control, not to the label.** This used to carry
@@ -278,7 +278,7 @@
 
 /* A vertical dock is a column of rows, and every control in it has to agree —
    not just the two carrying titles. Left-aligned at a common width, the icons
-   line up under the Layout and Graph glyphs and the column reads as a list;
+   line up under the Diagram and Graph glyphs and the column reads as a list;
    centred, they float in the middle of a width the titles set and the column
    reads as an accident. */
 .command-dock__surface[data-orientation='vertical'] > *:not(.command-dock__grip) {
@@ -366,7 +366,7 @@
 
 /* ---------------------------------------------------------------- cluster */
 
-/* Layout and Graph each read as one named thing carrying several commands,
+/* Diagram and Graph each read as one named thing carrying several commands,
    which is what a Card rail is (ADR 0073) — so each is a `Toolbar`, drawn
    tight, with the dock's own gap doing the separating between them. */
 .command-dock__cluster {

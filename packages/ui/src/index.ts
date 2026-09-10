@@ -85,7 +85,7 @@ export {
   EntityActionsIcon,
   FitViewIcon,
   GraphIcon,
-  LayoutIcon,
+  DiagramIcon,
   LinkActionsIcon,
   MarkdownIcon,
   OpenCardIcon,

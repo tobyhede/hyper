@@ -6,10 +6,10 @@ test(
   async ({ page }) => {
     await page.goto('/');
     const space = page.getByTestId('space-title');
-    const layout = page.getByTestId('selected-canvas');
+    const diagram = page.getByTestId('selected-canvas');
     await expect(space).toBeVisible();
-    await expect(layout).toBeVisible();
-    const typography = await layout.evaluate((element) => {
+    await expect(diagram).toBeVisible();
+    const typography = await diagram.evaluate((element) => {
       const style = getComputedStyle(element);
       return [style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight, style.color];
     });
@@ -29,9 +29,9 @@ test(
       ).toEqual(typography);
     }
     await expect(page.getByRole('button', { name: /^Rename Space:/ })).toHaveCount(0);
-    await layout.click();
-    await expect(page.getByRole('textbox', { name: 'Layout name', exact: true })).toBeFocused();
+    await diagram.click();
+    await expect(page.getByRole('textbox', { name: 'Diagram name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(layout).toBeFocused();
+    await expect(diagram).toBeFocused();
   },
 );

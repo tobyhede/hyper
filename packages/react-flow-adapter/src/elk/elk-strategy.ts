@@ -17,7 +17,7 @@ import { DEFAULT_ELK_LAYOUT_OPTIONS, elkPortId, PORT_ID_SEPARATOR } from './layo
  * tested without running elkjs.
  *
  * Automatic: it computes placement from the cards and graphs without naming a
- * selectable Layout. It remains a non-addressable capability.
+ * selectable Diagram. It remains a non-addressable capability.
  */
 
 /** The slice of elkjs this module uses, so a fake can stand in for it. */

@@ -31,9 +31,9 @@ import {
  * Both are loaded at module scope, so a literal that stops parsing takes the
  * story down with a message instead of rendering something subtly wrong.
  *
- * Each also **declares where it opens**, so `defaultLayout` answers that for a
+ * Each also **declares where it opens**, so `defaultDiagram` answers that for a
  * story exactly as it does for the app. The fixture used to decide it — "the
- * first Layout, else Flow" — which is the state translation ADR 0052's negative
+ * first Diagram, else Flow" — which is the state translation ADR 0052's negative
  * names. `story-spaces.test.ts` holds the declaration and what the Ladle specs
  * press to the same answer.
  */
@@ -64,24 +64,24 @@ const chain = (links: number): GraphEdge[] =>
     return index < links && to !== undefined ? [{ from, to }] : [];
   });
 
-/** Named once, because the Space both declares this Layout and opens on it. */
+/** Named once, because the Space both declares this Diagram and opens on it. */
 const COLLECTION_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
 const COLLECTION_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 /**
- * A Space with two authored Layouts and the four Graphs they own.
+ * A Space with two authored Diagrams and the four Graphs they own.
  *
  * **No Graph carries a colour.** A Graph without one takes a palette slot by
- * order through `graphColorMap`, and the flatten across Layouts in declared
+ * order through `graphColorMap`, and the flatten across Diagrams in declared
  * order (ADR 0045) puts Long, Mid, Short and Echo in the first four slots — the
  * same blue, amber, green and pink the fixture used to write out by hand.
  * Deriving them is the point: a palette edit reaches the story, and the story
  * cannot claim a colour production would not give it.
  *
- * **It names `defaultLayout`**, which the tracked e2e fixture deliberately does
- * not: that one exists to prove a Space declaring Layouts still arrives in Flow,
- * and this one exists to draw a sidebar with a Layout pressed. Declaring it is
- * how the story gets that from `defaultLayout` instead of from a rule the
+ * **It names `defaultDiagram`**, which the tracked e2e fixture deliberately does
+ * not: that one exists to prove a Space declaring Diagrams still arrives in Flow,
+ * and this one exists to draw a sidebar with a Diagram pressed. Declaring it is
+ * how the story gets that from `defaultDiagram` instead of from a rule the
  * harness keeps.
  *
  * Exported alongside the {@link authoredSpace} it loads into, because a story
@@ -94,8 +94,8 @@ export const authoredSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Space',
-    defaultLayout: COLLECTION_ONE,
-    layouts: [
+    defaultDiagram: COLLECTION_ONE,
+    diagrams: [
       {
         id: COLLECTION_ONE,
         title: 'Collection 1',
@@ -143,42 +143,42 @@ export const authoredSnapshot: SpaceSnapshot = {
 /**
  * The same Space opened on Collection 2, which holds two of the five Cards.
  *
- * The Cards drawer's stories need a Layout some Cards are *absent* from, and
+ * The Cards drawer's stories need a Diagram some Cards are *absent* from, and
  * this **declares where it opens** like every other fixture here rather than
- * leaving a story to index into `layouts` — array order is not a declaration,
- * and a Layout inserted before it would move the story somewhere else in
+ * leaving a story to index into `diagrams` — array order is not a declaration,
+ * and a Diagram inserted before it would move the story somewhere else in
  * silence. `story-spaces.test.ts` holds both halves: where it opens, and that
  * Cards remain outside it.
  */
 export const sparseAuthoredSnapshot: SpaceSnapshot = {
   ...authoredSnapshot,
-  document: { ...authoredSnapshot.document, defaultLayout: COLLECTION_TWO },
+  document: { ...authoredSnapshot.document, defaultDiagram: COLLECTION_TWO },
 };
 
 export const authoredSpace: Space = loaded(loadSpaceSnapshot(authoredSnapshot));
 
 /**
- * {@link authoredSnapshot} one Edit later: a third Layout, `Collection 3`.
+ * {@link authoredSnapshot} one Edit later: a third Diagram, `Collection 3`.
  *
  * What a story submits has to differ from what it loaded, or a failed save and
  * a successful one draw the same list and nothing proves the sidebar read the
- * session at all. The Layout only has to be legal — a title, positions naming
+ * session at all. The Diagram only has to be legal — a title, positions naming
  * Cards this Space already holds, and one owned Graph whose Edge endpoints are
  * members of it (ADR 0040) — so it is built from the same spine helpers the two
- * Layouts above it are, rather than by transcribing coordinates a third time.
+ * Diagrams above it are, rather than by transcribing coordinates a third time.
  *
- * It **appends**, and an Edit here that removed or replaced a Layout or a Graph
+ * It **appends**, and an Edit here that removed or replaced a Diagram or a Graph
  * would not. The fixture that submits this seeds its opened canvas and its
  * Active Graph from the first Space it is handed and never reconciles them
  * against a later one, so withdrawing `Collection 1` would leave the story
- * naming a Layout the Space no longer holds.
+ * naming a Diagram the Space no longer holds.
  */
 export const editedSnapshot: SpaceSnapshot = {
   ...authoredSnapshot,
   document: {
     ...authoredSnapshot.document,
-    layouts: [
-      ...(authoredSnapshot.document.layouts ?? []),
+    diagrams: [
+      ...(authoredSnapshot.document.diagrams ?? []),
       {
         id: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
         title: 'Collection 3',
@@ -197,18 +197,18 @@ export const editedSnapshot: SpaceSnapshot = {
 };
 
 /**
- * A newly created Space: one Card, placed in one authored Layout owning one
+ * A newly created Space: one Card, placed in one authored Diagram owning one
  * empty Active Graph (ADR 0018, ADR 0080).
  *
  * `newSpace()` is the one encoding of that starting state, and a hand-written
  * snapshot beside it would be a second — the story would go on saying "one Card
- * and no Layout" long after the rule said something else. It returns the
+ * and no Diagram" long after the rule said something else. It returns the
  * **on-disk** shape, a space file and its card files, which is why this is
  * `loadSpace` rather than `loadSpaceSnapshot`.
  *
  * It mints fresh ids on every page load, and nothing reads one: no story and no
- * Ladle spec names a Card, a Layout or a Graph of this Space by id, only the
- * `Layout 1` and `Graph 1` titles `newSpace()` mints for them. The ambient
+ * Ladle spec names a Card, a Diagram or a Graph of this Space by id, only the
+ * `Diagram 1` and `Graph 1` titles `newSpace()` mints for them. The ambient
  * generator is named here rather than inside `newSpace`, which takes its
  * identity source like every other minting operation (ADR 0016); this fixture
  * is the composition root that supplies it.
@@ -234,7 +234,7 @@ export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.cardF
  * together, and `story-spaces.test.ts` holds them apart.
  *
  * The base is a **reserved block** rather than one past the highest id, so a
- * story that declares another Card or Layout does not have to move it — the
+ * story that declares another Card or Diagram does not have to move it — the
  * literals above occupy `0x02`..`0x40`, and this leaves the whole space between
  * them and here. Hexadecimal throughout, which is what the ids are: the
  * decimal counter this replaced rendered `12` as `…0000012` while `CARD_E` is
@@ -263,9 +263,9 @@ export const storyGraphIds = (): (() => GraphId) => {
  * several outgoing Edges, and there is no such Card anywhere in the tracked
  * fixtures — the E2E fixture's Graphs are deliberately all lines too.
  *
- * Each **declares where it opens**, so `defaultLayout` and ADR 0026's Active
- * Graph rule answer for a story exactly as they do for the app: the Layout named
- * here owns one Graph, and a Layout that names no `activeGraph` opens on the
+ * Each **declares where it opens**, so `defaultDiagram` and ADR 0026's Active
+ * Graph rule answer for a story exactly as they do for the app: the Diagram named
+ * here owns one Graph, and a Diagram that names no `activeGraph` opens on the
  * first it owns. A story therefore calls `present()` and nothing else to be
  * presenting the Graph it is about.
  *
@@ -279,7 +279,7 @@ const traversalPositions = (ids: readonly CardId[]): Record<string, CardPlacemen
 const traversalCards = (titled: readonly (readonly [CardId, string])[]): SpaceSnapshot['cards'] =>
   titled.map(([id, title]) => ({ id, document: { title, kind: 'markdown', body: '' } }));
 
-const TRAVERSAL_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+const TRAVERSAL_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
 const TRAVERSAL_CARDS = [
   [uuidSchema.parse('00000000-0000-4000-8000-000000000062'), 'Introduction'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000063'), 'How it works'],
@@ -298,10 +298,10 @@ export const traversalSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Traversal',
-    defaultLayout: TRAVERSAL_LAYOUT,
-    layouts: [
+    defaultDiagram: TRAVERSAL_DIAGRAM,
+    diagrams: [
       {
-        id: TRAVERSAL_LAYOUT,
+        id: TRAVERSAL_DIAGRAM,
         title: 'Traversal',
         kind: 'positioned',
         positions: traversalPositions(TRAVERSAL_CARDS.map(([id]) => id)),
@@ -323,7 +323,7 @@ export const traversalSnapshot: SpaceSnapshot = {
 
 export const traversalSpace: Space = loaded(loadSpaceSnapshot(traversalSnapshot));
 
-const DEEP_DIVE_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+const DEEP_DIVE_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 const DEEP_DIVE_CARDS = [
   [uuidSchema.parse('00000000-0000-4000-8000-000000000072'), 'Introduction'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000073'), 'Read path'],
@@ -349,10 +349,10 @@ export const deepDiveSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Deep dive',
-    defaultLayout: DEEP_DIVE_LAYOUT,
-    layouts: [
+    defaultDiagram: DEEP_DIVE_DIAGRAM,
+    diagrams: [
       {
-        id: DEEP_DIVE_LAYOUT,
+        id: DEEP_DIVE_DIAGRAM,
         title: 'Deep dive',
         kind: 'positioned',
         positions: traversalPositions(DEEP_DIVE_CARDS.map(([id]) => id)),
@@ -382,7 +382,7 @@ export const deepDiveSpace: Space = loaded(loadSpaceSnapshot(deepDiveSnapshot));
  * Where the Command Dock prototype's identities live: `0x80`..`0xbf`.
  *
  * A reserved block, like {@link MINTED_GRAPH_ID_BASE} and for the same reason.
- * Thirty-four Cards, Layouts and Graphs written out as full literals would bury
+ * Thirty-four Cards, Diagrams and Graphs written out as full literals would bury
  * the shape of the fixture in uuids, so they are minted from this base instead
  * — and the base is declared here, above everything that draws from it, so the
  * block a reader has to keep clear is visible in one place.
@@ -427,7 +427,7 @@ const DOCK_PLACED = [
  *
  * **Twenty-nine rather than four, and that count is the fixture's whole claim.**
  * A list of four fits any surface and settles nothing, while a real Space's
- * unplaced Cards outnumber its Layouts and Graphs by an order of magnitude. The
+ * unplaced Cards outnumber its Diagrams and Graphs by an order of magnitude. The
  * open question the Dock's list surfaces are compared on — an edge drawer, an
  * anchored popover, a second dock — is whether each can carry that many rows
  * and still be dragged out of, so a fixture that cannot overrun a popover
@@ -559,8 +559,8 @@ const dockPositions = (count: number): Record<string, CardPlacement> =>
  * Purpose-built, and deliberately not {@link authoredSpace}: that one exists to
  * draw a sidebar and every Card in it is placed, so a Cards surface opened over
  * it would have nothing to offer. The Dock needs three things at once that no
- * existing fixture has together — **two Layouts** to switch between, **three
- * Graphs over one Layout** so emphasis is a visible answer rather than a
+ * existing fixture has together — **two Diagrams** to switch between, **three
+ * Graphs over one Diagram** so emphasis is a visible answer rather than a
  * one-member choice, and **many more unplaced Cards than placed ones**, which
  * is what its list surfaces are being compared on.
  *
@@ -569,7 +569,7 @@ const dockPositions = (count: number): Record<string, CardPlacement> =>
  * prototype this replaced wrote `#4c8dff`, `#d08a3a` and `#2f9e8f` out by hand,
  * which is a fixture free to disagree with the palette the canvas draws.
  *
- * It **declares where it opens**, so `defaultLayout` answers that for the Dock
+ * It **declares where it opens**, so `defaultDiagram` answers that for the Dock
  * exactly as it does for the app.
  */
 export const commandDockSnapshot: SpaceSnapshot = {
@@ -577,8 +577,8 @@ export const commandDockSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Rendering',
-    defaultLayout: DOCK_COLLECTION_ONE,
-    layouts: [
+    defaultDiagram: DOCK_COLLECTION_ONE,
+    diagrams: [
       {
         id: DOCK_COLLECTION_ONE,
         title: 'Collection 1',
@@ -632,7 +632,7 @@ const chainId = (offset: number): UUID =>
  * prototype could not have been walked into.
  *
  * Each takes a **block of sixteen** off {@link CHAIN_ID_BASE} — the Space, its
- * Layout, its Graph, then one Card per target — so a link that gains a target
+ * Diagram, its Graph, then one Card per target — so a link that gains a target
  * cannot reach into the next link's ids.
  */
 const crossingSpace = (
@@ -644,8 +644,8 @@ const crossingSpace = (
   document: {
     version: 1,
     title,
-    defaultLayout: chainId(block + 1),
-    layouts: [
+    defaultDiagram: chainId(block + 1),
+    diagrams: [
       {
         id: chainId(block + 1),
         title: 'Catalogue',
@@ -712,15 +712,15 @@ const META_TARGETS = [
 ] as const satisfies readonly (readonly [string, UUID])[];
 
 /**
- * Meta's own identity, and the Layout and Graph it owns — three values from the
+ * Meta's own identity, and the Diagram and Graph it owns — three values from the
  * reserved block rather than one shared between kinds.
  *
  * The Space used to spell its Id as the literal `metaId(0)` resolves to, so the
- * Space *was* its Catalogue Layout as far as any Id comparison could tell, and
- * `/spaces/:spaceId/views/:layoutId` drew the same 22 characters twice.
+ * Space *was* its Catalogue Diagram as far as any Id comparison could tell, and
+ * `/spaces/:spaceId/diagrams/:diagramId` drew the same 22 characters twice.
  */
 const META_SPACE_ID = metaId(0);
-const META_LAYOUT = metaId(1);
+const META_DIAGRAM = metaId(1);
 const META_GRAPH = metaId(2);
 
 /**
@@ -741,10 +741,10 @@ export const metaSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Meta Space',
-    defaultLayout: META_LAYOUT,
-    layouts: [
+    defaultDiagram: META_DIAGRAM,
+    diagrams: [
       {
-        id: META_LAYOUT,
+        id: META_DIAGRAM,
         title: 'Catalogue',
         kind: 'positioned',
         positions: Object.fromEntries(

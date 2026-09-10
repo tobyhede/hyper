@@ -19,7 +19,7 @@ export default { title: 'Review/Selected Edge On Canvas' };
  * are here to be looked at while the surface is being changed.
  */
 
-/** As an author meets it: the whole Layout in view, controls at that scale. */
+/** As an author meets it: the whole Diagram in view, controls at that scale. */
 export const AtOverviewZoom: Story = () => <SelectedEdgeCanvasFixture />;
 AtOverviewZoom.meta = { iframed: true };
 
@@ -44,7 +44,7 @@ EditorOnCanvas.meta = { iframed: true };
 /** A refused Delete, drawn where the author is actually looking. */
 export const DeletionRefusalOnCanvas: Story = () => (
   <SelectedEdgeCanvasFixture
-    refusal={{ kind: 'deletion', refusal: { code: 'layout-required', operation: 'deleted-edge' } }}
+    refusal={{ kind: 'deletion', refusal: { code: 'diagram-required', operation: 'deleted-edge' } }}
   />
 );
 DeletionRefusalOnCanvas.meta = { iframed: true };

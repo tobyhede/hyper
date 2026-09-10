@@ -7,16 +7,16 @@ const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuid('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuid('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000004');
-const LAYOUT_ID = uuid('00000000-0000-4000-8000-000000000022');
+const DIAGRAM_ID = uuid('00000000-0000-4000-8000-000000000022');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Snapshot space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
+        id: DIAGRAM_ID,
         title: 'Working',
         kind: 'positioned',
         positions: {
@@ -101,13 +101,13 @@ describe('loadSpaceSnapshot', () => {
   });
 
   it('returns the parsed snapshot accepted by intake', () => {
-    // The parsed value and not the argument: a Layout written without its
-    // `kind` is the shape `layoutSchema` fills in, so a snapshot carrying the
+    // The parsed value and not the argument: a Diagram written without its
+    // `kind` is the shape `diagramSchema` fills in, so a snapshot carrying the
     // default back is the parse's own answer rather than the input echoed.
-    const { kind: _kind, ...authoredLayout } = snapshot.document.layouts![0]!;
+    const { kind: _kind, ...authoredDiagram } = snapshot.document.diagrams![0]!;
     const result = loadSpaceSnapshot({
       ...snapshot,
-      document: { ...snapshot.document, layouts: [authoredLayout] },
+      document: { ...snapshot.document, diagrams: [authoredDiagram] },
     });
 
     expect(result.ok).toBe(true);
@@ -123,7 +123,7 @@ describe('loadSpaceSnapshot', () => {
     // because the refusal is by policy rather than by name (ADR 0056).
     const result = loadSpaceSnapshot({
       ...snapshot,
-      document: { ...snapshot.document, undeclaredKey: LAYOUT_ID },
+      document: { ...snapshot.document, undeclaredKey: DIAGRAM_ID },
     });
 
     expect(result.ok).toBe(false);

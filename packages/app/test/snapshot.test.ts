@@ -3,31 +3,31 @@ import { spaceSnapshotSchema, uuidSchema, type Graph } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import {
   snapshotFromSpace,
-  updatePositionedLayout,
-  withCardRemovedFromLayouts,
+  updatePositionedDiagram,
+  withCardRemovedFromDiagrams,
 } from '../src/snapshot';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
-/** A Card no Layout in these fixtures places or connects. */
+/** A Card no Diagram in these fixtures places or connects. */
 const UNHELD_CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 const MAIN: Graph = { id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] };
 
-/** One Layout owning one Graph over both its Cards — the first-public shape (ADR 0040). */
+/** One Diagram owning one Graph over both its Cards — the first-public shape (ADR 0040). */
 const snapshot = spaceSnapshotSchema.parse({
   id: '00000000-0000-4000-8000-000000000001',
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: {
           [CARD_A]: { x: 0, y: 0, open: false },
@@ -43,10 +43,10 @@ const snapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-it('writes a Layout that owns its Graphs as a complete valid persistence snapshot', () => {
-  const changed = updatePositionedLayout(snapshot, {
-    layoutId: LAYOUT_ID,
-    title: 'Layout',
+it('writes a Diagram that owns its Graphs as a complete valid persistence snapshot', () => {
+  const changed = updatePositionedDiagram(snapshot, {
+    diagramId: DIAGRAM_ID,
+    title: 'Diagram',
     positions: Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: false }],
       [CARD_B, { x: 300, y: 40, open: false }],
@@ -56,11 +56,11 @@ it('writes a Layout that owns its Graphs as a complete valid persistence snapsho
   });
 
   expect(changed.cards).toEqual(snapshot.cards);
-  expect(changed.document.defaultLayout).toBe(LAYOUT_ID);
-  expect(changed.document.layouts).toEqual([
+  expect(changed.document.defaultDiagram).toBe(DIAGRAM_ID);
+  expect(changed.document.diagrams).toEqual([
     {
-      id: LAYOUT_ID,
-      title: 'Layout',
+      id: DIAGRAM_ID,
+      title: 'Diagram',
       kind: 'positioned',
       positions: {
         [CARD_A]: { x: 10, y: 20, open: false },
@@ -73,20 +73,20 @@ it('writes a Layout that owns its Graphs as a complete valid persistence snapsho
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
 });
 
-/** A new Layout owns its Graph; there is no Space-level Graph collection. */
-it('appends a Layout owning its own Graph without touching the other Layouts', () => {
+/** A new Diagram owns its Graph; there is no Space-level Graph collection. */
+it('appends a Diagram owning its own Graph without touching the other Diagrams', () => {
   const minted: Graph = { id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] };
-  const changed = updatePositionedLayout(snapshot, {
-    layoutId: OTHER_LAYOUT_ID,
-    title: 'Layout 2',
+  const changed = updatePositionedDiagram(snapshot, {
+    diagramId: OTHER_DIAGRAM_ID,
+    title: 'Diagram 2',
     positions: Placement.fromEntries([[CARD_A, { x: 1, y: 2, open: false }]]),
     graphs: [minted],
     activeGraphId: OTHER_GRAPH_ID,
   });
 
-  expect(changed.document.layouts).toHaveLength(2);
-  expect(changed.document.layouts?.[1]?.graphs).toEqual([minted]);
-  expect(changed.document.layouts?.[1]?.activeGraph).toBe(OTHER_GRAPH_ID);
+  expect(changed.document.diagrams).toHaveLength(2);
+  expect(changed.document.diagrams?.[1]?.graphs).toEqual([minted]);
+  expect(changed.document.diagrams?.[1]?.activeGraph).toBe(OTHER_GRAPH_ID);
   expect(Object.hasOwn(changed.document, 'graphs')).toBe(false);
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
 });
@@ -100,15 +100,15 @@ it('converts the validated runtime aggregate back to the persistence seam', () =
   expect(snapshotFromSpace(loaded.space).document.version).toBe(1);
 });
 
-it('leaves unrelated layouts standing while replacing placement', () => {
-  const withLayouts = spaceSnapshotSchema.parse({
+it('leaves unrelated diagrams standing while replacing placement', () => {
+  const withDiagrams = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
       ...snapshot.document,
-      layouts: [
-        ...(snapshot.document.layouts ?? []),
+      diagrams: [
+        ...(snapshot.document.diagrams ?? []),
         {
-          id: OTHER_LAYOUT_ID,
+          id: OTHER_DIAGRAM_ID,
           title: 'Other',
           kind: 'positioned',
           positions: { [CARD_A]: { x: 0, y: 400, open: false } },
@@ -118,9 +118,9 @@ it('leaves unrelated layouts standing while replacing placement', () => {
     },
   });
 
-  const changed = updatePositionedLayout(withLayouts, {
-    layoutId: LAYOUT_ID,
-    title: 'Layout',
+  const changed = updatePositionedDiagram(withDiagrams, {
+    diagramId: DIAGRAM_ID,
+    title: 'Diagram',
     positions: Placement.fromEntries([
       [CARD_A, { x: 5, y: 6, open: false }],
       [CARD_B, { x: 7, y: 8, open: false }],
@@ -129,12 +129,12 @@ it('leaves unrelated layouts standing while replacing placement', () => {
     activeGraphId: GRAPH_ID,
   });
 
-  expect(changed.document.layouts).toHaveLength(2);
-  expect(changed.document.layouts?.map((layout) => layout.id)).toEqual([
-    LAYOUT_ID,
-    OTHER_LAYOUT_ID,
+  expect(changed.document.diagrams).toHaveLength(2);
+  expect(changed.document.diagrams?.map((diagram) => diagram.id)).toEqual([
+    DIAGRAM_ID,
+    OTHER_DIAGRAM_ID,
   ]);
-  expect(changed.document.layouts?.[1]).toEqual(withLayouts.document.layouts?.[1]);
+  expect(changed.document.diagrams?.[1]).toEqual(withDiagrams.document.diagrams?.[1]);
   expect(changed.cards).toEqual(snapshot.cards);
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
 });
@@ -146,9 +146,9 @@ it('leaves unrelated layouts standing while replacing placement', () => {
  * instruction to erase.
  */
 it('leaves an authored active Graph alone when the Edit names none', () => {
-  const changed = updatePositionedLayout(snapshot, {
-    layoutId: LAYOUT_ID,
-    title: 'Layout',
+  const changed = updatePositionedDiagram(snapshot, {
+    diagramId: DIAGRAM_ID,
+    title: 'Diagram',
     positions: Placement.fromEntries([
       [CARD_A, { x: 5, y: 6, open: false }],
       [CARD_B, { x: 7, y: 8, open: false }],
@@ -157,12 +157,12 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
     activeGraphId: null,
   });
 
-  expect(changed.document.layouts?.[0]?.activeGraph).toBeUndefined();
+  expect(changed.document.diagrams?.[0]?.activeGraph).toBeUndefined();
 
-  const authored = updatePositionedLayout(
-    updatePositionedLayout(snapshot, {
-      layoutId: LAYOUT_ID,
-      title: 'Layout',
+  const authored = updatePositionedDiagram(
+    updatePositionedDiagram(snapshot, {
+      diagramId: DIAGRAM_ID,
+      title: 'Diagram',
       positions: Placement.fromEntries([
         [CARD_A, { x: 5, y: 6, open: false }],
         [CARD_B, { x: 7, y: 8, open: false }],
@@ -171,8 +171,8 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
       activeGraphId: GRAPH_ID,
     }),
     {
-      layoutId: LAYOUT_ID,
-      title: 'Layout',
+      diagramId: DIAGRAM_ID,
+      title: 'Diagram',
       positions: Placement.fromEntries([
         [CARD_A, { x: 9, y: 9, open: false }],
         [CARD_B, { x: 7, y: 8, open: false }],
@@ -182,25 +182,25 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
     },
   );
 
-  expect(authored.document.layouts?.[0]?.activeGraph).toBe(GRAPH_ID);
+  expect(authored.document.diagrams?.[0]?.activeGraph).toBe(GRAPH_ID);
   expect(loadSpaceSnapshot(authored).ok).toBe(true);
 });
 
 /**
- * Deleting a Card from the Space is one Edit over every Layout at once, and this
- * is the part of it no single-Layout write can do: the Card's membership and its
- * incident Edges leave every Layout that held them, while empty Graphs and
- * Layouts stay exactly where they were.
+ * Deleting a Card from the Space is one Edit over every Diagram at once, and this
+ * is the part of it no single-Diagram write can do: the Card's membership and its
+ * incident Edges leave every Diagram that held them, while empty Graphs and
+ * Diagrams stay exactly where they were.
  */
-it('cascades a deleted Card out of every Layout that held it', () => {
-  const withLayouts = spaceSnapshotSchema.parse({
+it('cascades a deleted Card out of every Diagram that held it', () => {
+  const withDiagrams = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
       ...snapshot.document,
-      layouts: [
-        ...(snapshot.document.layouts ?? []),
+      diagrams: [
+        ...(snapshot.document.diagrams ?? []),
         {
-          id: OTHER_LAYOUT_ID,
+          id: OTHER_DIAGRAM_ID,
           title: 'Other',
           kind: 'positioned',
           positions: {
@@ -222,46 +222,46 @@ it('cascades a deleted Card out of every Layout that held it', () => {
     },
   });
 
-  const changed = withCardRemovedFromLayouts(withLayouts, CARD_A);
+  const changed = withCardRemovedFromDiagrams(withDiagrams, CARD_A);
 
-  expect(changed.document.layouts?.[0]?.positions).toEqual({
+  expect(changed.document.diagrams?.[0]?.positions).toEqual({
     [CARD_B]: { x: 200, y: 0, open: false },
   });
-  expect(changed.document.layouts?.[0]?.graphs).toEqual([{ ...MAIN, edges: [] }]);
-  expect(changed.document.layouts?.[1]?.positions).toEqual({
+  expect(changed.document.diagrams?.[0]?.graphs).toEqual([{ ...MAIN, edges: [] }]);
+  expect(changed.document.diagrams?.[1]?.positions).toEqual({
     [CARD_B]: { x: 0, y: 600, open: false },
   });
-  expect(changed.document.layouts?.[1]?.graphs).toEqual([
+  expect(changed.document.diagrams?.[1]?.graphs).toEqual([
     { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
   ]);
   // The Card itself is the caller's to remove: this answers only what the
-  // Layouts hold, so an intake over the result still names the Card it lists.
-  expect(changed.cards).toEqual(withLayouts.cards);
+  // Diagrams hold, so an intake over the result still names the Card it lists.
+  expect(changed.cards).toEqual(withDiagrams.cards);
 });
 
-it('answers the snapshot it was given when no Layout held the Card', () => {
-  expect(withCardRemovedFromLayouts(snapshot, UNHELD_CARD)).toBe(snapshot);
+it('answers the snapshot it was given when no Diagram held the Card', () => {
+  expect(withCardRemovedFromDiagrams(snapshot, UNHELD_CARD)).toBe(snapshot);
 });
 
 /**
- * The cascade half of Delete Card from Space owes the reclaim the single-Layout
+ * The cascade half of Delete Card from Space owes the reclaim the single-Diagram
  * half owes (ADR 0084). Under the derivation ADR 0084 removed, dropping a
  * Card's entry dropped its displacement with it; now the room an Open Card
- * holds is written into its neighbours' own coordinates, so a Layout the Edit
+ * holds is written into its neighbours' own coordinates, so a Diagram the Edit
  * is not drawing would keep that room forever — with no Card left on that
  * canvas to Close and no Edit that could give it back.
  */
-it('reclaims the room an Open Card held in every Layout it is deleted from', () => {
-  // CARD_A is Open at 800x600 in the second Layout, so its growth of 540x454
+it('reclaims the room an Open Card held in every Diagram it is deleted from', () => {
+  // CARD_A is Open at 800x600 in the second Diagram, so its growth of 540x454
   // is already written into CARD_B's coordinates there: (100, 100) + (540, 454).
-  const withLayouts = spaceSnapshotSchema.parse({
+  const withDiagrams = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
       ...snapshot.document,
-      layouts: [
-        ...(snapshot.document.layouts ?? []),
+      diagrams: [
+        ...(snapshot.document.diagrams ?? []),
         {
-          id: OTHER_LAYOUT_ID,
+          id: OTHER_DIAGRAM_ID,
           title: 'Other',
           kind: 'positioned',
           positions: {
@@ -274,9 +274,9 @@ it('reclaims the room an Open Card held in every Layout it is deleted from', () 
     },
   });
 
-  const changed = withCardRemovedFromLayouts(withLayouts, CARD_A);
+  const changed = withCardRemovedFromDiagrams(withDiagrams, CARD_A);
 
-  expect(changed.document.layouts?.[1]?.positions).toEqual({
+  expect(changed.document.diagrams?.[1]?.positions).toEqual({
     [CARD_B]: { x: 100, y: 100, open: false },
   });
 });

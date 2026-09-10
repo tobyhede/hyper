@@ -13,7 +13,7 @@ import {
   selectedCanvas,
   settled,
 } from './graph';
-import { seedPositionedLayout, type HttpLoadedSpace } from './seed';
+import { seedPositionedDiagram, type HttpLoadedSpace } from './seed';
 
 /**
  * Opening the app with nothing to open gives a new space: one card (ADR 0018).
@@ -22,16 +22,16 @@ import { seedPositionedLayout, type HttpLoadedSpace } from './seed';
  * startup creates the one-card Space once, and reloads reopen that durable UUID.
  */
 
-const seedNewSpaceLayout = (page: Page) =>
-  seedPositionedLayout(page, 'Authored Layout', (snapshot) => {
+const seedNewSpaceDiagram = (page: Page) =>
+  seedPositionedDiagram(page, 'Authored Diagram', (snapshot) => {
     const cardId = snapshot.cards[0]?.id;
     if (cardId === undefined) throw new Error('The new Space must hold Card 1.');
     return { [cardId]: { x: 0, y: 0, open: false } };
   });
 
-/** A new Space already owns its complete first Layout and centered Card. */
-const createLayout = async (page: Page): Promise<void> => {
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
+/** A new Space already owns its complete first Diagram and centered Card. */
+const createDiagram = async (page: Page): Promise<void> => {
+  await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
   await settled(page);
@@ -100,7 +100,9 @@ test('shows one card, and it is the only thing on screen', async ({ page }) => {
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
-test('starts in a complete authored Layout with its first empty Active Graph', async ({ page }) => {
+test('starts in a complete authored Diagram with its first empty Active Graph', async ({
+  page,
+}) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
@@ -111,14 +113,14 @@ test('starts in a complete authored Layout with its first empty Active Graph', a
   await expect(handles).toHaveCount(4);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await expect(activeGraph(page)).toHaveText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(createCardControl(page)).not.toHaveAttribute('aria-disabled', 'true');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
 test('Alt toggles a transient Card 2 preview during an empty connection drag', async ({ page }) => {
   await page.goto('/');
-  await createLayout(page);
+  await createDiagram(page);
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
   await settled(page);
@@ -152,7 +154,7 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   page,
 }) => {
   await page.goto('/');
-  await createLayout(page);
+  await createDiagram(page);
   const sourceCard = nodeByTitle(page, 'Card 1');
   await expect(sourceCard).toBeVisible();
   await settled(page);
@@ -188,7 +190,7 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   expect(createdBox.y + createdBox.height / 2).toBeCloseTo(dropPoint.y, 0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
@@ -203,23 +205,23 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
 });
 
 /**
- * A selected Layout always has a Graph to author into.
+ * A selected Diagram always has a Graph to author into.
  *
- * Creating a Layout creates its initial Active Graph in the same Edit (ADR
- * 0040), so the seeded Layout owns one from the start — empty, exactly as a
- * conversion leaves it. What the drop does is put the Layout's *first Edge* in
+ * Creating a Diagram creates its initial Active Graph in the same Edit (ADR
+ * 0040), so the seeded Diagram owns one from the start — empty, exactly as a
+ * conversion leaves it. What the drop does is put the Diagram's *first Edge* in
  * the Graph it already owns, rather than minting a second one beside it.
  */
-test('Alt empty-drop authors the first Edge into the Graph a selected Layout owns', async ({
+test('Alt empty-drop authors the first Edge into the Graph a selected Diagram owns', async ({
   page,
 }) => {
-  const seeded = await seedNewSpaceLayout(page);
+  const seeded = await seedNewSpaceDiagram(page);
   const persistedRevision = String(BigInt(seeded.revision) + 1n);
   await page.goto('/');
 
   const sourceCard = nodeByTitle(page, 'Card 1');
   await expect(sourceCard).toBeVisible();
-  await expect(selectedCanvas(page)).toContainText('Authored Layout');
+  await expect(selectedCanvas(page)).toContainText('Authored Diagram');
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await settled(page);
@@ -231,7 +233,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Layout own
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Authored Layout');
+  await expect(selectedCanvas(page)).toContainText('Authored Diagram');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -243,7 +245,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Layout own
   await expect(nodeByTitle(page, 'Card 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Authored Layout');
+  await expect(selectedCanvas(page)).toContainText('Authored Diagram');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -252,7 +254,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Layout own
 
 test('an Alt-drop released off the canvas creates no Card', async ({ page }) => {
   await page.goto('/');
-  await createLayout(page);
+  await createDiagram(page);
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
   await settled(page);
@@ -290,11 +292,11 @@ test('an Alt-drop released off the canvas creates no Card', async ({ page }) => 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
-test('the first self-connection authors into the Graph the explicit Layout owns', async ({
+test('the first self-connection authors into the Graph the explicit Diagram owns', async ({
   page,
 }) => {
   await page.goto('/');
-  await createLayout(page);
+  await createDiagram(page);
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
   await settled(page);
@@ -310,17 +312,19 @@ test('the first self-connection authors into the Graph the explicit Layout owns'
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  // Authoring the Edge must not move the Card already placed in the Layout.
+  // Authoring the Edge must not move the Card already placed in the Diagram.
   await settled(page);
   expect(await positionOf(card)).toEqual(before);
 });
 
-test('the Graph the explicit Layout owns can be self-connected and presented', async ({ page }) => {
+test('the Graph the explicit Diagram owns can be self-connected and presented', async ({
+  page,
+}) => {
   await page.goto('/');
-  await createLayout(page);
+  await createDiagram(page);
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
   await settled(page);
@@ -349,13 +353,13 @@ test('the Graph the explicit Layout owns can be self-connected and presented', a
 
 test(
   'shows the empty initial Graph and its graph HUD',
-  { tag: '@parity:command-dock-names-a-new-spaces-initial-layout-and-graph' },
+  { tag: '@parity:command-dock-names-a-new-spaces-initial-diagram-and-graph' },
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
 
     await expect(activeGraph(page)).toHaveText('Graph 1');
-    await expect(selectedCanvas(page)).toContainText('Layout 1');
+    await expect(selectedCanvas(page)).toContainText('Diagram 1');
     // `aria-disabled` rather than the attribute — a toolbar item stays focusable
     // while it is unavailable (ADR 0073).
     await expect(presentControl(page)).toHaveAttribute('aria-disabled', 'true');
@@ -365,7 +369,7 @@ test(
 
 test('its one centered authored Card is draggable', async ({ page }) => {
   await page.goto('/');
-  await createLayout(page);
+  await createDiagram(page);
 
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
@@ -396,7 +400,7 @@ test('renders at natural size rather than filling the screen', async ({ page }) 
 
 test('persists a completed edit through the backend session', async ({ page }) => {
   await page.goto('/');
-  await createLayout(page);
+  await createDiagram(page);
 
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
@@ -409,7 +413,7 @@ test('persists a completed edit through the backend session', async ({ page }) =
 
 test('a completed edit and space identity survive reload', async ({ page }) => {
   await page.goto('/');
-  await createLayout(page);
+  await createDiagram(page);
   const first = nodeByTitle(page, 'Card 1');
   await expect(first).toBeVisible();
   const firstId = await first.getAttribute('data-id');
@@ -462,7 +466,7 @@ test(
     const cardId = loaded.snapshot.cards[0]?.id;
     if (cardId === undefined) throw new Error('The new Space must hold Card 1.');
 
-    const layoutId = '00000000-0000-4000-8000-0000000000fe';
+    const diagramId = '00000000-0000-4000-8000-0000000000fe';
     const graphId = '00000000-0000-4000-8000-0000000000fd';
     const missingCardId = '00000000-0000-4000-8000-0000000000ff';
     await page.route('**/api/spaces/*', async (route) => {
@@ -483,10 +487,10 @@ test(
             ...loaded.snapshot,
             document: {
               ...loaded.snapshot.document,
-              layouts: [
+              diagrams: [
                 {
-                  id: layoutId,
-                  title: 'Layout',
+                  id: diagramId,
+                  title: 'Diagram',
                   kind: 'positioned',
                   positions: { [cardId]: { x: 0, y: 0, open: false } },
                   graphs: [
@@ -494,7 +498,7 @@ test(
                   ],
                 },
               ],
-              defaultLayout: layoutId,
+              defaultDiagram: diagramId,
             },
           },
         }),

@@ -6,8 +6,8 @@ import {
   createCard,
   createCardControl,
   dock,
-  layoutMenu,
-  newLayout,
+  diagramMenu,
+  newDiagram,
   nodeByTitle,
   presentControl,
   selectCanvas,
@@ -66,7 +66,7 @@ test(
     await expect(page.getByTestId('active-graph')).toBeVisible();
     await expect(dock(page).getByRole('button', { name: 'Cards' })).toBeVisible();
 
-    // And every disclosure still discloses. The Layout menu is opened, a choice
+    // And every disclosure still discloses. The Diagram menu is opened, a choice
     // is made, and the result is on the canvas with nothing dismissed in
     // between — which is the sentence the Sheet's contract used to be about.
     await selectCanvas(page, 'Collection 2');
@@ -112,23 +112,23 @@ test('Create Alias from the strip opens the Target picker', async ({ page }) => 
 });
 
 /**
- * New Layout at phone width, and the Delete that undoes it.
+ * New Diagram at phone width, and the Delete that undoes it.
  *
- * Both are rows in the Layout menu rather than a permanent control and a row
+ * Both are rows in the Diagram menu rather than a permanent control and a row
  * menu, which is the one thing the narrower box changed about them.
  */
-test('New Layout selects an empty authored Layout, and Delete returns to the one before', async ({
+test('New Diagram selects an empty authored Diagram, and Delete returns to the one before', async ({
   page,
 }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await newLayout(page);
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await newDiagram(page);
+  await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
-  // An empty Layout reveals the Cards drawer, which at this width overlays the
+  // An empty Diagram reveals the Cards drawer, which at this width overlays the
   // end of the strip — so it is dismissed before the next command rather than
   // reached around. That is the drawer's own contract and not the Dock's: a
   // surface the author opens is dismissed by the author.
@@ -136,8 +136,8 @@ test('New Layout selects an empty authored Layout, and Delete returns to the one
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
 
-  const menu = await layoutMenu(page);
-  await menu.getByRole('menuitem', { name: 'Delete Layout 1' }).click();
+  const menu = await diagramMenu(page);
+  await menu.getByRole('menuitem', { name: 'Delete Diagram 1' }).click();
   await expect(selectedCanvas(page)).toContainText('Collection 1');
 });
 
@@ -199,7 +199,7 @@ test('one disclosure is open at a time', async ({ page }) => {
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await layoutMenu(page);
+  await diagramMenu(page);
   await expect(page.getByRole('menu')).toHaveCount(1);
 
   // **The second trigger is pressed directly.** `disclose` dismisses whatever is

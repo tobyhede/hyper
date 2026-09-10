@@ -94,7 +94,7 @@ const targetTitle = (card: Card, titleById: ReadonlyMap<CardId, string>): string
 const frontOf = (card: Card) => {
   if (card.kind === 'alias') return { kind: 'alias' as const, source: '', open: false };
   // Closed, always: this list draws Cards that are *not* on the canvas, so no
-  // entry here carries the Layout's Open state and none offers the selections
+  // entry here carries the Diagram's Open state and none offers the selections
   // an Open Space Card authors.
   if (card.kind === 'space') return { kind: 'space' as const, open: false };
   return { kind: 'markdown' as const, source: card.body, open: false as const };
@@ -127,11 +127,11 @@ const emptyMessage = (available: number, inSpace: number): string =>
   inSpace === 0
     ? 'This Space has no Cards.'
     : available === 0
-      ? 'All Cards are in this Layout.'
+      ? 'All Cards are in this Diagram.'
       : 'No matching Cards.';
 
 /**
- * The Cards View: existing Cards absent from the selected Layout.
+ * The Cards View: existing Cards absent from the selected Diagram.
  *
  * A `Drawer` rather than a second `Sidebar` — ADR 0053 gives the one Sidebar the
  * left edge, and composing another on the right made this panel share the
@@ -315,7 +315,7 @@ export function CardsDrawer({
                         setRefusal(onAdd(card, event.detail === 0 ? 'keyboard' : 'pointer'))
                       }
                       className="block rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      aria-label={`Add ${titleName(card.title)} to Layout`}
+                      aria-label={`Add ${titleName(card.title)} to Diagram`}
                     >
                       {/* The whole Title, because this *is* a Card front and
                           the front is the one surface that draws the ladder —

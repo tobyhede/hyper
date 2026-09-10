@@ -49,7 +49,7 @@ export type CanvasCardFront =
       readonly autoFocusEditor?: never;
     })
   | (CanvasMarkdownCardFront & {
-      /** Authored Layout state. CanvasCard renders it; it does not own it. */
+      /** Authored Diagram state. CanvasCard renders it; it does not own it. */
       readonly open: true;
       /** Present exactly while the Markdown body holds the canvas caret. */
       readonly editor?: CanvasCardBodyEditor;
@@ -60,17 +60,17 @@ export type CanvasCardFront =
       readonly kind: 'alias';
       /** The resolved Target Markdown this Alias displays read-only. */
       readonly source: string;
-      /** Authored Layout state; an Alias Opens through the shared Card operation. */
+      /** Authored Diagram state; an Alias Opens through the shared Card operation. */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
     }
   | {
       readonly kind: 'space';
-      /** Authored Layout state; a Space Card Opens through the shared Card operation. */
+      /** Authored Diagram state; a Space Card Opens through the shared Card operation. */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /**
-       * What an Open Space Card offers to author: the target's Layouts, the
+       * What an Open Space Card offers to author: the target's Diagrams, the
        * Graphs of the selected one, and this Card's own selections. Absent while
        * the target Space has not been read yet.
        */
@@ -88,25 +88,25 @@ export interface CanvasSpaceCardChoice {
  * them from.
  *
  * One interface rather than four loose props, because the four move together:
- * the Graphs on offer are the selected Layout's, so a caller that changed the
- * Layout without changing the list beside it would be offering Graphs from a
- * Layout this Card no longer shows. Which Layouts and Graphs exist is the target
+ * the Graphs on offer are the selected Diagram's, so a caller that changed the
+ * Diagram without changing the list beside it would be offering Graphs from a
+ * Diagram this Card no longer shows. Which Diagrams and Graphs exist is the target
  * Space's business and neither is derived here.
  */
 export interface CanvasSpaceCardSelection {
-  readonly layouts: readonly CanvasSpaceCardChoice[];
+  readonly diagrams: readonly CanvasSpaceCardChoice[];
   readonly graphs: readonly CanvasSpaceCardChoice[];
-  /** The selected Layout, or `null` where the Card selects none. */
-  readonly layoutId: string | null;
+  /** The selected Diagram, or `null` where the Card selects none. */
+  readonly diagramId: string | null;
   readonly graphId: string | null;
-  readonly onLayoutChange: (layoutId: string) => void;
+  readonly onDiagramChange: (diagramId: string) => void;
   readonly onGraphChange: (graphId: string) => void;
   /**
    * The selections are read but cannot be changed right now.
    *
    * Distinct from an absent selection, which means the target Space has not
    * been read yet: a canvas that has withdrawn authoring — a creation pane is
-   * up, or the Space is presenting — still knows perfectly well which Layout
+   * up, or the Space is presenting — still knows perfectly well which Diagram
    * and Graph this Card selects, and a Card that said otherwise would be
    * reporting a wait that had already ended.
    */
@@ -255,7 +255,7 @@ export function CanvasCard(props: CanvasCardProps) {
   const contentFront = front.kind === 'markdown' || front.kind === 'alias' ? front : undefined;
   /**
    * The kinds that carry authored Open/Closed state — every kind but the
-   * creation ghost, which is not a Card yet and so has no Layout to author it
+   * creation ghost, which is not a Card yet and so has no Diagram to author it
    * on. It is a wider set than `contentFront` because a Space Card Opens
    * without having any Markdown of its own to reveal: what it shows when it
    * opens is its two selectors, drawn in the body rather than above it.
@@ -563,8 +563,8 @@ interface SpaceCardSelectorsProps {
 }
 
 /**
- * What an Open Space Card offers to author: which Layout of the referenced
- * Space it shows, and which Graph of that Layout.
+ * What an Open Space Card offers to author: which Diagram of the referenced
+ * Space it shows, and which Graph of that Diagram.
  *
  * The absent case is a line of prose and nothing else. A `Spinner` would be a
  * second thing to look at on a Card whose whole content is two short controls,
@@ -579,12 +579,12 @@ function SpaceCardSelectors({ selection }: SpaceCardSelectorsProps) {
   return (
     <div className="canvas-card__space-selectors">
       <SpaceCardSelector
-        label="Layout"
-        testId="space-card-layout"
-        choices={selection.layouts}
-        chosen={selection.layoutId}
+        label="Diagram"
+        testId="space-card-diagram"
+        choices={selection.diagrams}
+        chosen={selection.diagramId}
         disabled={selection.disabled === true}
-        onChoose={selection.onLayoutChange}
+        onChoose={selection.onDiagramChange}
       />
       <SpaceCardSelector
         label="Graph"
@@ -609,7 +609,7 @@ interface SpaceCardSelectorProps {
 }
 
 /**
- * One of the two, so the Layout and the Graph cannot drift apart in treatment,
+ * One of the two, so the Diagram and the Graph cannot drift apart in treatment,
  * labelling or keyboard behaviour.
  *
  * The shared `Select` (ADR 0050), which until now had no consumer: opening,
@@ -629,7 +629,7 @@ interface SpaceCardSelectorProps {
  * with no Graphs is an ordinary thing to reference, and a control that opens
  * onto an empty list says "look again" where an unavailable one says "there are
  * none". A canvas that has withdrawn authoring disables it the same way, and
- * for the reason it still draws the selection at all: which Layout this Card
+ * for the reason it still draws the selection at all: which Diagram this Card
  * shows is known, and only changing it is unavailable.
  *
  * `SelectValue`'s function child resolves the selected id against this list

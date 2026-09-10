@@ -15,7 +15,7 @@ function loadFixture(): Space {
       version: 1,
       id: '00000000-0000-4000-8000-000000000001',
       title: 'T',
-      layouts: [
+      diagrams: [
         {
           id: '00000000-0000-4000-8000-000000000022',
           title: 'Working',
@@ -76,7 +76,7 @@ describe('buildLayoutStrategyGraph', () => {
       { id: '00000000-0000-4000-8000-000000000004::in', side: 'in' },
       { id: '00000000-0000-4000-8000-000000000004::out', side: 'out' },
     ]);
-    // Nothing is positioned yet — that is the layout's job.
+    // Nothing is positioned yet — that is the diagram's job.
     expect(b.x).toBeUndefined();
   });
 

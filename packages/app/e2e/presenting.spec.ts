@@ -152,7 +152,7 @@ test(
     await present(page);
     // **The whole surface goes, rather than its commands one at a time.** The
     // Sidebar withdrew authoring item by item and this test named which items
-    // left a Layout row's menu; the Dock is furniture over the paper, so
+    // left a Diagram row's menu; the Dock is furniture over the paper, so
     // presenting removes the furniture and there is no menu left to withdraw
     // anything from. What the audience is left with is the canvas and
     // `PresentingChrome`, which carries the way out.
@@ -382,7 +382,7 @@ test(
     await expect(page.locator('.react-flow__node').first()).toBeVisible();
     await settled(page);
 
-    // An authored Layout, so the Edge joins a Graph that already holds one out
+    // An authored Diagram, so the Edge joins a Graph that already holds one out
     // of A rather than the empty Graph a conversion would mint (ADR 0045).
     await selectCanvas(page, 'Collection 1');
     await activateGraph(page, 'Short');
@@ -396,7 +396,7 @@ test(
       authoringHandle(a, 'source', 'right'),
       authoringHandle(c, 'target', 'top'),
     );
-    // Attached rather than visible: A and C sit on the same row of this Layout,
+    // Attached rather than visible: A and C sit on the same row of this Diagram,
     // so the Edge is a flat line whose box has no height — which Playwright
     // reads as hidden.
     await expect(page.getByLabel(/^Edge from A to C in Short$/)).toBeAttached();

@@ -20,23 +20,23 @@ import { openTestSpace } from './opened-space';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Target',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout 1',
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: { [CARD_A]: { x: 10, y: 20, open: false } },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [{ id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
 };
@@ -56,7 +56,7 @@ const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
  * The embedded composition, reporting where its target's composition does.
  *
  * The reporter is taken off the entry rather than handed in beside it, because
- * that is the one `EmbeddedLayoutAuthoring` spends (ADR 0016) — a recording one
+ * that is the one `EmbeddedDiagramAuthoring` spends (ADR 0016) — a recording one
  * supplied straight to the factory would prove the argument and not the wiring.
  */
 const embedded = () => {
@@ -64,12 +64,12 @@ const embedded = () => {
   const entry = openEntry((error) => {
     reported.push(error);
   });
-  const composition = createEmbeddedAuthoring(entry, LAYOUT_ID, entry.app.reportObserverError);
+  const composition = createEmbeddedAuthoring(entry, DIAGRAM_ID, entry.app.reportObserverError);
   return { composition, reported };
 };
 
-describe('a completion an embedded Layout does not support', () => {
-  it('is reported as an invariant rather than refused as an Edge that leaves the Layout', () => {
+describe('a completion an embedded Diagram does not support', () => {
+  it('is reported as an invariant rather than refused as an Edge that leaves the Diagram', () => {
     const { composition, reported } = embedded();
 
     const result = composition.authoring.complete({
@@ -77,7 +77,7 @@ describe('a completion an embedded Layout does not support', () => {
       anchor: { x: 0, y: 0 },
     });
 
-    expect(result).not.toMatchObject({ refusal: { code: 'edge-card-outside-layout' } });
+    expect(result).not.toMatchObject({ refusal: { code: 'edge-card-outside-diagram' } });
     expect(result).toEqual({ kind: 'unchanged' });
     expect(reported).toHaveLength(1);
     expect(reported[0]).toBeInstanceOf(Error);
@@ -99,7 +99,7 @@ describe('a completion an embedded Layout does not support', () => {
     const entry = openEntry(() => {
       throw new Error('reporter failed');
     });
-    const composition = createEmbeddedAuthoring(entry, LAYOUT_ID, entry.app.reportObserverError);
+    const composition = createEmbeddedAuthoring(entry, DIAGRAM_ID, entry.app.reportObserverError);
 
     expect(composition.authoring.complete({ kind: 'deleted-card', cardId: CARD_A })).toEqual({
       kind: 'unchanged',
@@ -127,7 +127,7 @@ describe('a completion an embedded Layout does not support', () => {
   });
 
   /** The six supported kinds still reach the target's own Space Authoring. */
-  it('still forwards a supported kind into the Layout', () => {
+  it('still forwards a supported kind into the Diagram', () => {
     const { composition, reported } = embedded();
 
     expect(composition.authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toMatchObject({

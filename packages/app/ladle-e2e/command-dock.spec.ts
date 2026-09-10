@@ -32,8 +32,8 @@ const surface = (page: Page) => page.getByRole('toolbar', { name: 'Command Dock'
  * `link-actions.spec.ts`, where the regression it caught happened.
  */
 const disclose = async (page: Page, name: string) => {
-  // `exact`, because every identity draws its own name twice: `Layout:
-  // Collection 1` on the disclosure and `Rename Layout: Collection 1` on the
+  // `exact`, because every identity draws its own name twice: `Diagram:
+  // Collection 1` on the disclosure and `Rename Diagram: Collection 1` on the
   // control beside it, and a substring match resolves to both.
   await surface(page).getByRole('button', { name, exact: true }).click({ delay: 120 });
   const menu = page.getByRole('menu').last();
@@ -43,23 +43,23 @@ const disclose = async (page: Page, name: string) => {
 
 /**
  * ADR 0053's one surviving clause, kept verbatim by ADR 0082: the canvas takes
- * one exclusive choice over authored Layouts, with no second control and no
+ * one exclusive choice over authored Diagrams, with no second control and no
  * empty value.
  *
  * The list is a `DropdownMenuRadioGroup` rather than a column of pressed rows,
  * so what carries the choice is `aria-checked` on one item — and the cluster
- * outside the menu names the same Layout, which is the "no second control" half
+ * outside the menu names the same Diagram, which is the "no second control" half
  * read from the other side.
  */
 test(
-  'the Layout cluster is one exclusive list over the authored Layouts',
-  { tag: '@parity:command-dock-marks-one-current-layout' },
+  'the Diagram cluster is one exclusive list over the authored Diagrams',
+  { tag: '@parity:command-dock-marks-one-current-diagram' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
 
-    const menu = await disclose(page, 'Layout: Collection 1');
+    const menu = await disclose(page, 'Diagram: Collection 1');
     const chosen = menu.getByRole('menuitemradio', { name: 'Collection 1' });
     const other = menu.getByRole('menuitemradio', { name: 'Collection 2' });
     await expect(chosen).toHaveAttribute('aria-checked', 'true');
@@ -69,45 +69,45 @@ test(
     await other.click();
 
     await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
-    // And the Graphs follow the Layout that owns them (ADR 0040): `Echo` is
-    // `Collection 2`'s only Graph, and `Long` belongs to the Layout just left.
+    // And the Graphs follow the Diagram that owns them (ADR 0040): `Echo` is
+    // `Collection 2`'s only Graph, and `Long` belongs to the Diagram just left.
     await expect(page.getByTestId('active-graph')).toContainText('Echo');
     await expect(
-      surface(page).getByRole('button', { name: 'Layout: Collection 2', exact: true }),
+      surface(page).getByRole('button', { name: 'Diagram: Collection 2', exact: true }),
     ).toBeVisible();
   },
 );
 
 /**
- * New Layout is in the Layout menu, beside the list it adds to, and it adds an
+ * New Diagram is in the Diagram menu, beside the list it adds to, and it adds an
  * *empty* one (ADR 0079, ADR 0080).
  *
- * The Sidebar had room for a permanent Add Layout button; the Dock finds room by
+ * The Sidebar had room for a permanent Add Diagram button; the Dock finds room by
  * disclosure. What did not change is that the command creates and selects a
- * Layout with no Cards placed in it — the fixture writes the stored snapshot and
+ * Diagram with no Cards placed in it — the fixture writes the stored snapshot and
  * re-derives it through `loadSpaceSnapshot`, so an empty canvas here is an empty
- * authored Layout and not a list that forgot to draw.
+ * authored Diagram and not a list that forgot to draw.
  */
 test(
-  'New Layout creates and selects an empty Layout from the Layout menu',
-  { tag: '@parity:command-dock-adds-an-empty-layout' },
+  'New Diagram creates and selects an empty Diagram from the Diagram menu',
+  { tag: '@parity:command-dock-adds-an-empty-diagram' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     const nodes = page.locator('.react-flow__node');
     await expect(nodes.first()).toBeVisible();
 
-    const menu = await disclose(page, 'Layout: Collection 1');
-    await menu.getByRole('menuitem', { name: 'New Layout' }).click();
+    const menu = await disclose(page, 'Diagram: Collection 1');
+    await menu.getByRole('menuitem', { name: 'New Diagram' }).click();
 
-    // `Layout 1` is what `nextLayoutTitle` mints over `Collection 1` and
+    // `Diagram 1` is what `nextDiagramTitle` mints over `Collection 1` and
     // `Collection 2` — the application's own numbering, not a word this test
     // chose.
-    await expect(page.getByTestId('selected-canvas')).toContainText('Layout 1');
+    await expect(page.getByTestId('selected-canvas')).toContainText('Diagram 1');
     await expect(page.getByTestId('active-graph')).toContainText('Graph 1');
     await expect(nodes).toHaveCount(0);
 
-    const reopened = await disclose(page, 'Layout: Layout 1');
+    const reopened = await disclose(page, 'Diagram: Diagram 1');
     await expect(reopened.getByRole('menuitemradio')).toHaveCount(3);
   },
 );
@@ -120,14 +120,14 @@ test(
  * which address is "the link" here and which is the permanent one.
  */
 test(
-  'the Graph menu builds the Layout address and the Graph address separately',
+  'the Graph menu builds the Diagram address and the Graph address separately',
   { tag: '@parity:command-dock-copies-graph-destinations' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     const menu = await disclose(page, 'Active Graph: Long');
     await menu.getByRole('menuitem', { name: 'Copy link', exact: true }).click();
-    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'layout-graph');
+    await expect(page.locator('body')).toHaveAttribute('data-copy-command', 'diagram-graph');
 
     const reopened = await disclose(page, 'Active Graph: Long');
     await reopened.getByRole('menuitem', { name: 'Copy permanent link' }).click();
@@ -145,24 +145,24 @@ test(
  * focus back to itself.
  */
 test(
-  'the Layout and Graph names each edit in place and keep a refusal on the field',
+  'the Diagram and Graph names each edit in place and keep a refusal on the field',
   { tag: '@parity:command-dock-edits-identity-names' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     await page.getByTestId('selected-canvas').click();
-    const layoutName = page.getByRole('textbox', { name: 'Layout name' });
-    await expect(layoutName).toBeFocused();
-    await layoutName.fill('');
-    await layoutName.press('Enter');
-    await expect(page.getByText('A Layout needs a name.')).toBeVisible();
+    const diagramName = page.getByRole('textbox', { name: 'Diagram name' });
+    await expect(diagramName).toBeFocused();
+    await diagramName.fill('');
+    await diagramName.press('Enter');
+    await expect(page.getByText('A Diagram needs a name.')).toBeVisible();
     // Refused and still open: the words the author typed are still theirs.
-    await expect(layoutName).toBeVisible();
-    await layoutName.fill('Workshop');
-    await layoutName.press('Enter');
+    await expect(diagramName).toBeVisible();
+    await diagramName.fill('Workshop');
+    await diagramName.press('Enter');
     await expect(page.getByTestId('selected-canvas')).toContainText('Workshop');
     await expect(
-      surface(page).getByRole('button', { name: 'Layout: Workshop', exact: true }),
+      surface(page).getByRole('button', { name: 'Diagram: Workshop', exact: true }),
     ).toBeVisible();
 
     await page.getByTestId('active-graph').click();
@@ -240,7 +240,7 @@ test(
     await expect(page.getByTestId('active-graph')).toContainText('Long');
     await expect(surface(page).getByRole('button', { name: 'Cards' })).toBeVisible();
 
-    const menu = await disclose(page, 'Layout: Collection 1');
+    const menu = await disclose(page, 'Diagram: Collection 1');
     const frame = await dock(page).boundingBox();
     const popup = await menu.boundingBox();
     expect(frame).not.toBeNull();
@@ -264,23 +264,23 @@ test(
 );
 
 /**
- * A newly created Space opens complete: one authored Layout, selected, owning
+ * A newly created Space opens complete: one authored Diagram, selected, owning
  * one empty Active Graph (ADR 0018, ADR 0079, ADR 0080).
  *
- * `Layout 1`, `Graph 1` and `New space` are the titles `newSpace()` mints, read
+ * `Diagram 1`, `Graph 1` and `New space` are the titles `newSpace()` mints, read
  * rather than supplied — which is the evidence that this is really that Space
  * and not a stand-in wearing the catalogue's label. The Dock names both rather
  * than leaving a cluster blank, and Present is unavailable because an empty
  * Graph has nothing to traverse.
  */
 test(
-  'a new Space names its initial Layout and empty Graph and cannot present',
-  { tag: '@parity:command-dock-names-a-new-spaces-initial-layout-and-graph' },
+  'a new Space names its initial Diagram and empty Graph and cannot present',
+  { tag: '@parity:command-dock-names-a-new-spaces-initial-diagram-and-graph' },
   async ({ page }) => {
     await page.goto(story('new-space'));
 
     await expect(page.getByTestId('space-title')).toContainText('New space');
-    await expect(page.getByTestId('selected-canvas')).toContainText('Layout 1');
+    await expect(page.getByTestId('selected-canvas')).toContainText('Diagram 1');
     await expect(page.getByTestId('active-graph')).toContainText('Graph 1');
     // `aria-disabled`, not the attribute: ADR 0073 keeps a toolbar item focusable
     // while it is unavailable so it announces itself rather than being drawn and
@@ -301,7 +301,7 @@ test(
  * Presenting removes the furniture rather than emptying it.
  *
  * The Sidebar withdrew authoring command by command, and its claim described
- * which items left a Layout row's menu. There is no menu left to withdraw
+ * which items left a Diagram row's menu. There is no menu left to withdraw
  * anything from: the audience is left with the canvas and `PresentingChrome`.
  */
 test(
@@ -354,7 +354,7 @@ test(
 
     // And a command runs from the strip with nothing dismissed first: the menu
     // opens over the canvas, the choice lands, and the strip is still there.
-    const menu = await disclose(page, 'Layout: Collection 1');
+    const menu = await disclose(page, 'Diagram: Collection 1');
     await menu.getByRole('menuitemradio', { name: 'Collection 2' }).click();
     await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
     await expect(strip).toBeVisible();
@@ -523,10 +523,10 @@ test(
   async ({ page }) => {
     await page.goto(story('default'));
     const space = page.getByTestId('space-title');
-    const layout = page.getByTestId('selected-canvas');
+    const diagram = page.getByTestId('selected-canvas');
     await expect(space).toBeVisible();
-    await expect(layout).toBeVisible();
-    const typography = await layout.evaluate((element) => {
+    await expect(diagram).toBeVisible();
+    const typography = await diagram.evaluate((element) => {
       const style = getComputedStyle(element);
       return [style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight, style.color];
     });
@@ -546,9 +546,9 @@ test(
       ).toEqual(typography);
     }
     await expect(page.getByRole('button', { name: /^Rename Space:/ })).toHaveCount(0);
-    await layout.click();
-    await expect(page.getByRole('textbox', { name: 'Layout name', exact: true })).toBeFocused();
+    await diagram.click();
+    await expect(page.getByRole('textbox', { name: 'Diagram name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(layout).toBeFocused();
+    await expect(diagram).toBeFocused();
   },
 );

@@ -15,7 +15,7 @@ import { aliasFile, cardFile, uuid } from './card-files';
  * loader alone would say nothing about the snapshot every commit goes through,
  * and the pair of them is exactly where a divergence would hide.
  *
- * The old `validate.test.ts` handed hand-built broken layouts straight to
+ * The old `validate.test.ts` handed hand-built broken diagrams straight to
  * `validateReferences`. That module is internal, its input shape is not a thing
  * any caller holds, and half of what it accepted was a shape the schema rejects
  * — so those cases are here instead, stated over documents a loader could
@@ -30,15 +30,15 @@ const WORKING = uuid('00000000-0000-4000-8000-000000000022');
 const SECOND = uuid('00000000-0000-4000-8000-000000000023');
 const MAIN = uuid('00000000-0000-4000-8000-000000000004');
 const ASIDE = uuid('00000000-0000-4000-8000-000000000020');
-/** A third graph, owned by a second layout, so the flatten crosses one. */
+/** A third graph, owned by a second diagram, so the flatten crosses one. */
 const THIRD = uuid('00000000-0000-4000-8000-000000000021');
 /** Held back from every fixture: the id of something no space below holds. */
 const ABSENT = uuid('00000000-0000-4000-8000-000000000099');
 
 /** What both loaders are handed: a document's structure, and the cards under it. */
 interface Document {
-  readonly layouts?: readonly unknown[];
-  readonly defaultLayout?: string;
+  readonly diagrams?: readonly unknown[];
+  readonly defaultDiagram?: string;
   readonly cards: readonly Card[];
 }
 
@@ -57,7 +57,7 @@ const viaFiles: Loader = ({ cards, ...structure }) =>
         : card.kind === 'space'
           ? {
               path: `cards/${card.id}.md`,
-              text: `---\nid: ${card.id}\ntitle: ${card.title}\nkind: space\nspaceId: ${card.spaceId}\n${card.layout === undefined ? '' : `layout: ${card.layout}\n`}${card.graph === undefined ? '' : `graph: ${card.graph}\n`}---\n`,
+              text: `---\nid: ${card.id}\ntitle: ${card.title}\nkind: space\nspaceId: ${card.spaceId}\n${card.diagram === undefined ? '' : `diagram: ${card.diagram}\n`}${card.graph === undefined ? '' : `graph: ${card.graph}\n`}---\n`,
             }
           : cardFile(card.id, card.title, card.body),
     ),
@@ -100,24 +100,24 @@ const graph = (id: string, title: string, edges: { from: string; to: string }[] 
   edges,
 });
 
-const layout = (
+const diagram = (
   id: string,
   positions: Record<string, CardPlacement>,
   graphs: unknown[],
   extra: { readonly activeGraph?: string } = {},
-) => ({ id, title: `Layout ${id}`, kind: 'positioned', positions, graphs, ...extra });
+) => ({ id, title: `Diagram ${id}`, kind: 'positioned', positions, graphs, ...extra });
 
-/** One Layout over A and B, owning one Graph that joins them. */
-const simple = (defaultLayout?: string): Document => {
+/** One Diagram over A and B, owning one Graph that joins them. */
+const simple = (defaultDiagram?: string): Document => {
   const document: Document = {
     cards: [markdown(A, 'A'), markdown(B, 'B')],
-    layouts: [
-      layout(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
+    diagrams: [
+      diagram(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
         graph(MAIN, 'Main', [{ from: A, to: B }]),
       ]),
     ],
   };
-  return defaultLayout === undefined ? document : { ...document, defaultLayout };
+  return defaultDiagram === undefined ? document : { ...document, defaultDiagram };
 };
 
 const loaded = (result: LoadSpaceResult) => {
@@ -144,12 +144,12 @@ describe.each([
   ['loadSpaceSnapshot', viaSnapshot],
 ])('Space intake through %s', (_name, load: Loader) => {
   describe('the aggregate it builds', () => {
-    it('flattens the graphs its layouts own, in layout then authored order', () => {
+    it('flattens the graphs its diagrams own, in diagram then authored order', () => {
       const space = loaded(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [
@@ -157,7 +157,7 @@ describe.each([
                 graph(ASIDE, 'Aside', [{ from: B, to: A }]),
               ],
             ),
-            layout(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(THIRD, 'Third')]),
+            diagram(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(THIRD, 'Third')]),
           ],
         }),
       );
@@ -168,29 +168,29 @@ describe.each([
     it('flattens the exact nested values, never copies of them', () => {
       const space = loaded(load(simple()));
       const [first] = space.graphs;
-      expect(first).toBe(space.layouts[0]?.graphs[0]);
+      expect(first).toBe(space.diagrams[0]?.graphs[0]);
       expect(space.lookup.graph(MAIN)?.graph).toBe(first);
     });
 
     it('answers one canonical value per id, however often it is asked', () => {
       const space = loaded(load(simple()));
-      expect(space.lookup.layout(WORKING)).toBe(space.lookup.layout(WORKING));
+      expect(space.lookup.diagram(WORKING)).toBe(space.lookup.diagram(WORKING));
       expect(space.lookup.graph(MAIN)).toBe(space.lookup.graph(MAIN));
       expect(space.lookup.card(A)).toBe(space.lookup.card(A));
     });
 
     it('answers a graph with the very value its owner resolves to', () => {
       const space = loaded(load(simple()));
-      expect(space.lookup.graph(MAIN)?.owner).toBe(space.lookup.layout(WORKING));
-      expect(space.lookup.graph(MAIN)?.owner.layout.id).toBe(WORKING);
+      expect(space.lookup.graph(MAIN)?.owner).toBe(space.lookup.diagram(WORKING));
+      expect(space.lookup.graph(MAIN)?.owner.diagram.id).toBe(WORKING);
     });
 
-    it('answers a layout with the exact owned graph it opens active on', () => {
+    it('answers a diagram with the exact owned graph it opens active on', () => {
       const space = loaded(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
@@ -200,16 +200,16 @@ describe.each([
         }),
       );
 
-      const resolved = space.lookup.layout(WORKING);
+      const resolved = space.lookup.diagram(WORKING);
       expect(resolved?.activeGraph).toBe(space.lookup.graph(ASIDE)?.graph);
     });
 
-    it('falls back to a layout’s first graph when it names none', () => {
+    it('falls back to a diagram’s first graph when it names none', () => {
       const space = loaded(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
@@ -218,7 +218,7 @@ describe.each([
         }),
       );
 
-      expect(space.lookup.layout(WORKING)?.activeGraph.id).toBe(MAIN);
+      expect(space.lookup.diagram(WORKING)?.activeGraph.id).toBe(MAIN);
     });
 
     it('resolves the fallback without filling the authored optional', () => {
@@ -226,34 +226,34 @@ describe.each([
       // are projected from, so writing the fallback into it would turn "the first
       // one, whichever that is" into a named choice the author never made.
       const space = loaded(load(simple()));
-      expect(space.lookup.layout(WORKING)?.activeGraph.id).toBe(MAIN);
-      expect(space.layouts[0]?.activeGraph).toBeUndefined();
+      expect(space.lookup.diagram(WORKING)?.activeGraph.id).toBe(MAIN);
+      expect(space.diagrams[0]?.activeGraph).toBeUndefined();
     });
 
     it('answers nothing for an id the space does not hold', () => {
       const space = loaded(load(simple()));
       expect(space.lookup.card(ABSENT)).toBeUndefined();
-      expect(space.lookup.layout(ABSENT)).toBeUndefined();
+      expect(space.lookup.diagram(ABSENT)).toBeUndefined();
       expect(space.lookup.graph(ABSENT)).toBeUndefined();
     });
 
-    it('builds a space with cards and no layouts, and so no graphs (ADR 0015)', () => {
-      const space = loaded(load({ cards: [markdown(A, 'A')], layouts: [] }));
+    it('builds a space with cards and no diagrams, and so no graphs (ADR 0015)', () => {
+      const space = loaded(load({ cards: [markdown(A, 'A')], diagrams: [] }));
       expect(space.graphs).toEqual([]);
-      expect(space.layouts).toEqual([]);
+      expect(space.diagrams).toEqual([]);
       expect(space.lookup.card(A)?.title).toBe('A');
     });
 
-    it('loads a layout whose only graph holds no edges', () => {
-      // Creating a Layout creates its initial empty Active Graph in the same Edit
+    it('loads a diagram whose only graph holds no edges', () => {
+      // Creating a Diagram creates its initial empty Active Graph in the same Edit
       // (ADR 0040), and converting a View returns exactly that (ADR 0045), so
       // this is the first thing a conversion writes. Closure over an empty edge
       // set is vacuous, not exempt.
       const space = loaded(
         load({
           cards: [markdown(A, 'A')],
-          layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
+          diagrams: [
+            diagram(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
           ],
         }),
       );
@@ -261,13 +261,13 @@ describe.each([
     });
   });
 
-  describe('edge closure over the owning layout (ADR 0040)', () => {
+  describe('edge closure over the owning diagram (ADR 0040)', () => {
     it('accepts a cycle, a self-edge, a fork and a merge (ADR 0032)', () => {
       const space = loaded(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               {
                 [A]: { x: 0, y: 0, open: false },
@@ -290,12 +290,12 @@ describe.each([
       expect(space.lookup.graph(MAIN)?.graph.edges).toHaveLength(5);
     });
 
-    it('accepts the same edge in two graphs one layout owns', () => {
+    it('accepts the same edge in two graphs one diagram owns', () => {
       const space = loaded(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [
@@ -313,8 +313,8 @@ describe.each([
       const errors = refused(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [
@@ -336,8 +336,8 @@ describe.each([
       const errors = refused(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
@@ -351,17 +351,17 @@ describe.each([
       expect(errors[0]?.message).toContain('as its to');
     });
 
-    it('refuses an endpoint naming a space card outside its layout, and says only that', () => {
+    it('refuses an endpoint naming a space card outside its diagram, and says only that', () => {
       // The failure a space-wide check could not see: `C` is a perfectly good
-      // Space card, but this Layout does not position it, so it is not a member
+      // Space card, but this Diagram does not position it, so it is not a member
       // and an Edge here cannot reach it. Told apart from the case above because
       // the two send an author to different places — add a member, or find a card
       // that is gone.
       const errors = refused(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: B, to: C }])],
@@ -370,26 +370,26 @@ describe.each([
         }),
       );
 
-      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-card-outside-layout']);
+      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-card-outside-diagram']);
       expect(errors[0]?.ref).toBe(C);
       expect(errors[0]?.message).toContain(WORKING);
     });
 
-    it('refuses an endpoint naming a card only a second layout holds', () => {
+    it('refuses an endpoint naming a card only a second diagram holds', () => {
       const errors = refused(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: C }])],
             ),
-            layout(SECOND, { [C]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            diagram(SECOND, { [C]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
-      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-card-outside-layout']);
+      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-card-outside-diagram']);
     });
 
     it('says only that a position names a missing card, not that edges into it dangle', () => {
@@ -398,8 +398,8 @@ describe.each([
       const errors = refused(
         load({
           cards: [markdown(A, 'A')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
@@ -408,16 +408,16 @@ describe.each([
         }),
       );
 
-      expect(errors.map(({ kind }) => kind)).toEqual(['layout-member-missing-card']);
+      expect(errors.map(({ kind }) => kind)).toEqual(['diagram-member-missing-card']);
       expect(errors[0]?.ref).toBe(ABSENT);
     });
 
-    it('accepts a layout that omits cards — a card it leaves out is not in it', () => {
+    it('accepts a diagram that omits cards — a card it leaves out is not in it', () => {
       const space = loaded(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
@@ -429,13 +429,13 @@ describe.each([
     });
   });
 
-  describe('the graph a layout opens active on (ADR 0026)', () => {
-    it('accepts any graph the layout owns', () => {
+  describe('the graph a diagram opens active on (ADR 0026)', () => {
+    it('accepts any graph the diagram owns', () => {
       const space = loaded(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
@@ -444,15 +444,15 @@ describe.each([
           ],
         }),
       );
-      expect(space.lookup.layout(WORKING)?.activeGraph.id).toBe(ASIDE);
+      expect(space.lookup.diagram(WORKING)?.activeGraph.id).toBe(ASIDE);
     });
 
-    it('refuses one no layout in the space owns, and says only that', () => {
+    it('refuses one no diagram in the space owns, and says only that', () => {
       const errors = refused(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
@@ -462,37 +462,37 @@ describe.each([
         }),
       );
 
-      expect(errors.map(({ kind }) => kind)).toEqual(['layout-active-graph-missing']);
+      expect(errors.map(({ kind }) => kind)).toEqual(['diagram-active-graph-missing']);
       expect(errors[0]?.ref).toBe(ABSENT);
       expect(errors[0]?.message).toContain(WORKING);
     });
 
-    it('refuses one a second layout owns — ownership, not existence', () => {
+    it('refuses one a second diagram owns — ownership, not existence', () => {
       // The graph resolves in the space, so a space-wide check would pass it. It
-      // is not this layout's to open on, which is what ownership makes checkable.
+      // is not this diagram's to open on, which is what ownership makes checkable.
       const errors = refused(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
               { activeGraph: ASIDE },
             ),
-            layout(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            diagram(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
 
-      expect(errors.map(({ kind }) => kind)).toEqual(['layout-active-graph-outside-layout']);
+      expect(errors.map(({ kind }) => kind)).toEqual(['diagram-active-graph-outside-diagram']);
       expect(errors[0]?.ref).toBe(ASIDE);
     });
   });
 
   describe('duplicate identities', () => {
     it('reports one error per repeated graph id, naming every occurrence in order', () => {
-      // Ownership is layout-scoped; the *id* is not (ADR 0045). The flatten keys
+      // Ownership is diagram-scoped; the *id* is not (ADR 0045). The flatten keys
       // colour, `<graphId>::out`/`::in` handles and activation on the id alone,
       // and the lookup would drop one of a set in silence. One error, because one
       // id is one fault however many times it appears — and it names where each
@@ -500,13 +500,13 @@ describe.each([
       const errors = refused(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(MAIN, 'Main again')],
             ),
-            layout(SECOND, { [A]: { x: 0, y: 200, open: false } }, [
+            diagram(SECOND, { [A]: { x: 0, y: 200, open: false } }, [
               graph(MAIN, 'Main a third time'),
             ]),
           ],
@@ -517,21 +517,21 @@ describe.each([
       expect(duplicates).toHaveLength(1);
       expect(duplicates[0]?.ref).toBe(MAIN);
       expect(duplicates[0]?.message).toBe(
-        `Duplicate graph id "${MAIN}" at layout "${WORKING}" graph 0, layout "${WORKING}" graph 1, layout "${SECOND}" graph 0`,
+        `Duplicate graph id "${MAIN}" at diagram "${WORKING}" graph 0, diagram "${WORKING}" graph 1, diagram "${SECOND}" graph 0`,
       );
     });
 
-    it('accepts two layouts owning distinct graphs over the same cards', () => {
+    it('accepts two diagrams owning distinct graphs over the same cards', () => {
       const space = loaded(
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
             ),
-            layout(
+            diagram(
               SECOND,
               { [A]: { x: 0, y: 200, open: false }, [B]: { x: 320, y: 200, open: false } },
               [graph(ASIDE, 'Aside', [{ from: B, to: A }])],
@@ -542,18 +542,18 @@ describe.each([
       expect(space.graphs.map(({ title }) => title)).toEqual(['Main', 'Aside']);
     });
 
-    it('refuses duplicate layout ids, which the lookup would silently collapse', () => {
+    it('refuses duplicate diagram ids, which the lookup would silently collapse', () => {
       const errors = refused(
         load({
           cards: [markdown(A, 'A')],
-          layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-            layout(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+          diagrams: [
+            diagram(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
+            diagram(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'duplicate-layout-id', ref: WORKING }),
+        expect.objectContaining({ kind: 'duplicate-diagram-id', ref: WORKING }),
       );
     });
   });
@@ -563,21 +563,21 @@ describe.each([
       const space = loaded(
         load({
           cards: [markdown(A, 'A'), aliasTo(B, A)],
-          layouts: [],
+          diagrams: [],
         }),
       );
       expect(space.cards).toHaveLength(2);
     });
 
     it('refuses an alias whose target resolves to no card', () => {
-      const errors = refused(load({ cards: [aliasTo(A, ABSENT)], layouts: [] }));
+      const errors = refused(load({ cards: [aliasTo(A, ABSENT)], diagrams: [] }));
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'unresolved-alias-target', ref: ABSENT }),
       );
     });
 
     it('refuses an alias that points at itself', () => {
-      const errors = refused(load({ cards: [aliasTo(A, A)], layouts: [] }));
+      const errors = refused(load({ cards: [aliasTo(A, A)], diagrams: [] }));
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'alias-self-reference', ref: A }),
       );
@@ -585,7 +585,7 @@ describe.each([
 
     it('refuses an alias whose target is itself an alias', () => {
       const errors = refused(
-        load({ cards: [markdown(A, 'A'), aliasTo(B, A), aliasTo(C, B)], layouts: [] }),
+        load({ cards: [markdown(A, 'A'), aliasTo(B, A), aliasTo(C, B)], diagrams: [] }),
       );
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'alias-targets-alias', ref: B }),
@@ -593,7 +593,7 @@ describe.each([
     });
 
     it('refuses an alias whose target is a Space Card', () => {
-      const errors = refused(load({ cards: [spaceCard(A, ABSENT), aliasTo(B, A)], layouts: [] }));
+      const errors = refused(load({ cards: [spaceCard(A, ABSENT), aliasTo(B, A)], diagrams: [] }));
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'alias-target-must-own-content', ref: A }),
       );
@@ -602,7 +602,7 @@ describe.each([
 
   describe('Space Card reference cycles (ADR 0068)', () => {
     it('refuses a Space Card that targets the Space containing it', () => {
-      const errors = refused(load({ cards: [spaceCard(A, SPACE)], layouts: [] }));
+      const errors = refused(load({ cards: [spaceCard(A, SPACE)], diagrams: [] }));
 
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'space-card-reference-cycle', ref: SPACE }),
@@ -610,27 +610,27 @@ describe.each([
     });
 
     it('accepts several Space Cards that converge on one target', () => {
-      const space = loaded(load({ cards: [spaceCard(A, C), spaceCard(B, C)], layouts: [] }));
+      const space = loaded(load({ cards: [spaceCard(A, C), spaceCard(B, C)], diagrams: [] }));
 
       expect(space.cards).toHaveLength(2);
     });
   });
 
   describe('the view a space opens in', () => {
-    it('accepts a defaultLayout naming a declared layout', () => {
-      expect(loaded(load(simple(WORKING))).defaultLayout).toBe(WORKING);
+    it('accepts a defaultDiagram naming a declared diagram', () => {
+      expect(loaded(load(simple(WORKING))).defaultDiagram).toBe(WORKING);
     });
 
-    it('refuses a defaultLayout naming no declared Layout', () => {
+    it('refuses a defaultDiagram naming no declared Diagram', () => {
       // The kind names the field the document actually has (ADR 0055). A kind
       // and the message beside it that name two different fields is the split
       // the rename exists to close, and a consumer matching on the kind is the
       // one that reads the retired name.
       const errors = refused(load(simple(ABSENT)));
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'unresolved-default-layout', ref: ABSENT }),
+        expect.objectContaining({ kind: 'unresolved-default-diagram', ref: ABSENT }),
       );
-      expect(errors.map(({ message }) => message).join('\n')).toContain('defaultLayout');
+      expect(errors.map(({ message }) => message).join('\n')).toContain('defaultDiagram');
     });
   });
 
@@ -639,16 +639,16 @@ describe.each([
       const errors = refused(
         load({
           cards: [markdown(A, 'A'), aliasTo(B, ABSENT)],
-          layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-            layout(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+          diagrams: [
+            diagram(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
+            diagram(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
-          defaultLayout: ABSENT,
+          defaultDiagram: ABSENT,
         }),
       );
 
       expect(new Set(errors.map(({ kind }) => kind))).toEqual(
-        new Set(['duplicate-layout-id', 'unresolved-default-layout', 'unresolved-alias-target']),
+        new Set(['duplicate-diagram-id', 'unresolved-default-diagram', 'unresolved-alias-target']),
       );
     });
 
@@ -656,8 +656,8 @@ describe.each([
       const document = () =>
         load({
           cards: [markdown(A, 'A')],
-          layouts: [
-            layout(
+          diagrams: [
+            diagram(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 1, y: 1, open: false } },
               [graph(MAIN, 'Main'), graph(MAIN, 'Main again')],

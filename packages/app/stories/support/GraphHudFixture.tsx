@@ -19,7 +19,7 @@ import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
  * through the shared `graphColor` seam the Sidebar reads — so a colour on screen
  * here is one the Space app would agree with, rather than a hex literal a
  * fixture chose. The Graphs are the tracked story Space's, flattened across its
- * Layouts in declared order exactly as `space.graphs` is.
+ * Diagrams in declared order exactly as `space.graphs` is.
  */
 const SPACE = authoredSpace;
 const COLORS = graphColorMap(SPACE);
@@ -44,7 +44,7 @@ const openingGraph = (): GraphId => {
  * the framework's rather than a stand-in: these are ordinary nodes React Flow
  * lays out, measures and reports bounds for, at the size the application's own
  * `CARD_SIZE` declares. **The positions are the fixture's**, which is the one
- * thing a story is allowed to supply here — a Space's placement is a Layout
+ * thing a story is allowed to supply here — a Space's placement is a Diagram
  * strategy's answer, and running one to draw a HUD would put elkjs between this
  * story and the surface it is about. They are staggered so the minimap frame has
  * two dimensions to show rather than a single line.

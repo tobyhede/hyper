@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0015, 0017
-Refined by: 0025, 0059
+Refined by: 0025, 0059, 0085
 
 Opening the app with nothing else to open gives you a **new space: one card, centered**. That is the default, not the bundled fixture and not an empty canvas.
 

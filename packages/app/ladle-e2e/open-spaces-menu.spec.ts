@@ -34,7 +34,7 @@ const openSpacesMenu = async (page: Page) => {
  * Moving is not closing, which is the change ADR 0068 has to answer to.
  *
  * Exit used to be both the move and the close, so leaving a Space took its
- * Layout and Graph selections with it. Nothing closes here: the open set is a
+ * Diagram and Graph selections with it. Nothing closes here: the open set is a
  * tree a reader moves around, and every entry keeps where it was left — so
  * coming back to one arrives where you were rather than at its default.
  */
@@ -45,9 +45,9 @@ test('the Open Spaces menu moves between Spaces without closing or resetting one
   await expect(page.getByTestId('space-title')).toContainText('Rendering');
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
 
-  // Leave the Layout the entry opened on, so returning has something to prove.
+  // Leave the Diagram the entry opened on, so returning has something to prove.
   await page
-    .getByRole('button', { name: 'Layout: Collection 1', exact: true })
+    .getByRole('button', { name: 'Diagram: Collection 1', exact: true })
     .click({ delay: 120 });
   await page.getByRole('menuitemradio', { name: 'Collection 2' }).click();
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');

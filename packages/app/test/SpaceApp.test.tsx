@@ -22,21 +22,21 @@ import {
   exitSpaceItem,
   createCard,
   createCardControl,
-  newLayout,
+  newDiagram,
   openGraphMenu,
-  openLayoutMenu,
+  openDiagramMenu,
   presentControl,
   unavailable,
 } from './command-dock';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const OWNED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const OUTSIDE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
 const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
@@ -45,18 +45,18 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
     document: {
       version: 1,
       title,
-      layouts: [
+      diagrams: [
         {
-          id: LAYOUT_ID,
-          title: 'Layout',
+          id: DIAGRAM_ID,
+          title: 'Diagram',
           kind: 'positioned',
           positions: { [CARD_ID]: { x, y, open: false } },
-          // A Layout owns at least one Graph (ADR 0040), and one Card has
+          // A Diagram owns at least one Graph (ADR 0040), and one Card has
           // nothing to connect — so the Graph it opens on holds no Edges.
           graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
-      defaultLayout: LAYOUT_ID,
+      defaultDiagram: DIAGRAM_ID,
     },
     cards: [
       {
@@ -67,11 +67,11 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
   });
 
 /**
- * The same Space with its Layout owning a Graph that reaches a Card the Space
+ * The same Space with its Diagram owning a Graph that reaches a Card the Space
  * does not hold — the unloadable snapshot every test below is about.
  *
- * An Edge is closed over the Cards its owning Layout positions (ADR 0040), so
- * the dangling endpoint lives inside the Layout rather than beside it, and
+ * An Edge is closed over the Cards its owning Diagram positions (ADR 0040), so
+ * the dangling endpoint lives inside the Diagram rather than beside it, and
  * intake names it there.
  */
 const withDanglingGraph = (base: SpaceSnapshot, title: string): SpaceSnapshot => ({
@@ -79,11 +79,11 @@ const withDanglingGraph = (base: SpaceSnapshot, title: string): SpaceSnapshot =>
   document: {
     ...base.document,
     title,
-    layouts: (base.document.layouts ?? []).map((layout) => ({
-      ...layout,
+    diagrams: (base.document.diagrams ?? []).map((diagram) => ({
+      ...diagram,
       graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
       // Named outright rather than carried through: replacing the owned Graphs
-      // would otherwise strand an inherited `activeGraph` on an id this Layout
+      // would otherwise strand an inherited `activeGraph` on an id this Diagram
       // no longer holds, and the snapshot would be unloadable for two reasons
       // where these tests are about one.
       activeGraph: GRAPH_ID,
@@ -161,8 +161,8 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
     ...base,
     document: {
       ...base.document,
-      layouts: base.document.layouts?.map((layout) => ({
-        ...layout,
+      diagrams: base.document.diagrams?.map((diagram) => ({
+        ...diagram,
         graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: CARD_ID }] }],
       })),
     },
@@ -490,9 +490,9 @@ describe('Space app failure reporting', () => {
       ...snapshot('Space', 'Card', 10, 20),
       document: {
         ...snapshot('Space', 'Card', 10, 20).document,
-        layouts: snapshot('Space', 'Card', 10, 20).document.layouts?.map((layout) => ({
-          ...layout,
-          graphs: [...layout.graphs, { id: GRAPH_ID, title: 'Addressed', edges: [] }],
+        diagrams: snapshot('Space', 'Card', 10, 20).document.diagrams?.map((diagram) => ({
+          ...diagram,
+          graphs: [...diagram.graphs, { id: GRAPH_ID, title: 'Addressed', edges: [] }],
         })),
       },
     };
@@ -511,7 +511,7 @@ describe('Space app failure reporting', () => {
       },
       (app) => render(app),
       {
-        selection: LAYOUT_ID,
+        selection: DIAGRAM_ID,
         cardId: null,
         graphId: GRAPH_ID,
         presentationCardId: null,
@@ -577,7 +577,7 @@ describe('Space app failure reporting', () => {
           },
           (app) => render(app),
           {
-            selection: LAYOUT_ID,
+            selection: DIAGRAM_ID,
             cardId: CARD_ID,
             graphId: null,
             presentationCardId: null,
@@ -587,9 +587,9 @@ describe('Space app failure reporting', () => {
           // so the two agree in production and have to agree here.
           recordingHistory(
             productDestinationPath({
-              kind: 'layout-card',
+              kind: 'diagram-card',
               spaceId: SPACE_ID,
-              layoutId: LAYOUT_ID,
+              diagramId: DIAGRAM_ID,
               cardId: CARD_ID,
             }),
           ),
@@ -704,7 +704,7 @@ describe('Space app failure reporting', () => {
         (view) => {
           render(view);
         },
-        { selection: LAYOUT_ID, cardId: null, graphId: GRAPH_ID, presentationCardId: null },
+        { selection: DIAGRAM_ID, cardId: null, graphId: GRAPH_ID, presentationCardId: null },
       ),
     ).not.toThrow();
 
@@ -752,7 +752,7 @@ describe('Space app failure reporting', () => {
 });
 
 describe('Space app Cards drawer', () => {
-  it('opens once for the client whose working load created the empty Layout', () => {
+  it('opens once for the client whose working load created the empty Diagram', () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 1n, exportedRevision: null };
     const { spaceSession: session, spaceCards } = openTestSpace(
@@ -766,7 +766,7 @@ describe('Space app Cards drawer', () => {
         session,
         app: composeApp({ spaceSession: session }),
         spaceCards,
-        initialization: 'created-layout',
+        initialization: 'created-diagram',
       },
       (app) => render(app),
     );
@@ -783,7 +783,7 @@ describe('Space app Cards drawer', () => {
       cards: [],
       document: {
         ...seeded.document,
-        layouts: seeded.document.layouts?.map((layout) => ({ ...layout, positions: {} })),
+        diagrams: seeded.document.diagrams?.map((diagram) => ({ ...diagram, positions: {} })),
       },
     };
     const stored = { snapshot: empty, revision: 1n, exportedRevision: null };
@@ -798,7 +798,7 @@ describe('Space app Cards drawer', () => {
         session,
         app: composeApp({ spaceSession: session }),
         spaceCards,
-        initialization: 'created-layout',
+        initialization: 'created-diagram',
       },
       (app) => render(app),
     );
@@ -811,7 +811,7 @@ describe('Space app Cards drawer', () => {
     expect(session.getState().working.cards).toHaveLength(1);
   });
 
-  it('adds an empty selected Layout and reveals its existing Cards once', () => {
+  it('adds an empty selected Diagram and reveals its existing Cards once', () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const { spaceSession: session, spaceCards } = openTestSpace(
@@ -824,12 +824,12 @@ describe('Space app Cards drawer', () => {
       (app) => render(app),
     );
 
-    newLayout('Layout');
+    newDiagram('Diagram');
 
-    expect(session.getState().working.document.layouts).toHaveLength(2);
-    expect(session.getState().working.document.layouts?.[1]?.positions).toEqual({});
-    expect(session.getState().working.document.layouts?.[1]?.graphs).toHaveLength(1);
-    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout 1');
+    expect(session.getState().working.document.diagrams).toHaveLength(2);
+    expect(session.getState().working.document.diagrams?.[1]?.positions).toEqual({});
+    expect(session.getState().working.document.diagrams?.[1]?.graphs).toHaveLength(1);
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Diagram 1');
     expect(screen.getByRole('dialog', { name: 'Cards' })).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
@@ -848,7 +848,7 @@ describe('Space app Cards drawer', () => {
    * is the state the placeholder above announces. Offering Rename there is
    * offering an item that does nothing — the effect that discards a draft begun
    * against a disabled edit runs on the same render — and offering Delete
-   * Layout there runs a real Edit against a Space with nothing drawn. The copy
+   * Diagram there runs a real Edit against a Space with nothing drawn. The copy
    * command stays, because an address is a fact about the entity rather than an
    * Edit.
    *
@@ -869,13 +869,13 @@ describe('Space app Cards drawer', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('Arranging…');
-    // The Layout's Edits are withdrawn and its address is not. Renaming is
+    // The Diagram's Edits are withdrawn and its address is not. Renaming is
     // clicking the name the Dock already draws, so the withdrawal is that name
     // ceasing to be a button; Delete is present and unavailable, because a
     // control that disappears teaches nothing about why.
     expect(screen.getByTestId('selected-canvas').tagName).not.toBe('BUTTON');
-    openLayoutMenu('Layout');
-    expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Layout' }))).toBe(true);
+    openDiagramMenu('Diagram');
+    expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Diagram' }))).toBe(true);
     expect(screen.getByRole('menuitem', { name: /^Copy link/ })).toBeInTheDocument();
 
     // Left settling rather than abandoned mid-placement: the strategy resolves
@@ -888,15 +888,15 @@ describe('Space app Cards drawer', () => {
    * **A rename cannot outlive the thing it is renaming, and ending it is not a
    * render-time job.**
    *
-   * The Dock draws one name cluster and moves it between Layouts rather than
-   * unmounting it, so a Layout changing under a live editor would leave the
+   * The Dock draws one name cluster and moves it between Diagrams rather than
+   * unmounting it, so a Diagram changing under a live editor would leave the
    * caret in a field editing something the reader has already left. The editor
    * is closed by a render-time transition for that reason — but closing it also
    * tells the App a chrome rename has ended, and a *parent's* state cannot be
    * written from a child's render body. React says so out loud, and the state
    * it withdraws is what gates Present, Create Card and every entity Edit.
    */
-  it('ends a live Layout rename when the Layout changes, without writing to the App during render', async () => {
+  it('ends a live Diagram rename when the Diagram changes, without writing to the App during render', async () => {
     const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
@@ -909,17 +909,17 @@ describe('Space app Cards drawer', () => {
       (app) => render(app),
     );
 
-    newLayout('Layout');
+    newDiagram('Diagram');
     const created = screen.getByTestId('selected-canvas').textContent;
     await beginRename('selected-canvas');
-    await screen.findByRole('textbox', { name: 'Layout name' });
+    await screen.findByRole('textbox', { name: 'Diagram name' });
 
-    // Back onto the first Layout with the caret still in the field.
-    openLayoutMenu(created);
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Layout' }));
+    // Back onto the first Diagram with the caret still in the field.
+    openDiagramMenu(created);
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Diagram' }));
 
-    expect(screen.queryByRole('textbox', { name: 'Layout name' })).toBeNull();
-    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout');
+    expect(screen.queryByRole('textbox', { name: 'Diagram name' })).toBeNull();
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Diagram');
     expect(reported.mock.calls.flat().join(' ')).not.toContain('Cannot update a component');
     reported.mockRestore();
   });
@@ -935,7 +935,7 @@ describe('Space app Cards drawer', () => {
    * Tab restarted from the top of the document. `InlineTitleEditor` calls
    * `onReturnFocus` from its own Enter and Escape handlers for exactly this.
    */
-  it('returns the caret to the name it was opened from when a Layout rename ends', async () => {
+  it('returns the caret to the name it was opened from when a Diagram rename ends', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const { spaceSession: session, spaceCards } = openTestSpace(
@@ -948,7 +948,7 @@ describe('Space app Cards drawer', () => {
     );
 
     await beginRename('selected-canvas');
-    const editor = await screen.findByRole('textbox', { name: 'Layout name' });
+    const editor = await screen.findByRole('textbox', { name: 'Diagram name' });
     fireEvent.change(editor, { target: { value: 'Workshop' } });
     fireEvent.keyDown(editor, { key: 'Enter' });
 
@@ -968,7 +968,7 @@ describe('Space app Cards drawer', () => {
    * `onReturnFocus` alone for this reason; wiring the same ending into
    * `onComplete` reinstated the theft with the commit as its cover.
    */
-  it('leaves the caret where the reader put it when a Layout rename ends by blur', async () => {
+  it('leaves the caret where the reader put it when a Diagram rename ends by blur', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const { spaceSession: session, spaceCards } = openTestSpace(
@@ -981,7 +981,7 @@ describe('Space app Cards drawer', () => {
     );
 
     await beginRename('selected-canvas');
-    const editor = await screen.findByRole('textbox', { name: 'Layout name' });
+    const editor = await screen.findByRole('textbox', { name: 'Diagram name' });
     fireEvent.change(editor, { target: { value: 'Workshop' } });
 
     // Somewhere else the reader has chosen — the canvas in the product, any
@@ -1002,7 +1002,7 @@ describe('Space app Cards drawer', () => {
    * **One name in the bar is being renamed, or none is.**
    *
    * A blank name is refused and `InlineTitleEditor` holds a refused draft open
-   * and editable, so a Layout rename can still be running while the reader
+   * and editable, so a Diagram rename can still be running while the reader
    * presses the Graph name beside it — the availability rule that stops a
    * *second* Rename beginning reads `editingChromeTitle`, and the name control
    * deliberately does not, because withdrawing it would draw the live editor's
@@ -1026,14 +1026,14 @@ describe('Space app Cards drawer', () => {
     );
 
     await beginRename('selected-canvas');
-    const layoutEditor = await screen.findByRole('textbox', { name: 'Layout name' });
-    fireEvent.change(layoutEditor, { target: { value: '' } });
-    fireEvent.keyDown(layoutEditor, { key: 'Enter' });
-    expect(screen.getByRole('textbox', { name: 'Layout name' })).toBeInTheDocument();
+    const diagramEditor = await screen.findByRole('textbox', { name: 'Diagram name' });
+    fireEvent.change(diagramEditor, { target: { value: '' } });
+    fireEvent.keyDown(diagramEditor, { key: 'Enter' });
+    expect(screen.getByRole('textbox', { name: 'Diagram name' })).toBeInTheDocument();
 
     await beginRename('active-graph');
 
-    expect(screen.getAllByRole('textbox', { name: /^(Layout|Graph) name$/ })).toHaveLength(1);
+    expect(screen.getAllByRole('textbox', { name: /^(Diagram|Graph) name$/ })).toHaveLength(1);
     expect(screen.getByRole('textbox', { name: 'Graph name' })).toBeInTheDocument();
   });
 
@@ -1043,7 +1043,7 @@ describe('Space app Cards drawer', () => {
    * A live chrome rename withdraws Create Card, Present, Delete Card and the
    * canvas's own title editing, because each of those re-derives the canvas or
    * takes the caret from under the editor. Three identities drawing three
-   * editors over one boolean is what let that come apart: with a blank Layout
+   * editors over one boolean is what let that come apart: with a blank Diagram
    * draft still refusing, a Graph rename begun and then abandoned with Escape
    * reported the *bar* as idle and handed the commands back underneath an
    * editor that was still on screen.
@@ -1067,31 +1067,32 @@ describe('Space app Cards drawer', () => {
     );
 
     await beginRename('selected-canvas');
-    const layoutEditor = await screen.findByRole('textbox', { name: 'Layout name' });
-    fireEvent.change(layoutEditor, { target: { value: '' } });
-    fireEvent.keyDown(layoutEditor, { key: 'Enter' });
+    const diagramEditor = await screen.findByRole('textbox', { name: 'Diagram name' });
+    fireEvent.change(diagramEditor, { target: { value: '' } });
+    fireEvent.keyDown(diagramEditor, { key: 'Enter' });
     expect(unavailable(createCardControl())).toBe(true);
 
     await beginRename('active-graph');
     const graphEditor = await screen.findByRole('textbox', { name: 'Graph name' });
     fireEvent.keyDown(graphEditor, { key: 'Escape' });
 
-    const standing = screen.queryAllByRole('textbox', { name: /^(Layout|Graph) name$/ }).length > 0;
+    const standing =
+      screen.queryAllByRole('textbox', { name: /^(Diagram|Graph) name$/ }).length > 0;
     expect(unavailable(createCardControl())).toBe(standing);
   });
 
   /**
-   * **The last Layout cannot be deleted, and the Dock says so before the press.**
+   * **The last Diagram cannot be deleted, and the Dock says so before the press.**
    *
-   * ADR 0079 keeps a Space on at least one Layout. The Sidebar let the command
+   * ADR 0079 keeps a Space on at least one Diagram. The Sidebar let the command
    * run and printed the refusal afterwards; the Dock draws it present and
    * unavailable instead — a control that disappears teaches nothing about why,
    * and one that refuses every time teaches it a press too late. So what is
    * pinned here is the availability, and then the ordinary lifecycle once a
-   * second Layout exists: rename in place, delete, and the selection landing
+   * second Diagram exists: rename in place, delete, and the selection landing
    * back on what is left.
    */
-  it('withholds Delete from the last Layout and runs the lifecycle once there are two', async () => {
+  it('withholds Delete from the last Diagram and runs the lifecycle once there are two', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const { spaceSession: session, spaceCards } = openTestSpace(
@@ -1104,38 +1105,38 @@ describe('Space app Cards drawer', () => {
       (app) => render(app),
     );
 
-    openLayoutMenu('Layout');
-    expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Layout' }))).toBe(true);
+    openDiagramMenu('Diagram');
+    expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Diagram' }))).toBe(true);
 
-    newLayout('Layout');
+    newDiagram('Diagram');
     fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
     // Renaming is the name itself, not a menu row: there is one name on the bar
     // and clicking it is the whole command.
     await beginRename('selected-canvas');
-    const editor = await screen.findByRole('textbox', { name: 'Layout name' });
+    const editor = await screen.findByRole('textbox', { name: 'Diagram name' });
     fireEvent.change(editor, { target: { value: 'Workshop' } });
     fireEvent.keyDown(editor, { key: 'Enter' });
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Workshop');
 
-    openLayoutMenu('Workshop');
+    openDiagramMenu('Workshop');
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Workshop' }));
-    expect(session.getState().working.document.layouts).toHaveLength(1);
+    expect(session.getState().working.document.diagrams).toHaveLength(1);
     expect(session.getState().working.cards).toEqual(base.cards);
-    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout');
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Diagram');
   });
 
   /**
-   * **A Layout refusal was pinned here and its one route has gone.**
+   * **A Diagram refusal was pinned here and its one route has gone.**
    *
-   * The claim was that a Delete Layout refusal does not outlive its own Layout:
-   * the refusal is drawn in the shell's standing notice, which every Layout
-   * shows, so one left standing explained a Layout the reader had already left.
-   * The only way to produce it was Delete on the last Layout, and the Command
+   * The claim was that a Delete Diagram refusal does not outlive its own Diagram:
+   * the refusal is drawn in the shell's standing notice, which every Diagram
+   * shows, so one left standing explained a Diagram the reader had already left.
+   * The only way to produce it was Delete on the last Diagram, and the Command
    * Dock withholds that command before the press (ADR 0079) — which the test
    * above now pins instead.
    *
-   * What is left is a race: a Delete whose Layout is gone by the time the press
-   * lands refuses `layout-not-found`. That is real, the alert and the clearing
+   * What is left is a race: a Delete whose Diagram is gone by the time the press
+   * lands refuses `diagram-not-found`. That is real, the alert and the clearing
    * effect are both still there for it, and it is not reachable from a mount —
    * so this is a note rather than a test, and the effect is one an integration
    * run would have to catch.
@@ -1160,28 +1161,28 @@ describe('Space app Cards drawer', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session, selection: LAYOUT_ID }),
+        app: composeApp({ spaceSession: session, selection: DIAGRAM_ID }),
         spaceCards,
       },
       (app) => render(app),
       {
-        selection: LAYOUT_ID,
+        selection: DIAGRAM_ID,
         cardId: OUTSIDE_CARD_ID,
         graphId: null,
         presentationCardId: null,
       },
-      // The Card is in no Layout, so the address that names it is the canonical
-      // one — which opens the Space's default Layout, the one selected here.
+      // The Card is in no Diagram, so the address that names it is the canonical
+      // one — which opens the Space's default Diagram, the one selected here.
       recordingHistory(
         productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: OUTSIDE_CARD_ID }),
       ),
     );
 
-    expect(screen.getByRole('button', { name: 'Add Outside card to Layout' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Outside card to Diagram' })).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
     expect(
-      screen.queryByRole('button', { name: 'Add Outside card to Layout' }),
+      screen.queryByRole('button', { name: 'Add Outside card to Diagram' }),
     ).not.toBeInTheDocument();
 
     await waitFor(() => expect(unavailable(createCardControl())).toBe(false));
@@ -1190,41 +1191,41 @@ describe('Space app Cards drawer', () => {
     expect(session.getState().working.cards.length).toBe(before + 1);
 
     expect(
-      screen.queryByRole('button', { name: 'Add Outside card to Layout' }),
+      screen.queryByRole('button', { name: 'Add Outside card to Diagram' }),
     ).not.toBeInTheDocument();
   });
 
   /**
-   * A chrome title draft belongs to the Layout it was begun on, and a Back that
-   * lands on another Layout discards it.
+   * A chrome title draft belongs to the Diagram it was begun on, and a Back that
+   * lands on another Diagram discards it.
    *
    * The Graph subject is the demanding one: Graph rows are the selected
-   * Layout's, so the arrival unmounts the row the draft was begun on. A draft
+   * Diagram's, so the arrival unmounts the row the draft was begun on. A draft
    * outliving that has no editor left to cancel it and still withdraws Add
    * Card, Present, Delete Card and every entity menu's Edits.
    *
-   * Choosing a Layout row spends `setSpaceChromeEdit(null)` at the call site,
+   * Choosing a Diagram row spends `setSpaceChromeEdit(null)` at the call site,
    * and this arrival does not — it is `authoringAvailability`'s
    * `chromeTitleEdit` that answers it,
-   * because the Layout change clears the published projection and the canvas
+   * because the Diagram change clears the published projection and the canvas
    * holds no Cards until placement resolves. That is one clear standing on
    * another's condition, which is why the behaviour is pinned here rather than
    * left to the reader of either.
    */
-  it('discards an open chrome title draft when a Back moves to another Layout', async () => {
+  it('discards an open chrome title draft when a Back moves to another Diagram', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const local: SpaceSnapshot = {
       ...base,
       document: {
         ...base.document,
-        layouts: [
-          ...(base.document.layouts ?? []),
+        diagrams: [
+          ...(base.document.diagrams ?? []),
           {
-            id: OTHER_LAYOUT_ID,
-            title: 'Other Layout',
+            id: OTHER_DIAGRAM_ID,
+            title: 'Other Diagram',
             kind: 'positioned',
-            // The Card is placed here too, so this Layout stays editable: an
-            // empty Layout withdraws chrome editing on its own and would clear
+            // The Card is placed here too, so this Diagram stays editable: an
+            // empty Diagram withdraws chrome editing on its own and would clear
             // the draft for a reason that has nothing to do with the arrival.
             positions: { [CARD_ID]: { x: 40, y: 50, open: false } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
@@ -1238,57 +1239,57 @@ describe('Space app Cards drawer', () => {
       stored,
     );
     const history = recordingHistory(
-      productDestinationPath({ kind: 'layout', spaceId: SPACE_ID, layoutId: LAYOUT_ID }),
+      productDestinationPath({ kind: 'diagram', spaceId: SPACE_ID, diagramId: DIAGRAM_ID }),
     );
 
     mountSpace(
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session, selection: LAYOUT_ID }),
+        app: composeApp({ spaceSession: session, selection: DIAGRAM_ID }),
         spaceCards,
       },
       (app) => render(app),
-      { selection: LAYOUT_ID, cardId: null, graphId: null, presentationCardId: null },
+      { selection: DIAGRAM_ID, cardId: null, graphId: null, presentationCardId: null },
       history,
     );
 
-    // The Graph's name is renamed where it is drawn, exactly as the Layout's is.
+    // The Graph's name is renamed where it is drawn, exactly as the Diagram's is.
     await beginRename('active-graph');
     expect(await screen.findByRole('textbox', { name: 'Graph name' })).toBeVisible();
     expect(unavailable(createCardControl())).toBe(true);
 
     act(() => {
       history.popTo(
-        productDestinationPath({ kind: 'layout', spaceId: SPACE_ID, layoutId: OTHER_LAYOUT_ID }),
+        productDestinationPath({ kind: 'diagram', spaceId: SPACE_ID, diagramId: OTHER_DIAGRAM_ID }),
       );
     });
 
-    expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Layout');
+    expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Diagram');
     expect(screen.queryByRole('textbox', { name: 'Graph name' })).not.toBeInTheDocument();
     expect(unavailable(createCardControl())).toBe(false);
   });
 
-  it('reveals the addressed Card again in a newly adopted default Layout that omits it, even though the same Card was already addressed once', async () => {
+  it('reveals the addressed Card again in a newly adopted default Diagram that omits it, even though the same Card was already addressed once', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const local: SpaceSnapshot = {
       ...base,
       document: {
         ...base.document,
-        layouts: [
-          ...(base.document.layouts ?? []),
+        diagrams: [
+          ...(base.document.diagrams ?? []),
           {
-            id: OTHER_LAYOUT_ID,
-            title: 'Other Layout',
+            id: OTHER_DIAGRAM_ID,
+            title: 'Other Diagram',
             kind: 'positioned',
             positions: {},
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
           },
         ],
         // The canonical Card link below resolves to the Space's default
-        // Layout, so this second navigation lands on the Layout that omits
+        // Diagram, so this second navigation lands on the Diagram that omits
         // the Card rather than the one it started on.
-        defaultLayout: OTHER_LAYOUT_ID,
+        defaultDiagram: OTHER_DIAGRAM_ID,
       },
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
@@ -1298,9 +1299,9 @@ describe('Space app Cards drawer', () => {
     );
     const history = recordingHistory(
       productDestinationPath({
-        kind: 'layout-card',
+        kind: 'diagram-card',
         spaceId: SPACE_ID,
-        layoutId: LAYOUT_ID,
+        diagramId: DIAGRAM_ID,
         cardId: CARD_ID,
       }),
     );
@@ -1309,12 +1310,12 @@ describe('Space app Cards drawer', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session, selection: LAYOUT_ID }),
+        app: composeApp({ spaceSession: session, selection: DIAGRAM_ID }),
         spaceCards,
       },
       (app) => render(app),
       {
-        selection: LAYOUT_ID,
+        selection: DIAGRAM_ID,
         cardId: CARD_ID,
         graphId: null,
         presentationCardId: null,
@@ -1322,18 +1323,18 @@ describe('Space app Cards drawer', () => {
       history,
     );
 
-    // Card is a member of the selected Layout, so there is nothing to reveal yet.
-    expect(screen.queryByRole('button', { name: 'Add Card to Layout' })).not.toBeInTheDocument();
+    // Card is a member of the selected Diagram, so there is nothing to reveal yet.
+    expect(screen.queryByRole('button', { name: 'Add Card to Diagram' })).not.toBeInTheDocument();
 
     // The second of the two mount tests, and the other direction: a Back the
     // injected History API reports has to reach Navigation and redraw. The
-    // canonical Card link carries no Layout of its own — it opens wherever the
-    // Space's default Layout is, which is now the Layout that omits this Card.
+    // canonical Card link carries no Diagram of its own — it opens wherever the
+    // Space's default Diagram is, which is now the Diagram that omits this Card.
     act(() => {
       history.popTo(productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: CARD_ID }));
     });
 
-    expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Layout');
-    expect(await screen.findByRole('button', { name: 'Add Card to Layout' })).toBeVisible();
+    expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Diagram');
+    expect(await screen.findByRole('button', { name: 'Add Card to Diagram' })).toBeVisible();
   });
 });

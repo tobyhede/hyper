@@ -191,7 +191,7 @@ describe('where a refused Edge Edit is said', () => {
     },
   );
 
-  /** A Layout, Graph or Edge that has gone: no row in either list would answer it. */
+  /** A Diagram, Graph or Edge that has gone: no row in either list would answer it. */
   it('uses the form channel for a refusal no endpoint could correct', () => {
     mount({
       editorOpen: true,
@@ -216,7 +216,7 @@ describe('where a refused Edge Edit is said', () => {
     mount({ refusal: { kind: 'deletion', refusal: { code: 'graph-not-owned' } } });
 
     expect(screen.getByTestId('edge-delete-refusal')).toHaveTextContent(
-      'That Graph is not one this Layout owns.',
+      'That Graph is not one this Diagram owns.',
     );
     expect(screen.getByRole('alert')).toBeVisible();
     expect(screen.queryByTestId('edge-editor')).not.toBeInTheDocument();

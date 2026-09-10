@@ -9,8 +9,8 @@ const OTHER = uuid('00000000-0000-4000-8000-000000000103');
 const META_CARD = uuid('00000000-0000-4000-8000-000000000201');
 const SECOND_META_CARD = uuid('00000000-0000-4000-8000-000000000202');
 const CHILD_CARD = uuid('00000000-0000-4000-8000-000000000203');
-const LAYOUT = uuid('00000000-0000-4000-8000-000000000301');
-const SECOND_LAYOUT = uuid('00000000-0000-4000-8000-000000000302');
+const DIAGRAM = uuid('00000000-0000-4000-8000-000000000301');
+const SECOND_DIAGRAM = uuid('00000000-0000-4000-8000-000000000302');
 const GRAPH = uuid('00000000-0000-4000-8000-000000000401');
 const SECOND_GRAPH = uuid('00000000-0000-4000-8000-000000000402');
 
@@ -24,7 +24,7 @@ const markdown = (id: UUID, title = id): StoredCard => ({
 const spaceCard = (
   id: UUID,
   target: UUID,
-  selection: { readonly layout?: UUID; readonly graph?: UUID } = {},
+  selection: { readonly diagram?: UUID; readonly graph?: UUID } = {},
 ): StoredCard => ({
   id,
   document: { title: id, kind: 'space', spaceId: target, ...selection },
@@ -34,9 +34,9 @@ const snapshot = (
   id: UUID,
   cards: readonly StoredCard[],
   options: {
-    readonly layout?: boolean;
-    readonly secondLayout?: boolean;
-    readonly defaultLayout?: UUID;
+    readonly diagram?: boolean;
+    readonly secondDiagram?: boolean;
+    readonly defaultDiagram?: UUID;
   } = {},
 ): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
@@ -44,13 +44,13 @@ const snapshot = (
     document: {
       version: 1,
       title: id,
-      defaultLayout: options.defaultLayout,
-      layouts: [
-        ...(options.layout === true
+      defaultDiagram: options.defaultDiagram,
+      diagrams: [
+        ...(options.diagram === true
           ? [
               {
-                id: LAYOUT,
-                title: 'Layout',
+                id: DIAGRAM,
+                title: 'Diagram',
                 kind: 'positioned',
                 positions: Object.fromEntries(
                   cards.map(({ id: cardId }, index) => [
@@ -63,11 +63,11 @@ const snapshot = (
               },
             ]
           : []),
-        ...(options.secondLayout === true
+        ...(options.secondDiagram === true
           ? [
               {
-                id: SECOND_LAYOUT,
-                title: 'Second Layout',
+                id: SECOND_DIAGRAM,
+                title: 'Second Diagram',
                 kind: 'positioned' as const,
                 positions: Object.fromEntries(
                   cards.map(({ id: cardId }, index) => [
@@ -110,12 +110,12 @@ describe('loadSpaceAggregate', () => {
         snapshot(
           META,
           [
-            spaceCard(META_CARD, CHILD, { layout: LAYOUT, graph: GRAPH }),
+            spaceCard(META_CARD, CHILD, { diagram: DIAGRAM, graph: GRAPH }),
             spaceCard(SECOND_META_CARD, CHILD),
           ],
-          { layout: true },
+          { diagram: true },
         ),
-        snapshot(CHILD, [markdown(CHILD_CARD)], { layout: true }),
+        snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true }),
       ],
     });
 
@@ -139,13 +139,13 @@ describe('loadSpaceAggregate', () => {
     ]);
   });
 
-  it('refuses duplicate Card ids across Spaces while allowing Layout and Graph id reuse', () => {
+  it('refuses duplicate Card ids across Spaces while allowing Diagram and Graph id reuse', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceCard(META_CARD, CHILD), markdown(CHILD_CARD)], { layout: true }),
-          snapshot(CHILD, [markdown(CHILD_CARD)], { layout: true }),
+          snapshot(META, [spaceCard(META_CARD, CHILD), markdown(CHILD_CARD)], { diagram: true }),
+          snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true }),
         ],
       }),
     );
@@ -213,36 +213,36 @@ describe('loadSpaceAggregate', () => {
     expect(errors).toEqual([{ kind: 'ordinary-space-unreferenced', spaceId: CHILD }]);
   });
 
-  it('locates an explicit Layout that the target does not supply', () => {
+  it('locates an explicit Diagram that the target does not supply', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceCard(META_CARD, CHILD, { layout: OTHER })]),
-          snapshot(CHILD, [markdown(CHILD_CARD)], { layout: true }),
+          snapshot(META, [spaceCard(META_CARD, CHILD, { diagram: OTHER })]),
+          snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true }),
         ],
       }),
     );
 
     expect(errors).toEqual([
       {
-        kind: 'space-card-layout-missing',
+        kind: 'space-card-diagram-missing',
         spaceId: META,
         cardId: META_CARD,
         targetSpaceId: CHILD,
-        layoutId: OTHER,
+        diagramId: OTHER,
       },
     ]);
   });
 
-  it('cannot report a missing Layout without naming the Layout it looked for', () => {
-    type LayoutMissing = Extract<
+  it('cannot report a missing Diagram without naming the Diagram it looked for', () => {
+    type DiagramMissing = Extract<
       SpaceAggregateError,
-      { readonly kind: 'space-card-layout-missing' }
+      { readonly kind: 'space-card-diagram-missing' }
     >;
-    // The only producer resolves `card.layout ?? target.defaultLayout` and
-    // continues when that is absent, so the refusal always names a Layout.
-    expectTypeOf<LayoutMissing['layoutId']>().toEqualTypeOf<UUID>();
+    // The only producer resolves `card.diagram ?? target.defaultDiagram` and
+    // continues when that is absent, so the refusal always names a Diagram.
+    expectTypeOf<DiagramMissing['diagramId']>().toEqualTypeOf<UUID>();
   });
 
   it('locates an explicit Graph that the target does not hold', () => {
@@ -251,7 +251,7 @@ describe('loadSpaceAggregate', () => {
         metaSpaceId: META,
         snapshots: [
           snapshot(META, [spaceCard(META_CARD, CHILD, { graph: OTHER })]),
-          snapshot(CHILD, [markdown(CHILD_CARD)], { layout: true }),
+          snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true }),
         ],
       }),
     );
@@ -269,14 +269,14 @@ describe('loadSpaceAggregate', () => {
 
   it.each([
     {
-      name: 'an explicit authored Layout',
-      selection: { layout: LAYOUT },
-      target: { layout: true },
+      name: 'an explicit authored Diagram',
+      selection: { diagram: DIAGRAM },
+      target: { diagram: true },
     },
     {
-      name: 'a Graph with the target Layout fallback',
+      name: 'a Graph with the target Diagram fallback',
       selection: { graph: GRAPH },
-      target: { layout: true },
+      target: { diagram: true },
     },
     {
       name: 'no selections when the target has no Graph',
@@ -295,39 +295,39 @@ describe('loadSpaceAggregate', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('refuses a Graph outside the explicit Layout', () => {
+  it('refuses a Graph outside the explicit Diagram', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceCard(META_CARD, CHILD, { layout: LAYOUT, graph: SECOND_GRAPH })]),
-          snapshot(CHILD, [markdown(CHILD_CARD)], { layout: true, secondLayout: true }),
+          snapshot(META, [spaceCard(META_CARD, CHILD, { diagram: DIAGRAM, graph: SECOND_GRAPH })]),
+          snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true, secondDiagram: true }),
         ],
       }),
     );
 
     expect(errors).toEqual([
       {
-        kind: 'space-card-graph-outside-layout',
+        kind: 'space-card-graph-outside-diagram',
         spaceId: META,
         cardId: META_CARD,
         targetSpaceId: CHILD,
-        layoutId: LAYOUT,
+        diagramId: DIAGRAM,
         graphId: SECOND_GRAPH,
       },
     ]);
   });
 
-  it('uses the target default Layout when only the Graph is explicit', () => {
+  it('uses the target default Diagram when only the Graph is explicit', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
           snapshot(META, [spaceCard(META_CARD, CHILD, { graph: GRAPH })]),
           snapshot(CHILD, [markdown(CHILD_CARD)], {
-            layout: true,
-            secondLayout: true,
-            defaultLayout: SECOND_LAYOUT,
+            diagram: true,
+            secondDiagram: true,
+            defaultDiagram: SECOND_DIAGRAM,
           }),
         ],
       }),
@@ -335,11 +335,11 @@ describe('loadSpaceAggregate', () => {
 
     expect(errors).toEqual([
       {
-        kind: 'space-card-graph-outside-layout',
+        kind: 'space-card-graph-outside-diagram',
         spaceId: META,
         cardId: META_CARD,
         targetSpaceId: CHILD,
-        layoutId: SECOND_LAYOUT,
+        diagramId: SECOND_DIAGRAM,
         graphId: GRAPH,
       },
     ]);

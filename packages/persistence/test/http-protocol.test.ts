@@ -190,13 +190,13 @@ describe('aggregate wire protocol', () => {
       { kind: 'invalid-frontmatter', path: 'card.md', message: 'message' },
       { kind: 'duplicate-card-id', ...described },
       { kind: 'duplicate-graph-id', ...described },
-      { kind: 'duplicate-layout-id', ...described },
-      { kind: 'layout-member-missing-card', ...described },
-      { kind: 'layout-active-graph-missing', ...described },
-      { kind: 'layout-active-graph-outside-layout', ...described },
+      { kind: 'duplicate-diagram-id', ...described },
+      { kind: 'diagram-member-missing-card', ...described },
+      { kind: 'diagram-active-graph-missing', ...described },
+      { kind: 'diagram-active-graph-outside-diagram', ...described },
       { kind: 'graph-edge-missing-card', ...described },
-      { kind: 'graph-edge-card-outside-layout', ...described },
-      { kind: 'unresolved-default-layout', ...described },
+      { kind: 'graph-edge-card-outside-diagram', ...described },
+      { kind: 'unresolved-default-diagram', ...described },
       { kind: 'duplicate-graph-edge', ...described },
       { kind: 'unresolved-alias-target', ...described },
       { kind: 'alias-self-reference', ...described },
@@ -213,12 +213,12 @@ describe('aggregate wire protocol', () => {
       { kind: 'space-card-target-missing', ...location },
       { kind: 'space-card-reference-cycle', ...location },
       { kind: 'ordinary-space-unreferenced', spaceId: secondId },
-      { kind: 'space-card-layout-missing', ...location, layoutId: secondId },
+      { kind: 'space-card-diagram-missing', ...location, diagramId: secondId },
       { kind: 'space-card-graph-missing', ...location, graphId: secondId },
       {
-        kind: 'space-card-graph-outside-layout',
+        kind: 'space-card-graph-outside-diagram',
         ...location,
-        layoutId: SPACE_ID,
+        diagramId: SPACE_ID,
         graphId: secondId,
       },
     ];
@@ -227,14 +227,14 @@ describe('aggregate wire protocol', () => {
     expect(decodeCommitRefusal(encodeCommitRefusal(refusal))).toEqual(refusal);
   });
 
-  it('declares the Space Card Layout refusal the way its decoder reads it', () => {
-    type WireLayoutMissing = Extract<
+  it('declares the Space Card Diagram refusal the way its decoder reads it', () => {
+    type WireDiagramMissing = Extract<
       CommitRefusalBody['errors'][number],
-      { readonly kind: 'space-card-layout-missing' }
+      { readonly kind: 'space-card-diagram-missing' }
     >;
     // `decodeCommitRefusal` reads this key with `requiredUuid`, so a body
     // omitting it is refused rather than decoded.
-    expectTypeOf<WireLayoutMissing['layoutId']>().toEqualTypeOf<string>();
+    expectTypeOf<WireDiagramMissing['diagramId']>().toEqualTypeOf<string>();
   });
 
   it('rejects unknown aggregate refusal identities and fields', () => {

@@ -24,7 +24,7 @@ import { openTestSpace } from './opened-space';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
@@ -33,18 +33,18 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
     document: {
       version: 1,
       title,
-      layouts: [
+      diagrams: [
         {
-          id: LAYOUT_ID,
-          title: 'Layout',
+          id: DIAGRAM_ID,
+          title: 'Diagram',
           kind: 'positioned',
           positions: { [CARD_ID]: { x, y, open: false } },
-          // A Layout owns at least one Graph (ADR 0040); this one holds no
+          // A Diagram owns at least one Graph (ADR 0040); this one holds no
           // Edges, which is all a single-Card Space has to connect.
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
         },
       ],
-      defaultLayout: LAYOUT_ID,
+      defaultDiagram: DIAGRAM_ID,
     },
     cards: [{ id: CARD_ID, document: { title: cardTitle, kind: 'markdown', body: cardTitle } }],
   });

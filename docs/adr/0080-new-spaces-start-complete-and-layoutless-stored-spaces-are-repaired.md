@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0079
+Refined by: 0085
 Related: 0018, 0040, 0054, 0056, 0076, 0078
 
 ADR 0079 correctly requires every working Space to carry a durable default

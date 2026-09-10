@@ -16,7 +16,7 @@ export const SpaceApp: Story = () => (
   <SpaceAppFailureView message="Graph names an absent card 00000000-0000-4000-8000-000000000005" />
 );
 
-/** The canvas when no strategy produced positions for the active Layout. */
+/** The canvas when no strategy produced positions for the active Diagram. */
 export const Placement: Story = () => (
   <PlacementFailure error={new Error('No position for Card A')} />
 );

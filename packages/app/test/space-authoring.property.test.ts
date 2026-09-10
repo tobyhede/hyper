@@ -6,8 +6,8 @@ import {
   uuidSchema,
   type Card,
   type Graph,
-  type Layout,
-  type LayoutId,
+  type Diagram,
+  type DiagramId,
   type SpaceSnapshot,
 } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
@@ -25,7 +25,7 @@ import type { AuthoringCompletion, AuthoringResult } from '../src/space-authorin
  *
  * 1. The working Space always passes normal domain intake. A completed Edit
  *    derives and validates the whole next Space before a collaborator moves, so
- *    an Edit that would break Layout membership, Edge closure, Alias resolution
+ *    an Edit that would break Diagram membership, Edge closure, Alias resolution
  *    or Graph ownership is refused rather than stored — and the sequence keeps
  *    going afterwards.
  * 2. An operation that is not an Edit changes nothing. `unchanged` and `refused`
@@ -48,11 +48,11 @@ const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 
 /**
- * Two Layouts, an Alias, a Card one Layout omits and a Graph in each — the
+ * Two Diagrams, an Alias, a Card one Diagram omits and a Graph in each — the
  * smallest Space in which every rule under test has something to bite on.
  */
 const start: SpaceSnapshot = {
@@ -60,10 +60,10 @@ const start: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout 1',
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [CARD_A]: { x: 10, y: 20, open: false },
@@ -75,8 +75,8 @@ const start: SpaceSnapshot = {
         ],
       },
       {
-        id: OTHER_LAYOUT_ID,
-        title: 'Layout 2',
+        id: OTHER_DIAGRAM_ID,
+        title: 'Diagram 2',
         kind: 'positioned',
         positions: {
           [CARD_A]: { x: 0, y: 400, open: false },
@@ -91,7 +91,7 @@ const start: SpaceSnapshot = {
         ],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -128,8 +128,8 @@ const operation = fc.oneof(
     title: fc.oneof(fc.constant(''), fc.constant('  '), fc.string({ maxLength: 8 })),
     proposedTarget: fc.option(index, { nil: undefined }),
   }),
-  fc.record({ op: fc.constant('added-card-to-layout' as const), card: index, anchor }),
-  fc.record({ op: fc.constant('removed-card-from-layout' as const), card: index }),
+  fc.record({ op: fc.constant('added-card-to-diagram' as const), card: index, anchor }),
+  fc.record({ op: fc.constant('removed-card-from-diagram' as const), card: index }),
   fc.record({ op: fc.constant('deleted-card' as const), card: index }),
   fc.record({ op: fc.constant('added-graph' as const) }),
   fc.record({
@@ -187,15 +187,15 @@ it('keeps an existing Alias Target immutable while accepting Title edits', () =>
         const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
         const { authoring } = composeApp({
           spaceSession: session,
-          selection: OTHER_LAYOUT_ID,
+          selection: OTHER_DIAGRAM_ID,
           initialPlacement: null,
         });
-        const aliasLayout = snapshot.document.layouts?.find(
-          (layout) => layout.id === OTHER_LAYOUT_ID,
+        const aliasDiagram = snapshot.document.diagrams?.find(
+          (diagram) => diagram.id === OTHER_DIAGRAM_ID,
         );
-        if (aliasLayout === undefined)
-          throw new Error('property fixture must include the Alias Layout');
-        authoring.replacePlacement(Placement.fromLayout(aliasLayout));
+        if (aliasDiagram === undefined)
+          throw new Error('property fixture must include the Alias Diagram');
+        authoring.replacePlacement(Placement.fromDiagram(aliasDiagram));
 
         expect(
           authoring.complete({
@@ -230,26 +230,26 @@ it('keeps the working Space loadable through any sequence of semantic operations
   fc.assert(
     fc.property(
       fc.array(operation, { minLength: 1, maxLength: 12 }),
-      fc.constantFrom<LayoutId>(LAYOUT_ID, OTHER_LAYOUT_ID, LAYOUT_ID),
-      (operations, layoutId) => {
+      fc.constantFrom<DiagramId>(DIAGRAM_ID, OTHER_DIAGRAM_ID, DIAGRAM_ID),
+      (operations, diagramId) => {
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
         const { currentSpace, navigation, authoring } = composeApp({
           spaceSession: session,
-          selection: layoutId,
+          selection: diagramId,
           // Deterministic, so a shrunk counterexample replays: creating this
-          // Space's Layout creation mints one Graph, and the rest of the
+          // Space's Diagram creation mints one Graph, and the rest of the
           // block is the margin that makes an exhaustion a real signal.
           // These cases install the geometry the canvas would have reported by
           // now, immediately below.
           initialPlacement: null,
         });
         // The authored geometry available when an author reaches these controls.
-        const selectedLayout = (): Layout | undefined => {
-          const selected = navigation.getState().selectedLayoutId;
-          return currentSpace().lookup.layout(selected)?.layout;
+        const selectedDiagram = (): Diagram | undefined => {
+          const selected = navigation.getState().selectedDiagramId;
+          return currentSpace().lookup.diagram(selected)?.diagram;
         };
-        const opened = selectedLayout();
+        const opened = selectedDiagram();
         authoring.replacePlacement(
           opened === undefined
             ? Placement.fromEntries([
@@ -257,12 +257,12 @@ it('keeps the working Space loadable through any sequence of semantic operations
                 [CARD_B, { x: 300, y: 40, open: false }],
                 [CARD_C, { x: 600, y: 40, open: false }],
               ])
-            : Placement.fromLayout(opened),
+            : Placement.fromDiagram(opened),
         );
 
         for (const generated of operations) {
           const space = currentSpace();
-          const graphs: readonly Graph[] = selectedLayout()?.graphs ?? space.graphs;
+          const graphs: readonly Graph[] = selectedDiagram()?.graphs ?? space.graphs;
           const completion = resolve(generated, space.cards, graphs);
 
           const before = session.getState().working;
@@ -328,10 +328,10 @@ function resolve(
       return { kind: 'created-card', anchor: generated.anchor };
     case 'created-alias':
       return { kind: 'created-alias', target: cardId, anchor: generated.anchor };
-    case 'added-card-to-layout':
-      return { kind: 'added-card-to-layout', cardId, anchor: generated.anchor };
-    case 'removed-card-from-layout':
-      return { kind: 'removed-card-from-layout', cardId };
+    case 'added-card-to-diagram':
+      return { kind: 'added-card-to-diagram', cardId, anchor: generated.anchor };
+    case 'removed-card-from-diagram':
+      return { kind: 'removed-card-from-diagram', cardId };
     case 'deleted-card':
       return { kind: 'deleted-card', cardId };
     case 'added-graph':

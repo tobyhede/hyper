@@ -22,7 +22,7 @@ const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_CARD_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
-const LAYOUT_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const DIAGRAM_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const GRAPH_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
 const LINK_CARD_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 
@@ -62,7 +62,7 @@ const storedSpace = (
 
 describe('defaultContentAggregate', () => {
   it('mints one complete Meta Space through the injected identity source', () => {
-    const aggregate = defaultContentAggregate(mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID));
+    const aggregate = defaultContentAggregate(mintingIds(SPACE_ID, CARD_ID, DIAGRAM_ID, GRAPH_ID));
 
     expect(aggregate).toEqual({
       metaSpaceId: SPACE_ID,
@@ -72,11 +72,11 @@ describe('defaultContentAggregate', () => {
           document: {
             version: 1,
             title: 'New space',
-            defaultLayout: LAYOUT_ID,
-            layouts: [
+            defaultDiagram: DIAGRAM_ID,
+            diagrams: [
               {
-                id: LAYOUT_ID,
-                title: 'Layout 1',
+                id: DIAGRAM_ID,
+                title: 'Diagram 1',
                 kind: 'positioned',
                 positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
                 graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -121,7 +121,7 @@ describe('establishMetaSpace', () => {
 
     const metaSpaceId = await establishMetaSpace(
       repository,
-      mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID),
+      mintingIds(SPACE_ID, CARD_ID, DIAGRAM_ID, GRAPH_ID),
     );
 
     expect(metaSpaceId).toBe(SPACE_ID);
@@ -210,7 +210,7 @@ const recordingWait = (waits: number[]) => (milliseconds: number) => {
 };
 
 /** The four ids one establishment mints, and no more. */
-const establishmentIds = () => mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID);
+const establishmentIds = () => mintingIds(SPACE_ID, CARD_ID, DIAGRAM_ID, GRAPH_ID);
 
 describe('retryMetaSpaceEstablishment', () => {
   it('establishes the Meta Space once the database comes back', async () => {
@@ -383,7 +383,7 @@ describe('resolveDatabaseStartup', () => {
 
     const result = await resolveDatabaseStartup(
       repository,
-      mintingIds(SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID),
+      mintingIds(SPACE_ID, CARD_ID, DIAGRAM_ID, GRAPH_ID),
     );
 
     expect(result).toEqual({
@@ -394,11 +394,11 @@ describe('resolveDatabaseStartup', () => {
           document: {
             version: 1,
             title: 'New space',
-            defaultLayout: LAYOUT_ID,
-            layouts: [
+            defaultDiagram: DIAGRAM_ID,
+            diagrams: [
               {
-                id: LAYOUT_ID,
-                title: 'Layout 1',
+                id: DIAGRAM_ID,
+                title: 'Diagram 1',
                 kind: 'positioned',
                 positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
                 graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -444,7 +444,7 @@ describe('resolveDatabaseStartup', () => {
     };
     const repository = new MemorySpaceRepository([storedSpace(4n), meta], OTHER_SPACE_ID);
 
-    const result = await resolveDatabaseStartup(repository, mintingIds(LAYOUT_ID));
+    const result = await resolveDatabaseStartup(repository, mintingIds(DIAGRAM_ID));
 
     expect(result).toEqual({ kind: 'opened', space: meta });
   });

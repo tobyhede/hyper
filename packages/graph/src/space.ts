@@ -3,7 +3,7 @@ import {
   spaceFileSchema,
   spaceSnapshotSchema,
   type Card,
-  type Layout,
+  type Diagram,
   type Graph,
   type SpaceSnapshot,
   type UUID,
@@ -39,11 +39,11 @@ export interface Space {
   readonly title: string;
   readonly cards: readonly Card[];
   /**
-   * Every graph in the space, **flattened** across the layouts that own them —
-   * layouts in declared order, each layout's graphs in authored order (ADR
-   * 0045). Derived, never stored: a graph is an owned value of one layout (ADR
+   * Every graph in the space, **flattened** across the diagrams that own them —
+   * diagrams in declared order, each diagram's graphs in authored order (ADR
+   * 0045). Derived, never stored: a graph is an owned value of one diagram (ADR
    * 0040), and this is the collection a view whose subject is the space's cards
-   * draws. Closed for free, since every edge endpoint is a card of some layout
+   * draws. Closed for free, since every edge endpoint is a card of some diagram
    * and so a card of the space.
    *
    * The exact nested values, never copies: a graph read off here and one read
@@ -51,13 +51,13 @@ export interface Space {
    */
   readonly graphs: readonly Graph[];
   /**
-   * The positioned layouts the author wrote, if any. Empty is the normal state
-   * of a hand-authored space: automatic layouts carry no data, so they are
+   * The positioned diagrams the author wrote, if any. Empty is the normal state
+   * of a hand-authored space: automatic strategies carry no data, so they are
    * declared nowhere (ADR 0025).
    */
-  readonly layouts: readonly Layout[];
-  /** Which Layout this Space opens in — one UUID namespace for both variants. */
-  readonly defaultLayout: UUID | undefined;
+  readonly diagrams: readonly Diagram[];
+  /** Which Diagram this Space opens in — one UUID namespace for both variants. */
+  readonly defaultDiagram: UUID | undefined;
   /**
    * Contextual entity resolution — the only one. The Maps behind it are closed
    * over and appear nowhere on this value, so no caller can index the space a
@@ -86,7 +86,7 @@ export type SpaceError =
  * ordinary shape check speak.
  *
  * Read before parsing, because a version 2 document does not fail *once* under
- * version 1 — its layouts each lack the graphs they now own, so the shape check
+ * version 1 — its diagrams each lack the graphs they now own, so the shape check
  * answers a cascade in which nothing says which version arrived. A version this
  * cannot read at all (absent, not a number) is left to the shape check, whose
  * message for it is already the right one.
@@ -137,7 +137,7 @@ function retiredSpaceGraphs(document: unknown): SpaceError | null {
   return {
     kind: 'retired-space-graphs',
     message:
-      'This document carries a space-level `graphs` array, which is retired: a Layout owns the Graphs it draws (ADR 0040)',
+      'This document carries a space-level `graphs` array, which is retired: a Diagram owns the Graphs it draws (ADR 0040)',
   };
 }
 
@@ -229,8 +229,8 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
     id: file.id,
     title: file.title,
     cards,
-    layouts: file.layouts,
-    defaultLayout: file.defaultLayout,
+    diagrams: file.diagrams,
+    defaultDiagram: file.defaultDiagram,
   });
 }
 
@@ -271,8 +271,8 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
     id,
     title: document.title,
     cards,
-    layouts: document.layouts,
-    defaultLayout: document.defaultLayout,
+    diagrams: document.diagrams,
+    defaultDiagram: document.defaultDiagram,
   });
   return loaded.ok ? { ...loaded, snapshot: parsed.data } : loaded;
 }
@@ -281,8 +281,8 @@ function buildSpace(input: {
   id: UUID;
   title: string;
   cards: Card[];
-  layouts: Layout[] | undefined;
-  defaultLayout: UUID | undefined;
+  diagrams: Diagram[] | undefined;
+  defaultDiagram: UUID | undefined;
 }): LoadSpaceResult {
   // Array order is read only by automatic strategies, so title order is the one
   // default stable across filesystem scans and unordered relational reads. Ties
@@ -290,25 +290,25 @@ function buildSpace(input: {
   const cards = [...input.cards].sort(
     (left, right) => left.title.localeCompare(right.title) || left.id.localeCompare(right.id),
   );
-  const layouts = input.layouts ?? [];
-  const referenceErrors = validateReferences({ ...input, cards, layouts });
+  const diagrams = input.diagrams ?? [];
+  const referenceErrors = validateReferences({ ...input, cards, diagrams });
   if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
 
-  // The flatten: layouts in declared order, each layout's owned graphs in
+  // The flatten: diagrams in declared order, each diagram's owned graphs in
   // authored order. Derived and never stored (ADR 0045) — it exists so the
   // readers that key colour, handles, render edge ids and activation on a graph
-  // id alone keep reading one collection while ownership sits on the layout.
+  // id alone keep reading one collection while ownership sits on the diagram.
   // The reference check above has already refused a repeated id, so the lookup
   // built below can drop nothing.
-  const graphs = layouts.flatMap((layout) => layout.graphs);
-  const built = buildSpaceLookup({ cards, layouts });
+  const graphs = diagrams.flatMap((diagram) => diagram.graphs);
+  const built = buildSpaceLookup({ cards, diagrams });
   if (!built.ok) {
     return {
       ok: false,
       errors: [
         {
           kind: 'invalid-shape',
-          message: `layouts: layout "${built.layoutWithoutGraph}" owns no graph`,
+          message: `diagrams: diagram "${built.diagramWithoutGraph}" owns no graph`,
         },
       ],
     };
@@ -320,8 +320,8 @@ function buildSpace(input: {
       title: input.title,
       cards,
       graphs,
-      layouts,
-      defaultLayout: input.defaultLayout,
+      diagrams,
+      defaultDiagram: input.defaultDiagram,
       lookup: built.lookup,
     }),
   };

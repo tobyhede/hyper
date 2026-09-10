@@ -1,4 +1,4 @@
-import type { CardId, LayoutPosition } from '@project/core';
+import type { CardId, DiagramPosition } from '@project/core';
 import { createNonThrowingReporter, type ObserverErrorReporter } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { RenderAdapter } from './render-adapter';
@@ -57,7 +57,7 @@ export interface ConnectionCompletion {
   /** Author a Card at an Option/Alt empty drop and the Edge that reaches it. */
   readonly createAndConnect: (
     from: CardId,
-    position: LayoutPosition,
+    position: DiagramPosition,
     projected: readonly CardFlowNode[] | null,
   ) => ConnectionResult;
 }
@@ -88,7 +88,7 @@ export function createConnectionCompletion({
    * screen. They diverge only for a Card the projection has gained and the live
    * list has not, which `App` makes reachable by withholding `syncProjection`
    * until a strategy resolves. That Card has no resolved position yet, and
-   * authoring the origin it is standing on is exactly what a sparse Layout
+   * authoring the origin it is standing on is exactly what a sparse Diagram
    * exists to avoid.
    *
    * A completion that has not happened — refused, or thrown on an invalid Space

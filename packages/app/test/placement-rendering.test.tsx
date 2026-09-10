@@ -65,7 +65,7 @@ describe('usePlacementRendering', () => {
     // snapshot, and the `LayoutStrategyGraph` derived from it re-fires this effect on
     // its own. Nothing here touches the placement — the same object is handed
     // back on every render, so only the strategyGraph half can produce the second
-    // layout run.
+    // diagram run.
     const authored = Placement.fromEntries([
       [CARD_A, { x: 80, y: 120, open: false }],
       [CARD_B, { x: 400, y: 260, open: false }],

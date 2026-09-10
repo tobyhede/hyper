@@ -402,10 +402,10 @@ describe('runHyper', () => {
       document: {
         version: 1,
         title: 'Canonical: talk',
-        layouts: [
+        diagrams: [
           {
             id: OTHER_SPACE_ID,
-            title: 'Authored layout',
+            title: 'Authored diagram',
             kind: 'positioned',
             positions: {
               [THIRD_SPACE_ID]: { x: 30, y: 40, open: false },
@@ -422,7 +422,7 @@ describe('runHyper', () => {
             activeGraph: GRAPH_ID,
           },
         ],
-        defaultLayout: OTHER_SPACE_ID,
+        defaultDiagram: OTHER_SPACE_ID,
       },
       cards: [
         {
@@ -722,13 +722,13 @@ describe('runHyper', () => {
   /*
    * The three cases above stub the repository's verdict, so they prove the CLI
    * prints what it is handed. This one produces the fault for real: a directory
-   * whose two layouts own one graph id, read off disk, identified, and put
+   * whose two diagrams own one graph id, read off disk, identified, and put
    * through domain intake by a real repository. That error is new to version 1
-   * — a graph id is unique across the space although one layout owns it (ADR
-   * 0045) — and the only part of it an author can act on is which two layouts
+   * — a graph id is unique across the space although one diagram owns it (ADR
+   * 0045) — and the only part of it an author can act on is which two diagrams
    * collided, so both ids have to survive the trip to stderr.
    */
-  it('reports a graph id two layouts own, naming both of them', async () => {
+  it('reports a graph id two diagrams own, naming both of them', async () => {
     const directory = await makeTemporaryDirectory();
     await mkdir(join(directory, 'cards'));
     await writeFile(
@@ -741,7 +741,7 @@ describe('runHyper', () => {
         version: 1,
         id: SPACE_ID,
         title: 'Two owners',
-        layouts: [
+        diagrams: [
           {
             id: OTHER_SPACE_ID,
             title: 'First owner',

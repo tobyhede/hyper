@@ -5,20 +5,20 @@ const story = (name: string) => `/?story=surfaces--cards-drawer--${name}&mode=pr
 
 test(
   'Cards drawer uses production Card fronts and narrows the available Cards',
-  { tag: '@parity:cards-drawer-adds-existing-layout-members' },
+  { tag: '@parity:cards-drawer-adds-existing-diagram-members' },
   async ({ page }) => {
     await page.goto(STORY);
 
     await page.getByRole('button', { name: 'Cards' }).click();
     await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
 
-    await expect(page.getByRole('button', { name: /^Add .* to Layout$/ })).toHaveCount(5);
+    await expect(page.getByRole('button', { name: /^Add .* to Diagram$/ })).toHaveCount(5);
     await expect(page.locator('.react-flow__handle')).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Filter cards by kind' }).click();
     await page.getByRole('menuitemradio', { name: 'Alias' }).click();
-    await expect(page.getByRole('button', { name: 'Add Constraints to Layout' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add Architecture to Layout' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Add Constraints to Diagram' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(0);
 
     await page.getByRole('textbox', { name: 'Search cards' }).fill('missing');
     await expect(page.getByText('No matching Cards.')).toBeVisible();
@@ -26,12 +26,12 @@ test(
 );
 
 test(
-  'Cards drawer names an empty Layout',
-  { tag: '@parity:cards-drawer-distinguishes-an-empty-layout' },
+  'Cards drawer names an empty Diagram',
+  { tag: '@parity:cards-drawer-distinguishes-an-empty-diagram' },
   async ({ page }) => {
     await page.goto(story('empty'));
     await page.getByRole('button', { name: 'Cards' }).click();
-    await expect(page.getByText('All Cards are in this Layout.')).toBeVisible();
+    await expect(page.getByText('All Cards are in this Diagram.')).toBeVisible();
   },
 );
 
@@ -66,12 +66,12 @@ test(
   async ({ page }) => {
     await page.goto(story('refused'));
     await page.getByRole('button', { name: 'Cards' }).click();
-    await page.getByRole('button', { name: 'Add Card 3 to Layout' }).evaluate((button) => {
+    await page.getByRole('button', { name: 'Add Card 3 to Diagram' }).evaluate((button) => {
       button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    await expect(page.getByRole('alert')).toContainText('This Card is already in this Layout.');
+    await expect(page.getByRole('alert')).toContainText('This Card is already in this Diagram.');
   },
 );
 

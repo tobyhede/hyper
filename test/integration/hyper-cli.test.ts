@@ -224,12 +224,12 @@ describe('hyper CLI', () => {
     expect(created.title).toBe('New space');
     const stored = await repository.loadSpace(created.id);
     // A new Space begins complete: its Card is already placed in an authored
-    // default Layout with one empty Active Graph (ADR 0079, ADR 0080). Every id
+    // default Diagram with one empty Active Graph (ADR 0079, ADR 0080). Every id
     // in it is minted, so the shape is asserted against the ones that arrived.
-    const layout = stored?.snapshot.document.layouts?.[0];
-    if (layout === undefined) throw new Error('Expected the new space to arrive with its Layout');
-    const graph = layout.graphs[0];
-    if (graph === undefined) throw new Error('Expected the new Layout to arrive with its Graph');
+    const diagram = stored?.snapshot.document.diagrams?.[0];
+    if (diagram === undefined) throw new Error('Expected the new space to arrive with its Diagram');
+    const graph = diagram.graphs[0];
+    if (graph === undefined) throw new Error('Expected the new Diagram to arrive with its Graph');
     const cardId = stored?.snapshot.cards[0]?.id;
     if (cardId === undefined) throw new Error('Expected the new space to arrive with its Card');
     expect(stored).toEqual({
@@ -238,17 +238,17 @@ describe('hyper CLI', () => {
         document: {
           version: 1,
           title: 'New space',
-          layouts: [
+          diagrams: [
             {
-              id: layout.id,
-              title: 'Layout 1',
+              id: diagram.id,
+              title: 'Diagram 1',
               kind: 'positioned',
               positions: { [cardId]: { x: 0, y: 0, open: false } },
               graphs: [{ id: graph.id, title: 'Graph 1', edges: [] }],
               activeGraph: graph.id,
             },
           ],
-          defaultLayout: layout.id,
+          defaultDiagram: diagram.id,
         },
         cards: [
           {
@@ -260,7 +260,7 @@ describe('hyper CLI', () => {
       revision: 0n,
       exportedRevision: null,
     });
-    for (const id of [cardId, layout.id, graph.id]) {
+    for (const id of [cardId, diagram.id, graph.id]) {
       expect(uuidSchema.safeParse(id).success).toBe(true);
     }
   });

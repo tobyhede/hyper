@@ -16,8 +16,8 @@ import {
 import {
   type Card,
   type CardId,
-  type LayoutId,
-  type LayoutPosition,
+  type DiagramId,
+  type DiagramPosition,
   type UUID,
 } from '@project/core';
 import type { ProductDestination } from '@project/http';
@@ -52,7 +52,7 @@ import { copyLink } from './clipboard';
 import {
   COPY_LINK_ACTION_ID,
   COPY_PERMANENT_LINK_ACTION_ID,
-  DELETE_LAYOUT_ACTION_ID,
+  DELETE_DIAGRAM_ACTION_ID,
   spaceEntityActions,
   type EntityCommandId,
   type SpaceChromeTitleSubject,
@@ -60,7 +60,7 @@ import {
 } from './entity-actions';
 import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
-import { layoutCards, resolveLayout } from './layout-resolution';
+import { diagramCards, resolveDiagram } from './diagram-resolution';
 import type { DestinationOpening } from './destination-opening';
 import { SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
@@ -159,12 +159,12 @@ export const createApp = (
   const openingPresentationCardId = opening?.presentationCardId ?? null;
   if (openingGraphId !== null && openingPresentationCardId !== null) {
     navigation.openPresentation(
-      navigation.getState().selectedLayoutId,
+      navigation.getState().selectedDiagramId,
       openingGraphId,
       openingPresentationCardId,
     );
   } else if (openingGraphId !== null) {
-    navigation.openGraph(navigation.getState().selectedLayoutId, openingGraphId);
+    navigation.openGraph(navigation.getState().selectedDiagramId, openingGraphId);
   }
 
   function App() {
@@ -194,7 +194,7 @@ export const createApp = (
     );
     const active = spaces === null || openSpacesState.activeSpaceId === sessionState.working.id;
     const navigationState = authoringState.navigation;
-    const selectedLayoutId = navigationState.selectedLayoutId;
+    const selectedDiagramId = navigationState.selectedDiagramId;
     /**
      * The two things the browser's location tells this component (ADR 0081).
      *
@@ -207,8 +207,8 @@ export const createApp = (
       browserLocation.subscribe,
       browserLocation.getState,
     );
-    // Keyed on the Layout as well as the Card: a deliberate move clears the
-    // published selection, and moving between two Layouts that address
+    // Keyed on the Diagram as well as the Card: a deliberate move clears the
+    // published selection, and moving between two Diagrams that address
     // the *same* Card leaves `addressedCardId` untouched, so keying on the Card
     // alone would let React bail out and never restore it. Clearing on `null` is
     // the other half — an address that stops naming a Card must stop selecting
@@ -230,7 +230,7 @@ export const createApp = (
         select: false,
         then: 'reveal',
       });
-    }, [addressedCardId, selectedLayoutId]);
+    }, [addressedCardId, selectedDiagramId]);
     /**
      * Whether a Card's content edit is running, reported up by the canvas.
      *
@@ -242,10 +242,9 @@ export const createApp = (
      */
     const [editingCardBody, setEditingCardBody] = useState(false);
     const [editingCardTitle, setEditingCardTitle] = useState(false);
-    const [createLayoutRefusal, setCreateLayoutRefusal] = useState<AuthoringRefusal | null>(null);
-    const [layoutManagementRefusal, setLayoutManagementRefusal] = useState<AuthoringRefusal | null>(
-      null,
-    );
+    const [createDiagramRefusal, setCreateDiagramRefusal] = useState<AuthoringRefusal | null>(null);
+    const [diagramManagementRefusal, setDiagramManagementRefusal] =
+      useState<AuthoringRefusal | null>(null);
     /**
      * A Space command that broke rather than refusing, in words.
      *
@@ -307,10 +306,10 @@ export const createApp = (
       },
       [],
     );
-    const [cardsDrawerOpen, setCardsDrawerOpen] = useState(initialization === 'created-layout');
+    const [cardsDrawerOpen, setCardsDrawerOpen] = useState(initialization === 'created-diagram');
     const cardsDrag = useRef<{
       readonly cardId: CardId;
-      readonly layoutId: LayoutId;
+      readonly diagramId: DiagramId;
     } | null>(null);
     const renderedSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
@@ -338,7 +337,7 @@ export const createApp = (
      *
      * Set through the updater form because the value *is* a function: passing
      * it directly would have React call it as an updater and store a
-     * `LayoutPosition` where a getter belongs.
+     * `DiagramPosition` where a getter belongs.
      */
     const [visibleCentre, setVisibleCentre] = useState<VisibleCentre | null>(null);
     /**
@@ -358,7 +357,7 @@ export const createApp = (
     // Card must land *somewhere*, and a refusal would be the wrong answer to a
     // question about geometry.
     const centreAnchor = useCallback(
-      (): LayoutPosition => visibleCentre?.() ?? { x: 0, y: 0 },
+      (): DiagramPosition => visibleCentre?.() ?? { x: 0, y: 0 },
       [visibleCentre],
     );
 
@@ -422,14 +421,14 @@ export const createApp = (
         targetSpaceId,
         title,
       }: Extract<CardCreationInput, { kind: 'space' }>): Promise<CardCreationOutcome> => {
-        // Resolved here rather than closed over: the Layout a Space Card is added
+        // Resolved here rather than closed over: the Diagram a Space Card is added
         // to is the one drawing when the author confirms, and the pane has been
-        // open across renders. `create` still refuses `layout-not-found` on its
-        // own account, against the Layout the coordinated Edit actually sees.
-        const resolved = resolveLayout(currentSpace(), navigation.getState().selectedLayoutId);
+        // open across renders. `create` still refuses `diagram-not-found` on its
+        // own account, against the Diagram the coordinated Edit actually sees.
+        const resolved = resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
         const input = {
           containingSpaceId: currentSpace().id,
-          layoutId: resolved.layout.id,
+          diagramId: resolved.diagram.id,
           title,
           position: centreAnchor(),
         };
@@ -479,8 +478,8 @@ export const createApp = (
                   kind: 'alias',
                   // The single-hop rule read forwards (ADR 0009): a Target must
                   // own its Markdown content. The Space's own Cards, not the
-                  // Layout's — an Alias points at content, and content is not a
-                  // thing a Layout owns.
+                  // Diagram's — an Alias points at content, and content is not a
+                  // thing a Diagram owns.
                   targets: currentSpace().cards.filter((card) => card.kind === 'markdown'),
                 },
                 listing: null,
@@ -509,38 +508,38 @@ export const createApp = (
     // to the module that owns the arms.
     const creationRefusal = cardCreationMessage(creationPane);
 
-    const selectedLayout = useMemo(
-      () => resolveLayout(renderedSpace, selectedLayoutId),
-      [renderedSpace, selectedLayoutId],
+    const selectedDiagram = useMemo(
+      () => resolveDiagram(renderedSpace, selectedDiagramId),
+      [renderedSpace, selectedDiagramId],
     );
-    // The positioned strategy that draws this Layout, built where it is used:
+    // The positioned strategy that draws this Diagram, built where it is used:
     // its one consumer is the placement rendering below (ADR 0025, ADR 0041).
     const strategy = useMemo(
-      () => positionedStrategy(Placement.fromLayout(selectedLayout.layout)),
-      [selectedLayout],
+      () => positionedStrategy(Placement.fromDiagram(selectedDiagram.diagram)),
+      [selectedDiagram],
     );
-    // The Cards this Layout places. Memoized on the same two values the Layout
+    // The Cards this Diagram places. Memoized on the same two values the Diagram
     // is: it is the sole dependency of Edge Authoring's Card-title map and its
     // endpoint choices, and a fresh array per render would rebuild both on every
     // intermediate drag frame — which is the identity churn
     // `edge-authoring-react.tsx` says its commands object must not have.
     const placedCards = useMemo(
-      () => layoutCards(renderedSpace, selectedLayout.layout),
-      [renderedSpace, selectedLayout],
+      () => diagramCards(renderedSpace, selectedDiagram.diagram),
+      [renderedSpace, selectedDiagram],
     );
-    // Everything the canvas draws, derived once from the Space and the Layout.
+    // Everything the canvas draws, derived once from the Space and the Diagram.
     // Memoized on those two alone: the interaction state below changes far more
     // often, and it is `project` that reads it rather than this.
     const projection = useMemo(
-      () => canvasProjection(renderedSpace, selectedLayout),
-      [renderedSpace, selectedLayout],
+      () => canvasProjection(renderedSpace, selectedDiagram),
+      [renderedSpace, selectedDiagram],
     );
 
     const { activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
     useEffect(() => {
       cardsDrag.current = null;
-    }, [selectedLayoutId, presenting, authoringState.replacementEpoch]);
+    }, [selectedDiagramId, presenting, authoringState.replacementEpoch]);
     // There is a Card to go back to only once a traversal has left its first, and only
     // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
@@ -563,7 +562,7 @@ export const createApp = (
     // Read at the point of use, like `moves` above and for the same reason: the
     // placement is not published state, and subscribing to it through the
     // render adapter — a store that knows nothing about either the placement or
-    // the selected Layout — only worked because every install happened to be
+    // the selected Diagram — only worked because every install happened to be
     // followed by an unrelated notification. This component already re-renders
     // on both stores, and a render-time read cannot be stale at the render that
     // uses it. `replacePlacement` keeps the map's identity when the value is
@@ -573,20 +572,20 @@ export const createApp = (
     const selection = useRenderAdapter((s) => s.selection);
     const selectedCardId = selectedCardOf(selection);
 
-    const cardsOutsideSelectedLayout = useMemo(
+    const cardsOutsideSelectedDiagram = useMemo(
       () =>
         renderedSpace.cards.filter(
-          (card) => selectedLayout.layout.positions[card.id] === undefined,
+          (card) => selectedDiagram.diagram.positions[card.id] === undefined,
         ),
-      [selectedLayout, renderedSpace.cards],
+      [selectedDiagram, renderedSpace.cards],
     );
     const liveProjection = useRenderAdapter((s) => s.projection);
     // Reported by the canvas, which is the only place it can be seen: an
-    // embedded Layout publishes its live edits from inside the React Flow
+    // embedded Diagram publishes its live edits from inside the React Flow
     // subtree. Read back out of the store the canvas wrote it into, so the
     // answers derived from it reach the command surface and the canvas in one
     // render rather than an effect apart.
-    const editingEmbeddedLayout = useRenderAdapter((s) => s.editingEmbeddedLayout);
+    const editingEmbeddedDiagram = useRenderAdapter((s) => s.editingEmbeddedDiagram);
     // There are Cards on the canvas to interact with once placement resolves
     // and the store has taken it.
     const hasCardsOnCanvas = liveProjection !== null;
@@ -594,7 +593,7 @@ export const createApp = (
      * Whether a chrome name is being renamed in place.
      *
      * A boolean where this was a whole draft — subject, text, error and the
-     * surface it began on. The draft existed because a Layout's name was drawn
+     * surface it began on. The draft existed because a Diagram's name was drawn
      * **twice**, in a Sidebar row and in the canvas header, and one rename had
      * to be live in both at once and return the caret to whichever began it.
      * The Command Dock draws each name once and `InlineTitleEditor` owns the
@@ -603,7 +602,7 @@ export const createApp = (
      * canvas's own title editing beside it (`authoring-availability.ts`).
      */
     const [editingChromeTitle, setEditingChromeTitle] = useState(false);
-    const cardIsOpen = Object.values(selectedLayout.layout.positions).some(
+    const cardIsOpen = Object.values(selectedDiagram.diagram.positions).some(
       (at) => at?.open === true,
     );
     /**
@@ -624,7 +623,7 @@ export const createApp = (
       cardIsOpen,
       editingChromeTitle,
       spaceOnCanvas: active,
-      editingEmbeddedLayout,
+      editingEmbeddedDiagram,
     });
     // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
     // `cardsDrawerOpen`. Presenting and creating an Alias both pass through here,
@@ -638,31 +637,31 @@ export const createApp = (
     // nothing derived from this flag, so setting it false here settles in one
     // pass.
     if (cardsDrawerOpen && !availability.cardsView) setCardsDrawerOpen(false);
-    // Reveals the drawer once per (Layout, address) rather than on every
+    // Reveals the drawer once per (Diagram, address) rather than on every
     // dependency change: an unrelated edit elsewhere in the Space still
-    // recomputes `cardsOutsideSelectedLayout` with a fresh array identity, and
+    // recomputes `cardsOutsideSelectedDiagram` with a fresh array identity, and
     // re-running on that alone would reopen a drawer the reader just closed.
-    // The Layout is part of the key, not just the Card id — a canonical Card
-    // link addresses no Layout of its own, so the same Card can be
-    // revealed once in one Layout and then adopt a different default Layout
+    // The Diagram is part of the key, not just the Card id — a canonical Card
+    // link addresses no Diagram of its own, so the same Card can be
+    // revealed once in one Diagram and then adopt a different default Diagram
     // that omits it, and that is a second reveal rather than a repeat.
     const [revealedAddress, setRevealedAddress] = useState<{
-      readonly layoutId: LayoutId;
+      readonly diagramId: DiagramId;
       readonly cardId: CardId;
     } | null>(null);
     if (addressedCardId === null) {
-      // Only a real navigation clears the address — choosing a Layout,
+      // Only a real navigation clears the address — choosing a Diagram,
       // activating a Graph, or restoring a destination that names no Card — so
       // leaving it is the reader moving on rather than the incidental
       // recomputation this guard absorbs. Arriving back at the same address
       // afterwards is a fresh reveal, not the repeat being suppressed.
       if (revealedAddress !== null) setRevealedAddress(null);
     } else if (
-      revealedAddress?.layoutId !== selectedLayoutId ||
+      revealedAddress?.diagramId !== selectedDiagramId ||
       revealedAddress.cardId !== addressedCardId
     ) {
-      setRevealedAddress({ layoutId: selectedLayoutId, cardId: addressedCardId });
-      if (cardsOutsideSelectedLayout.some(({ id }) => id === addressedCardId)) {
+      setRevealedAddress({ diagramId: selectedDiagramId, cardId: addressedCardId });
+      if (cardsOutsideSelectedDiagram.some(({ id }) => id === addressedCardId)) {
         setCardsDrawerOpen(true);
       }
     }
@@ -703,24 +702,24 @@ export const createApp = (
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
     const cardResize = useRenderAdapter((s) => s.cardResize);
-    const reportEmbeddedLayoutEditing = useRenderAdapter((s) => s.reportEmbeddedLayoutEditing);
+    const reportEmbeddedDiagramEditing = useRenderAdapter((s) => s.reportEmbeddedDiagramEditing);
     const canvas = canvasContent(placement, hasCardsOnCanvas);
-    // Every standing refusal is about the Layout that was selected when it was
-    // refused — the Edit New Layout would have made, the Rename or Delete on
+    // Every standing refusal is about the Diagram that was selected when it was
+    // refused — the Edit New Diagram would have made, the Rename or Delete on
     // the one it named, the Graph Edit inside it, the Card it would not remove
-    // from it. None of them says anything about the Layout the reader has moved
+    // from it. None of them says anything about the Diagram the reader has moved
     // to, so the move clears them together, during the render that moves rather
     // than one frame after it.
     //
     // The Card deletion refusal was outside this and cleared only when the next
     // Delete Card was armed, so a refused deletion stayed pinned to the shell
-    // through Layout switches and unrelated Edits until someone pressed Delete
+    // through Diagram switches and unrelated Edits until someone pressed Delete
     // again.
-    const [refusedUnder, setRefusedUnder] = useState(selectedLayoutId);
-    if (refusedUnder !== selectedLayoutId) {
-      setRefusedUnder(selectedLayoutId);
-      setCreateLayoutRefusal(null);
-      setLayoutManagementRefusal(null);
+    const [refusedUnder, setRefusedUnder] = useState(selectedDiagramId);
+    if (refusedUnder !== selectedDiagramId) {
+      setRefusedUnder(selectedDiagramId);
+      setCreateDiagramRefusal(null);
+      setDiagramManagementRefusal(null);
       setGraphRefusal(null);
       setCardDeletionRefusal(null);
     }
@@ -730,7 +729,7 @@ export const createApp = (
      *
      * An effect runs after the render it reacts to, so each of these drew one
      * frame of a rename that had already stopped being available — an editor
-     * over a Layout the reader has left, or over a Space that was replaced under
+     * over a Diagram the reader has left, or over a Space that was replaced under
      * them. The Dock's rename slot reads the same two facts the same way and
      * for the same reason (`useDockRenaming` in `components/CommandDock.tsx`),
      * so the surface and the composition agree about when a draft ends.
@@ -766,15 +765,15 @@ export const createApp = (
      * The editor is `InlineTitleEditor`, mounted by the Dock's own name control,
      * and it holds a refused draft open and editable — so this returns the
      * refusal's sentence rather than swallowing it, and `null` for an Edit that
-     * landed. `unchanged` is `null` too: renaming a Layout to the title it
+     * landed. `unchanged` is `null` too: renaming a Diagram to the title it
      * already has is the value the author already authored, and closing the
      * editor is the right answer to it (`space-authoring.ts`).
      */
     const renameChromeTitle = useCallback(
       (subject: SpaceChromeTitleSubject, title: string): string | null => {
         const result =
-          subject.kind === 'layout'
-            ? authoring.complete({ kind: 'renamed-layout', layoutId: subject.id, title })
+          subject.kind === 'diagram'
+            ? authoring.complete({ kind: 'renamed-diagram', diagramId: subject.id, title })
             : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
         return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
       },
@@ -792,7 +791,7 @@ export const createApp = (
      * measures that and calls the widening harmless.
      *
      * Wrapping both builders in `useMemo` was tried and reverted: with the
-     * identity stable, six embedded-Layout tests stop drawing their target at
+     * identity stable, six embedded-Diagram tests stop drawing their target at
      * all. That memo's dependency list is therefore *incomplete*, and the churn
      * has been standing in for a dependency nobody has named — so stabilising
      * this quietly converts a performance cost into a correctness one. The fix
@@ -804,16 +803,16 @@ export const createApp = (
       spaceId: renderedSpace.id,
       spaceTitle: renderedSpace.title,
       onCopy: copyProductDestination,
-      // No Rename item: the Dock renames a Layout and a Graph by clicking the
+      // No Rename item: the Dock renames a Diagram and a Graph by clicking the
       // name it already draws, so a menu row that opened the same editor would
       // be the second path to one command this arrangement keeps removing. The
       // Card rail is this builder's other consumer and a Card has no rename here
       // either — its title is renamed in place on the canvas.
       onRename: null,
-      onDeleteLayout: availability.entityEdits
-        ? (layoutId) => {
-            const result = authoring.complete({ kind: 'deleted-layout', layoutId });
-            setLayoutManagementRefusal(result.kind === 'refused' ? result.refusal : null);
+      onDeleteDiagram: availability.entityEdits
+        ? (diagramId) => {
+            const result = authoring.complete({ kind: 'deleted-diagram', diagramId });
+            setDiagramManagementRefusal(result.kind === 'refused' ? result.refusal : null);
             // Answered rather than swallowed: the refusal set above renders in
             // the shell's standing notice, and the answer is what tells a caller
             // whether the Delete had a canvas result at all.
@@ -868,16 +867,16 @@ export const createApp = (
      * address: a Card's deletion belongs to the Card, and the Space's surface is
      * where it was only because the Card had no menu of its own.
      *
-     * A Card the drawing Layout does not place still has commands — its own
-     * permanent address — so nothing here reads `layout.positions`; which
-     * addresses exist is decided from the Layout by the builder above.
+     * A Card the drawing Diagram does not place still has commands — its own
+     * permanent address — so nothing here reads `diagram.positions`; which
+     * addresses exist is decided from the Diagram by the builder above.
      */
     const cardRailActions = (cardId: CardId): readonly EntityActionGroup[] => {
       const card = renderedSpace.lookup.card(cardId);
       // A node the projection is still drawing for a Card the working Space no
       // longer has. No commands rather than commands that name nothing.
       if (card === undefined) return [];
-      const addresses = entityActions({ kind: 'card', card, layout: selectedLayout.layout });
+      const addresses = entityActions({ kind: 'card', card, diagram: selectedDiagram.diagram });
       if (!availability.deleteCard) return addresses;
       const remove = cardDeletion(card);
       return [
@@ -887,7 +886,7 @@ export const createApp = (
             id: 'delete-card',
             // "Delete Card", not "Delete Card <title>": the menu that draws
             // this item is already named for the Card it belongs to, and the
-            // Layout menu's own destructive command is spelled the same way.
+            // Diagram menu's own destructive command is spelled the same way.
             label: 'Delete Card',
             icon: <DeleteIcon />,
             variant: 'destructive',
@@ -919,14 +918,14 @@ export const createApp = (
     };
 
     /**
-     * Choosing a Layout, including the one already drawing.
+     * Choosing a Diagram, including the one already drawing.
      *
      * One act now. Discarding the chrome title draft used to be paired with it,
      * because the draft was the application's and outlived the control it was
-     * begun from; the Dock's editor is the control, so choosing another Layout
+     * begun from; the Dock's editor is the control, so choosing another Diagram
      * unmounts it and there is nothing here to discard.
      */
-    const selectLayout = browserLocation.chooseLayout;
+    const selectDiagram = browserLocation.chooseDiagram;
 
     const present = navigation.present;
     const advance = navigation.advance;
@@ -968,9 +967,9 @@ export const createApp = (
     /**
      * The refusal goes back to the caller, and only the caller can place it.
      *
-     * Both `added-card-to-layout` outcomes this can produce
-     * (`card-already-in-layout`, `card-not-found`) mean the Card just left
-     * `cardsOutsideSelectedLayout`, so the row the reader activated is already
+     * Both `added-card-to-diagram` outcomes this can produce
+     * (`card-already-in-diagram`, `card-not-found`) mean the Card just left
+     * `cardsOutsideSelectedDiagram`, so the row the reader activated is already
      * gone. The drawer is still on screen though, and it is the surface that
      * asked — so it keeps the sentence, in the `Alert` above its list.
      *
@@ -979,8 +978,8 @@ export const createApp = (
      * dismissed, leaving nowhere the sentence belongs.
      */
     const addExistingCard = useCallback(
-      (cardId: CardId, anchor: LayoutPosition, focus: boolean): string | null => {
-        const result = authoring.complete({ kind: 'added-card-to-layout', cardId, anchor });
+      (cardId: CardId, anchor: DiagramPosition, focus: boolean): string | null => {
+        const result = authoring.complete({ kind: 'added-card-to-diagram', cardId, anchor });
         if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
         if (result.kind !== 'completed') return null;
         useRenderAdapter.getState().selectCard(cardId);
@@ -1000,13 +999,13 @@ export const createApp = (
     );
 
     const dropExistingCard = useCallback(
-      (cardId: CardId, anchor: LayoutPosition): void => {
+      (cardId: CardId, anchor: DiagramPosition): void => {
         const drag = cardsDrag.current;
         cardsDrag.current = null;
-        if (drag?.cardId !== cardId || drag.layoutId !== selectedLayoutId) return;
+        if (drag?.cardId !== cardId || drag.diagramId !== selectedDiagramId) return;
         addExistingCard(cardId, anchor, false);
       },
-      [addExistingCard, selectedLayoutId],
+      [addExistingCard, selectedDiagramId],
     );
 
     /**
@@ -1022,7 +1021,7 @@ export const createApp = (
      * one activation, from a toolbar button and a keystroke, and leaves nothing
      * standing that a sentence could correct.
      *
-     * The toolbar remains available for an empty authored Layout: it is the
+     * The toolbar remains available for an empty authored Diagram: it is the
      * zero-Card Space's way to create the first Card. Canvas-local authoring is
      * still gated on a resolved placement — `hasCardsOnCanvas`, which reaches
      * the canvas as `availability.authorOnCanvas` — because there is no
@@ -1168,14 +1167,14 @@ export const createApp = (
     }, [openerId, openSpacesState]);
 
     /**
-     * The one Layout refusal there is anywhere to put, now that Add Layout and
-     * Delete Layout report in the same place.
+     * The one Diagram refusal there is anywhere to put, now that Add Diagram and
+     * Delete Diagram report in the same place.
      *
-     * Both were drawn under Add Layout in the Sidebar and both are about the
-     * Layout that was selected when they were refused, which is why moving
-     * between Layouts already clears them together.
+     * Both were drawn under Add Diagram in the Sidebar and both are about the
+     * Diagram that was selected when they were refused, which is why moving
+     * between Diagrams already clears them together.
      */
-    const layoutRefusal = createLayoutRefusal ?? layoutManagementRefusal;
+    const diagramRefusal = createDiagramRefusal ?? diagramManagementRefusal;
 
     /**
      * Where a refused Graph Edit is drawn, which is the notice every other
@@ -1243,7 +1242,7 @@ export const createApp = (
      * One command out of an entity's own menu, spent by a cluster that draws its
      * own.
      *
-     * The Dock's Layout, Graph and Space clusters are menus with a radio group in
+     * The Dock's Diagram, Graph and Space clusters are menus with a radio group in
      * them, so they cannot render an `EntityActionGroup[]` whole the way a Card's
      * rail does — but *which* address each entity offers is a decision this
      * application makes once, in `entity-actions.tsx`. This reads that decision
@@ -1264,11 +1263,11 @@ export const createApp = (
     /**
      * The Graph the Dock's cluster names, or nothing to name.
      *
-     * A Layout always owns at least one Graph — ADR 0079 mints one with every
-     * Layout and Authoring refuses the Edit that would empty it — but the type
+     * A Diagram always owns at least one Graph — ADR 0079 mints one with every
+     * Diagram and Authoring refuses the Edit that would empty it — but the type
      * does not say so, and a surface that asserted it would be asserting a
      * domain rule from the outside. `null` is drawn as no Dock at all, which is
-     * the same answer the canvas gives for a Layout it cannot resolve.
+     * the same answer the canvas gives for a Diagram it cannot resolve.
      */
     const activeGraph =
       projection.visibleGraphs.find((graph) => graph.id === activeGraphId) ??
@@ -1322,34 +1321,36 @@ export const createApp = (
               onDismissExitReport: () => setExitReport(null),
             },
             canvas: {
-              layouts: renderedSpace.layouts,
-              selected: selectedLayout.layout,
-              onSelect: selectLayout,
+              diagrams: renderedSpace.diagrams,
+              selected: selectedDiagram.diagram,
+              onSelect: selectDiagram,
               onRename: availability.chromeTitleEdit
-                ? (layoutId, title) => renameChromeTitle({ kind: 'layout', id: layoutId }, title)
+                ? (diagramId, title) => renameChromeTitle({ kind: 'diagram', id: diagramId }, title)
                 : null,
-              createDisabled: !availability.createLayout,
-              // The same answer `onDeleteLayout` above is built from, said on
+              createDisabled: !availability.createDiagram,
+              // The same answer `onDeleteDiagram` above is built from, said on
               // the row as well: when entity Edits are withdrawn the
-              // `delete-layout` action is not built at all, and a row that did
+              // `delete-diagram` action is not built at all, and a row that did
               // not know it dispatched into nothing.
               deleteDisabled: !availability.entityEdits,
               onCreate: () => {
-                const result = authoring.complete({ kind: 'created-layout' });
-                setCreateLayoutRefusal(result.kind === 'refused' ? result.refusal : null);
-                setLayoutManagementRefusal(null);
+                const result = authoring.complete({ kind: 'created-diagram' });
+                setCreateDiagramRefusal(result.kind === 'refused' ? result.refusal : null);
+                setDiagramManagementRefusal(null);
                 if (result.kind === 'completed') setCardsDrawerOpen(true);
               },
-              // The Dock's Delete names the Layout its cluster is showing, which is
+              // The Dock's Delete names the Diagram its cluster is showing, which is
               // the drawing one — resolved from the id it hands back rather than
               // closed over, so the command and the name it carries cannot come apart.
-              onDelete: (layoutId) => {
-                const layout = renderedSpace.layouts.find((candidate) => candidate.id === layoutId);
-                if (layout === undefined) return;
-                runEntityCommand({ kind: 'layout', layout }, DELETE_LAYOUT_ACTION_ID)();
+              onDelete: (diagramId) => {
+                const diagram = renderedSpace.diagrams.find(
+                  (candidate) => candidate.id === diagramId,
+                );
+                if (diagram === undefined) return;
+                runEntityCommand({ kind: 'diagram', diagram }, DELETE_DIAGRAM_ACTION_ID)();
               },
               onCopyLink: runEntityCommand(
-                { kind: 'layout', layout: selectedLayout.layout },
+                { kind: 'diagram', diagram: selectedDiagram.diagram },
                 COPY_LINK_ACTION_ID,
               ),
             },
@@ -1362,11 +1363,11 @@ export const createApp = (
               onRename: availability.chromeTitleEdit
                 ? (graphId, title) => renameChromeTitle({ kind: 'graph', id: graphId }, title)
                 : null,
-              // **Answered, not swallowed** — the same shape the Layout arm
+              // **Answered, not swallowed** — the same shape the Diagram arm
               // above spends, and for the same reason. A Graph Edit can be
               // refused for reasons no surface can see coming (`placement-pending`
               // before the canvas has reported, `graph-not-owned` for a Graph a
-              // second Layout owns), and a command that discards that answer
+              // second Diagram owns), and a command that discards that answer
               // closes its menu having changed nothing, said nothing and logged
               // nothing.
               onRecolor: (graphId, color) => {
@@ -1380,11 +1381,11 @@ export const createApp = (
               },
               editsDisabled: !availability.entityEdits,
               onCopyLink: runEntityCommand(
-                { kind: 'graph', graph: activeGraph, layout: selectedLayout.layout },
+                { kind: 'graph', graph: activeGraph, diagram: selectedDiagram.diagram },
                 COPY_LINK_ACTION_ID,
               ),
               onCopyPermanentLink: runEntityCommand(
-                { kind: 'graph', graph: activeGraph, layout: selectedLayout.layout },
+                { kind: 'graph', graph: activeGraph, diagram: selectedDiagram.diagram },
                 COPY_PERMANENT_LINK_ACTION_ID,
               ),
               presenting,
@@ -1412,14 +1413,14 @@ export const createApp = (
                   disabled={!availability.cardsView}
                   triggerRender={<ToolbarButton variant="ghost" {...CARDS_TRIGGER} />}
                   triggerLabel={<CardsTrigger />}
-                  cards={cardsOutsideSelectedLayout}
+                  cards={cardsOutsideSelectedDiagram}
                   allCards={renderedSpace.cards}
                   spaceTitleById={spaceTitleById}
                   onAdd={(card, activation) =>
                     addExistingCard(card.id, centreAnchor(), activation === 'keyboard')
                   }
                   onDragStart={(cardId) => {
-                    cardsDrag.current = { cardId, layoutId: selectedLayoutId };
+                    cardsDrag.current = { cardId, diagramId: selectedDiagramId };
                   }}
                   onDragEnd={() => {
                     cardsDrag.current = null;
@@ -1461,21 +1462,21 @@ export const createApp = (
                 {cardDeletionRefusal}
               </ShellNotice>
             )}
-            {layoutRefusal === null ? null : (
+            {diagramRefusal === null ? null : (
               <ShellNotice
                 /* Named for the command that was refused rather than for the
-                   Layout, because a refused *creation* left no Layout to be
-                   unchanged — "Layout unchanged" told the author an existing
-                   Layout had been left alone when none had been made. */
-                title={createLayoutRefusal === null ? 'Layout unchanged' : 'Layout not created'}
+                   Diagram, because a refused *creation* left no Diagram to be
+                   unchanged — "Diagram unchanged" told the author an existing
+                   Diagram had been left alone when none had been made. */
+                title={createDiagramRefusal === null ? 'Diagram unchanged' : 'Diagram not created'}
                 // Both, because the one that is standing is whichever was
                 // written last and the reader is dismissing what they can see.
                 onDismiss={() => {
-                  setCreateLayoutRefusal(null);
-                  setLayoutManagementRefusal(null);
+                  setCreateDiagramRefusal(null);
+                  setDiagramManagementRefusal(null);
                 }}
               >
-                {describeAuthoringRefusal(layoutRefusal)}
+                {describeAuthoringRefusal(diagramRefusal)}
               </ShellNotice>
             )}
             {spaceCommandBreak === null ? null : (
@@ -1539,7 +1540,7 @@ export const createApp = (
           />
         )}
         {/* One child, not a row: the Cards drawer portals over this rather than
-            sitting beside it, so a toggle that says nothing about the Layout no
+            sitting beside it, so a toggle that says nothing about the Diagram no
             longer re-flows the canvas and re-measures every Card on it. */}
         <div ref={graphArea} className="graph-area size-full min-w-0" style={cardSizeVars}>
           {/* **The Space's one command surface, over the canvas rather than
@@ -1611,7 +1612,7 @@ export const createApp = (
                 onBodyEditingChange={setEditingCardBody}
                 onTitleEditingChange={setEditingCardTitle}
                 cardResize={cardResize}
-                reportEmbeddedLayoutEditing={reportEmbeddedLayoutEditing}
+                reportEmbeddedDiagramEditing={reportEmbeddedDiagramEditing}
                 graphs={projection.visibleGraphs}
                 colorByGraphId={projection.colors}
                 activeGraphId={activeGraphId}
@@ -1640,7 +1641,7 @@ export const createApp = (
                 void copyProductDestination({
                   kind: 'presentation',
                   spaceId: renderedSpace.id,
-                  layoutId: selectedLayoutId,
+                  diagramId: selectedDiagramId,
                   graphId: activeGraphId,
                   cardId: activeCardId,
                 });

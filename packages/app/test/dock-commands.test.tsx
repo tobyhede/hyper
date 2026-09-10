@@ -102,17 +102,17 @@ const visibleLabel = (control: HTMLElement): string => control.textContent.trim(
 const accessibleName = (control: HTMLElement): string =>
   control.getAttribute('aria-label') ?? visibleLabel(control);
 
-describe('placing a Card into a Layout without a pointer (ADR 0082)', () => {
+describe('placing a Card into a Diagram without a pointer (ADR 0082)', () => {
   /**
    * The rows were `<div draggable>` — no role, no tab stop, no activation — so
-   * an HTML5 drag was the only way to add a Card to the Layout. ADR 0082 says a
+   * an HTML5 drag was the only way to add a Card to the Diagram. ADR 0082 says a
    * drag may be *a* way and never the only one.
    */
   it('offers each Card in the list as a focusable button', () => {
     render(<Default />);
     fireEvent.click(within(dock()).getByRole('button', { name: 'Cards' }));
 
-    const row = screen.getByRole('button', { name: 'Add Constraints to Layout' });
+    const row = screen.getByRole('button', { name: 'Add Constraints to Diagram' });
 
     // A native button rather than a `div` wearing a role: Enter and Space
     // activating one is the platform's, and jsdom does not synthesise that
@@ -126,10 +126,10 @@ describe('placing a Card into a Layout without a pointer (ADR 0082)', () => {
   /**
    * **The same completion, not a parallel one.** Activating a row spends the
    * `onPlace` the canvas's own `onDrop` spends, so the Card lands on the
-   * selected Layout and the canvas draws it — which is the observable a drop
+   * selected Diagram and the canvas draws it — which is the observable a drop
    * would have produced.
    */
-  it('adds the Card to the drawing Layout, as the drop does', async () => {
+  it('adds the Card to the drawing Diagram, as the drop does', async () => {
     render(<Default />);
     fireEvent.click(within(dock()).getByRole('button', { name: 'Cards' }));
 
@@ -139,12 +139,12 @@ describe('placing a Card into a Layout without a pointer (ADR 0082)', () => {
     const placed = (): number => document.querySelectorAll('[data-testid^="rf__node-"]').length;
     await waitFor(() => expect(placed()).toBe(5));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Constraints to Layout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Constraints to Diagram' }));
 
     await waitFor(() => expect(placed()).toBe(6));
     // The list is not dismissed by the placement: adding several Cards costs
     // one disclosure, exactly as the drag out of it does.
-    expect(screen.getByRole('button', { name: 'Add Prior art to Layout' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Prior art to Diagram' })).toBeInTheDocument();
   });
 });
 
@@ -200,7 +200,7 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
 
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
       'Space',
-      'Layout',
+      'Diagram',
       'Graph',
       'Cards',
     ]);
@@ -488,12 +488,12 @@ function TwoSpacesWithAnUnwellParent() {
 }
 
 /**
- * **The last Layout and the last Graph cannot be deleted from a story either.**
+ * **The last Diagram and the last Graph cannot be deleted from a story either.**
  *
  * The fixture passes `deleteDisabled: false` and `editsDisabled: false`, which
  * reads at a glance like a story being allowed to empty a Space the application
  * would refuse — and emptying it would reach `loadSpaceSnapshot`'s refusal or
- * the fixture's own `has no Layout to draw` throw.
+ * the fixture's own `has no Diagram to draw` throw.
  *
  * It cannot, and the reason is that neither flag is the floor. Both rows read
  * `<flag> || <collection>.length <= 1`, and each flag's doc says so in as many
@@ -508,9 +508,9 @@ function TwoSpacesWithAnUnwellParent() {
  * reader will have the same doubt and a comment there would only assert the
  * answer.
  */
-describe('the last Layout and Graph', () => {
+describe('the last Diagram and Graph', () => {
   /** Whichever the cluster is showing now, which each deletion changes. */
-  const showing = (kind: 'Layout' | 'Active Graph'): string => {
+  const showing = (kind: 'Diagram' | 'Active Graph'): string => {
     const name = within(dock())
       .getByRole('button', { name: new RegExp(`^${kind}: `) })
       .getAttribute('aria-label');
@@ -518,7 +518,7 @@ describe('the last Layout and Graph', () => {
     return name.slice(`${kind}: `.length);
   };
 
-  const deleteItem = (kind: 'Layout' | 'Active Graph'): HTMLElement => {
+  const deleteItem = (kind: 'Diagram' | 'Active Graph'): HTMLElement => {
     if (screen.queryByRole('menu') !== null) fireEvent.keyDown(document.body, { key: 'Escape' });
     const title = showing(kind);
     fireEvent.click(within(dock()).getByRole('button', { name: `${kind}: ${title}` }));
@@ -528,7 +528,7 @@ describe('the last Layout and Graph', () => {
   it('withhold Delete from a story, which cannot empty the Space', () => {
     render(<Default />);
 
-    for (const kind of ['Layout', 'Active Graph'] as const) {
+    for (const kind of ['Diagram', 'Active Graph'] as const) {
       // Down to one, however many the fixture starts with. The loop is bounded
       // by the collection rather than by a count this test would have to keep
       // in step with the fixture.
@@ -543,7 +543,7 @@ describe('the last Layout and Graph', () => {
     fireEvent.keyDown(document.body, { key: 'Escape' });
     // Still drawing: neither `loadSpaceSnapshot`'s refusal nor the fixture's own
     // guard was reached, which is what an emptied Space would have done.
-    expect(within(dock()).getByRole('button', { name: /^Layout: / })).toBeInTheDocument();
+    expect(within(dock()).getByRole('button', { name: /^Diagram: / })).toBeInTheDocument();
     expect(within(dock()).getByRole('button', { name: /^Active Graph: / })).toBeInTheDocument();
   });
 });

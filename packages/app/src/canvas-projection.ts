@@ -6,7 +6,7 @@ import {
   filterHandlesByGraphs,
   Placement,
   type LayoutStrategyGraph,
-  type ResolvedLayout,
+  type ResolvedDiagram,
   type Space,
 } from '@project/graph';
 import type { Edge } from '@xyflow/react';
@@ -18,12 +18,12 @@ import {
 } from '@project/react-flow-adapter';
 import { CARD_HEIGHT, CARD_SIZE } from './card';
 import { activeGraphColor, graphColorMap } from './colors';
-import { layoutCards } from './layout-resolution';
+import { diagramCards } from './diagram-resolution';
 
 /**
- * What the canvas draws, derived from a Space and the Layout drawing it.
+ * What the canvas draws, derived from a Space and the Diagram drawing it.
  *
- * Everything here is a pure function of the Space, the resolved Layout and the
+ * Everything here is a pure function of the Space, the resolved Diagram and the
  * interaction state — no store, no React, no DOM. It is split in two because a
  * layout strategy runs asynchronously: the outer call answers everything a
  * strategy needs and everything the canvas draws *around* the cards, and
@@ -55,7 +55,7 @@ export interface PendingCanvasProjection {
   readonly strategyGraph: LayoutStrategyGraph;
   /** Every visible Graph's resolved colour. */
   readonly colors: Readonly<Record<string, string>>;
-  /** The Graphs this Layout draws — its own, in authored order. */
+  /** The Graphs this Diagram draws — its own, in authored order. */
   readonly visibleGraphs: readonly Graph[];
   /**
    * The placed cards and their Edges, coloured by the interaction state.
@@ -68,22 +68,22 @@ export interface PendingCanvasProjection {
   project(laidOut: LayoutStrategyGraph, interaction: CanvasInteraction): CanvasNodesAndEdges;
 }
 
-export function canvasProjection(space: Space, resolved: ResolvedLayout): PendingCanvasProjection {
+export function canvasProjection(space: Space, resolved: ResolvedDiagram): PendingCanvasProjection {
   const colors = graphColorMap(space);
-  // Which Graphs the Layout draws: the ones it owns, exactly (ADR 0045). They
+  // Which Graphs the Diagram draws: the ones it owns, exactly (ADR 0045). They
   // are the Space's own values, so the projection below draws the same Graphs
-  // the Layout carries rather than a set derived a second way here.
-  const visibleGraphs = resolved.layout.graphs;
+  // the Diagram carries rather than a set derived a second way here.
+  const visibleGraphs = resolved.diagram.graphs;
   const drawnGraphIds = visibleGraphs.map((graph) => graph.id);
   const visible = new Set<GraphId>(drawnGraphIds);
   const handles = filterHandlesByGraphs(buildCardHandles(space), drawnGraphIds);
   const edges = buildGraphRenderEdges(space).filter((edge) => visible.has(edge.graphId));
-  // The Layout chooses the Cards it draws. In particular, a Layout's sparse
+  // The Diagram chooses the Cards it draws. In particular, a Diagram's sparse
   // placement omits Cards from its canvas; the Cards drawer is the surface that
   // reveals those Cards without manufacturing positions (ADR 0040, ADR 0069) —
   // the Sidebar's Cards collection before ADR 0082, the Dock's drawer now.
-  const cardIds = layoutCards(space, resolved.layout).map((card) => card.id);
-  const authored = Placement.fromLayout(resolved.layout);
+  const cardIds = diagramCards(space, resolved.diagram).map((card) => card.id);
+  const authored = Placement.fromDiagram(resolved.diagram);
   const openCardIds = new Set([...authored].filter(([, at]) => at.open).map(([cardId]) => cardId));
   const strategyGraph = buildLayoutStrategyGraph(cardIds, handles, edges, (cardId) => {
     const at = authored.get(cardId);
@@ -99,7 +99,7 @@ export function canvasProjection(space: Space, resolved: ResolvedLayout): Pendin
       // Activating a Graph emphasises it; it never hides the rest of the Space.
       const emphasis: GraphEmphasis = activeGraphId === null ? 'equal' : 'subtle';
 
-      // A layout's routed Edge geometry describes the placement it computed,
+      // A diagram's routed Edge geometry describes the placement it computed,
       // so it stops being true once a Card is dragged out of it. From then on
       // the Edges fall back to plain curves between wherever the Cards now are
       // — which is what a positioned view draws anyway, since it routes nothing.

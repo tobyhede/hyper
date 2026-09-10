@@ -4,7 +4,7 @@ import type { Space } from '@project/graph';
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { createNavigation, type Navigation, type NavigationState } from '#src/navigation';
-import { requireDefaultLayout } from '#src/layout-resolution';
+import { requireDefaultDiagram } from '#src/diagram-resolution';
 
 /**
  * Production Navigation, composed the way a story needs it and no other way.
@@ -47,7 +47,7 @@ interface ComposedNavigation {
  * composed with.
  *
  * Navigation resolves every selection against `currentSpace()` — that is what
- * stops it naming a Layout the Space does not hold — so what it holds has to
+ * stops it naming a Diagram the Space does not hold — so what it holds has to
  * be one indirection over the reader that answers *now*, not the closure that
  * answered at mount. A `useRef` is the usual shape for that and is refused
  * here: React's own lint rule forbids reading a ref during render, and the
@@ -64,7 +64,7 @@ function composeStoryNavigation(
   const initialSpace = current();
   const navigation = createNavigation(
     () => current(),
-    requireDefaultLayout(initialSpace),
+    requireDefaultDiagram(initialSpace),
     initialSpace,
   );
   begin(navigation);
@@ -90,7 +90,7 @@ export function useStoryNavigation(
   currentSpace: () => Space,
   begin: (navigation: Navigation) => void = () => undefined,
 ): StoryNavigation {
-  // State, not a memo. Navigation holds the selected Layout, the Active Graph,
+  // State, not a memo. Navigation holds the selected Diagram, the Active Graph,
   // the mode and the Traversal history — everything a Ladle spec clicks its way
   // into — and a memo is a caching hint React may discard, not a place to keep
   // any of that. Keyed on a fixture's props it was worse than that: a prop

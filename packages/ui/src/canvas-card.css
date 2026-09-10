@@ -239,7 +239,7 @@
 
 /* The heading itself, which the activation control wraps rather than sits
    inside (ADR 0065, ADR 0083). A plain block, so inserting it between the
-   Title's box and its rungs changes no layout: the box keeps the clamp and the
+   Title's box and its rungs reflows nothing: the box keeps the clamp and the
    type, and each rung keeps its own. */
 .canvas-card__title-heading {
   display: block;
@@ -378,7 +378,7 @@
   font-size: 12px;
 }
 
-/* The selected title, which is as long as an author's Layout names are and the
+/* The selected title, which is as long as an author's Diagram names are and the
    Card is as wide as a Card. */
 .canvas-card__space-selector .canvas-card__space-selector-trigger > span:first-of-type {
   overflow: hidden;
@@ -395,12 +395,12 @@
   outline-offset: 2px;
 }
 
-/* An Open Space Card draws the Layout it selects (ADR 0068), and that view
+/* An Open Space Card draws the Diagram it selects (ADR 0068), and that view
    is React Flow sub-flow nodes painted *over* this Card rather than DOM inside
    it — so nothing here can lay out around them, and the room they get has to be
    a number both sides agree on. The Card's own passengers take a footer of
    exactly `SPACE_CARD_FOOTER_HEIGHT`, leaving the region above it for the view.
-   `packages/ui/test/canvas-card-embedded-layout.test.ts` holds this rule and that
+   `packages/ui/test/canvas-card-embedded-diagram.test.ts` holds this rule and that
    constant to the same number.
 
    `flex: none` with `margin-top: auto` rather than the `flex: 1` the body

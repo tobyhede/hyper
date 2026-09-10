@@ -25,7 +25,7 @@ import { beginRename } from './command-dock';
  * so all three held by construction and by reading.
  *
  * **Two of the three cases are characterization: they pin outcomes that already
- * held.** The third is not. The Layout rename below was written as
+ * held.** The third is not. The Diagram rename below was written as
  * characterization too and was never entitled to be: the chrome editor is the
  * Dock name control's own state, no mechanism here reached it, and the case
  * passed only on the runs where the conflict's modal stole the caret and blur
@@ -73,11 +73,11 @@ import { beginRename } from './command-dock';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 /**
- * One positioned Card in a Layout that owns one empty Graph — the smallest Space
+ * One positioned Card in a Diagram that owns one empty Graph — the smallest Space
  * that draws a Card, and one Card has nothing to connect (ADR 0040).
  *
  * The local and remote snapshots below share every identity and differ only in
@@ -88,7 +88,7 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
  */
 const snapshot = (
   title: string,
-  layoutTitle: string,
+  diagramTitle: string,
   cardTitle: string,
   body: string,
   x: number,
@@ -99,22 +99,22 @@ const snapshot = (
     document: {
       version: 1,
       title,
-      layouts: [
+      diagrams: [
         {
-          id: LAYOUT_ID,
-          title: layoutTitle,
+          id: DIAGRAM_ID,
+          title: diagramTitle,
           kind: 'positioned',
           positions: { [CARD_ID]: { x, y, open: false } },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
-      defaultLayout: LAYOUT_ID,
+      defaultDiagram: DIAGRAM_ID,
     },
     cards: [{ id: CARD_ID, document: { title: cardTitle, kind: 'markdown', body } }],
   });
 
-const LOCAL = snapshot('Local space', 'Local layout', 'Local card', 'Local source', 10, 20);
-const REMOTE = snapshot('Remote space', 'Remote layout', 'Remote card', 'Remote source', 900, 700);
+const LOCAL = snapshot('Local space', 'Local diagram', 'Local card', 'Local source', 10, 20);
+const REMOTE = snapshot('Remote space', 'Remote diagram', 'Remote card', 'Remote source', 900, 700);
 
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);
@@ -289,9 +289,9 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
 
   /**
    * The Space chrome's own title draft, which lives outside the keyed canvas
-   * subtree and so is reached by none of the mechanisms above. A Layout rename
-   * left uncompleted names a Layout the accepted Space may not hold, and
-   * completing it afterwards writes against whatever Layout now resolves.
+   * subtree and so is reached by none of the mechanisms above. A Diagram rename
+   * left uncompleted names a Diagram the accepted Space may not hold, and
+   * completing it afterwards writes against whatever Diagram now resolves.
    *
    * **The draft is one the rename refuses, and that is what makes this test say
    * anything.** It was a typed name before, and the assertion passed or failed
@@ -310,10 +310,10 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    * "gone" for an editor that is still mounted, and the discard would read as
    * proved by the dialog that hid it.
    */
-  it('discards a Layout rename left open when the stored Space is accepted', async () => {
+  it('discards a Diagram rename left open when the stored Space is accepted', async () => {
     const session = await mountedSpaceApp();
     await beginRename('selected-canvas');
-    const name = screen.getByRole('textbox', { name: 'Layout name' });
+    const name = screen.getByRole('textbox', { name: 'Diagram name' });
     fireEvent.change(name, { target: { value: '   ' } });
     expect(name).toHaveValue('   ');
 
@@ -321,16 +321,16 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
     // The staged pre-condition, asserted rather than assumed: without an open
     // editor here the discard below is vacuous, which is exactly how this case
     // passed while the editor was surviving.
-    expect(screen.getByRole('textbox', { name: 'Layout name', hidden: true })).toHaveValue('   ');
+    expect(screen.getByRole('textbox', { name: 'Diagram name', hidden: true })).toHaveValue('   ');
     acceptRemote();
 
     await replacementLanded();
     expect(
-      screen.queryByRole('textbox', { name: 'Layout name', hidden: true }),
+      screen.queryByRole('textbox', { name: 'Diagram name', hidden: true }),
     ).not.toBeInTheDocument();
-    // And the cluster is back to naming the Layout the accepted Space authored,
+    // And the cluster is back to naming the Diagram the accepted Space authored,
     // rather than an editor reseeded from it.
-    expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Remote layout');
+    expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Remote diagram');
   });
 
   /**

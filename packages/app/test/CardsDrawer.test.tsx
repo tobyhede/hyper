@@ -60,7 +60,7 @@ const openDrawer = async () => {
   return await screen.findByRole('dialog', { name: 'Cards' });
 };
 
-const cardButtons = () => screen.getAllByRole('button', { name: /^Add .* to Layout$/ });
+const cardButtons = () => screen.getAllByRole('button', { name: /^Add .* to Diagram$/ });
 
 describe('CardsDrawer', () => {
   it('opens from its own trigger as a named dialog', async () => {
@@ -142,10 +142,10 @@ describe('CardsDrawer', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search cards' }), {
       target: { value: 'zul' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Add Zulu to Layout' }), { detail: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Zulu to Diagram' }), { detail: 1 });
 
     expect(onAdd).toHaveBeenCalledWith(CARDS[0], 'pointer');
-    expect(screen.queryByRole('button', { name: 'Add Alpha to Layout' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add Alpha to Diagram' })).not.toBeInTheDocument();
   });
 
   /**
@@ -154,7 +154,7 @@ describe('CardsDrawer', () => {
    *
    * The two halves are the same division `CardSearchCombobox` makes and for the
    * same reason: an author's recall does not respect which line they typed a
-   * word on, and a control called `Add Auth\nHow a session begins to Layout` is
+   * word on, and a control called `Add Auth\nHow a session begins to Diagram` is
    * a broken-looking label.
    */
   it('adds a Card by name and finds it by any line of its Title', async () => {
@@ -165,14 +165,14 @@ describe('CardsDrawer', () => {
     render(<Fixture cards={laddered} allCards={laddered} />);
     await openDrawer();
 
-    expect(screen.getByRole('button', { name: 'Add Auth to Layout' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Auth to Diagram' })).toBeVisible();
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search cards' }), {
       target: { value: 'session begins' },
     });
 
     expect(cardButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
-      'Add Auth to Layout',
+      'Add Auth to Diagram',
     ]);
   });
 
@@ -180,10 +180,10 @@ describe('CardsDrawer', () => {
     render(<Fixture onAdd={() => 'This Card is no longer available.'} />);
     await openDrawer();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Zulu to Layout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Zulu to Diagram' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('This Card is no longer available.');
-    expect(screen.getByRole('button', { name: 'Add Zulu to Layout' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Zulu to Diagram' })).toBeVisible();
   });
 
   it('carries the Card id on the drag it starts', async () => {
@@ -192,7 +192,7 @@ describe('CardsDrawer', () => {
     await openDrawer();
 
     const setData = vi.fn();
-    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Zulu to Layout' }), {
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Zulu to Diagram' }), {
       dataTransfer: { setData, effectAllowed: 'none' },
     });
 
@@ -208,10 +208,10 @@ describe('CardsDrawer', () => {
     // The list opts out for all input types so the press starts the drag.
     const list = popup.querySelector('[data-base-ui-swipe-ignore]');
     expect(list).not.toBeNull();
-    expect(list).toContainElement(screen.getByRole('button', { name: 'Add Zulu to Layout' }));
+    expect(list).toContainElement(screen.getByRole('button', { name: 'Add Zulu to Diagram' }));
   });
 
-  it('distinguishes an empty Space from a Layout that already contains every Card', async () => {
+  it('distinguishes an empty Space from a Diagram that already contains every Card', async () => {
     const view = render(<Fixture cards={[]} allCards={[]} />);
     await openDrawer();
     expect(screen.getByText('This Space has no Cards.')).toBeVisible();
@@ -219,7 +219,7 @@ describe('CardsDrawer', () => {
     // Rerendering keeps the drawer open, so the second message is read in place
     // rather than through a toggle that would close it.
     view.rerender(<Fixture cards={[]} allCards={CARDS} />);
-    expect(await screen.findByText('All Cards are in this Layout.')).toBeVisible();
+    expect(await screen.findByText('All Cards are in this Diagram.')).toBeVisible();
   });
 
   it('forgets its query and kind when it closes, so the next open lists everything', async () => {
@@ -250,7 +250,7 @@ describe('CardsDrawer', () => {
       target: { value: 'Alpha' },
     });
 
-    expect(screen.getByRole('button', { name: 'Add Constraints to Layout' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Constraints to Diagram' })).toBeVisible();
   });
 
   /**
@@ -271,8 +271,8 @@ describe('CardsDrawer', () => {
     });
 
     expect(cardButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
-      'Add Alpha to Layout',
-      'Add Constraints to Layout',
+      'Add Alpha to Diagram',
+      'Add Constraints to Diagram',
     ]);
   });
 
@@ -283,7 +283,7 @@ describe('CardsDrawer', () => {
       target: { value: 'Roadmap' },
     });
 
-    expect(screen.getByRole('button', { name: 'Add Alpha to Layout' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Alpha to Diagram' })).toBeVisible();
     expect(cardButtons()).toHaveLength(1);
   });
 
@@ -294,11 +294,11 @@ describe('CardsDrawer', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search cards' }), {
       target: { value: 'Roadmap' },
     });
-    expect(screen.queryByRole('button', { name: /^Add .* to Layout$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Add .* to Diagram$/ })).not.toBeInTheDocument();
 
     view.rerender(<Fixture spaceTitleById={new Map([[id('000000000012'), 'Roadmap']])} />);
 
-    expect(screen.getByRole('button', { name: 'Add Alpha to Layout' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Alpha to Diagram' })).toBeVisible();
   });
 
   it('lists an Alias whose Target is absent from allCards', async () => {
@@ -308,6 +308,6 @@ describe('CardsDrawer', () => {
     render(<Fixture cards={dangling} allCards={dangling} />);
     await openDrawer();
 
-    expect(screen.getByRole('button', { name: 'Add Stray to Layout' })).toHaveTextContent('Stray');
+    expect(screen.getByRole('button', { name: 'Add Stray to Diagram' })).toHaveTextContent('Stray');
   });
 });

@@ -626,7 +626,7 @@ describe('release scope', () => {
     );
     const written: unknown = JSON.parse(readFileSync(join(destination, 'space.json'), 'utf8'));
     const file = spaceFileSchema.parse(written);
-    expect(file.layouts?.[0]?.graphs.map(({ edges }) => edges)).toEqual([
+    expect(file.diagrams?.[0]?.graphs.map(({ edges }) => edges)).toEqual([
       [expect.any(Object), expect.any(Object)],
       [],
     ]);

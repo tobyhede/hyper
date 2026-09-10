@@ -77,7 +77,7 @@ describe('PostgresSpaceRepository import decoding', () => {
     const result = await repository.importSpaces(
       [
         {
-          document: { version: 9, title: 7, layouts: 4, defaultLayout: 7 },
+          document: { version: 9, title: 7, diagrams: 4, defaultDiagram: 7 },
           cards: [{ document: { title: 5, kind: 'nope', body: 3 } }],
         } as never,
       ],
@@ -109,7 +109,7 @@ describe('PostgresSpaceRepository import decoding', () => {
   it('describes one malformed document the same way for the CLI and for the wire', async () => {
     const malformed = {
       id: SPACE_ID,
-      document: { version: 9, title: 7, layouts: 4, defaultLayout: 7 },
+      document: { version: 9, title: 7, diagrams: 4, defaultDiagram: 7 },
       cards: [{ id: CARD_ID, document: { title: 5, kind: 'nope', body: 3 } }],
     };
 
@@ -132,8 +132,8 @@ describe('PostgresSpaceRepository import decoding', () => {
   interface FailingDocument {
     version: number;
     title: number;
-    layouts?: number;
-    defaultLayout?: number;
+    diagrams?: number;
+    defaultDiagram?: number;
   }
 
   const documentFailingIn = (paths: 1 | 3 | 4 | 5) => {
@@ -141,8 +141,8 @@ describe('PostgresSpaceRepository import decoding', () => {
       version: paths === 1 ? 1 : 9,
       title: 7,
     };
-    if (paths >= 3) document.layouts = 4;
-    if (paths >= 4) document.defaultLayout = 7;
+    if (paths >= 3) document.diagrams = 4;
+    if (paths >= 4) document.defaultDiagram = 7;
     return {
       id: SPACE_ID,
       document,
@@ -216,7 +216,7 @@ describe('PostgresSpaceRepository import decoding', () => {
         document: {
           version: 1,
           title: 'T',
-          layouts: [
+          diagrams: [
             {
               id: SPACE_ID,
               title: 'L',
@@ -232,10 +232,10 @@ describe('PostgresSpaceRepository import decoding', () => {
       { id: SPACE_ID, document: { version: 9, title: 'T' }, cards: [] },
       {
         id: SPACE_ID,
-        document: { version: 1, title: 7, layouts: 4, defaultLayout: 7 },
+        document: { version: 1, title: 7, diagrams: 4, defaultDiagram: 7 },
         cards: [],
       },
-      // Discriminated-union failures, on a card's kind and on a layout's.
+      // Discriminated-union failures, on a card's kind and on a diagram's.
       {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
@@ -246,7 +246,7 @@ describe('PostgresSpaceRepository import decoding', () => {
         document: {
           version: 1,
           title: 'T',
-          layouts: [{ id: SPACE_ID, title: 'L', kind: 'Weird', positions: {}, graphs: [] }],
+          diagrams: [{ id: SPACE_ID, title: 'L', kind: 'Weird', positions: {}, graphs: [] }],
         },
         cards: [],
       },
@@ -255,10 +255,10 @@ describe('PostgresSpaceRepository import decoding', () => {
       { id: SPACE_ID, document: { version: 1, title: '' }, cards: [] },
       {
         id: SPACE_ID,
-        document: { version: 1, title: 'T', defaultLayout: 'SpaceCanvas' },
+        document: { version: 1, title: 'T', defaultDiagram: 'SpaceCanvas' },
         cards: [],
       },
-      { id: SPACE_ID, document: { version: 1, title: 'T', defaultLayout: 7 }, cards: [] },
+      { id: SPACE_ID, document: { version: 1, title: 'T', defaultDiagram: 7 }, cards: [] },
       // And the root-path renders, where neither schema sees an object at all.
       'nope',
       42,

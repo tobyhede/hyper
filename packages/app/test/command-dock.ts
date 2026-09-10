@@ -5,7 +5,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
  *
  * Every one of these was a single control on the Space Sidebar and is a
  * disclosure on the Command Dock: the Sidebar had room for a permanent `Add
- * Card`, a permanent `Add Layout` and a Present button because it was a column
+ * Card`, a permanent `Add Diagram` and a Present button because it was a column
  * sixteen rem wide, and the Dock is a strip over the canvas that finds room by
  * disclosure instead (ADR 0082). So a test that used to press one button now
  * opens a menu and presses a row.
@@ -35,7 +35,7 @@ export const unavailable = (control: HTMLElement): boolean =>
  * Begin the inline rename of a Dock identity, once it may begin.
  *
  * The name is a **button** while a chrome rename is available and a plain label
- * while it is not — the Space is never renameable, and a Layout or a Graph stops
+ * while it is not — the Space is never renameable, and a Diagram or a Graph stops
  * being while a Card title editor or a live content edit owns the caret, or
  * before the canvas has a placement to edit at all. So a test that presses the
  * name has to wait for it to be a control, and the wait is the assertion: it is
@@ -70,29 +70,29 @@ export const createCardControl = (): HTMLElement =>
   within(dock()).getByRole('button', { name: 'Create Card' });
 
 /**
- * The Layout cluster's disclosure: the authored Layouts, then the commands on
+ * The Diagram cluster's disclosure: the authored Diagrams, then the commands on
  * the one that is drawing.
  *
- * Named for the Layout it is showing, which is what the cluster announces.
+ * Named for the Diagram it is showing, which is what the cluster announces.
  */
-export const openLayoutMenu = (title: string): void => {
+export const openDiagramMenu = (title: string): void => {
   // Dismissed first if something else in the bar is open. At most one Dock
   // disclosure is open at a time — one open id under the whole row — so a press
   // on this trigger while another is open is an *outside* press that Base UI
   // spends on dismissing, and the menu this asked for never appears.
   if (screen.queryByRole('menu') !== null) fireEvent.keyDown(document.body, { key: 'Escape' });
-  fireEvent.click(within(dock()).getByRole('button', { name: `Layout: ${title}` }));
+  fireEvent.click(within(dock()).getByRole('button', { name: `Diagram: ${title}` }));
 };
 
-/** New Layout, and whether it may run — its availability is its own (ADR 0065). */
-export const newLayoutItem = (layoutTitle: string): HTMLElement => {
-  openLayoutMenu(layoutTitle);
-  return screen.getByRole('menuitem', { name: 'New Layout' });
+/** New Diagram, and whether it may run — its availability is its own (ADR 0065). */
+export const newDiagramItem = (diagramTitle: string): HTMLElement => {
+  openDiagramMenu(diagramTitle);
+  return screen.getByRole('menuitem', { name: 'New Diagram' });
 };
 
-/** New Layout, which creates and selects an empty Layout owning one empty Graph. */
-export const newLayout = (title: string): void => {
-  fireEvent.click(newLayoutItem(title));
+/** New Diagram, which creates and selects an empty Diagram owning one empty Graph. */
+export const newDiagram = (title: string): void => {
+  fireEvent.click(newDiagramItem(title));
 };
 
 /**
@@ -140,22 +140,22 @@ export const presentControlBehindAModal = (graphTitle: string): HTMLElement =>
   screen.getByRole('button', { name: `Present ${graphTitle}`, hidden: true });
 
 /**
- * Delete, on the Layout the cluster is showing.
+ * Delete, on the Diagram the cluster is showing.
  *
- * Two rules meet on this one row and neither implies the other: the last Layout
+ * Two rules meet on this one row and neither implies the other: the last Diagram
  * cannot be deleted (ADR 0079), and *no* entity Edit may run while a title
  * editor or a live content edit owns the caret. A row that reads only the first
  * is drawn available for a command the application has already withdrawn.
  */
-export const deleteLayoutItem = (layoutTitle: string): HTMLElement => {
-  openLayoutMenu(layoutTitle);
-  return screen.getByRole('menuitem', { name: `Delete ${layoutTitle}` });
+export const deleteDiagramItem = (diagramTitle: string): HTMLElement => {
+  openDiagramMenu(diagramTitle);
+  return screen.getByRole('menuitem', { name: `Delete ${diagramTitle}` });
 };
 
 /**
- * The Graph cluster's disclosure: the Graphs this Layout owns, then its commands.
+ * The Graph cluster's disclosure: the Graphs this Diagram owns, then its commands.
  *
- * Dismissed first for the reason {@link openLayoutMenu} is: one open id under
+ * Dismissed first for the reason {@link openDiagramMenu} is: one open id under
  * the whole row means a press on this trigger while another cluster is open is
  * an outside press Base UI spends on dismissing.
  */
@@ -173,7 +173,7 @@ export const newGraphItem = (graphTitle: string): HTMLElement => {
 /**
  * The Space cluster's disclosure: New Space, Copy link, the open set and Exit.
  *
- * Dismissed first for the reason {@link openLayoutMenu} is.
+ * Dismissed first for the reason {@link openDiagramMenu} is.
  */
 export const openSpaceMenu = (title: string): void => {
   if (screen.queryByRole('menu') !== null) fireEvent.keyDown(document.body, { key: 'Escape' });

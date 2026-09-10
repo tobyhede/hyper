@@ -88,11 +88,11 @@ reviews:
         beside Graphs.
 
         ADR 0040 is BUILT: `.scratch/first-public-aggregate/` landed it. A
-        Layout's `graphs` are nested owned values and its position keys are its
+        Diagram's `graphs` are nested owned values and its position keys are its
         explicit Card membership; there is no Space-level Graph collection.
         `validateReferences` in `packages/graph/src/validate.ts` checks every
         owned Edge endpoint against that membership (`graph-edge-missing-card`,
-        `graph-edge-card-outside-layout`). Do not report the aggregate as
+        `graph-edge-card-outside-diagram`). Do not report the aggregate as
         unbuilt or propose reverting to a Space-owned Graph collection.
 
     - path: 'packages/core/**'
@@ -101,7 +101,7 @@ reviews:
         no elkjs, no framework dependency — ESLint enforces this, so a finding
         here means the rule was bypassed. Geometry rides as optional fields on
         elements (ADR 0005); there is no `Arrangement` type and none should be
-        proposed. A Layout is authored data; a LayoutStrategy is behaviour
+        proposed. A Diagram is authored data; a LayoutStrategy is behaviour
         living in `graph` (ADR 0014). Do not collapse them.
 
     - path: 'packages/graph/**'
@@ -167,14 +167,14 @@ reviews:
         when a newly drawn Edge should become traversable. In `space-authoring`,
         `session.submit` is deliberately the first statement of the install
         shell and the only fallible one; do not reorder it or re-check the
-        Graph/Layout inside that window. The install gate counts depth and
+        Graph/Diagram inside that window. The install gate counts depth and
         publishes in the `finally` — a boolean flag republishes part-way state.
         `beforeunload` is registered only while persistence is unsettled and
         calls `preventDefault()` alone; `event.returnValue` is deprecated.
         `resolveView` is the one seam answering the subject and the Active
         Graph, and both fallbacks live there; Navigation takes that answer as
         an argument rather than reaching for the Space's first Graph, because
-        two places answering it would disagree the moment a Layout filters.
+        two places answering it would disagree the moment a Diagram filters.
         There is no *persistence* Save action: ADR 0030 retired it with file
         write-back, and every completed Edit commits on its own. That is a
         different action from ADR 0064's Save, which replaces Edit while

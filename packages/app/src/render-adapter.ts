@@ -6,7 +6,7 @@ import {
   type NodePositionChange,
 } from '@xyflow/react';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import type { CardId, GraphEdge, GraphId, LayoutPosition } from '@project/core';
+import type { CardId, GraphEdge, GraphId, DiagramPosition } from '@project/core';
 import { Placement } from '@project/graph';
 import type { CardFlowNode, RoutedEdgeData } from '@project/react-flow-adapter';
 import { snapCardSizeToClose } from './card';
@@ -189,9 +189,9 @@ export interface RenderAdapterState {
    */
   projection: Projection | null;
   /** Gesture starts retained until each node receives a settled callback. */
-  dragOrigins: ReadonlyMap<string, LayoutPosition>;
+  dragOrigins: ReadonlyMap<string, DiagramPosition>;
   /**
-   * Set once a card has actually moved. A layout's routed edge geometry
+   * Set once a card has actually moved. A diagram's routed edge geometry
    * describes the placement it computed, so it stops being true the moment a
    * card leaves the place that routing assumed; from then on edges are drawn as
    * plain curves between wherever the cards now are.
@@ -202,12 +202,12 @@ export interface RenderAdapterState {
   /** One transient resize layered over the authored Placement. */
   resizeDraft: ResizeDraft | null;
   /**
-   * Whether some embedded Layout on this canvas is running a Card edit.
+   * Whether some embedded Diagram on this canvas is running a Card edit.
    *
    * The one Interaction fact this store holds that it does not itself produce.
-   * A Space Card draws another Space's Layout inside this one, and an edit
+   * A Space Card draws another Space's Diagram inside this one, and an edit
    * begun in there withdraws authoring from the canvas around it
-   * (`authoring-availability.ts`'s `editingEmbeddedLayout`). It begins and ends
+   * (`authoring-availability.ts`'s `editingEmbeddedDiagram`). It begins and ends
    * inside the canvas subtree, so it has to be published to be read above it —
    * and it is published *here*, beside `resizeDraft`, because both are drafts
    * of one canvas gesture and because this store re-renders the Space's command
@@ -217,14 +217,14 @@ export interface RenderAdapterState {
    * The aggregate only. Which embedding holds the edit is a question about a
    * Card of that canvas and is answered where the Cards are.
    */
-  editingEmbeddedLayout: boolean;
+  editingEmbeddedDiagram: boolean;
   /** Publish projected Card nodes, their declared handles and Graph Edges together. */
   syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
   /**
-   * Navigate to another Layout. The replacement placement will arrive via
-   * `syncProjection`; Layout selection itself is not an edit.
+   * Navigate to another Diagram. The replacement placement will arrive via
+   * `syncProjection`; Diagram selection itself is not an edit.
    */
-  selectLayout: (placement: Placement | null) => void;
+  selectDiagram: (placement: Placement | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
   /**
@@ -237,13 +237,13 @@ export interface RenderAdapterState {
    */
   changeEdges: (changes: EdgeChange<Edge>[]) => void;
   /**
-   * Report whether any embedded Layout on this canvas is now running an edit.
+   * Report whether any embedded Diagram on this canvas is now running an edit.
    *
    * A report of what the canvas currently holds rather than of a transition, so
    * an unchanged answer publishes nothing: this store's subscribers include
    * every reader of the projection, and none of them has seen this change.
    */
-  reportEmbeddedLayoutEditing: (editing: boolean) => void;
+  reportEmbeddedDiagramEditing: (editing: boolean) => void;
   /** Select one Card after a completed connection. */
   selectCard: (cardId: CardId) => void;
   /**
@@ -292,9 +292,9 @@ function placementFromNodes(nodes: readonly CardFlowNode[]): Placement {
 }
 
 function trackDragOrigins(
-  dragOrigins: Map<string, LayoutPosition>,
+  dragOrigins: Map<string, DiagramPosition>,
   positionChanges: readonly NodePositionChange[],
-  beforeById: ReadonlyMap<string, LayoutPosition>,
+  beforeById: ReadonlyMap<string, DiagramPosition>,
 ): void {
   for (const change of positionChanges) {
     if (change.dragging !== true || dragOrigins.has(change.id)) continue;
@@ -305,9 +305,9 @@ function trackDragOrigins(
 
 function consumeSettledMovedIds(
   settled: readonly NodePositionChange[],
-  dragOrigins: Map<string, LayoutPosition>,
-  beforeById: ReadonlyMap<string, LayoutPosition>,
-  afterById: ReadonlyMap<string, LayoutPosition>,
+  dragOrigins: Map<string, DiagramPosition>,
+  beforeById: ReadonlyMap<string, DiagramPosition>,
+  afterById: ReadonlyMap<string, DiagramPosition>,
 ): CardId[] {
   // The same `Node.id` erasure `placementFromNodes` repairs above.
   const movedIds: CardId[] = [];
@@ -337,7 +337,7 @@ function consumeSettledMovedIds(
 function reconcile(
   current: readonly CardFlowNode[],
   projected: readonly CardFlowNode[],
-  dragOrigins: ReadonlyMap<string, LayoutPosition>,
+  dragOrigins: ReadonlyMap<string, DiagramPosition>,
 ): CardFlowNode[] {
   const byId = new Map(current.map((node) => [node.id, node]));
   return projected.map((node) => {
@@ -436,7 +436,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     moved: false,
     selection: NO_SELECTION,
     resizeDraft: null,
-    editingEmbeddedLayout: false,
+    editingEmbeddedDiagram: false,
 
     // Written once, here, and by nothing after: every `set` below merges a
     // partial, so this reference is what the canvas keeps holding.
@@ -493,7 +493,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       const current = get().projection;
       // The empty list rather than a separate branch for the first projection:
       // it too may be the one that first draws a Card already selected, since
-      // `selectLayout` clears the projection and a selection can be made
+      // `selectDiagram` clears the projection and a selection can be made
       // before the next one lands.
       //
       // `withSelection` over the reconciled list is what seeds a Card the live
@@ -514,12 +514,12 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         state.selection,
       );
       set({ projection: { nodes: reconciled, edges: [...edges] } });
-      // Reporting geometry, not authoring it: only Cards the selected Layout
+      // Reporting geometry, not authoring it: only Cards the selected Diagram
       // draws can contribute placement.
       authoring.reportRendered(placementFromNodes(reconciled));
     },
 
-    selectLayout: (placement) => {
+    selectDiagram: (placement) => {
       set({
         projection: null,
         dragOrigins: new Map(),
@@ -530,8 +530,8 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       authoring.replacePlacement(placement);
     },
 
-    reportEmbeddedLayoutEditing: (editing) => {
-      if (get().editingEmbeddedLayout !== editing) set({ editingEmbeddedLayout: editing });
+    reportEmbeddedDiagramEditing: (editing) => {
+      if (get().editingEmbeddedDiagram !== editing) set({ editingEmbeddedDiagram: editing });
     },
 
     selectCard: (cardId) => set((state) => selecting(state, { kind: 'card', cardId })),
@@ -672,7 +672,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
   // A replacement Space arrives without unmounting anything, so the projection
   // this store is holding describes Cards that may no longer exist and drag
   // bookkeeping for a gesture made against the Space that is gone. Dropping it
-  // is the same reset `selectLayout` performs, for the same reason: what is on
+  // is the same reset `selectDiagram` performs, for the same reason: what is on
   // screen no longer describes what is being rendered.
   //
   // The unsubscribe is deliberately dropped: this store's lifetime is the

@@ -281,7 +281,7 @@ function EdgeEndpointFields({
           {toError}
         </FieldError>
       </Field>
-      {/* The form channel: a stale Layout, Graph or Edge that no endpoint in
+      {/* The form channel: a stale Diagram, Graph or Edge that no endpoint in
           either list could correct, so neither Field is marked invalid. */}
       {errors.form !== undefined && (
         <FieldError data-testid="edge-endpoint-refusal">{errors.form}</FieldError>

@@ -13,17 +13,17 @@ const CARD_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
 const CARD_B = uuidSchema.parse('a0000000-0000-4000-8000-000000000011');
 const CARD_E = uuidSchema.parse('a0000000-0000-4000-8000-000000000012');
 const CARD_F = uuidSchema.parse('a0000000-0000-4000-8000-000000000013');
-const SPINE_LAYOUT_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000020');
-const ECHO_LAYOUT_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000021');
+const SPINE_DIAGRAM_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000020');
+const ECHO_DIAGRAM_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000021');
 const LONG_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000030');
 const SHORT_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000031');
 const ECHO_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000032');
 
 /**
- * Two Layouts owning three Graphs between them, which is the only shape that
+ * Two Diagrams owning three Graphs between them, which is the only shape that
  * exercises what version 1 moved: a Graph reached through its owner rather than
- * through a Space-level array. The second Layout's Graph shares no Card with the
- * first, so each owned Edge is closed over its own Layout's position keys.
+ * through a Space-level array. The second Diagram's Graph shares no Card with the
+ * first, so each owned Edge is closed over its own Diagram's position keys.
  *
  * Deliberately supplied *unsorted* — positions in descending key order, Graphs
  * in an order no sort would produce — so the canonical form's two different
@@ -36,9 +36,9 @@ const storedSpace: LoadedSpace = {
     document: {
       version: 1,
       title: 'Stored talk',
-      layouts: [
+      diagrams: [
         {
-          id: SPINE_LAYOUT_ID,
+          id: SPINE_DIAGRAM_ID,
           title: 'Spine',
           kind: 'positioned',
           positions: {
@@ -57,7 +57,7 @@ const storedSpace: LoadedSpace = {
           activeGraph: LONG_GRAPH_ID,
         },
         {
-          id: ECHO_LAYOUT_ID,
+          id: ECHO_DIAGRAM_ID,
           title: 'Echo',
           kind: 'positioned',
           positions: {
@@ -95,7 +95,7 @@ afterEach(async () => {
 });
 
 describe('canonical export', () => {
-  it('emits a version 1 space file whose Graphs are nested under the Layouts that own them', async () => {
+  it('emits a version 1 space file whose Graphs are nested under the Diagrams that own them', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
@@ -106,9 +106,9 @@ describe('canonical export', () => {
       version: 1,
       id: SPACE_ID,
       title: 'Stored talk',
-      layouts: [
+      diagrams: [
         {
-          id: SPINE_LAYOUT_ID,
+          id: SPINE_DIAGRAM_ID,
           title: 'Spine',
           kind: 'positioned',
           positions: {
@@ -127,7 +127,7 @@ describe('canonical export', () => {
           activeGraph: LONG_GRAPH_ID,
         },
         {
-          id: ECHO_LAYOUT_ID,
+          id: ECHO_DIAGRAM_ID,
           title: 'Echo',
           kind: 'positioned',
           positions: {
@@ -152,7 +152,7 @@ describe('canonical export', () => {
    * alone, whatever ordering the exporter does or does not impose.
    *
    * So every object below is permuted against `storedSpace`: the document's
-   * keys, each layout's, each graph's, each edge's, the position map's, each
+   * keys, each diagram's, each graph's, each edge's, the position map's, each
    * *point's*, and the card array's. Only the exporter rebuilding all of them
    * makes the two agree.
    */
@@ -169,7 +169,7 @@ describe('canonical export', () => {
       id: SPACE_ID,
       document: {
         title: 'Stored talk',
-        layouts: [
+        diagrams: [
           {
             kind: 'positioned',
             activeGraph: LONG_GRAPH_ID,
@@ -187,7 +187,7 @@ describe('canonical export', () => {
               [CARD_A]: { y: 0, x: 0, open: false },
               [CARD_B]: { y: 0, x: 260, open: false },
             },
-            id: SPINE_LAYOUT_ID,
+            id: SPINE_DIAGRAM_ID,
           },
           {
             title: 'Echo',
@@ -196,7 +196,7 @@ describe('canonical export', () => {
               [CARD_E]: { y: 200, x: 0, open: false },
             },
             graphs: [{ title: 'Echo', edges: [{ to: CARD_F, from: CARD_E }], id: ECHO_GRAPH_ID }],
-            id: ECHO_LAYOUT_ID,
+            id: ECHO_DIAGRAM_ID,
             kind: 'positioned',
           },
         ],
@@ -233,9 +233,9 @@ describe('canonical export', () => {
       document: {
         version: 1,
         title: 'Stored talk',
-        layouts: [
+        diagrams: [
           {
-            id: SPINE_LAYOUT_ID,
+            id: SPINE_DIAGRAM_ID,
             title: 'Spine',
             kind: 'positioned',
             positions: {
@@ -282,9 +282,9 @@ describe('canonical export', () => {
       version: 1,
       id: SPACE_ID,
       title: 'Stored talk',
-      layouts: [
+      diagrams: [
         {
-          id: SPINE_LAYOUT_ID,
+          id: SPINE_DIAGRAM_ID,
           title: 'Spine',
           kind: 'positioned',
           positions: {

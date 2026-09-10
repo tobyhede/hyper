@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Card, type Graph, type Layout } from '@project/core';
+import { uuidSchema, type Card, type Graph, type Diagram } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { EntityActionGroup } from '@project/ui';
 import {
-  DELETE_LAYOUT_ACTION_ID,
+  DELETE_DIAGRAM_ACTION_ID,
   spaceEntityActions,
   type SpaceEntity,
 } from '../src/entity-actions';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const PLACED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OUTSIDE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
 const GRAPH: Graph = { id: GRAPH_ID, title: 'Long', edges: [] };
-const LAYOUT: Layout = {
-  id: LAYOUT_ID,
+const DIAGRAM: Diagram = {
+  id: DIAGRAM_ID,
   title: 'Collection 1',
   kind: 'positioned',
   positions: { [PLACED_CARD_ID]: { x: 0, y: 0, open: false } },
@@ -37,7 +37,7 @@ const build = (
     spaceTitle: 'Fixture Space',
     onCopy: vi.fn(),
     onRename: vi.fn(),
-    onDeleteLayout: vi.fn(),
+    onDeleteDiagram: vi.fn(),
     ...overrides,
   });
 
@@ -76,11 +76,11 @@ describe('spaceEntityActions', () => {
    */
   it.each([
     { name: 'a Space', entity: { kind: 'space' } as const },
-    { name: 'a Layout', entity: { kind: 'layout', layout: LAYOUT } as const },
-    { name: 'a Graph', entity: { kind: 'graph', graph: GRAPH, layout: LAYOUT } as const },
+    { name: 'a Diagram', entity: { kind: 'diagram', diagram: DIAGRAM } as const },
+    { name: 'a Graph', entity: { kind: 'graph', graph: GRAPH, diagram: DIAGRAM } as const },
     {
       name: 'a Card',
-      entity: { kind: 'card', card: card(PLACED_CARD_ID, 'A'), layout: LAYOUT } as const,
+      entity: { kind: 'card', card: card(PLACED_CARD_ID, 'A'), diagram: DIAGRAM } as const,
     },
   ])('never says canonical or contextual in $name’s menu', ({ entity }) => {
     const written = commands(build()(entity))
@@ -99,18 +99,18 @@ describe('spaceEntityActions', () => {
     expect(copied({ kind: 'space' }, 'Copy link')).toEqual({ kind: 'space', spaceId: SPACE_ID });
   });
 
-  it('offers a Layout its rename, its address and a destructive delete', () => {
-    const entity: SpaceEntity = { kind: 'layout', layout: LAYOUT };
+  it('offers a Diagram its rename, its address and a destructive delete', () => {
+    const entity: SpaceEntity = { kind: 'diagram', diagram: DIAGRAM };
     const groups = build()(entity);
 
-    expect(labels(groups)).toEqual(['Rename', 'Copy link', 'Delete Layout']);
-    expect(commands(groups).find((action) => action.id === DELETE_LAYOUT_ACTION_ID)?.variant).toBe(
+    expect(labels(groups)).toEqual(['Rename', 'Copy link', 'Delete Diagram']);
+    expect(commands(groups).find((action) => action.id === DELETE_DIAGRAM_ACTION_ID)?.variant).toBe(
       'destructive',
     );
     expect(copied(entity, 'Copy link')).toEqual({
-      kind: 'layout',
+      kind: 'diagram',
       spaceId: SPACE_ID,
-      layoutId: LAYOUT_ID,
+      diagramId: DIAGRAM_ID,
     });
   });
 
@@ -118,10 +118,10 @@ describe('spaceEntityActions', () => {
    * A withheld command is absent, never present and disabled — the rule the
    * Sidebar's link buttons already followed, applied to the Edits as well.
    */
-  it('withholds the Layout Edits rather than offering them refused', () => {
-    const groups = build({ onRename: null, onDeleteLayout: null })({
-      kind: 'layout',
-      layout: LAYOUT,
+  it('withholds the Diagram Edits rather than offering them refused', () => {
+    const groups = build({ onRename: null, onDeleteDiagram: null })({
+      kind: 'diagram',
+      diagram: DIAGRAM,
     });
 
     expect(labels(groups)).toEqual(['Copy link']);
@@ -135,28 +135,28 @@ describe('spaceEntityActions', () => {
    * on away with it, and the reader was told nothing.
    */
   it.each([
-    { outcome: 'done', deleted: true, name: 'the Layout was deleted' },
+    { outcome: 'done', deleted: true, name: 'the Diagram was deleted' },
     { outcome: 'failed', deleted: false, name: 'the Edit was refused' },
   ])('answers $outcome when $name', async ({ outcome, deleted }) => {
-    const groups = build({ onDeleteLayout: () => deleted })({ kind: 'layout', layout: LAYOUT });
-    const action = commands(groups).find((candidate) => candidate.id === DELETE_LAYOUT_ACTION_ID);
+    const groups = build({ onDeleteDiagram: () => deleted })({ kind: 'diagram', diagram: DIAGRAM });
+    const action = commands(groups).find((candidate) => candidate.id === DELETE_DIAGRAM_ACTION_ID);
 
     expect(await action?.onSelect()).toBe(outcome);
   });
 
   /**
-   * A Layout owns its Graphs (ADR 0040), so a Graph row always has both forms:
-   * the address within the Layout drawing it, and the address that opens it
+   * A Diagram owns its Graphs (ADR 0040), so a Graph row always has both forms:
+   * the address within the Diagram drawing it, and the address that opens it
    * wherever it is drawn.
    */
-  it('offers a Graph both link forms, the Layout one first', () => {
-    const entity: SpaceEntity = { kind: 'graph', graph: GRAPH, layout: LAYOUT };
+  it('offers a Graph both link forms, the Diagram one first', () => {
+    const entity: SpaceEntity = { kind: 'graph', graph: GRAPH, diagram: DIAGRAM };
 
     expect(labels(build()(entity))).toEqual(['Rename', 'Copy link', 'Copy permanent link']);
     expect(copied(entity, 'Copy link')).toEqual({
-      kind: 'layout-graph',
+      kind: 'diagram-graph',
       spaceId: SPACE_ID,
-      layoutId: LAYOUT_ID,
+      diagramId: DIAGRAM_ID,
       graphId: GRAPH_ID,
     });
     expect(copied(entity, 'Copy permanent link')).toEqual({
@@ -170,14 +170,14 @@ describe('spaceEntityActions', () => {
     const entity: SpaceEntity = {
       kind: 'card',
       card: card(PLACED_CARD_ID, 'A'),
-      layout: LAYOUT,
+      diagram: DIAGRAM,
     };
 
     expect(labels(build()(entity))).toEqual(['Copy link', 'Copy permanent link']);
     expect(copied(entity, 'Copy link')).toEqual({
-      kind: 'layout-card',
+      kind: 'diagram-card',
       spaceId: SPACE_ID,
-      layoutId: LAYOUT_ID,
+      diagramId: DIAGRAM_ID,
       cardId: PLACED_CARD_ID,
     });
   });
@@ -191,7 +191,7 @@ describe('spaceEntityActions', () => {
     const entity: SpaceEntity = {
       kind: 'card',
       card: card(PLACED_CARD_ID, 'Auth\nHow a session begins'),
-      layout: LAYOUT,
+      diagram: DIAGRAM,
     };
 
     const written = commands(build()(entity))
@@ -203,15 +203,15 @@ describe('spaceEntityActions', () => {
   });
 
   /**
-   * A Card the Cards drawer reveals but this Layout does not place has one
+   * A Card the Cards drawer reveals but this Diagram does not place has one
    * address, so there is nothing for a second to differ from. Offering it
-   * anyway would copy a `layout-card` path the host answers 404 for.
+   * anyway would copy a `diagram-card` path the host answers 404 for.
    */
-  it('withholds the permanent link from a Card this Layout does not place', () => {
+  it('withholds the permanent link from a Card this Diagram does not place', () => {
     const entity: SpaceEntity = {
       kind: 'card',
       card: card(OUTSIDE_CARD_ID, 'Outside'),
-      layout: LAYOUT,
+      diagram: DIAGRAM,
     };
 
     expect(labels(build()(entity))).toEqual(['Copy link']);
@@ -224,7 +224,7 @@ describe('spaceEntityActions', () => {
 
   /** Every address command confirms in place, which is what holds the menu open. */
   it('confirms every copy and describes where it lands', () => {
-    const copies = commands(build()({ kind: 'graph', graph: GRAPH, layout: LAYOUT })).filter(
+    const copies = commands(build()({ kind: 'graph', graph: GRAPH, diagram: DIAGRAM })).filter(
       (action) => action.label.startsWith('Copy'),
     );
 
@@ -239,7 +239,7 @@ describe('spaceEntityActions', () => {
   it('begins a rename against the entity the row is about', () => {
     const onRename = vi.fn();
 
-    commands(build({ onRename })({ kind: 'graph', graph: GRAPH, layout: LAYOUT }))
+    commands(build({ onRename })({ kind: 'graph', graph: GRAPH, diagram: DIAGRAM }))
       .filter((action) => action.id === 'rename')
       .forEach((action) => {
         void action.onSelect();

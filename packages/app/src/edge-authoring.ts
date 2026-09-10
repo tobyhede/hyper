@@ -1,4 +1,4 @@
-import type { CardId, LayoutPosition } from '@project/core';
+import type { CardId, DiagramPosition } from '@project/core';
 import {
   createNonThrowingReporter,
   createObservableState,
@@ -111,7 +111,7 @@ export type ConnectionGesture =
       readonly kind: 'dragging';
       readonly sourceId: string;
       /** Canvas coordinates supplied by the active interaction. */
-      readonly point: LayoutPosition;
+      readonly point: DiagramPosition;
       readonly over: DropTarget;
       /** Alt/Option, tracked on `window` so it survives leaving the canvas. */
       readonly modifierHeld: boolean;
@@ -120,7 +120,7 @@ export type ConnectionGesture =
 /** The Card an empty-drop would author: its source, and its top-left. */
 export interface NewCardDrop {
   readonly sourceId: string;
-  readonly position: LayoutPosition;
+  readonly position: DiagramPosition;
 }
 
 /**
@@ -256,7 +256,7 @@ export interface EdgeAuthoring {
   /** An Option/Alt empty drop: author the Card and the Edge that reaches it. */
   readonly createConnectedCard: (
     from: CardId,
-    position: LayoutPosition,
+    position: DiagramPosition,
     projected: readonly CardFlowNode[] | null,
   ) => void;
   /**
@@ -355,7 +355,7 @@ export function createEdgeAuthoring({
    *
    * Asked through the eligibility query rather than by reading the Space: the
    * *identity* proposal — reconnecting an endpoint to the Card it already names
-   * — is eligible exactly when the Graph is still one this Layout owns and still
+   * — is eligible exactly when the Graph is still one this Diagram owns and still
    * holds the Edge, which is the whole of what "the subject survives" means. A
    * connect draft asks the empty-drop proposal for the same reason: it is the
    * question "may this Card still be an Edge's source here", with no target to
@@ -479,7 +479,7 @@ export function createEdgeAuthoring({
   // Invalidation. The draft is cancelled by anything that changes what it is
   // about, and by nothing else — an unrelated completed Edit leaves it standing.
   let replacementEpoch = authoring.getState().replacementEpoch;
-  let selectedLayoutId = authoring.getState().navigation.selectedLayoutId;
+  let selectedDiagramId = authoring.getState().navigation.selectedDiagramId;
   let activeGraphId = authoring.getState().navigation.activeGraphId;
   let presenting = authoring.getState().navigation.mode === 'presenting';
   const unsubscribeAuthoring = authoring.subscribe(() => {
@@ -487,7 +487,7 @@ export function createEdgeAuthoring({
     const nowPresenting = state.navigation.mode === 'presenting';
     const contextChanged =
       state.replacementEpoch !== replacementEpoch ||
-      state.navigation.selectedLayoutId !== selectedLayoutId ||
+      state.navigation.selectedDiagramId !== selectedDiagramId ||
       state.navigation.activeGraphId !== activeGraphId ||
       // Presenting withdraws Edge authoring altogether, so a draft made before
       // it has no context left to complete in. Cancelled rather than merely
@@ -495,7 +495,7 @@ export function createEdgeAuthoring({
       // and an Edge editor behind it reopens when the author returns.
       (nowPresenting && !presenting);
     replacementEpoch = state.replacementEpoch;
-    selectedLayoutId = state.navigation.selectedLayoutId;
+    selectedDiagramId = state.navigation.selectedDiagramId;
     activeGraphId = state.navigation.activeGraphId;
     presenting = nowPresenting;
     const { draft, refusal } = observable.getState();

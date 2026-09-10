@@ -1,5 +1,5 @@
 import type { Edge } from '@xyflow/react';
-import { SPACE_CARD_EMBED_INSET, type LayoutPosition } from '@project/core';
+import { SPACE_CARD_EMBED_INSET, type DiagramPosition } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { CanvasNodesAndEdges } from './canvas-projection';
 
@@ -15,10 +15,10 @@ export interface EmbeddedBounds {
   readonly bottom: number;
 }
 
-export interface EmbeddedLayoutRequest {
+export interface EmbeddedDiagramRequest {
   readonly parent: CardFlowNode;
   readonly projection: CanvasNodesAndEdges;
-  readonly offset: LayoutPosition;
+  readonly offset: DiagramPosition;
   readonly enabled: boolean;
   readonly bounds?: EmbeddedBounds;
 }
@@ -39,13 +39,13 @@ const EMBEDDED_GRAB_SLIVER = 24;
  * and every ancestor's clip — and not the containing Card's own box: a proposal
  * accepted outside it is clipped by `clipEmbeddedNode` rather than drawn, and
  * taken to the corner it is clipped away entirely while the move is still
- * committed to the target Space's Layout. Taking the bounds rather than the
+ * committed to the target Space's Diagram. Taking the bounds rather than the
  * node is what makes a nested embedding hold to the region an ancestor leaves
  * it, which its containing Card's box alone does not know about.
  *
  * Deliberately *not* React Flow's `extent`. A numeric extent is applied by
  * `adoptUserNodes`, which runs on every render and not only on a drag, so an
- * extent narrower than the authored placement redraws the Layout: a Card
+ * extent narrower than the authored placement redraws the Diagram: a Card
  * authored beyond the containing bounds would be moved to the edge while
  * `clipEmbeddedNode` still clips from where it was authored, and shrinking the
  * containing Card would shift its children rather than reveal less of them. A
@@ -53,9 +53,9 @@ const EMBEDDED_GRAB_SLIVER = 24;
  * *proposes* is constrained, and that is this function's job.
  */
 export function constrainEmbeddedPosition(
-  position: LayoutPosition,
+  position: DiagramPosition,
   bounds: EmbeddedBounds,
-): LayoutPosition {
+): DiagramPosition {
   const hold = (value: number, least: number, most: number): number =>
     Math.min(Math.max(value, least), Math.max(least, most));
   return {
@@ -77,13 +77,13 @@ export function clipEmbeddedNode(node: CardFlowNode, bounds: EmbeddedBounds): Ca
 }
 
 /** Reparent the production projection, clipping partial Cards instead of dropping them. */
-export function embeddedLayout({
+export function embeddedDiagram({
   parent,
   projection,
   offset,
   enabled,
   bounds,
-}: EmbeddedLayoutRequest): CanvasNodesAndEdges {
+}: EmbeddedDiagramRequest): CanvasNodesAndEdges {
   const nodes = projection.nodes.map((node): CardFlowNode => {
     const position = { x: node.position.x + offset.x, y: node.position.y + offset.y };
     return clipEmbeddedNode(

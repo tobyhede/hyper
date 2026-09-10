@@ -93,7 +93,7 @@ const readAggregate = async (repository: SpaceRepository): Promise<AggregateLoad
  *
  * `newId` is the composition-owned identity source (ADR 0016), and it is the
  * host's only one. One thing the host composes mints: the API tree's
- * working-space loader durably initializes a stored layoutless Space on first
+ * working-space loader durably initializes a stored diagramless Space on first
  * load (ADR 0079). So it is forwarded to `createSpaceHttpApp` rather than left
  * to that function's own default, which would reinstate the ambient generator
  * behind this composition's back — a host handed a deterministic minter would

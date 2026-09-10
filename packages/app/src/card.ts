@@ -1,5 +1,5 @@
 /**
- * The shape of a card in the graph — declared once, consumed by both the layout
+ * The shape of a card in the graph — declared once, consumed by both the diagram
  * and the stylesheet.
  *
  * A card draws its title (ADR 0006), so its content is bounded and every card is
@@ -34,7 +34,7 @@ import { COLLAPSED_CARD_SIZE } from '@project/core';
 export const CARD_WIDTH = COLLAPSED_CARD_SIZE.width;
 export const CARD_HEIGHT = COLLAPSED_CARD_SIZE.height;
 
-/** The size a layout arranges cards at. */
+/** The size a layout strategy arranges cards at. */
 export const CARD_SIZE = { width: CARD_WIDTH, height: CARD_HEIGHT } as const;
 
 /** Application-owned magnetic range for resizing an Open Card to Close. */
@@ -52,7 +52,7 @@ export const snapCardSizeToClose = (size: {
 
 /**
  * Handed to the graph container so the stylesheet draws cards at exactly the size
- * the layout placed them at. If these drift, ports land where the card isn't.
+ * the strategy placed them at. If these drift, ports land where the card isn't.
  */
 export const cardSizeVars =
   // SAFETY: CSSProperties doesn't type CSS custom properties (`--*`); these

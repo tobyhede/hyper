@@ -22,8 +22,8 @@ import {
   SPACE_CARD_EMBED_INSET,
   titleName,
   uuidSchema,
-  type LayoutPosition,
-  type LayoutId,
+  type DiagramPosition,
+  type DiagramId,
   type Card,
   type CardId,
   type Graph,
@@ -52,9 +52,9 @@ import { CARD_SIZE } from '../card';
 import { CARD_DRAG_TYPE } from './CardsDrawer';
 import { OverviewCamera, PresentingCamera } from './cameras';
 import type { OpenSpace } from '../open-spaces';
-import { clipEmbeddedNode, embeddedClipId, type EmbeddedBounds } from '../embedded-layout';
+import { clipEmbeddedNode, embeddedClipId, type EmbeddedBounds } from '../embedded-diagram';
 import { useOpenSpaces } from '../open-spaces-context';
-import { EmbeddedLayoutAuthoring, type EmbeddedPublication } from './EmbeddedLayoutAuthoring';
+import { EmbeddedDiagramAuthoring, type EmbeddedPublication } from './EmbeddedDiagramAuthoring';
 
 const EMPTY_ENTRIES = [] as const;
 const emptySubscription = () => () => undefined;
@@ -73,9 +73,9 @@ const emptySubscription = () => () => undefined;
  */
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default':
-    'Press enter or space to open a Card, backspace or delete to remove it from this Layout, the arrow keys to move it, and escape to cancel.',
+    'Press enter or space to open a Card, backspace or delete to remove it from this Diagram, the arrow keys to move it, and escape to cancel.',
   'node.a11yDescription.keyboardDisabled':
-    'Press enter or space to open a Card, backspace or delete to remove it from this Layout, the arrow keys to move it, and escape to cancel.',
+    'Press enter or space to open a Card, backspace or delete to remove it from this Diagram, the arrow keys to move it, and escape to cancel.',
   'edge.a11yDescription.default':
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
@@ -136,7 +136,7 @@ const NOT_A_CANVAS_COMMAND =
  *
  * Answered from the projection rather than from the DOM id alone, which is what
  * keeps a second canvas's node — a story, a catalogue page — from naming a Card
- * this Layout is not drawing.
+ * this Diagram is not drawing.
  */
 const focusedCard = (target: Element, nodes: readonly CardFlowNode[]): CardId | null => {
   const element = target.closest<HTMLElement>('.react-flow__node[data-id]');
@@ -162,7 +162,7 @@ export interface SpaceCanvasProps {
    */
   presenting: boolean;
   /**
-   * That the selected Layout's placement has resolved and the store has taken
+   * That the selected Diagram's placement has resolved and the store has taken
    * it — the fact, not an operation, and read by one thing: the aria
    * description React Flow gives every node.
    *
@@ -171,7 +171,7 @@ export interface SpaceCanvasProps {
    * words: "This Card is unavailable while placement is pending." Any
    * availability answer would make it false somewhere — `connectOnCanvas`
    * announces "pending" over a placement that resolved long ago the moment an
-   * author begins an inline Layout rename on the Dock, which is a lie told
+   * author begins an inline Diagram rename on the Dock, which is a lie told
    * to exactly the readers who depend on it, and told while the canvas behind
    * that rename is fully reachable (nothing about a chrome rename covers the
    * graph or traps focus).
@@ -197,7 +197,7 @@ export interface SpaceCanvasProps {
   selection: CanvasSelection;
   onSelectCard: (cardId: CardId) => void;
   onSelectEdge: (subject: EdgeSubject) => void;
-  /** The Cards this Layout places — what an Edge picker may offer. */
+  /** The Cards this Diagram places — what an Edge picker may offer. */
   placedCards: readonly Card[];
   /** Exact neutral title shown by the transient empty-drop preview. */
   newCardTitle: string;
@@ -233,17 +233,17 @@ export interface SpaceCanvasProps {
   onTitleEditingChange?: (editing: boolean) => void;
   cardResize: CardResize;
   /**
-   * Report whether some embedded Layout on this canvas is running a Card edit.
+   * Report whether some embedded Diagram on this canvas is running a Card edit.
    *
    * The one availability fact that is produced *inside* this subtree: an
-   * embedded Layout publishes its live edits from within React Flow, so nothing
+   * embedded Diagram publishes its live edits from within React Flow, so nothing
    * above can see one without being told. It goes into the render adapter
    * rather than up a chain of `useState` because that store re-renders the
    * Space's command surface and this canvas together, and the answer derived
    * from it comes back down as `availability.authorOnCanvas` — one answer, not
    * a term recombined here (`authoring-availability.ts`).
    */
-  reportEmbeddedLayoutEditing: (editing: boolean) => void;
+  reportEmbeddedDiagramEditing: (editing: boolean) => void;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: GraphId | null;
@@ -256,7 +256,7 @@ export interface SpaceCanvasProps {
    *
    * Passed straight through to `useCanvasCardAuthoring`, which is where every
    * other per-Card operation is attached. Absent on a canvas whose Cards have
-   * no such commands to run, which is how an embedded Layout draws none.
+   * no such commands to run, which is how an embedded Diagram draws none.
    *
    * A command list is built afresh on every render of the composition that owns
    * it — an address and an Edit both read state that has just changed — so this
@@ -292,7 +292,7 @@ export function SpaceCanvas({
   onBodyEditingChange,
   onTitleEditingChange,
   cardResize,
-  reportEmbeddedLayoutEditing,
+  reportEmbeddedDiagramEditing,
   graphs,
   colorByGraphId,
   activeGraphId,
@@ -323,18 +323,18 @@ export function SpaceCanvas({
     const requests: {
       parent: CardFlowNode;
       spaceId: CardId;
-      layoutId: LayoutId;
+      diagramId: DiagramId;
       graphId: GraphId | null;
       entry: OpenSpace | undefined;
-      absolute: LayoutPosition;
+      absolute: DiagramPosition;
       bounds: EmbeddedBounds;
     }[] = [];
     const queue: {
       parent: CardFlowNode;
       session: SpaceSession;
-      origin: LayoutPosition;
+      origin: DiagramPosition;
       clip: EmbeddedBounds | null;
-      /** The Layouts already crossed to reach this parent, newest last. */
+      /** The Diagrams already crossed to reach this parent, newest last. */
       path: ReadonlySet<string>;
     }[] = nodes.map((parent) => ({
       parent,
@@ -349,11 +349,11 @@ export function SpaceCanvas({
       const document = session
         .getState()
         .working.cards.find((card) => card.id === parent.data.cardId)?.document;
-      if (document?.kind !== 'space' || document.layout === undefined) continue;
-      // A Layout already on this path would embed itself. Single-Space intake
+      if (document?.kind !== 'space' || document.diagram === undefined) continue;
+      // A Diagram already on this path would embed itself. Single-Space intake
       // refuses only a Card targeting its own Space, so a mutual pair reaches
       // here validated and would otherwise nest one level deeper per commit.
-      const crossing = `${document.spaceId}:${document.layout}`;
+      const crossing = `${document.spaceId}:${document.diagram}`;
       if (path.has(crossing)) continue;
       const crossed = new Set(path).add(crossing);
       const absolute = { x: origin.x + parent.position.x, y: origin.y + parent.position.y };
@@ -372,7 +372,7 @@ export function SpaceCanvas({
       requests.push({
         parent,
         spaceId: document.spaceId,
-        layoutId: document.layout,
+        diagramId: document.diagram,
         graphId: document.graph ?? null,
         entry: entries.find((entry) => entry.id === document.spaceId),
         absolute,
@@ -384,7 +384,7 @@ export function SpaceCanvas({
         },
       });
       const published = embeddedPublications.get(parent.id);
-      if (published?.layoutId === document.layout) {
+      if (published?.diagramId === document.diagram) {
         for (const child of published.nodes)
           queue.push({
             parent: child,
@@ -404,10 +404,10 @@ export function SpaceCanvas({
    * `undefined`, and the last read is what the retained read-only drawing is
    * made of. A Space Card that is simply **Closed** makes no request at all, so
    * its read ends with it — a publication left in the map would be picked up as
-   * *live* by the next Open of that same Card at that same Layout, one commit
+   * *live* by the next Open of that same Card at that same Diagram, one commit
    * of nodes whose `changeNodes` and `removeCard` are bound to a composition
    * whose `observe()` was torn down, and it would seed the nested traversal
-   * above from a Layout nobody is reading any more.
+   * above from a Diagram nobody is reading any more.
    *
    * Adjusted during render, the way `commandRefusal` is below: React discards
    * this pass, so neither the DOM nor the load effect ever sees the requests the
@@ -434,7 +434,7 @@ export function SpaceCanvas({
       const value = embeddedPublications.get(request.parent.id);
       return value !== undefined &&
         request.entry === value.entry &&
-        value.layoutId === request.layoutId &&
+        value.diagramId === request.diagramId &&
         (value.bodyEditing || value.titleEditing)
         ? [request.parent.id]
         : [];
@@ -458,9 +458,9 @@ export function SpaceCanvas({
    */
   const embeddedEditing = editingEmbeddingIds.size > 0;
   useLayoutEffect(() => {
-    reportEmbeddedLayoutEditing(embeddedEditing);
-    return () => reportEmbeddedLayoutEditing(false);
-  }, [embeddedEditing, reportEmbeddedLayoutEditing]);
+    reportEmbeddedDiagramEditing(embeddedEditing);
+    return () => reportEmbeddedDiagramEditing(false);
+  }, [embeddedEditing, reportEmbeddedDiagramEditing]);
   const cardAuthoring = useCanvasCardAuthoring({
     nodes,
     availability,
@@ -513,7 +513,7 @@ export function SpaceCanvas({
   useEffect(() => {
     const visible = new Map(
       embeddedRequests.map((request) => [
-        `${request.parent.id}:${request.layoutId}:${request.graphId ?? ''}`,
+        `${request.parent.id}:${request.diagramId}:${request.graphId ?? ''}`,
         request,
       ]),
     );
@@ -525,7 +525,7 @@ export function SpaceCanvas({
       // change in every open Space does — so releasing the id on failure asks a
       // permanently unreadable target again on essentially every edit anywhere.
       // One read per embedding: closing and reopening the Card, or selecting
-      // another Layout, is what asks again, and so is `resumeEmbedded`.
+      // another Diagram, is what asks again, and so is `resumeEmbedded`.
       requested.current.add(id);
       void resumeEmbedded(request.spaceId);
     }
@@ -543,7 +543,7 @@ export function SpaceCanvas({
     () =>
       embeddedRequests.flatMap((request) => {
         const value = embeddedPublications.get(request.parent.id);
-        if (value?.layoutId !== request.layoutId) return [];
+        if (value?.diagramId !== request.diagramId) return [];
         if (request.entry === value.entry) return [value];
         return [
           {
@@ -552,7 +552,7 @@ export function SpaceCanvas({
             // The three Card commands aimed at a retained read answer it the
             // same way: reopen the target's session so the next press acts.
             // The canvas still announces that delete removes the focused Card
-            // from its Layout, and this drawing is still focusable, so an
+            // from its Diagram, and this drawing is still focusable, so an
             // answer of `null` alone consumed the key and did nothing at all.
             // There is no refusal to report either — the target is not open,
             // which is a state this press ends rather than a refused Edit.
@@ -701,7 +701,7 @@ export function SpaceCanvas({
   const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = cardAuthoring.nodes;
   /**
-   * The canvas React Flow draws: this Space's Cards, then the Layouts its
+   * The canvas React Flow draws: this Space's Cards, then the Diagrams its
    * Open Space Cards embed (ADR 0068).
    *
    * Concatenated here and nowhere earlier. React Flow requires a parent to be
@@ -827,7 +827,7 @@ export function SpaceCanvas({
       if (cardId !== null) {
         event.preventDefault();
         const result = current.authoring.complete({
-          kind: 'removed-card-from-layout',
+          kind: 'removed-card-from-diagram',
           cardId,
         });
         setCommandRefusal(
@@ -1009,14 +1009,14 @@ export function SpaceCanvas({
       </svg>
       {embeddedRequests.map((request) =>
         request.entry === undefined ? null : (
-          <EmbeddedLayoutAuthoring
-            key={`${request.parent.id}:${request.layoutId}`}
+          <EmbeddedDiagramAuthoring
+            key={`${request.parent.id}:${request.diagramId}`}
             parent={request.parent}
             entry={request.entry}
-            layoutId={request.layoutId}
+            diagramId={request.diagramId}
             graphId={request.graphId}
             // Two answers and one membership test, and each is here for its own
-            // reason. `authorInEmbeddedLayout` is every way this canvas is not
+            // reason. `authorInEmbeddedDiagram` is every way this canvas is not
             // being authored *except* an embedded edit; `authorOnCanvas` adds
             // that one, so it is false the moment any embedding is editing —
             // and the membership test is that same fact read the other way
@@ -1028,7 +1028,7 @@ export function SpaceCanvas({
             // freshness; the answers `App` holds are a frame behind them, since
             // each is reported up through an effect.
             enabled={
-              availability.authorInEmbeddedLayout &&
+              availability.authorInEmbeddedDiagram &&
               (availability.authorOnCanvas || editingEmbeddingIds.has(request.parent.id)) &&
               !bodyEditing &&
               !cardAuthoring.titleEditing

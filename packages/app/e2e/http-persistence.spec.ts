@@ -132,7 +132,7 @@ test(
     await selectCanvas(page, 'Collection 1');
     await settled(page);
     await page.getByRole('button', { name: 'Cards' }).click();
-    await page.getByRole('button', { name: 'Add E to Layout' }).click();
+    await page.getByRole('button', { name: 'Add E to Diagram' }).click();
 
     // The report is a standing `Alert` beside the toolbar and never a cue in it:
     // status is not a command (ADR 0082), and there is no resting dot to read
@@ -271,7 +271,7 @@ test(
       await settled(stalePage);
       expect(await positionOf(acceptedCard)).toEqual(remotePosition);
       // Fresh Navigation over the stored Space, not the emphasis this page was
-      // left in: Reload opens the authored Layout the other page changed on its
+      // left in: Reload opens the authored Diagram the other page changed on its
       // first owned Graph, without replacing the mounted application surface.
       await expect(activeGraph(stalePage)).toHaveText('Long');
       await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();

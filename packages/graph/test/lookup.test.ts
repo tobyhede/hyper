@@ -8,7 +8,7 @@ function baseSpace(): Space {
       version: 1,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Test',
-      layouts: [
+      diagrams: [
         {
           id: uuid('00000000-0000-4000-8000-000000000022'),
           title: 'Working',

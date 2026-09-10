@@ -22,7 +22,7 @@ const idSchema = uuidSchema;
  *
  * **Mint, not allocate.** Nothing reserves an id from a registry, and in
  * particular PostgreSQL does not hand them out: a space's id comes from its
- * column default, and every other id — card, graph, layout — is generated here,
+ * column default, and every other id — card, graph, diagram — is generated here,
  * in whichever process is doing the work. Calling it allocation is what made the
  * importer read as though the database had to be consulted for a random value.
  *
@@ -44,7 +44,7 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
  * but whitespace no longer passes: it carries no name, and the name is what
  * every list, search and accessible label shows.
  *
- * Cards only. Space, Layout and Graph titles keep their plain single-line
+ * Cards only. Space, Diagram and Graph titles keep their plain single-line
  * field: they are labels in lists with no front to draw a ladder on, and giving
  * all four the capability because they share a field type would be the model
  * following the implementation (ADR 0083).
@@ -91,7 +91,7 @@ export const spaceCardFrontmatterSchema = z.object({
   title: cardTitleSchema,
   kind: z.literal('space'),
   spaceId: idSchema,
-  layout: uuidSchema.optional(),
+  diagram: uuidSchema.optional(),
   graph: idSchema.optional(),
 });
 
@@ -159,7 +159,7 @@ export const cardSchema = z.discriminatedUnion('kind', [
  * 0032). This is the element an author draws, and the graph is the set of them.
  *
  * Shape only, as everywhere in this file. Whether both ids name real cards,
- * whether they name cards of the layout that owns this graph, and whether an
+ * whether they name cards of the diagram that owns this graph, and whether an
  * exact edge occurs more than once need the whole Graph/Space in view and are
  * checked in `@project/graph`.
  */
@@ -175,8 +175,8 @@ export const graphSchema = z.object({
   color: z.string().min(1).optional(),
   /**
    * Possibly none. A graph *is* its edges, but it is no longer minted by
-   * drawing one: creating a layout creates its initial empty active graph in
-   * the same edit (ADR 0040), and Add Layout produces exactly that — one fresh
+   * drawing one: creating a diagram creates its initial empty active graph in
+   * the same edit (ADR 0040), and Add Diagram produces exactly that — one fresh
    * graph holding no edges (ADR 0079). Deleting a graph's last edge leaves the
    * same shape, and graph management may not delete the graph itself to avoid
    * it. The superseded rule read ADR 0033's connect gesture as the only way a
@@ -188,8 +188,8 @@ export const graphSchema = z.object({
   edges: z.array(graphEdgeSchema),
 });
 
-/** Where a positioned layout puts a card, in the layout's own coordinate space. */
-export const layoutPositionSchema = z.object({
+/** Where a positioned diagram puts a card, in the diagram's own coordinate space. */
+export const diagramPositionSchema = z.object({
   x: z.number(),
   y: z.number(),
 });
@@ -199,52 +199,52 @@ const openSizeSchema = z.object({
   height: z.number().min(COLLAPSED_CARD_SIZE.height),
 });
 
-/** What a Layout stores for one Card: its origin, Open/Closed state and remembered Open Size. */
+/** What a Diagram stores for one Card: its origin, Open/Closed state and remembered Open Size. */
 export const cardPlacementSchema = z.discriminatedUnion('open', [
-  layoutPositionSchema.extend({ open: z.literal(true), openSize: openSizeSchema }),
-  layoutPositionSchema.extend({ open: z.literal(false), openSize: openSizeSchema.optional() }),
+  diagramPositionSchema.extend({ open: z.literal(true), openSize: openSizeSchema }),
+  diagramPositionSchema.extend({ open: z.literal(false), openSize: openSizeSchema.optional() }),
 ]);
 
 /**
- * A layout the author wrote: a card-to-position map and the graphs over it
+ * A diagram the author wrote: a card-to-position map and the graphs over it
  * (ADR 0025, ADR 0040).
  *
  * Its position keys **are** its card membership. A card the map omits is not in
- * this layout — and a position may not name a card the space does not hold;
+ * this diagram — and a position may not name a card the space does not hold;
  * that is a reference error, checked in `@project/graph` where the whole space
  * is in view.
  *
  * The graphs are **owned**, not referenced: they are nested values of the one
- * layout that holds them, ordered, and never shared with a second (ADR 0040).
- * Every edge endpoint of an owned graph names a card in this layout, which
- * again needs the whole space in view. Ownership is layout-scoped while a graph
+ * diagram that holds them, ordered, and never shared with a second (ADR 0040).
+ * Every edge endpoint of an owned graph names a card in this diagram, which
+ * again needs the whole space in view. Ownership is diagram-scoped while a graph
  * id is unique across the *space* (ADR 0045), because the flatten a
  * space-subject view draws keys colour, handles and activation on the id alone.
  *
  * **Strict**, as the space file itself is. Under the version 2 shape this
- * key held a filter — an array of graph ids naming the graphs the layout drew.
+ * key held a filter — an array of graph ids naming the graphs the diagram drew.
  * Reading one of those as an owned collection would be a type error, but a
- * *stripped* one would read a file that said "draw only these" as a layout with
+ * *stripped* one would read a file that said "draw only these" as a diagram with
  * no graphs at all. Rejecting says so instead.
  */
-export const positionedLayoutSchema = z
+export const positionedDiagramSchema = z
   .object({
     id: idSchema,
     title: z.string().min(1),
     kind: z.literal('positioned'),
     positions: z.record(idSchema, cardPlacementSchema),
     /**
-     * The graphs this layout owns, in author order. **At least one**: creating a
-     * layout creates its initial graph in the same edit, and graph management
-     * cannot delete the last (ADR 0040), so a layout with none is a state no
+     * The graphs this diagram owns, in author order. **At least one**: creating a
+     * diagram creates its initial graph in the same edit, and graph management
+     * cannot delete the last (ADR 0040), so a diagram with none is a state no
      * gesture produces.
      */
     graphs: z.array(graphSchema).min(1),
     /**
-     * Which graph is active when this layout opens. Absent, the **first graph**
+     * Which graph is active when this diagram opens. Absent, the **first graph**
      * is (ADR 0026) — resolved on read, so a hand-authored space needs nothing
      * here, while a file the app wrote names it outright rather than depending
-     * on graph order (ADR 0028). That it names a graph *this layout* owns needs
+     * on graph order (ADR 0028). That it names a graph *this diagram* owns needs
      * the whole space in view and is checked in `@project/graph`.
      */
     activeGraph: idSchema.optional(),
@@ -252,14 +252,14 @@ export const positionedLayoutSchema = z
   .strict();
 
 /**
- * A layout carried by the space file, discriminated by `kind`. Every Layout is
+ * A diagram carried by the space file, discriminated by `kind`. Every Diagram is
  * authored: an automatic strategy computes placement from the cards and graphs
  * alone, so it has nothing to write down and appears here nowhere (ADR 0025).
  * There is one kind today; the union is what makes a second one cost no
  * migration.
  *
  * `kind` defaults to `'positioned'` when absent, the same shape `cardSchema`
- * uses — here it is for hand-authoring rather than back-compat, so a layout can
+ * uses — here it is for hand-authoring rather than back-compat, so a diagram can
  * be written as just an id, a title, and its positions.
  */
 const defaultPositionedKind = (value: unknown): unknown =>
@@ -267,16 +267,16 @@ const defaultPositionedKind = (value: unknown): unknown =>
     ? { ...value, kind: 'positioned' }
     : value;
 
-export const layoutSchema = z.preprocess(
+export const diagramSchema = z.preprocess(
   defaultPositionedKind,
-  z.discriminatedUnion('kind', [positionedLayoutSchema]),
+  z.discriminatedUnion('kind', [positionedDiagramSchema]),
 );
 
 /**
  * The **first-public** space document version.
  *
  * Version 2 was the disposable pre-release shape, which carried a space-level
- * `graphs` array beside layouts that owned none. Hyper is unreleased, so it has
+ * `graphs` array beside diagrams that owned none. Hyper is unreleased, so it has
  * no compatibility claim on this one and is rejected rather than migrated (ADR
  * 0040). A named constant rather than a literal inlined in one schema, because
  * `documentRefusal` in `@project/graph` reads the declared version
@@ -298,11 +298,11 @@ export const SPACE_FILE_VERSION = 1;
  * because a card exists by virtue of its file existing. `loadSpace` takes the
  * card files alongside this.
  *
- * **Strict**, for the reason `positionedLayoutSchema` is. A stripped key is a
+ * **Strict**, for the reason `positionedDiagramSchema` is. A stripped key is a
  * question answered silently: a top-level `cards` or `edges` array (ADR 0020,
  * ADR 0007) half-describes a space nothing loads from, and a file still
  * spelling the opening selection the way ADR 0079 renamed it reaches
- * `workingSpace`, which adopts `layouts[0]` and commits it — the Layout its
+ * `workingSpace`, which adopts `diagrams[0]` and commits it — the Diagram its
  * author named replaced by one they did not, and then persisted. Rejecting
  * says so instead.
  *
@@ -326,14 +326,14 @@ const spaceFileObjectSchema = z.strictObject({
   id: idSchema,
   title: z.string().min(1),
   /**
-   * Optional, and it is what holds the space's graphs — a layout owns them
+   * Optional, and it is what holds the space's graphs — a diagram owns them
    * (ADR 0040), so there is no space-level collection to declare beside it. A
-   * space with no layouts therefore has no structure yet, which is what a new
+   * space with no diagrams therefore has no structure yet, which is what a new
    * space *is*: it renders and it cannot be presented (ADR 0015).
    */
-  layouts: z.array(layoutSchema).optional(),
-  /** The durable opening selection, naming one declared Layout. */
-  defaultLayout: uuidSchema.optional(),
+  diagrams: z.array(diagramSchema).optional(),
+  /** The durable opening selection, naming one declared Diagram. */
+  defaultDiagram: uuidSchema.optional(),
 });
 
 export const spaceFileSchema = spaceFileObjectSchema;
@@ -360,22 +360,22 @@ export const spaceSnapshotSchema = z.object({
 
 export const importGraphSchema = graphSchema.extend({ id: uuidSchema.optional() });
 /**
- * A layout being imported, with the ids the importer mints left out — its own
+ * A diagram being imported, with the ids the importer mints left out — its own
  * and those of the graphs it owns. Ownership is not relaxed: an owned graph
  * still arrives nested, and there is still at least one.
  */
-const importPositionedLayoutSchema = positionedLayoutSchema.extend({
+const importPositionedDiagramSchema = positionedDiagramSchema.extend({
   id: uuidSchema.optional(),
   graphs: z.array(importGraphSchema).min(1),
 });
-const importLayoutSchema = z.preprocess(
+const importDiagramSchema = z.preprocess(
   defaultPositionedKind,
-  z.discriminatedUnion('kind', [importPositionedLayoutSchema]),
+  z.discriminatedUnion('kind', [importPositionedDiagramSchema]),
 );
 
 const importSpaceFileObjectSchema = spaceFileObjectSchema.extend({
   id: uuidSchema.optional(),
-  layouts: z.array(importLayoutSchema).optional(),
+  diagrams: z.array(importDiagramSchema).optional(),
 });
 
 export const importSpaceFileSchema = importSpaceFileObjectSchema;

@@ -6,14 +6,14 @@
  *   Space   frame        a bounded region you go into
  *   Card    sticky-note  a note, not a filed document
  *   Graph   route        a path from a start pin to an end pin
- *   Layout  layout-grid  placements on a plane
+ *   Diagram  layout-grid  placements on a plane
  *   Alias   a corner badge on whichever of those it is an Alias of
  *
  * The four replace `SquareSquare`, `FileText`, `Network` and `PanelsTopLeft`.
  * Two of those described something the product is not: `Network` is a
  * hierarchy — one node over two under a bracket — where a Graph is a curated
  * directed traversal with branches and joins; `PanelsTopLeft` is a web page
- * chrome where a Layout is authored placement on a plane (ADR 0014 — placement
+ * chrome where a Diagram is authored placement on a plane (ADR 0014 — placement
  * is authored, not computed).
  *
  * **An Alias is not a fifth glyph, and that is the load-bearing decision.** A
@@ -42,7 +42,7 @@
  * renamed because `anti-slop/no-shape-in-symbol-names` reads an object key as a
  * symbol name.
  *
- * **This is now built.** `LayoutIcon`, `GraphIcon`, `MarkdownIcon` and
+ * **This is now built.** `DiagramIcon`, `GraphIcon`, `MarkdownIcon` and
  * `SpaceCardIcon` draw these glyphs, and `AliasIcon` composes the badge over a
  * base rather than being a glyph of its own; `CardKindIcon` takes `aliasOf` and
  * composes rather than switching on a table. What is *not* built is the
@@ -649,17 +649,17 @@ const SPACE: readonly Candidate[] = [
   { name: 'files', note: 'A stack of sheets. Same family as Markdown, at the cost of "a place".' },
   {
     name: 'sticky-notes',
-    note: 'Notes plural. Pairs with a notepad Markdown glyph and says "the Cards in here" without borrowing Layout or Graph.',
+    note: 'Notes plural. Pairs with a notepad Markdown glyph and says "the Cards in here" without borrowing Diagram or Graph.',
   },
   { name: 'file-stack', note: 'The same claim, filed rather than pinned. Heavier at 14px.' },
-  { name: 'box', note: 'A container with contents. No collision with Layout or Graph.' },
+  { name: 'box', note: 'A container with contents. No collision with Diagram or Graph.' },
   { name: 'boxes', note: 'Many contained things. Busier; blurs at 14px.' },
   { name: 'square-stack', note: 'Cards stacked in one place. Close to a duplicate mark.' },
   { name: 'layers', note: 'Depth. Reads as z-order, which a Space is not.' },
   { name: 'door-open', note: 'You go in. The one glyph that draws the verb.' },
   { name: 'map', note: 'A territory you navigate. Strong, and a different vocabulary.' },
   { name: 'orbit', note: 'Things around a centre. Pretty; says little.' },
-  { name: 'frame', note: 'A canvas. Collides with PanelsTopLeft — reads as a Layout.' },
+  { name: 'frame', note: 'A canvas. Collides with PanelsTopLeft — reads as a Diagram.' },
 ];
 
 /**
@@ -743,15 +743,15 @@ const ALIAS_OPTIONS: readonly AliasOption[] = [
 ];
 
 /**
- * Graph and Layout are no longer fixed points.
+ * Graph and Diagram are no longer fixed points.
  *
  * They were the two constraints the Card kinds had to dodge, and both are now
  * themselves in question — which loosens the Card columns as much as it opens
  * these two. `Network` is a hierarchy: one box on top, two below, joined by a
  * bracket. That is a **tree**, and a Graph here is a curated directed traversal
- * with branches and joins, over Cards a Layout has already placed.
+ * with branches and joins, over Cards a Diagram has already placed.
  * `PanelsTopLeft` is a web page: header, sidebar, content. That is a **document
- * chrome**, and a Layout here is authored placement on a plane (ADR 0014 —
+ * chrome**, and a Diagram here is authored placement on a plane (ADR 0014 —
  * placement is authored, not computed).
  */
 const GRAPH: readonly Candidate[] = [
@@ -776,11 +776,11 @@ const GRAPH: readonly Candidate[] = [
   { name: 'milestone', note: 'A signpost. Direction without structure.' },
 ];
 
-const LAYOUT: readonly Candidate[] = [
+const DIAGRAM: readonly Candidate[] = [
   { name: 'panels-top-left', note: 'In the tree. Header, sidebar, content — a web page.' },
   {
     name: 'group',
-    note: 'Selection corners around two placed rectangles. "These Cards, positioned together" is what a Layout owns.',
+    note: 'Selection corners around two placed rectangles. "These Cards, positioned together" is what a Diagram owns.',
   },
   {
     name: 'triangle-square-circle',
@@ -830,8 +830,8 @@ const SPENT: readonly {
   },
   {
     name: 'panels-top-left',
-    icon: 'LayoutIcon',
-    means: 'a Layout',
+    icon: 'DiagramIcon',
+    means: 'a Diagram',
     rulesOut: 'any board-shaped Space — frame, layout-dashboard, panel-top',
   },
   {
@@ -853,7 +853,7 @@ const SPENT: readonly {
     means: 'Stop presenting',
     rulesOut: 'a bare-rectangle Space — half of why square-square fails',
   },
-  { name: 'plus', icon: 'PlusIcon', means: 'Create Card, New Layout, New Graph', rulesOut: '—' },
+  { name: 'plus', icon: 'PlusIcon', means: 'Create Card, New Diagram, New Graph', rulesOut: '—' },
   { name: 'trash-2', icon: 'DeleteIcon', means: 'Delete', rulesOut: '—' },
   { name: 'pencil', icon: 'EditIcon', means: 'Edit a Card', rulesOut: '—' },
   { name: 'maximize-2', icon: 'OpenCardIcon', means: 'Open a Card', rulesOut: 'square-arrow-out' },
@@ -866,7 +866,7 @@ const SPENT: readonly {
 /**
  * The four icons the chrome actually spends on entities, drawn together.
  *
- * Four and not three: Graph and Layout stopped being fixed constraints once
+ * Four and not three: Graph and Diagram stopped being fixed constraints once
  * `Network` was read as a tree and `PanelsTopLeft` as a web page, so the whole
  * entity vocabulary is one choice. The Alias is not a fifth entry — it is the
  * Card entry with a decoration, which is the point.
@@ -877,7 +877,7 @@ interface EntitySet {
   readonly space: GlyphName;
   readonly card: GlyphName;
   readonly graph: GlyphName;
-  readonly layout: GlyphName;
+  readonly diagram: GlyphName;
 }
 
 const ENTITY_SETS: readonly EntitySet[] = [
@@ -888,7 +888,7 @@ const ENTITY_SETS: readonly EntitySet[] = [
     space: 'frame',
     card: 'sticky-note',
     graph: 'route',
-    layout: 'layout-grid',
+    diagram: 'layout-grid',
   },
   {
     title: 'In the tree',
@@ -897,7 +897,7 @@ const ENTITY_SETS: readonly EntitySet[] = [
     space: 'square-square',
     card: 'file-text',
     graph: 'network',
-    layout: 'panels-top-left',
+    diagram: 'panels-top-left',
   },
 ];
 
@@ -911,7 +911,7 @@ const ENTITY_ROWS = [
   { kind: 'space', label: 'Space', example: 'Rendering' },
   { kind: 'card', label: 'Card', example: 'Why authored placement beats a layout engine' },
   { kind: 'graph', label: 'Graph', example: 'Long' },
-  { kind: 'layout', label: 'Layout', example: 'Collection 1' },
+  { kind: 'diagram', label: 'Diagram', example: 'Collection 1' },
   { kind: 'card', label: 'Alias', example: 'Strategy overview', alias: true },
   { kind: 'space', label: 'Alias', example: 'Rendering overview', alias: true },
 ] as const satisfies readonly {
@@ -1067,7 +1067,7 @@ export const Default: Story = () => (
       <CandidateColumn heading="Card — shortlisted: sticky-note" candidates={MARKDOWN} />
       <CandidateColumn heading="Space — shortlisted: frame" candidates={SPACE} />
       <CandidateColumn heading="Graph — shortlisted: route" candidates={GRAPH} />
-      <CandidateColumn heading="Layout — shortlisted: layout-grid" candidates={LAYOUT} />
+      <CandidateColumn heading="Diagram — shortlisted: layout-grid" candidates={DIAGRAM} />
     </div>
 
     <section className="icons__collisions">

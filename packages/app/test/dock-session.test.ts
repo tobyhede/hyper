@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Layout, LayoutId, SpaceSnapshot } from '@project/core';
+import type { Diagram, DiagramId, SpaceSnapshot } from '@project/core';
 import { newUuid } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
-  editSelectedLayout,
+  editSelectedDiagram,
   exitSpace,
   openTree,
   opened,
@@ -11,7 +11,7 @@ import {
   type SessionState,
 } from '../src/dock-model';
 
-const layout = (id: string, title: string): Layout => ({
+const diagram = (id: string, title: string): Diagram => ({
   id: newUuid(),
   title,
   kind: 'positioned',
@@ -19,52 +19,52 @@ const layout = (id: string, title: string): Layout => ({
   graphs: [{ id: newUuid(), title: `${id} graph`, edges: [] }],
 });
 
-const first = layout('a', 'Collection 1');
-const second = layout('b', 'Collection 2');
+const first = diagram('a', 'Collection 1');
+const second = diagram('b', 'Collection 2');
 
 const snapshot: SpaceSnapshot = {
   id: newUuid(),
-  document: { version: 1, title: 'Rendering', layouts: [first, second], defaultLayout: first.id },
+  document: { version: 1, title: 'Rendering', diagrams: [first, second], defaultDiagram: first.id },
   cards: [],
 };
 
-const entryOn = (layoutId: LayoutId): OpenEntry => ({
+const entryOn = (diagramId: DiagramId): OpenEntry => ({
   snapshot,
   from: null,
-  layoutId,
+  diagramId,
   graphId: null,
   persistence: { kind: 'settled' },
 });
 
 const titles = (next: OpenEntry): readonly string[] =>
-  (next.snapshot.document.layouts ?? []).map((each) => each.title);
+  (next.snapshot.document.diagrams ?? []).map((each) => each.title);
 
 /**
- * Which Layout an Edit lands on.
+ * Which Diagram an Edit lands on.
  *
  * **It has to be the one the entry being written selects**, and the entry is
  * the only place that can answer. The hook resolved it from a `selectedId`
  * captured during render and then spent it inside a functional state updater
  * that had correctly gone and fetched the *live* entry — so the target and the
  * thing being targeted came from two different moments. A gesture that selected
- * a Layout and edited it in one tick wrote into the Layout that had been
+ * a Diagram and edited it in one tick wrote into the Diagram that had been
  * selected before it.
  *
  * That is the same stale-closure class the drag gesture had, and the same
  * answer: take the state being written as an argument rather than closing over
  * a rendered copy of it. This test is what says the target follows the entry —
- * two entries differing in nothing but `layoutId`, one Edit, two different
- * Layouts changed.
+ * two entries differing in nothing but `diagramId`, one Edit, two different
+ * Diagrams changed.
  */
-describe('an Edit on the selected Layout', () => {
-  it('lands on the Layout the entry selects, not one captured elsewhere', () => {
-    const rename = (each: Layout): Layout => ({ ...each, title: 'Renamed' });
+describe('an Edit on the selected Diagram', () => {
+  it('lands on the Diagram the entry selects, not one captured elsewhere', () => {
+    const rename = (each: Diagram): Diagram => ({ ...each, title: 'Renamed' });
 
-    expect(titles(editSelectedLayout(entryOn(first.id), rename))).toEqual([
+    expect(titles(editSelectedDiagram(entryOn(first.id), rename))).toEqual([
       'Renamed',
       'Collection 2',
     ]);
-    expect(titles(editSelectedLayout(entryOn(second.id), rename))).toEqual([
+    expect(titles(editSelectedDiagram(entryOn(second.id), rename))).toEqual([
       'Collection 1',
       'Renamed',
     ]);
@@ -74,32 +74,32 @@ describe('an Edit on the selected Layout', () => {
 /**
  * Where a Space opens, when the document does not say.
  *
- * `defaultLayout` is `uuidSchema.optional()` (ADR 0079 makes it the durable
- * opening selection, and a stored layoutless Space has none until first working
- * load initializes one). So the entry's selection is a Layout id **or nothing**,
+ * `defaultDiagram` is `uuidSchema.optional()` (ADR 0079 makes it the durable
+ * opening selection, and a stored diagramless Space has none until first working
+ * load initializes one). So the entry's selection is a Diagram id **or nothing**,
  * and the absent case has to be spelled as nothing.
  *
- * It was spelled `String(snapshot.document.defaultLayout)`, which for a
- * layoutless Space is the five-letter string `"undefined"` — an id no Layout can
+ * It was spelled `String(snapshot.document.defaultDiagram)`, which for a
+ * diagramless Space is the five-letter string `"undefined"` — an id no Diagram can
  * ever carry, sitting in the field the whole surface reads to decide what is
- * drawing. Every fixture this prototype ships declares a `defaultLayout`, so the
- * fallback to the first Layout hid it; the moment a Space arrives without one
- * the entry claims a selection it does not have, and `editSelectedLayout` is
- * asked to find a Layout by a name nothing answers to.
+ * drawing. Every fixture this prototype ships declares a `defaultDiagram`, so the
+ * fallback to the first Diagram hid it; the moment a Space arrives without one
+ * the entry claims a selection it does not have, and `editSelectedDiagram` is
+ * asked to find a Diagram by a name nothing answers to.
  */
 describe('opening a Space', () => {
-  it('opens a layoutless Space on no Layout at all', () => {
-    const layoutless: SpaceSnapshot = {
+  it('opens a diagramless Space on no Diagram at all', () => {
+    const diagramless: SpaceSnapshot = {
       id: newUuid(),
       document: { version: 1, title: 'Nothing authored yet' },
       cards: [],
     };
 
-    expect(opened(layoutless, null).layoutId).toBeNull();
+    expect(opened(diagramless, null).diagramId).toBeNull();
   });
 
-  it('opens a Space the document places on the Layout it names', () => {
-    expect(opened(snapshot, null).layoutId).toBe(first.id);
+  it('opens a Space the document places on the Diagram it names', () => {
+    expect(opened(snapshot, null).diagramId).toBe(first.id);
   });
 });
 

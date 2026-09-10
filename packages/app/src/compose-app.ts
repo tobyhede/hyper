@@ -1,19 +1,19 @@
-import { newUuid, type LayoutId, type SpaceSnapshot, type UUID } from '@project/core';
-import { Placement, type ResolvedLayout, type Space } from '@project/graph';
+import { newUuid, type DiagramId, type SpaceSnapshot, type UUID } from '@project/core';
+import { Placement, type ResolvedDiagram, type Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
 import { createContinuation, type Continuation } from './continuation';
 import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
 import { createNavigation, type Navigation } from './navigation';
 import { createRenderAdapter, type RenderAdapter } from './render-adapter';
-import { requireDefaultLayout, resolveLayout } from './layout-resolution';
+import { requireDefaultDiagram, resolveDiagram } from './diagram-resolution';
 import { createWorkingSpaceReader } from './snapshot';
 import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
 
 /**
  * What an opened Space is composed of.
  *
- * The order below is not free — the opening Layout resolves before Navigation
+ * The order below is not free — the opening Diagram resolves before Navigation
  * and before the opening placement, Authoring before the render adapter, and
  * both before Edge Authoring — and every collaborator closes over
  * **one** {@link createWorkingSpaceReader}, which is what gives them a single
@@ -41,17 +41,17 @@ export interface ComposeCoreDependencies {
    * stored snapshot and the session then `structuredClone`s
    * it, so the Space a caller holds at open and the session's `working` are
    * equal values with different identities; taking both is how production came
-   * to resolve its opening Layout against one and everything after it against
+   * to resolve its opening Diagram against one and everything after it against
    * the other.
    */
   readonly spaceSession: SpaceSession;
-  /** Which Layout the Space opens in; the Space's own default when absent. */
-  readonly selection?: LayoutId | undefined;
+  /** Which Diagram the Space opens in; the Space's own default when absent. */
+  readonly selection?: DiagramId | undefined;
 }
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
   /**
-   * Mints the identity of every Card, Layout and Graph a completed Edit creates
+   * Mints the identity of every Card, Diagram and Graph a completed Edit creates
    * (ADR 0016).
    *
    * Passed explicitly so `createSpaceAuthoring` cannot fall back to its own and
@@ -61,7 +61,7 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
   /**
    * The placement the Space opens on.
    *
-   * Absent, the opening Layout supplies its already-authored, possibly sparse
+   * Absent, the opening Diagram supplies its already-authored, possibly sparse
    * map. An explicit `null` says "none", which is not the same statement.
    */
   readonly initialPlacement?: Placement | null | undefined;
@@ -108,13 +108,13 @@ export interface AppCore {
   readonly currentSpace: () => Space;
   readonly navigation: Navigation;
   /**
-   * The Layout this composition opened in.
+   * The Diagram this composition opened in.
    *
    * Answered rather than read back off Navigation: it is what `composeCore`
    * decided, and recovering it through `navigation.getState()` makes the
    * decision look like Navigation's when it is this module's.
    */
-  readonly openingSelection: LayoutId;
+  readonly openingSelection: DiagramId;
 }
 
 export interface ComposedApp extends AppCore {
@@ -145,14 +145,14 @@ export interface ComposedApp extends AppCore {
 }
 
 /**
- * The placement a resolved Layout opens on (ADR 0025).
+ * The placement a resolved Diagram opens on (ADR 0025).
  *
- * Exported because selecting a Layout asks the same question again
+ * Exported because selecting a Diagram asks the same question again
  * (`App.tsx`), and a Space that opens on one placement while re-selecting the
- * same Layout installs another is two sources of truth for one rule.
+ * same Diagram installs another is two sources of truth for one rule.
  */
-export const openingPlacement = (resolved: ResolvedLayout): Placement | null =>
-  Placement.fromLayout(resolved.layout);
+export const openingPlacement = (resolved: ResolvedDiagram): Placement | null =>
+  Placement.fromDiagram(resolved.diagram);
 
 /**
  * Navigation and everything it needs, over one working-space reader.
@@ -167,10 +167,10 @@ export function composeCore({ spaceSession, selection }: ComposeCoreDependencies
   // is parsed and indexed once rather than once per render.
   const readWorkingSpace = createWorkingSpaceReader();
   const currentSpace = (): Space => readWorkingSpace(spaceSession.getState().working);
-  // Which Layout this space opens in. It also answers which Graphs are drawn
+  // Which Diagram this space opens in. It also answers which Graphs are drawn
   // and which of them opens active (ADR 0026), so it has to resolve before
   // anything that reads the canvas is built.
-  const openingSelection = selection ?? requireDefaultLayout(currentSpace());
+  const openingSelection = selection ?? requireDefaultDiagram(currentSpace());
   const navigation = createNavigation(currentSpace, openingSelection);
   return { readWorkingSpace, currentSpace, navigation, openingSelection };
 }
@@ -187,11 +187,11 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   const core = composeCore(dependencies);
   const { currentSpace, navigation, openingSelection } = core;
   // Live nodes hold whichever positions are on screen. Absent an argument, the
-  // Layout the composition opened in answers what they start as; an explicit
+  // Diagram the composition opened in answers what they start as; an explicit
   // one — `null` included — is the caller's own statement and stands.
   const placement =
     initialPlacement === undefined
-      ? openingPlacement(resolveLayout(currentSpace(), openingSelection))
+      ? openingPlacement(resolveDiagram(currentSpace(), openingSelection))
       : initialPlacement;
   const authoring = createSpaceAuthoring({
     session: spaceSession,

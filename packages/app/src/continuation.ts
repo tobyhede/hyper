@@ -47,7 +47,7 @@ export type ContinuationTarget =
  * adapter resolves each of these against `data-continuation-control`.
  *
  * **There was a third kind here, `sidebar-row`, and it is gone with the surface
- * it named.** It existed because a Layout or Graph rename was one draft shared
+ * it named.** It existed because a Diagram or Graph rename was one draft shared
  * between a Sidebar row and the canvas header, begun from either and returning
  * the caret to whichever began it — so the return address had to survive the
  * row swapping its own branch mid-rename, and could only be an attribute query.
@@ -113,13 +113,13 @@ const NONE: ContinuationState = { pending: null };
  *
  * A canvas subject stays owed. A continuation is published synchronously with
  * the Edit that produced it, and the projection carrying that Edit's result
- * arrives a strategy later — so a Card just created, just added to the Layout
+ * arrives a strategy later — so a Card just created, just added to the Diagram
  * or an Edge just reconnected resolves to nothing *yet*, and spending it on
  * the canvas fallback lands focus anywhere but the thing the author made.
  * A chrome control and the canvas itself fall through: both are drawn already,
  * so unresolvable means gone, and a wait with no end is worse than a fallback.
  *
- * **Every card target waits**, not only `reveal` and `rename`. Add to Layout
+ * **Every card target waits**, not only `reveal` and `rename`. Add to Diagram
  * is a `focus` whose target arrives a projection later exactly as a creation
  * does — it is why the mechanism this replaces polled the live projection —
  * and keying the wait on `then` would drop it. The two card targets that name
@@ -147,10 +147,10 @@ export function createContinuation({
   // Invalidated on two facts and deliberately not on four. A replacement
   // discards every open Interaction draft (ADR 0042), and presenting draws over
   // the surfaces a continuation would land on — spending onto a chrome control
-  // underneath a live presentation is wrong. **Not** the selected Layout and
+  // underneath a live presentation is wrong. **Not** the selected Diagram and
   // **not** the Active Graph, which the chrome title draft invalidates on:
   // over-invalidating silently loses a legitimate continuation, and a target in
-  // a Layout no longer drawn simply fails to resolve, which the wait policy
+  // a Diagram no longer drawn simply fails to resolve, which the wait policy
   // above already answers.
   let replacementEpoch = authoring.getState().replacementEpoch;
   let presenting = authoring.getState().navigation.mode === 'presenting';

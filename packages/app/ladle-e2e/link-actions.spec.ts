@@ -26,20 +26,20 @@ import { expect, test } from '@playwright/test';
  * decisions rather than one.
  *
  * The address is the Space's **own**, and that is a departure rather than the
- * rule: a second address does exist — the drawing Layout's, which is what
+ * rule: a second address does exist — the drawing Diagram's, which is what
  * reproduces the screen and what the Graph cluster copies. The Space menu
  * deliberately does not offer it, because copying it would stop the Space's link
  * meaning the Space. Which of the two a Space title means is a product decision
  * `.scratch/link-ux` has not taken, so this holds the behaviour that stands
  * rather than a claim that no second address is possible.
  *
- * And no rename either. `space-authoring.ts` has `renamed-layout` and
+ * And no rename either. `space-authoring.ts` has `renamed-diagram` and
  * `renamed-graph` and nothing for a Space, so the Dock draws the name as a
  * label — not a disabled control, which would advertise a command nobody can
- * run. The Layout beside it is a rename control, which is what makes the
+ * run. The Diagram beside it is a rename control, which is what makes the
  * difference visible in one story.
  */
-test('the Space name is a label with one address, beside a Layout that renames', async ({
+test('the Space name is a label with one address, beside a Diagram that renames', async ({
   page,
 }) => {
   await page.goto('/?story=space--command-dock--default&mode=preview');
@@ -48,7 +48,7 @@ test('the Space name is a label with one address, beside a Layout that renames',
   await expect(title).toContainText('Rendering');
   await expect(title).not.toHaveJSProperty('tagName', 'BUTTON');
   await expect(page.getByRole('button', { name: /^Rename Space/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Rename Layout: Collection 1' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rename Diagram: Collection 1' })).toBeVisible();
 
   // `delay` is the whole reason this test is in a browser: a default Playwright
   // click puts mousedown and mouseup in the same tick, and the dismissal that
@@ -96,7 +96,9 @@ test('a Card rail opens its actions menu from the link control', async ({ page }
   const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
   await menu.getByRole('menuitem', { name: /^Copy link/ }).click();
-  await expect(page.getByText(/Copied → .*\/views\/AAAAAAAAQACAAAAAAAAAIA\/cards\//)).toBeVisible();
+  await expect(
+    page.getByText(/Copied → .*\/diagrams\/AAAAAAAAQACAAAAAAAAAIA\/cards\//),
+  ).toBeVisible();
 });
 
 test('a Card opens the same actions menu from a right click', async ({ page }) => {

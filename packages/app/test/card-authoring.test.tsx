@@ -24,22 +24,22 @@ import { openTestSpace } from './opened-space';
 import {
   createCard,
   createCardControl,
-  deleteLayoutItem,
+  deleteDiagramItem,
   newGraphItem,
-  newLayoutItem,
-  openLayoutMenu,
+  newDiagramItem,
+  openDiagramMenu,
   presentControl,
   unavailable,
 } from './command-dock';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 
 /** Replace CodeMirror source through its public editable surface. */
@@ -52,7 +52,7 @@ const replaceMarkdownSource = (value: string): HTMLElement => {
 };
 
 /**
- * Two Cards on one Graph the Layout owns, so the graph opens on a Positioned
+ * Two Cards on one Graph the Diagram owns, so the graph opens on a Positioned
  * canvas with a placement already installed and presenting has a traversal to
  * run.
  */
@@ -61,10 +61,10 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: {
           [CARD_ID]: { x: 10, y: 20, open: false },
@@ -73,7 +73,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
@@ -94,11 +94,11 @@ const twiceAliased: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
     ...snapshot.document,
-    layouts: [
+    diagrams: [
       {
-        ...snapshot.document.layouts![0],
+        ...snapshot.document.diagrams![0],
         positions: {
-          ...snapshot.document.layouts![0]!.positions,
+          ...snapshot.document.diagrams![0]!.positions,
           [ALIAS_ID]: { x: 600, y: 20, open: false },
           [SECOND_ALIAS_ID]: { x: 900, y: 20, open: false },
         },
@@ -113,18 +113,18 @@ const twiceAliased: SpaceSnapshot = spaceSnapshotSchema.parse({
 });
 
 /**
- * The same Space with a second Layout, so a location can name a Layout the
+ * The same Space with a second Diagram, so a location can name a Diagram the
  * Space does not open on by default.
  */
-const secondLayout: SpaceSnapshot = spaceSnapshotSchema.parse({
+const secondDiagram: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
     ...snapshot.document,
-    layouts: [
-      ...snapshot.document.layouts!,
+    diagrams: [
+      ...snapshot.document.diagrams!,
       {
-        id: OTHER_LAYOUT_ID,
-        title: 'Other Layout',
+        id: OTHER_DIAGRAM_ID,
+        title: 'Other Diagram',
         kind: 'positioned',
         positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
@@ -223,7 +223,7 @@ describe('authoring a Card title on the graph', () => {
   /**
    * A refused title draft has nowhere to go but the editor still holding it.
    *
-   * Add Layout selects the empty Layout it creates, so the canvas re-derives
+   * Add Diagram selects the empty Diagram it creates, so the canvas re-derives
    * with no nodes at all and the edited Card unmounts — taking the draft text,
    * the announced reason and the caret with it, with neither of the Title's own
    * exits spent. A *valid* draft is safe without this gate, because the
@@ -232,17 +232,17 @@ describe('authoring a Card title on the graph', () => {
    */
   it('withdraws chrome authoring while a Card title editor holds a refused draft', async () => {
     const session = mount();
-    // **New Layout is the control, and Create Card is deliberately not.** The
-    // two read different terms and the difference is the claim: `createLayout`
-    // is `addCard && !editingCardTitle`, because creating a Layout *selects* it
+    // **New Diagram is the control, and Create Card is deliberately not.** The
+    // two read different terms and the difference is the claim: `createDiagram`
+    // is `addCard && !editingCardTitle`, because creating a Diagram *selects* it
     // and the canvas re-derives with no nodes at all — a Card holding a live
     // draft unmounts. Creating a Card re-derives nothing under the editor, so
-    // it stays available, which is why the assertion below is on New Layout
+    // it stays available, which is why the assertion below is on New Diagram
     // even though it sits behind a disclosure.
     await screen.findByTestId('selected-canvas');
-    await waitFor(() => expect(unavailable(newLayoutItem('Layout'))).toBe(false));
+    await waitFor(() => expect(unavailable(newDiagramItem('Diagram'))).toBe(false));
 
-    // **The disclosure `newLayoutItem` opened is dismissed before the canvas is
+    // **The disclosure `newDiagramItem` opened is dismissed before the canvas is
     // pressed.** One open id under the whole row means a press landing while a
     // menu is open is an *outside* press, which Base UI spends on dismissing —
     // so the press below would reach the Card only by whatever jsdom happens to
@@ -258,12 +258,12 @@ describe('authoring a Card title on the graph', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
 
-    const newLayout = newLayoutItem('Layout');
-    expect(unavailable(newLayout)).toBe(true);
+    const newDiagram = newDiagramItem('Diagram');
+    expect(unavailable(newDiagram)).toBe(true);
 
     // And the draft survives the attempt, which is what the gate is for.
-    fireEvent.click(newLayout);
-    expect(session.getState().working.document.layouts).toHaveLength(1);
+    fireEvent.click(newDiagram);
+    expect(session.getState().working.document.diagrams).toHaveLength(1);
     expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveAttribute(
       'aria-invalid',
       'true',
@@ -273,20 +273,20 @@ describe('authoring a Card title on the graph', () => {
   });
 
   /**
-   * The Layout cluster's Delete reads *two* rules, and the ADR one is not the
+   * The Diagram cluster's Delete reads *two* rules, and the ADR one is not the
    * one under test.
    *
-   * `layouts.length <= 1` is the rule the row wears on its sleeve (ADR 0079),
-   * and a Space with two Layouts satisfies it — so what is left to prove is the
+   * `diagrams.length <= 1` is the rule the row wears on its sleeve (ADR 0079),
+   * and a Space with two Diagrams satisfies it — so what is left to prove is the
    * other one. Every entity Edit is withdrawn while a Card title editor holds a
-   * refused draft, exactly as New Layout above is, and a Delete drawn available
+   * refused draft, exactly as New Diagram above is, and a Delete drawn available
    * in that state is a destructive command that presses cleanly and does
    * nothing.
    */
-  it('withdraws Delete Layout while a Card title editor holds a refused draft', async () => {
-    const session = mount(secondLayout);
+  it('withdraws Delete Diagram while a Card title editor holds a refused draft', async () => {
+    const session = mount(secondDiagram);
     await screen.findByTestId('selected-canvas');
-    await waitFor(() => expect(unavailable(deleteLayoutItem('Layout'))).toBe(false));
+    await waitFor(() => expect(unavailable(deleteDiagramItem('Diagram'))).toBe(false));
     fireEvent.keyDown(document.body, { key: 'Escape' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
@@ -295,21 +295,21 @@ describe('authoring a Card title on the graph', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
 
-    const deleteLayout = deleteLayoutItem('Layout');
-    expect(unavailable(deleteLayout)).toBe(true);
+    const deleteDiagram = deleteDiagramItem('Diagram');
+    expect(unavailable(deleteDiagram)).toBe(true);
 
-    // And the Space still has both Layouts, which is what an unavailable
+    // And the Space still has both Diagrams, which is what an unavailable
     // destructive command is for.
-    fireEvent.click(deleteLayout);
-    expect(session.getState().working.document.layouts).toHaveLength(2);
+    fireEvent.click(deleteDiagram);
+    expect(session.getState().working.document.diagrams).toHaveLength(2);
     await settled(session);
   });
 
   /**
    * The Graph cluster's own lifecycle commands read the same withdrawal.
    *
-   * New Graph, Delete Graph and Recolour are entity Edits exactly as New Layout
-   * and Delete Layout are, and they went out un-gated: the rows pressed
+   * New Graph, Delete Graph and Recolour are entity Edits exactly as New Diagram
+   * and Delete Diagram are, and they went out un-gated: the rows pressed
    * cleanly, `authoring.complete` answered `refused`, and the answer was
    * discarded with nothing drawn anywhere. This asserts the gate; the refusal
    * the notice draws is the other half.
@@ -330,7 +330,7 @@ describe('authoring a Card title on the graph', () => {
     expect(unavailable(newGraph)).toBe(true);
 
     fireEvent.click(newGraph);
-    expect(session.getState().working.document.layouts?.[0]?.graphs).toHaveLength(1);
+    expect(session.getState().working.document.diagrams?.[0]?.graphs).toHaveLength(1);
     await settled(session);
   });
 
@@ -398,7 +398,7 @@ describe('authoring a Card title on the graph', () => {
  * place it now opens.
  *
  * Dropping a Graph's minimum Edge count made an empty Graph legal, and ADR 0040
- * made it *ordinary*: creating a Layout mints its one
+ * made it *ordinary*: creating a Diagram mints its one
  * Active Graph holds nothing, so this is the state the author is in immediately
  * after their first edit on the Flow view. `graphStartCard` has no answer for
  * such a Graph, so `present()` returns having changed nothing — and an enabled
@@ -408,12 +408,12 @@ describe('authoring a Card title on the graph', () => {
  * Neither half proves this on its own: the refusal is in Navigation and the
  * enablement is in `GraphSelector`, and what went wrong was that they disagreed.
  */
-describe('presenting from a Layout', () => {
-  it('offers Present on a Layout whose Active Graph holds an Edge', async () => {
+describe('presenting from a Diagram', () => {
+  it('offers Present on a Diagram whose Active Graph holds an Edge', async () => {
     // The other half of the same control, and the reason it is here: the test
     // above passes just as well against a Present that is disabled always, so
     // on its own it cannot tell "refuses an empty Graph" from "refuses
-    // everything". `snapshot`'s Layout owns one Graph with one Edge, which is
+    // everything". `snapshot`'s Diagram owns one Graph with one Edge, which is
     // the smallest presentable Space.
     const session = mount(snapshot);
 
@@ -429,24 +429,24 @@ describe('the browser location, from the surface', () => {
    *
    * Every rule about *what* a position deserves is `browser-location.test.ts`'s,
    * proved against a recording `HistoryApi` with no DOM. What only a mount can
-   * show is that the Layout row spends its choice on that module rather than on
+   * show is that the Diagram row spends its choice on that module rather than on
    * a browser of its own — so this asserts the write reached the seam, and
    * nothing about how the seam decided.
    */
-  it('spends a Layout choice on the injected History API', async () => {
-    const layoutView = `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}`;
-    const history = recordingHistory(layoutView);
-    const session = mount(secondLayout, history);
+  it('spends a Diagram choice on the injected History API', async () => {
+    const diagramView = `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}`;
+    const history = recordingHistory(diagramView);
+    const session = mount(secondDiagram, history);
     await screen.findByTestId('selected-canvas');
 
-    openLayoutMenu('Layout');
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Other Layout' }));
+    openDiagramMenu('Diagram');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Other Diagram' }));
 
     await waitFor(() =>
       expect(history.writes).toEqual([
         {
           method: 'push',
-          path: `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(OTHER_LAYOUT_ID)}`,
+          path: `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(OTHER_DIAGRAM_ID)}`,
         },
       ]),
     );
@@ -468,11 +468,11 @@ describe('authoring an opened Card', () => {
       ...snapshot,
       document: {
         ...snapshot.document,
-        layouts: [
+        diagrams: [
           {
-            ...snapshot.document.layouts![0],
+            ...snapshot.document.diagrams![0],
             positions: {
-              ...snapshot.document.layouts![0]!.positions,
+              ...snapshot.document.diagrams![0]!.positions,
               [ALIAS_ID]: { x: 600, y: 20, open: false },
             },
           },
@@ -612,21 +612,21 @@ describe('authoring an opened Card', () => {
   });
 
   /**
-   * The Layout's rename is withdrawn while a Card title editor owns the caret;
+   * The Diagram's rename is withdrawn while a Card title editor owns the caret;
    * its address is not.
    *
-   * Renaming a Layout is the very chrome title edit that condition withdraws.
+   * Renaming a Diagram is the very chrome title edit that condition withdraws.
    * Copying an address is not an edit at all — an address is a fact about the
-   * Layout rather than a change to it — so the menu stays and only the name
+   * Diagram rather than a change to it — so the menu stays and only the name
    * stops being a control.
    *
    * **The mechanism changed with the surface and the claim did not.** The
-   * Sidebar drew Rename as a row in the Layout's actions menu, so the withdrawal
-   * was a menu item going missing. The Dock renames a Layout by clicking the
+   * Sidebar drew Rename as a row in the Diagram's actions menu, so the withdrawal
+   * was a menu item going missing. The Dock renames a Diagram by clicking the
    * name it already draws, so the withdrawal is that name ceasing to be a
    * button — which is the same fact, said where the reader is looking.
    */
-  it('withdraws the Layout rename, but not its address, while a Card title editor is open', async () => {
+  it('withdraws the Diagram rename, but not its address, while a Card title editor is open', async () => {
     const session = mount();
     await settled(session);
 
@@ -636,7 +636,7 @@ describe('authoring an opened Card', () => {
     expect(await screen.findByRole('textbox', { name: 'Card title' })).toBeVisible();
 
     expect(screen.getByTestId('selected-canvas').tagName).not.toBe('BUTTON');
-    openLayoutMenu('Layout');
+    openDiagramMenu('Diagram');
     const menu = await screen.findByRole('menu');
     expect(within(menu).getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
     await settled(session);
@@ -717,8 +717,8 @@ describe('authoring an opened Card', () => {
  * Opening a Space Card is deliberately not covered here.
  *
  * It used to be, as the one kind Opening refused — and that refusal is gone:
- * Opening is one Layout-owned Edit that asks no question about the Card's kind
- * (ADR 0064), and a Space Card has something to draw Open, being the Layout
+ * Opening is one Diagram-owned Edit that asks no question about the Card's kind
+ * (ADR 0064), and a Space Card has something to draw Open, being the Diagram
  * it selects of the Space it references (ADR 0068). The behaviour needs a
  * *second* stored Space to be about anything, and this file's fixture is one
  * Space over a backend that holds only it, so the test moved whole to

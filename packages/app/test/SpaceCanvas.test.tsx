@@ -16,7 +16,7 @@ const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 const snapshot = spaceSnapshotSchema.parse({
@@ -24,10 +24,10 @@ const snapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: {
           [CARD_ID]: { x: 0, y: 0, open: false },
@@ -37,7 +37,7 @@ const snapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -105,7 +105,7 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     subscribe: () => () => undefined,
     eligibility: () => ({
       kind: 'refused',
-      refusal: { code: 'layout-required', operation: 'reconnected-edge' },
+      refusal: { code: 'diagram-required', operation: 'reconnected-edge' },
     }),
     accepts: () => false,
     beginPointerConnect: () => undefined,
@@ -171,7 +171,7 @@ function mountGraph(
           cardIsOpen: false,
           editingChromeTitle: false,
           spaceOnCanvas: true,
-          editingEmbeddedLayout: false,
+          editingEmbeddedDiagram: false,
         })}
         onNodesChange={nodesChanged}
         onEdgesChange={() => undefined}
@@ -189,7 +189,7 @@ function mountGraph(
         onBodyEditingChange={() => undefined}
         onTitleEditingChange={titleEditingChanged}
         cardResize={cardResize}
-        reportEmbeddedLayoutEditing={() => undefined}
+        reportEmbeddedDiagramEditing={() => undefined}
         graphs={[]}
         colorByGraphId={{}}
         activeGraphId={null}

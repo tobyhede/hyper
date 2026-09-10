@@ -11,7 +11,7 @@ import {
 /**
  * The one number the stylesheet and the projection both read.
  *
- * An Open Space Card's Layout is React Flow sub-flow nodes painted *over*
+ * An Open Space Card's Diagram is React Flow sub-flow nodes painted *over*
  * the Card rather than DOM inside it (ADR 0068), so no CSS can lay out around
  * them and no measurement can discover where they go. The room they get is a
  * constant, and the two halves of it live in different packages: the projection
@@ -29,7 +29,7 @@ const stylesheet = readFileSync(
   'utf8',
 );
 
-describe('the room an Open Space Card reserves for its Layout', () => {
+describe('the room an Open Space Card reserves for its Diagram', () => {
   it('gives the Card own footer exactly the height the inset clears', () => {
     const rule = /\.canvas-card\[data-kind='space'\]\[data-expanded='true'\][^{]*\{([^}]*)\}/.exec(
       stylesheet,
@@ -92,11 +92,11 @@ describe('the room an Open Space Card reserves for its Layout', () => {
   });
 
   /**
-   * And the region left over is somewhere a Layout can be drawn rather than a
+   * And the region left over is somewhere a Diagram can be drawn rather than a
    * strip of nothing: the smallest Card the target Space can hold fits inside
    * the inset at the floor, on both axes.
    */
-  it('leaves the floor room for one collapsed Card of the embedded Layout', () => {
+  it('leaves the floor room for one collapsed Card of the embedded Diagram', () => {
     expect(
       SPACE_CARD_MIN_OPEN_SIZE.height - SPACE_CARD_EMBED_INSET.top - SPACE_CARD_EMBED_INSET.bottom,
     ).toBe(COLLAPSED_CARD_SIZE.height);

@@ -24,50 +24,50 @@ import { createCard } from './command-dock';
 /**
  * The two selections an Open Space Card authors.
  *
- * A Space Card's content is the Layout it selects of the Space it
+ * A Space Card's content is the Diagram it selects of the Space it
  * references (ADR 0068), so Opening it is what exposes the only two things
  * about it an author can change — and the target reference is deliberately not
  * one of them: it is chosen once, at creation, and no control on the Open Card
  * reaches it.
  *
  * The pairing is the point of these tests rather than either control on its
- * own: a Graph is owned by the Layout that holds it (ADR 0040), so the Graphs
- * on offer are the selected Layout's and choosing a Layout re-seeds the Graph
- * from it. The alternative — leaving the previous Layout's Graph in place — is
+ * own: a Graph is owned by the Diagram that holds it (ADR 0040), so the Graphs
+ * on offer are the selected Diagram's and choosing a Diagram re-seeds the Graph
+ * from it. The alternative — leaving the previous Diagram's Graph in place — is
  * a Card the aggregate refuses, so the re-seed is a domain rule and not a
  * courtesy.
  */
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const META_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const META_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const META_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const META_TO_HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const META_TO_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const HOME_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
-const HOME_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
+const HOME_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const HOME_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
 const SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000014');
 
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
 const TARGET_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const FIRST_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const FIRST_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const FIRST_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
 const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
-const SECOND_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000025');
+const SECOND_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000025');
 const THIRD_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
-const THIRD_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000027');
+const THIRD_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000027');
 const FOURTH_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000028');
 const FIFTH_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000029');
 
 /**
- * The Space this Card references: two Layouts, and the first owning two Graphs.
+ * The Space this Card references: two Diagrams, and the first owning two Graphs.
  *
  * Two of each is the smallest fixture that can tell the two selectors apart —
- * one Layout would make every Graph list the same list, and one Graph per
- * Layout would make the re-seed indistinguishable from leaving the selection
+ * one Diagram would make every Graph list the same list, and one Graph per
+ * Diagram would make the re-seed indistinguishable from leaving the selection
  * alone.
  */
 const target: SpaceSnapshot = spaceSnapshotSchema.parse({
@@ -75,9 +75,9 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Architecture',
-    layouts: [
+    diagrams: [
       {
-        id: FIRST_LAYOUT_ID,
+        id: FIRST_DIAGRAM_ID,
         title: 'Collection 1',
         kind: 'positioned',
         positions: { [TARGET_CARD_ID]: { x: 0, y: 0, open: false } },
@@ -87,18 +87,18 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         ],
       },
       {
-        id: SECOND_LAYOUT_ID,
+        id: SECOND_DIAGRAM_ID,
         title: 'Collection 2',
         kind: 'positioned',
         positions: { [TARGET_CARD_ID]: { x: 200, y: 0, open: false } },
         graphs: [{ id: THIRD_GRAPH_ID, title: 'Second pass', edges: [] }],
       },
-      // The one Layout that has authored an Active Graph, and deliberately not
+      // The one Diagram that has authored an Active Graph, and deliberately not
       // its first: a seed taken from the head of the list agrees with an
-      // authored `activeGraph` everywhere else, so nothing but this Layout can
+      // authored `activeGraph` everywhere else, so nothing but this Diagram can
       // tell the two rules apart.
       {
-        id: THIRD_LAYOUT_ID,
+        id: THIRD_DIAGRAM_ID,
         title: 'Collection 3',
         kind: 'positioned',
         positions: { [TARGET_CARD_ID]: { x: 400, y: 0, open: false } },
@@ -109,7 +109,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         activeGraph: FIFTH_GRAPH_ID,
       },
     ],
-    defaultLayout: FIRST_LAYOUT_ID,
+    defaultDiagram: FIRST_DIAGRAM_ID,
   },
   cards: [{ id: TARGET_CARD_ID, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
 });
@@ -128,10 +128,10 @@ const home = (spaceCard: Extract<CardDocument, { kind: 'space' }>): SpaceSnapsho
     document: {
       version: 1,
       title: 'Home',
-      layouts: [
+      diagrams: [
         {
-          id: HOME_LAYOUT_ID,
-          title: 'Layout 1',
+          id: HOME_DIAGRAM_ID,
+          title: 'Diagram 1',
           kind: 'positioned',
           positions: {
             [HOME_CARD_ID]: { x: 10, y: 20, open: false },
@@ -140,7 +140,7 @@ const home = (spaceCard: Extract<CardDocument, { kind: 'space' }>): SpaceSnapsho
           graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
       ],
-      defaultLayout: HOME_LAYOUT_ID,
+      defaultDiagram: HOME_DIAGRAM_ID,
     },
     cards: [
       { id: HOME_CARD_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
@@ -160,10 +160,10 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Meta',
-    layouts: [
+    diagrams: [
       {
-        id: META_LAYOUT_ID,
-        title: 'Layout 1',
+        id: META_DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [META_CARD_ID]: { x: 0, y: 0, open: false },
@@ -173,7 +173,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
     ],
-    defaultLayout: META_LAYOUT_ID,
+    defaultDiagram: META_DIAGRAM_ID,
   },
   cards: [
     { id: META_CARD_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
@@ -231,14 +231,14 @@ const settled = (session: SpaceSession): Promise<void> =>
  * Card is already drawn — until that read lands the Open Card draws its waiting
  * note in place of the two controls.
  *
- * Open is authored on the Layout (ADR 0064), so a snapshot may already carry
+ * Open is authored on the Diagram (ADR 0064), so a snapshot may already carry
  * it: the reopening test mounts one that does, and pressing Open there would
  * close the Card this helper is asked to open.
  */
 async function openSpaceCard(): Promise<HTMLElement> {
   const control = await screen.findByRole('button', { name: /^(Open|Close) Card Elsewhere$/ });
   if (control.getAttribute('aria-label') === 'Open Card Elsewhere') fireEvent.click(control);
-  await screen.findByTestId('space-card-layout');
+  await screen.findByTestId('space-card-diagram');
   const node = document.querySelector(`.react-flow__node[data-id="${SPACE_CARD_ID}"]`);
   if (!(node instanceof HTMLElement)) throw new Error('the Space Card is not drawn as a node');
   return node;
@@ -294,17 +294,17 @@ describe('an Open Space Card', () => {
 
     const card = await openSpaceCard();
 
-    expect(within(card).getByRole('combobox', { name: 'Layout' })).toBeEnabled();
-    // Nothing is selected yet, so the Layout offers the target's two and the
-    // Graph beside it has no Layout to draw from.
+    expect(within(card).getByRole('combobox', { name: 'Diagram' })).toBeEnabled();
+    // Nothing is selected yet, so the Diagram offers the target's two and the
+    // Graph beside it has no Diagram to draw from.
     expect(within(card).getByRole('combobox', { name: 'Graph' })).toBeDisabled();
     await settled(session);
   });
 
   /**
    * One Edit writes both keys, because they are not independent: a Graph is
-   * owned by its Layout, so a Layout chosen without re-seeding the Graph names
-   * a Graph the new Layout does not own, and the aggregate refuses exactly
+   * owned by its Diagram, so a Diagram chosen without re-seeding the Graph names
+   * a Graph the new Diagram does not own, and the aggregate refuses exactly
    * that (ADR 0040, ADR 0068).
    */
   /**
@@ -328,23 +328,23 @@ describe('an Open Space Card', () => {
     // the whole canvas behind it inert and no accessible role on it is
     // reachable — which is the same fact the assertion is about.
     expect(within(card).queryByText('Reading the referenced Space…')).toBeNull();
-    expect(within(card).getByTestId('space-card-layout')).toBeDisabled();
+    expect(within(card).getByTestId('space-card-diagram')).toBeDisabled();
     expect(within(card).getByTestId('space-card-graph')).toBeDisabled();
     await settled(session);
   });
 
-  it('writes the chosen Layout and re-seeds the Graph from it', async () => {
+  it('writes the chosen Diagram and re-seeds the Graph from it', async () => {
     const session = mount();
     await openSpaceCard();
 
-    choose('space-card-layout', 'Collection 1');
+    choose('space-card-diagram', 'Collection 1');
 
     await waitFor(() =>
       expect(spaceCardDocument(session)).toEqual({
         title: 'Elsewhere',
         kind: 'space',
         spaceId: TARGET_ID,
-        layout: FIRST_LAYOUT_ID,
+        diagram: FIRST_DIAGRAM_ID,
         graph: FIRST_GRAPH_ID,
       }),
     );
@@ -352,35 +352,35 @@ describe('an Open Space Card', () => {
   });
 
   /**
-   * The seed is the Layout's own Active Graph where it has one.
+   * The seed is the Diagram's own Active Graph where it has one.
    *
-   * A Layout answers "which Graph is current here" itself (ADR 0026), and a
-   * Space Card that showed a different one would be disagreeing with the Layout
+   * A Diagram answers "which Graph is current here" itself (ADR 0026), and a
+   * Space Card that showed a different one would be disagreeing with the Diagram
    * it had just been pointed at. The head of the list is the fallback rather
    * than the rule — which is what ADR 0026 says an absent `activeGraph` means.
    */
-  it('seeds the Graph from the chosen Layout’s Active Graph', async () => {
+  it('seeds the Graph from the chosen Diagram’s Active Graph', async () => {
     const session = mount();
     await openSpaceCard();
 
-    choose('space-card-layout', 'Collection 3');
+    choose('space-card-diagram', 'Collection 3');
 
     await waitFor(() =>
       expect(spaceCardDocument(session)).toMatchObject({
-        layout: THIRD_LAYOUT_ID,
+        diagram: THIRD_DIAGRAM_ID,
         graph: FIFTH_GRAPH_ID,
       }),
     );
     await settled(session);
   });
 
-  it('writes a Graph chosen from the Layout already selected', async () => {
+  it('writes a Graph chosen from the Diagram already selected', async () => {
     const session = mount(
       home({
         title: 'Elsewhere',
         kind: 'space',
         spaceId: TARGET_ID,
-        layout: FIRST_LAYOUT_ID,
+        diagram: FIRST_DIAGRAM_ID,
         graph: FIRST_GRAPH_ID,
       }),
     );
@@ -390,7 +390,7 @@ describe('an Open Space Card', () => {
 
     await waitFor(() =>
       expect(spaceCardDocument(session)).toMatchObject({
-        layout: FIRST_LAYOUT_ID,
+        diagram: FIRST_DIAGRAM_ID,
         graph: SECOND_GRAPH_ID,
       }),
     );
@@ -407,10 +407,10 @@ describe('an Open Space Card', () => {
   it('keeps both selections in the snapshot, and shows them selected on reopening', async () => {
     const session = mount();
     await openSpaceCard();
-    choose('space-card-layout', 'Collection 2');
+    choose('space-card-diagram', 'Collection 2');
     await waitFor(() =>
       expect(spaceCardDocument(session)).toMatchObject({
-        layout: SECOND_LAYOUT_ID,
+        diagram: SECOND_DIAGRAM_ID,
         graph: THIRD_GRAPH_ID,
       }),
     );
@@ -421,7 +421,7 @@ describe('an Open Space Card', () => {
     const reopened = mount(written);
 
     const card = await openSpaceCard();
-    expect(within(card).getByRole('combobox', { name: 'Layout' })).toHaveTextContent(
+    expect(within(card).getByRole('combobox', { name: 'Diagram' })).toHaveTextContent(
       'Collection 2',
     );
     expect(within(card).getByRole('combobox', { name: 'Graph' })).toHaveTextContent('Second pass');
@@ -442,7 +442,7 @@ describe('an Open Space Card', () => {
     // Exactly two, named: a third would be the retarget control this Card is
     // not allowed to have, whatever it happened to be labelled.
     expect(within(card).getAllByRole('combobox')).toHaveLength(2);
-    expect(within(card).getByRole('combobox', { name: 'Layout' })).toBeInTheDocument();
+    expect(within(card).getByRole('combobox', { name: 'Diagram' })).toBeInTheDocument();
     expect(within(card).getByRole('combobox', { name: 'Graph' })).toBeInTheDocument();
     await settled(session);
   });

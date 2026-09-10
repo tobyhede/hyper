@@ -20,41 +20,42 @@ interface WorkingSpaceStore extends Pick<SpaceResourceRepository, 'loadSpace'> {
 const initializedSnapshot = (
   snapshot: SpaceSnapshot,
   newId: () => UUID,
-): { readonly snapshot: SpaceSnapshot; readonly createdLayout: boolean } | undefined => {
-  const layouts = snapshot.document.layouts ?? [];
-  if (layouts.length > 0) {
-    if (snapshot.document.defaultLayout !== undefined) return undefined;
-    const firstLayout = layouts[0];
-    if (firstLayout === undefined) throw new Error('A non-empty Layout list lost its first value');
+): { readonly snapshot: SpaceSnapshot; readonly createdDiagram: boolean } | undefined => {
+  const diagrams = snapshot.document.diagrams ?? [];
+  if (diagrams.length > 0) {
+    if (snapshot.document.defaultDiagram !== undefined) return undefined;
+    const firstDiagram = diagrams[0];
+    if (firstDiagram === undefined)
+      throw new Error('A non-empty Diagram list lost its first value');
     return {
       snapshot: {
         ...snapshot,
-        document: { ...snapshot.document, defaultLayout: firstLayout.id },
+        document: { ...snapshot.document, defaultDiagram: firstDiagram.id },
       },
-      createdLayout: false,
+      createdDiagram: false,
     };
   }
-  const layoutId = newId();
+  const diagramId = newId();
   const graphId = newId();
   return {
     snapshot: {
       ...snapshot,
       document: {
         ...snapshot.document,
-        layouts: [
+        diagrams: [
           {
-            id: layoutId,
-            title: 'Layout 1',
+            id: diagramId,
+            title: 'Diagram 1',
             kind: 'positioned',
             positions: {},
             graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
             activeGraph: graphId,
           },
         ],
-        defaultLayout: layoutId,
+        defaultDiagram: diagramId,
       },
     },
-    createdLayout: true,
+    createdDiagram: true,
   };
 };
 
@@ -104,8 +105,8 @@ async function loadWorkingSpace(
       revision,
       exportedRevision: loaded.exportedRevision,
     };
-    if (!initialization.createdLayout) return working;
-    return { ...working, initialization: 'created-layout' };
+    if (!initialization.createdDiagram) return working;
+    return { ...working, initialization: 'created-diagram' };
   }
 }
 

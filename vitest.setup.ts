@@ -203,7 +203,7 @@ if (typeof window !== 'undefined') {
 
 /**
  * CodeMirror measures text ranges to size its viewport after an edit. jsdom
- * supplies `Range` but no layout-backed rectangle methods, so the measurement
+ * supplies `Range` but no rectangle methods backed by layout, so the measurement
  * otherwise throws asynchronously after an editor test has already passed.
  * Empty geometry is the honest jsdom answer and keeps browser layout behavior
  * in Playwright, where the real methods exist.

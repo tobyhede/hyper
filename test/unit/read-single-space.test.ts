@@ -13,11 +13,11 @@ import { captureError } from '../support/capture-error';
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const ROOT_CARD_ID = '00000000-0000-4000-8000-000000000002';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000003';
-const LAYOUT_ID = '00000000-0000-4000-8000-000000000004';
+const DIAGRAM_ID = '00000000-0000-4000-8000-000000000004';
 
 /**
- * The disposable pre-release shape: graphs declared beside the layouts rather
- * than owned by them (ADR 0040). Under version 1 each of its layouts is missing
+ * The disposable pre-release shape: graphs declared beside the diagrams rather
+ * than owned by them (ADR 0040). Under version 1 each of its diagrams is missing
  * the graphs it now owns and carries a key the schema does not recognise, so a
  * shape check reached on its own answers a cascade in which nothing says which
  * version arrived.
@@ -27,7 +27,7 @@ const versionTwoDocument = {
   id: SPACE_ID,
   title: 'Pre-release talk',
   graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
-  layouts: [{ id: LAYOUT_ID, title: 'Working', positions: {} }],
+  diagrams: [{ id: DIAGRAM_ID, title: 'Working', positions: {} }],
 };
 
 /**
@@ -205,9 +205,9 @@ describe('readSingleSpace', () => {
       JSON.stringify({
         version: 1,
         title: 'Talk',
-        layouts: [
+        diagrams: [
           {
-            title: 'Layout',
+            title: 'Diagram',
             kind: 'positioned',
             positions: { [ROOT_CARD_ID]: { x: 0, y: 0 } },
             graphs: [
@@ -227,7 +227,7 @@ describe('readSingleSpace', () => {
     if (!(thrown instanceof SpaceImportFileError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain(spaceFile);
-    expect(thrown.diagnostics.join('\n')).toContain('layouts.0.graphs.0.edges.0.from');
+    expect(thrown.diagnostics.join('\n')).toContain('diagrams.0.graphs.0.edges.0.from');
   });
 
   it('answers a version it cannot read once, ahead of every key that moved', async () => {

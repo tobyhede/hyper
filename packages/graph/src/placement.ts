@@ -2,8 +2,8 @@ import {
   COLLAPSED_CARD_SIZE,
   type CardId,
   type CardPlacement,
-  type Layout,
-  type LayoutPosition,
+  type Diagram,
+  type DiagramPosition,
 } from '@project/core';
 import type { LayoutStrategyGraph } from './layout';
 
@@ -12,7 +12,7 @@ declare const PLACEMENT: unique symbol;
 
 /**
  * A **Placement** is the card→position map itself: which cards sit where, and
- * nothing more. A `Layout` is the authored thing a Space holds; the placement is
+ * nothing more. A `Diagram` is the authored thing a Space holds; the placement is
  * the map inside it. It is also what an automatic strategy computes and what
  * `positionedStrategy` reads.
  *
@@ -23,7 +23,7 @@ declare const PLACEMENT: unique symbol;
  *
  * ## Sparse, and omission means something
  *
- * A placement may omit a card, and that Card is not a member of the Layout.
+ * A placement may omit a card, and that Card is not a member of the Diagram.
  * `positionedStrategy` consequently omits it from the canvas; adding membership
  * and its authored position is an explicit Edit rather than a rendering concern.
  *
@@ -31,9 +31,9 @@ declare const PLACEMENT: unique symbol;
  *
  * `Placement` is a `ReadonlyMap` the type system will not let you build with
  * `new Map()`. Every read works unchanged; only construction is closed. The
- * rendered geometry of an existing Layout was twice copied wholesale into the
+ * rendered geometry of an existing Diagram was twice copied wholesale into the
  * authored map by code that built one by hand, which persisted every card the
- * Layout deliberately omitted. Routing construction through `fromEntries` and
+ * Diagram deliberately omitted. Routing construction through `fromEntries` and
  * merging through `next` is what makes that unrepresentable rather than a rule
  * each new caller has to remember.
  *
@@ -58,8 +58,8 @@ export type Placement = ReadonlyMap<CardId, Readonly<CardPlacement>> & {
  * The one place a `CardId` key is asserted rather than parsed.
  *
  * SAFETY: a single erasure reaches this module: `Object.entries` widens the keys of a
- * `Layout`'s `positions` to `string`. They have already been branded —
- * `layoutSchema` declares `positions` as `z.record(idSchema, …)`, so Zod rejects
+ * `Diagram`'s `positions` to `string`. They have already been branded —
+ * `diagramSchema` declares `positions` as `z.record(idSchema, …)`, so Zod rejects
  * a non-UUID key at parse, and every Space arrives through `loadSpace` or
  * `loadSpaceSnapshot`. Re-parsing here would declare a failure mode nothing can
  * reach and force callers to handle it.
@@ -72,7 +72,7 @@ export type Placement = ReadonlyMap<CardId, Readonly<CardPlacement>> & {
 const brand = (positions: ReadonlyMap<CardId, Readonly<CardPlacement>>): Placement =>
   positions as Placement;
 
-type PlacementPoint = CardPlacement | (LayoutPosition & { readonly open?: never });
+type PlacementPoint = CardPlacement | (DiagramPosition & { readonly open?: never });
 
 const point = (at: PlacementPoint): CardPlacement => {
   if (at.open === undefined) return { x: at.x, y: at.y, open: false };
@@ -94,13 +94,13 @@ const point = (at: PlacementPoint): CardPlacement => {
       };
 };
 
-/** The placement a Layout holds. */
-function fromLayout(layout: Layout): Placement {
+/** The placement a Diagram holds. */
+function fromDiagram(diagram: Diagram): Placement {
   const positions = new Map<CardId, CardPlacement>();
-  for (const [cardId, at] of Object.entries(layout.positions)) {
+  for (const [cardId, at] of Object.entries(diagram.positions)) {
     if (at !== undefined) {
       // SAFETY: `Object.entries` widens this key to `string`, but it was
-      // already branded — `layoutSchema` declares `positions` as
+      // already branded — `diagramSchema` declares `positions` as
       // `z.record(idSchema, …)`, so every key reaching here already passed
       // through `loadSpace`/`loadSpaceSnapshot` (see the module docstring
       // above `brand`).
@@ -178,7 +178,7 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * nothing legitimate needs the wider read.
  *
  * What the report says is taken **as it stands**. Nothing sits between the
- * Layout's positions and the canvas any more — displacement is applied by the
+ * Diagram's positions and the canvas any more — displacement is applied by the
  * Edit that causes it (ADR 0084), so a canvas coordinate already is an authored
  * one and there is no derivation left to invert. A settled drag therefore
  * authors the drop point exactly, whatever is Open and wherever it sits. The
@@ -239,8 +239,8 @@ function place(placement: Placement, cardId: CardId, at: PlacementPoint): Placem
 /**
  * The placement without one card.
  *
- * A layout's position keys **are** its card membership (ADR 0040), so removing a
- * card from a layout is exactly this — and, like `place`, it is authorship
+ * A diagram's position keys **are** its card membership (ADR 0040), so removing a
+ * card from a diagram is exactly this — and, like `place`, it is authorship
  * rather than a report, which is why it belongs here beside the closed
  * constructors rather than being done with a `new Map` at the call site.
  *
@@ -255,13 +255,13 @@ function remove(placement: Placement, cardId: CardId): Placement {
   return brand(remaining);
 }
 
-/** The record a Layout stores. Keys are already card ids; this only widens them. */
+/** The record a Diagram stores. Keys are already card ids; this only widens them. */
 function toPositions(placement: Placement): Record<CardId, CardPlacement> {
   return Object.fromEntries([...placement].map(([cardId, at]) => [cardId, point(at)]));
 }
 
 /**
- * Empty: a Layout that authors no card yet. Distinct from having no Layout.
+ * Empty: a Diagram that authors no card yet. Distinct from having no Diagram.
  *
  * A function rather than a constant so no two callers are handed the same map.
  */
@@ -306,9 +306,9 @@ function growth(openSize: Extent): Extent {
  * This is the whole of displacement (ADR 0084). Opening a Card applies its
  * growth here as part of the Open Edit, and the coordinates it writes are
  * authored ones with the same standing as any other — the author opened the
- * Card, and opening is a Layout decision. Closing applies the negation, and
+ * Card, and opening is a Diagram decision. Closing applies the negation, and
  * resizing the difference. Between those Edits nothing derives anything: the
- * Layout's positions are what the canvas draws.
+ * Diagram's positions are what the canvas draws.
  *
  * The comparison is **strict and per-axis**. A Card whose authored `x` is
  * strictly greater than the subject's takes `growth.width`, and its `y` is
@@ -331,7 +331,7 @@ function growth(openSize: Extent): Extent {
  * across the subject and the reopen leaves it there. The asymmetry is therefore
  * stated rather than repaired — clamping it, or remembering which Cards a
  * particular Open pushed, is the per-Card history ADR 0084 rejected for making
- * two identical Layouts behave differently.
+ * two identical Diagrams behave differently.
  *
  * The same memorylessness read from the subject's side: a subject the author
  * has dragged past the neighbours its own Open displaced finds nobody beyond it
@@ -371,12 +371,12 @@ function displace(placement: Placement, subjectId: CardId, growth: Extent): Plac
  * beyond it, the Card's own entry left exactly as it was.
  *
  * The displacement half of every way an Open Card stops holding its room, and
- * the one statement of it (ADR 0084). A Card closes, leaves a Layout, or is
+ * the one statement of it (ADR 0084). A Card closes, leaves a Diagram, or is
  * deleted from the Space, and all three owe the same negation of the growth of
  * the size it is Open at — the size read off its own entry, not off whatever
  * rect the gesture is proposing. That is why this is a member here beside
  * `growth` and `displace` rather than a line each caller writes: the third
- * caller is how a Card deleted from a Layout the Edit was not drawing came to
+ * caller is how a Card deleted from a Diagram the Edit was not drawing came to
  * strand its room permanently, and a rule with three owners has none.
  *
  * Answers the placement it was given for a Card that is Closed or not a member,
@@ -385,7 +385,7 @@ function displace(placement: Placement, subjectId: CardId, growth: Extent): Plac
  * here (ADR 0066).
  *
  * Separate from `remove` rather than folded into it, because removing a key is
- * also how a placement is reconciled against a Layout that has already
+ * also how a placement is reconciled against a Diagram that has already
  * reclaimed, and reclaiming there would give the room back twice.
  */
 function reclaim(placement: Placement, cardId: CardId): Placement {
@@ -397,7 +397,7 @@ function reclaim(placement: Placement, cardId: CardId): Placement {
 
 export const Placement = {
   empty,
-  fromLayout,
+  fromDiagram,
   fromLayoutStrategyGraph,
   fromEntries,
   equals,

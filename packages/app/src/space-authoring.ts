@@ -8,8 +8,8 @@ import {
   type Graph,
   type GraphEdge,
   type GraphId,
-  type LayoutId,
-  type LayoutPosition,
+  type DiagramId,
+  type DiagramPosition,
   CARD_TITLE_REQUIRED,
   normalizeTitle,
   type SpaceSnapshot,
@@ -19,7 +19,7 @@ import {
 import {
   loadSpaceSnapshot,
   Placement,
-  type ResolvedLayout,
+  type ResolvedDiagram,
   type Space,
   type SpaceError,
 } from '@project/graph';
@@ -33,12 +33,12 @@ import {
 import { nextGraphColor } from './colors';
 import type { Navigation, NavigationState } from './navigation';
 import {
-  updatePositionedLayout,
-  withCardRemovedFromLayouts,
+  updatePositionedDiagram,
+  withCardRemovedFromDiagrams,
   withoutIncidentEdges,
 } from './snapshot';
-import { nextCardTitle, nextGraphTitle, nextLayoutTitle } from './titles';
-import { requireDefaultLayout, resolveLayout } from './layout-resolution';
+import { nextCardTitle, nextGraphTitle, nextDiagramTitle } from './titles';
+import { requireDefaultDiagram, resolveDiagram } from './diagram-resolution';
 
 /** Which end of an Edge a reconnection replaces. */
 export type EdgeEndpoint = 'from' | 'to';
@@ -104,7 +104,7 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
  * already installed.
  */
 export type AuthoringCompletion =
-  | { readonly kind: 'created-layout' }
+  | { readonly kind: 'created-diagram' }
   | {
       readonly kind: 'settled-card-movement';
       readonly rendered: Placement;
@@ -131,11 +131,11 @@ export type AuthoringCompletion =
   | {
       readonly kind: 'create-and-connect';
       readonly from: CardId;
-      readonly position: LayoutPosition;
+      readonly position: DiagramPosition;
       readonly rendered: Placement;
     }
   /** Add Card: a detached Markdown Card at the visible centre, neutrally titled. */
-  | { readonly kind: 'created-card'; readonly anchor: LayoutPosition }
+  | { readonly kind: 'created-card'; readonly anchor: DiagramPosition }
   /**
    * Add Alias: created only once its Target is chosen, because an Alias without
    * one is not a valid Card. An empty title mints `Card N` like any other Card
@@ -146,20 +146,20 @@ export type AuthoringCompletion =
       readonly kind: 'created-alias';
       readonly target: CardId;
       readonly title?: string;
-      readonly anchor: LayoutPosition;
+      readonly anchor: DiagramPosition;
     }
-  /** Add to Layout: membership and a first position for a Card already in the Space. */
+  /** Add to Diagram: membership and a first position for a Card already in the Space. */
   | {
-      readonly kind: 'added-card-to-layout';
+      readonly kind: 'added-card-to-diagram';
       readonly cardId: CardId;
-      readonly anchor: LayoutPosition;
+      readonly anchor: DiagramPosition;
     }
-  /** Remove from Layout: membership, position and incident Edges, in this Layout only. */
-  | { readonly kind: 'removed-card-from-layout'; readonly cardId: CardId }
-  /** Delete Card from Space: the same removal, cascaded through every Layout. */
+  /** Remove from Diagram: membership, position and incident Edges, in this Diagram only. */
+  | { readonly kind: 'removed-card-from-diagram'; readonly cardId: CardId }
+  /** Delete Card from Space: the same removal, cascaded through every Diagram. */
   | { readonly kind: 'deleted-card'; readonly cardId: CardId }
-  | { readonly kind: 'renamed-layout'; readonly layoutId: UUID; readonly title: string }
-  | { readonly kind: 'deleted-layout'; readonly layoutId: UUID }
+  | { readonly kind: 'renamed-diagram'; readonly diagramId: UUID; readonly title: string }
+  | { readonly kind: 'deleted-diagram'; readonly diagramId: UUID }
   | { readonly kind: 'added-graph' }
   | { readonly kind: 'renamed-graph'; readonly graphId: GraphId; readonly title: string }
   | { readonly kind: 'recolored-graph'; readonly graphId: GraphId; readonly color: string }
@@ -198,14 +198,14 @@ export type AuthoringResult =
   | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal }
   | { readonly kind: 'queued' };
 
-type LayoutRequiredOperation = Extract<
+type DiagramRequiredOperation = Extract<
   AuthoringCompletion,
-  | { readonly kind: 'added-card-to-layout' }
-  | { readonly kind: 'removed-card-from-layout' }
+  | { readonly kind: 'added-card-to-diagram' }
+  | { readonly kind: 'removed-card-from-diagram' }
   | { readonly kind: 'opened-card' }
   | { readonly kind: 'closed-card' }
   | { readonly kind: 'resized-card' }
-  | { readonly kind: 'renamed-layout' }
+  | { readonly kind: 'renamed-diagram' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
   | { readonly kind: 'deleted-graph' }
@@ -232,8 +232,8 @@ export type StoredSpaceRefusal =
 /** Stable identities for every expected refusal at the Authoring seam. */
 export type AuthoringRefusal =
   | { readonly code: 'placement-pending' }
-  | { readonly code: 'layout-not-found' }
-  | { readonly code: 'layout-required'; readonly operation: LayoutRequiredOperation }
+  | { readonly code: 'diagram-not-found' }
+  | { readonly code: 'diagram-required'; readonly operation: DiagramRequiredOperation }
   | { readonly code: 'card-not-found' }
   | { readonly code: 'card-kind-immutable' }
   | { readonly code: 'alias-target-immutable' }
@@ -242,12 +242,12 @@ export type AuthoringRefusal =
   // The one code here the domain owns rather than this module: `@project/core`
   // raises it from the Card schema, so both ends spell it from one constant.
   | { readonly code: typeof CARD_TITLE_REQUIRED }
-  | { readonly code: 'layout-title-required' }
-  | { readonly code: 'space-must-keep-layout' }
+  | { readonly code: 'diagram-title-required' }
+  | { readonly code: 'space-must-keep-diagram' }
   | { readonly code: 'alias-target-not-found'; readonly targetId: CardId }
   | { readonly code: 'alias-target-must-own-content'; readonly targetId: CardId }
-  | { readonly code: 'card-already-in-layout' }
-  | { readonly code: 'card-not-in-layout' }
+  | { readonly code: 'card-already-in-diagram' }
+  | { readonly code: 'card-not-in-diagram' }
   | { readonly code: 'card-not-expanded' }
   | {
       readonly code: 'card-has-aliases';
@@ -255,12 +255,12 @@ export type AuthoringRefusal =
       readonly aliasTitles: readonly string[];
     }
   | { readonly code: 'graph-title-required' }
-  | { readonly code: 'layout-must-keep-graph' }
+  | { readonly code: 'diagram-must-keep-graph' }
   | { readonly code: 'graph-not-owned' }
   | { readonly code: 'edge-not-found' }
-  | { readonly code: 'edge-card-outside-layout' }
+  | { readonly code: 'edge-card-outside-diagram' }
   | { readonly code: 'edge-already-exists' }
-  | { readonly code: 'layout-active-graph-required' };
+  | { readonly code: 'diagram-active-graph-required' };
 
 /**
  * The published state: what the collaborators say, plus the one thing only
@@ -276,7 +276,7 @@ export interface SpaceAuthoringState {
   /**
    * ADR 0042's replacement signal: advances when a replacement Space is opened
    * over this Authoring without recreating it, and at no other time. Retry,
-   * Keep local, persistence status changes, Layout selection and completed
+   * Keep local, persistence status changes, Diagram selection and completed
    * Edits all leave it where it is.
    *
    * It is invalidation rather than a registry — Authoring never learns which
@@ -291,7 +291,7 @@ export interface SpaceAuthoringState {
 export interface SpaceAuthoring {
   readonly getState: () => SpaceAuthoringState;
   /**
-   * The selected Layout's installed placement.
+   * The selected Diagram's installed placement.
    *
    * Read at the point of use rather than subscribed to. Every path that
    * installs a placement is paired with a publication from this store or from
@@ -314,8 +314,8 @@ export interface SpaceAuthoring {
   readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
   /** Complete an embedded Card gesture without moving this Space's Navigation. */
-  readonly completeInLayout: (
-    layoutId: UUID,
+  readonly completeInDiagram: (
+    diagramId: UUID,
     completion: EmbeddedCardCompletion,
   ) => AuthoringResult;
   readonly retryPersistence: () => void;
@@ -357,13 +357,13 @@ export interface SpaceAuthoring {
 interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
   readonly placement: Placement;
-  /** The Layout this Edit wrote, which Navigation continues in. */
-  readonly nextLayoutId: LayoutId;
+  /** The Diagram this Edit wrote, which Navigation continues in. */
+  readonly nextDiagramId: DiagramId;
   /**
-   * The Active Graph of that Layout, which Navigation adopts along with it.
+   * The Active Graph of that Diagram, which Navigation adopts along with it.
    *
-   * Under ADR 0040 a Layout owns its Graphs, so which one is active is a fact
-   * about the Layout this Edit wrote and not a separate consequence.
+   * Under ADR 0040 a Diagram owns its Graphs, so which one is active is a fact
+   * about the Diagram this Edit wrote and not a separate consequence.
    */
   readonly nextActiveGraphId: GraphId | null;
   readonly createdCardId?: CardId;
@@ -397,7 +397,7 @@ const refuse = (refusal: AuthoringRefusal): DerivedCompletion => ({ kind: 'refus
 interface ReportedCompletion {
   readonly completion: AuthoringCompletion;
   readonly placement: Placement | null;
-  readonly embeddedLayoutId?: UUID | undefined;
+  readonly embeddedDiagramId?: UUID | undefined;
 }
 
 export type EmbeddedCardCompletion = Extract<
@@ -409,7 +409,7 @@ export type EmbeddedCardCompletion = Extract<
       | 'resized-card'
       | 'edited-card'
       | 'settled-card-movement'
-      | 'removed-card-from-layout';
+      | 'removed-card-from-diagram';
   }
 >;
 
@@ -428,7 +428,7 @@ interface SpaceAuthoringDependencies {
   /**
    * The validated aggregate behind the session's working snapshot.
    *
-   * The same reader Navigation is given, so both resolve a Layout against one
+   * The same reader Navigation is given, so both resolve a Diagram against one
    * `Space` identity and one parse — and both read entity context through that
    * Space's own `lookup`.
    */
@@ -436,7 +436,7 @@ interface SpaceAuthoringDependencies {
   readonly initialPlacement?: Placement | null;
   readonly reportObserverError?: ObserverErrorReporter | undefined;
   /**
-   * Mints the identity of every Card, Layout and Graph a completed Edit creates.
+   * Mints the identity of every Card, Diagram and Graph a completed Edit creates.
    *
    * Taken here, once, rather than at each `newUuid()` call inside the derivation,
    * so a test supplies the ids it is about to assert on instead of reaching past
@@ -476,7 +476,7 @@ type SnapshotCards = SpaceSnapshot['cards'];
  */
 const STACK_STEP = 24;
 
-const freeAnchor = (placement: Placement, anchor: LayoutPosition): LayoutPosition => {
+const freeAnchor = (placement: Placement, anchor: DiagramPosition): DiagramPosition => {
   const taken = new Set([...placement.values()].map(({ x, y }) => `${x},${y}`));
   let at = anchor;
   // Terminates: each step is a distinct point on one diagonal, and the taken
@@ -500,7 +500,7 @@ type Extent = { readonly width: number; readonly height: number };
  *
  * Resize's alone. Close hands its whole growth back rather than a difference,
  * and says so in one place — `Placement.reclaim` — which is where a Card that
- * leaves a Layout and a Card deleted from the Space say it too.
+ * leaves a Diagram and a Card deleted from the Space say it too.
  *
  * Negative on an axis the Card shrank on, which is legitimate and is the whole
  * of a shrinking Resize. It is **not** the involution the Open/Close pair is,
@@ -547,7 +547,7 @@ const withRoomFor = (
  *
  * Both ways a Card closes end here — the Close completion, and a resize
  * proposal the magnet has taken to the collapsed size (ADR 0066) — so this
- * Layout's two Close gestures reach the shared rule through one line rather
+ * Diagram's two Close gestures reach the shared rule through one line rather
  * than each restating it. That matters most for the magnetic one, which is
  * where a restatement would reclaim the collapsed proposal's zero growth
  * instead of the growth of the size the Card was actually Open at.
@@ -569,7 +569,7 @@ const closedCard = (
   Placement.place(Placement.reclaim(placement, cardId), cardId, { ...at, open: false });
 
 /**
- * The placement after a Card leaves this Layout, with the room it held given
+ * The placement after a Card leaves this Diagram, with the room it held given
  * back.
  *
  * Leaving is a Close the Card does not come back from, so it reclaims exactly
@@ -584,11 +584,11 @@ const closedCard = (
  * the Card's own entry — after `Placement.remove` there is neither an Open Size
  * to read nor a subject to compare the neighbours against.
  *
- * Two of the three ways a Card leaves end here — `removed-card-from-layout`,
+ * Two of the three ways a Card leaves end here — `removed-card-from-diagram`,
  * and the deletion applied with the other membership changes below — and both
- * of those write *this* Layout. The third is the same deletion cascading into
- * every other Layout, which no single-Layout write can reach;
- * `withCardRemovedFromLayouts` performs it, and reaches the same rule through
+ * of those write *this* Diagram. The third is the same deletion cascading into
+ * every other Diagram, which no single-Diagram write can reach;
+ * `withCardRemovedFromDiagrams` performs it, and reaches the same rule through
  * `Placement.reclaim` rather than through this function.
  */
 const removedCard = (placement: Placement, cardId: CardId): Placement =>
@@ -615,8 +615,8 @@ type ReconnectOutcome =
  * Edge, so this returns it rather than a boolean the completion would have to
  * recompute. The order is deliberate: **unchanged is decided before
  * membership**, because a Card that is already this Edge's endpoint is by
- * definition in this Layout, and asking the placement first would refuse a
- * dragged endpoint dropped back where it started on a Layout still arranging.
+ * definition in this Diagram, and asking the placement first would refuse a
+ * dragged endpoint dropped back where it started on a Diagram still arranging.
  */
 const reconnectOutcome = (
   graph: Graph | undefined,
@@ -638,7 +638,7 @@ const reconnectOutcome = (
    */
   holdsCard: (cardId: CardId) => boolean,
 ): ReconnectOutcome => {
-  // Ownership, not existence: a Graph a *second* Layout owns exists and is
+  // Ownership, not existence: a Graph a *second* Diagram owns exists and is
   // still not one this Edit may write (ADR 0040).
   if (graph === undefined) {
     return { kind: 'refused', refusal: { code: 'graph-not-owned' } };
@@ -655,9 +655,9 @@ const reconnectOutcome = (
       : { from: proposal.edge.from, to: proposal.cardId };
   if (sameEdge(proposal.edge, reconnected)) return UNCHANGED;
   // Checked together and after `unchanged`, so an endpoint returned to its own
-  // Card is still eligible on a Layout that has not finished arranging.
+  // Card is still eligible on a Diagram that has not finished arranging.
   if (!placement.has(proposal.cardId) || !holdsCard(proposal.cardId)) {
-    return { kind: 'refused', refusal: { code: 'edge-card-outside-layout' } };
+    return { kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } };
   }
   if (indexOfEdge(graph.edges, reconnected) !== -1) {
     return { kind: 'refused', refusal: { code: 'edge-already-exists' } };
@@ -691,11 +691,11 @@ const aliasTargetRefusal = (space: Space, document: CardDocument): AuthoringRefu
 /**
  * A Card an Edit is creating, held rather than placed.
  *
- * Its position waits here until the complete next Layout is assembled.
+ * Its position waits here until the complete next Diagram is assembled.
  */
 interface CreatedCard {
   readonly id: CardId;
-  readonly position: LayoutPosition;
+  readonly position: DiagramPosition;
   /**
    * Step off a position another Card already occupies exactly. A gesture that
    * dropped on empty canvas aimed at its point and keeps it; a Card created from
@@ -711,7 +711,7 @@ const incomingAliases = (cards: SnapshotCards, cardId: CardId): SnapshotCards =>
 /**
  * A single-line title normalized for authorship, or `null` when it has no name.
  *
- * Layouts and Graphs only. Their titles are single-line by ADR 0083, so the
+ * Diagrams and Graphs only. Their titles are single-line by ADR 0083, so the
  * whole string is one line and trimming it is the whole rule. A Card's Title is
  * Title Lines and normalizes by a rule of its own — {@link namedCardTitle}.
  */
@@ -743,7 +743,7 @@ const namedCardTitle = (title: string): string | null => {
  * Serializing both sides and comparing the text was the same answer only when
  * the two agreed on key order, and nothing promises that: a snapshot loaded
  * from the database or an import carries whatever order it was written in,
- * while a completed Edit rebuilds each Layout in the writer's order. A
+ * while a completed Edit rebuilds each Diagram in the writer's order. A
  * difference in order is not a difference an author made, and reading one as an
  * Edit submits a commit that changes nothing.
  */
@@ -789,7 +789,7 @@ export function createSpaceAuthoring({
   //
   // Identity is load-bearing, not just the value: `usePlacementRendering`
   // rebuilds the positioned strategy whenever this changes identity and re-runs
-  // layout, so an equal placement pushed in by a projection must keep the one it
+  // diagram, so an equal placement pushed in by a projection must keep the one it
   // already has or every projection would re-arrange a settled graph. A
   // completed Edit needs no help getting its re-layout — it replaces the working
   // snapshot, and the `LayoutStrategyGraph` derived from it re-fires the same effect.
@@ -798,8 +798,8 @@ export function createSpaceAuthoring({
     placement = nextPlacement;
   };
 
-  const selectedResolvedLayout = (): ResolvedLayout =>
-    resolveLayout(currentSpace(), navigation.getState().selectedLayoutId);
+  const selectedResolvedDiagram = (): ResolvedDiagram =>
+    resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
 
   const mergeBase = (): Placement | null => placement;
 
@@ -863,25 +863,25 @@ export function createSpaceAuthoring({
    * Space Authoring installs the placement for every Edit it completes, so this
    * is about the Edits it does not: a Space Card lifecycle operation is one
    * atomic Edit across several Spaces and installs the containing Space's
-   * snapshot through the session directly (ADR 0076). The Layout it wrote then
+   * snapshot through the session directly (ADR 0076). The Diagram it wrote then
    * holds a Card this placement has never heard of, and every operation keyed on
-   * placement membership — Opening it, resizing it, removing it from the Layout
-   * — refuses `card-not-in-layout` for a Card plainly on the canvas. Read the
+   * placement membership — Opening it, resizing it, removing it from the Diagram
+   * — refuses `card-not-in-diagram` for a Card plainly on the canvas. Read the
    * other way, a Card the cascade deleted would linger as a position naming no
    * Card, which is a reference error the next Edit's intake would throw on.
    *
-   * **Membership only.** A Card the Layout has gained takes the position the
-   * Layout authored for it, one it has lost is dropped, and every Card both
+   * **Membership only.** A Card the Diagram has gained takes the position the
+   * Diagram authored for it, one it has lost is dropped, and every Card both
    * still hold keeps the value the placement holds — which is what stops a
    * reconciliation discarding a live drag, an Open state or a resize the stored
    * snapshot has not caught up with.
    */
   const reconcilePlacement = (): void => {
     /**
-     * A snapshot that no longer passes intake has no Layout to reconcile
+     * A snapshot that no longer passes intake has no Diagram to reconcile
      * against, and saying so is not this function's job.
      *
-     * `selectedResolvedLayout` resolves against `currentSpace()`, which throws
+     * `selectedResolvedDiagram` resolves against `currentSpace()`, which throws
      * for exactly that snapshot — and this runs inside a session observer,
      * which `SpaceSession` contains by design. A throw here would therefore
      * never reach anyone: it would go to the observer sink and take the
@@ -891,38 +891,38 @@ export function createSpaceAuthoring({
      * `SpaceAppFailure` report the throw with its diagnostic — which is where an
      * unloadable snapshot is supposed to surface (`SpaceApp.tsx`).
      */
-    let resolved: ResolvedLayout;
+    let resolved: ResolvedDiagram;
     try {
-      resolved = selectedResolvedLayout();
+      resolved = selectedResolvedDiagram();
     } catch {
       return;
     }
-    const authored = Placement.fromLayout(resolved.layout);
+    const authored = Placement.fromDiagram(resolved.diagram);
     /**
-     * Nothing installed is nothing to merge, so the Layout's own map is what
+     * Nothing installed is nothing to merge, so the Diagram's own map is what
      * there is to adopt.
      *
      * This does not overrule `composeApp`'s "an explicit `null` — is the
      * caller's own statement and stands". That statement is about the placement
      * a Space *opens* on, and every later install writes over the opening value
      * as a matter of course: a rendered report, a completed Edit, a re-selected
-     * Layout. What is adopted here is the same value the composition would have
+     * Diagram. What is adopted here is the same value the composition would have
      * opened on had the caller said nothing at all, so a placement that was
-     * pending ends on geometry the Layout already holds rather than on geometry
+     * pending ends on geometry the Diagram already holds rather than on geometry
      * this module invented — which is the sense in which this is still
      * membership only.
      *
      * No production composition reaches it, and since ADR 0082 retired the
      * Space Sidebar nothing outside `packages/app/test` does either.
-     * `composeApp` derives its opening placement from the Layout it opened in
-     * and `Placement.fromLayout` is total, so the only `null` placements are the
+     * `composeApp` derives its opening placement from the Diagram it opened in
+     * and `Placement.fromDiagram` is total, so the only `null` placements are the
      * ones a caller states — and every caller that states one is now a test
      * arranging the geometry the case is about, rather than opening on the
-     * Layout's own map: `space-authoring-operations.test.ts`,
+     * Diagram's own map: `space-authoring-operations.test.ts`,
      * `space-authoring.property.test.ts` and `render-adapter.test.ts`'s
      * session-backed adapter. The one non-test statement there used to be came
      * from a story fixture of the retired surface, and it stated `null` for
-     * exactly the Layout that does not resolve — so even that one died on the
+     * exactly the Diagram that does not resolve — so even that one died on the
      * `catch` above rather than here. What is left is a branch production cannot
      * enter and a test suite can.
      */
@@ -950,27 +950,27 @@ export function createSpaceAuthoring({
   });
 
   /**
-   * The Graph a Layout-owned Edge operation names, or `undefined` when the
-   * selected Layout is not the one that owns it.
+   * The Graph a Diagram-owned Edge operation names, or `undefined` when the
+   * selected Diagram is not the one that owns it.
    *
    * Asked of `space.lookup.graph`, which answers a Graph *with its owner* — the
    * index built for exactly this question (ADR 0040), and O(1) rather than a
-   * walk over one Layout's Graphs. Comparing the owner's id is what keeps this
-   * ownership rather than existence: a Graph a second Layout owns resolves here
+   * walk over one Diagram's Graphs. Comparing the owner's id is what keeps this
+   * ownership rather than existence: a Graph a second Diagram owns resolves here
    * and is still not one this Edit may write. Graph ids are unique across the
    * Space (ADR 0045), so there is no second Graph the id could have meant.
    */
   const ownedGraph = (graphId: GraphId): Graph | undefined => {
-    const selectedLayout = selectedResolvedLayout();
+    const selectedDiagram = selectedResolvedDiagram();
     const owned = currentSpace().lookup.graph(graphId);
-    return owned?.owner.layout.id === selectedLayout.layout.id ? owned.graph : undefined;
+    return owned?.owner.diagram.id === selectedDiagram.diagram.id ? owned.graph : undefined;
   };
 
   /**
    * The Graph a connection drawn right now would land in, or `null` when no
-   * selected Layout owns one.
+   * selected Diagram owns one.
    *
-   * A Layout the Space no longer holds answers `null` too: it names no Graph,
+   * A Diagram the Space no longer holds answers `null` too: it names no Graph,
    * and the completion that follows refuses for that reason rather than this one.
    */
   const targetGraph = (): Graph | null => {
@@ -982,15 +982,15 @@ export function createSpaceAuthoring({
    * Whether a Card is one an Edge this gesture authors may name at all.
    *
    * Two conditions, and the second is ADR 0040's closure read forwards. A Card
-   * of the Space is not necessarily a Card of the Layout the Edit writes: a
-   * Layout's members **are** its position keys, and the completed placement is
+   * of the Space is not necessarily a Card of the Diagram the Edit writes: a
+   * Diagram's members **are** its position keys, and the completed placement is
    * what those keys are about to become. An Edge naming a Card outside it
    * derives a Space intake rejects, and `deriveCompletedEdit` answers an
    * unloadable Space by throwing — right for a bug, wrong for an eligibility
-   * query. Refusing here keeps the interaction boundary closed over the Layout
+   * query. Refusing here keeps the interaction boundary closed over the Diagram
    * even if a stale caller names a Card outside it.
    *
-   * Reading the installed placement rather than the stored Layout is deliberate.
+   * Reading the installed placement rather than the stored Diagram is deliberate.
    * It is the same value the completion reports, so the preview and the
    * completion cannot disagree.
    */
@@ -1014,10 +1014,10 @@ export function createSpaceAuthoring({
    */
   const connectRefusal = (from: CardId, to: CardId | null): AuthoringRefusal | null => {
     if (!connectable(from) || (to !== null && !connectable(to))) {
-      return { code: 'edge-card-outside-layout' };
+      return { code: 'edge-card-outside-diagram' };
     }
     const graph = targetGraph();
-    if (graph === null) return { code: 'layout-active-graph-required' };
+    if (graph === null) return { code: 'diagram-active-graph-required' };
     if (to !== null && indexOfEdge(graph.edges, { from, to }) !== -1) {
       return { code: 'edge-already-exists' };
     }
@@ -1063,7 +1063,7 @@ export function createSpaceAuthoring({
    * lets the shell below be a sequence of statements rather than a transaction.
    *
    * Neither `unchanged` nor `refused` is a failure: an Edit that changes
-   * nothing, names a Card the Space no longer holds, or targets a Layout that
+   * nothing, names a Card the Space no longer holds, or targets a Diagram that
    * has gone is simply not an Edit, and the two say which of those it was.
    * Producing an unloadable Space *is* a failure, and it throws — here, where
    * the collaborators are all still level.
@@ -1071,17 +1071,17 @@ export function createSpaceAuthoring({
   const deriveCompletedEdit = ({
     completion,
     placement: reportedPlacement,
-    embeddedLayoutId,
+    embeddedDiagramId,
   }: ReportedCompletion): DerivedCompletion => {
-    const selection = embeddedLayoutId ?? navigation.getState().selectedLayoutId;
-    if (completion.kind === 'created-layout') {
+    const selection = embeddedDiagramId ?? navigation.getState().selectedDiagramId;
+    if (completion.kind === 'created-diagram') {
       const snapshot = session.getState().working;
-      const layoutId = newId();
+      const diagramId = newId();
       const graphId = newId();
       const emptyPlacement = Placement.fromEntries([]);
-      const next = updatePositionedLayout(snapshot, {
-        layoutId,
-        title: nextLayoutTitle(snapshot),
+      const next = updatePositionedDiagram(snapshot, {
+        diagramId,
+        title: nextDiagramTitle(snapshot),
         positions: emptyPlacement,
         graphs: [
           {
@@ -1100,33 +1100,33 @@ export function createSpaceAuthoring({
           snapshot: next,
           placement: emptyPlacement,
           nextActiveGraphId: graphId,
-          nextLayoutId: layoutId,
+          nextDiagramId: diagramId,
         },
       };
     }
-    if (completion.kind === 'deleted-layout') {
+    if (completion.kind === 'deleted-diagram') {
       const snapshot = session.getState().working;
-      const layouts = snapshot.document.layouts ?? [];
-      const target = layouts.find((layout) => layout.id === completion.layoutId);
-      if (target === undefined) return refuse({ code: 'layout-not-found' });
-      if (layouts.length === 1) return refuse({ code: 'space-must-keep-layout' });
-      const survivors = layouts.filter((layout) => layout.id !== completion.layoutId);
-      const selectedSurvives = survivors.some((layout) => layout.id === selection);
-      const nextLayout = selectedSurvives
-        ? survivors.find((layout) => layout.id === selection)
+      const diagrams = snapshot.document.diagrams ?? [];
+      const target = diagrams.find((diagram) => diagram.id === completion.diagramId);
+      if (target === undefined) return refuse({ code: 'diagram-not-found' });
+      if (diagrams.length === 1) return refuse({ code: 'space-must-keep-diagram' });
+      const survivors = diagrams.filter((diagram) => diagram.id !== completion.diagramId);
+      const selectedSurvives = survivors.some((diagram) => diagram.id === selection);
+      const nextDiagram = selectedSurvives
+        ? survivors.find((diagram) => diagram.id === selection)
         : survivors[0];
-      if (nextLayout === undefined) {
-        throw new Error('Deleting a Layout left no survivor after the last Layout was refused.');
+      if (nextDiagram === undefined) {
+        throw new Error('Deleting a Diagram left no survivor after the last Diagram was refused.');
       }
       const next = {
         ...snapshot,
         document: {
           ...snapshot.document,
-          layouts: survivors,
-          defaultLayout:
-            snapshot.document.defaultLayout === completion.layoutId
-              ? nextLayout.id
-              : snapshot.document.defaultLayout,
+          diagrams: survivors,
+          defaultDiagram:
+            snapshot.document.defaultDiagram === completion.diagramId
+              ? nextDiagram.id
+              : snapshot.document.defaultDiagram,
         },
       };
       assertValidAuthoredSnapshot(next);
@@ -1134,9 +1134,9 @@ export function createSpaceAuthoring({
         kind: 'completed',
         edit: {
           snapshot: next,
-          placement: Placement.fromLayout(nextLayout),
-          nextActiveGraphId: nextLayout.activeGraph ?? nextLayout.graphs[0]?.id ?? null,
-          nextLayoutId: nextLayout.id,
+          placement: Placement.fromDiagram(nextDiagram),
+          nextActiveGraphId: nextDiagram.activeGraph ?? nextDiagram.graphs[0]?.id ?? null,
+          nextDiagramId: nextDiagram.id,
         },
       };
     }
@@ -1147,23 +1147,23 @@ export function createSpaceAuthoring({
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
     const space = currentSpace();
-    // A selected Layout the Space no longer holds is not an Edit. Checked before
+    // A selected Diagram the Space no longer holds is not an Edit. Checked before
     // resolving, because the resolver answers that case by throwing.
     //
     // Not the thing ADR 0045 forbids, which is turning a *thrown*
-    // `LayoutNotFoundError` into a refusal — there is no catch here and a
+    // `DiagramNotFoundError` into a refusal — there is no catch here and a
     // resolver that refuses still takes the Edit down with it. This asks a
     // question of the Space instead, and the answer is an author's state rather
-    // than a defect: the Layout this gesture was aimed at is gone, so there is
+    // than a defect: the Diagram this gesture was aimed at is gone, so there is
     // nothing to write it into.
-    if (space.lookup.layout(selection) === undefined) {
-      return refuse({ code: 'layout-not-found' });
+    if (space.lookup.diagram(selection) === undefined) {
+      return refuse({ code: 'diagram-not-found' });
     }
-    const resolved = resolveLayout(space, selection);
+    const resolved = resolveDiagram(space, selection);
     /**
      * What this Edit does to the placement, held rather than applied.
      *
-     * Card additions and removals wait here until the complete next Layout is
+     * Card additions and removals wait here until the complete next Diagram is
      * assembled.
      */
     let createdCard: CreatedCard | null = null;
@@ -1173,13 +1173,13 @@ export function createSpaceAuthoring({
     let completedPlacement = reportedPlacement;
     // The one way a Card is added: mint it, place it at a free anchor, append it.
     // Add Card and Add Alias differ in the document they carry and in nothing
-    // else — neither creates an Edge, and neither adds a Graph to a Layout that
+    // else — neither creates an Edge, and neither adds a Graph to a Diagram that
     // already has one.
     // Returns rather than assigns: `createdCard` is read further down, and a
     // `let` written only from inside a closure keeps its initial narrowing.
     const createCard = (
       document: CardDocument,
-      at: LayoutPosition,
+      at: DiagramPosition,
       avoidingOverlap = true,
     ): CreatedCard => {
       const id = newId();
@@ -1228,7 +1228,7 @@ export function createSpaceAuthoring({
       snapshot = { ...snapshot, cards };
     } else if (completion.kind === 'opened-card') {
       const at = completedPlacement.get(completion.cardId);
-      if (at === undefined) return refuse({ code: 'card-not-in-layout' });
+      if (at === undefined) return refuse({ code: 'card-not-in-diagram' });
       if (at.open) return UNCHANGED;
       // The size the Card is actually opening at: the one it remembers, or the
       // default for its kind. The room it takes is that size's growth, so the
@@ -1246,15 +1246,15 @@ export function createSpaceAuthoring({
       );
     } else if (completion.kind === 'closed-card') {
       const at = completedPlacement.get(completion.cardId);
-      if (at === undefined) return refuse({ code: 'card-not-in-layout' });
+      if (at === undefined) return refuse({ code: 'card-not-in-diagram' });
       if (!at.open) return UNCHANGED;
-      // Read as the Layout stands, with no record of who this Card's Open
+      // Read as the Diagram stands, with no record of who this Card's Open
       // pushed: everything currently beyond it moves back, the Cards the author
       // dragged there while it was open included (ADR 0084).
       completedPlacement = closedCard(completedPlacement, completion.cardId, at);
     } else if (completion.kind === 'resized-card') {
       const at = completedPlacement.get(completion.cardId);
-      if (at === undefined) return refuse({ code: 'card-not-in-layout' });
+      if (at === undefined) return refuse({ code: 'card-not-in-diagram' });
       if (!at.open) return refuse({ code: 'card-not-expanded' });
       if (
         completion.size.width === COLLAPSED_CARD_SIZE.width &&
@@ -1302,12 +1302,12 @@ export function createSpaceAuthoring({
       const refusal = aliasTargetRefusal(space, document);
       if (refusal !== null) return refuse(refusal);
       createdCard = createCard(document, completion.anchor);
-    } else if (completion.kind === 'added-card-to-layout') {
+    } else if (completion.kind === 'added-card-to-diagram') {
       if (space.lookup.card(completion.cardId) === undefined) {
         return refuse({ code: 'card-not-found' });
       }
       if (completedPlacement.has(completion.cardId)) {
-        return refuse({ code: 'card-already-in-layout' });
+        return refuse({ code: 'card-already-in-diagram' });
       }
       // Membership and a position, and nothing else: a re-added Card is detached,
       // and the Edges it once had are never inferred back.
@@ -1318,9 +1318,9 @@ export function createSpaceAuthoring({
         completion.cardId,
         freeAnchor(completedPlacement, completion.anchor),
       );
-    } else if (completion.kind === 'removed-card-from-layout') {
+    } else if (completion.kind === 'removed-card-from-diagram') {
       if (!completedPlacement.has(completion.cardId)) {
-        return refuse({ code: 'card-not-in-layout' });
+        return refuse({ code: 'card-not-in-diagram' });
       }
       unplacedCardId = completion.cardId;
       completedPlacement = removedCard(completedPlacement, completion.cardId);
@@ -1340,7 +1340,7 @@ export function createSpaceAuthoring({
       }
       // An Alias whose Target vanished is not a Card intake accepts, so the Space
       // cannot lose one out from under its Aliases. Removing that Card from a
-      // single Layout is never blocked this way — only deleting it outright.
+      // single Diagram is never blocked this way — only deleting it outright.
       const incoming = incomingAliases(snapshot.cards, completion.cardId);
       if (incoming.length > 0) {
         return refuse({
@@ -1350,7 +1350,7 @@ export function createSpaceAuthoring({
           aliasTitles: incoming.map((alias) => titleName(alias.document.title)),
         });
       }
-      // Deferred like a creation so the complete Layout changes atomically.
+      // Deferred like a creation so the complete Diagram changes atomically.
       unplacedCardId = completion.cardId;
       deletedCardId = completion.cardId;
       snapshot = {
@@ -1374,45 +1374,45 @@ export function createSpaceAuthoring({
       if (refusal !== null) return refuse(refusal);
       connection = { from: completion.from, to: completion.to };
     }
-    // Which Layout this Edit writes, and what it owns afterwards.
-    const layoutId: UUID = resolved.layout.id;
-    let layoutTitle: string;
+    // Which Diagram this Edit writes, and what it owns afterwards.
+    const diagramId: UUID = resolved.diagram.id;
+    let diagramTitle: string;
     let ownedGraphs: readonly Graph[];
     let activeGraphId: GraphId | null;
     let createdGraphId: GraphId | undefined;
-    const { layout } = resolved;
-    layoutTitle = layout.title;
-    ownedGraphs = layout.graphs;
+    const { diagram } = resolved;
+    diagramTitle = diagram.title;
+    ownedGraphs = diagram.graphs;
     activeGraphId =
-      embeddedLayoutId === undefined
+      embeddedDiagramId === undefined
         ? navigationState.activeGraphId
-        : (layout.activeGraph ?? layout.graphs[0]?.id ?? null);
-    if (completion.kind === 'renamed-layout') {
+        : (diagram.activeGraph ?? diagram.graphs[0]?.id ?? null);
+    if (completion.kind === 'renamed-diagram') {
       // Addressed by id, exactly as Rename Graph is (ADR 0040) — and the id is
-      // checked because this Edit resolves its Layout from state read *later*
+      // checked because this Edit resolves its Diagram from state read *later*
       // than the gesture that named one. `deriveCompletedEdit` takes the
       // selection from `navigation.getState()` at derivation time, and three
       // things put that ahead of the id the author submitted: a completion that
       // arrived while another was completing derives off the queue rather than
       // off the press; the Dock's `IdentityName` closes over the
       // `canvas.selected.id` of its last committed render, so a selection that
-      // moved this tick has not reached it yet; and an embedded Layout Edit
-      // resolves `embeddedLayoutId` rather than the selection at all, so a
-      // rename aimed at the drawing Layout names the wrong one by construction.
+      // moved this tick has not reached it yet; and an embedded Diagram Edit
+      // resolves `embeddedDiagramId` rather than the selection at all, so a
+      // rename aimed at the drawing Diagram names the wrong one by construction.
       // The surface guards are real and are not this one — `IdentityName` ends
       // a draft whose subject changed, `App` ends one the replacement epoch or
       // lost availability invalidated (ADR 0042) — but both end it on the
       // *next* render, and this answers the submit already in flight. So a
-      // rename naming a Layout other than the one this Edit resolves is a
+      // rename naming a Diagram other than the one this Edit resolves is a
       // gesture aimed at something no longer drawing — an author's state, not a
       // defect.
-      if (completion.layoutId !== layoutId) return refuse({ code: 'layout-not-found' });
+      if (completion.diagramId !== diagramId) return refuse({ code: 'diagram-not-found' });
       const title = trimmedNonBlankTitle(completion.title);
-      if (title === null) return refuse({ code: 'layout-title-required' });
-      if (title === layoutTitle) return UNCHANGED;
-      layoutTitle = title;
+      if (title === null) return refuse({ code: 'diagram-title-required' });
+      if (title === diagramTitle) return UNCHANGED;
+      diagramTitle = title;
     }
-    // Apply membership changes together to the completed Layout.
+    // Apply membership changes together to the completed Diagram.
     if (createdCard !== null) {
       // As above: the drop point is authorship, not a coordinate to convert
       // (ADR 0084).
@@ -1431,14 +1431,14 @@ export function createSpaceAuthoring({
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === activeGraphId);
       const graph = ownedGraphs[graphIndex];
       if (graph === undefined) {
-        return refuse({ code: 'layout-active-graph-required' });
+        return refuse({ code: 'diagram-active-graph-required' });
       }
       const graphs = [...ownedGraphs];
       graphs[graphIndex] = { ...graph, edges: [...graph.edges, connection] };
       ownedGraphs = graphs;
     } else if (unplacedCardId !== undefined) {
-      // A Card that has left this Layout cannot be an endpoint of a Graph this
-      // Layout owns (ADR 0040), so its incident Edges leave with it. The Graphs
+      // A Card that has left this Diagram cannot be an endpoint of a Graph this
+      // Diagram owns (ADR 0040), so its incident Edges leave with it. The Graphs
       // themselves stay, empty ones included: deletion is their own action.
       ownedGraphs = withoutIncidentEdges(ownedGraphs, unplacedCardId);
     } else if (completion.kind === 'added-graph') {
@@ -1460,7 +1460,7 @@ export function createSpaceAuthoring({
     ) {
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === completion.graphId);
       const graph = ownedGraphs[graphIndex];
-      // Ownership, not existence: a Graph a *second* Layout owns exists and is
+      // Ownership, not existence: a Graph a *second* Diagram owns exists and is
       // still not one this Edit may write (ADR 0040).
       if (graph === undefined) {
         return refuse({ code: 'graph-not-owned' });
@@ -1480,10 +1480,10 @@ export function createSpaceAuthoring({
         if (completion.color === graph.color) return UNCHANGED;
         ownedGraphs = replacing({ ...graph, color: completion.color });
       } else if (completion.kind === 'deleted-graph') {
-        // Every Layout resolves an Active Graph, so the last one cannot go
+        // Every Diagram resolves an Active Graph, so the last one cannot go
         // (ADR 0040). Removing its Edges is the author's way to empty it.
         if (ownedGraphs.length === 1) {
-          return refuse({ code: 'layout-must-keep-graph' });
+          return refuse({ code: 'diagram-must-keep-graph' });
         }
         ownedGraphs = ownedGraphs.filter((_, index) => index !== graphIndex);
         // Order among the survivors is untouched, and the first of them becomes
@@ -1515,14 +1515,14 @@ export function createSpaceAuthoring({
         });
       }
     }
-    const next = updatePositionedLayout(
-      // The cascade first, then this Layout written whole over the top of it.
-      // Delete Card from Space is one Edit over every Layout (ADR 0040), and the
-      // current one is simply the Layout this Edit was also going to write.
-      deletedCardId === undefined ? snapshot : withCardRemovedFromLayouts(snapshot, deletedCardId),
+    const next = updatePositionedDiagram(
+      // The cascade first, then this Diagram written whole over the top of it.
+      // Delete Card from Space is one Edit over every Diagram (ADR 0040), and the
+      // current one is simply the Diagram this Edit was also going to write.
+      deletedCardId === undefined ? snapshot : withCardRemovedFromDiagrams(snapshot, deletedCardId),
       {
-        layoutId,
-        title: layoutTitle,
+        diagramId,
+        title: diagramTitle,
         positions: completedPlacement,
         graphs: ownedGraphs,
         activeGraphId,
@@ -1539,7 +1539,7 @@ export function createSpaceAuthoring({
         snapshot: next,
         placement: completedPlacement,
         nextActiveGraphId: activeGraphId,
-        nextLayoutId: layoutId,
+        nextDiagramId: diagramId,
         ...created,
       },
     };
@@ -1550,7 +1550,7 @@ export function createSpaceAuthoring({
    * nothing this Edit produces.
    *
    * `session.submit` has to come first. Both Navigation calls resolve the Graph
-   * and the Layout against `currentSpace()`, which reads the working snapshot
+   * and the Diagram against `currentSpace()`, which reads the working snapshot
    * `submit` installs synchronously — before it, neither exists yet and both
    * would refuse. So the order is forced, and the useful consequence is that
    * the only statement here that can *fail* is also the first: no later failure
@@ -1559,30 +1559,30 @@ export function createSpaceAuthoring({
    *
    * That leaves exactly one failure shape — the session ahead of the placement
    * and Navigation — and it is the recoverable one. The snapshot the session
-   * took already carries `completedPlacement` inside its Layout, so the local
+   * took already carries `completedPlacement` inside its Diagram, so the local
    * placement is merely stale and the next projection re-derives it; installing
    * first would instead leave the placement describing an Edit the session
    * never took, and for a created Card, a position for a Card that does not
    * exist. That is the strand `b091623` inverted this order to close.
    *
-   * **The Layout is adopted with the Active Graph that belongs to it**, and
+   * **The Diagram is adopted with the Active Graph that belongs to it**, and
    * the ordering that used to be spread over two Navigation calls is now inside
    * one. It has not been relaxed — the Graph is still resolved against the
-   * Layout *this Edit produced* rather than the one it began in, which is the
-   * whole of what that ordering bought. What changed is that a Layout owns its
+   * Diagram *this Edit produced* rather than the one it began in, which is the
+   * whole of what that ordering bought. What changed is that a Diagram owns its
    * Graphs (ADR 0040), so the pair is one answer and the intermediate state
-   * where the Layout has moved and the Graph has not would name a Layout
-   * beside a Graph some other Layout owns, which Navigation refuses.
+   * where the Diagram has moved and the Graph has not would name a Diagram
+   * beside a Graph some other Diagram owns, which Navigation refuses.
    *
    * In that order the three statements below refuse nothing, and each for a
    * reason this Edit established rather than by having no guard to trip:
    *
    * - `install` decides nothing and reads nothing.
-   * - `continueInLayout` resolves a Layout `updatePositionedLayout` wrote into
-   *   the snapshot `submit` just installed, and refuses only a Layout that does
-   *   not draw the Active Graph handed with it — which is that Layout's own
+   * - `continueInDiagram` resolves a Diagram `updatePositionedDiagram` wrote into
+   *   the snapshot `submit` just installed, and refuses only a Diagram that does
+   *   not draw the Active Graph handed with it — which is that Diagram's own
    *   `activeGraph`, in a snapshot `loadSpaceSnapshot` accepted a line earlier,
-   *   and intake is precisely the check that a Layout's `activeGraph` is one it
+   *   and intake is precisely the check that a Diagram's `activeGraph` is one it
    *   owns. A null Active Graph names nothing and is exempt.
    *
    * Re-checking any of that *here* would add a branch that cannot be taken, and
@@ -1594,7 +1594,7 @@ export function createSpaceAuthoring({
     installTogether(() => {
       session.submit(edit.snapshot);
       install(edit.placement);
-      navigation.continueInLayout(edit.nextLayoutId, edit.nextActiveGraphId);
+      navigation.continueInDiagram(edit.nextDiagramId, edit.nextActiveGraphId);
     });
   };
 
@@ -1604,7 +1604,7 @@ export function createSpaceAuthoring({
     // interface share one vocabulary rather than translating between two.
     if (derived.kind !== 'completed') return derived;
     const { createdCardId, createdGraphId } = derived.edit;
-    if (reported.embeddedLayoutId === undefined) {
+    if (reported.embeddedDiagramId === undefined) {
       installCompletedEdit(derived.edit);
     } else {
       const previous = session.getState().working;
@@ -1612,12 +1612,12 @@ export function createSpaceAuthoring({
         ...derived.edit.snapshot,
         document: {
           ...derived.edit.snapshot.document,
-          defaultLayout: previous.document.defaultLayout,
+          defaultDiagram: previous.document.defaultDiagram,
         },
       };
       installTogether(() => {
         session.submit(snapshot);
-        if (navigation.getState().selectedLayoutId === reported.embeddedLayoutId) {
+        if (navigation.getState().selectedDiagramId === reported.embeddedDiagramId) {
           install(derived.edit.placement);
         }
       });
@@ -1630,31 +1630,33 @@ export function createSpaceAuthoring({
 
   let completing = false;
   const queued: QueuedCompletion[] = [];
-  const complete = (completion: AuthoringCompletion, embeddedLayoutId?: UUID): AuthoringResult => {
+  const complete = (completion: AuthoringCompletion, embeddedDiagramId?: UUID): AuthoringResult => {
     // A pointer gesture reports where React Flow has drawn the Cards, and that
     // report is merged under `Placement.next`'s rules. Every other operation is
     // written into the placement already installed — there is no second source
     // of geometry for a rename or a deletion to disagree with.
-    const embeddedLayout =
-      embeddedLayoutId === undefined ? undefined : currentSpace().lookup.layout(embeddedLayoutId);
-    if (embeddedLayoutId !== undefined && embeddedLayout === undefined) {
-      return { kind: 'refused', refusal: { code: 'layout-not-found' } };
+    const embeddedDiagram =
+      embeddedDiagramId === undefined
+        ? undefined
+        : currentSpace().lookup.diagram(embeddedDiagramId);
+    if (embeddedDiagramId !== undefined && embeddedDiagram === undefined) {
+      return { kind: 'refused', refusal: { code: 'diagram-not-found' } };
     }
     const base =
-      embeddedLayout === undefined ? placement : Placement.fromLayout(embeddedLayout.layout);
+      embeddedDiagram === undefined ? placement : Placement.fromDiagram(embeddedDiagram.diagram);
     const completedPlacement =
       'rendered' in completion
         ? Placement.next(
-            embeddedLayout === undefined ? mergeBase() : base,
+            embeddedDiagram === undefined ? mergeBase() : base,
             completion.rendered,
             completion.kind === 'settled-card-movement' ? completion.placed : [],
           )
         : base;
-    if (embeddedLayoutId === undefined) install(completedPlacement);
+    if (embeddedDiagramId === undefined) install(completedPlacement);
     const reported: ReportedCompletion = {
       completion,
       placement: completedPlacement,
-      embeddedLayoutId,
+      embeddedDiagramId,
     };
     if (completing) {
       queued.push({ ...reported, replacementEpoch });
@@ -1753,9 +1755,9 @@ export function createSpaceAuthoring({
     if (!accepted.ok) {
       return { code: 'stored-space-invalid', errors: accepted.errors };
     }
-    const selection = requireDefaultLayout(accepted.space);
-    const resolved = resolveLayout(accepted.space, selection);
-    const acceptedPlacement = Placement.fromLayout(resolved.layout);
+    const selection = requireDefaultDiagram(accepted.space);
+    const resolved = resolveDiagram(accepted.space, selection);
+    const acceptedPlacement = Placement.fromDiagram(resolved.diagram);
     installTogether(() => {
       session.acceptRemote();
       install(acceptedPlacement);
@@ -1773,7 +1775,7 @@ export function createSpaceAuthoring({
     replacePlacement: install,
     edgeEligibility,
     complete,
-    completeInLayout: (layoutId, completion) => complete(completion, layoutId),
+    completeInDiagram: (diagramId, completion) => complete(completion, diagramId),
     retryPersistence: session.retry,
     // Read at the moment the author asks, never captured earlier. `session`
     // ignores the call outside a conflict, so there is nothing to check here.

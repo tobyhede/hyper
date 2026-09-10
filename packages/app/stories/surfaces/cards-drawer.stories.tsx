@@ -48,7 +48,7 @@ function CardsDrawerFixture({
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex shrink-0 items-center gap-2 border-b p-2">
-        <span className="text-sm font-medium">Layout 1</span>
+        <span className="text-sm font-medium">Diagram 1</span>
         <CardsDrawer
           cards={cards}
           allCards={allCards}
@@ -84,11 +84,11 @@ function RefusedAdd() {
   const composed = useMemo(() => composeApp({ spaceSession: session }), [session]);
   useSyncExternalStore(session.subscribe, session.getState);
   const space = composed.currentSpace();
-  const layout = space.lookup.layout(composed.navigation.getState().selectedLayoutId)?.layout;
+  const diagram = space.lookup.diagram(composed.navigation.getState().selectedDiagramId)?.diagram;
   const cards =
-    layout === undefined
+    diagram === undefined
       ? []
-      : space.cards.filter((card) => layout.positions[card.id] === undefined);
+      : space.cards.filter((card) => diagram.positions[card.id] === undefined);
   const [open, setOpen] = useState(false);
 
   return (
@@ -100,7 +100,7 @@ function RefusedAdd() {
         onOpenChange={setOpen}
         onAdd={(card) => {
           const result = composed.authoring.complete({
-            kind: 'added-card-to-layout',
+            kind: 'added-card-to-diagram',
             cardId: card.id,
             anchor: { x: 0, y: 0 },
           });

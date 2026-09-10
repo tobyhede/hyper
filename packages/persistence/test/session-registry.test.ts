@@ -48,7 +48,7 @@ describe('Space session registry', () => {
       .spaceCards(() => CARD_ID)
       .link({
         containingSpaceId: SPACE_ID,
-        layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000009'),
+        diagramId: uuidSchema.parse('00000000-0000-4000-8000-000000000009'),
         targetSpaceId: SPACE_ID,
         title: 'Linked',
         position: { x: 0, y: 0 },

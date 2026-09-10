@@ -10,25 +10,25 @@ import type { LoadedSpace, SpaceResourceRepository } from '@project/persistence'
 
 export type ProductDestination =
   | { readonly kind: 'space'; readonly spaceId: UUID }
-  | { readonly kind: 'layout'; readonly spaceId: UUID; readonly layoutId: UUID }
+  | { readonly kind: 'diagram'; readonly spaceId: UUID; readonly diagramId: UUID }
   | { readonly kind: 'card'; readonly spaceId: UUID; readonly cardId: CardId }
   | { readonly kind: 'graph'; readonly spaceId: UUID; readonly graphId: GraphId }
   | {
-      readonly kind: 'layout-card';
+      readonly kind: 'diagram-card';
       readonly spaceId: UUID;
-      readonly layoutId: UUID;
+      readonly diagramId: UUID;
       readonly cardId: CardId;
     }
   | {
-      readonly kind: 'layout-graph';
+      readonly kind: 'diagram-graph';
       readonly spaceId: UUID;
-      readonly layoutId: UUID;
+      readonly diagramId: UUID;
       readonly graphId: GraphId;
     }
   | {
       readonly kind: 'presentation';
       readonly spaceId: UUID;
-      readonly layoutId: UUID;
+      readonly diagramId: UUID;
       readonly graphId: GraphId;
       readonly cardId: CardId;
     };
@@ -56,15 +56,15 @@ export const productDestinationPath = (destination: ProductDestination): string 
   if (destination.kind === 'graph') {
     return `${space}/graphs/${encodeCompactUuid(destination.graphId)}`;
   }
-  const view = `${space}/views/${encodeCompactUuid(destination.layoutId)}`;
+  const diagram = `${space}/diagrams/${encodeCompactUuid(destination.diagramId)}`;
   if (destination.kind === 'presentation') {
-    return `${view}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.cardId)}`;
+    return `${diagram}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.cardId)}`;
   }
-  return destination.kind === 'layout'
-    ? view
-    : destination.kind === 'layout-card'
-      ? `${view}/cards/${encodeCompactUuid(destination.cardId)}`
-      : `${view}/graphs/${encodeCompactUuid(destination.graphId)}`;
+  return destination.kind === 'diagram'
+    ? diagram
+    : destination.kind === 'diagram-card'
+      ? `${diagram}/cards/${encodeCompactUuid(destination.cardId)}`
+      : `${diagram}/graphs/${encodeCompactUuid(destination.graphId)}`;
 };
 
 type ProductDestinationLoader = Pick<SpaceResourceRepository, 'loadSpace'>;
@@ -91,25 +91,27 @@ const parseProductDestination = (pathname: string): ProductDestination | undefin
     const graphId = decodeCompactUuid(segments[4] ?? '');
     return graphId === undefined ? undefined : { kind: 'graph', spaceId, graphId };
   }
-  if (segments[3] !== 'views') return undefined;
-  const layoutId = decodeCompactUuid(segments[4] ?? '');
-  if (layoutId === undefined) return undefined;
-  if (segments.length === 5) return { kind: 'layout', spaceId, layoutId };
+  if (segments[3] !== 'diagrams') return undefined;
+  const diagramId = decodeCompactUuid(segments[4] ?? '');
+  if (diagramId === undefined) return undefined;
+  if (segments.length === 5) return { kind: 'diagram', spaceId, diagramId };
   if (segments.length === 9) {
     if (segments[5] !== 'graphs' || segments[7] !== 'present') return undefined;
     const graphId = decodeCompactUuid(segments[6] ?? '');
     const cardId = decodeCompactUuid(segments[8] ?? '');
     return graphId === undefined || cardId === undefined
       ? undefined
-      : { kind: 'presentation', spaceId, layoutId, graphId, cardId };
+      : { kind: 'presentation', spaceId, diagramId, graphId, cardId };
   }
   if (segments[5] === 'cards') {
     const cardId = decodeCompactUuid(segments[6] ?? '');
-    return cardId === undefined ? undefined : { kind: 'layout-card', spaceId, layoutId, cardId };
+    return cardId === undefined ? undefined : { kind: 'diagram-card', spaceId, diagramId, cardId };
   }
   if (segments[5] === 'graphs') {
     const graphId = decodeCompactUuid(segments[6] ?? '');
-    return graphId === undefined ? undefined : { kind: 'layout-graph', spaceId, layoutId, graphId };
+    return graphId === undefined
+      ? undefined
+      : { kind: 'diagram-graph', spaceId, diagramId, graphId };
   }
   return undefined;
 };
@@ -121,41 +123,44 @@ const destinationInSnapshot = (
   if (destination.spaceId !== snapshot.id) return { kind: 'unresolved' };
   if (
     destination.kind === 'card' ||
-    destination.kind === 'layout-card' ||
+    destination.kind === 'diagram-card' ||
     destination.kind === 'presentation'
   ) {
     if (!snapshot.cards.some(({ id }) => id === destination.cardId)) return { kind: 'unresolved' };
   }
   const graphOwner =
     destination.kind === 'graph' ||
-    destination.kind === 'layout-graph' ||
+    destination.kind === 'diagram-graph' ||
     destination.kind === 'presentation'
-      ? snapshot.document.layouts?.find((layout) =>
-          layout.graphs.some(({ id }) => id === destination.graphId),
+      ? snapshot.document.diagrams?.find((diagram) =>
+          diagram.graphs.some(({ id }) => id === destination.graphId),
         )
       : undefined;
   if (
     (destination.kind === 'graph' ||
-      destination.kind === 'layout-graph' ||
+      destination.kind === 'diagram-graph' ||
       destination.kind === 'presentation') &&
     graphOwner === undefined
   ) {
     return { kind: 'unresolved' };
   }
   if (
-    destination.kind === 'layout' ||
-    destination.kind === 'layout-card' ||
-    destination.kind === 'layout-graph' ||
+    destination.kind === 'diagram' ||
+    destination.kind === 'diagram-card' ||
+    destination.kind === 'diagram-graph' ||
     destination.kind === 'presentation'
   ) {
-    const layout = snapshot.document.layouts?.find(({ id }) => id === destination.layoutId);
-    if (layout === undefined) return { kind: 'unresolved' };
-    if (destination.kind === 'layout-card' && layout.positions[destination.cardId] === undefined) {
+    const diagram = snapshot.document.diagrams?.find(({ id }) => id === destination.diagramId);
+    if (diagram === undefined) return { kind: 'unresolved' };
+    if (
+      destination.kind === 'diagram-card' &&
+      diagram.positions[destination.cardId] === undefined
+    ) {
       return { kind: 'unresolved' };
     }
     if (
-      (destination.kind === 'layout-graph' || destination.kind === 'presentation') &&
-      layout.id !== graphOwner?.id
+      (destination.kind === 'diagram-graph' || destination.kind === 'presentation') &&
+      diagram.id !== graphOwner?.id
     ) {
       return { kind: 'unresolved' };
     }
@@ -230,7 +235,7 @@ export const resolveProductDestination = async (
  * not-found for one that reads and names nothing, a method rejection for a
  * request that is not a read, a service-unavailable for a repository that
  * cannot be read from yet, and an internal error for a stored document whose
- * Layout identities collide.
+ * Diagram identities collide.
  *
  * Why a given host has nothing to serve yet, and what it does about it, is that
  * host's to say and not this module's: Node, Vite, PostgreSQL and process

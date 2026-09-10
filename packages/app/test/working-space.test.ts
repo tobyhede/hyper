@@ -8,10 +8,10 @@ const snapshot = (title: string): SpaceSnapshot =>
     document: {
       version: 1,
       title,
-      // The Graph is a nested owned value of the Layout that positions both the
+      // The Graph is a nested owned value of the Diagram that positions both the
       // Cards its Edge names (ADR 0040) — a Space holds Graphs by holding a
-      // Layout, and nowhere else.
-      layouts: [
+      // Diagram, and nowhere else.
+      diagrams: [
         {
           id: '00000000-0000-4000-8000-000000000005',
           title: 'Working',
@@ -75,7 +75,7 @@ it('revalidates when the session installs a different working snapshot', () => {
 });
 
 it('throws the validation failure every time an invalid snapshot is read', () => {
-  // A Layout positioning — and a Graph naming — Cards the snapshot does not
+  // A Diagram positioning — and a Graph naming — Cards the snapshot does not
   // carry: valid wire shape, invalid aggregate, so this fails domain intake
   // rather than the schema.
   const base = snapshot('Space');

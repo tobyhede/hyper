@@ -5,15 +5,16 @@ import type {
   CanvasSpaceCardSelection,
   EntityActionGroup,
 } from '@project/ui';
-import type { Card, CardId, LayoutPosition, GraphId } from '@project/core';
+import type { Card, CardId, GraphId } from '@project/core';
 import { inHandleId, outHandleId, resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
+  GraphRenderEdge,
+  GraphRenderHandleRef,
   LayoutStrategyCard,
   LayoutStrategyEdge,
   LayoutStrategyGraph,
-  GraphRenderEdge,
-  GraphRenderHandleRef,
+  Point,
   Space,
 } from '@project/graph';
 import type { RoutedEdgeData } from './RoutedEdge';
@@ -103,10 +104,10 @@ export type CardNodeData = {
    */
   titleEditor?: CardTitleEditor;
   /**
-   * Whether the Layout has Opened this Card, so it draws its content on the Card
+   * Whether the Diagram has Opened this Card, so it draws its content on the Card
    * rather than its title alone (ADR 0064).
    *
-   * Authored, not derived: it is a fact about the Layout, and the Card's rect
+   * Authored, not derived: it is a fact about the Diagram, and the Card's rect
    * follows from it rather than the other way round. The adapter cannot read it
    * off the geometry — a Card is not Open just because it is large.
    *
@@ -129,7 +130,7 @@ export type CardNodeData = {
    * the editor mounted. A composition that gave `onEnd` the abandon meaning
    * would undo every accepted save.
    *
-   * Independent of `titleEditor` on purpose. Expansion is what the Layout
+   * Independent of `titleEditor` on purpose. Expansion is what the Diagram
    * authored and the caret is a gesture the author just made, so a Card can be
    * Expanded while its *title* is being renamed (ADR 0064).
    */
@@ -200,7 +201,7 @@ export type CardNodeData = {
    *  **An Expanded Card carries one too.** ADR 0064 narrows ADR 0006 rather
    *  than lifting it — an Expanded Card carries its source because the author
    *  asked for that one, not because every Card does. `openCardIds` is what
-   *  tells this projection which Cards the Layout Expanded, and `body` is
+   *  tells this projection which Cards the Diagram Expanded, and `body` is
    *  resolved for them in the same pass: `CardNode` reads `data.body ?? ''`, so
    *  a Card resolved into one set and not the other would draw an empty
    *  document over a working editor rather than fail. */
@@ -244,7 +245,7 @@ export interface ProjectCardNodesOptions {
   nodeHeight?: number;
   /** Restrict the projection to these card ids (e.g. one graph's cards). */
   cardIds?: readonly CardId[];
-  /** Layout-authored Expanded Cards whose Markdown body is drawn in place. */
+  /** Diagram-authored Expanded Cards whose Markdown body is drawn in place. */
   openCardIds?: ReadonlySet<CardId>;
 }
 
@@ -257,7 +258,7 @@ function resolveHandles(
   const count = refs.length;
   return refs.map((ref, index) => {
     const port = portsById.get(ref.id);
-    // Not every layout places ports — a grid has no opinion about them, and ELK
+    // Not every strategy places ports — a grid has no opinion about them, and ELK
     // has not run yet on first paint. Fall back to an even spread.
     const offsetY = port?.y ?? ((index + 1) / (count + 1)) * nodeHeight;
     return {
@@ -373,10 +374,10 @@ export function projectCardNodes(
 
   return source.map((card) => {
     const handles = handlesByCard.get(card.id) ?? EMPTY_HANDLES;
-    const cardLayout = laidOut.get(card.id);
+    const placedCard = laidOut.get(card.id);
     const active = card.id === activeCardId;
     const showContent = active && showActiveCardContent;
-    // Every Card kind Opens, so the Layout's Open set is the whole answer and
+    // Every Card kind Opens, so the Diagram's Open set is the whole answer and
     // there is no kind guard beside it. The guard this replaced named the two
     // kinds that had a front to draw when Open; a Space Card gained one with
     // `entity-url-addressability/07` (ADR 0068), which left the third arm the
@@ -385,21 +386,21 @@ export function projectCardNodes(
     const open = options.openCardIds?.has(card.id) === true;
     // An alias shows its target's content under its own title (ADR 0009).
     const body = showContent || open ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
-    const portsById = new Map((cardLayout?.ports ?? []).map((port) => [port.id, port]));
-    // The Card's own height once a layout has placed it, and the constant only
+    const portsById = new Map((placedCard?.ports ?? []).map((port) => [port.id, port]));
+    // The Card's own height once a strategy has placed it, and the constant only
     // before one has. The two agree for every collapsed Card — the strategies
     // arrange at `CARD_SIZE` — and differ exactly for an Open one, whose
     // anchors have to spread down the box it actually occupies (ADR 0064).
     // Read from the same rect `declaredHandles` reasons about below, so a
     // Graph's drawn anchor and its declared one cannot land in different places.
-    const spread = cardLayout?.height ?? nodeHeight;
+    const spread = placedCard?.height ?? nodeHeight;
     const sourceHandles = resolveHandles(handles.sourceHandles, colors, portsById, spread);
     const targetHandles = resolveHandles(handles.targetHandles, colors, portsById, spread);
 
     const node: CardFlowNode = {
       id: card.id,
       type: 'card',
-      position: { x: cardLayout?.x ?? 0, y: cardLayout?.y ?? 0 },
+      position: { x: placedCard?.x ?? 0, y: placedCard?.y ?? 0 },
       data: {
         cardId: card.id,
         title: card.title,
@@ -416,9 +417,9 @@ export function projectCardNodes(
       },
       className: active ? 'rf-card-node rf-card-node--active' : 'rf-card-node',
     };
-    // Carry the layout's dimensions through when it has placed the card. ELK
+    // Carry the diagram's dimensions through when it has placed the card. ELK
     // (and the grid) work at a fixed `CARD_SIZE`, so declaring width/height
-    // here means React Flow renders the node at exactly the size the layout
+    // here means React Flow renders the node at exactly the size the diagram
     // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
     // view chooses one) resolves correctly on first paint. Absent before the
     // layout resolves, so React Flow falls back to measuring, as before.
@@ -431,14 +432,14 @@ export function projectCardNodes(
     // React Flow preserves cached `handleBounds` instead of resetting them for
     // re-measure — a distinction with no meaning here, because the bounds come
     // from `declaredHandles` either way.
-    if (cardLayout) {
-      node.width = cardLayout.width;
-      node.height = cardLayout.height;
+    if (placedCard) {
+      node.width = placedCard.width;
+      node.height = placedCard.height;
       node.handles = declaredHandles(
         sourceHandles,
         targetHandles,
         space.graphs.map((graph) => graph.id),
-        cardLayout,
+        placedCard,
       );
     }
     if (body !== undefined) node.data.body = body;
@@ -460,9 +461,9 @@ export interface ProjectGraphEdgesOptions {
 }
 
 /** Flatten an edge's routed sections into one point list: start → bends → end. */
-function routedPoints(edge: LayoutStrategyEdge | undefined): LayoutPosition[] | undefined {
+function routedPoints(edge: LayoutStrategyEdge | undefined): Point[] | undefined {
   if (!edge?.sections?.length) return undefined;
-  const points: LayoutPosition[] = [];
+  const points: Point[] = [];
   for (const section of edge.sections) {
     points.push(section.startPoint, ...(section.bendPoints ?? []), section.endPoint);
   }

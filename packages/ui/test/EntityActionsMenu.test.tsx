@@ -94,10 +94,10 @@ const permanentCopyCommand = (onSelect: EntityAction['onSelect']): EntityAction 
   onSelect,
 });
 
-/** A command the Sidebar's Delete Layout is shaped like: it reports no words. */
-const deleteLayoutCommand = (onSelect: EntityAction['onSelect']): EntityAction => ({
-  id: 'delete-layout',
-  label: 'Delete Layout',
+/** A command the Sidebar's Delete Diagram is shaped like: it reports no words. */
+const deleteDiagramCommand = (onSelect: EntityAction['onSelect']): EntityAction => ({
+  id: 'delete-diagram',
+  label: 'Delete Diagram',
   variant: 'destructive',
   onSelect,
 });
@@ -217,23 +217,23 @@ describe('the entity actions menu', () => {
   /**
    * The failure of a command that names no words still has to go somewhere.
    *
-   * This is the Sidebar's Delete Layout: it reports no words, wraps its command
+   * This is the Sidebar's Delete Diagram: it reports no words, wraps its command
    * in an `async` function to dismiss the mobile Sheet on the outcome, and runs
    * an Edit whose `complete` throws outright for a Space that has stopped
    * loading. The rejection used to be discarded unread — the menu had already
    * closed, the Sheet stayed open, no alert was armed, and the author pressed
-   * Delete Layout to no effect and no message anywhere.
+   * Delete Diagram to no effect and no message anywhere.
    */
   it('does not drop the failure of a command that reports no words', async () => {
     const recorded = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const failure = new Error('the Space has stopped loading');
     openMenu([
-      deleteLayoutCommand(async () => {
+      deleteDiagramCommand(async () => {
         await Promise.resolve();
         throw failure;
       }),
     ]);
-    await press(/Delete Layout/);
+    await press(/Delete Diagram/);
 
     await vi.waitFor(() => expect(recorded).toHaveBeenCalledWith(expect.any(String), failure));
   });

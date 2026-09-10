@@ -57,7 +57,7 @@ const cardArb: fc.Arbitrary<Card> = fc.oneof(
       title: line,
       kind: fc.constant('space' as const),
       spaceId: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-      layout: fc.option(
+      diagram: fc.option(
         fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
         { nil: undefined },
       ),

@@ -18,7 +18,7 @@ function loadFixture(): Space {
       version: 1,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Test',
-      layouts: [
+      diagrams: [
         {
           id: uuid('00000000-0000-4000-8000-000000000022'),
           title: 'Working',
@@ -103,7 +103,7 @@ describe('buildCardHandles', () => {
         version: 1,
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Fork',
-        layouts: [
+        diagrams: [
           {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
@@ -278,7 +278,7 @@ describe('buildGraphRenderEdges', () => {
         version: 1,
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Test',
-        layouts: [
+        diagrams: [
           {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
@@ -362,7 +362,7 @@ describe('buildGraphRenderEdges', () => {
         version: 1,
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Test',
-        layouts: [
+        diagrams: [
           {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
@@ -409,7 +409,7 @@ describe('buildGraphRenderEdges', () => {
         version: 1,
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Fork',
-        layouts: [
+        diagrams: [
           {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',

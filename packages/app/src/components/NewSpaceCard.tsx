@@ -180,7 +180,7 @@ export function NewSpaceCard({
           <Field className="card-pane__heading">
             <FieldTitle>New Space Card</FieldTitle>
             <FieldDescription>
-              A Space Card shows another Space, through the Layout and Graph it selects.
+              A Space Card shows another Space, through the Diagram and Graph it selects.
             </FieldDescription>
           </Field>
           <Field className="card-pane__field" data-invalid={titleError !== null}>

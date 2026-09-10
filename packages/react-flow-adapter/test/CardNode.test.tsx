@@ -691,7 +691,7 @@ describe('CardNode Expanded Card front', () => {
     );
   });
 
-  it('draws its title alone until the Layout Expands it', () => {
+  it('draws its title alone until the Diagram Expands it', () => {
     const { container } = render(<CardNode {...props({ body: SOURCE })} />);
 
     expect(
@@ -704,7 +704,7 @@ describe('CardNode Expanded Card front', () => {
     );
   });
 
-  it('does not mount a stale body editor until the Layout Expands the Card', () => {
+  it('does not mount a stale body editor until the Diagram Expands the Card', () => {
     const { container } = render(
       <CardNode
         {...props({

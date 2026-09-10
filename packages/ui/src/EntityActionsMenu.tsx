@@ -224,7 +224,7 @@ function useConfirmation() {
      * is called on this click exactly as before — but a command that throws
      * before it ever returns a promise now rejects instead of throwing out of a
      * React event handler, which no error boundary catches. The Sidebar's
-     * Delete Layout is that command: it runs an Edit, and `complete` throws
+     * Delete Diagram is that command: it runs an Edit, and `complete` throws
      * outright for a Space that has stopped loading.
      */
     void (async () => {
@@ -237,7 +237,7 @@ function useConfirmation() {
          * outcome, and an item naming no words has nothing to show for it
          * either way. So it is recorded here as well, because the alternative
          * is what this replaced: the promise was never consumed on the
-         * wordless path, so a refused Delete Layout became an unhandled
+         * wordless path, so a refused Delete Diagram became an unhandled
          * rejection and the author pressed it to no effect and no message
          * anywhere.
          */

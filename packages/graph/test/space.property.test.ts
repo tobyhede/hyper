@@ -22,8 +22,8 @@ const cardsArb = fc
   )
   .map((cards) => ({ cards, files: cards.map((c) => cardFile(c.id, c.title)) }));
 
-// No layouts, and so no graphs: these properties are about which cards a space
-// ends up with, and a layout would only constrain them (ADR 0040).
+// No diagrams, and so no graphs: these properties are about which cards a space
+// ends up with, and a diagram would only constrain them (ADR 0040).
 const emptySpaceFile = {
   version: 1,
   id: '00000000-0000-4000-8000-000000000001',

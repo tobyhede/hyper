@@ -31,7 +31,7 @@ function SpaceApplication({
  *
  * So what is left is the mounting rule, and it is load-bearing. Every entry
  * stays mounted and hidden rather than being unmounted, because a Space keeps
- * its Layout selection, its Graph and its traversal for as long as it is open —
+ * its Diagram selection, its Graph and its traversal for as long as it is open —
  * and because a hidden Space still commits, still fails, and still has to be
  * reportable on the showing Space's Open Spaces menu. `active` is what withholds
  * the global keys and the portalled persistence dialogs from the hidden ones;
