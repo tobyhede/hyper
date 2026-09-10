@@ -65,7 +65,13 @@ const HISTORICAL = ['docs/adr/', 'docs/superpowers/', '.scratch/'];
 const EXCLUDED_PATHS = [
   'pnpm-lock.yaml',
   'skills-lock.json',
-  '.agents/skills/',
+  // Only the tree `skills-lock.json` actually pins. Change one excluded
+  // `.agents/skills/` whole, and for Layout that was harmless; here it would
+  // have frozen `shadcn-first-ui`, which is **repo-owned**, unlocked, and names
+  // our own components in its guidance — a skill telling the next agent to
+  // compose a `CanvasCard` when the component is `CanvasThing` is worse than
+  // stale, it is wrong instruction.
+  '.agents/skills/shadcn/',
   'migrations/',
   'packages/ui/src/components/card.tsx',
 ];

@@ -1061,7 +1061,11 @@ const RETIRED_DIAGRAM_NAME = new RegExp(
     // see `withoutQualifiedSpellings`, which is where a path citation, a
     // foreign glyph and the verb are separated from the entity.
     `${retiredDiagramLower}-[a-z]`,
-    `[a-z]-${retiredDiagramLower}s?\\b`,
+    // `(?![a-z])` rather than `\\b`: an underscore is a word character, so no
+    // boundary lands after the retired word in a BEM block and `.canvas-x__rail`
+    // would read as clean. Nothing in the tree hides behind it today — this
+    // closes the gap the sibling block below found rather than fixing a site.
+    `[a-z]-${retiredDiagramLower}s?(?![a-z])`,
     // The optional field. The key arm above cannot cross the `?`, and this is
     // the declared shape of the Space Thing frontmatter key ADR 0079 still owes.
     `\\b${retiredDiagramLower}s?\\?\\s*:`,
@@ -1313,10 +1317,10 @@ describe('a Diagram is named once (ADR 0085)', () => {
       // leading hyphen out by name.
       `refusal: { code: '${retiredDiagramLower}-not-found' },`,
       `return 'space-must-keep-${retiredDiagramLower}';`,
-      `<div data-testid="space-thing-${retiredDiagramLower}">`,
+      `<div data-testid="space-${retiredThingLower}-${retiredDiagramLower}">`,
       `.${retiredDiagramLower}-header { display: flex; }`,
       // The optional field, whose `?` the field arm's quote-then-colon cannot
-      // cross. This is the Space Thing frontmatter key's own declared shape.
+      // cross. This is the Space Card frontmatter key's own declared shape.
       `readonly ${retiredDiagramLower}?: UUID;`,
       // The callback binding, where the retired word is the whole parameter
       // name and no capital follows it. This repo's own convention writes it.
@@ -1412,11 +1416,10 @@ describe('a Diagram is named once (ADR 0085)', () => {
  * as Lucide's glyph is for Route and elkjs's options bag is for Layout.
  *
  * The registry's Tailwind tokens and custom properties need **nothing**, and
- * that is the collection-key arm's `(?<!-)` earning itself a second time:
- * `bg-card`, `text-card-foreground`, `--card` and `--color-card` all carry a
- * hyphen immediately before the retired word, so a rule written to keep prose
- * about re-running a strategy out of a Diagram scan keeps a whole vendored
- * palette out of this one.
+ * the collection-key arm's `(?<!-)` and the qualified masker between them cover
+ * every one: each carries a hyphen immediately before the retired word, or a
+ * slash, so a rule written to keep prose about re-running a strategy out of a
+ * Diagram scan keeps a whole vendored palette out of this one.
  */
 const RETIRED_THING = ['C', 'ard'].join('');
 const retiredThingLower = RETIRED_THING.toLowerCase();
@@ -1451,6 +1454,26 @@ const RETIRED_THING_NAME = new RegExp(
     // the model rename could land with every table name still retired and the
     // scan silent.
     `["']${retiredThingLower}s?["']`,
+    // The kebab-case compounds, which are the shape most of this rename was
+    // written in and which review of change one found the Diagram block blind
+    // to: refusal codes, completion kinds, test ids, CSS blocks and every
+    // `data-` attribute. A hyphen is not a word character, so `\\b` lands either
+    // side of the retired word and every arm above reads straight past
+    // `thing-not-found`, `edited-thing` and `.canvas-thing`. The registry's own
+    // hyphenated tokens are the reason the exemption below is masked by
+    // spelling rather than skipped by file.
+    `${retiredThingLower}-[a-z]`,
+    // `(?![a-z])` rather than `\\b`, because an underscore is a word character
+    // and no boundary lands after the retired word in a BEM block — which is
+    // exactly how this rename's CSS was written: `canvas-thing__rail`,
+    // `thing-rail__action`. The Diagram block's `\\b` would have read past every
+    // one of them.
+    `[a-z]-${retiredThingLower}s?(?![a-z])`,
+    // The optional field, which the key arm cannot cross the `?` to reach.
+    `\\b${retiredThingLower}s?\\?\\s*:`,
+    // The callback binding written as a whole parameter, where no capital
+    // follows the retired word to end a compound.
+    `\\(\\s*${retiredThingLower}\\s*\\)\\s*=>`,
   ].join('|'),
 );
 
@@ -1462,6 +1485,45 @@ const RETIRED_THING_NAME = new RegExp(
  * prose and a glossary entry retiring a noun has to spell the noun.
  */
 const RETIRED_THING_BARE = new RegExp(`\\b${RETIRED_THING}\\b`);
+
+/**
+ * Spellings the kebab arms are broad enough to reach and which ADR 0085
+ * deliberately leaves alone, masked out **before** the scan reads any file
+ * rather than carved out per file — the idiom `withoutQualifiedSpellings`
+ * established for the Diagram block, and needed here for the same reason: a
+ * hyphen is what makes a kebab arm see a token at all, and it is also what
+ * every one of these is built from.
+ *
+ * Three kinds. The shadcn registry's Tailwind tokens, custom properties and
+ * `data-slot` values, which are read in six modules outside the vendored one
+ * and are not ours to sweep (ADR 0047, ADR 0050). The two `.scratch/` efforts
+ * `docs/agents/issue-tracker.md` names **without** their directory prefix,
+ * which no path shape can see — the same blind spot that let two of them
+ * through the sweep itself. And `CITED_PATH`, shared with the block above,
+ * for every citation that does carry a prefix: a renamed citation into a tree
+ * this rename does not rewrite is a broken link, which is the failure this
+ * file's own comments record as having happened twice.
+ */
+const QUALIFIED_THING_SPELLINGS = [
+  `text-${retiredThingLower}-foreground`,
+  `--color-${retiredThingLower}-foreground`,
+  `--${retiredThingLower}-foreground`,
+  `--${retiredThingLower}-spacing`,
+  `--color-${retiredThingLower}`,
+  `data-slot="${retiredThingLower}`,
+  // Tailwind's attribute-variant spelling of the same slot values.
+  `[slot=${retiredThingLower}`,
+  `bg-${retiredThingLower}`,
+  `--${retiredThingLower}\``,
+  `${retiredThingLower}-authoring`,
+  `${retiredThingLower}-gestures`,
+] as const;
+
+const withoutQualifiedThingSpellings = (source: string): string =>
+  QUALIFIED_THING_SPELLINGS.reduce(
+    (text, spelling) => text.split(spelling).join('qualified'),
+    source.replace(CITED_PATH, 'path'),
+  );
 
 /**
  * The six registry compounds the exemption below forgives. The registry's
@@ -1481,6 +1543,9 @@ const FOREIGN_THING_SPELLINGS = new RegExp(
     `/${retiredThingLower}:`,
     // The registry's own slot value, which the quoted-string arm reads.
     `data-slot="${retiredThingLower}"`,
+    // A second registry component whose name ends in the retired word, written
+    // only in the vendored guidance below.
+    `Hover${RETIRED_THING}`,
   ].join('|'),
 );
 
@@ -1502,6 +1567,18 @@ const withoutForeignThingSpellings = (source: string): string =>
  * registry one under different names (ADR 0047, ADR 0050, ADR 0085).
  */
 const FOREIGN_THING_FILES: readonly string[] = [
+  // The vendored shadcn skill set, which `skills-lock.json` pins and which is
+  // written in shadcn's own vocabulary: its composition rule *is* that you use
+  // the registry's `Card` family rather than one `div`. Masked by spelling
+  // rather than skipped as a tree, in the idiom the Diagram block above adopted
+  // for the same tree — so a pinned-skills bump that introduced a domain
+  // compound would still be reported. `shadcn-first-ui` and
+  // `address-code-review` are repo-owned and are **not** here: the first names
+  // our own components in its guidance and speaks the current vocabulary.
+  '.agents/skills/shadcn/SKILL.md',
+  '.agents/skills/shadcn/rules/composition.md',
+  '.agents/skills/shadcn/rules/styling.md',
+  '.agents/skills/shadcn/evals/evals.json',
   'packages/ui/src/components/card.tsx',
   'packages/ui/src/index.ts',
   'packages/ui/src/CanvasThing.tsx',
@@ -1570,9 +1647,10 @@ describe('a Thing is named once (ADR 0085)', () => {
     const found = scanned.flatMap((file) => {
       const source = readTracked(file);
       if (source === null) return [];
+      const qualified = withoutQualifiedThingSpellings(source);
       const read = FOREIGN_THING_FILES.includes(file)
-        ? withoutForeignThingSpellings(source)
-        : source;
+        ? withoutForeignThingSpellings(qualified)
+        : qualified;
       return hits(read, RETIRED_THING_NAME).map((hit) => `${file}:${hit}`);
     });
 
@@ -1647,6 +1725,18 @@ describe('a Thing is named once (ADR 0085)', () => {
       `{ "${retiredThingLower}s": [], "default${RETIRED_THING}": null }`,
       `model ${RETIRED_THING} { @@map("${retiredThingLower}s") }`,
       `for (const entry of space.${retiredThingLower}s) {`,
+      // The kebab-case shapes, which are most of what this rename carried and
+      // what every arm above reads straight past: refusal codes, completion
+      // kinds, test ids, CSS blocks and `data-` attributes.
+      `refusal.code = '${retiredThingLower}-not-found';`,
+      `case 'edited-${retiredThingLower}':`,
+      `<article data-testid="canvas-${retiredThingLower}">`,
+      `.canvas-${retiredThingLower}__rail { display: flex; }`,
+      `'space-${retiredThingLower}-target-missing',`,
+      // The optional field, which the key arm cannot cross the `?` to reach.
+      `readonly ${retiredThingLower}?: ${RETIRED_THING}Id;`,
+      // The binding written as a whole parameter, with no capital to end it.
+      `space.things.map((${retiredThingLower}) => ${retiredThingLower}.id)`,
     ];
 
     for (const line of retired) {
@@ -1687,11 +1777,6 @@ describe('a Thing is named once (ADR 0085)', () => {
 
   it('stays silent on the registry, on ordinary English, and on the vocabulary that replaced it', () => {
     const kept = [
-      // The registry's Tailwind tokens and custom properties, which the
-      // collection-key arm's lookbehind keeps out without an exemption.
-      `'rounded-xl bg-${retiredThingLower} text-sm text-${retiredThingLower}-foreground'`,
-      `  --color-${retiredThingLower}: var(--${retiredThingLower});`,
-      `  --${retiredThingLower}-foreground: var(--foreground);`,
       // Ordinary English that merely contains the letters.
       `const ${retiredThingLower}inality = new Set(ids).size;`,
       `// the author dis${retiredThingLower}ed the draft rather than saving it`,
@@ -1708,6 +1793,18 @@ describe('a Thing is named once (ADR 0085)', () => {
     // The registry's component names are forgiven by the exemption rather than
     // by the shape — the arms above read them exactly as they read a domain
     // compound, which is the whole reason this carve-out is by file.
+    // The registry's hyphenated tokens and a citation into a tree this rename
+    // does not rewrite: forgiven by the qualified masker, which runs before the
+    // scan reads any file, rather than by the shape or by a file exemption.
+    for (const line of [
+      `'rounded-xl bg-${retiredThingLower} text-sm text-${retiredThingLower}-foreground'`,
+      `  --color-${retiredThingLower}: var(--${retiredThingLower}-foreground);`,
+      `  * see \`.scratch/${retiredThingLower}-route-editing/edge-authoring-design.md\``,
+    ]) {
+      expect(RETIRED_THING_NAME.test(line), line).toBe(true);
+      expect(RETIRED_THING_NAME.test(withoutQualifiedThingSpellings(line)), line).toBe(false);
+    }
+
     for (const line of [
       `import { ${RETIRED_THING}Header } from './components/${retiredThingLower}';`,
       `<${RETIRED_THING}Content className="canvas-thing__body">`,
