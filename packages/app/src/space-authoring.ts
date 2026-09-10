@@ -135,7 +135,9 @@ export type AuthoringCompletion =
   | { readonly kind: 'created-card'; readonly anchor: LayoutPosition }
   /**
    * Add Alias: created only once its Target is chosen, because an Alias without
-   * one is not a valid Card. An empty title takes the Target's.
+   * one is not a valid Card. An empty title mints `Card N` like any other Card
+   * rather than copying the Target's, which is what stopped two Cards arriving
+   * with one name (ADR 0083 refines ADR 0046).
    */
   | {
       readonly kind: 'created-alias';

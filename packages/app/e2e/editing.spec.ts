@@ -2765,13 +2765,15 @@ test(
     await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
     await expect(page.getByTestId('new-alias')).toHaveCount(0);
-    await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('B');
+    await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('Card 1');
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
     await page.getByRole('textbox', { name: 'Card title' }).press('Escape');
 
-    // An empty title takes the Target's, so the Alias is a second Card called B.
+    // An unnamed Alias mints its own name like any other Card, so the Target is
+    // still the only Card called B and the Alias is the next `Card N`.
     await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
-    await expect(nodeByTitle(page, 'B')).toHaveCount(2);
+    await expect(nodeByTitle(page, 'B')).toHaveCount(1);
+    await expect(nodeByTitle(page, 'Card 1')).toHaveCount(1);
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   },
@@ -2780,10 +2782,10 @@ test(
 /**
  * The whole gesture, and the reason the Title field had to exist.
  *
- * An empty title takes the Target's, so creation leaves two Cards called `B` and
- * the author standing in a pane that has to tell them apart. Renaming has to be
- * reachable from where the author already is, has to reach the *Alias*, and has
- * to leave the Target's own title alone.
+ * An unnamed Alias mints `Card N`, so creation leaves the author standing in a
+ * pane holding a name that says nothing about what they just made. Renaming has
+ * to be reachable from where the author already is, has to reach the *Alias*,
+ * and has to leave the Target's own title alone.
  *
  * The editor retains the pane contract: only its labelled Done action commits.
  */
@@ -2799,7 +2801,7 @@ test('an Alias is renamed by the shared Title editor creation begins', async ({ 
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
   const title = page.getByRole('textbox', { name: 'Card title' });
-  await expect(title).toHaveValue('B');
+  await expect(title).toHaveValue('Card 1');
   await expect(title).toBeFocused();
   await title.fill('Recap');
   await title.press('Enter');
@@ -2842,6 +2844,7 @@ test('Escape discards an Alias rename without undoing the Alias', async ({ page 
 
   await quiescent(page);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(0);
-  await expect(nodeByTitle(page, 'B')).toHaveCount(2);
+  await expect(nodeByTitle(page, 'B')).toHaveCount(1);
+  await expect(nodeByTitle(page, 'Card 1')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });

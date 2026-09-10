@@ -1,6 +1,7 @@
 # A Card Title is Title Lines
 
 Status: accepted
+Refines: 0046
 Related: 0009, 0014, 0020, 0047, 0050, 0052, 0057, 0064, 0065, 0070
 
 A Card's **Title** is one or more **Title Lines**. It is stored as it always was — one `string` on the Card document — and the newlines inside it are load-bearing: the **first line is the Card's name**, and the lines after it draw beneath the name on the Card front at descending typographic weight. A Title with no newline in it is exactly the Title Hyper has always had, drawn exactly as it has always been drawn.
@@ -48,3 +49,9 @@ Multiline Titles belong to **Cards only**. Space, Layout and Graph titles keep a
 Editing gains a line break at the cost of nothing else: `Enter` still completes, `Escape` still cancels, and `Shift+Enter` inserts a line. The field grows with its content and stays at one uniform size while typing — per-line preview would mean hand-rolling a text editing surface, which ADR 0047 and ADR 0050 make a last resort and which this does not need.
 
 Stored Titles are unaffected: every existing Title is a single line and normalizes to itself, so there is no migration. A multiline Title serializes through the existing `yaml` writer as a block scalar.
+
+## What this refines in 0046
+
+ADR 0046 gave Alias creation an empty-Title fallback that took the Target's Title, reasoning that creation "has a Target in hand and a Card that does not exist yet, so an empty field is an author declining to choose a name". That fallback is **gone**: an unnamed Alias mints `Card N` through the same operation every other Card's default name comes from.
+
+The rest of 0046 stands. What changes is only where the default comes from, and the reason is 0046's own: it wanted an author never to face two Cards with one name they did not choose, and forbade the *rename* the same fallback for exactly that reason. Creation producing the collision that renaming is forbidden to produce was the inconsistency, not the cure — and 0046's grounds for the fallback (an author declining to choose) are answered better by a minted name, because ADR 0070's creation flow continues straight into inline Title naming and is asking for a name at that moment anyway. An author who deliberately names an Alias after its Target still gets two Cards with one name; that is authored rather than produced.
