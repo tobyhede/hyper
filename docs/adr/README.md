@@ -105,7 +105,6 @@ under `superseded/`.
 | [0065](0065-a-card-title-edits-on-one-activation.md) | A Card Title edits on one activation. |
 | [0066](0066-open-size-survives-closing.md) | A Layout keeps the Open Size after a Close. |
 | [0073](0073-a-card-rail-is-a-toolbar.md) | A Card rail is one `role="toolbar"` with roving tabindex. |
-| [0083](0083-a-card-title-is-title-lines.md) | A Card Title is one or more Title Lines. The first line is its name. |
 
 ## Toolchain
 
