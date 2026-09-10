@@ -141,6 +141,43 @@ fixture's `remoteRefusal` prop (`SpaceSidebarFixture.tsx:63`, `:264`).
       changes application code, a persistence surface the browser reaches, and
       two components with stories.
 
+## What the review pass added
+
+Three defects and a missing pin, found reviewing this branch before it merged.
+None of them moves an acceptance criterion above; they are recorded because they
+landed on this branch and inside this ticket's surface.
+
+- **The `payload-too-large` sentence named the wrong thing twice.** It blamed a
+  long Card for a limit `MAX_COMMIT_BODY_BYTES` applies to the whole serialised
+  snapshot — a Space can exceed it on Card *count* with nothing long in it — and
+  told the author to "try again" in the one state whose dialog offers only
+  Continue editing, `PersistenceNotice` drawing nothing for `rejected`. It now
+  names the change and the Cards that shorten it.
+
+- **`ConflictControl` kept a refusal across two conflicts.** Its remount key was
+  the stored revision, which collapses to the constant `'coordinated'` for every
+  conflict carrying no stored snapshot, so two coordinated conflicts reused the
+  instance and the first's "Unable to reload" alert stood over the second —
+  whose stored side may load perfectly well. The key is gone and the refusal is
+  held beside the conflict that raised it.
+
+- **A dismissed rejection returned on the way back to the Space.** The
+  acknowledgement sat below `PersistenceControl`'s `active` gate, which unmounts
+  everything that component returns; it moved up one level, to the component
+  Open Spaces leaves mounted. The test written with the original fix pinned
+  nothing either — its two rejections differed in `message`, which the
+  `${code}:${message}` key it replaced also told apart. They are byte-identical
+  now, which is the pair the fix is for.
+
+- **The invariant the acknowledgement rests on is pinned rather than assumed.**
+  Two rejections are separated by the identity of the failure the session
+  published, because nothing in the value separates them once `message` is
+  unread. That makes a fresh result per commit load-bearing:
+  `http-backend.test.ts`'s "mints a distinct failure for each rejected commit".
+  The alternative — a sequence number in the acknowledgement — has to be minted
+  by the session and carried on `SpaceSessionState`, which widens a persistence
+  contract to hold one component's bookkeeping.
+
 ## What remains, and why it is not here
 
 Both residues are named in ADR 0057's status block, which points at this file.
