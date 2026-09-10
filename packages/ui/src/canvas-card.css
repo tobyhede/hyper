@@ -6,6 +6,36 @@
   --canvas-card-muted: var(--canvas-card-muted-color);
   --canvas-card-error: var(--canvas-card-error-color);
 
+  /* The Title ladder (ADR 0083). One size and one leading are authored — the
+     `title` role's, which is the Title Hyper has always drawn — and the two
+     rungs below it are ratios of that size rather than sizes of their own. A
+     change to the top of the scale therefore moves the whole ladder, and a
+     single-line Title, which is only ever the `title` role, is untouched by
+     any of it.
+
+     0.78 and 0.67 draw 14px and 12px against an 18px name. Both keep
+     `--canvas-card-title` as their ink: the size and the weight step are
+     already saying "descending", and dimming on top of that would be two
+     mechanisms for one meaning on a front where the Graph colour is carrying
+     information of its own. */
+  --canvas-card-title-size: 18px;
+  --canvas-card-title-leading: 1.12;
+  --canvas-card-subtitle-ratio: 0.78;
+  --canvas-card-caption-ratio: 0.67;
+
+  /* The ladder's ceiling, in lines of the `title` role. Placement is authored,
+     so a Title is clamped to the room available and never accommodated (ADR
+     0014, ADR 0066, ADR 0083) — a Title with more lines than fit is clipped.
+
+     A number rather than the room the Card happens to have, because the ladder
+     has to draw the same whether the Card is Open or Closed: room-relative
+     clipping would reveal more rungs on Opening and teach an author that
+     Opening edits the Title. The number is chosen to fit inside the body of a
+     Closed Card, which is the smaller of the two and the authored default;
+     `packages/ui/test/canvas-card-title-ladder.test.ts` holds it to that
+     Card's own geometry. */
+  --canvas-card-title-ladder-lines: 4;
+
   position: relative;
   box-sizing: border-box;
   width: var(--card-width);
@@ -187,18 +217,76 @@
   padding: 10px 12px;
 }
 
+/* The heading box holds the ladder and caps it. Its own type is the `title`
+   role's, so the Title Lines below it inherit the leading, the tracking and the
+   ink from one place, and a Title with no break in it is drawn by exactly the
+   declarations that drew it before there was a ladder at all. */
 .canvas-card__title {
-  display: -webkit-box;
+  display: block;
+  max-height: calc(
+    var(--canvas-card-title-size) * var(--canvas-card-title-leading) *
+      var(--canvas-card-title-ladder-lines)
+  );
   margin: 0;
   overflow: hidden;
   color: var(--canvas-card-title);
-  font-size: 18px;
+  font-size: var(--canvas-card-title-size);
   font-weight: 600;
-  line-height: 1.12;
+  line-height: var(--canvas-card-title-leading);
   letter-spacing: -0.02em;
   text-wrap: balance;
+}
+
+/* The heading itself, which the activation control wraps rather than sits
+   inside (ADR 0065, ADR 0083). A plain block, so inserting it between the
+   Title's box and its rungs changes no layout: the box keeps the clamp and the
+   type, and each rung keeps its own. */
+.canvas-card__title-heading {
+  display: block;
+}
+
+/* One Title Line, drawn as its own block so the break the author typed is the
+   only thing that starts a new rung (ADR 0083). A break the *box* chooses is
+   not a rung: a line wraps freely inside its own role, so a subtitle that takes
+   two visual lines is one subtitle and a long single-line Title is still all
+   `title`. That is what the clamp counts — visual lines, per role.
+
+   `white-space: normal` because ADR 0065 puts this ladder inside the shared
+   `Button`, whose base class is `whitespace-nowrap`. Wrapping within a role is
+   the rule; the control the rule is drawn inside does not get to withdraw it. */
+.canvas-card__title-line {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
   -webkit-box-orient: vertical;
+}
+
+/* An interior blank line is a gap the author meant and the schema keeps
+   verbatim (ADR 0083). An empty block box has no height of its own to draw one
+   with, so it is given the line it stands for. */
+.canvas-card__title-line:empty {
+  min-height: 1lh;
+}
+
+/* The three rungs. The first restates the heading's own type rather than
+   inheriting it silently, so the ladder reads as a ladder at the one place a
+   reader looks for it. */
+.canvas-card__title-line[data-role='title'] {
+  font-size: var(--canvas-card-title-size);
+  font-weight: 600;
   -webkit-line-clamp: 3;
+}
+
+.canvas-card__title-line[data-role='subtitle'] {
+  font-size: calc(var(--canvas-card-title-size) * var(--canvas-card-subtitle-ratio));
+  font-weight: 500;
+  -webkit-line-clamp: 2;
+}
+
+.canvas-card__title-line[data-role='caption'] {
+  font-size: calc(var(--canvas-card-title-size) * var(--canvas-card-caption-ratio));
+  font-weight: 400;
+  -webkit-line-clamp: 1;
 }
 
 /* The Title's one-activation control (ADR 0065) must claim only the pixels it

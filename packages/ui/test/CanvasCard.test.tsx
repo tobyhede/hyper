@@ -461,12 +461,12 @@ describe('CanvasCard title', () => {
     );
 
     const heading = screen.getByRole('heading', { name: 'A' });
-    expect(heading).toHaveAttribute('data-editable', 'false');
+    expect(heading.closest('.canvas-card__title')).toHaveAttribute('data-editable', 'false');
     fireEvent.click(heading);
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
 
-  it('exposes the editable Title as a named control inside its heading', () => {
+  it('wraps its heading in the Title’s one-activation control', () => {
     const onBeginTitleEdit = vi.fn();
     render(
       <CanvasCard
@@ -479,10 +479,14 @@ describe('CanvasCard title', () => {
     );
 
     const heading = screen.getByRole('heading', { name: 'A' });
-    expect(heading).toHaveAttribute('data-editable', 'true');
+    expect(heading.closest('.canvas-card__title')).toHaveAttribute('data-editable', 'true');
     expect(heading).toHaveAccessibleName('A');
     const control = screen.getByRole('button', { name: 'Edit Title A' });
-    expect(heading).toContainElement(control);
+    // The control wraps the heading and not the other way round. An accessible
+    // name comes from an element's own label first and its content second, so a
+    // heading *containing* a labelled control is named by that control and the
+    // Title Lines are reachable through nothing (ADR 0065, ADR 0083).
+    expect(control).toContainElement(heading);
 
     fireEvent.click(control);
     expect(onBeginTitleEdit).toHaveBeenCalledOnce();
@@ -514,6 +518,133 @@ describe('CanvasCard title', () => {
     expect(onBeginTitleEdit).toHaveBeenCalledOnce();
     expect(selectedCard).not.toHaveBeenCalled();
     expect(pressedCard).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The Title ladder (ADR 0083). What the DOM has to say is the structure — a
+ * block element per Title Line, carrying the role the domain gave it — and the
+ * typography that structure hangs off is held by
+ * `canvas-card-title-ladder.test.ts`, because jsdom computes no CSS.
+ *
+ * The distinction every one of these is protecting: a break the **author typed**
+ * starts a rung; a break the **box chose** does not. jsdom cannot wrap text, so
+ * the second half is proved where wrapping is real — the Ladle suite's
+ * `markdown · long title` specimen, whose long single-line Title must stay one
+ * `title`-role element however many visual lines it takes.
+ */
+describe('CanvasCard Title ladder', () => {
+  const ladder = (): readonly { role: string | null; text: string }[] =>
+    [...screen.getByRole('heading').querySelectorAll('.canvas-card__title-line')].map((line) => ({
+      role: line.getAttribute('data-role'),
+      text: line.textContent,
+    }));
+
+  it('draws a Title with no break as one element at the title role', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="rest"
+        title="Strategies"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    expect(ladder()).toEqual([{ role: 'title', text: 'Strategies' }]);
+  });
+
+  /** Line one names the Card; line two qualifies it; line three and after repeat. */
+  it('gives each authored line its role, and every line past the third the last one', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="rest"
+        title={'Strategies\nNo strategy is privileged\nADR 0014\nADR 0041'}
+        graphColor="#ffc53d"
+      />,
+    );
+
+    expect(ladder()).toEqual([
+      { role: 'title', text: 'Strategies' },
+      { role: 'subtitle', text: 'No strategy is privileged' },
+      { role: 'caption', text: 'ADR 0014' },
+      { role: 'caption', text: 'ADR 0041' },
+    ]);
+  });
+
+  /** An interior blank line is a gap the author meant, and it keeps its rung. */
+  it('keeps an interior blank line as a line of its own', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="rest"
+        title={'Strategies\n\nADR 0014'}
+        graphColor="#ffc53d"
+      />,
+    );
+
+    expect(ladder()).toEqual([
+      { role: 'title', text: 'Strategies' },
+      { role: 'subtitle', text: '' },
+      { role: 'caption', text: 'ADR 0014' },
+    ]);
+  });
+
+  /**
+   * A Title that changed shape when a Card opened would teach an author that
+   * Opening edits it, so Open and Closed draw the same ladder — and so does
+   * every kind, the Card front being the one surface that draws one at all.
+   */
+  it('draws the same ladder Open and Closed, on every Card kind', () => {
+    const title = 'Strategies\nNo strategy is privileged\nADR 0014';
+    const fronts: readonly CanvasCardFront[] = [
+      { kind: 'preview' },
+      { kind: 'markdown', source: '', open: false },
+      { kind: 'markdown', source: '', open: true },
+      { kind: 'alias', source: '', open: false },
+      { kind: 'alias', source: '', open: true },
+      { kind: 'space', open: false },
+      { kind: 'space', open: true },
+    ];
+
+    for (const front of fronts) {
+      const { unmount } = render(
+        <CanvasCard front={front} state="rest" title={title} graphColor="#ffc53d" />,
+      );
+      expect(ladder(), front.kind).toEqual([
+        { role: 'title', text: 'Strategies' },
+        { role: 'subtitle', text: 'No strategy is privileged' },
+        { role: 'caption', text: 'ADR 0014' },
+      ]);
+      unmount();
+    }
+  });
+
+  /**
+   * ADR 0065's one-activation control covers the whole Title rather than its
+   * first line: the editor it opens edits the whole string, and a control over
+   * the name alone would say otherwise. One control, and the ladder inside it,
+   * which is also what puts the hover and focus treatment across the ladder.
+   */
+  it('puts the whole ladder inside the one Title control', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="rest"
+        title={'Strategies\nNo strategy is privileged\nADR 0014'}
+        graphColor="#ffc53d"
+        onBeginTitleEdit={() => undefined}
+      />,
+    );
+
+    const control = screen.getByRole('button', {
+      name: 'Edit Title Strategies\nNo strategy is privileged\nADR 0014',
+    });
+    const lines = control.querySelectorAll('.canvas-card__title-line');
+    expect(lines).toHaveLength(3);
+    expect(screen.getByRole('heading').querySelectorAll('.canvas-card__title-line')).toHaveLength(
+      3,
+    );
   });
 });
 
