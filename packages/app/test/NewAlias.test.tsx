@@ -163,6 +163,29 @@ describe('NewAlias', () => {
     );
   });
 
+  /**
+   * The hint is the pane's one sentence about what finishing does, so it has to
+   * describe the Edit that actually runs. An empty title mints the same neutral
+   * `Card N` every other created Card gets — the Target's own Title is never
+   * copied, because that gave the Space two Cards with one name by default
+   * (ADR 0083's refinement of ADR 0046).
+   */
+  it('says an untitled Alias is named for the author, not after its Target', () => {
+    render(
+      <NewAlias
+        targets={targets}
+        refusal={null}
+        onCreate={() => undefined}
+        onCancel={() => undefined}
+        onRefusalStale={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText(/Choosing a Target creates the Alias/)).toHaveTextContent(
+      'Choosing a Target creates the Alias. Leave the title empty and it is named for you; renaming continues on the Card.',
+    );
+  });
+
   it('says nothing while there is no refusal to go stale', () => {
     const staleRefusal = vi.fn();
     render(

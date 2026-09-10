@@ -394,15 +394,13 @@ export function useCanvasCardAuthoring({
               ? spaceCardTargets.get(stored.document.spaceId)
               : undefined;
           if (target !== undefined) {
-            data.spaceTitle = target.title;
             // Supplied whenever the target has been read, and *disabled* rather
             // than withheld where it cannot be authored. An absent selection is
             // how the Card says the target Space has not been read yet, so a
             // canvas that had merely withdrawn authoring — a creation pane is
             // up, the Space is presenting, a chrome title is being edited —
             // would put every Open Space Card on it back to reporting a wait
-            // that had already ended, beside a marker naming the Space it had
-            // just read.
+            // that had already ended.
             data.spaceSelection = spaceCardSelection(
               node.data.cardId,
               target,

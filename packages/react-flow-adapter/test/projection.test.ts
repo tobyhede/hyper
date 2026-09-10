@@ -343,40 +343,6 @@ describe('projectCardNodes', () => {
     );
   });
 
-  it('marks an alias node with the title of the card it shows', () => {
-    const withAlias = load(
-      spaceFile([
-        {
-          id: '00000000-0000-4000-8000-000000000004',
-          title: 'Main',
-          edges: [
-            {
-              from: '00000000-0000-4000-8000-000000000002',
-              to: '00000000-0000-4000-8000-000000000007',
-            },
-          ],
-        },
-      ]),
-      [
-        cardFile('00000000-0000-4000-8000-000000000002', 'Card A'),
-        aliasFile(
-          '00000000-0000-4000-8000-000000000007',
-          'Card A, again',
-          '00000000-0000-4000-8000-000000000002',
-        ),
-      ],
-    );
-    const nodes = projectCardNodes(withAlias, buildCardHandles(withAlias), colors);
-    // A markdown card is nobody's alias.
-    expect(
-      nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!.data.aliasOf,
-    ).toBeUndefined();
-    // The alias carries its target's title, so the node can name what it redraws.
-    expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000007')!.data.aliasOf).toBe(
-      'Card A',
-    );
-  });
-
   it("resolves an Open Alias's Target Markdown under the Alias identity", () => {
     const aliasId = uuid('00000000-0000-4000-8000-000000000007');
     const withAlias = load(

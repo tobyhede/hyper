@@ -384,8 +384,10 @@ export const createApp = (
         const created = authoring.complete({
           kind: 'created-alias',
           target,
-          // Exactly as typed, empty string included: an empty title is how
-          // Authoring is told to take the Target's own.
+          // Exactly as typed, the empty string included. The default is
+          // Authoring's: an empty title mints the same neutral `Card N` any
+          // other created Card gets (ADR 0083), so nothing here guesses a name
+          // — and normalization is the schema's rule, which Authoring applies.
           title,
           anchor: centreAnchor(),
         });

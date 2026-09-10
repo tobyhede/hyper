@@ -47,8 +47,8 @@
  * base rather than being a glyph of its own; `CardKindIcon` takes `aliasOf` and
  * composes rather than switching on a table. What is *not* built is the
  * plumbing: no call site supplies `aliasOf` yet, because the Target's kind is
- * not on `CanvasCardFront` — its `aliasOf` is the Target's Title — so every
- * Alias still draws over the Markdown base. Carrying the Target's kind to the
+ * not on `CanvasCardFront` at all — so every Alias still draws over the
+ * Markdown base. Carrying the Target's kind to the
  * surface is a change to the front's shape and belongs with the ADR.
  *
  * This sheet survives its own implementation only as the record of what was
