@@ -409,6 +409,10 @@ export function CanvasCard(props: CanvasCardProps) {
             title={title}
             label="Card title"
             variant="card"
+            // A Card's Title is Title Lines (ADR 0083), and the Card front is
+            // the one surface that draws them, so the Card front is where the
+            // capability is asked for.
+            multiline
             onComplete={props.onCompleteTitleEdit}
             onCancel={props.onCancelTitleEdit}
             onReturnFocus={props.onReturnFocus}

@@ -788,6 +788,38 @@ describe('CanvasCard title editor', () => {
     expect(onCompleteTitleEdit).toHaveBeenCalledTimes(2);
     expect(onCompleteTitleEdit).toHaveBeenLastCalledWith('Renamed again');
   });
+
+  /**
+   * The Card front is the surface that asks for Title Lines (ADR 0083).
+   *
+   * `InlineTitleEditor.test.tsx` holds the capability itself; what is proved
+   * here is that this front opts into it, which is the half a component
+   * reading `variant` would not have needed and a Sidebar row must not gain.
+   */
+  it('writes a Title on more than one line and completes it whole', () => {
+    const onCompleteTitleEdit = vi.fn(() => null);
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="editing"
+        title="Auth"
+        graphColor="#ffc53d"
+        onCompleteTitleEdit={onCompleteTitleEdit}
+        onCancelTitleEdit={() => undefined}
+        onReturnFocus={() => undefined}
+      />,
+    );
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+    expect(input).toBeInstanceOf(HTMLTextAreaElement);
+
+    // Shift+Enter is the textarea's own line, so the edit is still running.
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    expect(onCompleteTitleEdit).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: 'Auth\nThe service, not the screen' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onCompleteTitleEdit).toHaveBeenCalledWith('Auth\nThe service, not the screen');
+  });
 });
 
 describe('CanvasCard open Markdown front', () => {
