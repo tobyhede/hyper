@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { titleName, uuidSchema } from '@project/core';
 import { loadSpace, type CardFile } from '@project/graph';
 import fixtureJson from '../fixture/space.json';
 import exampleJson from '../example/space.json';
@@ -40,8 +40,22 @@ describe.each([
   // The fixture is two disconnected collections sharing no cards, so it splits
   // into two Layouts; the example is one connected collection, so its three
   // Graphs are owned by one.
-  ['fixture', fixtureJson, { cards: 10, layouts: 2, graphs: 4, defaultLayout: LAYOUT_ID }],
-  ['example', exampleJson, { cards: 7, layouts: 1, graphs: 3, defaultLayout: undefined }],
+  [
+    'fixture',
+    fixtureJson,
+    {
+      cards: 11,
+      layouts: 2,
+      graphs: 4,
+      unreached: { 'Collection 1': ['T'], 'Collection 2': [] },
+      defaultLayout: LAYOUT_ID,
+    },
+  ],
+  [
+    'example',
+    exampleJson,
+    { cards: 7, layouts: 1, graphs: 3, unreached: { Walkthroughs: [] }, defaultLayout: undefined },
+  ],
 ])('%s/', (name, json, expected) => {
   it('loads as a version 1 Space whose Layouts own every Graph, and opens in Flow', () => {
     const result = loadSpace(json, cardFiles(name));
@@ -54,20 +68,44 @@ describe.each([
     expect(result.space.defaultLayout).toBe(expected.defaultLayout);
   });
 
-  it("each Layout's position keys are exactly the Cards its own Graphs connect", () => {
+  it('makes every Edge endpoint a member, and names the members no Edge reaches', () => {
     const result = loadSpace(json, cardFiles(name));
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
 
     // Membership *is* the position map (ADR 0040), and `loadSpace` has already
     // refused an Edge endpoint that is not a member. What it cannot refuse is a
-    // member no Edge reaches, which in these two spaces would be a Card
-    // stranded in a Layout it does not belong to.
-    for (const layout of result.space.layouts) {
-      const connected = new Set(
-        layout.graphs.flatMap((graph) => graph.edges.flatMap((edge) => [edge.from, edge.to])),
-      );
-      expect(new Set(Object.keys(layout.positions))).toEqual(connected);
-    }
+    // member no Edge reaches — which is both a legitimate authored state (Add
+    // Card and the Cards drawer each leave one) and what a Card stranded in a
+    // Layout it does not belong to looks like. So the strays are named, by Card
+    // and by the Layout holding them, rather than counted: a count cannot tell a
+    // Card that became connected apart from a different Card stranded in the
+    // same fixture edit, and lets the two regressions through together. The
+    // fixture strands exactly `T`, whose three-line Title draws the ladder
+    // wherever the fixture is loaded (ADR 0083), and the example strands none.
+    const nameById = new Map<string, string>(
+      result.space.cards.map((card) => [card.id, titleName(card.title)]),
+    );
+    const unreached = Object.fromEntries(
+      result.space.layouts.map((layout): readonly [string, readonly string[]] => {
+        const endpoints = layout.graphs.flatMap((graph) =>
+          graph.edges.flatMap((edge) => [edge.from, edge.to]),
+        );
+        for (const endpoint of endpoints) expect(layout.positions[endpoint]).toBeDefined();
+        const connected = new Set<string>(endpoints);
+        return [
+          layout.title,
+          Object.keys(layout.positions)
+            .filter((card) => !connected.has(card))
+            .map((card) => nameById.get(card) ?? card)
+            .sort(),
+        ];
+      }),
+    );
+
+    // Keyed by Layout title, so two Layouts sharing one would fold together and
+    // take a stray in the second with them.
+    expect(Object.keys(unreached)).toHaveLength(expected.layouts);
+    expect(unreached).toEqual(expected.unreached);
 
     // Every Card is in exactly one Layout, so nothing is left over and nothing
     // is in both.
