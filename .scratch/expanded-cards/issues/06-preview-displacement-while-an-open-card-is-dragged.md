@@ -81,14 +81,19 @@ breaks is the one where the displacement function's own input is what moves.
 
 ## Out of scope
 
-**A closed Card released inside an Open Card's own drawn box.** `authoredPoint`
-clamps it to the near side, so it too settles somewhere other than the drop
-point. Previewing that would mean drawing the dragged Card away from the pointer
-mid-gesture, which is a different and far more invasive change to React Flow's
-controlled drag. ADR 0064 names this one and accepts it: "a Card crossing an
-Expanded Card's authored origin may jump between the two sides of the
-displacement rule." It is untouched, and `Placement.next`'s clamp test still
-pins it.
+**A closed Card released within one displacement step of an Open Card's authored
+origin** — not the whole drawn box, which a sweep of the drop point disproves:
+a release well inside an Open Card lands exactly where dropped, while one in the
+step-wide band just after its origin clamps back to it. `authoredPoint` answers
+the near side there, so that Card too settles off the drop point.
+
+Ticket 06's answer does not reach it. Here the Card that must move *is* the one
+under the pointer, so previewing the clamp means inverting `reconcile`'s rule
+that an active drag keeps its live position — the Card detaching from the cursor
+by up to a full step and snapping back. ADR 0064 names this direction and
+accepts it: "a Card crossing an Expanded Card's authored origin may jump between
+the two sides of the displacement rule." It is untouched, `Placement.next`'s
+clamp test still pins it, and `07` carries the measurement and the decision.
 
 ## Why no ADR
 
