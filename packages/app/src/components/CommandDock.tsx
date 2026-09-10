@@ -117,6 +117,7 @@ import {
   orientationOf,
   slotValue,
   trailControls,
+  unwellElsewhere,
   unwellReport,
   type DockAlong,
   type DockBox,
@@ -126,6 +127,8 @@ import {
   type ExitOutcome,
   type OpenRow,
   type SpaceStep,
+  openSpacesName,
+  SPACES_LABEL,
 } from '../dock-model';
 import { SET_TRIGGER } from './command-dock-triggers';
 import './command-dock.css';
@@ -137,11 +140,27 @@ import './command-dock.css';
  * rotates through when it mints a Graph — so the menu cannot offer a colour the
  * canvas would not draw. The names are this module's, because a swatch with no
  * word beside it is a colour a reader cannot ask anyone else for.
+ *
+ * **Keyed by the colour and not by its position.** A parallel list zipped by
+ * index agrees with the palette exactly as long as nobody reorders it, and
+ * reordering a palette is a colour decision taken in `colors.ts` with no reason
+ * to look at this menu — after which every swatch is mislabelled, the reader
+ * picks Blue and gets amber, and typecheck, lint and every suite stay green
+ * because nothing asserted the pairing. Keyed, a reorder cannot say anything
+ * and a *new* colour is a compile error here rather than a hex code drawn as
+ * its own name, which is what the `??` fallback beside the zip did.
  */
-const GRAPH_COLOR_NAMES = ['Blue', 'Amber', 'Green', 'Pink', 'Purple', 'Red'] as const;
+const GRAPH_COLOR_NAMES = {
+  '#6ea8fe': 'Blue',
+  '#f59e0b': 'Amber',
+  '#34d399': 'Green',
+  '#f472b6': 'Pink',
+  '#c084fc': 'Purple',
+  '#f87171': 'Red',
+} as const satisfies Record<(typeof GRAPH_PALETTE)[number], string>;
 
 const GRAPH_COLORS: readonly (readonly [string, string])[] = GRAPH_PALETTE.map(
-  (color, index): readonly [string, string] => [GRAPH_COLOR_NAMES[index] ?? color, color],
+  (color): readonly [string, string] => [GRAPH_COLOR_NAMES[color], color],
 );
 
 /** The three kinds Create offers, in the order the menu lists them. */
@@ -207,6 +226,30 @@ export interface DockChrome {
    * Layout rename and a Graph rename disagree about whether a rename is running.
    */
   readonly onRenamingChange: (renaming: boolean) => void;
+  /**
+   * How many times the Space under this bar has been **replaced** — ADR 0042's
+   * epoch, counted by Space Authoring and handed down unchanged.
+   *
+   * **The one fact that ends a rename which no identity in the bar can see
+   * coming.** Every other ending is visible from here: the author presses Enter
+   * or Escape, moves to another Layout, or the rename stops being available. A
+   * replacement is none of those — accepting the stored Space installs a
+   * different Space's document under the same ids, so `Layout` names the same
+   * `subject`, `chromeTitleEdit` is unchanged once placement resolves, and an
+   * editor left open goes on standing over a Space that is gone, reseeded from
+   * the accepted title. Completing it then writes a name the author typed
+   * against a Layout they never saw.
+   *
+   * It is a counter and not a `replaced` flag for the reason `replacementEpoch`
+   * is one everywhere else: two replacements in a row are two facts, and a
+   * boolean that has to be lowered again is a second message this seam would
+   * have to carry. A number the component compares against its own is total.
+   *
+   * `DockChrome`'s rather than a group's, and read through a context rather than
+   * threaded, for the same reason {@link onRenamingChange} is: it is one answer
+   * under the whole bar, and every name control owes it the same obedience.
+   */
+  readonly replacementEpoch: number;
   readonly space: DockSpace;
   readonly canvas: DockCanvas;
   readonly graph: DockGraph;
@@ -562,6 +605,13 @@ function IdentityName({
    * Layout is exactly that, and it moves the whole cluster without unmounting
    * it. Read as a render-time transition rather than an effect, because an
    * effect would let one render draw the stale editor first.
+   *
+   * **It cannot see a replacement**, which is the other way a subject stops
+   * being the one the rename began against: the accepted Space carries the same
+   * Layout and Graph ids, so this value is unchanged across the very transition
+   * ADR 0042 says discards the draft. {@link DockReplacementContext} is what
+   * answers that, and the two stay separate conditions below because they are
+   * two rules — one about the reader moving, one about the Space moving.
    */
   readonly subject: string;
   /** Absent for an entity the product cannot rename — see {@link DockSpace.onRename}. */
@@ -572,6 +622,37 @@ function IdentityName({
   const reportRenaming = useContext(DockRenamingContext);
   if (renaming !== subject) {
     setRenamingSubject(subject);
+    if (editing) setEditing(false);
+  }
+
+  /**
+   * **A replacement ends the rename, and only this can (ADR 0042).**
+   *
+   * The application clears its own `editingChromeTitle` on the same epoch, but
+   * that flag is what *withdraws other commands* while a rename runs — it is not
+   * the editor, and lowering it neither closes this one nor stops it being
+   * completed. The editor is this component's, so the invalidation has to reach
+   * this component; anything else invalidates the report and leaves the draft.
+   *
+   * The transition above cannot stand in for it: the accepted Space keeps the
+   * ids, so `subject` is unchanged. Neither can the availability guard, and the
+   * way it fails is worth writing down — placement is asynchronous, so a
+   * replacement passes through a render where `onRename` is `null` and this
+   * draws the static label with `editing` still true. That looks like the draft
+   * going. It comes back the moment placement resolves, remounting
+   * `InlineTitleEditor` reseeded from the *accepted* Layout's title: an editor
+   * the author never opened, over a Space they never saw, one Enter away from
+   * renaming it.
+   *
+   * Read during render for the reason the subject transition is, and the caret
+   * is deliberately not returned — the author did not end this, and pulling
+   * focus onto a name in a Space that has just been replaced under them is
+   * taking focus rather than giving it back.
+   */
+  const replacementEpoch = useContext(DockReplacementContext);
+  const [renamedUnder, setRenamedUnder] = useState(replacementEpoch);
+  if (renamedUnder !== replacementEpoch) {
+    setRenamedUnder(replacementEpoch);
     if (editing) setEditing(false);
   }
 
@@ -622,8 +703,20 @@ function IdentityName({
    */
   const returningFocus = useRef(false);
   const endRename = (): void => {
-    returningFocus.current = true;
     setEditing(false);
+  };
+  /**
+   * The two endings that owe the caret a home, and only those.
+   *
+   * Enter and Escape end the rename from inside the editor's own key handler,
+   * so the caret is on an element about to unmount and falls to
+   * `document.body` unless this puts it back. A blur completion is the reader
+   * having already put the caret where they want it — pulling it onto the name
+   * they just left is taking focus, not returning it.
+   */
+  const endRenameReturningFocus = (): void => {
+    returningFocus.current = true;
+    endRename();
   };
   useEffect(() => {
     if (editing || !returningFocus.current) return;
@@ -671,8 +764,8 @@ function IdentityName({
           endRename();
           return null;
         }}
-        onCancel={endRename}
-        onReturnFocus={endRename}
+        onCancel={endRenameReturningFocus}
+        onReturnFocus={endRenameReturningFocus}
       />
     );
   }
@@ -1153,6 +1246,20 @@ const DockDisclosureContext = createContext<DockDisclosure>({
 const DockRenamingContext = createContext<(renaming: boolean) => void>(() => undefined);
 
 /**
+ * How a name control learns the Space beneath it was replaced (ADR 0042).
+ *
+ * A context beside {@link DockRenamingContext} and for its reason: the fact is
+ * the bar's, the three identities each owe it the same answer, and threading a
+ * counter through `SpacesControl`, `LayoutControls` and `GraphControls` to reach
+ * a leaf is what makes the next person decide the leaf can live without it.
+ *
+ * `0` as the default is the count a bar that has replaced nothing is at, so a
+ * component mounted outside a provider — a unit test over one identity — never
+ * sees a transition it was not given.
+ */
+const DockReplacementContext = createContext(0);
+
+/**
  * One disclosure's share of the Dock's single open slot.
  *
  * **Base UI's `Menubar` is the documented answer and it cannot be used here.**
@@ -1409,17 +1516,6 @@ function ExitReport({ space }: { readonly space: DockSpace }) {
 }
 
 /**
- * The word the Open Spaces menu shows, and the word it is named by.
- *
- * One token spent twice rather than two strings that agree today. Every
- * control's accessible name has to contain its visible label (WCAG 2.5.3, ADR
- * 0082), and the Open Spaces menu is the control in this surface where the two were
- * written independently and had already drifted apart. A token cannot drift: a
- * reader who renames the set renames both.
- */
-const SPACES_LABEL = 'Spaces';
-
-/**
  * `[Parent] [⌄]` — where you came from, and every other Space you have open.
  *
  * **The bar names one step, and the Open Spaces menu holds the rest.** Depth costs
@@ -1458,13 +1554,6 @@ function ParentSpace({
 }) {
   const { id: triggerId, open, onOpenChange } = useDockDisclosure();
   const parent = space.parent;
-  // The trail decision, held in the model rather than in this JSX: which of the
-  // parent step and the Open Spaces menu the bar draws, and when it draws neither.
-  const controls = trailControls(parent, space.openSpaces);
-  if (controls === 'none') return null;
-  const openSpacesMenu =
-    controls === 'open-spaces-menu' || controls === 'parent-and-open-spaces-menu';
-
   /**
    * **The open Spaces that are unwell, counted on the bar rather than inside
    * the menu.**
@@ -1479,10 +1568,19 @@ function ParentSpace({
    * its own persistence control and standing notice are on this same bar, with
    * the recovery in them. What this mark is for is the Space you are not
    * looking at.
+   *
+   * Derived in the model and read here, because the trail decision below now
+   * reads the same number: the control this mark rides on is withheld while the
+   * bar is already naming the whole set, so a count taken twice could withhold
+   * the control that draws it.
    */
-  const unwellElsewhere = space.openSpaces.filter(
-    (row) => row.spaceId !== space.currentSpaceId && unwellReport(row.persistence) !== null,
-  ).length;
+  const unwell = unwellElsewhere(space.openSpaces, space.currentSpaceId);
+  // The trail decision, held in the model rather than in this JSX: which of the
+  // parent step and the Open Spaces menu the bar draws, and when it draws neither.
+  const controls = trailControls(parent, space.openSpaces, unwell);
+  if (controls === 'none') return null;
+  const openSpacesMenu =
+    controls === 'open-spaces-menu' || controls === 'parent-and-open-spaces-menu';
 
   return (
     <Breadcrumb>
@@ -1537,22 +1635,10 @@ function ParentSpace({
                     ? `command-dock__spaces-trigger ${SET_TRIGGER.className}`
                     : 'nokey command-dock__more command-dock__disclose'
                 }
-                // **The name is built from the visible word, not matched to
-                // it.** This read `Switch Space. N open.` while the trigger
-                // showed `Spaces`, so the accessible name did not contain the
-                // visible label — WCAG 2.5.3, and ADR 0082's naming clause,
-                // which is what speech input reaches a control by. Writing the
-                // word twice and keeping the two in step is the fix that stops
-                // working the first time either side is edited; sharing
-                // {@link SPACES_LABEL} is the one that cannot come apart.
-                // The count of unwell Spaces joins the name rather than riding
-                // on the glyph alone, so the state is never colour alone and a
-                // reader who never opens the menu is still told.
-                aria-label={
-                  unwellElsewhere === 0
-                    ? `${SPACES_LABEL}. ${space.openSpaces.length} open.`
-                    : `${SPACES_LABEL}. ${space.openSpaces.length} open, ${unwellElsewhere} needs attention.`
-                }
+                // The Dock's words, and {@link openSpacesName} is where they
+                // and the reason for them live — the visible word and the
+                // accessible name are one token, so the pair cannot drift.
+                aria-label={openSpacesName(space.openSpaces.length, unwell)}
                 title="Switch Space"
                 // A `ToolbarButton` like every other control in the bar. It sits
                 // in a breadcrumb rather than in a cluster, which used to mean a
@@ -1585,7 +1671,7 @@ function ParentSpace({
                     is `aria-hidden` because the count above already says it;
                     two announcements of one state is the `title`-beside-`sr-only`
                     duplication the row below was fixed for. */}
-                {unwellElsewhere === 0 ? null : (
+                {unwell === 0 ? null : (
                   <span className="command-dock__unwell" data-unwell aria-hidden="true" />
                 )}
               </DropdownMenuTrigger>
@@ -2360,48 +2446,50 @@ export function CommandDock({
 
   return (
     <DockDisclosureContext.Provider value={{ openId, setOpenId }}>
-      <DockRenamingContext.Provider value={chrome.onRenamingChange}>
-        <Dock
-          dock={dock}
-          onDock={setDock}
-          container={container}
-          presenting={chrome.graph.presenting}
-          label="Command Dock"
-          report={<PersistenceReport persistence={chrome.persistence} edge={dock.edge} />}
-        >
-          {/* Space | Layout Graph | Cards.
-          The three selections first, then the inventory. Which Space, which
-          Layout and which Graph are one question asked three times — each names
-          the current one, discloses the set, and promotes at most one verb — and
-          Layout and Graph are divided like the rest. They used to run together
-          on the grounds that a Graph is authored over a Layout and so they are
-          one region — which stopped being legible the moment Present moved to
-          the head of the Graph cluster: an unseparated `[Collection 1 ⌄][▶ Long
-          ⌄]` reads as a Present belonging to the Layout beside it. The
-          containment is still true and the order still says it; the rule no
-          longer has to be carried by an absent line.
-          Cards comes last because it is the odd cluster and should read as one:
-          it names a set rather than a selection, so it has no name to edit and
-          nothing to promote but Create. Between Layout and Space it looked like
-          a fourth selection that had lost its name. */}
-          {/* One open-id under the whole row, spent by every disclosure through
-          `useDockDisclosure` — that, and not a convention each control keeps,
-          is what makes at most one open. The hook says why the `Menubar` this
-          obviously wants cannot be used inside Toolbars. */}
-          <SpacesControl space={chrome.space} side={side} vertical={vertical} />
-          <Divider orientation={divider} />
-          <LayoutControls canvas={chrome.canvas} side={side} />
-          <Divider orientation={divider} />
-          <GraphControls
-            graph={chrome.graph}
-            layoutTitle={chrome.canvas.selected.title}
-            side={side}
-            vertical={vertical}
-          />
-          <Divider orientation={divider} />
-          <CardsControl cards={chrome.cards} side={side} />
-        </Dock>
-      </DockRenamingContext.Provider>
+      <DockReplacementContext.Provider value={chrome.replacementEpoch}>
+        <DockRenamingContext.Provider value={chrome.onRenamingChange}>
+          <Dock
+            dock={dock}
+            onDock={setDock}
+            container={container}
+            presenting={chrome.graph.presenting}
+            label="Command Dock"
+            report={<PersistenceReport persistence={chrome.persistence} edge={dock.edge} />}
+          >
+            {/* Space | Layout Graph | Cards.
+            The three selections first, then the inventory. Which Space, which
+            Layout and which Graph are one question asked three times — each names
+            the current one, discloses the set, and promotes at most one verb — and
+            Layout and Graph are divided like the rest. They used to run together
+            on the grounds that a Graph is authored over a Layout and so they are
+            one region — which stopped being legible the moment Present moved to
+            the head of the Graph cluster: an unseparated `[Collection 1 ⌄][▶ Long
+            ⌄]` reads as a Present belonging to the Layout beside it. The
+            containment is still true and the order still says it; the rule no
+            longer has to be carried by an absent line.
+            Cards comes last because it is the odd cluster and should read as one:
+            it names a set rather than a selection, so it has no name to edit and
+            nothing to promote but Create. Between Layout and Space it looked like
+            a fourth selection that had lost its name. */}
+            {/* One open-id under the whole row, spent by every disclosure through
+            `useDockDisclosure` — that, and not a convention each control keeps,
+            is what makes at most one open. The hook says why the `Menubar` this
+            obviously wants cannot be used inside Toolbars. */}
+            <SpacesControl space={chrome.space} side={side} vertical={vertical} />
+            <Divider orientation={divider} />
+            <LayoutControls canvas={chrome.canvas} side={side} />
+            <Divider orientation={divider} />
+            <GraphControls
+              graph={chrome.graph}
+              layoutTitle={chrome.canvas.selected.title}
+              side={side}
+              vertical={vertical}
+            />
+            <Divider orientation={divider} />
+            <CardsControl cards={chrome.cards} side={side} />
+          </Dock>
+        </DockRenamingContext.Provider>
+      </DockReplacementContext.Provider>
     </DockDisclosureContext.Provider>
   );
 }

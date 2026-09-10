@@ -739,6 +739,15 @@ export const createApp = (
      * one. **A replacement discards every open Interaction draft (ADR 0042)**,
      * and this draft lives outside the canvas subtree `replacementEpoch` keys,
      * so the remount does not reach it.
+     *
+     * **This clears the report and not the editor** — the two are different
+     * things and reading them as one is what left the defect. The editor is the
+     * Dock name control's own state, so the epoch is *also* handed to the Dock
+     * (`replacementEpoch` below) and `IdentityName` ends the rename on it. What
+     * this branch still owes is that the withdrawal it drives — Create Card,
+     * Present, Delete Card, the canvas's own title editing — comes back in the
+     * same render as the replacement rather than on the commit after, when the
+     * name control's effect cleanup would otherwise report it.
      */
     const [renameEpoch, setRenameEpoch] = useState(authoringState.replacementEpoch);
     if (renameEpoch !== authoringState.replacementEpoch) {
@@ -1268,6 +1277,12 @@ export const createApp = (
         ? null
         : {
             onRenamingChange: setEditingChromeTitle,
+            // ADR 0042's epoch, handed down rather than acted on here: the
+            // editor a replacement has to discard is a name control's own, and
+            // `editingChromeTitle` below is the *report* of one running, not the
+            // draft. Clearing the report while the Dock kept the editor is
+            // precisely the half-invalidation this pair replaced.
+            replacementEpoch: authoringState.replacementEpoch,
             space: {
               title: renderedSpace.title,
               currentSpaceId: renderedSpace.id,

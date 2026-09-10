@@ -1,6 +1,8 @@
 import { expect, test } from './fixtures';
+import type { Route } from '@playwright/test';
 import {
   activateGraph,
+  boxOf,
   createCard,
   dock,
   layoutMenu,
@@ -208,4 +210,69 @@ test('one disclosure is open at a time', async ({ page }) => {
     .click({ delay: 120 });
   await expect(page.getByRole('menu')).toHaveCount(1);
   await expect(page.getByRole('menu').getByRole('menuitemradio', { name: 'Long' })).toBeVisible();
+});
+
+/**
+ * The standing persistence notice at phone width, beside a side-edge Dock.
+ *
+ * **This is the one piece of Dock furniture that is not the strip itself**, and
+ * it is the piece that does not shrink with it. The frame caps to its container
+ * so the bar always fits (the first test above), but the notice is absolutely
+ * positioned *out* of that frame and hangs off the dock's inner side — so its
+ * own width is spent from wherever the dock ends rather than from the edge of
+ * the screen, and the cap the frame took says nothing about it.
+ *
+ * A side edge is the case that bites, because that is the orientation the Dock
+ * keeps every cluster's name in: the column is the widest the strip ever is, and
+ * the notice starts after all of it. The obligation is ADR 0082's — a failure
+ * stays visible with Retry reachable — and the shell is `overflow: hidden`, so
+ * anything past the right edge is not scrolled to, it is gone.
+ *
+ * Asserted as geometry rather than as a CSS value: what the reader is owed is a
+ * notice inside the viewport with a Retry they can press, and any number of
+ * sizing rules could honour or break that.
+ */
+test('a persistence failure stays inside the viewport beside a side-edge Dock', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  // Left edge, middle — the slot menu orders its four labelled edge groups
+  // clockwise, so the second `Middle` is the left edge's midpoint.
+  await dock(page)
+    .getByRole('button', { name: /^Move Command Dock/ })
+    .click();
+  await page.getByRole('menuitemradio', { name: 'Middle', exact: true }).nth(1).click();
+  await expect(dock(page)).toHaveAttribute('data-orientation', 'vertical');
+
+  const failCommit = async (route: Route) => {
+    const request = route.request();
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/spaces') {
+      return route.abort('failed');
+    }
+    return route.continue();
+  };
+  await page.route('**/api/spaces', failCommit);
+
+  // Any Edit will do; this one is reachable from the strip itself at this width.
+  await createCard(page, 'Markdown Card');
+
+  const failure = page.getByTestId('persistence-failure');
+  await expect(failure).toBeVisible();
+  const box = await boxOf(failure, 'the persistence notice');
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  await expect(failure).toBeInViewport({ ratio: 1 });
+
+  // And the recovery, which is the half the clipped edge takes first: Retry sits
+  // at the notice's trailing end.
+  const retry = failure.getByRole('button', { name: 'Retry', exact: true });
+  await expect(retry).toBeVisible();
+  await expect(retry).toBeInViewport({ ratio: 1 });
+
+  await page.unroute('**/api/spaces', failCommit);
+  await retry.click();
+  await expect(failure).toBeHidden();
 });

@@ -905,6 +905,47 @@ describe('Space app Cards drawer', () => {
   });
 
   /**
+   * **A rename the reader ended by leaving does not pull them back.**
+   *
+   * `InlineTitleEditor` completes on blur as well as on Enter, and only the
+   * keyboard exits call `onReturnFocus` — because only they leave the caret
+   * with nowhere to be. A blur completion is the reader already putting the
+   * caret somewhere they chose, and returning it to the name is taking focus
+   * rather than giving it back. The Sidebar spent its continuation from
+   * `onReturnFocus` alone for this reason; wiring the same ending into
+   * `onComplete` reinstated the theft with the commit as its cover.
+   */
+  it('leaves the caret where the reader put it when a Layout rename ends by blur', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      (app) => render(app),
+    );
+
+    await beginRename('selected-canvas');
+    const editor = await screen.findByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(editor, { target: { value: 'Workshop' } });
+
+    // Somewhere else the reader has chosen — the canvas in the product, any
+    // focusable element here, because what is pinned is that the Dock does not
+    // take it back rather than which element holds it.
+    const elsewhere = document.createElement('button');
+    document.body.append(elsewhere);
+    elsewhere.focus();
+    fireEvent.blur(editor);
+
+    const name = await screen.findByTestId('selected-canvas');
+    expect(name).toHaveTextContent('Workshop');
+    expect(document.activeElement).toBe(elsewhere);
+    elsewhere.remove();
+  });
+
+  /**
    * **The last Layout cannot be deleted, and the Dock says so before the press.**
    *
    * ADR 0079 keeps a Space on at least one Layout. The Sidebar let the command

@@ -372,6 +372,11 @@ export function useCommandDockChrome(
     // Nothing in a story withdraws on it, but the seam is the application's and
     // a fixture that dropped it would be one field short of the thing it proves.
     onRenamingChange: () => undefined,
+    // A session that has replaced nothing, which is every story here: accepting
+    // a stored Space is a persistence recovery and the catalogue has no backend
+    // to conflict with. Stated rather than defaulted for the reason above — the
+    // field is the application's and a fixture one short of it is not parity.
+    replacementEpoch: 0,
     drawn: { space, layoutId: layout.id },
     onDropCard: (cardId) => {
       const dropped = space.cards.find((card) => card.id === cardId);

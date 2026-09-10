@@ -529,7 +529,29 @@
   position: absolute;
   z-index: 21;
   width: 22rem;
-  max-width: min(22rem, 80vw);
+  /* **Capped by the room it is given, not by a fraction of the screen.**
+
+     `min(22rem, 80vw)` read as a responsive cap and was not one. 80% of the
+     viewport is a share of a box this notice never starts at the edge of: it is
+     positioned *out* of the dock frame, so it begins wherever that frame ends,
+     and a fraction measured from the screen's edge says nothing about what is
+     left after the strip. The two numbers only agreed while the dock was
+     small and centred.
+
+     `100vw` rather than a percentage, because a percentage here measures the
+     **dock**: the notice's containing block is `.command-dock`, so `100%` is the
+     strip's own width and not the container the strip docks in. That makes the
+     strip's width nameable — which the side rules below need — and leaves the
+     container's width as the one term this element cannot say, so the viewport
+     stands in for it. Nothing scrolls the page (`.shell` is `overflow: hidden`
+     with no scrollbar to discount), so the two agree except for the strip the
+     Cards drawer yields, and the drawer is drawn over this notice rather than
+     beside it.
+
+     The 32px is `EDGE_INSET` spent twice — the 16px the dock is held off its own
+     edge by, matched at the far end so the report stops where the furniture
+     would. */
+  max-width: min(22rem, calc(100vw - 2 * 16px));
   /* Its own frame, so a wide notice cannot stretch a dock sized by its
      clusters. Pointer events stay on: Retry is in there. */
   pointer-events: auto;
@@ -553,6 +575,34 @@
 .command-dock__notice[data-side='left'] {
   right: calc(100% + 8px);
   top: 0;
+}
+
+/* **Beside the strip, so the strip is spent out of the room too.**
+
+   The two side-hung variants are the ones that bite, and they bite hardest
+   exactly where the cap above is loosest: a side edge is the orientation that
+   stacks the clusters and keeps every one of their names, so it is the widest
+   the dock ever is, and the notice starts *after* all of it. On a 390px phone
+   with the dock at the left edge that is a 208px column at a 16px inset with an
+   8px gap after it — 158px of room — while `80vw` asked for 312 and put the
+   trailing 154px outside the viewport. `.shell` is `overflow: hidden`, so that
+   was not a strip a reader could scroll to: it was the end of the sentence and
+   the whole of Retry, gone. ADR 0082 owes the opposite — a standing failure
+   visible with its recovery reachable.
+
+   So the subtraction names every part: the dock's own 16px inset, `100%` for
+   the column itself, the 8px the offsets above hang it by, and 16px held at the
+   far end.
+
+   **Only these two.** On a top or bottom edge the notice's leading edge *is* the
+   dock's (`left: 0`), so the frame's own cap already carries it inside the
+   container and the base rule's two insets are the whole story. The one stop
+   that could still run past the far edge is `end` with a strip narrower than
+   the notice, and a horizontal dock drawing five named clusters is several times
+   this wide — it is capped to the container long before it is that small. */
+.command-dock__notice[data-side='right'],
+.command-dock__notice[data-side='left'] {
+  max-width: min(22rem, calc(100vw - 100% - 16px - 8px - 16px));
 }
 
 /* **Which open Space is the unwell one**, on the Open Spaces menu row that names it.

@@ -183,8 +183,8 @@ test(
 /**
  * Where the reader came from, and where the rest of the open set is.
  *
- * The bar names **one** step up rather than a whole path — that is the
- * arrangement's answer to width, and the Open Spaces menu is what makes it an
+ * The bar names **one** step up rather than the full Traversal history — that
+ * is the Dock's answer to width, and the Open Spaces menu is what makes it an
  * answer rather than an omission. The parent step carries `ParentIcon`, the cube
  * `06` moved into `@project/ui` to lock the decision somewhere other than a
  * throwaway sheet; this is the consumer that gives it a check rather than a doc

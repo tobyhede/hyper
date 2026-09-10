@@ -53,6 +53,55 @@ export const unwellReport = (persistence: SpaceSessionState['persistence']): str
   return status === null ? null : openSpaceStatusLabel(status);
 };
 
+/**
+ * How many open Spaces are unwell *other than the one being read*.
+ *
+ * The Space the reader is in is excluded because it reports for itself: its own
+ * `PersistenceControl` and standing notice are on this same bar, with the
+ * recovery in them. What this counts is the Space you are **not** looking at,
+ * which is the case a single session-wide persistence field could not express at
+ * all.
+ *
+ * One derivation rather than one per consumer, because two of them now read it
+ * and they must not disagree: {@link openSpacesName} and the dot say *that*
+ * something needs attention, and {@link trailControls} decides whether the
+ * control carrying both is drawn. A surface that counted separately for the mark
+ * and for the disclosure could withhold the control that draws the mark.
+ */
+export const unwellElsewhere = (openSpaces: readonly OpenRow[], currentSpaceId: UUID): number =>
+  openSpaces.filter(
+    (row) => row.spaceId !== currentSpaceId && unwellReport(row.persistence) !== null,
+  ).length;
+
+/** The word on the Open Spaces trigger's face, which its name has to contain. */
+export const SPACES_LABEL = 'Spaces';
+
+/**
+ * The Open Spaces trigger's accessible name.
+ *
+ * **The name is built from the visible word, not matched to it.** It read
+ * `Switch Space. N open.` while the trigger showed `Spaces`, so the accessible
+ * name did not contain the visible label — WCAG 2.5.3, and ADR 0082's naming
+ * clause, which is what speech input reaches a control by. Writing the word
+ * twice and keeping the two in step is the fix that stops working the first
+ * time either side is edited; sharing {@link SPACES_LABEL} is the one that
+ * cannot come apart.
+ *
+ * The count of unwell Spaces joins the name rather than riding on the glyph
+ * alone, so the state is never colour alone and a reader who never opens the
+ * menu is still told. And a count that joins a sentence agrees with its verb —
+ * "2 needs attention" is a template showing through, spoken in full by the one
+ * reader who depends on this name for anything.
+ *
+ * Here rather than in the component because it is the Dock's words and not its
+ * markup: pure, and testable without mounting a Space to arrange two unwell
+ * ones behind it.
+ */
+export const openSpacesName = (open: number, unwell: number): string =>
+  unwell === 0
+    ? `${SPACES_LABEL}. ${open} open.`
+    : `${SPACES_LABEL}. ${open} open, ${unwell} ${unwell === 1 ? 'needs' : 'need'} attention.`;
+
 /* ------------------------------------------------------------------ slots */
 
 /**
@@ -490,13 +539,39 @@ export type TrailControls = 'none' | 'open-spaces-menu' | 'parent' | 'parent-and
  * at the root. It stays at the root rather than vanishing there, because a
  * Open Spaces menu reachable from everywhere except the top makes the top the one place
  * a reader cannot get back from.
+ *
+ * **And it arrives early when a Space the bar is not naming is unwell.** ADR
+ * 0082 binds two things at once here: an unwell member of the open set must be
+ * distinguishable from a well one, and "a standing failure announces itself
+ * rather than waiting to be opened — a report you have to go and find is not a
+ * report". Both of those ride on this control — the count is in its accessible
+ * name and the dot is on its face, and the row inside it is what says *which* —
+ * so withholding it withholds the report. The width rule had one shape where
+ * that bit: two Spaces open with the reader in the child, where the bar names
+ * the parent, the Open Spaces menu is withheld as redundant, and the parent step
+ * draws a name and no state. A parent whose commit had failed then showed
+ * nothing anywhere, and there was no chevron to go and find it behind either.
+ *
+ * The report wins for as long as it stands and the bar returns to two controls
+ * when the Space recovers. That is a control appearing under the reader, which
+ * this surface otherwise avoids — but a set that gains a way in is not the set
+ * changing shape under a reader using it, and the alternative is a failure the
+ * surface never mentions. Marking the parent step itself was the other candidate
+ * and loses on consistency: it would be the one Space in the set whose state is
+ * read off a second control, and only in the shape where this one is absent.
+ *
+ * `unwell` is a count and not a flag so the caller can spend the same number on
+ * the name; `unwellElsewhere` is where it comes from, and passing it in rather
+ * than deriving it here is what keeps the mark and the control that carries it
+ * reading one answer.
  */
 export const trailControls = (
   parent: SpaceStep | null,
   openSpaces: readonly OpenRow[],
+  unwell: number,
 ): TrailControls => {
   const named = parent === null ? 1 : 2;
-  const openSpacesMenu = openSpaces.length > named;
+  const openSpacesMenu = openSpaces.length > named || unwell > 0;
   if (parent === null) return openSpacesMenu ? 'open-spaces-menu' : 'none';
   return openSpacesMenu ? 'parent-and-open-spaces-menu' : 'parent';
 };
