@@ -709,7 +709,7 @@ describe('render adapter', () => {
     // Still the live capability and not a snapshot of one: the canvas holds it
     // from before the gesture and the store has to answer that same value.
     capability.beginResize(CARD_A);
-    expect(store.getState().interactionDraft?.cardId).toBe(CARD_A);
+    expect(store.getState().interactionDraft).toMatchObject({ kind: 'resize', cardId: CARD_A });
   });
 
   it('previews one resize through a derived Placement and completes only its final size', () => {
@@ -857,9 +857,10 @@ describe('render adapter', () => {
       // one and the draft takes the drop point as it stands.
       store.getState().changeNodes(moving(CARD_A, 400, 300));
 
+      // The Placement is the whole draft: a `move` names no Card, because what
+      // its two consumers ask is where everything is, not which one moved.
       expect(store.getState().interactionDraft).toEqual({
         kind: 'move',
-        cardId: CARD_A,
         placement: Placement.fromEntries([
           [CARD_A, { x: 400, y: 300, open: true, openSize: { width: 500, height: 360 } }],
           [CARD_B, { x: 300, y: 200, open: false }],

@@ -585,8 +585,13 @@ test('dragging an Open Card displaces its neighbours before release, not after',
   await openCard(b, 'B');
   await settled(page);
   const openedId = await b.getAttribute('data-id');
-  const box = (await b.boundingBox())!;
+  expect(openedId, 'the Open Card reports a node id').not.toBeNull();
+  const box = await boxOf(b, 'the Open Card B');
   const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
+
+  // Before the pointer goes down, so the displacement the drag causes can be
+  // told from no drag having happened at all.
+  const resting = await allPositions(page);
 
   // Up and to the left, far enough to cross every other Card's authored origin
   // on both axes — which is exactly the crossing that adds their displacement.
@@ -600,6 +605,16 @@ test('dragging an Open Card displaces its neighbours before release, not after',
 
   // Still holding the pointer: this is what the author is aiming at.
   const held = await allPositions(page);
+
+  // The whole test rests on a neighbour having moved *during* the gesture. A
+  // drag React Flow swallowed, a Card that never opened, or a delta too small
+  // to cross an authored origin all leave `held` equal to `released` and would
+  // pass the stillness check below while proving nothing (ADR 0064).
+  const displaced = Object.entries(held).filter(
+    ([id, position]) => id !== openedId && JSON.stringify(resting[id]) !== JSON.stringify(position),
+  );
+  expect(displaced.length, 'the drag displaced at least one neighbour').toBeGreaterThan(0);
+
   await page.mouse.up();
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await settled(page);

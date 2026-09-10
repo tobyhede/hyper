@@ -64,10 +64,16 @@ export type InteractionDraft =
    * A closed Card's drag mints nothing, because no neighbour's drawn position
    * depends on it: displacement reads the Open Cards alone, and a draft per
    * frame would re-run the strategy to answer the geometry already on screen.
+   *
+   * The Placement is the whole of it, and there is deliberately no `cardId`
+   * beside it. What a consumer asks a `move` draft is "where is everything
+   * right now", which the Placement answers on its own; naming one Card as
+   * *the* dragged one would be a field nothing reads and, the day React Flow
+   * is configured for multi-select, a field that names an arbitrary member of
+   * the set.
    */
   | {
       readonly kind: 'move';
-      readonly cardId: CardId;
       readonly placement: Placement;
     };
 
@@ -355,18 +361,18 @@ function moveDraft(
   if (dragging.size === 0) return null;
 
   let placement = authored;
-  let openCardId: CardId | null = null;
+  let dragged = false;
   for (const [cardId, at] of authored) {
     if (!at.open || !dragging.has(cardId)) continue;
     const drawn = drawnById.get(cardId);
     if (drawn === undefined) continue;
-    openCardId = cardId;
+    dragged = true;
     placement = Placement.place(placement, cardId, {
       ...at,
       ...Placement.authoredPoint(authored, drawn, cardId),
     });
   }
-  return openCardId === null ? null : { kind: 'move', cardId: openCardId, placement };
+  return dragged ? { kind: 'move', placement } : null;
 }
 
 function trackDragOrigins(

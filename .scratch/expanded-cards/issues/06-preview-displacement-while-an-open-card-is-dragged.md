@@ -99,27 +99,45 @@ changed is when the author sees the displacement — gesture treatment, which
 
 ## Verification
 
-Run over the finished tree on `worktree-fix+open-card-drop-position`, whose
-parent is `129d5162` on `feat/card-titles`.
+Run over the finished tree on `worktree-fix+open-card-drop-position`, rebased
+onto `main` (`8449a0c2`). It previously sat on `feat/card-titles`, which bundled
+the Card Titles work into every reading of this branch's diff; the three commits
+here touch none of it, so the base is now the one they are actually about.
 
 - **The defect, first.** `pnpm e2e --grep "displaces its neighbours before
-  release"` at the parent commit fails: `card 00000000-0000-4000-8000-000000000002
-  moved on release`, `y` 12 → 286. With the draft it passes in 2.3s.
+  release"` fails without the draft: `card 00000000-0000-4000-8000-000000000002
+  moved on release`, `y` 12 → 286. With it the test passes in 3.1s.
 - `pnpm verify` — passed, exit 0. All eight gates: `typecheck:toolchain`,
   `typecheck`, `typecheck:packages`, `ui:catalog:check`, `lint`,
-  `lint:anti-slop`, `format:check`, `test:coverage`. 198 test files, 2412
+  `lint:anti-slop`, `format:check`, `test:coverage`. 196 test files, 2394
   passed, 2 skipped.
-- `pnpm e2e` — 157 passed, 3 failed, 3.5m. **The three failures are inherited,
-  not caused.** They are the Alias Title tests in `editing.spec.ts` — "choosing a
-  Target creates the Alias and begins shared Title editing", "an Alias is renamed
-  by the shared Title editor creation begins", "Escape discards an Alias rename
-  without undoing the Alias" — and each asserts that a new Alias takes its
-  Target's Title while the branch gives it `Card 1`. All three fail identically
-  at `129d5162` with none of this work in the tree, which is how they were
-  established as pre-existing rather than assumed to be. They belong to the
-  Card Titles work in progress on this branch; nothing here touches Alias
-  creation, Titles, or the pane that runs them.
+- `pnpm e2e` — **160 passed, 0 failed, 2.6m, exit 0.** The three Alias Title
+  failures recorded here against the old base were `feat/card-titles`'s, not
+  this work's; on `main` they do not arise, and `feat/card-titles` has since
+  fixed them itself in `900a4eec`.
 - `pnpm e2e:ladle` — **not run, and not applicable.** No component changed. The
   work is the render adapter's store, its test, and one browser spec; no file
   under `packages/ui`, `packages/react-flow-adapter` or `packages/app/stories`
   is touched, so no story can observe it.
+
+## Review pass
+
+A three-reviewer pass over the branch found three things belonging to this work,
+two of them fixed here:
+
+- The browser evidence could pass vacuously. It compared only the held frame
+  against the released one, so a drag React Flow swallowed, a Card that never
+  opened, or a delta too small to cross an authored origin all left the two
+  trivially equal. It now samples the resting frame before the pointer goes
+  down and asserts at least one neighbour moved during the gesture.
+- The `move` draft carried a `cardId` nothing read, assigned last-wins across
+  the loop. The Placement is the whole answer its two consumers ask for, so the
+  field is gone rather than left to name an arbitrary Card the day multi-select
+  is configured.
+- **Left unfixed:** a `move` draft is discarded by a settled position change,
+  `selectLayout` or the `replacementEpoch` reset — so if the dragged node's
+  settle were dropped by `changeNodes`'s `owned` filter, the draft would outlive
+  its gesture and the canvas would keep drawing from it. No product path removes
+  a Card from the Layout while the pointer is down, so this stays a latent gap
+  rather than a defect, recorded here rather than answered with a guard nothing
+  can currently reach.
