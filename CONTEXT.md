@@ -27,7 +27,7 @@ _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id
 **Card**:
 A single addressable piece of a space, and the thing a Graph's Edges run between. Named for HyperCard's card.
 
-A card has a **Title** and a **kind**, which owns everything else: the additional fields, the opened editor, and what the Card front draws around the Title. Card fronts keep one uniform geometry across kinds. Markdown owns its body; Alias owns its Target. There is no shared Description, summary, or second content slot on Card, and the Card front draws nothing the author did not write there.
+A card has a **Title** and a **kind**, which owns everything else: the additional fields, the opened editor, and what the Card front draws around the Title. Card fronts keep one uniform geometry across kinds. Markdown owns its body; Alias owns its Target. There is no shared Description, summary, or second content slot on Card, and the Card front draws no text the author did not write there — a kind shows as treatment, not as a line of prose beneath the Title.
 
 A Title is one or more **Title Lines**. The first line is the Card's **name**: it is what every surface that lists or refers to the Card shows, and it is the Card's accessible name. The lines after it draw only on the Card front, beneath the name, at descending typographic weight. They name and qualify the Card — they are not content, which lives in the body an Open Card reads. A Title with one line is the ordinary case and the whole of what most Cards have.
 _Avoid_: heading, label, caption as a name for the Title itself (a caption is the role the third and later Title Lines take), and description or subtitle as a name for a separate field — there is no separate field.
