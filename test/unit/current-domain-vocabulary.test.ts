@@ -531,11 +531,13 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
-    // The two files the rename left something behind in: the sidebar, which
-    // held one identifier over two things, and the agent-facing document that
-    // pointed at a deleted module. A file list that quietly stopped resolving
-    // would report nothing forever.
-    expect(scanned).toContain('packages/app/src/components/SpaceSidebar.tsx');
+    // The two files the rename left something behind in: the Space command
+    // surface, which held one identifier over two things, and the agent-facing
+    // document that pointed at a deleted module. A file list that quietly
+    // stopped resolving would report nothing forever. The surface is the
+    // Command Dock now — `SpaceSidebar.tsx` stood here until ADR 0082 retired
+    // it — and the canary follows the component rather than the filename.
+    expect(scanned).toContain('packages/app/src/components/CommandDock.tsx');
     expect(scanned).toContain('docs/agents/ui.md');
     expect(scanned.filter((file) => file.endsWith('.tsx')).length).toBeGreaterThan(0);
   });
@@ -767,7 +769,7 @@ describe('the name used loosely for a Space and its chrome is gone', () => {
     // names moved with it, and the two outside `packages/` that the first draft
     // of this scope could not see. A file list that quietly stopped resolving
     // would report nothing forever.
-    expect(authored).toContain('packages/app/src/components/SpaceSidebar.tsx');
+    expect(authored).toContain('packages/app/src/components/CommandDock.tsx');
     expect(authored).toContain('packages/app/src/styles.css');
     expect(authored).toContain('test/unit/app-http-startup.test.ts');
     expect(authored).toContain('vitest.setup.ts');
@@ -891,7 +893,7 @@ describe('the vocabulary the loose-name guard reads', () => {
 
     // The first two are silent because the module holding them is pnpm's.
     expect(MONOREPO_VOCABULARY).toContain(`packages/app/${RETIRED_LOOSE_NAME}-aliases.ts`);
-    expect(MONOREPO_VOCABULARY).not.toContain('packages/app/src/components/SpaceSidebar.tsx');
+    expect(MONOREPO_VOCABULARY).not.toContain('packages/app/src/components/CommandDock.tsx');
 
     // The third is silent because of the line it is on, and a manifest is
     // forgiven that line and nothing else — a script name, an `imports` entry

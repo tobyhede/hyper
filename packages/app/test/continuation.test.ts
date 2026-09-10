@@ -197,7 +197,6 @@ describe('the wait policy', () => {
 
   it.each([
     ['the canvas', { kind: 'canvas' } as const],
-    ['a Sidebar row', { kind: 'sidebar-row', entity: { kind: 'layout', id: LAYOUT_ID } } as const],
     ['a control', { kind: 'control', name: 'add-card' } as const],
   ])('falls through on %s', (_name, target) => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(false);

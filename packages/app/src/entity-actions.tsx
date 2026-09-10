@@ -1,4 +1,4 @@
-import type { LayoutId, UUID } from '@project/core';
+import type { Card, Graph, GraphId, Layout, LayoutId, UUID } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import {
   CopyIcon,
@@ -8,26 +8,77 @@ import {
   type EntityActionGroup,
   type EntityActionOutcome,
 } from '@project/ui';
-import {
-  DELETE_LAYOUT_ACTION_ID,
-  type SpaceChromeTitleSubject,
-  type SpaceEntity,
-} from './components/SpaceSidebar';
 
 /**
- * What every entity in the Space Sidebar offers, built once.
+ * What each entity in a Space offers, built once.
  *
  * It exists as its own module rather than as a closure inside `App.tsx` for one
  * reason: a story that draws this menu has to draw *this* menu. The commands
  * were prototyped as a story-local list, and a story-local list is a second
  * menu that agrees with production only for as long as somebody keeps it in
  * step — a menu on screen in the catalogue that the application does not have
- * is worse evidence than none. `SpaceSidebarFixture` calls this, so the stable
- * Space story and the application cannot offer different commands.
+ * is worse evidence than none.
+ *
+ * **It has two consumers and they spend it differently.** A Card's own rail
+ * draws the `card` arm as a menu (ADR 0073), and the Command Dock spends the
+ * other three one command at a time — its Layout, Graph and Space clusters are
+ * menus of their own with a radio group in them, so what they take from here is
+ * the *decision* about which address an entity offers rather than a list to
+ * render. Either way the decision is made once: the two surfaces cannot come to
+ * disagree about what a Graph's "Copy link" means.
  *
  * Pure: it decides the whole menu from the entity and the four callbacks it was
  * composed with, and the callbacks are where every side effect lives.
  */
+
+/**
+ * The id of the one entity command whose *outcome* a caller reads rather than
+ * assumes.
+ *
+ * Exported so a consumer spells it from here instead of from a second literal
+ * that happens to agree. It outlived the Sidebar that first needed it — that
+ * surface read the outcome to decide whether to dismiss its mobile Sheet — and
+ * it stays because the answer is still the only way to tell a Delete that ran
+ * from one the domain refused.
+ */
+export const DELETE_LAYOUT_ACTION_ID = 'delete-layout';
+
+/**
+ * The two addresses, spelled once.
+ *
+ * Same reason as the constant above, arrived at the other way round: the Dock's
+ * clusters draw their own menus and cannot render an `EntityActionGroup[]`
+ * whole, so they reach into this list by id — and they did it with bare
+ * literals at four call sites. `runEntityCommand` looks an id up and spends
+ * `?.onSelect()` on the miss, so a rename here left the copy commands silently
+ * inert with `tsc` and lint both green. One spelling on both sides, and
+ * {@link EntityCommandId} is what stops a fifth being invented.
+ */
+export const COPY_LINK_ACTION_ID = 'copy-link';
+export const COPY_PERMANENT_LINK_ACTION_ID = 'copy-permanent-link';
+
+/** The commands a surface may ask this list for by id. */
+export type EntityCommandId =
+  | typeof DELETE_LAYOUT_ACTION_ID
+  | typeof COPY_LINK_ACTION_ID
+  | typeof COPY_PERMANENT_LINK_ACTION_ID;
+
+/**
+ * An entity a surface offers commands for, named the way that surface knows it.
+ *
+ * It carries the whole `Layout`/`Graph`/`Card` rather than an id: handed an id,
+ * a caller has to find the thing again down a second path, and the surface and
+ * the menu it draws are then free to disagree about what they are naming.
+ */
+export type SpaceEntity =
+  | { readonly kind: 'space' }
+  | { readonly kind: 'layout'; readonly layout: Layout }
+  | { readonly kind: 'graph'; readonly graph: Graph; readonly layout: Layout }
+  | { readonly kind: 'card'; readonly card: Card; readonly layout: Layout };
+
+/** What an inline rename names, for the two entities that have one. */
+export type SpaceChromeTitleSubject =
+  { readonly kind: 'layout'; readonly id: UUID } | { readonly kind: 'graph'; readonly id: GraphId };
 export interface SpaceEntityActionsOptions {
   readonly spaceId: UUID;
   /** Named in the Space's own destination sentence. */
@@ -47,21 +98,17 @@ export interface SpaceEntityActionsOptions {
    *
    * `null` rather than a disabled item: Rename here is a second path to the
    * very chrome title edit that a live Card title editor withdraws, so while it
-   * cannot run there is nothing to offer. Where the caret goes afterwards is
-   * not an argument here any more — the rename names its own continuation, and
-   * one adapter resolves every Sidebar row (`continuation.ts`).
+   * cannot run there is nothing to offer.
    */
   readonly onRename: ((subject: SpaceChromeTitleSubject, title: string) => void) | null;
   /**
    * Deletes the Layout, answering whether it went, or `null` while no Layout
    * Edit may run.
    *
-   * The answer is not decoration: the Sidebar dismisses its mobile Sheet for a
-   * command that did what its label said, and the refusal a refused deletion
-   * produces is rendered *on that Sheet*. A callback that swallowed its outcome
-   * left the item answering `done` either way, which took the surface the
-   * refusal was about to be printed on away with it. Same shape and same reason
-   * as `onCopy` above.
+   * The answer is not decoration: it is the only way a caller can tell a Delete
+   * that ran from one the domain refused, and a callback that swallowed its
+   * outcome left the item answering `done` either way. Same shape and same
+   * reason as `onCopy` above.
    */
   readonly onDeleteLayout: ((layoutId: LayoutId) => boolean) | null;
 }
@@ -157,7 +204,7 @@ export function spaceEntityActions({
         [],
         [
           copy(
-            'copy-link',
+            COPY_LINK_ACTION_ID,
             COPY_LINK,
             `Opens ${spaceTitle} at the Layout it opens on`,
             { kind: 'space', spaceId },
@@ -174,7 +221,7 @@ export function spaceEntityActions({
         renameAction({ kind: 'layout', id: layoutId }, title),
         [
           copy(
-            'copy-link',
+            COPY_LINK_ACTION_ID,
             COPY_LINK,
             `Opens ${title} exactly as it draws now`,
             { kind: 'layout', spaceId, layoutId },
@@ -185,19 +232,17 @@ export function spaceEntityActions({
           ? []
           : [
               {
-                // Imported rather than written: the Sidebar recognises this
-                // one id to decide its mobile dismissal on the outcome below
-                // instead of before it, and the constant is where that
-                // pairing is stated.
+                // Named from the constant above rather than written out, so a
+                // caller that recognises this one command spells it the same
+                // way this does.
                 id: DELETE_LAYOUT_ACTION_ID,
                 label: 'Delete Layout',
                 icon: <DeleteIcon />,
                 variant: 'destructive',
-                // The Edit's prose report is the Sidebar's own refusal alert,
-                // and this item carries no words of its own to swap — so what
-                // the outcome is read for is not the label. It is what tells
-                // the Sidebar whether the Delete had a canvas result to dismiss
-                // its mobile Sheet for, and a refusal renders on that Sheet.
+                // The Edit's prose report is the application's own refusal
+                // alert, and this item carries no words of its own to swap — so
+                // what the outcome is read for is not the label. It is what
+                // tells a caller whether the Delete had a canvas result at all.
                 onSelect: (): EntityActionOutcome => (onDeleteLayout(layoutId) ? 'done' : 'failed'),
               },
             ],
@@ -212,14 +257,14 @@ export function spaceEntityActions({
         renameAction({ kind: 'graph', id: graph.id }, graph.title),
         [
           copy(
-            'copy-link',
+            COPY_LINK_ACTION_ID,
             COPY_LINK,
             `Opens ${graph.title} inside ${layout.title}`,
             { kind: 'layout-graph', spaceId, layoutId: layout.id, graphId: graph.id },
             onCopy,
           ),
           copy(
-            'copy-permanent-link',
+            COPY_PERMANENT_LINK_ACTION_ID,
             COPY_PERMANENT_LINK,
             `Always opens ${graph.title}, in whichever Layout draws it`,
             { kind: 'graph', spaceId, graphId: graph.id },
@@ -240,19 +285,19 @@ export function spaceEntityActions({
     const placed = layout.positions[card.id] !== undefined;
     return [
       // No Rename: a Card's title is renamed in place on the canvas, and the
-      // Sidebar's chrome title edit takes Layout and Graph subjects only.
+      // chrome title edit takes Layout and Graph subjects only.
       [],
       placed
         ? [
             copy(
-              'copy-link',
+              COPY_LINK_ACTION_ID,
               COPY_LINK,
               `Opens ${card.title} inside ${layout.title}, selected the way it is now`,
               { kind: 'layout-card', spaceId, layoutId: layout.id, cardId: card.id },
               onCopy,
             ),
             copy(
-              'copy-permanent-link',
+              COPY_PERMANENT_LINK_ACTION_ID,
               COPY_PERMANENT_LINK,
               `Always opens ${card.title} on its own, wherever it is placed`,
               permanent,
@@ -261,7 +306,7 @@ export function spaceEntityActions({
           ]
         : [
             copy(
-              'copy-link',
+              COPY_LINK_ACTION_ID,
               COPY_LINK,
               `Opens ${card.title} on its own — ${layout.title} does not place it`,
               permanent,

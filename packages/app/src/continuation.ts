@@ -6,7 +6,6 @@ import {
 } from '@project/persistence';
 import type { EdgeSubject } from './render-adapter';
 import type { SpaceAuthoring } from './space-authoring';
-import type { SpaceChromeTitleSubject } from './components/SpaceSidebar';
 
 /**
  * Where an Edit continues, as one module.
@@ -37,18 +36,27 @@ export type ContinuationTarget =
   | { readonly kind: 'card'; readonly cardId: CardId }
   | ({ readonly kind: 'edge' } & EdgeSubject)
   | { readonly kind: 'canvas' }
-  | { readonly kind: 'sidebar-row'; readonly entity: SpaceChromeTitleSubject }
   | { readonly kind: 'control'; readonly name: ContinuationControl };
 
 /**
- * A control that is neither a canvas subject nor a Sidebar row.
+ * A control that is not a canvas subject.
  *
  * Named rather than held as a ref: a module with no framework cannot name one,
  * and a name→ref registry only moves the lifetime problem — a control that
  * unmounts and re-registers leaves the module holding a stale element. The
  * adapter resolves each of these against `data-continuation-control`.
+ *
+ * **There was a third kind here, `sidebar-row`, and it is gone with the surface
+ * it named.** It existed because a Layout or Graph rename was one draft shared
+ * between a Sidebar row and the canvas header, begun from either and returning
+ * the caret to whichever began it — so the return address had to survive the
+ * row swapping its own branch mid-rename, and could only be an attribute query.
+ * The Command Dock draws each name once and its editor replaces that one
+ * control, so the editor returns focus to itself and there is no second surface
+ * to address (`components/CommandDock.tsx`). Renaming it would have been a name
+ * for a thing that no longer exists.
  */
-export type ContinuationControl = 'add-card' | 'layout-header';
+export type ContinuationControl = 'add-card';
 
 export interface PendingContinuation {
   readonly target: ContinuationTarget;
@@ -108,7 +116,7 @@ const NONE: ContinuationState = { pending: null };
  * arrives a strategy later — so a Card just created, just added to the Layout
  * or an Edge just reconnected resolves to nothing *yet*, and spending it on
  * the canvas fallback lands focus anywhere but the thing the author made.
- * A chrome target and the canvas itself fall through: both are drawn already,
+ * A chrome control and the canvas itself fall through: both are drawn already,
  * so unresolvable means gone, and a wait with no end is worse than a fallback.
  *
  * **Every card target waits**, not only `reveal` and `rename`. Add to Layout
@@ -122,25 +130,6 @@ const NONE: ContinuationState = { pending: null };
  */
 export const staysOwed = ({ target }: PendingContinuation): boolean =>
   target.kind === 'card' || target.kind === 'edge';
-
-/**
- * Where a chrome title rename returns the caret, from the surface it began on.
- *
- * Here rather than at each wiring, because production and the Ladle fixture
- * both answer it and a third rename surface would otherwise be added to one and
- * not the other — at which point the fixture stops proving production.
- */
-export const renameReturn = (
-  surface: 'sidebar' | 'header',
-  entity: SpaceChromeTitleSubject,
-): PendingContinuation => ({
-  target:
-    surface === 'header'
-      ? { kind: 'control', name: 'layout-header' }
-      : { kind: 'sidebar-row', entity },
-  select: false,
-  then: 'focus',
-});
 
 export function createContinuation({
   authoring,
@@ -157,7 +146,7 @@ export function createContinuation({
 
   // Invalidated on two facts and deliberately not on four. A replacement
   // discards every open Interaction draft (ADR 0042), and presenting draws over
-  // the surfaces a continuation would land on — spending onto a Sidebar row
+  // the surfaces a continuation would land on — spending onto a chrome control
   // underneath a live presentation is wrong. **Not** the selected Layout and
   // **not** the Active Graph, which the chrome title draft invalidates on:
   // over-invalidating silently loses a legitimate continuation, and a target in

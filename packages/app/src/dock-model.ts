@@ -1,22 +1,17 @@
 import { openSpaceStatusLabel, type OpenSpaceStatus } from '@project/ui';
 import type { SpaceSessionState } from '@project/persistence';
 import type { GraphId, Layout, LayoutId, SpaceSnapshot, UUID } from '@project/core';
-import type { ExitSpaceResult, RejectedExitConfirmation } from '#src/open-spaces';
+import type { ExitSpaceResult, RejectedExitConfirmation } from './open-spaces';
 
 /**
  * The Command Dock's model: what it derives, with no React and no DOM.
  *
- * It sits beside `command-dock.stories.tsx` rather than inside it because a
- * story module cannot be imported by a test — it draws components, pulls in a
- * stylesheet and depends on Ladle — while everything here is arithmetic and
- * mapping that a node-environment test can hold to an answer. The prototype
- * imports from here; nothing imports the prototype.
- *
- * A plain `.ts` under `stories/` is invisible to both halves of the design
- * system ratchet: `scripts/ui-catalog.ts` reads `.stories.tsx` for stories, and
- * for components it reads the `src` tree of each package rather than this one.
- * `stories/support/spaces.ts` is the same arrangement, tested by
- * `packages/app/test/story-spaces.test.ts`.
+ * A module beside the component rather than inside it, because everything here
+ * is arithmetic and mapping — which edge a released box is nearest, which of
+ * twelve slots a menu value names, what the open set looks like as a tree, what
+ * a refused Exit has to say — and every one of those is held to an answer by a
+ * node-environment test (`packages/app/test/dock-*.test.ts`). `CommandDock.tsx`
+ * imports from here; nothing here imports it.
  */
 
 /**
@@ -57,6 +52,55 @@ export const unwellReport = (persistence: SpaceSessionState['persistence']): str
   const status = UNWELL_STATUS[persistence.kind];
   return status === null ? null : openSpaceStatusLabel(status);
 };
+
+/**
+ * How many open Spaces are unwell *other than the one being read*.
+ *
+ * The Space the reader is in is excluded because it reports for itself: its own
+ * `PersistenceControl` and standing notice are on this same bar, with the
+ * recovery in them. What this counts is the Space you are **not** looking at,
+ * which is the case a single session-wide persistence field could not express at
+ * all.
+ *
+ * One derivation rather than one per consumer, because two of them now read it
+ * and they must not disagree: {@link openSpacesName} and the dot say *that*
+ * something needs attention, and {@link trailControls} decides whether the
+ * control carrying both is drawn. A surface that counted separately for the mark
+ * and for the disclosure could withhold the control that draws the mark.
+ */
+export const unwellElsewhere = (openSpaces: readonly OpenRow[], currentSpaceId: UUID): number =>
+  openSpaces.filter(
+    (row) => row.spaceId !== currentSpaceId && unwellReport(row.persistence) !== null,
+  ).length;
+
+/** The word on the Open Spaces trigger's face, which its name has to contain. */
+export const SPACES_LABEL = 'Spaces';
+
+/**
+ * The Open Spaces trigger's accessible name.
+ *
+ * **The name is built from the visible word, not matched to it.** It read
+ * `Switch Space. N open.` while the trigger showed `Spaces`, so the accessible
+ * name did not contain the visible label — WCAG 2.5.3, and ADR 0082's naming
+ * clause, which is what speech input reaches a control by. Writing the word
+ * twice and keeping the two in step is the fix that stops working the first
+ * time either side is edited; sharing {@link SPACES_LABEL} is the one that
+ * cannot come apart.
+ *
+ * The count of unwell Spaces joins the name rather than riding on the glyph
+ * alone, so the state is never colour alone and a reader who never opens the
+ * menu is still told. And a count that joins a sentence agrees with its verb —
+ * "2 needs attention" is a template showing through, spoken in full by the one
+ * reader who depends on this name for anything.
+ *
+ * Here rather than in the component because it is the Dock's words and not its
+ * markup: pure, and testable without mounting a Space to arrange two unwell
+ * ones behind it.
+ */
+export const openSpacesName = (open: number, unwell: number): string =>
+  unwell === 0
+    ? `${SPACES_LABEL}. ${open} open.`
+    : `${SPACES_LABEL}. ${open} open, ${unwell} ${unwell === 1 ? 'needs' : 'need'} attention.`;
 
 /* ------------------------------------------------------------------ slots */
 
@@ -401,6 +445,35 @@ export interface OpenRow extends SpaceStep {
 export interface SessionState {
   readonly open: ReadonlyMap<UUID, OpenEntry>;
   readonly currentId: UUID;
+  /**
+   * The Space that cannot be exited, named rather than inferred.
+   *
+   * Exit's root rule is `spaceId === metaSpaceId` (`open-spaces.ts`), and this
+   * carried no Meta id — so {@link exitSpace} approximated it as "the entry
+   * with no Opener", which is a *different* rule: production records a `null`
+   * Opener for a Space opened directly and for one reached by URL too, so the
+   * stand-in refused Exits the built one performs. One field is the whole
+   * distance between the two.
+   */
+  readonly metaSpaceId: UUID;
+}
+
+/**
+ * One open Space, as little of it as the tree needs.
+ *
+ * **Four fields rather than the session's own entry**, because there are two
+ * sessions: the application's `OpenSpacesState` — entries plus the `openedFrom`
+ * map that is deliberately kept off them — and the catalogue fixture's map of
+ * stored snapshots. Neither is convertible to the other, and a model that took
+ * either would be a model one of its two callers had to reshape itself for.
+ * What the tree actually reads is a name, an opener and a persistence state.
+ */
+export interface OpenSpaceRow {
+  readonly spaceId: UUID;
+  readonly title: string;
+  /** The Space this one was entered from — the Opener — or `null` at the root. */
+  readonly from: UUID | null;
+  readonly persistence: SpaceSessionState['persistence'];
 }
 
 /**
@@ -412,8 +485,8 @@ export interface SessionState {
  * with nothing to tell them apart but their names, which is exactly the
  * confusion the bar's parent step exists to remove.
  *
- * `Map` iterates in insertion order, so siblings are listed in the order the
- * reader opened them. Nothing sorts them: a Open Spaces menu that reordered itself as
+ * Siblings keep the order the caller lists them in, which is the order the
+ * reader opened them. Nothing sorts them here: a Open Spaces menu that reordered itself as
  * the reader moved would move the row they were aiming at.
  *
  * **Every `from` names a Space that is open**, which is what makes the walk
@@ -421,13 +494,13 @@ export interface SessionState {
  * the Space it closes. Without that invariant this drops a Space whose opener
  * exited — still open, and not in the list that is the only way back to it.
  */
-export const openTree = (session: SessionState): readonly OpenRow[] => {
+export const openTree = (rows: readonly OpenSpaceRow[]): readonly OpenRow[] => {
   const below = (from: UUID | null, depth: number): readonly OpenRow[] =>
-    [...session.open]
-      .filter(([, entry]) => entry.from === from)
-      .flatMap(([spaceId, entry]) => [
-        { spaceId, title: entry.snapshot.document.title, depth, persistence: entry.persistence },
-        ...below(spaceId, depth + 1),
+    rows
+      .filter((row) => row.from === from)
+      .flatMap((row) => [
+        { spaceId: row.spaceId, title: row.title, depth, persistence: row.persistence },
+        ...below(row.spaceId, depth + 1),
       ]);
   return below(null, 0);
 };
@@ -466,13 +539,39 @@ export type TrailControls = 'none' | 'open-spaces-menu' | 'parent' | 'parent-and
  * at the root. It stays at the root rather than vanishing there, because a
  * Open Spaces menu reachable from everywhere except the top makes the top the one place
  * a reader cannot get back from.
+ *
+ * **And it arrives early when a Space the bar is not naming is unwell.** ADR
+ * 0082 binds two things at once here: an unwell member of the open set must be
+ * distinguishable from a well one, and "a standing failure announces itself
+ * rather than waiting to be opened — a report you have to go and find is not a
+ * report". Both of those ride on this control — the count is in its accessible
+ * name and the dot is on its face, and the row inside it is what says *which* —
+ * so withholding it withholds the report. The width rule had one shape where
+ * that bit: two Spaces open with the reader in the child, where the bar names
+ * the parent, the Open Spaces menu is withheld as redundant, and the parent step
+ * draws a name and no state. A parent whose commit had failed then showed
+ * nothing anywhere, and there was no chevron to go and find it behind either.
+ *
+ * The report wins for as long as it stands and the bar returns to two controls
+ * when the Space recovers. That is a control appearing under the reader, which
+ * this surface otherwise avoids — but a set that gains a way in is not the set
+ * changing shape under a reader using it, and the alternative is a failure the
+ * surface never mentions. Marking the parent step itself was the other candidate
+ * and loses on consistency: it would be the one Space in the set whose state is
+ * read off a second control, and only in the shape where this one is absent.
+ *
+ * `unwell` is a count and not a flag so the caller can spend the same number on
+ * the name; `unwellElsewhere` is where it comes from, and passing it in rather
+ * than deriving it here is what keeps the mark and the control that carries it
+ * reading one answer.
  */
 export const trailControls = (
   parent: SpaceStep | null,
   openSpaces: readonly OpenRow[],
+  unwell: number,
 ): TrailControls => {
   const named = parent === null ? 1 : 2;
-  const openSpacesMenu = openSpaces.length > named;
+  const openSpacesMenu = openSpaces.length > named || unwell > 0;
   if (parent === null) return openSpacesMenu ? 'open-spaces-menu' : 'none';
   return openSpacesMenu ? 'parent-and-open-spaces-menu' : 'parent';
 };
@@ -545,15 +644,12 @@ export const exitReportSentence = (title: string, outcome: ExitOutcome): string 
  * `ExitSpaceResult` rather than a shape invented here, which is what the three
  * arms the Dock draws are drawn from.
  *
- * **One rule is approximated, and the approximation is stated rather than
- * hidden.** Production refuses `spaceId === metaSpaceId`; this refuses an entry
- * whose Opener is `null`, because a `SessionState` carries no Meta id to
- * compare against. In this fixture the two coincide — Meta is the only entry
- * minted with no Opener — but they are not the same rule: production records a
- * `null` Opener for a Space opened directly and for one reached by URL, so the
- * built Exit closes Spaces this stand-in would refuse. Nothing here is
- * evidence about those, and the seam that removes the approximation is
- * `.scratch/command-dock/issues/07`'s.
+ * **The root rule is production's own now.** It refused an entry whose Opener
+ * was `null`, which coincided with Meta in this fixture and was a different
+ * rule everywhere else — production records a `null` Opener for a Space opened
+ * directly and for one reached by URL, and closes both. `SessionState` names
+ * the Meta id instead, so the stand-in and the built Exit refuse the same one
+ * Space.
  *
  * **It is a stand-in and not the call, and that is a finding rather than a
  * shortcut.** `exit` is a closure over a `SpaceSessionRegistry` of live
@@ -585,9 +681,10 @@ export const exitSpace = (
   // the caller rather than an outcome a reader is owed a sentence about.
   if (entry === undefined) throw new Error(`Space ${spaceId} is not open`);
   const opener = entry.from;
-  // Meta is the entry nothing was entered from, and in this fixture that is the
-  // one that cannot go — the approximation the doc comment above states.
-  if (opener === null) {
+  // Production's rule verbatim: Meta is permanent and nothing else is. It is
+  // asked of the named Space rather than of the Opener, because a Space opened
+  // by its own address has no Opener and is still exitable.
+  if (spaceId === session.metaSpaceId) {
     return { result: { kind: 'refused', refusal: { code: 'meta-space-permanent' } }, session };
   }
   const { persistence } = entry;
@@ -617,12 +714,17 @@ export const exitSpace = (
     if (id === spaceId) continue;
     open.set(id, each.from === spaceId ? { ...each, from: opener } : each);
   }
-  // The Opener, not the Space just removed, is what an empty set falls back to.
-  // `opener` is non-null on this branch and `spaceId` names a Space that is no
-  // longer open, so the arm that cannot be reached still says something true.
-  const first = [...open.keys()][0] ?? opener;
+  // The Opener, not the Space just removed, is what an empty set falls back to
+  // — and Meta behind it, because a Space opened by its own address has no
+  // Opener and can still be exited. Neither arm is reachable while Meta is
+  // permanent and open, which is the whole of why both say something true.
+  const first = [...open.keys()][0] ?? opener ?? session.metaSpaceId;
   return {
     result: { kind: 'exited' },
-    session: { open, currentId: session.currentId === spaceId ? first : session.currentId },
+    session: {
+      open,
+      currentId: session.currentId === spaceId ? first : session.currentId,
+      metaSpaceId: session.metaSpaceId,
+    },
   };
 };

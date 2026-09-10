@@ -16,6 +16,20 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
+    id: 'card-rail-reveal-distinguishes-pointer-and-keyboard',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'OpenAndClose',
+    claim:
+      'Pointer Open and Close allow the rail to hide on departure; keyboard activation keeps the focused command visible across both transitions.',
+  },
+  {
+    id: 'command-dock-identity-presentation',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'Space, Layout and Graph names share typography; Space remains a non-interactive label, while Layout opens its rename editor and returns focus on Escape.',
+  },
+  {
     id: 'cards-drawer-adds-existing-layout-members',
     storyFile: 'surfaces/cards-drawer.stories.tsx',
     storyExport: 'AvailableCards',
@@ -215,95 +229,139 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       'An Open Alias keeps its own Title, renders its Target Markdown read-only, and offers Close without Target or source-edit controls.',
   },
+  /*
+   * **`persistence-indicator-shows-save-lifecycle` is retired with its story,
+   * for the reason the Dock's own claims are the shape they are.** It said
+   * persistence reports saving, briefly acknowledges success and returns to
+   * rest, and `components/persistence-indicator.stories.tsx` drove exactly that
+   * through a real `SpaceSession`. The Command Dock mounts `PersistenceControl`
+   * only for a conflict and a rejection — ticket `01` settled that there is no
+   * resting cue, because a commit settles faster than a dot can be read — so
+   * the saving half of that lifecycle is unreachable in the application, and a
+   * stable story for a state production cannot reach is not parity evidence
+   * (ADR 0052).
+   *
+   * `PersistenceIndicator` itself keeps a production path and needs no
+   * inventory entry: an acknowledged rejection draws it, which is the Dock's
+   * `SaveRejected` story, and the coverage walk reaches the module through
+   * `PersistenceControl`.
+   */
+  /*
+   * The Command Dock (ADR 0082).
+   *
+   * **Thirteen claims stood here and none of them was carried across.** They
+   * named `space/space.stories.tsx` and `space/messaging.stories.tsx`, both of
+   * which are gone with `SpaceSidebar`, and four of them named the Sidebar in
+   * the claim sentence itself. Carrying one would have asserted that the
+   * behaviour did not change; the audit in
+   * `.scratch/command-dock/issues/07-promote-the-dock-and-retire-the-space-sidebar.md`
+   * is what found that five of the thirteen were false about the Dock. Each
+   * claim below states one obligation in the Dock's own words, so a reader
+   * comparing them to the old set reads two surfaces rather than one renamed.
+   *
+   * **Two obligations left rather than moved.** A Card's Copy link, Copy
+   * permanent link and Delete belong to the Card rail (ADR 0073) and not to
+   * this surface — the Dock's organising rule is that a Card's own commands are
+   * absent — so `space-sidebar-copies-card-destinations` and
+   * `space-sidebar-entity-actions-menu` have no successor here. They keep their
+   * browser evidence in `space-routing.spec.ts` and `link-actions.spec.ts`
+   * untagged, and they gain a claim of their own when the rail's story sheet
+   * leaves `stories/review`.
+   *
+   * **And one was retired rather than restated.** `space-sidebar-shows-pending-
+   * persistence` claimed a pending commit is exposed as saving. Ticket `01`
+   * settled that the Dock carries no resting cue at all — a commit settles
+   * faster than a dot can be read — so `PersistenceIndicator` is never called
+   * from here and there is nothing left to claim.
+   */
   {
-    id: 'persistence-indicator-shows-save-lifecycle',
-    storyFile: 'components/persistence-indicator.stories.tsx',
-    storyExport: 'Lifecycle',
-    claim: 'Persistence reports saving, briefly acknowledges success, then returns to rest.',
-  },
-  {
-    id: 'space-sidebar-marks-one-current-renderer',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'Settled',
-    claim: 'Exactly one authored Layout is the one drawing the canvas.',
-  },
-  {
-    id: 'space-sidebar-copies-card-destinations',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'Settled',
+    id: 'command-dock-marks-one-current-layout',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
     claim:
-      "The selected Card's own actions menu offers Copy link and Copy permanent link, building the current-Layout address and the Card's own address respectively.",
+      "Exactly one authored Layout is the one drawing the canvas, chosen from the Layout cluster's single exclusive list, which names the chosen one on the cluster itself.",
   },
   {
-    id: 'space-sidebar-copies-graph-destinations',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'Settled',
+    id: 'command-dock-adds-an-empty-layout',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
     claim:
-      "A Graph's own row menu offers Copy link and Copy permanent link, building the current-Layout address and the Graph's own address respectively.",
+      'New Layout sits in the Layout menu beside the list it adds to, and creates and selects an empty Layout without implicitly placing Cards.',
   },
   {
-    id: 'space-sidebar-entity-actions-menu',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'Settled',
+    id: 'command-dock-copies-graph-destinations',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
     claim:
-      'One entity-actions menu is reached two ways from a Sidebar row — its trailing icon and a right click — and holds the same Rename, address and Delete Layout commands either way.',
+      "The Graph menu offers Copy link and Copy permanent link, building the current-Layout address and the Graph's own address respectively.",
   },
   {
-    id: 'space-chrome-edits-names',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'Settled',
+    id: 'command-dock-edits-identity-names',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
     claim:
-      'An authored Layout shares one refusable name draft between its active Sidebar row and Layout label, and an active Graph edits with the same keyboard lifecycle.',
+      'The Layout and Graph names are each their own rename control, editing in place as one refusable draft that keeps a refusal on the field, completes on Enter and cancels on Escape.',
   },
   {
-    id: 'space-sidebar-names-unauthored-state',
-    storyFile: 'space/space.stories.tsx',
+    id: 'command-dock-marks-the-space-one-crossing-up',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'A Space entered from another names that one Space as a step back, marked with the parent glyph, and holds every other open Space behind the Open Spaces disclosure beside it.',
+  },
+  {
+    id: 'command-dock-keeps-its-names-on-a-side-edge',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'DockedLeft',
+    claim:
+      'Docked to a side edge the surface is a column of named rows rather than a rail of glyphs, and its disclosures open away from that edge into the canvas.',
+  },
+  {
+    id: 'command-dock-names-a-new-spaces-initial-layout-and-graph',
+    storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'NewSpace',
-    claim: 'A new Space names its initial Layout and empty Active Graph and cannot present.',
-  },
-  {
-    id: 'space-sidebar-adds-empty-layout',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'AddLayoutReady',
     claim:
-      'Add Layout is an ordinary enabled command and dispatches its production callback without implicitly placing Cards.',
+      'A new Space names its initial Layout and its empty Active Graph rather than leaving either cluster blank, and cannot present.',
   },
   {
-    id: 'mobile-space-sidebar-adds-empty-layout',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'AddLayoutReady',
-    claim: 'The narrow Sidebar offers Add Layout and dismisses after the command runs.',
+    id: 'command-dock-withdraws-entirely-while-presenting',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Presenting',
+    claim:
+      'Presenting hides the command toolbar and leaves the presenting chrome; a failed save remains reported with Retry reachable.',
   },
   {
-    id: 'space-sidebar-shows-pending-persistence',
-    storyFile: 'space/messaging.stories.tsx',
-    storyExport: 'Saving',
-    claim: 'A pending commit is exposed as saving in the Space Sidebar.',
+    id: 'command-dock-fits-a-narrow-container',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Narrow',
+    claim:
+      'At phone width every cluster keeps its name, its disclosure and its place in the roving order, reached by scrolling the surface along its own axis with nothing to dismiss first.',
   },
   {
-    id: 'space-sidebar-recovers-retryable-failure',
-    storyFile: 'space/messaging.stories.tsx',
+    id: 'command-dock-recovers-retryable-failure',
+    storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'SaveFailed',
-    claim: 'Retryable persistence failure keeps local work visible and offers retry.',
+    claim:
+      'A retryable persistence failure keeps local work visible and offers Retry beside the toolbar rather than inside it.',
   },
   {
-    id: 'space-sidebar-reports-permanent-rejection',
-    storyFile: 'space/messaging.stories.tsx',
+    id: 'command-dock-reports-permanent-rejection',
+    storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'SaveRejected',
     claim: 'Permanent persistence rejection explains the reason and can be acknowledged.',
   },
   {
-    id: 'space-sidebar-resolves-conflict',
-    storyFile: 'space/messaging.stories.tsx',
+    id: 'command-dock-resolves-conflict',
+    storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'SaveConflict',
-    claim: 'A revision conflict blocks dismissal until local or remote work is chosen.',
+    claim: 'A revision conflict blocks dismissal until local or stored work is chosen.',
   },
   {
-    id: 'space-sidebar-withdraws-authoring-while-presenting',
-    storyFile: 'space/space.stories.tsx',
-    storyExport: 'Presenting',
+    id: 'command-dock-names-an-unwell-open-space',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'SaveFailedElsewhere',
     claim:
-      "Presenting replaces its entry action with Stop and withdraws authoring, including the Rename and Delete Layout in a Layout row's actions menu while leaving its address there.",
+      'The bar marks that another open Space is unwell before anything is disclosed, and the Open Spaces menu names which one, in words rather than colour alone, offering no recovery there.',
   },
   {
     id: 'presenting-line-offers-one-move',
@@ -463,7 +521,7 @@ export const parityClaims: readonly ParityClaim[] = [
       'Editing a Card inside an Open Space Card authors its target Space and updates both canvases; cross-Space connection handles remain unavailable.',
   },
   {
-    id: 'graph-hud-and-sidebar-agree-on-the-active-graph',
+    id: 'graph-hud-and-dock-agree-on-the-active-graph',
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim: 'The canvas HUD keys every Graph and emphasises the active one, beside a real MiniMap.',

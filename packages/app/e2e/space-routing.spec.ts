@@ -16,16 +16,25 @@ const CARD_C_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const CARD_E_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
 /**
- * Copy one address out of the entity's own actions menu.
+ * Copy one address out of the menu that offers it.
  *
- * Every copy command lives in that menu now, reached from the row's trailing
- * icon — the path that needs no pointer gesture beyond a press, and the one
- * ADR 0052's right-click accelerator is explicitly an enhancement over. A copy
- * confirms in place without closing the menu, so this dismisses it before the
- * next one.
+ * **Two menus now, and which one an entity uses is the design.** A Card's own
+ * commands are on its rail (ADR 0073) — the Command Dock's organising rule is
+ * that they are not on the Space's command surface at all — while a Layout's and
+ * a Graph's are behind their own cluster's disclosure. Both are `DropdownMenu`s
+ * with the same `spaceEntityActions` deciding what an address means, which is
+ * what stops the two coming to disagree.
+ *
+ * `delay` is the whole reason a press is spelled out: a default Playwright click
+ * puts mousedown and mouseup in one tick and Base UI's dismissal never gets a
+ * turn between them. A copy on the rail confirms in place without closing its
+ * menu, so this dismisses before the next one.
  */
 const copyFromMenu = async (page: Page, trigger: string, command: RegExp): Promise<void> => {
-  await page.getByRole('button', { name: trigger }).click({ delay: 120 });
+  // `exact`, because an Alias's rail is named for its own Title and a Card's
+  // Title is a prefix of its Alias's — `Actions for Card A` matches
+  // `Actions for Card A′` without it.
+  await page.getByRole('button', { name: trigger, exact: true }).click({ delay: 120 });
   await page.getByRole('menuitem', { name: command }).click();
   await page.keyboard.press('Escape');
 };
@@ -49,14 +58,14 @@ test('root redirects to and opens the canonical Meta Space URL', async ({ page }
 
   expect(response?.status()).toBe(200);
   await expect(page).toHaveURL(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
-  await expect(page.getByRole('heading', { name: 'Layout fixture', exact: true })).toBeVisible();
+  await expect(page.getByTestId('space-title')).toHaveText('Layout fixture');
 });
 
 test('a direct canonical URL opens its exact existing Space', async ({ page }) => {
   const response = await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
 
   expect(response?.status()).toBe(200);
-  await expect(page.getByRole('heading', { name: 'Layout fixture', exact: true })).toBeVisible();
+  await expect(page.getByTestId('space-title')).toHaveText('Layout fixture');
 });
 
 /**
@@ -90,7 +99,10 @@ test('choosing a Layout pushes history and Back, Forward and reload restore it w
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
 
-  await page.getByTestId('layout-row').filter({ hasText: 'Collection 2' }).click();
+  await page
+    .getByRole('button', { name: 'Layout: Collection 1', exact: true })
+    .click({ delay: 120 });
+  await page.getByRole('menuitemradio', { name: 'Collection 2' }).click();
   await expect(page).toHaveURL(second);
   await page.reload();
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
@@ -275,64 +287,70 @@ test('history restores a canonical Card through the default Layout, not the cont
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
 });
 
-test(
-  'copy commands distinguish canonical Card identity from its current Layout',
-  {
-    tag: '@parity:space-sidebar-copies-card-destinations',
-  },
-  async ({ page }) => {
-    await installClipboard(page);
-    const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}`;
-    await page.goto(view);
-    await page.locator(`.react-flow__node[data-id="${CARD_A_ID}"]`).click();
-    await page.getByTestId('selected-card-row').hover();
+/**
+ * A Card's two addresses, from the Card's own rail.
+ *
+ * **Untagged, and that is a decision rather than an omission.** The claim this
+ * carried — `space-sidebar-copies-card-destinations` — was retired with the
+ * surface it named: a Card's links are the rail's now, and the rail's story
+ * sheet is still under `stories/review`, so there is no stable story for a
+ * parity claim to name. The behaviour is proved here and in
+ * `card-rail-actions.test.tsx` meanwhile, and `parity-claims.ts` records that
+ * the claim returns when the rail's sheet is promoted.
+ */
+test('copy commands distinguish canonical Card identity from its current Layout', async ({
+  page,
+}) => {
+  await installClipboard(page);
+  const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}`;
+  await page.goto(view);
+  const card = page.locator(`.react-flow__node[data-id="${CARD_A_ID}"]`);
+  await card.click();
+  // The rail reveals on hover, and it is the Card's own — no Space surface is
+  // involved in reaching it.
+  await card.hover();
 
-    await copyFromMenu(page, 'Actions for Card A', /^Copy permanent link/);
-    await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(
-        `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/cards/${encodeCompactUuid(CARD_A_ID)}`,
-      );
+  await copyFromMenu(page, 'Actions for Card A', /^Copy permanent link/);
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(
+      `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/cards/${encodeCompactUuid(CARD_A_ID)}`,
+    );
 
-    await copyFromMenu(page, 'Actions for Card A', /^Copy link/);
-    await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(`${new URL(page.url()).origin}${view}/cards/${encodeCompactUuid(CARD_A_ID)}`);
-  },
-);
+  await card.hover();
+  await copyFromMenu(page, 'Actions for Card A', /^Copy link/);
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(`${new URL(page.url()).origin}${view}/cards/${encodeCompactUuid(CARD_A_ID)}`);
+});
 
 /**
- * The application half of the entity-actions menu claim.
+ * What the Layout cluster's disclosure holds, and what it deliberately does not.
  *
- * Its Ladle pair drives the same real `SpaceSidebar` in the catalogue; this
- * proves the running application reaches it, from both trigger paths, over the
- * commands `App.tsx` actually supplies.
+ * **The claim this test carried is gone with its mechanism.**
+ * `space-sidebar-entity-actions-menu` said one menu was "reached two ways from a
+ * Sidebar row — its trailing icon and a right click". The Dock has clusters
+ * rather than rows and no `onContextMenu` anywhere, so there is no second route
+ * to restate; what survives is that a Layout's commands are all in one place,
+ * and that Rename is not among them because the name itself is the control.
  */
-test(
-  'a Layout row opens one actions menu from its icon and from a right click',
-  { tag: '@parity:space-sidebar-entity-actions-menu' },
-  async ({ page }) => {
-    await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
-    const row = page.getByRole('button', { name: 'Collection 1', exact: true });
-    await expect(row).toBeVisible();
-    await row.hover();
+test('the Layout cluster holds every Layout command except the rename its name is', async ({
+  page,
+}) => {
+  await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
 
-    await page
-      .getByRole('button', { name: 'Actions for Layout Collection 1' })
-      .click({ delay: 120 });
-    const menu = page.getByRole('menu');
-    await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
-    await expect(menu.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
-    await expect(menu.getByRole('menuitem', { name: 'Delete Layout' })).toBeVisible();
-    await page.keyboard.press('Escape');
+  await page
+    .getByRole('button', { name: 'Layout: Collection 1', exact: true })
+    .click({ delay: 120 });
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem', { name: 'New Layout' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Copy link' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Delete Collection 1' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
 
-    await row.click({ button: 'right' });
-    const contextMenu = page.getByRole('menu');
-    await expect(contextMenu.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
-    await expect(contextMenu.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
-    await expect(contextMenu.getByRole('menuitem', { name: 'Delete Layout' })).toBeVisible();
-  },
-);
+  await expect(page.getByRole('button', { name: 'Rename Layout: Collection 1' })).toBeVisible();
+});
 
 test('canonical and contextual Graph links restore navigation context without authoring', async ({
   page,
@@ -345,19 +363,19 @@ test('canonical and contextual Graph links restore navigation context without au
 
   expect((await page.goto(canonical))?.status()).toBe(200);
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
-  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
 
   expect((await page.goto(contextual))?.status()).toBe(200);
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
-  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(canonical);
-  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
   await page.goForward();
   await expect(page).toHaveURL(contextual);
-  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
 
   const after = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
@@ -372,36 +390,35 @@ test('activating a Graph pushes a contextual destination restored by Back and Fo
   const mid = `${view}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
   await page.goto(view);
 
-  await page.getByRole('button', { name: 'Mid', exact: true }).click();
+  await page.getByRole('button', { name: /^Active Graph: /, exact: false }).click({ delay: 120 });
+  await page.getByRole('menuitemradio', { name: 'Mid', exact: true }).click();
   await expect(page).toHaveURL(mid);
   await page.goBack();
   await expect(page).toHaveURL(view);
-  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
   await page.goForward();
   await expect(page).toHaveURL(mid);
-  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
 });
 
 test(
   'Graph copy commands distinguish canonical identity from the current Layout',
   {
-    tag: '@parity:space-sidebar-copies-graph-destinations',
+    tag: '@parity:command-dock-copies-graph-destinations',
   },
   async ({ page }) => {
     await installClipboard(page);
     const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}`;
     await page.goto(view);
 
-    await page.getByRole('button', { name: 'Long', exact: true }).hover();
-
-    await copyFromMenu(page, 'Actions for Graph Long', /^Copy permanent link/);
+    await copyFromMenu(page, 'Active Graph: Long', /^Copy permanent link/);
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(
         `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`,
       );
 
-    await copyFromMenu(page, 'Actions for Graph Long', /^Copy link/);
+    await copyFromMenu(page, 'Active Graph: Long', /^Copy link/);
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(`${new URL(page.url()).origin}${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
@@ -474,7 +491,7 @@ test('entering, advancing and retreating each append presentation history', asyn
   const atB = `${graph}/present/${encodeCompactUuid(CARD_B_ID)}`;
   await page.goto(graph);
 
-  await page.getByRole('button', { name: 'Present' }).click();
+  await page.getByRole('button', { name: /^Present / }).click();
   await expect(page).toHaveURL(atA);
   await page.keyboard.press('ArrowRight');
   await expect(page).toHaveURL(atB);
@@ -538,7 +555,7 @@ test('a self-Edge presentation move takes no browser entry', async ({ page }) =>
   const point = `${graph}/present/${encodeCompactUuid(CARD_A_ID)}`;
   await page.goto(graph);
 
-  await page.getByRole('button', { name: 'Present' }).click();
+  await page.getByRole('button', { name: /^Present / }).click();
   await expect(page).toHaveURL(point);
   await page.keyboard.press('ArrowRight');
   await expect(page).toHaveURL(point);

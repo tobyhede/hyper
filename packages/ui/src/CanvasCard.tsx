@@ -496,11 +496,7 @@ export function CanvasCard(props: CanvasCardProps) {
       )}
     </Card>
   );
-  return actionableEntityActions ? (
-    <EntityActions groups={entityActions}>{card}</EntityActions>
-  ) : (
-    card
-  );
+  return actionableEntityActions ? <EntityActions groups={entityActions} render={card} /> : card;
 }
 
 interface SpaceCardSelectorsProps {

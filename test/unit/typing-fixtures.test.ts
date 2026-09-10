@@ -30,6 +30,7 @@ const mustFail = {
   'non-null-assertion.ts': ['@typescript-eslint/no-non-null-assertion'],
   'ts-ignore.ts': ['@typescript-eslint/ban-ts-comment'],
   'missing-union-case.ts': ['@typescript-eslint/switch-exhaustiveness-check', 'TS2366'],
+  'mismatched-menu-item.tsx': ['TS2322'],
 } satisfies Readonly<Record<string, readonly string[]>>;
 
 const mustPass = [
@@ -277,7 +278,15 @@ const rootTsconfigInclude = (): readonly string[] => {
   return include;
 };
 
-const TSC_DIAGNOSTIC = /^(\S+\.ts)\(\d+,\d+\): error (TS\d+)/gm;
+/**
+ * `.tsx?`, not `.ts`: a fixture about a React seam is a `.tsx` file, and `\.ts`
+ * cannot match one — after `mismatched-menu-item.ts` the next character is `x`
+ * rather than the `(` the position expects, and no backtracking recovers it. The
+ * fixture's diagnostic would then go unread, `must-fail` would report it
+ * unrejected, and the failure would read as a gap in enforcement rather than as
+ * a regex that cannot see the file.
+ */
+const TSC_DIAGNOSTIC = /^(\S+\.tsx?)\(\d+,\d+\): error (TS\d+)/gm;
 
 /** A `--listFiles` line: an absolute path to a file in the program, and nothing else. */
 const TSC_PROGRAM_FILE = /^(\/\S+\.tsx?)$/gm;

@@ -3,9 +3,11 @@ import type { Page, Route } from '@playwright/test';
 import {
   activateGraph,
   activeGraph,
+  dock,
   dragBy,
   nodeByTitle,
   positionOf,
+  presentControl,
   selectCanvas,
   settled,
 } from './graph';
@@ -31,89 +33,88 @@ const settledNetwork = async (page: Page): Promise<void> => {
   });
 };
 
-test(
-  'rapid edits commit in order and the latest position survives reload',
-  {
-    tag: [
-      '@parity:persistence-indicator-shows-save-lifecycle',
-      '@parity:space-sidebar-shows-pending-persistence',
-    ],
-  },
-  async ({ page }) => {
-    let releaseFirst = (): void => undefined;
-    const firstGate = new Promise<void>((resolve) => {
-      releaseFirst = resolve;
-    });
-    let observeFirst = (): void => undefined;
-    const firstObserved = new Promise<void>((resolve) => {
-      observeFirst = resolve;
-    });
-    const expectedRevisions: string[] = [];
+/**
+ * **Untagged, and the claim it carried is retired.**
+ *
+ * `persistence-indicator-shows-save-lifecycle` said persistence reports saving,
+ * briefly acknowledges success and returns to rest. The Command Dock draws no
+ * resting cue at all — ticket `01` settled that a commit settles faster than a
+ * dot can be read — so `PersistenceControl` is mounted only for the two states
+ * that need a decision, and the saving half of that lifecycle is unreachable in
+ * the application. What is left true is the ordering and the durability, which
+ * is what this test actually proves.
+ */
+test('rapid edits commit in order and the latest position survives reload', async ({ page }) => {
+  let releaseFirst = (): void => undefined;
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let observeFirst = (): void => undefined;
+  const firstObserved = new Promise<void>((resolve) => {
+    observeFirst = resolve;
+  });
+  const expectedRevisions: string[] = [];
 
-    await page.route('**/api/spaces', async (route) => {
-      const request = route.request();
-      if (!isCommit(request.method(), request.url())) return route.continue();
-      // SAFETY: Playwright's `postDataJSON()` returns `any`; this narrows to
-      // the one field read below, from a commit request this same app's own
-      // client code just sent — not third-party input.
-      const body = request.postDataJSON() as {
-        changes: readonly { kind: string; expectedRevision?: string }[];
-      };
-      const update = body.changes.find((change) => change.kind === 'update');
-      if (update?.expectedRevision === undefined) {
-        throw new Error('The intercepted commit must contain an update change.');
-      }
-      expectedRevisions.push(update.expectedRevision);
-      if (expectedRevisions.length === 1) {
-        observeFirst();
-        await firstGate;
-      }
-      await route.continue();
-    });
-
-    await page.goto('/');
-    await selectCanvas(page, 'Collection 1');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
-    await settled(page);
-
-    await dragBy(page, card, 0, 180);
-    await firstObserved;
-    // The graph handler is parked on `firstGate`, so anything that throws before
-    // the release leaves that commit — and the page — waiting until the test
-    // times out, reporting a hang instead of the assertion that actually failed.
-    try {
-      await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
-      await expect.poll(() => navigationIsProtected(page)).toBe(true);
-      await dragBy(page, card, 120, 120);
-      expect(expectedRevisions).toEqual(['0']);
-    } finally {
-      releaseFirst();
+  await page.route('**/api/spaces', async (route) => {
+    const request = route.request();
+    if (!isCommit(request.method(), request.url())) return route.continue();
+    // SAFETY: Playwright's `postDataJSON()` returns `any`; this narrows to
+    // the one field read below, from a commit request this same app's own
+    // client code just sent — not third-party input.
+    const body = request.postDataJSON() as {
+      changes: readonly { kind: string; expectedRevision?: string }[];
+    };
+    const update = body.changes.find((change) => change.kind === 'update');
+    if (update?.expectedRevision === undefined) {
+      throw new Error('The intercepted commit must contain an update change.');
     }
+    expectedRevisions.push(update.expectedRevision);
+    if (expectedRevisions.length === 1) {
+      observeFirst();
+      await firstGate;
+    }
+    await route.continue();
+  });
 
-    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-    await expect(page.getByRole('button', { name: 'Changes saved' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden({
-      timeout: 4_000,
-    });
-    await expect.poll(() => navigationIsProtected(page)).toBe(false);
-    expect(expectedRevisions).toEqual(['0', '1']);
-    const durablePosition = await positionOf(card);
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
 
-    await page.reload();
-    const reloaded = nodeByTitle(page, 'A').first();
-    await expect(reloaded).toBeVisible();
-    await settled(page);
-    expect(await positionOf(reloaded)).toEqual(durablePosition);
-    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  },
-);
+  await dragBy(page, card, 0, 180);
+  await firstObserved;
+  // The graph handler is parked on `firstGate`, so anything that throws before
+  // the release leaves that commit — and the page — waiting until the test
+  // times out, reporting a hang instead of the assertion that actually failed.
+  try {
+    // A commit in flight is reported by the navigation guard rather than by a
+    // cue on the surface: the Dock says nothing while saving works.
+    await expect.poll(() => navigationIsProtected(page)).toBe(true);
+    await dragBy(page, card, 120, 120);
+    expect(expectedRevisions).toEqual(['0']);
+  } finally {
+    releaseFirst();
+  }
+
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect.poll(() => navigationIsProtected(page)).toBe(false);
+  expect(expectedRevisions).toEqual(['0', '1']);
+  const durablePosition = await positionOf(card);
+
+  await page.reload();
+  const reloaded = nodeByTitle(page, 'A').first();
+  await expect(reloaded).toBeVisible();
+  await settled(page);
+  expect(await positionOf(reloaded)).toEqual(durablePosition);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+});
 
 test(
   'a network failure stays visible until the user retries',
   {
     tag: [
-      '@parity:space-sidebar-recovers-retryable-failure',
+      '@parity:command-dock-recovers-retryable-failure',
       '@parity:cards-drawer-coexists-with-persistence-failure',
     ],
   },
@@ -133,10 +134,14 @@ test(
     await page.getByRole('button', { name: 'Cards' }).click();
     await page.getByRole('button', { name: 'Add E to Layout' }).click();
 
-    // The toolbar reports the failure as a red dot and keeps every control where
-    // it was; the reason and the action are in the notice pinned beneath it.
-    await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeVisible();
+    // The report is a standing `Alert` beside the toolbar and never a cue in it:
+    // status is not a command (ADR 0082), and there is no resting dot to read
+    // either way. The reason and the action are both on the notice.
     const failure = page.getByTestId('persistence-failure');
+    await expect(page.getByTestId('command-dock').getByTestId('persistence-failure')).toHaveCount(
+      1,
+    );
+    await expect(dock(page).getByTestId('persistence-failure')).toHaveCount(0);
     await expect(failure).toBeVisible();
     const retry = failure.getByRole('button', { name: 'Retry' });
     await expect(retry).toBeVisible();
@@ -156,7 +161,7 @@ test(
 
 test(
   'a permanent rejection explains the reason and leaves the Space available',
-  { tag: '@parity:space-sidebar-reports-permanent-rejection' },
+  { tag: '@parity:command-dock-reports-permanent-rejection' },
   async ({ page }) => {
     await page.route('**/api/spaces', async (route) => {
       const request = route.request();
@@ -194,7 +199,7 @@ test(
 
 test(
   'a stale browser reports conflict and accepts the remote space without overwriting it',
-  { tag: '@parity:space-sidebar-resolves-conflict' },
+  { tag: '@parity:command-dock-resolves-conflict' },
   async ({ page }) => {
     const stalePage = await page.context().newPage();
     try {
@@ -248,7 +253,7 @@ test(
       try {
         await selectCanvas(stalePage, 'Collection 2');
         await activateGraph(stalePage, 'Echo');
-        await stalePage.getByTestId('present-button').click();
+        await presentControl(stalePage).click();
       } finally {
         // Release even when setup fails, so the intercepted request cannot leave
         // the page hanging and hide the useful Playwright assertion.
@@ -306,11 +311,32 @@ test('graph activation and presenting do not write or protect navigation', async
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await selectCanvas(page, 'Collection 2');
   await activateGraph(page, 'Echo');
-  await page.getByTestId('present-button').click();
+  await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await settledNetwork(page);
 
   expect(commits).toBe(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
   await expect.poll(() => navigationIsProtected(page)).toBe(false);
+});
+
+test('Retry remains reachable while presenting and persists the failed Edit', async ({ page }) => {
+  await page.goto('/');
+  await settled(page);
+  await page.route('**/api/spaces', async (route) => {
+    if (isCommit(route.request().method(), route.request().url())) return route.abort('failed');
+    return route.continue();
+  });
+  await dragBy(page, nodeByTitle(page, 'A'), 0, 100);
+  const failure = page.getByTestId('persistence-failure');
+  await expect(failure).toBeVisible();
+  await presentControl(page).click();
+  await expect(page.getByTestId('presenting-chrome')).toBeVisible();
+  await expect(dock(page)).toBeHidden();
+  await expect(failure).toBeVisible();
+  await page.unroute('**/api/spaces');
+  await failure.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(failure).toBeHidden();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('presenting-chrome')).toBeVisible();
 });

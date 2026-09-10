@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Card, type Graph, type Layout } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { EntityActionGroup } from '@project/ui';
-import { spaceEntityActions } from '../src/entity-actions';
-import { DELETE_LAYOUT_ACTION_ID, type SpaceEntity } from '../src/components/SpaceSidebar';
+import {
+  DELETE_LAYOUT_ACTION_ID,
+  spaceEntityActions,
+  type SpaceEntity,
+} from '../src/entity-actions';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');

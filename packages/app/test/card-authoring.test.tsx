@@ -21,6 +21,16 @@ import { recordingHistory } from './browser-history';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
+import {
+  createCard,
+  createCardControl,
+  deleteLayoutItem,
+  newGraphItem,
+  newLayoutItem,
+  openLayoutMenu,
+  presentControl,
+  unavailable,
+} from './command-dock';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -220,10 +230,27 @@ describe('authoring a Card title on the graph', () => {
    * button's own mousedown blurs the input and a valid blur completes the Title
    * (ADR 0065); a refused one is re-focused instead and the click lands anyway.
    */
-  it('withdraws Add Layout while a Card title editor holds a refused draft', async () => {
+  it('withdraws chrome authoring while a Card title editor holds a refused draft', async () => {
     const session = mount();
-    const createLayout = await screen.findByRole('button', { name: 'Add Layout' });
-    await waitFor(() => expect(createLayout).toBeEnabled());
+    // **New Layout is the control, and Create Card is deliberately not.** The
+    // two read different terms and the difference is the claim: `createLayout`
+    // is `addCard && !editingCardTitle`, because creating a Layout *selects* it
+    // and the canvas re-derives with no nodes at all — a Card holding a live
+    // draft unmounts. Creating a Card re-derives nothing under the editor, so
+    // it stays available, which is why the assertion below is on New Layout
+    // even though it sits behind a disclosure.
+    await screen.findByTestId('selected-canvas');
+    await waitFor(() => expect(unavailable(newLayoutItem('Layout'))).toBe(false));
+
+    // **The disclosure `newLayoutItem` opened is dismissed before the canvas is
+    // pressed.** One open id under the whole row means a press landing while a
+    // menu is open is an *outside* press, which Base UI spends on dismissing —
+    // so the press below would reach the Card only by whatever jsdom happens to
+    // do with the event, and the same shape has already produced one flake in
+    // the browser suite. Every helper in `command-dock.ts` opens with this line
+    // for the same reason.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
     const input = screen.getByRole('textbox', { name: 'Card title' });
@@ -231,16 +258,79 @@ describe('authoring a Card title on the graph', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
 
-    expect(createLayout).toBeDisabled();
+    const newLayout = newLayoutItem('Layout');
+    expect(unavailable(newLayout)).toBe(true);
 
     // And the draft survives the attempt, which is what the gate is for.
-    fireEvent.click(createLayout);
+    fireEvent.click(newLayout);
     expect(session.getState().working.document.layouts).toHaveLength(1);
     expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveAttribute(
       'aria-invalid',
       'true',
     );
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    await settled(session);
+  });
+
+  /**
+   * The Layout cluster's Delete reads *two* rules, and the ADR one is not the
+   * one under test.
+   *
+   * `layouts.length <= 1` is the rule the row wears on its sleeve (ADR 0079),
+   * and a Space with two Layouts satisfies it — so what is left to prove is the
+   * other one. Every entity Edit is withdrawn while a Card title editor holds a
+   * refused draft, exactly as New Layout above is, and a Delete drawn available
+   * in that state is a destructive command that presses cleanly and does
+   * nothing.
+   */
+  it('withdraws Delete Layout while a Card title editor holds a refused draft', async () => {
+    const session = mount(secondLayout);
+    await screen.findByTestId('selected-canvas');
+    await waitFor(() => expect(unavailable(deleteLayoutItem('Layout'))).toBe(false));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+
+    const deleteLayout = deleteLayoutItem('Layout');
+    expect(unavailable(deleteLayout)).toBe(true);
+
+    // And the Space still has both Layouts, which is what an unavailable
+    // destructive command is for.
+    fireEvent.click(deleteLayout);
+    expect(session.getState().working.document.layouts).toHaveLength(2);
+    await settled(session);
+  });
+
+  /**
+   * The Graph cluster's own lifecycle commands read the same withdrawal.
+   *
+   * New Graph, Delete Graph and Recolour are entity Edits exactly as New Layout
+   * and Delete Layout are, and they went out un-gated: the rows pressed
+   * cleanly, `authoring.complete` answered `refused`, and the answer was
+   * discarded with nothing drawn anywhere. This asserts the gate; the refusal
+   * the notice draws is the other half.
+   */
+  it('withdraws New Graph while a Card title editor holds a refused draft', async () => {
+    const session = mount();
+    await screen.findByTestId('selected-canvas');
+    await waitFor(() => expect(unavailable(newGraphItem('Graph'))).toBe(false));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+
+    const newGraph = newGraphItem('Graph');
+    expect(unavailable(newGraph)).toBe(true);
+
+    fireEvent.click(newGraph);
+    expect(session.getState().working.document.layouts?.[0]?.graphs).toHaveLength(1);
     await settled(session);
   });
 
@@ -281,7 +371,8 @@ describe('presenting from a Layout', () => {
     // the smallest presentable Space.
     const session = mount(snapshot);
 
-    expect(await screen.findByTestId('present-button')).toBeEnabled();
+    await screen.findByTestId('selected-canvas');
+    expect(unavailable(presentControl('Graph'))).toBe(false);
     await settled(session);
   });
 });
@@ -302,7 +393,8 @@ describe('the browser location, from the surface', () => {
     const session = mount(secondLayout, history);
     await screen.findByTestId('selected-canvas');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Other Layout' }));
+    openLayoutMenu('Layout');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Other Layout' }));
 
     await waitFor(() =>
       expect(history.writes).toEqual([
@@ -434,8 +526,8 @@ describe('authoring an opened Card', () => {
     await openEditor();
     expect(screen.getByRole('button', { name: 'Save Card A' })).toBeVisible();
 
-    expect(screen.getByTestId('present-button')).toBeDisabled();
-    fireEvent.click(screen.getByTestId('present-button'));
+    expect(unavailable(presentControl('Graph'))).toBe(true);
+    fireEvent.click(presentControl('Graph'));
 
     expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
     await settled(session);
@@ -448,7 +540,7 @@ describe('authoring an opened Card', () => {
       key: 'Escape',
     });
 
-    fireEvent.click(screen.getByTestId('present-button'));
+    fireEvent.click(presentControl('Graph'));
 
     expect(screen.queryByRole('button', { name: /^Open Card/ })).not.toBeInTheDocument();
     await settled(session);
@@ -465,45 +557,41 @@ describe('authoring an opened Card', () => {
     const session = mount();
     await openEditor();
 
-    const addCard = screen.getByRole('button', { name: 'Add Card' });
-    expect(addCard).toBeDisabled();
-    fireEvent.click(addCard);
+    const create = createCardControl();
+    expect(unavailable(create)).toBe(true);
+    fireEvent.click(create);
 
     expect(session.getState().working.cards).toHaveLength(2);
     await settled(session);
   });
 
   /**
-   * Rename Layout begins a Space chrome title edit, and chrome title editing is
-   * already withdrawn while a Card title editor owns the caret — so the menu
-   * offered a Rename that began an edit the same render discarded, with a
-   * Delete Layout beside it.
-   */
-  /**
-   * The Layout's Edits are withdrawn while a Card title editor owns the caret;
-   * its addresses are not.
+   * The Layout's rename is withdrawn while a Card title editor owns the caret;
+   * its address is not.
    *
-   * Rename begins the very chrome title edit that condition withdraws, and
-   * Delete Layout runs an Edit that would unmount the Card holding the draft.
-   * Copying an address does neither — an address is a fact about the Layout
-   * rather than a change to it — so the menu stays, one command shorter, rather
-   * than the whole trigger disappearing off the row.
+   * Renaming a Layout is the very chrome title edit that condition withdraws.
+   * Copying an address is not an edit at all — an address is a fact about the
+   * Layout rather than a change to it — so the menu stays and only the name
+   * stops being a control.
+   *
+   * **The mechanism changed with the surface and the claim did not.** The
+   * Sidebar drew Rename as a row in the Layout's actions menu, so the withdrawal
+   * was a menu item going missing. The Dock renames a Layout by clicking the
+   * name it already draws, so the withdrawal is that name ceasing to be a
+   * button — which is the same fact, said where the reader is looking.
    */
-  it('withdraws the Layout Edits, but not its addresses, while a Card title editor is open', async () => {
+  it('withdraws the Layout rename, but not its address, while a Card title editor is open', async () => {
     const session = mount();
     await settled(session);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
-    expect(await screen.findByRole('menuitem', { name: 'Rename' })).toBeVisible();
-    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(screen.getByTestId('selected-canvas').tagName).toBe('BUTTON');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+    createCard('Markdown Card');
     expect(await screen.findByRole('textbox', { name: 'Card title' })).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
+    expect(screen.getByTestId('selected-canvas').tagName).not.toBe('BUTTON');
+    openLayoutMenu('Layout');
     const menu = await screen.findByRole('menu');
-    expect(within(menu).queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
-    expect(within(menu).queryByRole('menuitem', { name: 'Delete Layout' })).not.toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
     await settled(session);
   });
@@ -515,7 +603,7 @@ describe('authoring an opened Card', () => {
       key: 'Escape',
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+    createCard('Markdown Card');
 
     expect(session.getState().working.cards).toHaveLength(3);
     expect(await screen.findByRole('textbox', { name: 'Card title' })).toHaveValue('Card 1');

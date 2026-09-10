@@ -11,6 +11,7 @@ import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import type { SpaceCardAuthoring } from '../src/space-card-lifecycle';
+import { createCard, unavailable } from './command-dock';
 
 /**
  * Creating a Space Card, from the control an author actually has.
@@ -205,18 +206,14 @@ const settled = (session: SpaceSession): Promise<void> =>
 
 /** Wait for the Cards to reach the canvas, which is what makes Card authoring available. */
 async function readyToAuthor(): Promise<void> {
-  const addCard = await screen.findByRole('button', { name: 'Add Card' });
-  await waitFor(() => expect(addCard).toBeEnabled());
+  const create = await screen.findByRole('button', { name: 'Create Card' });
+  await waitFor(() => expect(unavailable(create)).toBe(false));
 }
 
-/** Reach Add Space Card the way an author does: through the Add Card menu. */
+/** Reach Create Space Card the way an author does: through the Create Card menu. */
 async function openSpaceCardCreation(): Promise<void> {
   await readyToAuthor();
-  const addCardMenu = screen.getByRole('button', { name: 'More Card kinds' });
-  fireEvent.pointerDown(addCardMenu, { button: 0 });
-  fireEvent.pointerUp(addCardMenu, { button: 0 });
-  fireEvent.click(addCardMenu);
-  fireEvent.click(await screen.findByRole('menuitem', { name: 'Add Space Card' }));
+  createCard('Space Card');
   await screen.findByTestId('new-space-card');
 }
 
@@ -652,9 +649,7 @@ describe('a coordination that broke rather than refused', () => {
     createNamed('Architecture');
 
     await waitFor(() => expect(screen.queryByTestId('new-space-card')).not.toBeInTheDocument());
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'More Card kinds' })).toHaveFocus(),
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create Card' })).toHaveFocus());
     await settled(session);
   });
 

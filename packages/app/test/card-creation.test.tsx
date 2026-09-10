@@ -6,6 +6,7 @@ import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
+import { createCard, presentControlBehindAModal, unavailable } from './command-dock';
 
 /**
  * Creating Cards, from the controls an author actually has.
@@ -134,18 +135,16 @@ const settled = (session: SpaceSession): Promise<void> =>
 
 /** Wait for the Cards to reach the canvas, which is what makes Card authoring available. */
 async function readyToAuthor(): Promise<HTMLElement> {
-  const addCard = await screen.findByRole('button', { name: 'Add Card' });
-  await waitFor(() => expect(addCard).toBeEnabled());
-  return addCard;
+  const create = await screen.findByRole('button', { name: 'Create Card' });
+  await waitFor(() => expect(unavailable(create)).toBe(false));
+  return create;
 }
 
 async function openAliasCreation(): Promise<void> {
   await readyToAuthor();
-  const addCardMenu = screen.getByRole('button', { name: 'More Card kinds' });
-  fireEvent.pointerDown(addCardMenu, { button: 0 });
-  fireEvent.pointerUp(addCardMenu, { button: 0 });
-  fireEvent.click(addCardMenu);
-  fireEvent.click(await screen.findByRole('menuitem', { name: 'Add Alias' }));
+  // One menu with three peers, where the Sidebar had a split button: the kind is
+  // chosen at creation, so there is no default hiding behind a primary press.
+  createCard('Alias');
   await screen.findByTestId('new-alias');
 }
 
@@ -176,7 +175,8 @@ describe('Add Card', () => {
   it('creates a neutrally titled Card and opens its name editor', async () => {
     const session = mount();
 
-    fireEvent.click(await readyToAuthor());
+    await readyToAuthor();
+    createCard('Markdown Card');
 
     expect(cardTitles(session)).toEqual(['A', 'B', 'Card 1']);
     const created = cardsOf(session)[2]!;
@@ -191,7 +191,8 @@ describe('Add Card', () => {
 
   it('renames the created Card in place, and leaves focus on the Card', async () => {
     const session = mount();
-    fireEvent.click(await readyToAuthor());
+    await readyToAuthor();
+    createCard('Markdown Card');
     const input = await screen.findByRole('textbox', { name: 'Card title' });
 
     fireEvent.change(input, { target: { value: 'Consequences' } });
@@ -210,7 +211,8 @@ describe('Add Card', () => {
    */
   it('keeps the Card when its naming is cancelled', async () => {
     const session = mount();
-    fireEvent.click(await readyToAuthor());
+    await readyToAuthor();
+    createCard('Markdown Card');
 
     const input = await screen.findByRole('textbox', { name: 'Card title' });
     fireEvent.change(input, { target: { value: 'Abandoned' } });
@@ -236,7 +238,8 @@ describe('Add Card', () => {
    */
   it('leaves the created Card selected for F2, not only for authoring', async () => {
     const session = mount();
-    fireEvent.click(await readyToAuthor());
+    await readyToAuthor();
+    createCard('Markdown Card');
     // Out of the naming editor creation opens, so `F2` is answered by the
     // canvas rather than typed into a field.
     const naming = await screen.findByRole('textbox', { name: 'Card title' });
@@ -274,7 +277,8 @@ describe('Add Card', () => {
   it('creates the first Card of an empty Layout as its only member', async () => {
     const session = mount(noCards);
 
-    fireEvent.click(await readyToAuthor());
+    await readyToAuthor();
+    createCard('Markdown Card');
 
     const layout = layoutsOf(session)[0]!;
     expect(cardTitles(session)).toEqual(['Card 1']);
@@ -303,7 +307,7 @@ describe('Add Alias', () => {
     expect(screen.queryByTestId('new-alias')).not.toBeInTheDocument();
     expect(session.getState().working).toBe(before);
     // Cancelled or completed, focus never lands on `<body>`.
-    expect(screen.getByRole('button', { name: 'More Card kinds' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Create Card' })).toHaveFocus();
     await settled(session);
   });
 
@@ -557,7 +561,7 @@ describe('presenting while the Alias creation state is open', () => {
     const session = mount();
     await openAliasCreation();
 
-    fireEvent.click(screen.getByTestId('present-button'));
+    fireEvent.click(presentControlBehindAModal('Graph'));
 
     expect(screen.queryByTestId('new-alias')).not.toBeInTheDocument();
     expect(cardTitles(session)).toEqual(['A', 'B']);

@@ -18,6 +18,7 @@ import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { newUuid } from '@project/core';
+import { anyPresentControl, openSpaceRow, openSpacesMenu, unavailable } from './command-dock';
 
 /**
  * What an Open Space Card *shows* (ADR 0068).
@@ -285,7 +286,8 @@ describe('the Layout an Open Space Card draws', () => {
       await waitFor(() =>
         expect(spaces.entry(TARGET_ID)?.session.getState().persistence.kind).toBe(kind),
       );
-      const targetEntry = screen.getByRole('tab', { name: /Architecture/ });
+      openSpacesMenu();
+      const targetEntry = openSpaceRow(/Architecture/);
       expect(
         within(targetEntry).getByText(kind === 'failed' ? 'Save failed' : 'Save conflict'),
       ).toBeTruthy();
@@ -335,7 +337,7 @@ describe('the Layout an Open Space Card draws', () => {
       },
     });
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
-    expect(screen.getByRole('button', { name: 'Present' }).hasAttribute('disabled')).toBe(false);
+    expect(unavailable(anyPresentControl())).toBe(false);
     fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Card/ }));
     await waitFor(() =>
       expect(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Save/ })).toBeTruthy(),
@@ -348,7 +350,7 @@ describe('the Layout an Open Space Card draws', () => {
     if (!(sibling instanceof HTMLElement)) throw new Error('Containing Markdown Card missing');
     expect(within(sibling).queryByRole('button', { name: /Edit Card/ })).toBeNull();
     expect(within(embeddedNode(DRAWN_B)).queryByRole('button', { name: /Edit Card/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Present' }).hasAttribute('disabled')).toBe(true);
+    expect(unavailable(anyPresentControl())).toBe(true);
     fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Cancel/ }));
     await waitFor(() =>
       expect(within(parent).getByRole('button', { name: /Close Card/ })).toBeTruthy(),

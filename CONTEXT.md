@@ -6,7 +6,7 @@ Graph-native technical content. Cards of content live in spatial Layouts; author
 
 **Space**:
 The whole authored world, and the top-level of the domain model: Cards organised into spatial Layouts, with each Layout carrying the Graphs authored across its Cards. Everything else — Cards, Layouts and their Graphs — belongs within a Space. Spaces may reference one another through Space Cards, and whichever Space is loaded independently is the root of that navigation context — loading a Space changes what you are navigating, never what owns it.
-_Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable thing — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph, workspace (used loosely for the loaded Space and for the app chrome around it — say Space, or Sidebar/canvas for the chrome).
+_Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable thing — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph, workspace (used loosely for the loaded Space and for the app chrome around it — say Space, or Dock/canvas for the chrome).
 
 A **new space** is one Card in one centered Layout with one empty Graph — not an empty canvas (ADR 0018, ADR 0079). One Card is the starting state, not a permanent minimum: deliberate deletion may later leave the Space with no Cards.
 
@@ -130,8 +130,8 @@ No strategy is the primary one. A space is arranged by whichever the author or t
 _Avoid_: arrangement (applying a strategy produces no separate entity — the cards themselves carry the positions), algorithm, engine.
 
 **Cards View**:
-An application-supplied collection of the Space's Cards absent from the selected Layout. Its current rendering is a Sidebar, but that mounting location is not part of the collection's identity.
-_Avoid_: Space-card palette, Card panel, Sidebar as the domain name.
+An application-supplied collection of the Space's Cards absent from the selected Layout. Its current rendering is a drawer reached from the Command Dock's Cards cluster, but that mounting location is not part of the collection's identity (ADR 0082).
+_Avoid_: Space-card palette, Card panel, drawer or Dock as the domain name.
 
 **Exporting**:
 Projecting a space into the repository-friendly form an author can review, commit and share. Exporting is not what makes an edit durable; it records the space outside Hyper at a chosen revision.

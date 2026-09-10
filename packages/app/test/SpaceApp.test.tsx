@@ -17,6 +17,17 @@ import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
+import {
+  beginRename,
+  exitSpaceItem,
+  createCard,
+  createCardControl,
+  newLayout,
+  openGraphMenu,
+  openLayoutMenu,
+  presentControl,
+  unavailable,
+} from './command-dock';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -105,6 +116,45 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
+/**
+ * **Exit is withheld from the meta Space, and from nothing else.**
+ *
+ * The row read "is there a Space I was opened *from*", which is a different
+ * question and answers `null` for every Space reached by its own URL —
+ * `open`, `openResolvedPath` and the startup path all record no opener. So a
+ * pasted link opened a Space whose Exit was greyed out although
+ * `openSpaces.exit` would have exited it. The rule the surface means is the one
+ * `open-spaces.ts` enforces: the meta Space is permanent and every other open
+ * Space can be left.
+ */
+it('offers Exit on a Space opened by its own address, which has no opener', async () => {
+  const meta = snapshot('Meta', 'Meta Card', 0, 0);
+  const other = { ...snapshot('Elsewhere', 'Other Card', 0, 0), id: newUuid() };
+  const backend = new MemorySpaceBackend(
+    SPACE_ID,
+    [meta, other].map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
+  );
+  const spaces = createOpenSpaces({
+    backend,
+    metaSpaceId: SPACE_ID,
+    newId: newUuid,
+    history: recordingHistory(),
+  });
+  const initial = await spaces.open(SPACE_ID);
+  render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+
+  // The meta Space is the one that cannot be exited, and it says so.
+  expect(unavailable(exitSpaceItem('Meta'))).toBe(true);
+  fireEvent.keyDown(document.body, { key: 'Escape' });
+
+  // Opened by id and not from anywhere, which is what a pasted address does.
+  await act(async () => {
+    await spaces.open(other.id);
+  });
+
+  expect(unavailable(exitSpaceItem('Elsewhere'))).toBe(false);
+});
+
 it('keeps a hidden Space presentation unchanged when the active Space receives Escape', async () => {
   const base = snapshot('First Space', 'First Card', 0, 0);
   const first = {
@@ -148,48 +198,16 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
   expect(initial.app.navigation.getState().mode).toBe('presenting');
 });
 
-/** The `data-state` of the shell sidebar the named Space's own chrome draws. */
-const sidebarStateOf = (spaceTitle: string): string | null => {
-  const title = [...document.querySelectorAll('[data-testid="space-title"]')].find(
-    (element) => element.textContent === spaceTitle,
-  );
-  if (title === undefined) throw new Error(`no Sidebar names the Space ${spaceTitle}`);
-  return title.closest('[data-slot="sidebar"]')?.getAttribute('data-state') ?? null;
-};
-
 /**
- * The sibling of the Escape claim above, for the shell's own global key.
+ * The Sidebar's `Ctrl/Cmd-B` had a claim here and it has gone with the key.
  *
- * Every open Space keeps its shell mounted, so `Ctrl/Cmd-B` on `window` reaches
- * as many `SidebarProvider`s as there are Spaces. Only the Space on the canvas
- * is being looked at, so only its sidebar answers the press.
+ * It proved that a `window` listener reaching every mounted shell only toggled
+ * the Space on the canvas. The Command Dock has no global key at all — it is
+ * furniture over the canvas rather than a gutter to collapse, so there is
+ * nothing to toggle and nothing for a hidden Space to answer wrongly (ADR 0082).
+ * The sibling claim above, that Escape reaches only the showing Space, is the
+ * one that outlived the surface, and it still stands.
  */
-it('leaves a hidden Space sidebar alone when the active Space receives Cmd/Ctrl+B', async () => {
-  const first = snapshot('First Space', 'First Card', 0, 0);
-  const second = { ...snapshot('Second Space', 'Second Card', 0, 0), id: newUuid() };
-  const backend = new MemorySpaceBackend(
-    SPACE_ID,
-    [first, second].map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
-  );
-  const spaces = createOpenSpaces({
-    backend,
-    metaSpaceId: SPACE_ID,
-    newId: newUuid,
-    history: recordingHistory(),
-  });
-  const initial = await spaces.open(SPACE_ID);
-  render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
-  await act(async () => {
-    await spaces.open(second.id);
-  });
-  expect(sidebarStateOf('First Space')).toBe('expanded');
-  expect(sidebarStateOf('Second Space')).toBe('expanded');
-
-  fireEvent.keyDown(document.body, { key: 'b', ctrlKey: true });
-
-  expect(sidebarStateOf('Second Space')).toBe('collapsed');
-  expect(sidebarStateOf('First Space')).toBe('expanded');
-});
 
 describe('Space app conflict recovery', () => {
   it('replaces the visible runtime and editor placement when remote state is accepted', async () => {
@@ -500,33 +518,39 @@ describe('Space app failure reporting', () => {
       },
     );
 
-    expect(await screen.findByRole('button', { name: 'Present' })).toBeVisible();
+    await screen.findByTestId('selected-canvas');
+    expect(presentControl('Addressed')).toBeVisible();
     expect(session.getState().working).toEqual(addressed);
   });
 
   /**
-   * Every copy command is a menu item now, so the refusal is reported from
-   * inside an open menu rather than from a standing button — and reported
-   * twice, because the two reports do not reach the same reader. The shell's
-   * alert is the standing one; the item's own label is the only one visible on
-   * a phone, where the Sidebar is a Sheet drawn over the area that alert
-   * renders in.
+   * A refused clipboard write is reported, and where depends on which surface
+   * asked.
+   *
+   * The **standing alert** is the report both surfaces share: it is pinned in
+   * the shell, over a canvas nothing now covers, so it is visible at every
+   * width. That is what changed with the Sidebar — a Sheet used to be drawn over
+   * the area the alert renders in, which is the whole reason a copy command had
+   * to report a second time in its own label.
+   *
+   * The **item's own label** survives on the Card rail, and only there: that
+   * menu is on the canvas, over the Card, so a reader following it is not
+   * looking at the shell's corner. The Dock's Graph menu is chrome beside the
+   * alert and needs no second voice — see `CommandDock.tsx`.
    *
    * Asserted through `role="alert"`, because the notice really is in the
-   * accessibility tree while this menu is open: Base UI's dropdown menu is
+   * accessibility tree while either menu is open: Base UI's dropdown menu is
    * **not** modal — `MenuPopup` passes `modal: isContextMenu` — so it hides
-   * nothing outside the popup. (Its context-menu sibling is modal and does hide
-   * the background, which is the other half of why the failure has to be
-   * legible in the menu itself.)
+   * nothing outside the popup.
    */
   it.each([
-    { entity: 'Actions for Card Card', command: /^Copy link/ },
-    { entity: 'Actions for Card Card', command: /^Copy permanent link/ },
-    { entity: 'Actions for Graph Graph', command: /^Copy link/ },
-    { entity: 'Actions for Graph Graph', command: /^Copy permanent link/ },
+    { entity: 'Actions for Card Card', command: /^Copy link/, reportsInPlace: true },
+    { entity: 'Actions for Card Card', command: /^Copy permanent link/, reportsInPlace: true },
+    { entity: 'Active Graph: Graph', command: /^Copy link/, reportsInPlace: false },
+    { entity: 'Active Graph: Graph', command: /^Copy permanent link/, reportsInPlace: false },
   ])(
     'reports a rejected clipboard write from $entity $command without unmounting the Space',
-    async ({ entity, command }) => {
+    async ({ entity, command, reportsInPlace }) => {
       const valid = snapshot('Space', 'Card', 10, 20);
       const { spaceSession: session, spaceCards } = openTestSpace(
         new MemorySpaceBackend(SPACE_ID),
@@ -579,10 +603,12 @@ describe('Space app failure reporting', () => {
         expect(alert).toHaveTextContent('The browser refused clipboard access.');
         expect(screen.getByText('Space')).toBeInTheDocument();
 
-        // The command did not do what its label says, so the item does not say
-        // it did. It reads the failure instead, in the one place a reader who
-        // cannot see the alert behind the Sheet is looking.
-        expect(await screen.findByRole('menuitem', { name: /^Not copied/ })).toBeVisible();
+        // The command did not do what its label says, so a rail item does not
+        // say it did — it reads the failure in place, over the Card the reader
+        // is looking at. Either way nothing anywhere claims it was copied.
+        if (reportsInPlace) {
+          expect(await screen.findByRole('menuitem', { name: /^Not copied/ })).toBeVisible();
+        }
         expect(screen.queryByRole('menuitem', { name: /^Copied/ })).not.toBeInTheDocument();
       } finally {
         if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
@@ -590,6 +616,58 @@ describe('Space app failure reporting', () => {
       }
     },
   );
+
+  /**
+   * **A standing report is put away by the reader, not by the next command.**
+   *
+   * The notice slot is pinned over the canvas *above* the Command Dock — a
+   * report drawn behind the furniture it reports for is not a report — and the
+   * Dock moves between twelve slots, so at every top slot the two share a
+   * corner and the report wins hit testing (`e2e/dock-interactions.spec.ts`).
+   * Four of these clear on the next corresponding command and the Space command
+   * break clears only when the next switch or exit is attempted, from the Space
+   * menu on the bar underneath it. So without a dismissal the reader can be left
+   * pressing a control the last failure is sitting on.
+   *
+   * `AlertAction` is the shared `Alert`'s own slot for exactly this, already
+   * spent on Retry by the persistence notice. What is pinned here is that
+   * dismissing is *acknowledgement*: the report goes and the Space is untouched.
+   */
+  it('puts a standing clipboard failure away when the reader dismisses it', async () => {
+    const valid = snapshot('Space', 'Card', 10, 20);
+    const { spaceSession: session, spaceCards } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
+      snapshot: valid,
+      revision: 0n,
+      exportedRevision: null,
+    });
+    const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard permission denied')) },
+    });
+
+    try {
+      mountSpace(
+        { id: runtime(valid).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+        (app) => render(app),
+      );
+
+      openGraphMenu('Graph');
+      fireEvent.click(await screen.findByRole('menuitem', { name: /^Copy link/ }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Link not copied');
+      // The menu the command was pressed in, dismissed the way a reader
+      // dismisses it — the report is what stands, not the surface behind it.
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Link not copied' }));
+
+      await waitFor(() => expect(screen.queryByText('Link not copied')).toBeNull());
+      expect(session.getState().working).toEqual(valid);
+    } finally {
+      if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
+      else Object.defineProperty(navigator, 'clipboard', previousClipboard);
+    }
+  });
 
   /**
    * Composition happens in Open Spaces now, so `createApp` no longer performs
@@ -728,9 +806,8 @@ describe('Space app Cards drawer', () => {
     expect(screen.getByRole('dialog', { name: 'Cards' })).toHaveTextContent(
       'This Space has no Cards.',
     );
-    const addCard = screen.getByRole('button', { name: 'Add Card' });
-    expect(addCard).toBeEnabled();
-    fireEvent.click(addCard);
+    expect(unavailable(createCardControl())).toBe(false);
+    createCard('Markdown Card');
     expect(session.getState().working.cards).toHaveLength(1);
   });
 
@@ -747,7 +824,7 @@ describe('Space app Cards drawer', () => {
       (app) => render(app),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Layout' }));
+    newLayout('Layout');
 
     expect(session.getState().working.document.layouts).toHaveLength(2);
     expect(session.getState().working.document.layouts?.[1]?.positions).toEqual({});
@@ -758,7 +835,7 @@ describe('Space app Cards drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
     expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+    createCard('Markdown Card');
     expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
   });
 
@@ -792,19 +869,229 @@ describe('Space app Cards drawer', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('Arranging…');
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
-
-    expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Delete Layout' })).not.toBeInTheDocument();
+    // The Layout's Edits are withdrawn and its address is not. Renaming is
+    // clicking the name the Dock already draws, so the withdrawal is that name
+    // ceasing to be a button; Delete is present and unavailable, because a
+    // control that disappears teaches nothing about why.
+    expect(screen.getByTestId('selected-canvas').tagName).not.toBe('BUTTON');
+    openLayoutMenu('Layout');
+    expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Layout' }))).toBe(true);
     expect(screen.getByRole('menuitem', { name: /^Copy link/ })).toBeInTheDocument();
 
     // Left settling rather than abandoned mid-placement: the strategy resolves
     // against an unmounted tree otherwise, and the Edits it restores are the
     // other half of the rule.
-    await screen.findByRole('menuitem', { name: 'Rename' });
+    await waitFor(() => expect(screen.getByTestId('selected-canvas').tagName).toBe('BUTTON'));
   });
 
-  it('offers Layout rename and delete actions and explains why the last cannot be deleted', async () => {
+  /**
+   * **A rename cannot outlive the thing it is renaming, and ending it is not a
+   * render-time job.**
+   *
+   * The Dock draws one name cluster and moves it between Layouts rather than
+   * unmounting it, so a Layout changing under a live editor would leave the
+   * caret in a field editing something the reader has already left. The editor
+   * is closed by a render-time transition for that reason — but closing it also
+   * tells the App a chrome rename has ended, and a *parent's* state cannot be
+   * written from a child's render body. React says so out loud, and the state
+   * it withdraws is what gates Present, Create Card and every entity Edit.
+   */
+  it('ends a live Layout rename when the Layout changes, without writing to the App during render', async () => {
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      (app) => render(app),
+    );
+
+    newLayout('Layout');
+    const created = screen.getByTestId('selected-canvas').textContent;
+    await beginRename('selected-canvas');
+    await screen.findByRole('textbox', { name: 'Layout name' });
+
+    // Back onto the first Layout with the caret still in the field.
+    openLayoutMenu(created);
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Layout' }));
+
+    expect(screen.queryByRole('textbox', { name: 'Layout name' })).toBeNull();
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout');
+    expect(reported.mock.calls.flat().join(' ')).not.toContain('Cannot update a component');
+    reported.mockRestore();
+  });
+
+  /**
+   * **Where the caret goes when a chrome rename ends.**
+   *
+   * The editor *replaces* the name it was opened from rather than expanding
+   * inside it, so ending the rename unmounts the element holding the caret. The
+   * Sidebar answered this with a continuation resolving `layout-header`; the
+   * Dock deleted that kind on the grounds that the editor "hands focus back
+   * itself", and nothing did — the caret fell to `document.body` and the next
+   * Tab restarted from the top of the document. `InlineTitleEditor` calls
+   * `onReturnFocus` from its own Enter and Escape handlers for exactly this.
+   */
+  it('returns the caret to the name it was opened from when a Layout rename ends', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      (app) => render(app),
+    );
+
+    await beginRename('selected-canvas');
+    const editor = await screen.findByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(editor, { target: { value: 'Workshop' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+
+    const name = screen.getByTestId('selected-canvas');
+    expect(name).toHaveTextContent('Workshop');
+    expect(document.activeElement).toBe(name);
+  });
+
+  /**
+   * **A rename the reader ended by leaving does not pull them back.**
+   *
+   * `InlineTitleEditor` completes on blur as well as on Enter, and only the
+   * keyboard exits call `onReturnFocus` — because only they leave the caret
+   * with nowhere to be. A blur completion is the reader already putting the
+   * caret somewhere they chose, and returning it to the name is taking focus
+   * rather than giving it back. The Sidebar spent its continuation from
+   * `onReturnFocus` alone for this reason; wiring the same ending into
+   * `onComplete` reinstated the theft with the commit as its cover.
+   */
+  it('leaves the caret where the reader put it when a Layout rename ends by blur', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      (app) => render(app),
+    );
+
+    await beginRename('selected-canvas');
+    const editor = await screen.findByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(editor, { target: { value: 'Workshop' } });
+
+    // Somewhere else the reader has chosen — the canvas in the product, any
+    // focusable element here, because what is pinned is that the Dock does not
+    // take it back rather than which element holds it.
+    const elsewhere = document.createElement('button');
+    document.body.append(elsewhere);
+    elsewhere.focus();
+    fireEvent.blur(editor);
+
+    const name = await screen.findByTestId('selected-canvas');
+    expect(name).toHaveTextContent('Workshop');
+    expect(document.activeElement).toBe(elsewhere);
+    elsewhere.remove();
+  });
+
+  /**
+   * **One name in the bar is being renamed, or none is.**
+   *
+   * A blank name is refused and `InlineTitleEditor` holds a refused draft open
+   * and editable, so a Layout rename can still be running while the reader
+   * presses the Graph name beside it — the availability rule that stops a
+   * *second* Rename beginning reads `editingChromeTitle`, and the name control
+   * deliberately does not, because withdrawing it would draw the live editor's
+   * own name as a static label.
+   *
+   * So the second press is reachable, and what it must not do is leave two
+   * editors standing over one bar. The exclusivity is the disclosure's, one
+   * step along: at most one open id under the whole row, and whichever control
+   * opens next clears whatever was open.
+   */
+  it('leaves one Dock name editor standing when a second rename is begun over a live one', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      (app) => render(app),
+    );
+
+    await beginRename('selected-canvas');
+    const layoutEditor = await screen.findByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(layoutEditor, { target: { value: '' } });
+    fireEvent.keyDown(layoutEditor, { key: 'Enter' });
+    expect(screen.getByRole('textbox', { name: 'Layout name' })).toBeInTheDocument();
+
+    await beginRename('active-graph');
+
+    expect(screen.getAllByRole('textbox', { name: /^(Layout|Graph) name$/ })).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: 'Graph name' })).toBeInTheDocument();
+  });
+
+  /**
+   * **What the bar reports and what the bar draws are one answer.**
+   *
+   * A live chrome rename withdraws Create Card, Present, Delete Card and the
+   * canvas's own title editing, because each of those re-derives the canvas or
+   * takes the caret from under the editor. Three identities drawing three
+   * editors over one boolean is what let that come apart: with a blank Layout
+   * draft still refusing, a Graph rename begun and then abandoned with Escape
+   * reported the *bar* as idle and handed the commands back underneath an
+   * editor that was still on screen.
+   *
+   * The claim is the coupling rather than either half of it, because the fix is
+   * free to end the first rename or to keep it — what it may not do is disagree
+   * with itself. Create Card is the one asserted: it reads `addCard`, which
+   * carries `editingChromeTitle` and nothing else about this Space, while
+   * Present here is withheld anyway for a Graph with no Edges to traverse.
+   */
+  it('withdraws Create Card for as long as a Dock name editor is standing', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      (app) => render(app),
+    );
+
+    await beginRename('selected-canvas');
+    const layoutEditor = await screen.findByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(layoutEditor, { target: { value: '' } });
+    fireEvent.keyDown(layoutEditor, { key: 'Enter' });
+    expect(unavailable(createCardControl())).toBe(true);
+
+    await beginRename('active-graph');
+    const graphEditor = await screen.findByRole('textbox', { name: 'Graph name' });
+    fireEvent.keyDown(graphEditor, { key: 'Escape' });
+
+    const standing = screen.queryAllByRole('textbox', { name: /^(Layout|Graph) name$/ }).length > 0;
+    expect(unavailable(createCardControl())).toBe(standing);
+  });
+
+  /**
+   * **The last Layout cannot be deleted, and the Dock says so before the press.**
+   *
+   * ADR 0079 keeps a Space on at least one Layout. The Sidebar let the command
+   * run and printed the refusal afterwards; the Dock draws it present and
+   * unavailable instead — a control that disappears teaches nothing about why,
+   * and one that refuses every time teaches it a press too late. So what is
+   * pinned here is the availability, and then the ordinary lifecycle once a
+   * second Layout exists: rename in place, delete, and the selection landing
+   * back on what is left.
+   */
+  it('withholds Delete from the last Layout and runs the lifecycle once there are two', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const { spaceSession: session, spaceCards } = openTestSpace(
@@ -817,55 +1104,42 @@ describe('Space app Cards drawer', () => {
       (app) => render(app),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('A Space keeps at least one Layout.');
+    openLayoutMenu('Layout');
+    expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Layout' }))).toBe(true);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Layout' }));
+    newLayout('Layout');
     fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout 1' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    // Renaming is the name itself, not a menu row: there is one name on the bar
+    // and clicking it is the whole command.
+    await beginRename('selected-canvas');
     const editor = await screen.findByRole('textbox', { name: 'Layout name' });
     fireEvent.change(editor, { target: { value: 'Workshop' } });
     fireEvent.keyDown(editor, { key: 'Enter' });
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Workshop');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Workshop' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
+    openLayoutMenu('Workshop');
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Workshop' }));
     expect(session.getState().working.document.layouts).toHaveLength(1);
     expect(session.getState().working.cards).toEqual(base.cards);
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout');
   });
 
   /**
-   * The refusal is drawn under Add Layout, which every canvas selection shows.
-   * A Delete Layout refusal that outlived its own Layout therefore reappeared
-   * as the next one's, explaining a Layout the reader had just left.
+   * **A Layout refusal was pinned here and its one route has gone.**
+   *
+   * The claim was that a Delete Layout refusal does not outlive its own Layout:
+   * the refusal is drawn in the shell's standing notice, which every Layout
+   * shows, so one left standing explained a Layout the reader had already left.
+   * The only way to produce it was Delete on the last Layout, and the Command
+   * Dock withholds that command before the press (ADR 0079) — which the test
+   * above now pins instead.
+   *
+   * What is left is a race: a Delete whose Layout is gone by the time the press
+   * lands refuses `layout-not-found`. That is real, the alert and the clearing
+   * effect are both still there for it, and it is not reachable from a mount —
+   * so this is a note rather than a test, and the effect is one an integration
+   * run would have to catch.
    */
-  it('clears a Layout management refusal when the canvas selection changes', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
-    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
-      new MemorySpaceBackend(SPACE_ID, [stored]),
-      stored,
-    );
-
-    mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
-      (app) => render(app),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Layout Layout' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Layout' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('A Space keeps at least one Layout.');
-
-    // The Space holds one Layout while the refusal stands, so Add Layout is the
-    // move away from it: it authors a second Layout and selects it.
-    fireEvent.click(screen.getByRole('button', { name: 'Add Layout' }));
-
-    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Layout 1');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
 
   it('keeps the Cards drawer closed after the reader closes it, even once the Space gains another Card', async () => {
     const base = snapshot('Space', 'Card', 10, 20);
@@ -910,13 +1184,9 @@ describe('Space app Cards drawer', () => {
       screen.queryByRole('button', { name: 'Add Outside card to Layout' }),
     ).not.toBeInTheDocument();
 
-    const addCardButton = await waitFor(() => {
-      const button = screen.getByRole('button', { name: 'Add Card' });
-      expect(button).toBeEnabled();
-      return button;
-    });
+    await waitFor(() => expect(unavailable(createCardControl())).toBe(false));
     const before = session.getState().working.cards.length;
-    fireEvent.click(addCardButton);
+    createCard('Markdown Card');
     expect(session.getState().working.cards.length).toBe(before + 1);
 
     expect(
@@ -983,10 +1253,10 @@ describe('Space app Cards drawer', () => {
       history,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Graph Graph' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    // The Graph's name is renamed where it is drawn, exactly as the Layout's is.
+    await beginRename('active-graph');
     expect(await screen.findByRole('textbox', { name: 'Graph name' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Add Card' })).toBeDisabled();
+    expect(unavailable(createCardControl())).toBe(true);
 
     act(() => {
       history.popTo(
@@ -996,7 +1266,7 @@ describe('Space app Cards drawer', () => {
 
     expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Layout');
     expect(screen.queryByRole('textbox', { name: 'Graph name' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add Card' })).toBeEnabled();
+    expect(unavailable(createCardControl())).toBe(false);
   });
 
   it('reveals the addressed Card again in a newly adopted default Layout that omits it, even though the same Card was already addressed once', async () => {

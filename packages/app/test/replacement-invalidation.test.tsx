@@ -13,6 +13,7 @@ import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
+import { beginRename } from './command-dock';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -23,7 +24,14 @@ import { openTestSpace } from './opened-space';
  * mechanism discards all three. Nothing held them to any of it before this file,
  * so all three held by construction and by reading.
  *
- * **This is a characterization test: it pins outcomes that already hold.**
+ * **Two of the three cases are characterization: they pin outcomes that already
+ * held.** The third is not. The Layout rename below was written as
+ * characterization too and was never entitled to be: the chrome editor is the
+ * Dock name control's own state, no mechanism here reached it, and the case
+ * passed only on the runs where the conflict's modal stole the caret and blur
+ * committed the draft before the accept. `IdentityName` now ends a rename on the
+ * replacement epoch, and the case stages a draft the rename refuses so the
+ * assertion no longer turns on where jsdom put focus.
  * `.scratch/interaction-draft-invalidation/issues/02-…` carries the argument. So
  * that nobody has to take the coverage on trust, each case was mutation-checked
  * against three deliberate breakages, and what follows is what was measured
@@ -39,20 +47,23 @@ import { openTestSpace } from './opened-space';
  * | opened-Card pane | passes | passes | passes | **fails** |
  * | in-flight drag | passes | **fails** | **fails** | passes |
  *
- * **The inline title field is not covered here, and cannot be.** The only
- * trigger the app has for accepting a stored Space is the conflict banner's
- * `Accept remote`, which now lives in a modal `AlertDialog`. Raising the
- * conflict traps focus into that dialog, the field blurs, and blur is the
- * editor's own commit — so the draft is *committed* before the replacement
- * lands, and there is no open draft left for the replacement to discard. That
- * is the app's real behaviour through its real trigger, not a harness artifact;
- * whether an arriving conflict should commit an in-progress rename is a product
- * question, and it is recorded in the ticket rather than frozen here.
+ * **What the modal does to a draft is the hazard this file kept walking into.**
+ * The only trigger the app has for accepting a stored Space is the conflict
+ * banner's `Accept remote`, which lives in a modal `AlertDialog`. Raising the
+ * conflict traps focus into that dialog, the field blurs, and blur is
+ * `InlineTitleEditor`'s own commit — so a draft the rename would *accept* is
+ * committed before the replacement lands and there is nothing left to discard.
+ * That is the app's real behaviour through its real trigger, not a harness
+ * artifact; whether an arriving conflict should commit an in-progress rename is
+ * a product question, and it is recorded in the ticket rather than frozen here.
+ * A draft the rename **refuses** is held open and editable by contract, which is
+ * why the chrome case below stages one: it is the draft that survives the trap
+ * either way, so what the assertion reads is the replacement and nothing else.
  *
- * `K` is therefore defended by nothing, here or anywhere: the canvas key and the
+ * `K` is defended by nothing, here or anywhere: the canvas key and the
  * projection reset are each sufficient for the drafts inside the canvas subtree,
- * and with the title field unreachable only the drag distinguishes them — which
- * `R` alone already kills.
+ * and only the drag distinguishes them — which `R` alone already kills. The
+ * chrome rename is outside that subtree and outside `K`'s reach entirely.
  *
  * What is deliberately **not** asserted: that the discard is silent, and where
  * focus lands afterwards. Both are open product questions recorded in that
@@ -77,6 +88,7 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
  */
 const snapshot = (
   title: string,
+  layoutTitle: string,
   cardTitle: string,
   body: string,
   x: number,
@@ -90,7 +102,7 @@ const snapshot = (
       layouts: [
         {
           id: LAYOUT_ID,
-          title: 'Layout',
+          title: layoutTitle,
           kind: 'positioned',
           positions: { [CARD_ID]: { x, y, open: false } },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
@@ -101,8 +113,8 @@ const snapshot = (
     cards: [{ id: CARD_ID, document: { title: cardTitle, kind: 'markdown', body } }],
   });
 
-const LOCAL = snapshot('Local space', 'Local card', 'Local source', 10, 20);
-const REMOTE = snapshot('Remote space', 'Remote card', 'Remote source', 900, 700);
+const LOCAL = snapshot('Local space', 'Local layout', 'Local card', 'Local source', 10, 20);
+const REMOTE = snapshot('Remote space', 'Remote layout', 'Remote card', 'Remote source', 900, 700);
 
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);
@@ -280,20 +292,45 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    * subtree and so is reached by none of the mechanisms above. A Layout rename
    * left uncompleted names a Layout the accepted Space may not hold, and
    * completing it afterwards writes against whatever Layout now resolves.
+   *
+   * **The draft is one the rename refuses, and that is what makes this test say
+   * anything.** It was a typed name before, and the assertion passed or failed
+   * on where the conflict's modal put the caret: `AlertDialog` traps focus, the
+   * field blurs, and blur is `InlineTitleEditor`'s own commit — so on the runs
+   * where the trap reached the field the draft was *committed* before the accept
+   * and the replacement had nothing left to discard. The editor survived on
+   * every other run, which is the defect this now pins. A blank name is the one
+   * refusal every renameable entity has (`IdentityName`), and a refused draft is
+   * held open and editable by contract — so the editor is still standing when
+   * the accept lands whether the trap reached it or not, and the assertion is
+   * about the replacement rather than about jsdom's focus.
+   *
+   * `hidden: true` throughout for the same reason: a conflicted shell is
+   * `aria-hidden` behind the modal, so an accessibility-tree query answers
+   * "gone" for an editor that is still mounted, and the discard would read as
+   * proved by the dialog that hid it.
    */
-  it('discards a Layout rename holding an uncompleted draft', async () => {
+  it('discards a Layout rename left open when the stored Space is accepted', async () => {
     const session = await mountedSpaceApp();
-    fireEvent.click(screen.getByRole('button', { name: 'Layout', pressed: true }));
+    await beginRename('selected-canvas');
     const name = screen.getByRole('textbox', { name: 'Layout name' });
-    fireEvent.change(name, { target: { value: 'Name nobody pressed Enter on' } });
-    expect(name).toHaveValue('Name nobody pressed Enter on');
+    fireEvent.change(name, { target: { value: '   ' } });
+    expect(name).toHaveValue('   ');
 
     await raiseConflict(session);
+    // The staged pre-condition, asserted rather than assumed: without an open
+    // editor here the discard below is vacuous, which is exactly how this case
+    // passed while the editor was surviving.
+    expect(screen.getByRole('textbox', { name: 'Layout name', hidden: true })).toHaveValue('   ');
     acceptRemote();
 
     await replacementLanded();
-    expect(screen.queryByRole('textbox', { name: 'Layout name' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Name nobody pressed Enter on')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('textbox', { name: 'Layout name', hidden: true }),
+    ).not.toBeInTheDocument();
+    // And the cluster is back to naming the Layout the accepted Space authored,
+    // rather than an editor reseeded from it.
+    expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Remote layout');
   });
 
   /**

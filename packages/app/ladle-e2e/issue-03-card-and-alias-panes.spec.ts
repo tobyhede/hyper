@@ -59,8 +59,8 @@ test('Alias pane stories are isolated from the Ladle catalogue', async ({ page }
   await expect(storyFrame.getByRole('dialog', { name: 'New Alias' })).toBeVisible();
 
   const storySearch = page.getByLabel('Search stories');
-  await storySearch.fill('Persistence Indicator');
-  await expect(storySearch).toHaveValue('Persistence Indicator');
-  await page.getByRole('link', { name: 'Lifecycle' }).click();
-  await expect(page).toHaveURL(/story=components--persistence-indicator--lifecycle/);
+  await storySearch.fill('Zoom Control');
+  await expect(storySearch).toHaveValue('Zoom Control');
+  await page.getByRole('link', { name: 'Canvas' }).click();
+  await expect(page).toHaveURL(/story=components--zoom-control--canvas/);
 });

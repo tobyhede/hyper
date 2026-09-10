@@ -2,23 +2,30 @@ import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
 import {
+  AUTHORING_HANDLE_SIDES,
   activateGraph,
   activeCard,
   activeGraph,
   allPositions,
   authoringHandle,
-  AUTHORING_HANDLE_SIDES,
   boxOf,
   connectHandles,
   connectToEmptyWithAlt,
+  createCard,
+  createCardControl,
+  dock,
   dragBy,
+  expectCardFillsNode,
+  layoutChoices,
+  layoutMenu,
+  newLayout,
   nodeByTitle,
   openCard,
   positionOf,
+  presentControl,
   selectCanvas,
   selectedCanvas,
   settled,
-  sidebar,
   viewportTransform,
 } from './graph';
 
@@ -326,7 +333,12 @@ test(
         .getByTestId('canvas-card-actions')
         .getByRole('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
-    ).toEqual(['Edit Card A', 'Close Card A']);
+      // The rail carries the Card's own actions menu between Edit and Close now:
+      // a Card's addresses and its deletion belong to the Card (ADR 0073), and
+      // the Space's command surface does not draw them at all (ADR 0082). The
+      // list is asserted whole rather than by presence, so a control appearing
+      // here is a decision rather than a drift.
+    ).toEqual(['Edit Card A', 'Actions for Card A', 'Close Card A']);
     await bodyTarget.click();
     const source = page.getByRole('textbox', { name: 'Markdown source of A' });
     await expect(source).toBeFocused();
@@ -364,6 +376,10 @@ test(
     await expect(source).toHaveCount(0);
     await expect(cardA).toContainText('entry point');
 
+    // Hovered first: the click on the pane above took the pointer off the Card,
+    // and a rail nobody is pointing at takes no pointer events — which is what
+    // the reload branch below already spells out.
+    await cardA.hover();
     await cardA.getByRole('button', { name: 'Edit Card A' }).click();
     const committedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
     await committedSource.fill(exact);
@@ -562,7 +578,7 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
 
 test(
   'selecting Layouts is navigation and does not persist',
-  { tag: '@parity:space-sidebar-marks-one-current-renderer' },
+  { tag: '@parity:command-dock-marks-one-current-layout' },
   async ({ page }) => {
     await page.goto('/');
     const a = nodeByTitle(page, 'A').first();
@@ -571,38 +587,34 @@ test(
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    // One Layout list with exactly one pressed row (ADR 0053/0079).
-    await expect(
-      sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
-    ).toBeVisible();
-    await expect(sidebar(page).getByRole('button', { name: 'Long', exact: true })).toBeVisible();
-    await expect(
-      sidebar(page).locator('[data-testid="layout-row"][aria-pressed="true"]'),
-    ).toHaveCount(1);
+    // One list over the authored Layouts with exactly one checked item, and the
+    // cluster outside it naming the same one (ADR 0053's surviving clause, kept
+    // verbatim by ADR 0082; ADR 0079).
+    const choices = await layoutChoices(page);
+    await expect(choices).toHaveCount(2);
+    await expect(choices.and(page.locator('[aria-checked="true"]'))).toHaveCount(1);
+    await expect(choices.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 1');
+    await page.keyboard.press('Escape');
+    await expect(selectedCanvas(page)).toContainText('Collection 1');
+    await expect(activeGraph(page)).toContainText('Long');
 
     await selectCanvas(page, 'Collection 2');
-    await expect(
-      sidebar(page).getByRole('button', { name: 'Collection 2', exact: true }),
-    ).toHaveAttribute('aria-pressed', 'true');
-    await expect(
-      sidebar(page).locator('[data-testid="layout-row"][aria-pressed="true"]'),
-    ).toHaveCount(1);
+    const afterSwitch = await layoutChoices(page);
+    await expect(afterSwitch.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 2');
+    await page.keyboard.press('Escape');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
     await selectCanvas(page, 'Collection 1');
-    await expect(
-      sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
-    ).toHaveAttribute('aria-pressed', 'true');
-    await expect(
-      sidebar(page).locator('[data-testid="layout-row"][aria-pressed="true"]'),
-    ).toHaveCount(1);
+    const afterReturn = await layoutChoices(page);
+    await expect(afterReturn.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 1');
+    await page.keyboard.press('Escape');
     await expect(persistence).toHaveAttribute('data-revision', '0');
   },
 );
 
 test(
-  'Add Layout creates an empty selected Layout and persists it through reload',
-  { tag: '@parity:space-sidebar-adds-empty-layout' },
+  'New Layout creates an empty selected Layout and persists it through reload',
+  { tag: '@parity:command-dock-adds-an-empty-layout' },
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -610,23 +622,27 @@ test(
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    const create = sidebar(page).getByRole('button', { name: 'Add Layout' });
-    await expect(create).toBeEnabled();
-    await create.click();
+    // In the Layout menu, beside the list it adds to — the Sidebar had room for
+    // a permanent control and the Dock finds room by disclosure (ADR 0082).
+    // What the command does is unchanged: an *empty* Layout, created and
+    // selected in one Edit (ADR 0079, ADR 0080).
+    await newLayout(page);
 
     await expect(selectedCanvas(page)).toContainText('Layout 1');
-    await expect(create).toBeEnabled();
     await expect(persistence).toHaveAttribute('data-revision', '1');
     await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
     expect(await allPositions(page)).toEqual({});
+    await page.keyboard.press('Escape');
 
     await page.reload();
     await expect(selectedCanvas(page)).toContainText('Layout 1');
     expect(await allPositions(page)).toEqual({});
 
-    await sidebar(page).getByRole('button', { name: 'Actions for Layout Layout 1' }).click();
-    await page.getByRole('menuitem', { name: 'Rename' }).click();
-    const title = sidebar(page).getByRole('textbox', { name: 'Layout name' });
+    // Rename is the name itself rather than a row menu: the Dock draws each
+    // name once, so the control the reader presses is the word they are
+    // changing.
+    await selectedCanvas(page).click();
+    const title = page.getByRole('textbox', { name: 'Layout name' });
     await title.fill('Workshop');
     await title.press('Enter');
     await expect(selectedCanvas(page)).toContainText('Workshop');
@@ -634,8 +650,8 @@ test(
 
     await page.reload();
     await expect(selectedCanvas(page)).toContainText('Workshop');
-    await sidebar(page).getByRole('button', { name: 'Actions for Layout Workshop' }).click();
-    await page.getByRole('menuitem', { name: 'Delete Layout' }).click();
+    const menu = await layoutMenu(page);
+    await menu.getByRole('menuitem', { name: 'Delete Workshop' }).click();
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await expect(persistence).toHaveAttribute('data-revision', '3');
@@ -657,6 +673,7 @@ test(
     const card = nodeByTitle(page, 'A').first();
     await expect(card).toBeVisible();
     await openCard(card, 'A');
+    await expectCardFillsNode(card);
     await card.click({ position: { x: 8, y: 8 } });
 
     const size = async () =>
@@ -673,12 +690,14 @@ test(
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 6 });
+    await expectCardFillsNode(card);
     await page.mouse.up();
 
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
     await card.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
+    await expectCardFillsNode(card);
     const resized = await size();
     expect(resized.width).toBeGreaterThan(beforeSize.width);
     expect(resized.height).toBeGreaterThan(beforeSize.height);
@@ -692,7 +711,17 @@ test(
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
+    await expectCardFillsNode(persisted);
     expect(persistedSize).toEqual(resized);
+    await persisted.hover();
+    await persisted.getByRole('button', { name: 'Close Card A', exact: true }).click();
+    await expect(persisted).toHaveCSS('width', '260px');
+    await expectCardFillsNode(persisted);
+    await persisted.hover();
+    await persisted.getByRole('button', { name: 'Edit Card A', exact: true }).click();
+    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
+    await expectCardFillsNode(persisted);
+    expect(await size()).toEqual(resized);
     expect(await positionOf(persisted)).toEqual(beforePosition);
   },
 );
@@ -1258,11 +1287,11 @@ test('opening animates the Card wrapper and displaced neighbours from one durati
   ).toBe(true);
 });
 
-test('Add Layout creates an empty Layout and leaves existing Cards in the Cards View', async ({
+test('New Layout creates an empty Layout and leaves existing Cards in the Cards View', async ({
   page,
 }) => {
   await page.goto('/');
-  await sidebar(page).getByRole('button', { name: 'Add Layout' }).click();
+  await newLayout(page);
 
   await expect(page.locator('.react-flow__node')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
@@ -1409,15 +1438,15 @@ test('leaving a presentation closes the Cards drawer rather than reopening it ov
   await page.getByRole('button', { name: 'Cards' }).click();
   await expect(drawer).toBeVisible();
 
-  await page.getByRole('button', { name: 'Present' }).click();
-  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+  await presentControl(page).click();
+  await expect(page.getByTestId('exit-presenting')).toBeVisible();
   await expect(drawer).toHaveCount(0);
 
   // A drawer that sprang back would also take focus with it — `Drawer.Popup`
   // moves focus in on every open, however that open was caused — landing the
   // reader in the Cards list instead of on the canvas they returned to.
-  await page.getByRole('button', { name: 'Stop' }).click();
-  await expect(page.getByRole('button', { name: 'Present' })).toBeVisible();
+  await page.getByTestId('exit-presenting').click();
+  await expect(presentControl(page)).toBeVisible();
   await expect(drawer).toHaveCount(0);
   await expect(page.locator('[data-slot="drawer-popup"]')).toHaveCount(0);
 });
@@ -1437,6 +1466,25 @@ test('keyboard placement moves focus from the Cards drawer to the added canvas C
   await expect(nodeByTitle(page, 'E')).toBeFocused();
 });
 
+/**
+ * Deleting a Card is the Card rail's now (ADR 0073), so its withdrawal is read
+ * there.
+ *
+ * The Sidebar drew a standing `Delete Card <title>` button for the selected
+ * Card, and these tests read its presence. The Command Dock has no Card
+ * commands at all — that is its organising rule — so the command lives in the
+ * Card's own actions menu, and "withdrawn" means the row is absent from that
+ * menu rather than a button absent from the chrome.
+ */
+const cardActions = async (page: Page, title: string): Promise<Locator> => {
+  const card = nodeByTitle(page, title).first();
+  await card.hover();
+  await card.getByRole('button', { name: `Actions for Card ${title}` }).click({ delay: 120 });
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  return menu;
+};
+
 test('Delete Card confirms before removing the Card from the whole Space', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
@@ -1444,14 +1492,16 @@ test('Delete Card confirms before removing the Card from the whole Space', async
 
   const card = nodeByTitle(page, 'B');
   await card.click();
-  await page.getByRole('button', { name: 'Delete Card B' }).click();
+  await (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }).click();
 
+  // The dialog is drawn at the App root rather than in the menu that armed it:
+  // the menu closes on the press and would take the question with it.
   const confirmation = page.getByRole('alertdialog', { name: 'Delete Card B?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
   await expect(card).toBeVisible();
 
-  await page.getByRole('button', { name: 'Delete Card B' }).click();
+  await (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }).click();
   await confirmation.getByRole('button', { name: 'Delete Card' }).click();
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
@@ -1465,13 +1515,20 @@ test('Delete Card is withdrawn while presenting', async ({ page }) => {
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  await nodeByTitle(page, 'B').click();
-  await expect(page.getByRole('button', { name: 'Delete Card B' })).toBeVisible();
+  await expect(
+    (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: 'Present' }).click();
-  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+  await presentControl(page).click();
+  await expect(page.getByTestId('exit-presenting')).toBeVisible();
 
-  await expect(page.getByRole('button', { name: 'Delete Card B' })).toHaveCount(0);
+  // The rail itself is withdrawn while presenting, so there is no menu to open:
+  // the audience is looking at the Space, not at the tools. Asserted without
+  // hovering the Card, because the camera has closed in on the presented one and
+  // `B` is off frame — which is the same reason the rail would be unreachable
+  // even if it were drawn.
+  await expect(page.getByRole('button', { name: 'Actions for Card B' })).toHaveCount(0);
 });
 
 test('Delete Card is withdrawn while the selected Card is Open', async ({ page }) => {
@@ -1479,12 +1536,18 @@ test('Delete Card is withdrawn while the selected Card is Open', async ({ page }
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  await nodeByTitle(page, 'B').click();
-  await expect(page.getByRole('button', { name: 'Delete Card B' })).toBeVisible();
+  await expect(
+    (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await nodeByTitle(page, 'B').first().click();
   await page.getByRole('button', { name: 'Open Card B' }).click();
   await expect(nodeByTitle(page, 'B').getByRole('button', { name: 'Close Card B' })).toBeVisible();
 
-  await expect(page.getByRole('button', { name: 'Delete Card B' })).toHaveCount(0);
+  await expect(
+    (await cardActions(page, 'B')).getByRole('menuitem', { name: 'Delete Card' }),
+  ).toHaveCount(0);
 });
 
 test('dragging from the Cards drawer uses transformed canvas coordinates then ordinary Card dragging', async ({
@@ -1532,13 +1595,30 @@ test(
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    const toggle = page.getByRole('button', { name: 'Cards' });
-    await expect(toggle).toBeEnabled();
+    const toggle = dock(page).getByRole('button', { name: 'Cards' });
+    await expect(toggle).not.toHaveAttribute('aria-disabled', 'true');
 
-    await page.getByRole('button', { name: 'Present' }).click();
-    await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await presentControl(page).click();
+    await expect(page.getByTestId('exit-presenting')).toBeVisible();
 
-    await expect(toggle).toBeDisabled();
+    // **Withdrawn by the surface being hidden, not by the toggle greying out.**
+    // Presenting hides the Dock's commands (ADR 0082) — it does not remove the
+    // Dock, which stays mounted at `data-presenting='true'` so the persistence
+    // report keeps its slot (`command-dock.css:86-91`). `visibility: hidden`
+    // takes the toolbar out of the accessibility tree, so `toggle` is scoped
+    // inside a locator matching nothing and its `toHaveCount(0)` would be
+    // satisfied by a Dock that had never rendered at all. The trigger is
+    // therefore addressed through the frame, which is still there, and the
+    // drawer it controls is closed rather than left hidden behind a still-true
+    // `open` — the half of the claim that outlived the Sidebar.
+    const surface = page.locator('.command-dock__surface');
+    await expect(surface).toBeAttached();
+    await expect(surface).toBeHidden();
+    await expect(
+      page.getByTestId('command-dock').locator('.command-dock__cards-trigger'),
+    ).toHaveCount(1);
+    await expect(toggle).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
   },
 );
 
@@ -1561,45 +1641,55 @@ test('editing an existing Layout updates it instead of creating another one', as
 
   await dragBy(page, a, 0, 160);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await expect(
-    sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
-  ).toHaveCount(1);
+  await expect(selectedCanvas(page)).toContainText('Collection 1');
 });
 
 test(
-  'Layout and Graph names edit from Space chrome and survive reload',
-  { tag: '@parity:space-chrome-edits-names' },
+  'Layout and Graph names edit from the Dock and survive reload',
+  { tag: '@parity:command-dock-edits-identity-names' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await selectedCanvas(page).getByRole('button', { name: 'Edit Layout Collection 1' }).click();
+    // **One name, one control, one draft.** The Sidebar shared a draft between
+    // an active row and a canvas header, begun from either and returning the
+    // caret to whichever began it — which is where `continuation.ts`'s
+    // `sidebar-row` target came from and why it is gone with the surface. The
+    // Dock draws each name once, so the editor replaces the control it began
+    // from and there is no second surface to keep in step.
+    await selectedCanvas(page).click();
     const layoutName = page.getByRole('textbox', { name: 'Layout name' });
+    await expect(layoutName).toBeFocused();
+    await layoutName.fill('');
+    await layoutName.press('Enter');
+    // Refused and still open, with the author's words still theirs.
+    await expect(page.getByText('A Layout needs a name.')).toBeVisible();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
     await layoutName.fill('Workshop');
-    await expect(
-      sidebar(page).getByRole('button', { name: 'Workshop', pressed: true }),
-    ).toBeVisible();
     await layoutName.press('Enter');
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
     await expect(selectedCanvas(page)).toContainText('Workshop');
 
-    await sidebar(page).getByRole('button', { name: 'Workshop', pressed: true }).click();
-    const sidebarLayoutName = page.getByRole('textbox', { name: 'Layout name' });
-    await sidebarLayoutName.fill('Studio');
-    await expect(selectedCanvas(page)).toContainText('Studio');
-    await sidebarLayoutName.press('Enter');
-    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+    // Begun again from the same control, and cancelled: Escape drops the draft
+    // rather than committing it.
+    await selectedCanvas(page).click();
+    const cancelled = page.getByRole('textbox', { name: 'Layout name' });
+    await cancelled.fill('Studio');
+    await cancelled.press('Escape');
+    await expect(selectedCanvas(page)).toContainText('Workshop');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
-    await sidebar(page).getByRole('button', { name: 'Long', pressed: true }).click();
+    await activeGraph(page).click();
     const graphName = page.getByRole('textbox', { name: 'Graph name' });
     await graphName.fill('Journey');
     await graphName.press('Enter');
-    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+    await expect(activeGraph(page)).toContainText('Journey');
 
     await page.reload();
-    await selectCanvas(page, 'Studio');
-    await expect(sidebar(page).getByRole('button', { name: 'Journey', exact: true })).toBeVisible();
+    await selectCanvas(page, 'Workshop');
+    await expect(activeGraph(page)).toContainText('Journey');
   },
 );
 
@@ -1732,7 +1822,11 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
     await expect(targetHandles.first()).toHaveCSS('opacity', '1');
     await expect(targetHandles).toHaveCount(6 * AUTHORING_HANDLE_SIDES);
     const preview = page.locator('.react-flow__connection-path');
-    await expect(preview).toBeVisible();
+    // `toBeAttached`, not `toBeVisible`: a connection drawn between two Cards
+    // whose centres share a row is a horizontal `path`, and a zero-height
+    // bounding box is what Playwright calls hidden. What the assertion is about
+    // is the line's colour and its arrow, both read below.
+    await expect(preview).toBeAttached();
     await expect(preview).toHaveCSS('stroke', activeGraphColor);
     await expect(preview).toHaveAttribute('marker-end', /url/);
   });
@@ -1775,7 +1869,7 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
   await expect(persistence).toHaveAttribute('data-revision', '2');
   await expect(persistence).toHaveText('Persisted');
 
-  await page.getByTestId('present-button').click();
+  await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000008');
   await expect(page.getByTestId('presenting-moves').getByRole('button')).toHaveText('A');
@@ -1806,7 +1900,7 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   await a.click();
   await expect(a).toHaveClass(/selected/);
 
-  await page.getByTestId('present-button').click();
+  await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await expect(activeCard(page)).toHaveAttribute('data-id', A);
   const moves = page.getByTestId('presenting-moves').getByRole('button');
@@ -1924,6 +2018,10 @@ test('a second connection drawn in the same session resolves its handles', async
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
   await settled(page);
 
+  // The drag above left the pointer on `F`, and a handle reveals with the Card
+  // it belongs to — an unrevealed handle takes no pointer events, so the press
+  // that starts the connection would land on the pane instead.
+  await a.hover();
   await connectHandles(
     page,
     authoringHandle(a, 'source', 'right'),
@@ -1941,6 +2039,7 @@ test('a second connection drawn in the same session resolves its handles', async
   // while React Flow is still settling the gesture that would undo it.
   await expect(e).toHaveClass(/selected/);
 
+  await e.hover();
   await connectHandles(
     page,
     authoringHandle(e, 'source', 'right'),
@@ -2508,11 +2607,14 @@ test('dragging an endpoint off the canvas restores the Edge', async ({ page }) =
 
   const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
   await edge.focus();
-  // The canvas header sits outside the flow container.
-  const header = await boxOf(page.locator('.shell__header'), 'the canvas header');
+  // Chrome, not canvas: the header that used to stand outside the flow went
+  // with the Sidebar (ADR 0082), and the Command Dock is the surface over the
+  // canvas now — a DOM sibling of the flow container, so a release on it is the
+  // same "no target at all" classification the header gave.
+  const chrome = await boxOf(page.getByTestId('command-dock'), 'the Command Dock');
   await dragEndpointTo(page, edge, 'target', {
-    x: header.x + header.width / 2,
-    y: header.y + header.height / 2,
+    x: chrome.x + chrome.width / 2,
+    y: chrome.y + chrome.height / 2,
   });
 
   await quiescent(page);
@@ -2636,10 +2738,9 @@ test('Add Card names the new Card in place in the selected Layout', async ({ pag
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
-  const addCard = page.getByTestId('add-card');
-  await expect(addCard).toBeEnabled();
+  await expect(createCardControl(page)).not.toHaveAttribute('aria-disabled', 'true');
 
-  await addCard.click();
+  await createCard(page, 'Markdown Card');
 
   const title = page.getByRole('textbox', { name: 'Card title' });
   await expect(title).toBeFocused();
@@ -2654,7 +2755,7 @@ test('Add Card names the new Card in place in the selected Layout', async ({ pag
 
   await expect(nodeByTitle(page, 'Consequences')).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await expect(sidebar(page).getByTestId('layout-row')).toHaveCount(2);
+  await expect(await layoutChoices(page)).toHaveCount(2);
 });
 
 /**
@@ -2674,8 +2775,7 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await createCard(page, 'Alias');
   const search = page.getByRole('combobox', { name: 'Target' });
   await expect(search).toBeFocused();
   await search.fill('A');
@@ -2687,7 +2787,7 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await quiescent(page);
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-  await expect(page.getByTestId('add-card-menu')).toBeFocused();
+  await expect(createCardControl(page)).toBeFocused();
 });
 
 /**
@@ -2706,8 +2806,7 @@ test('keeps the Alias pane’s controls reachable on a short viewport', async ({
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await createCard(page, 'Alias');
   await expect(page.getByRole('button', { name: 'Cancel' })).toBeInViewport();
 });
 
@@ -2727,8 +2826,7 @@ test('Escape discards a typed Alias title and closes the pane', async ({ page })
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await createCard(page, 'Alias');
   const title = page.getByTestId('new-alias-title');
   await title.fill('Recap');
 
@@ -2754,8 +2852,7 @@ test(
     await settled(page);
     const nodes = await page.locator('.react-flow__node').count();
 
-    await page.getByTestId('add-card-menu').click();
-    await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+    await createCard(page, 'Alias');
     // No create action beside Cancel — the Target chosen is the completion, and
     // a second activation would confirm a choice already made.
     const pane = page.getByTestId('new-alias');
@@ -2793,8 +2890,7 @@ test('an Alias is renamed by the shared Title editor creation begins', async ({ 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await createCard(page, 'Alias');
   await page.getByRole('combobox', { name: 'Target' }).fill('B');
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
@@ -2831,8 +2927,7 @@ test('Escape discards an Alias rename without undoing the Alias', async ({ page 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await createCard(page, 'Alias');
   await page.getByRole('combobox', { name: 'Target' }).fill('B');
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
   const title = page.getByRole('textbox', { name: 'Card title' });

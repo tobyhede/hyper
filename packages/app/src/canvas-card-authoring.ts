@@ -9,7 +9,7 @@ import {
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import type { CanvasSpaceCardSelection } from '@project/ui';
+import type { CanvasSpaceCardSelection, EntityActionGroup } from '@project/ui';
 import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { CARD_SIZE, snapCardSizeToClose } from './card';
@@ -93,6 +93,19 @@ export interface CanvasCardAuthoringInput {
    * (ADR 0068).
    */
   readonly spaceCardTargets?: SpaceCardTargets | undefined;
+  /**
+   * What commands each Card on this canvas offers, asked one Card at a time.
+   *
+   * A function rather than a built list, for the reason the Space's command
+   * surface takes one: what a command *is* — the address it copies, the Edit it
+   * runs — belongs to the composition that owns both, while this module knows
+   * only which Cards are on the canvas and which of them may be authored.
+   *
+   * Absent leaves every Card exactly as it was, which is what a read-only or
+   * embedded canvas wants: a Card drawn where none of these commands can run
+   * offers no menu rather than one that refuses.
+   */
+  readonly cardEntityActions?: ((cardId: CardId) => readonly EntityActionGroup[]) | undefined;
 }
 
 export interface CanvasCardAuthoring {
@@ -119,6 +132,7 @@ export function useCanvasCardAuthoring({
   onBodyEditingChange,
   onTitleEditingChange,
   spaceCardTargets = NO_SPACE_CARD_TARGETS,
+  cardEntityActions,
 }: CanvasCardAuthoringInput): CanvasCardAuthoring {
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleCardId = caret?.field === 'title' ? caret.cardId : null;
@@ -360,6 +374,19 @@ export function useCanvasCardAuthoring({
             onCancel: () => setCaret(null),
           };
         }
+        // The same gate every other control on the rail takes, and for the same
+        // reason rather than by analogy: these commands are drawn *in* that
+        // rail, so a canvas that has withdrawn authoring — presenting, a
+        // creation pane, a live chrome rename — would otherwise reinstate the
+        // one cluster that survived it, on a Card whose every other control has
+        // gone.
+        if (
+          cardEntityActions !== undefined &&
+          cardBelongsToWorkingSpace &&
+          availability.authorOnCanvas
+        ) {
+          data.entityActions = cardEntityActions(node.data.cardId);
+        }
         if (node.data.kind === 'space') {
           const stored = working.cards.find((card) => card.id === node.data.cardId);
           const target =
@@ -404,6 +431,7 @@ export function useCanvasCardAuthoring({
       working,
       spaceCardTargets,
       completeSpaceCardSelection,
+      cardEntityActions,
     ],
   );
 

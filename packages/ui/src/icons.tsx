@@ -182,6 +182,13 @@ export const ParentIcon = ({ size = 14 }: { size?: number | undefined }) => {
       viewBox={`0 0 ${view} ${view}`}
       fill="none"
       aria-hidden="true"
+      /* **The one thing a test can hold this glyph to.** The mark is
+         `aria-hidden`, so nothing about it reaches the accessible name and a
+         behaviour test can only ask "is there an icon here" — which is true of
+         every icon and so checks nothing. `ui:catalog:check` cannot see this
+         module either. Named rather than styled, so swapping the cube for a
+         chevron fails the check that says the parent mark says *containing*. */
+      data-icon="parent"
     >
       <g transform={`translate(12 12) scale(${scale}) translate(-12 -12)`}>
         <Box size={view} strokeWidth={stroke / scale} />

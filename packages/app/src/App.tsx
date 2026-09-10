@@ -6,15 +6,26 @@ import {
   AlertIcon,
   AlertTitle,
   AppShell,
+  DeleteIcon,
   DRAWER_WIDTH,
+  FALLBACK_GRAPH_COLOR,
+  ToolbarButton,
+  type EntityActionGroup,
+  type EntityActionOutcome,
 } from '@project/ui';
-import { type CardId, type LayoutId, type LayoutPosition, type UUID } from '@project/core';
+import {
+  type Card,
+  type CardId,
+  type LayoutId,
+  type LayoutPosition,
+  type UUID,
+} from '@project/core';
 import type { ProductDestination } from '@project/http';
 import { createNonThrowingReporter } from '@project/persistence';
 import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
-import type { OpenSpace, OpenSpacesState } from './open-spaces';
-import type { AuthoringRefusal } from './space-authoring';
+import type { OpenSpace, OpenSpacesState, RejectedExitConfirmation } from './open-spaces';
+import type { AuthoringRefusal, AuthoringResult } from './space-authoring';
 import { authoringAvailability } from './authoring-availability';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
@@ -38,30 +49,40 @@ import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { canRetreat } from './navigation';
 import { copyLink } from './clipboard';
-import { spaceEntityActions } from './entity-actions';
+import {
+  COPY_LINK_ACTION_ID,
+  COPY_PERMANENT_LINK_ACTION_ID,
+  DELETE_LAYOUT_ACTION_ID,
+  spaceEntityActions,
+  type EntityCommandId,
+  type SpaceChromeTitleSubject,
+  type SpaceEntity,
+} from './entity-actions';
 import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
 import { layoutCards, resolveLayout } from './layout-resolution';
 import type { DestinationOpening } from './destination-opening';
-import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
+import { SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
-import { renameReturn } from './continuation';
 import { CanvasContinuation } from './components/CanvasContinuation';
 import { ChromeContinuation } from './components/ChromeContinuation';
 import { CardsDrawer } from './components/CardsDrawer';
+import { CARDS_TRIGGER } from './components/command-dock-triggers';
+import { DeleteCardConfirmation } from './components/DeleteCardConfirmation';
+import {
+  CardsTrigger,
+  CommandDock,
+  type DockChrome,
+  type SpaceExitReport,
+} from './components/CommandDock';
 import { NewAlias } from './components/NewAlias';
 import { NewSpaceCard } from './components/NewSpaceCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
-import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
+import { ShellNotice } from './components/ShellNotice';
 import { useOpenSpaces } from './open-spaces-context';
-import { ExitSpaceControl } from './components/ExitSpaceControl';
-import {
-  SelectedLayoutName,
-  SpaceSidebar,
-  type SpaceChromeTitleEdit,
-} from './components/SpaceSidebar';
+import { openTree } from './dock-model';
 
 /**
  * What an isolated single-Space mount reads in place of the session's open set.
@@ -154,9 +175,12 @@ export const createApp = (
      * observable collaborator here.
      *
      * Both things taken off it decide what a *hidden* Space does — `active`
-     * withholds the `window`-level Presenting keys and the shell's
-     * `Ctrl/Cmd-B`, and the entry count yields the width of the strip Open
-     * Spaces draws beside the Sidebar. Reading `getState()` during render
+     * withholds the `window`-level Presenting keys and the portalled persistence
+     * dialogs, and the entries are the rows the Dock's Open Spaces menu draws,
+     * which is how a hidden Space that has gone unwell is still reportable on
+     * the showing one. (`active` withheld the shell's `Ctrl/Cmd-B` too, until
+     * ADR 0082 retired the Sidebar that shortcut opened.) Reading `getState()`
+     * during render
      * answered both correctly only while every mounted `App` happened to
      * re-render on each publish, which is `OpenSpacesApplication` rebuilding
      * every entry's element rather than anything this component asks for:
@@ -188,8 +212,8 @@ export const createApp = (
     // the *same* Card leaves `addressedCardId` untouched, so keying on the Card
     // alone would let React bail out and never restore it. Clearing on `null` is
     // the other half — an address that stops naming a Card must stop selecting
-    // one, or the Sidebar keeps offering copy commands for a Card the URL has
-    // left behind.
+    // one, or the Card's rail keeps offering copy commands for a Card the URL
+    // has left behind.
     useEffect(() => {
       const adapter = useRenderAdapter.getState();
       if (addressedCardId === null) {
@@ -222,7 +246,44 @@ export const createApp = (
     const [layoutManagementRefusal, setLayoutManagementRefusal] = useState<AuthoringRefusal | null>(
       null,
     );
+    /**
+     * A Space command that broke rather than refusing, in words.
+     *
+     * Switching and exiting are the two commands that reach *another* Space's
+     * session, and either can fail for a reason that is not a refusal — a Space
+     * that cannot be re-composed, a backend that will not answer. Both used to
+     * be reported: `OpenSpacesApplication` drew a "Space could not be opened"
+     * panel and `ExitSpaceControl` an `Alert`. Both surfaces went with the
+     * Sidebar and the failures went to `console.error` with them, which leaves
+     * the reader pressing a row that does nothing. `reportBreak` still runs —
+     * a broken command is a diagnostic as well as a report.
+     */
+    const [spaceCommandBreak, setSpaceCommandBreak] = useState<string | null>(null);
+    /** Why the last Graph Edit did not run, or `null` — see `reportGraphEdit`. */
+    const [graphRefusal, setGraphRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
+    /**
+     * Why the last Delete Card did not run, or `null`.
+     *
+     * The Card rail's menu reports *that* the command failed in its own label,
+     * which is all a two-word report can say; the reason has to be somewhere,
+     * and the canvas is where the author who pressed it is looking. Same shape
+     * and same place as the clipboard failure above, for the same reason: a
+     * command that did not do what its label says owes the reader words.
+     */
+    const [cardDeletionRefusal, setCardDeletionRefusal] = useState<string | null>(null);
+    /**
+     * The Card a confirmation is standing over, and the deletion it would run.
+     *
+     * The operation travels with the Card rather than being rebuilt when the
+     * answer comes: which Edit a deletion is depends on the kind of Card, and
+     * deciding that twice — once to arm the question, once to answer it — is two
+     * places to get it wrong about a command with no undo behind it.
+     */
+    const [pendingCardDeletion, setPendingCardDeletion] = useState<{
+      readonly card: Card;
+      readonly remove: () => string | null | Promise<string | null>;
+    } | null>(null);
     /**
      * Copy one address, answering whether it reached the clipboard.
      *
@@ -230,7 +291,8 @@ export const createApp = (
      * a `then`, so the press and the outcome were two moments and the item
      * swapped its label at the first one — "Copied" over a link the browser had
      * refused, with the refusal rendering as an alert the reader might not even
-     * be able to see (the Sidebar is a Sheet over that area on a phone).
+     * be able to see — the Sidebar was a Sheet over that area on a phone, and
+     * the report was behind it.
      *
      * The clipboard half of Copy link, and only that. What a destination's URL
      * *is* belongs to the browser location (ADR 0081); what happens to it after
@@ -263,15 +325,42 @@ export const createApp = (
      * by the time the Card is placed, and the whole point of the visible centre
      * is that it is where they are looking now.
      */
-    const visibleCentre = useRef<VisibleCentre | null>(null);
+    /**
+     * **State rather than a ref, and the difference is a lint rule with a point
+     * behind it.** The reporter is installed once when the canvas's `cards`
+     * branch mounts and withdrawn once when it unmounts (`CanvasCentre`), so
+     * there is no per-frame write to keep out of React's hands — and a ref read
+     * by a handler that the Command Dock's chrome object carries makes that
+     * whole object a ref value to React's compiler, which then refuses the
+     * object's use in render. What the ref was buying was nothing this needs;
+     * what it cost was the surface below being unrenderable without a
+     * suppression.
+     *
+     * Set through the updater form because the value *is* a function: passing
+     * it directly would have React call it as an updater and store a
+     * `LayoutPosition` where a getter belongs.
+     */
+    const [visibleCentre, setVisibleCentre] = useState<VisibleCentre | null>(null);
+    /**
+     * The box the Command Dock docks to.
+     *
+     * The canvas's own element, so the twelve slots are the slots of the paper
+     * rather than of the window: a drawer opening at the end edge narrows the
+     * area and the Dock's right-edge stops move with it, which is what a reader
+     * would expect of furniture sitting on the canvas.
+     */
+    const graphArea = useRef<HTMLDivElement | null>(null);
     const reportVisibleCentre = useCallback((centre: VisibleCentre | null) => {
-      visibleCentre.current = centre;
+      setVisibleCentre(() => centre);
     }, []);
     // The origin is unreachable in practice — the control is withdrawn until Cards
     // are on the canvas, and the reporter is mounted with them — but a created
     // Card must land *somewhere*, and a refusal would be the wrong answer to a
     // question about geometry.
-    const centreAnchor = (): LayoutPosition => visibleCentre.current?.() ?? { x: 0, y: 0 };
+    const centreAnchor = useCallback(
+      (): LayoutPosition => visibleCentre?.() ?? { x: 0, y: 0 },
+      [visibleCentre],
+    );
 
     /**
      * Making an Alias: the Target choice *is* the creation (ADR 0009's storyboard).
@@ -309,7 +398,7 @@ export const createApp = (
         if (created.createdCardId === undefined) return { kind: 'none' };
         return { kind: 'created', cardId: created.createdCardId };
       },
-      [],
+      [centreAnchor],
     );
 
     /**
@@ -360,7 +449,7 @@ export const createApp = (
         // Edit ran, so the author goes back to Add Card.
         return { kind: 'created', cardId: null };
       },
-      [],
+      [centreAnchor],
     );
 
     /**
@@ -481,8 +570,6 @@ export const createApp = (
     const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
     const selection = useRenderAdapter((s) => s.selection);
     const selectedCardId = selectedCardOf(selection);
-    const selectedCard =
-      selectedCardId === null ? undefined : renderedSpace.lookup.card(selectedCardId);
 
     const cardsOutsideSelectedLayout = useMemo(
       () =>
@@ -501,12 +588,19 @@ export const createApp = (
     // There are Cards on the canvas to interact with once placement resolves
     // and the store has taken it.
     const hasCardsOnCanvas = liveProjection !== null;
-    const [spaceChromeEdit, setSpaceChromeEdit] = useState<{
-      readonly subject: NonNullable<SpaceChromeTitleEdit['subject']>;
-      readonly draft: string;
-      readonly error: string | null;
-      readonly surface: 'sidebar' | 'header';
-    } | null>(null);
+    /**
+     * Whether a chrome name is being renamed in place.
+     *
+     * A boolean where this was a whole draft — subject, text, error and the
+     * surface it began on. The draft existed because a Layout's name was drawn
+     * **twice**, in a Sidebar row and in the canvas header, and one rename had
+     * to be live in both at once and return the caret to whichever began it.
+     * The Command Dock draws each name once and `InlineTitleEditor` owns the
+     * text, the refusal and the focus return, so all that is left for the
+     * application to know is that one is open — which is what withdraws the
+     * canvas's own title editing beside it (`authoring-availability.ts`).
+     */
+    const [editingChromeTitle, setEditingChromeTitle] = useState(false);
     const cardIsOpen = Object.values(selectedLayout.layout.positions).some(
       (at) => at?.open === true,
     );
@@ -526,7 +620,7 @@ export const createApp = (
       editingCardBody,
       editingCardTitle,
       cardIsOpen,
-      editingChromeTitle: spaceChromeEdit !== null,
+      editingChromeTitle,
       spaceOnCanvas: active,
       editingEmbeddedLayout,
     });
@@ -535,9 +629,13 @@ export const createApp = (
     // and a drawer that reopened itself on the way back would take
     // focus with it — `Drawer.Popup` moves focus in on every open, so Stop would
     // land the reader in the Cards list instead of on the canvas they returned to.
-    useEffect(() => {
-      if (!availability.cardsView) setCardsDrawerOpen(false);
-    }, [availability.cardsView]);
+    //
+    // Read during render rather than in an effect, like the rename guards below:
+    // an effect closes it one frame after the presentation has already started
+    // drawing over it. `cardsView` is `!presenting && !creatingCard` and carries
+    // nothing derived from this flag, so setting it false here settles in one
+    // pass.
+    if (cardsDrawerOpen && !availability.cardsView) setCardsDrawerOpen(false);
     // Reveals the drawer once per (Layout, address) rather than on every
     // dependency change: an unrelated edit elsewhere in the Space still
     // recomputes `cardsOutsideSelectedLayout` with a fresh array identity, and
@@ -546,31 +644,26 @@ export const createApp = (
     // link addresses no Layout of its own, so the same Card can be
     // revealed once in one Layout and then adopt a different default Layout
     // that omits it, and that is a second reveal rather than a repeat.
-    const revealedAddressRef = useRef<{
+    const [revealedAddress, setRevealedAddress] = useState<{
       readonly layoutId: LayoutId;
       readonly cardId: CardId;
     } | null>(null);
-    useEffect(() => {
-      if (addressedCardId === null) {
-        // Only a real navigation clears the address — choosing a Layout,
-        // activating a Graph, or restoring a destination that names no Card —
-        // so leaving it is the reader moving on rather than the incidental
-        // recomputation this guard absorbs. Arriving back at the same address
-        // afterwards is a fresh reveal, not the repeat being suppressed.
-        revealedAddressRef.current = null;
-        return;
-      }
-      if (
-        revealedAddressRef.current?.layoutId === selectedLayoutId &&
-        revealedAddressRef.current.cardId === addressedCardId
-      ) {
-        return;
-      }
+    if (addressedCardId === null) {
+      // Only a real navigation clears the address — choosing a Layout,
+      // activating a Graph, or restoring a destination that names no Card — so
+      // leaving it is the reader moving on rather than the incidental
+      // recomputation this guard absorbs. Arriving back at the same address
+      // afterwards is a fresh reveal, not the repeat being suppressed.
+      if (revealedAddress !== null) setRevealedAddress(null);
+    } else if (
+      revealedAddress?.layoutId !== selectedLayoutId ||
+      revealedAddress.cardId !== addressedCardId
+    ) {
+      setRevealedAddress({ layoutId: selectedLayoutId, cardId: addressedCardId });
       if (cardsOutsideSelectedLayout.some(({ id }) => id === addressedCardId)) {
         setCardsDrawerOpen(true);
       }
-      revealedAddressRef.current = { layoutId: selectedLayoutId, cardId: addressedCardId };
-    }, [addressedCardId, selectedLayoutId, cardsOutsideSelectedLayout]);
+    }
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
@@ -610,107 +703,228 @@ export const createApp = (
     const cardResize = useRenderAdapter((s) => s.cardResize);
     const reportEmbeddedLayoutEditing = useRenderAdapter((s) => s.reportEmbeddedLayoutEditing);
     const canvas = canvasContent(placement, hasCardsOnCanvas);
-    // Both refusals are drawn under Add Layout and both are about the Layout
-    // that was selected when they were refused — the Edit Add Layout would have
-    // made, and the Rename or Delete on that row. Neither says anything about
-    // the Layout the reader has moved to, so the move clears them together.
-    useEffect(() => {
+    // Every standing refusal is about the Layout that was selected when it was
+    // refused — the Edit New Layout would have made, the Rename or Delete on
+    // the one it named, the Graph Edit inside it, the Card it would not remove
+    // from it. None of them says anything about the Layout the reader has moved
+    // to, so the move clears them together, during the render that moves rather
+    // than one frame after it.
+    //
+    // The Card deletion refusal was outside this and cleared only when the next
+    // Delete Card was armed, so a refused deletion stayed pinned to the shell
+    // through Layout switches and unrelated Edits until someone pressed Delete
+    // again.
+    const [refusedUnder, setRefusedUnder] = useState(selectedLayoutId);
+    if (refusedUnder !== selectedLayoutId) {
+      setRefusedUnder(selectedLayoutId);
       setCreateLayoutRefusal(null);
       setLayoutManagementRefusal(null);
-    }, [selectedLayoutId]);
-    useEffect(() => {
-      if (!availability.chromeTitleEdit) setSpaceChromeEdit(null);
-    }, [availability.chromeTitleEdit]);
+      setGraphRefusal(null);
+      setCardDeletionRefusal(null);
+    }
+    /**
+     * The two facts that end a chrome rename that is not the author ending it,
+     * read as **render-time transitions rather than effects**.
+     *
+     * An effect runs after the render it reacts to, so each of these drew one
+     * frame of a rename that had already stopped being available — an editor
+     * over a Layout the reader has left, or over a Space that was replaced under
+     * them. The Dock's rename slot reads the same two facts the same way and
+     * for the same reason (`useDockRenaming` in `components/CommandDock.tsx`),
+     * so the surface and the composition agree about when a draft ends.
+     *
+     * They stay two conditions rather than one, and that separation is older
+     * than this shape: the availability guard reads only whether a chrome title
+     * edit may run, and listing the replacement epoch beside it re-ran a body
+     * that could then do nothing, which is how the two rules came to look like
+     * one. **A replacement discards every open Interaction draft (ADR 0042)**,
+     * and this draft lives outside the canvas subtree `replacementEpoch` keys,
+     * so the remount does not reach it.
+     *
+     * **This clears the report and not the editor** — the two are different
+     * things and reading them as one is what left the defect. The editor is the
+     * bar's own rename slot, so the epoch is *also* handed to the Dock
+     * (`replacementEpoch` below) and the slot ends the rename on it. What
+     * this branch still owes is that the withdrawal it drives — Create Card,
+     * Present, Delete Card, the canvas's own title editing — comes back in the
+     * same render as the replacement rather than on the commit after, when the
+     * name control's effect cleanup would otherwise report it.
+     */
+    const [renameEpoch, setRenameEpoch] = useState(authoringState.replacementEpoch);
+    if (renameEpoch !== authoringState.replacementEpoch) {
+      setRenameEpoch(authoringState.replacementEpoch);
+      if (editingChromeTitle) setEditingChromeTitle(false);
+    } else if (editingChromeTitle && !availability.chromeTitleEdit) {
+      setEditingChromeTitle(false);
+    }
 
-    // A replacement discards every open Interaction draft (ADR 0042), and this
-    // one lives outside the canvas subtree `replacementEpoch` keys, so the
-    // remount does not reach it. Separate from the guard above because that
-    // guard reads only the availability of a chrome title edit: listing the epoch beside it
-    // re-ran an effect whose body could then do nothing, which is how the two
-    // rules came to look like one.
-    useEffect(() => {
-      setSpaceChromeEdit(null);
-    }, [authoringState.replacementEpoch]);
-
-    const completeSpaceChromeTitle = useCallback(
-      (subject: NonNullable<SpaceChromeTitleEdit['subject']>, title: string): string | null => {
+    /**
+     * One chrome rename, answered rather than performed twice.
+     *
+     * The editor is `InlineTitleEditor`, mounted by the Dock's own name control,
+     * and it holds a refused draft open and editable — so this returns the
+     * refusal's sentence rather than swallowing it, and `null` for an Edit that
+     * landed. `unchanged` is `null` too: renaming a Layout to the title it
+     * already has is the value the author already authored, and closing the
+     * editor is the right answer to it (`space-authoring.ts`).
+     */
+    const renameChromeTitle = useCallback(
+      (subject: SpaceChromeTitleSubject, title: string): string | null => {
         const result =
           subject.kind === 'layout'
             ? authoring.complete({ kind: 'renamed-layout', layoutId: subject.id, title })
             : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
-        if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
-        setSpaceChromeEdit(null);
-        return null;
+        return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
       },
       [],
     );
 
-    const titleEdit: SpaceChromeTitleEdit = {
-      subject: spaceChromeEdit?.subject ?? null,
-      surface: spaceChromeEdit?.surface ?? null,
-      draft: spaceChromeEdit?.draft ?? '',
-      error: spaceChromeEdit?.error ?? null,
-      disabled: !availability.chromeTitleEdit,
-      onBegin: (subject, title, surface) =>
-        setSpaceChromeEdit({ subject, draft: title, error: null, surface }),
-      onDraftChange: (draft) =>
-        setSpaceChromeEdit((current) => (current === null ? null : { ...current, draft })),
-      onErrorChange: (error) =>
-        setSpaceChromeEdit((current) => (current === null ? null : { ...current, error })),
-      onComplete: completeSpaceChromeTitle,
-      onCancel: () => setSpaceChromeEdit(null),
-      /**
-       * Where a chrome rename returns the caret.
-       *
-       * The surface it was begun from decides, and both answers are addresses
-       * rather than elements: the editor calls this from inside its own key
-       * handler, before React has swapped the row's editing branch back, so
-       * there is no focusable element to have held on to — which is what the
-       * captured DOM closure on this state used to be, and why it needed the
-       * `.closest('li')` walk it carried to its call site.
-       */
-      onReturnFocus: () => {
-        if (spaceChromeEdit === null) return;
-        continuation.request(renameReturn(spaceChromeEdit.surface, spaceChromeEdit.subject));
-      },
-    };
-
+    /**
+     * **Rebuilt every render, and memoizing it is not the fix.**
+     *
+     * `cardRailActions` below hangs off this and is a dependency of the
+     * node-decoration memo in `canvas-card-authoring.ts`, so a fresh builder
+     * rebuilds every node object, re-renders every `CardNode` and runs
+     * `spaceEntityActions` once per Card — on renders that touch nothing on the
+     * canvas, the Cards drawer opening among them. `SpaceCanvas`'s own note
+     * measures that and calls the widening harmless.
+     *
+     * Wrapping both builders in `useMemo` was tried and reverted: with the
+     * identity stable, six embedded-Layout tests stop drawing their target at
+     * all. That memo's dependency list is therefore *incomplete*, and the churn
+     * has been standing in for a dependency nobody has named — so stabilising
+     * this quietly converts a performance cost into a correctness one. The fix
+     * the note already names is a per-node cache inside the memo, which does
+     * not depend on this identity; taking it belongs with that dependency list,
+     * not here.
+     */
     const entityActions = spaceEntityActions({
       spaceId: renderedSpace.id,
       spaceTitle: renderedSpace.title,
       onCopy: copyProductDestination,
-      onRename: availability.entityEdits
-        ? (subject, title) => {
-            setLayoutManagementRefusal(null);
-            titleEdit.onBegin(subject, title, 'sidebar');
-          }
-        : null,
+      // No Rename item: the Dock renames a Layout and a Graph by clicking the
+      // name it already draws, so a menu row that opened the same editor would
+      // be the second path to one command this arrangement keeps removing. The
+      // Card rail is this builder's other consumer and a Card has no rename here
+      // either — its title is renamed in place on the canvas.
+      onRename: null,
       onDeleteLayout: availability.entityEdits
         ? (layoutId) => {
             const result = authoring.complete({ kind: 'deleted-layout', layoutId });
             setLayoutManagementRefusal(result.kind === 'refused' ? result.refusal : null);
-            // Answered rather than swallowed, because the refusal set above is
-            // rendered *in the Sidebar* — and below its breakpoint that is a
-            // Sheet over the canvas. The Sidebar dismisses the Sheet on a menu
-            // command that did what its label said, so a Delete that did not
-            // has to say so or the alert it just armed goes off screen unread.
+            // Answered rather than swallowed: the refusal set above renders in
+            // the shell's standing notice, and the answer is what tells a caller
+            // whether the Delete had a canvas result at all.
             return result.kind === 'completed';
           }
         : null,
     });
 
     /**
-     * Choosing a Layout row, including the row already current.
+     * Deleting one Card, answering a refusal in words rather than a code.
      *
-     * Two acts, and only one of them is this component's. Discarding the chrome
-     * title draft belongs to whichever module owns that Interaction — it is not
-     * a fact about the browser's location — so it stays at the call site, in
-     * front of the choice.
+     * Two paths, because deleting a Space Card is a different Edit.
+     *
+     * An ordinary Card is removed from one Space, which is Space Authoring's. A
+     * Space Card owns its target's lifetime together with every other reference
+     * to it, so deleting one can delete that Space and every Space below it that
+     * nothing else references — one atomic Edit over coordinated per-Space
+     * sessions, which is the Space Card lifecycle's and not a single-Space
+     * update this seam could make (ADR 0074, ADR 0076). Space Authoring refuses
+     * it on its own account, so the choice is made here rather than discovered
+     * there.
+     *
+     * It answers the *operation* rather than performing the deletion, because
+     * the two surfaces that spend it need different things from it: the Space's
+     * command surface hands it to a confirmation that calls it later, and the
+     * Card's own rail runs it on the press. Which kind of Card it is stays a
+     * decision made once, here, for both.
      */
-    const selectLayoutRow = useCallback((selection: LayoutId) => {
-      setSpaceChromeEdit(null);
-      browserLocation.chooseLayout(selection);
-    }, []);
+    const cardDeletion = (card: Card): (() => string | null | Promise<string | null>) =>
+      card.kind === 'space'
+        ? async () => {
+            const result = await spaceCards.delete({
+              containingSpaceId: renderedSpace.id,
+              cardId: card.id,
+            });
+            return result.kind === 'refused' ? describeSpaceCardRefusal(result.refusal) : null;
+          }
+        : () => {
+            const result = authoring.complete({ kind: 'deleted-card', cardId: card.id });
+            return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
+          };
+
+    /**
+     * What a Card's own rail offers (ADR 0073): the addresses every Card has,
+     * and the deletion that used to be reachable only from the Space's command
+     * surface.
+     *
+     * The addresses are `spaceEntityActions`' answer and nothing else — the
+     * same menu the Space's surface builds for the same entity, so the Card's
+     * two links cannot come to mean different things on the two surfaces. What
+     * is appended here is the one command that is a Card's own rather than an
+     * address: a Card's deletion belongs to the Card, and the Space's surface is
+     * where it was only because the Card had no menu of its own.
+     *
+     * A Card the drawing Layout does not place still has commands — its own
+     * permanent address — so nothing here reads `layout.positions`; which
+     * addresses exist is decided from the Layout by the builder above.
+     */
+    const cardRailActions = (cardId: CardId): readonly EntityActionGroup[] => {
+      const card = renderedSpace.lookup.card(cardId);
+      // A node the projection is still drawing for a Card the working Space no
+      // longer has. No commands rather than commands that name nothing.
+      if (card === undefined) return [];
+      const addresses = entityActions({ kind: 'card', card, layout: selectedLayout.layout });
+      if (!availability.deleteCard) return addresses;
+      const remove = cardDeletion(card);
+      return [
+        ...addresses,
+        [
+          {
+            id: 'delete-card',
+            // "Delete Card", not "Delete Card <title>": the menu that draws
+            // this item is already named for the Card it belongs to, and the
+            // Layout menu's own destructive command is spelled the same way.
+            label: 'Delete Card',
+            icon: <DeleteIcon />,
+            variant: 'destructive',
+            // **It asks, and the confirmation runs it.** Deleting a Card is
+            // not undoable in V1, and deleting a Space Card can take the Space
+            // it references and every Space below it that nothing else
+            // references (ADR 0074) — so the command that used to sit behind
+            // the Sidebar's own `AlertDialog` keeps one. The dialog is drawn
+            // at the App root rather than in the menu that armed it, because
+            // the menu closes on the press and would take the question with
+            // it.
+            //
+            // **And it carries no `report`.** An item that names words has
+            // its menu held open and its label swapped to the word its
+            // outcome picks — machinery for a command that *runs* on the
+            // press. This one raises a question, so `done` said "Card deleted"
+            // beside a dialog still asking whether to, and announced it to a
+            // reader who might then press Cancel. What the deletion did is the
+            // canvas's to report; why it did not is the confirmation's, which
+            // prints it into the shell's standing notice.
+            onSelect: (): EntityActionOutcome => {
+              setCardDeletionRefusal(null);
+              setPendingCardDeletion({ card, remove });
+              return 'done';
+            },
+          },
+        ],
+      ];
+    };
+
+    /**
+     * Choosing a Layout, including the one already drawing.
+     *
+     * One act now. Discarding the chrome title draft used to be paired with it,
+     * because the draft was the application's and outlived the control it was
+     * begun from; the Dock's editor is the control, so choosing another Layout
+     * unmounts it and there is nothing here to discard.
+     */
+    const selectLayout = browserLocation.chooseLayout;
 
     const present = navigation.present;
     const advance = navigation.advance;
@@ -838,7 +1052,7 @@ export const createApp = (
         select: true,
         then: 'rename',
       });
-    }, []);
+    }, [centreAnchor]);
 
     /**
      * Presenting takes a creation pane away, creating nothing.
@@ -916,156 +1130,373 @@ export const createApp = (
       exitPresenting,
     });
 
-    const sidebar = (
-      <SpaceSidebar
-        sessionActions={<ExitSpaceControl spaceId={renderedSpace.id} />}
-        spaceTitle={renderedSpace.title}
-        canvas={{
-          layouts: renderedSpace.layouts,
-          selected: selectedLayout.layout,
-          onSelect: selectLayoutRow,
-        }}
-        graph={{
-          graphs: projection.visibleGraphs,
-          activeGraphId,
-          colorByGraphId: projection.colors,
-          onActivate: activateGraph,
-          onPresent: present,
-          canPresent: availability.present,
-          presenting,
-          onExitPresenting: exitPresenting,
-        }}
-        addCard={{
-          onAddCard: addCard,
-          onAddAlias: () => cardCreation.open('alias'),
-          onAddSpaceCard: () => cardCreation.open('space'),
-          disabled: !availability.addCard,
-          keyShortcut: ADD_CARD_KEY,
-          hidden: presenting,
-        }}
-        createLayout={{
-          disabled: !availability.createLayout,
-          refusal: createLayoutRefusal ?? layoutManagementRefusal,
-          onCreate: () => {
-            const result = authoring.complete({ kind: 'created-layout' });
-            setCreateLayoutRefusal(result.kind === 'refused' ? result.refusal : null);
-            setLayoutManagementRefusal(null);
-            if (result.kind === 'completed') setCardsDrawerOpen(true);
-          },
-        }}
-        persistence={{
-          control: (
-            <PersistenceControl
-              active={active}
-              persistence={sessionState.persistence}
-              onAcceptRemote={authoring.acceptStoredSpace}
-              onKeepLocal={authoring.keepLocalWork}
-            />
-          ),
-          state: sessionState.persistence.kind,
-          acknowledgedRevision: sessionState.acknowledgedRevision,
-        }}
-        selectedCard={
-          selectedCard === undefined
-            ? undefined
-            : {
-                // Which of its addresses this Card has is `spaceEntityActions`'
-                // to decide from the Layout it is handed, not this call site's:
-                // a selected Card the Cards drawer revealed is not necessarily
-                // placed by the drawing Layout, and `layout-card` resolves
-                // against `layout.positions`.
-                card: selectedCard,
-                /**
-                 * Two paths, because deleting a Space Card is a different Edit.
-                 *
-                 * An ordinary Card is removed from one Space, which is Space
-                 * Authoring's. A Space Card owns its target's lifetime together
-                 * with every other reference to it, so deleting one can delete
-                 * that Space and every Space below it that nothing else
-                 * references — one atomic Edit over coordinated per-Space
-                 * sessions, which is the Space Card lifecycle's and not a
-                 * single-Space update this seam could make (ADR 0074, ADR 0076).
-                 * Space Authoring refuses it on its own account, so the choice
-                 * is made here rather than discovered there.
-                 */
-                onDelete: availability.deleteCard
-                  ? selectedCard.kind === 'space'
-                    ? async () => {
-                        const result = await spaceCards.delete({
-                          containingSpaceId: renderedSpace.id,
-                          cardId: selectedCard.id,
-                        });
-                        return result.kind === 'refused'
-                          ? describeSpaceCardRefusal(result.refusal)
-                          : null;
-                      }
-                    : () => {
-                        const result = authoring.complete({
-                          kind: 'deleted-card',
-                          cardId: selectedCard.id,
-                        });
-                        return result.kind === 'refused'
-                          ? describeAuthoringRefusal(result.refusal)
-                          : null;
-                      }
-                  : undefined,
-              }
-        }
-        titleEdit={titleEdit}
-        entityActions={entityActions}
-      />
+    /**
+     * The Space the canvas draws, its open set, and the exit that leaves one.
+     *
+     * `openTree` takes the rows rather than the session because the session has
+     * two shapes — `OpenSpacesState` keeps the Opener in a map beside its
+     * entries, deliberately off them, while the catalogue fixture holds stored
+     * snapshots — and a model that took either would be one its other caller had
+     * to reshape itself for (`dock-model.ts`).
+     *
+     * Each row's persistence is read off that Space's **own** session, which is
+     * the whole of ADR 0082's clause about naming which open Space is unwell: a
+     * commit belongs to the Space it was made in (ADR 0076), and the reader is
+     * only ever standing in one of the set.
+     */
+    const openSpaceRows = useMemo(
+      () =>
+        openTree(
+          openSpacesState.entries.map((entry) => ({
+            spaceId: entry.id,
+            title: entry.session.getState().working.document.title,
+            from: openSpacesState.openedFrom.get(entry.id) ?? null,
+            persistence: entry.session.getState().persistence,
+          })),
+        ),
+      [openSpacesState],
     );
+    const openerId = openSpacesState.openedFrom.get(renderedSpace.id) ?? null;
+    const parentSpace = useMemo(() => {
+      if (openerId === null) return null;
+      const entry = openSpacesState.entries.find((candidate) => candidate.id === openerId);
+      return entry === undefined
+        ? null
+        : { spaceId: openerId, title: entry.session.getState().working.document.title };
+    }, [openerId, openSpacesState]);
+
+    /**
+     * The one Layout refusal there is anywhere to put, now that Add Layout and
+     * Delete Layout report in the same place.
+     *
+     * Both were drawn under Add Layout in the Sidebar and both are about the
+     * Layout that was selected when they were refused, which is why moving
+     * between Layouts already clears them together.
+     */
+    const layoutRefusal = createLayoutRefusal ?? layoutManagementRefusal;
+
+    /**
+     * Where a refused Graph Edit is drawn, which is the notice every other
+     * refused chrome command is drawn in.
+     *
+     * One reporter for the cluster's three commands rather than three call
+     * sites setting the same state: what the reader needs to know is which
+     * Graph Edit did not happen and why, and all three answer that in the same
+     * words.
+     */
+    const reportGraphEdit = (result: AuthoringResult): void => {
+      setGraphRefusal(result.kind === 'refused' ? result.refusal : null);
+    };
+
+    const [exitReport, setExitReport] = useState<SpaceExitReport | null>(null);
+    /** The Space an exit is in flight over, or `null` — see `exitSpace`. */
+    const [exiting, setExiting] = useState<UUID | null>(null);
+    /**
+     * Exiting a Space, and the two ways it does not happen.
+     *
+     * The lifecycle is `openSpaces.exit`'s and this only draws it: `warning` is
+     * the rejected-work question ADR 0068 makes Exit permit, answered by handing
+     * the same `RejectedExitConfirmation` token back rather than by a second
+     * command that means "and I mean it"; `refused` names the recovery the Space
+     * already has. `exited` reports nothing — the Space is gone from the Open
+     * Spaces menu and the canvas has moved, which is the whole of it.
+     *
+     * The title travels on the report because by the time it is drawn the Space
+     * it names may no longer be the one on the canvas, and ADR 0082 binds the
+     * surface to say *which* Space is unwell rather than to describe wherever
+     * the reader has since ended up.
+     */
+    const exitSpace = useCallback(
+      (spaceId: UUID, confirmation?: RejectedExitConfirmation): void => {
+        if (spaces === null) return;
+        // One attempt at a time, and the previous answer goes with the new
+        // attempt. `exit` waits on an in-flight commit, so a second press
+        // during that wait starts a second run over an entry the first has not
+        // finished with — and the refusal the first produced stays on screen
+        // reading as this attempt's. The deleted `ExitSpaceControl` disabled
+        // its button while closing and cleared the report on each try; both
+        // rules are here now, where the command is.
+        if (exiting !== null) return;
+        const title =
+          spaces.entry(spaceId)?.session.getState().working.document.title ?? renderedSpace.title;
+        setExiting(spaceId);
+        setExitReport(null);
+        setSpaceCommandBreak(null);
+        void (async () => {
+          try {
+            const result = await spaces.exit(spaceId, confirmation);
+            setExitReport(result.kind === 'exited' ? null : { spaceId, title, outcome: result });
+          } catch (failure) {
+            reportBreak(failure);
+            setSpaceCommandBreak(`${title} could not be exited.`);
+          } finally {
+            setExiting(null);
+          }
+        })();
+      },
+      [spaces, renderedSpace.title, exiting],
+    );
+
+    /**
+     * One command out of an entity's own menu, spent by a cluster that draws its
+     * own.
+     *
+     * The Dock's Layout, Graph and Space clusters are menus with a radio group in
+     * them, so they cannot render an `EntityActionGroup[]` whole the way a Card's
+     * rail does — but *which* address each entity offers is a decision this
+     * application makes once, in `entity-actions.tsx`. This reads that decision
+     * out by id rather than rebuilding the destination beside it, so the two
+     * surfaces cannot come to disagree about what a Graph's "Copy link" means.
+     *
+     * An id the entity does not offer is simply absent, which is the rule that
+     * module states: a destination that does not exist is not a thing to offer
+     * and refuse.
+     */
+    const runEntityCommand = (entity: SpaceEntity, id: EntityCommandId) => () => {
+      void entityActions(entity)
+        .flat()
+        .find((action) => action.id === id)
+        ?.onSelect();
+    };
+
+    /**
+     * The Graph the Dock's cluster names, or nothing to name.
+     *
+     * A Layout always owns at least one Graph — ADR 0079 mints one with every
+     * Layout and Authoring refuses the Edit that would empty it — but the type
+     * does not say so, and a surface that asserted it would be asserting a
+     * domain rule from the outside. `null` is drawn as no Dock at all, which is
+     * the same answer the canvas gives for a Layout it cannot resolve.
+     */
+    const activeGraph =
+      projection.visibleGraphs.find((graph) => graph.id === activeGraphId) ??
+      projection.visibleGraphs[0] ??
+      null;
+
+    const dockChrome: DockChrome | null =
+      activeGraph === null
+        ? null
+        : {
+            onRenamingChange: setEditingChromeTitle,
+            // ADR 0042's epoch, handed down rather than acted on here: the
+            // editor a replacement has to discard is a name control's own, and
+            // `editingChromeTitle` below is the *report* of one running, not the
+            // draft. Clearing the report while the Dock kept the editor is
+            // precisely the half-invalidation this pair replaced.
+            replacementEpoch: authoringState.replacementEpoch,
+            space: {
+              title: renderedSpace.title,
+              currentSpaceId: renderedSpace.id,
+              parent: parentSpace,
+              openSpaces: openSpaceRows,
+              // Null: there is no `renamed-space` Edit, and the name is a label until
+              // there is. See `DockSpace.onRename` for why that is a domain question
+              // rather than one this surface can settle.
+              onRename: null,
+              onCopyLink: runEntityCommand({ kind: 'space' }, COPY_LINK_ACTION_ID),
+              onNewSpace: () => cardCreation.open('space'),
+              onSwitchTo: (spaceId) => {
+                if (spaces === null) return;
+                const title =
+                  spaces.entry(spaceId)?.session.getState().working.document.title ?? 'That Space';
+                setSpaceCommandBreak(null);
+                void (async () => {
+                  try {
+                    await spaces.switchTo(spaceId);
+                  } catch (failure) {
+                    reportBreak(failure);
+                    setSpaceCommandBreak(`${title} could not be opened.`);
+                  }
+                })();
+              },
+              onExit: exitSpace,
+              // `openSpaces.exit`'s own rule, asked of the same aggregate that
+              // enforces it — not re-derived from the opener, which is a
+              // different question. With no session at all there is nothing to
+              // exit into, so the command is unavailable rather than absent.
+              exitDisabled:
+                spaces === null || renderedSpace.id === spaces.metaSpaceId || exiting !== null,
+              exitReport,
+              onDismissExitReport: () => setExitReport(null),
+            },
+            canvas: {
+              layouts: renderedSpace.layouts,
+              selected: selectedLayout.layout,
+              onSelect: selectLayout,
+              onRename: availability.chromeTitleEdit
+                ? (layoutId, title) => renameChromeTitle({ kind: 'layout', id: layoutId }, title)
+                : null,
+              createDisabled: !availability.createLayout,
+              // The same answer `onDeleteLayout` above is built from, said on
+              // the row as well: when entity Edits are withdrawn the
+              // `delete-layout` action is not built at all, and a row that did
+              // not know it dispatched into nothing.
+              deleteDisabled: !availability.entityEdits,
+              onCreate: () => {
+                const result = authoring.complete({ kind: 'created-layout' });
+                setCreateLayoutRefusal(result.kind === 'refused' ? result.refusal : null);
+                setLayoutManagementRefusal(null);
+                if (result.kind === 'completed') setCardsDrawerOpen(true);
+              },
+              // The Dock's Delete names the Layout its cluster is showing, which is
+              // the drawing one — resolved from the id it hands back rather than
+              // closed over, so the command and the name it carries cannot come apart.
+              onDelete: (layoutId) => {
+                const layout = renderedSpace.layouts.find((candidate) => candidate.id === layoutId);
+                if (layout === undefined) return;
+                runEntityCommand({ kind: 'layout', layout }, DELETE_LAYOUT_ACTION_ID)();
+              },
+              onCopyLink: runEntityCommand(
+                { kind: 'layout', layout: selectedLayout.layout },
+                COPY_LINK_ACTION_ID,
+              ),
+            },
+            graph: {
+              graphs: projection.visibleGraphs,
+              active: activeGraph,
+              colorByGraphId: projection.colors,
+              activeColor: projection.colors[activeGraph.id] ?? FALLBACK_GRAPH_COLOR,
+              onActivate: activateGraph,
+              onRename: availability.chromeTitleEdit
+                ? (graphId, title) => renameChromeTitle({ kind: 'graph', id: graphId }, title)
+                : null,
+              // **Answered, not swallowed** — the same shape the Layout arm
+              // above spends, and for the same reason. A Graph Edit can be
+              // refused for reasons no surface can see coming (`placement-pending`
+              // before the canvas has reported, `graph-not-owned` for a Graph a
+              // second Layout owns), and a command that discards that answer
+              // closes its menu having changed nothing, said nothing and logged
+              // nothing.
+              onRecolor: (graphId, color) => {
+                reportGraphEdit(authoring.complete({ kind: 'recolored-graph', graphId, color }));
+              },
+              onCreate: () => {
+                reportGraphEdit(authoring.complete({ kind: 'added-graph' }));
+              },
+              onDelete: (graphId) => {
+                reportGraphEdit(authoring.complete({ kind: 'deleted-graph', graphId }));
+              },
+              editsDisabled: !availability.entityEdits,
+              onCopyLink: runEntityCommand(
+                { kind: 'graph', graph: activeGraph, layout: selectedLayout.layout },
+                COPY_LINK_ACTION_ID,
+              ),
+              onCopyPermanentLink: runEntityCommand(
+                { kind: 'graph', graph: activeGraph, layout: selectedLayout.layout },
+                COPY_PERMANENT_LINK_ACTION_ID,
+              ),
+              presenting,
+              onPresent: present,
+              // **An empty Graph has nothing to traverse**, which is a fact
+              // about the Graph rather than about authoring availability — so it
+              // is stated here beside the Graph the cluster is naming, exactly
+              // as the catalogue's fixture states it. `availability.present`
+              // covers the other half: a live content edit or chrome rename owns
+              // the keyboard a presentation would take.
+              presentDisabled:
+                !presenting && (!availability.present || activeGraph.edges.length === 0),
+            },
+            cards: {
+              /* Trigger and panel are one component: only the trigger draws in the
+           cluster, the drawer portalling its popup over the canvas. That is what
+           stops the toggle's `disabled` and the surface it names from drifting
+           apart — they are the same availability answer read in one place. The
+           trigger takes the Dock's own name treatment so the word lands in the
+           column the other three names land in. */
+              surface: (
+                <CardsDrawer
+                  open={cardsDrawerOpen}
+                  onOpenChange={setCardsDrawerOpen}
+                  disabled={!availability.cardsView}
+                  triggerRender={<ToolbarButton variant="ghost" {...CARDS_TRIGGER} />}
+                  triggerLabel={<CardsTrigger />}
+                  cards={cardsOutsideSelectedLayout}
+                  allCards={renderedSpace.cards}
+                  spaceTitleById={spaceTitleById}
+                  onAdd={(card, activation) =>
+                    addExistingCard(card.id, centreAnchor(), activation === 'keyboard')
+                  }
+                  onDragStart={(cardId) => {
+                    cardsDrag.current = { cardId, layoutId: selectedLayoutId };
+                  }}
+                  onDragEnd={() => {
+                    cardsDrag.current = null;
+                  }}
+                  revealedCardId={addressedCardId}
+                />
+              ),
+              onCreate: (kind) => {
+                if (kind === 'markdown') addCard();
+                else cardCreation.open(kind);
+              },
+              createDisabled: !availability.addCard,
+            },
+            persistence: {
+              state: sessionState.persistence,
+              active,
+              onRetry: authoring.retryPersistence,
+              onAcceptRemote: authoring.acceptStoredSpace,
+              onKeepLocal: authoring.keepLocalWork,
+            },
+          };
 
     return (
       <AppShell
-        sidebarWidth={openSpacesState.entries.length > 1 ? 'calc(16rem - 36px)' : undefined}
-        // Every open Space keeps its shell mounted, and the sidebar's
-        // `Ctrl/Cmd-B` is a `window` listener: the same reason the Presenting
-        // keys above are bound only while this Space is the one on the canvas.
-        active={active}
-        sidebar={sidebar}
         // The drawer overlays the end edge of the main area, and the canvas, the
         // Graph key and a standing notice are all pinned to that same edge. The
         // shell yields exactly the panel's own width so the three stay beside it
         // rather than behind it — `DRAWER_WIDTH` is the one place that number is.
         insetEnd={cardsDrawerOpen ? DRAWER_WIDTH : undefined}
-        header={
-          <>
-            <SelectedLayoutName layout={selectedLayout.layout} titleEdit={titleEdit} />
-            {/* Trigger and panel are one component: only the trigger renders
-                here, the drawer portalling its popup over the canvas. That is
-                what stops the toggle's `disabled` and the surface it names from
-                drifting apart — they are now the same availability answer
-                read in one place rather than two 850 lines apart. */}
-            <CardsDrawer
-              open={cardsDrawerOpen}
-              onOpenChange={setCardsDrawerOpen}
-              disabled={!availability.cardsView}
-              cards={cardsOutsideSelectedLayout}
-              allCards={renderedSpace.cards}
-              spaceTitleById={spaceTitleById}
-              onAdd={(card, activation) =>
-                addExistingCard(card.id, centreAnchor(), activation === 'keyboard')
-              }
-              onDragStart={(cardId) => {
-                cardsDrag.current = { cardId, layoutId: selectedLayoutId };
-              }}
-              onDragEnd={() => {
-                cardsDrag.current = null;
-              }}
-              revealedCardId={addressedCardId}
-            />
-          </>
-        }
         notice={
           <>
             {clipboardFailure === null ? null : (
-              <Alert variant="destructive">
-                <AlertIcon />
-                <AlertTitle>Link not copied</AlertTitle>
-                <AlertDescription>{clipboardFailure}</AlertDescription>
-              </Alert>
+              <ShellNotice title="Link not copied" onDismiss={() => setClipboardFailure(null)}>
+                {clipboardFailure}
+              </ShellNotice>
             )}
+            {cardDeletionRefusal === null ? null : (
+              <ShellNotice title="Card not deleted" onDismiss={() => setCardDeletionRefusal(null)}>
+                {cardDeletionRefusal}
+              </ShellNotice>
+            )}
+            {layoutRefusal === null ? null : (
+              <ShellNotice
+                /* Named for the command that was refused rather than for the
+                   Layout, because a refused *creation* left no Layout to be
+                   unchanged — "Layout unchanged" told the author an existing
+                   Layout had been left alone when none had been made. */
+                title={createLayoutRefusal === null ? 'Layout unchanged' : 'Layout not created'}
+                // Both, because the one that is standing is whichever was
+                // written last and the reader is dismissing what they can see.
+                onDismiss={() => {
+                  setCreateLayoutRefusal(null);
+                  setLayoutManagementRefusal(null);
+                }}
+              >
+                {describeAuthoringRefusal(layoutRefusal)}
+              </ShellNotice>
+            )}
+            {spaceCommandBreak === null ? null : (
+              <ShellNotice
+                title="Space command failed"
+                onDismiss={() => setSpaceCommandBreak(null)}
+              >
+                {spaceCommandBreak}
+              </ShellNotice>
+            )}
+            {graphRefusal === null ? null : (
+              <ShellNotice title="Graph unchanged" onDismiss={() => setGraphRefusal(null)}>
+                {describeAuthoringRefusal(graphRefusal)}
+              </ShellNotice>
+            )}
+            {/* **The one report here with no dismissal, and it is not an
+                oversight.** The others are about a press that is over, so
+                putting one away changes nothing it is about. This one is about
+                the address the reader is *on*: clearing it is what asks for the
+                stale location to be corrected (`browser-location.ts`), so a
+                dismissal would be a move dressed as an acknowledgement. It is
+                answered by the first move the reader makes — including opening
+                a Card on the canvas, which the notice never covers. */}
             {destinationNotFound ? (
               <Alert variant="destructive">
                 <AlertIcon />
@@ -1075,18 +1506,53 @@ export const createApp = (
                 </AlertDescription>
               </Alert>
             ) : null}
-            <PersistenceNotice
-              persistence={sessionState.persistence}
-              onRetry={authoring.retryPersistence}
-            />
           </>
         }
       >
-        <ChromeContinuation continuation={continuation} />
+        <ChromeContinuation continuation={continuation} within={graphArea} />
+        {/* **How this Space's last commit went, for a test rather than a reader.**
+            The Command Dock draws nothing at all while saving is working — a
+            commit settles faster than a cue can be read, so a permanent slot
+            reporting the expected outcome is a slot spent on nothing — and that
+            decision is the surface's. This is not a cue: it is hidden, and what
+            it carries is the revision, which is the *Space's* rather than any
+            surface's. It sits beside the canvas for exactly that reason. */}
+        <span
+          hidden
+          aria-hidden="true"
+          data-testid="persistence-status"
+          data-persistence-state={sessionState.persistence.kind}
+          data-revision={String(sessionState.acknowledgedRevision)}
+        >
+          {sessionState.persistence.kind === 'settled'
+            ? 'Persisted'
+            : sessionState.persistence.kind}
+        </span>
+        {pendingCardDeletion === null ? null : (
+          <DeleteCardConfirmation
+            card={pendingCardDeletion.card}
+            onDelete={pendingCardDeletion.remove}
+            onDismiss={() => setPendingCardDeletion(null)}
+            onRefused={setCardDeletionRefusal}
+          />
+        )}
         {/* One child, not a row: the Cards drawer portals over this rather than
             sitting beside it, so a toggle that says nothing about the Layout no
             longer re-flows the canvas and re-measures every Card on it. */}
-        <div className="graph-area size-full min-w-0" style={cardSizeVars}>
+        <div ref={graphArea} className="graph-area size-full min-w-0" style={cardSizeVars}>
+          {/* **The Space's one command surface, over the canvas rather than
+              beside it** (ADR 0082). It docks to this element: the twelve slots
+              are its edges and stops, and every measurement the drag makes is
+              relative to it — which is why the frame is a prop rather than
+              something the Dock reaches upward through the DOM to find.
+
+              Inside the graph area and not the shell, so the surface a reader
+              moves it around is the paper they are working on. It takes no
+              layout space from that paper: it is absolutely positioned, and
+              `.graph-area` is already the positioned box it resolves against. */}
+          {dockChrome === null ? null : (
+            <CommandDock chrome={dockChrome} container={graphArea} initialEdge="top" />
+          )}
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />
           ) : canvas.kind === 'cards' ? (
@@ -1149,6 +1615,7 @@ export const createApp = (
                 activeGraphId={activeGraphId}
                 activeGraphCardIds={activeGraphCardIds}
                 spaceCardTargets={spaceCardTargets}
+                cardEntityActions={cardRailActions}
               />
             </ReactFlowProvider>
           ) : (

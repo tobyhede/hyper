@@ -3,7 +3,15 @@ import { Input } from './components/input';
 import { Field, FieldError } from './components/field';
 import { cn } from './lib/utils';
 
-export type InlineTitleEditorVariant = 'card' | 'sidebar' | 'header';
+/**
+ * Which surface the field is standing in.
+ *
+ * Two, since ADR 0082: a Card on the canvas and a name on the Command Dock.
+ * There was a `'sidebar'` arm and it went with the Sidebar — a variant with no
+ * caller is an invitation, and the next chrome control would reasonably have
+ * been written against it and taken styling tuned for a sixteen-rem column.
+ */
+export type InlineTitleEditorVariant = 'card' | 'header';
 
 interface InlineTitleEditorBase {
   readonly title: string;
@@ -53,7 +61,10 @@ export type InlineTitleEditorProps = InlineTitleEditorBase &
  * - Why composition alone is insufficient: Input and Field provide control and validation
  *   semantics, but own none of that edit lifecycle.
  * - Custom behavior: only that lifecycle; product identity and authorship stay in the caller.
- * - Tests: `CanvasCard.test.tsx`, `SpaceSidebar.test.tsx`, application and Ladle Playwright.
+ * - Tests: `CanvasCard.test.tsx` for the `card` variant and `SpaceApp.test.tsx` for the
+ *   `header` one, which is where the Command Dock renames a Layout and a Graph now that
+ *   ADR 0082 has retired the Sidebar that used to; application Playwright in
+ *   `e2e/editing.spec.ts` and Ladle Playwright in `ladle-e2e/command-dock.spec.ts`.
  */
 export function InlineTitleEditor({
   title,
@@ -106,11 +117,6 @@ export function InlineTitleEditor({
   const control = (
     <Input
       ref={input}
-      // The Sidebar's field is `Input`'s own `compact` size now: the height,
-      // radius, padding and scale it used to spell out here were the same
-      // five utilities the Dock's filter spelled out, and two copies of a
-      // size is what a size variant is for.
-      size={variant === 'sidebar' ? 'compact' : 'default'}
       className={cn(
         variant === 'card' && 'card__title-input',
         variant === 'header' && 'h-7 rounded-md border-transparent px-1 py-0 font-medium',

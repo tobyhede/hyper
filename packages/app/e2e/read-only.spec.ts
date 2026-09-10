@@ -1,7 +1,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from './fixtures';
-import { authoringHandle, connectToEmptyWithAlt, nodeByTitle, settled } from './graph';
+import {
+  authoringHandle,
+  connectToEmptyWithAlt,
+  createCardControl,
+  nodeByTitle,
+  settled,
+} from './graph';
 
 const fixtureDir = fileURLToPath(new URL('../fixture', import.meta.url));
 const readFixture = (directory = fixtureDir, prefix = ''): Record<string, string> =>
@@ -27,8 +33,9 @@ test('database persistence never writes structural edits back to imported author
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   await settled(page);
 
-  await expect(page.getByRole('button', { name: 'Add Card' })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Add Layout' })).toBeEnabled();
+  // Authoring is offered, which is the premise: what this test proves is that
+  // running it changes no file on disk, not that it is unavailable.
+  await expect(createCardControl(page)).not.toHaveAttribute('aria-disabled', 'true');
   await card.hover();
   await connectToEmptyWithAlt(page, authoringHandle(card, 'source', 'right'));
   const created = nodeByTitle(page, 'Card 1');

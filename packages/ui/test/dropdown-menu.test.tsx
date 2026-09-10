@@ -59,15 +59,24 @@ describe('DropdownMenu', () => {
   });
 
   /**
-   * A destructive item colours the row and lets its glyph follow.
+   * A destructive item is ink at rest, red where the reader is, and its glyph
+   * follows the row.
    *
-   * The registry drop painted `color` on the child `svg` as well, which a
-   * surface restating the row's resting colour could not reach past — a
-   * declared colour is not overridden by an ancestor's, however specific — so
-   * every consumer that wanted Delete to be ink at rest had to restate the
-   * glyph too. Nothing in the class list may target the glyph directly.
+   * Two registry defaults are gone and this is what holds them gone. The drop
+   * painted `color` on the child `svg`, which a surface restating the row's
+   * colour could not reach past — a declared colour is not overridden by an
+   * ancestor's, however specific — so a consumer that wanted Delete to be ink
+   * had to restate the glyph too and reach for `!important`. And the drop
+   * painted the row itself `text-destructive` at rest, so a menu with a Delete
+   * in it read as a warning about the menu rather than about the one command
+   * that removes something.
+   *
+   * Both were consumer overrides in the Command Dock's stylesheet until they
+   * were settled here (`.scratch/command-dock/issues/03`, `/07`). The test is
+   * what stops the second one coming back with the next registry sync: `focus:`
+   * may name `text-destructive`, and the resting class list may not.
    */
-  it('leaves a destructive item glyph following the row rather than colouring it', () => {
+  it('paints a destructive item only where the reader is, and lets its glyph follow', () => {
     render(
       <DropdownMenu>
         <DropdownMenuTrigger>Open</DropdownMenuTrigger>
@@ -81,7 +90,8 @@ describe('DropdownMenu', () => {
 
     const item = screen.getByRole('menuitem', { name: 'Delete' });
     expect(item).toHaveAttribute('data-variant', 'destructive');
-    expect(item.className).toContain('data-[variant=destructive]:text-destructive');
+    expect(item.className).toContain('data-[variant=destructive]:focus:text-destructive');
+    expect(item.className).not.toContain('data-[variant=destructive]:text-destructive');
     expect(item.className).not.toContain('data-[variant=destructive]:*:[svg]:text-destructive');
   });
 
@@ -147,6 +157,53 @@ describe('DropdownMenu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));
 
     expect(screen.getByRole('menuitemradio', { name: 'Left' })).toBeInTheDocument();
+  });
+
+  /**
+   * The composition rule's other half, held where it can be seen: an item left
+   * unbound is held to nothing, and the value it returns wears the group's type
+   * anyway.
+   *
+   * This is the failure the bound form above prevents, written out rather than
+   * described — `'middle'` is not one of the two things this group deals in, it
+   * renders, it is chosen, and `next` arrives typed `'left' | 'right'` while
+   * holding `'middle'`. A consumer that trusted the declaration and dropped its
+   * runtime lookup is then reading a value off a list that cannot contain it.
+   *
+   * **It compiles on purpose and must not be relaxed into an endorsement.** The
+   * group cannot detect the omission (`packages/ui/src/components/dropdown-menu.tsx`
+   * says why: JSX gives every child the type `ReactElement<any, any>`), so this
+   * stands as the tripwire for the day TypeScript can — on which the item below
+   * stops compiling, this test fails, and the composition rule, the two doc
+   * comments carrying it and `.scratch/command-dock/findings/`'s open call-site
+   * entry are all owed a rewrite.
+   */
+  it('does not hold an unbound item to the group, which is why callers bind', () => {
+    const chosen: ('left' | 'right')[] = [];
+
+    render(
+      <DropdownMenu>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuRadioGroup<'left' | 'right'>
+            defaultValue="left"
+            onValueChange={(next) => {
+              expectTypeOf(next).toEqualTypeOf<'left' | 'right'>();
+              chosen.push(next);
+            }}
+          >
+            <DropdownMenuRadioItem value="left">Left</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="middle">Middle</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Middle' }));
+
+    // The declaration says `'left' | 'right'`. The array holds neither.
+    expect(chosen).toEqual(['middle']);
   });
 
   /**

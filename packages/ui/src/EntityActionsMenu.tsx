@@ -58,9 +58,14 @@ export type EntityActionOutcome = 'done' | 'failed';
  * did not, "Not copied".
  *
  * The menu is where a failure has to be legible, not only in whatever standing
- * notice the application also renders: below the Sidebar's breakpoint that
- * surface is a Sheet drawn *over* the shell, so a report pinned under the header
- * is behind it and a reader on a phone never sees it.
+ * notice the application also renders. It was built for a surface that could
+ * *cover* that notice — below the Space Sidebar's breakpoint the whole command
+ * surface was a Sheet over the shell, so a report pinned in the corner was
+ * behind it and a reader on a phone never saw it. ADR 0082 retired that Sheet
+ * and the Command Dock covers nothing, so the Dock's own menus pass no words
+ * and report through the standing notice instead. What keeps this is the Card
+ * rail: it is a menu on the canvas, over the Cards, and a reader whose eyes are
+ * on the Card they pressed is not looking at the shell's corner.
  */
 export type EntityActionReport = Readonly<Record<EntityActionOutcome, string>>;
 
@@ -72,9 +77,10 @@ type TriggerRender = ComponentProps<typeof DropdownMenuTrigger>['render'];
  * reached by, open it somewhere else.
  *
  * A command the entity does not have is simply absent from the list it is built
- * into — never present and disabled. That is the rule the Space Sidebar's link
- * commands already follow, and the reason is the same: a destination that does
- * not exist is not a thing to offer and refuse.
+ * into — never present and disabled. The reason is about destinations rather
+ * than about any one surface: an address that does not exist is not a thing to
+ * offer and refuse. A command that exists and is *out of reach now* is the
+ * other case, and that one is drawn present and unavailable.
  */
 export interface EntityAction {
   /** Stable within one menu; what React keys the item on. */
@@ -127,8 +133,9 @@ export type EntityActionGroup = readonly EntityAction[];
  * its gap take a little over 20px off the text, and at `w-72` the longest
  * destination sentence a Card or Graph produces — "Always opens <title> on its
  * own, wherever it is placed" — went from two lines to three. The extra 32px
- * buys that line back without the popup reaching across the Sidebar it opens
- * against.
+ * buys that line back and still leaves the popup inside the canvas it opens
+ * over, which is the width that mattered when the menu opened against a
+ * sixteen-rem gutter and is no narrower now that the gutter has gone.
  */
 const MENU_WIDTH = 'w-80';
 
@@ -345,20 +352,21 @@ export interface EntityActionsTriggerProps {
   /** Names the control for assistive technology — "Golden path actions". */
   readonly label: string;
   /**
-   * The control the menu hangs off. A Sidebar row passes its
-   * `SidebarMenuAction`, a Card rail its `CardRailAction`, so the trigger takes
-   * the treatment of the cluster it sits in rather than importing a second one.
+   * The control the menu hangs off. A Card rail passes its `CardRailAction` —
+   * the Space Sidebar's rows passed their `SidebarMenuAction` before ADR 0082 —
+   * so the trigger takes the treatment of the cluster it sits in rather than
+   * importing a second one.
    */
   readonly render?: TriggerRender;
   /**
    * The glyph the trigger draws, because what reads as "the actions" depends on
    * what the trigger sits beside rather than on this component.
    *
-   * A Sidebar row stands alone and passes `<EntityActionsIcon />`, the
-   * conventional "more" glyph. A Card rail sits in a cluster where every other
-   * control names its own command, and keeps `LinkActionsIcon` — which is the
-   * default here for exactly one reason: the rail is the only caller that does
-   * not pass this, so leaving the default alone is what leaves the rail alone.
+   * A row that stands alone passes `<EntityActionsIcon />`, the conventional
+   * "more" glyph, as the Sidebar's rows did. A Card rail sits in a cluster where
+   * every other control names its own command, and keeps `LinkActionsIcon` —
+   * which is the default here for exactly one reason: the rail is the only
+   * caller left, so leaving the default alone is what leaves the rail alone.
    */
   readonly icon?: ReactNode;
   readonly className?: string;
@@ -409,7 +417,9 @@ export function EntityActionsTrigger({
 export interface EntityActionsProps {
   readonly groups: readonly EntityActionGroup[];
   /** The area that answers the right click — normally the entity's whole row. */
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
+  /** Reuse the entity element when its parent/sibling geometry must be preserved. */
+  readonly render?: ComponentProps<typeof ContextMenuTrigger>['render'];
   readonly className?: string;
 }
 
@@ -424,16 +434,22 @@ export interface EntityActionsProps {
  *
  * `display: contents` by default, because what this wraps is somebody else's
  * row. The trigger has to be an element to carry the handler, but it must not
- * become a box in the middle of a layout that was written without it — a
- * Sidebar row positions its own trailing action against the row, not against a
- * wrapper that appeared underneath it.
+ * become a box in the middle of a layout that was written without it — a row
+ * positions its own trailing action against the row, not against a wrapper that
+ * appeared underneath it. A geometry-sensitive entity instead supplies `render`
+ * to compose the trigger onto its existing element; `contents` would still
+ * change direct-child and sibling selectors.
  */
-export function EntityActions({ groups, children, className }: EntityActionsProps) {
+export function EntityActions({ groups, children, className, render }: EntityActionsProps) {
   const { report, fire, announcement } = useConfirmation();
   return (
     <>
       <ContextMenu>
-        <ContextMenuTrigger data-slot="entity-actions" className={cn('contents', className)}>
+        <ContextMenuTrigger
+          data-slot="entity-actions"
+          render={render}
+          className={cn(render === undefined && 'contents', className)}
+        >
           {children}
         </ContextMenuTrigger>
         <ContextMenuContent className={MENU_WIDTH}>

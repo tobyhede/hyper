@@ -19,6 +19,7 @@ import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
+import { createCard } from './command-dock';
 
 /**
  * The two selections an Open Space Card authors.
@@ -322,11 +323,7 @@ describe('an Open Space Card', () => {
     const session = mount();
     const card = await openSpaceCard();
 
-    const addCardMenu = screen.getByRole('button', { name: 'More Card kinds' });
-    fireEvent.pointerDown(addCardMenu, { button: 0 });
-    fireEvent.pointerUp(addCardMenu, { button: 0 });
-    fireEvent.click(addCardMenu);
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Add Space Card' }));
+    createCard('Space Card');
     await screen.findByTestId('new-space-card');
 
     // By test id rather than by role: the pane is modal, so Base UI has marked

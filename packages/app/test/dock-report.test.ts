@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { openSpaceStatusLabel } from '@project/ui';
-import { exitReportSentence, unwellReport, type ExitOutcome } from '../stories/review/dock-model';
+import {
+  exitReportSentence,
+  openSpacesName,
+  unwellReport,
+  type ExitOutcome,
+} from '../src/dock-model';
 
 /**
  * What the Command Dock's Open Spaces menu says about an open Space that is not well.
@@ -72,5 +77,30 @@ describe('what the Command Dock says when an exit does not happen', () => {
     const said = outcomes.map((outcome) => exitReportSentence('Rendering', outcome));
 
     expect(new Set(said).size).toBe(outcomes.length);
+  });
+});
+
+/**
+ * **The Open Spaces trigger's accessible name, which is where the count lives.**
+ *
+ * The mark on the trigger is a glyph, and a glyph is colour and shape — so the
+ * count joins the *name* rather than riding on the mark alone, and a reader who
+ * never opens the menu is still told how much is wrong. That makes the sentence
+ * something a screen reader speaks in full, and a number agreeing with its verb
+ * is the difference between a sentence and a template.
+ *
+ * The visible word is shared rather than spelled here, for the reason the
+ * component states: the name has to *contain* the label on the trigger's face
+ * (WCAG 2.5.3), and two copies of a word is a pair that comes apart the first
+ * time one is edited.
+ */
+describe("the Open Spaces trigger's name", () => {
+  it('says nothing about attention while every open Space is well', () => {
+    expect(openSpacesName(3, 0)).toBe('Spaces. 3 open.');
+  });
+
+  it('agrees with its count', () => {
+    expect(openSpacesName(2, 1)).toBe('Spaces. 2 open, 1 needs attention.');
+    expect(openSpacesName(3, 2)).toBe('Spaces. 3 open, 2 need attention.');
   });
 });

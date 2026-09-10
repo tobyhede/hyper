@@ -62,7 +62,10 @@ it('mounts an opened startup result without interpreting the browser path again'
       );
     });
 
-    expect(within(container).getByRole('heading', { name: 'Stored space' })).toBeVisible();
+    // The Space's name, on the bar. It was an `h1` in the Sidebar's header; the
+    // Command Dock draws it as one of four names in a strip, so it is a name
+    // rather than a document heading.
+    expect(within(container).getByTestId('space-title')).toHaveTextContent('Stored space');
     await waitFor(() => expect(container.querySelector('.react-flow')).toBeInTheDocument());
   } finally {
     act(() => root.unmount());

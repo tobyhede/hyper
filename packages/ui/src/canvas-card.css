@@ -111,6 +111,8 @@
   transition: opacity var(--card-hover-duration, 120ms) var(--card-hover-easing, ease);
 }
 
+/* Pointer focus survives Open/Close. Only keyboard-visible focus should keep
+   an unhovered, unselected Card's commands revealed. */
 .canvas-card:is(
     :hover,
     :has(~ .rf-card-node__authoring-handle:hover),
@@ -118,7 +120,7 @@
     [data-content-editing='true']
   )
   .canvas-card__actions,
-.canvas-card__actions:focus-within {
+.canvas-card__actions:has(:focus-visible) {
   opacity: 1;
   pointer-events: auto;
 }

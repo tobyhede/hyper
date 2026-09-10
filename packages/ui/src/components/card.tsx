@@ -1,14 +1,14 @@
-import type * as React from 'react';
+import * as React from 'react';
 
 import { cn } from '#lib/utils';
 
-function Card({
-  className,
-  size = 'default',
-  ...props
-}: React.ComponentProps<'div'> & { size?: 'default' | 'sm' }) {
+const Card = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<'div'> & { size?: 'default' | 'sm' }
+>(function Card({ className, size = 'default', ...props }, ref) {
   return (
     <div
+      ref={ref}
       data-slot="card"
       data-size={size}
       className={cn(
@@ -18,7 +18,7 @@ function Card({
       {...props}
     />
   );
-}
+});
 
 function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (

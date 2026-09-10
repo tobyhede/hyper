@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "imports": {
+    "#components/command-dock-triggers": "./src/components/command-dock-triggers.ts",
     "#components/*": "./src/components/*.tsx",
     "#hooks/*": "./src/hooks/*.ts",
     "#lib/*": "./src/lib/*.ts",

@@ -773,12 +773,19 @@ export function createSpaceAuthoring({
      * this module invented — which is the sense in which this is still
      * membership only.
      *
-     * No production composition reaches it. `composeApp` derives its opening
-     * placement from the Layout it opened in and `Placement.fromLayout` is
-     * total, so the only `null` placements are the ones a caller states, and the
-     * one non-test caller that states one (`stories/support/SpaceSidebarFixture`)
-     * states it for exactly the Layout that does not resolve — which the `catch`
-     * above has already returned on.
+     * No production composition reaches it, and since ADR 0082 retired the
+     * Space Sidebar nothing outside `packages/app/test` does either.
+     * `composeApp` derives its opening placement from the Layout it opened in
+     * and `Placement.fromLayout` is total, so the only `null` placements are the
+     * ones a caller states — and every caller that states one is now a test
+     * arranging the geometry the case is about, rather than opening on the
+     * Layout's own map: `space-authoring-operations.test.ts`,
+     * `space-authoring.property.test.ts` and `render-adapter.test.ts`'s
+     * session-backed adapter. The one non-test statement there used to be came
+     * from a story fixture of the retired surface, and it stated `null` for
+     * exactly the Layout that does not resolve — so even that one died on the
+     * `catch` above rather than here. What is left is a branch production cannot
+     * enter and a test suite can.
      */
     if (placement === null) {
       install(authored);
@@ -1225,10 +1232,24 @@ export function createSpaceAuthoring({
         ? navigationState.activeGraphId
         : (layout.activeGraph ?? layout.graphs[0]?.id ?? null);
     if (completion.kind === 'renamed-layout') {
-      // Addressed by id, exactly as Rename Graph is (ADR 0040). The Sidebar row
-      // and the canvas header coordinate one draft on this id, so a rename that
-      // names a Layout other than the one this Edit resolves is a gesture aimed
-      // at something no longer drawing — an author's state, not a defect.
+      // Addressed by id, exactly as Rename Graph is (ADR 0040) — and the id is
+      // checked because this Edit resolves its Layout from state read *later*
+      // than the gesture that named one. `deriveCompletedEdit` takes the
+      // selection from `navigation.getState()` at derivation time, and three
+      // things put that ahead of the id the author submitted: a completion that
+      // arrived while another was completing derives off the queue rather than
+      // off the press; the Dock's `IdentityName` closes over the
+      // `canvas.selected.id` of its last committed render, so a selection that
+      // moved this tick has not reached it yet; and an embedded Layout Edit
+      // resolves `embeddedLayoutId` rather than the selection at all, so a
+      // rename aimed at the drawing Layout names the wrong one by construction.
+      // The surface guards are real and are not this one — `IdentityName` ends
+      // a draft whose subject changed, `App` ends one the replacement epoch or
+      // lost availability invalidated (ADR 0042) — but both end it on the
+      // *next* render, and this answers the submit already in flight. So a
+      // rename naming a Layout other than the one this Edit resolves is a
+      // gesture aimed at something no longer drawing — an author's state, not a
+      // defect.
       if (completion.layoutId !== layoutId) return refuse({ code: 'layout-not-found' });
       const title = trimmedNonBlankTitle(completion.title);
       if (title === null) return refuse({ code: 'layout-title-required' });

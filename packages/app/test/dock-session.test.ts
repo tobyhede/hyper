@@ -9,7 +9,7 @@ import {
   opened,
   type OpenEntry,
   type SessionState,
-} from '../stories/review/dock-model';
+} from '../src/dock-model';
 
 const layout = (id: string, title: string): Layout => ({
   id: newUuid(),
@@ -134,7 +134,7 @@ const session = (persistence?: SpaceSessionState['persistence']): SessionState =
   if (persistence !== undefined && live !== undefined) {
     open.set(rendering.id, { ...live, persistence });
   }
-  return { open, currentId: rendering.id };
+  return { open, currentId: rendering.id, metaSpaceId: meta.id };
 };
 
 const retryable = {
@@ -164,6 +164,23 @@ const permanent = {
  * moving up a level, not a claim about structure — nothing acts on it, and
  * Space Card references form a DAG with no canonical parent anyway (ADR 0074).
  */
+/**
+ * The session as {@link openTree} takes it.
+ *
+ * The model stopped taking the fixture's own `SessionState` when the application
+ * became its second caller: `OpenSpacesState` keeps the Opener in a map beside
+ * its entries rather than on them, so neither session is convertible to the
+ * other and a tree that took either would be one its other caller had to reshape
+ * itself for. This is the reshaping, in the one test that needs it.
+ */
+const rowsOf = (state: SessionState) =>
+  [...state.open].map(([spaceId, entry]) => ({
+    spaceId,
+    title: entry.snapshot.document.title,
+    from: entry.from,
+    persistence: entry.persistence,
+  }));
+
 describe('exiting a Space', () => {
   it('closes one Space and never the Spaces opened through it', () => {
     const { result, session: next } = exitSpace(session(), designSystem.id);
@@ -175,7 +192,7 @@ describe('exiting a Space', () => {
   it('keeps a Space whose opener exited in the Open Spaces menu, under the nearest still-open one', () => {
     const { session: next } = exitSpace(session(), designSystem.id);
 
-    expect(openTree(next).map((row) => [row.title, row.depth])).toEqual([
+    expect(openTree(rowsOf(next)).map((row) => [row.title, row.depth])).toEqual([
       ['Meta', 0],
       ['Platform', 1],
       ['Rendering', 2],

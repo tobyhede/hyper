@@ -512,14 +512,26 @@ const moduleReferences = (source: ts.SourceFile): readonly ModuleReference[] => 
  * nothing through the barrel. That is deliberately the conservative direction:
  * a module only reachable that way is reported as uncatalogued rather than
  * quietly catalogued, which is the guarantee this function exists to keep.
+ *
+ * **Only a component name marks its module rendered.** A module may export a
+ * component and a plain helper side by side, and a story taking the *helper*
+ * renders nothing — `OpenSpaces.tsx` exports the retired strip beside
+ * `openSpaceStatusLabel`, the words the Command Dock spends, and that one
+ * import marked the whole module rendered and carried `tabs.tsx` in behind it.
+ * A dead surface then passed the ratchet unlisted, which is the one thing this
+ * walk exists to prevent. Read off the name's own casing, which is what a JSX
+ * tag is resolved by: `<OpenSpaces/>` is a component and
+ * `openSpaceStatusLabel` cannot be one.
  */
+const isComponentName = (name: string): boolean => /^[A-Z]/u.test(name);
+
 const barrelOwners = (
   reference: ModuleReference,
   index: string,
   repositoryRoot: string,
 ): readonly string[] => {
   if (reference.namespace) return [];
-  const wanted = reference.names === null ? null : new Set(reference.names);
+  const wanted = reference.names === null ? null : new Set(reference.names.filter(isComponentName));
   return moduleReferences(sourceFile(index))
     .filter((entry) => wanted === null || entry.names?.some((name) => wanted.has(name)))
     .map((entry) => resolveModule(entry.specifier, index, repositoryRoot))
@@ -948,7 +960,11 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
    * The dead-rule half of the ratchet, over the stylesheets that live beside their
    * component rather than in `styles.css` — `canvas-card.css` beside `CanvasCard`,
    * `card-search-combobox.css` beside `CardSearchCombobox`,
-   * `markdown-source-editor.css` beside `MarkdownSourceEditor`.
+   * `markdown-source-editor.css` beside `MarkdownSourceEditor`, and
+   * `command-dock.css` beside `CommandDock`, which is the first of them under
+   * `packages/app/src` rather than `packages/ui/src`. The walk is over
+   * `PRODUCTION_UI_ROOTS` rather than a list, so a fifth is covered the day it
+   * is written; the names here are examples and not the set.
    *
    * Only that half. Colocation is the *approved* home for product appearance, so these
    * owe no inventory entry — recording them would turn the inventory into a list of
