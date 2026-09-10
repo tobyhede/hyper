@@ -77,7 +77,7 @@ export type CanvasCardFront =
       readonly selection?: CanvasSpaceCardSelection;
     };
 
-/** One thing a Space Card's selectors can be pointed at, named as an author reads it. */
+/** One entity a Space Card's selectors can be pointed at, named as an author reads it. */
 export interface CanvasSpaceCardChoice {
   readonly id: string;
   readonly title: string;
@@ -626,7 +626,7 @@ interface SpaceCardSelectorProps {
  * press on the trigger does not drag the Card out from under it.
  *
  * An empty list disables the trigger rather than opening onto nothing. A Space
- * with no Graphs is an ordinary thing to reference, and a control that opens
+ * with no Graphs is an ordinary entity to reference, and a control that opens
  * onto an empty list says "look again" where an unavailable one says "there are
  * none". A canvas that has withdrawn authoring disables it the same way, and
  * for the reason it still draws the selection at all: which Diagram this Card

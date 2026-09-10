@@ -9,7 +9,7 @@ import { titleName, type Graph, type SpaceSnapshot } from '@project/core';
  * Three named operations rather than one helper taking a prefix. What a caller
  * knows is *what it is naming*; the `<Prefix> N` arithmetic and the prefix
  * literal are this module's, so no call site can spell "Diagram" a second way or
- * number one kind of thing differently from another. This is a deterministic
+ * number one kind of entity differently from another. This is a deterministic
  * rule and stays one — it is not injected, because there is nothing about it a
  * test would want to replace.
  */

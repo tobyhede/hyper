@@ -424,7 +424,7 @@ describe('the vocabulary that guard reads', () => {
  * a fourth.
  *
  * ADR 0079 then settled the noun itself: an authored **Diagram** is the only
- * thing that draws the canvas, and the render-layer word that stood between a
+ * entity that draws the canvas, and the render-layer word that stood between a
  * Diagram id and the Diagram it names went with the module it named. Its identity
  * is `DiagramId` in `@project/core` now, resolution is `resolveDiagram`, and the
  * Sidebar takes the Space's Diagrams rather than a row type derived for it.

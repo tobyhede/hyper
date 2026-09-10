@@ -47,7 +47,7 @@ export type PositionedDiagram = z.infer<typeof positionedDiagramSchema>;
 
 /**
  * A **Diagram**: the authored card-to-position map a space carries (ADR 0014).
- * It is data, not behaviour — the thing that arranges cards is a
+ * It is data, not behaviour — what arranges Cards is a
  * `LayoutStrategy` in `@project/graph`, and `positionedStrategy` is the one that
  * reads this. Only authored diagrams exist as values; an automatic strategy has
  * no Diagram behind it (ADR 0025).

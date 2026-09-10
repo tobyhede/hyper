@@ -12,7 +12,7 @@ declare const PLACEMENT: unique symbol;
 
 /**
  * A **Placement** is the card→position map itself: which cards sit where, and
- * nothing more. A `Diagram` is the authored thing a Space holds; the placement is
+ * nothing more. A `Diagram` is the authored entity a Space holds; the placement is
  * the map inside it. It is also what an automatic strategy computes and what
  * `positionedStrategy` reads.
  *

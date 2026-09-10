@@ -312,7 +312,7 @@ const anchorCardOf = (draft: EdgeDraft): CardId => {
   return draft.endpoint === 'from' ? draft.edge.to : draft.edge.from;
 };
 
-/** Whether a canvas selection names the thing this draft is about. */
+/** Whether a canvas selection names the entity this draft is about. */
 const selectionMatchesDraft = (selection: CanvasSelection, draft: EdgeDraft): boolean => {
   if (draft.kind === 'pointer-connect') {
     // A pointer connect deliberately survives an empty selection: React Flow
@@ -351,7 +351,7 @@ export function createEdgeAuthoring({
   const accepts = (proposal: EdgeProposal): boolean => eligibility(proposal).kind === 'eligible';
 
   /**
-   * Whether the thing a draft is about still exists and can still be authored.
+   * Whether the entity a draft is about still exists and can still be authored.
    *
    * Asked through the eligibility query rather than by reading the Space: the
    * *identity* proposal — reconnecting an endpoint to the Card it already names
@@ -466,7 +466,7 @@ export function createEdgeAuthoring({
   };
 
   /**
-   * Ask the author be put back on the thing this Edit left them with.
+   * Ask the author be put back on the entity this Edit left them with.
    *
    * One line, because where an Edit continues is one module now
    * (`continuation.ts`): this lifecycle says what it owes and an adapter that

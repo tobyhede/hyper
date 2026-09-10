@@ -8,7 +8,7 @@
  * standing at the other.
  *
  * **It reads what is in progress and never the Space.** Whether a *proposed*
- * thing may exist — an Edge between two Cards — is eligibility, taken against
+ * entity may exist — an Edge between two Cards — is eligibility, taken against
  * the Space at the Space Authoring seam (`space-authoring.ts`'s
  * `EdgeEligibility`). One word each, two modules, different subjects.
  *

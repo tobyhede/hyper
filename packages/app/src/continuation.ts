@@ -11,7 +11,7 @@ import type { SpaceAuthoring } from './space-authoring';
  * Where an Edit continues, as one module.
  *
  * `CONTEXT.md` states the rule in several places — **an Edit continues at the
- * thing it produced** — and before this it had six implementations in five
+ * entity it produced** — and before this it had six implementations in five
  * mechanisms: a boolean ref, a projection poll, a component inside
  * `ReactFlowProvider`, an attribute query, a DOM closure held on React state,
  * and Edge Authoring's published one-shot. Each carried a paragraph about a

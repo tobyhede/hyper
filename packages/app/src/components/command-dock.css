@@ -366,7 +366,7 @@
 
 /* ---------------------------------------------------------------- cluster */
 
-/* Diagram and Graph each read as one named thing carrying several commands,
+/* Diagram and Graph each read as one named entity carrying several commands,
    which is what a Card rail is (ADR 0073) — so each is a `Toolbar`, drawn
    tight, with the dock's own gap doing the separating between them. */
 .command-dock__cluster {

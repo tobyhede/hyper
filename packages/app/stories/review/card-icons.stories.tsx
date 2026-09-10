@@ -19,7 +19,7 @@
  * **An Alias is not a fifth glyph, and that is the load-bearing decision.** A
  * single Alias mark can say *that* a Card refers elsewhere but never *what it
  * refers to* — and a Space Card can be an Alias's Target as much as a Markdown
- * Card can, so the two would draw identically. The kind of the thing on the
+ * Card can, so the two would draw identically. The kind of the Card on the
  * canvas is exactly what the glyph exists to carry, so the base is kept and a
  * badge is added. It also agrees with what the canvas already does:
  * `canvas-card.css` keeps the Card and only changes `border-style` to dotted.
@@ -653,12 +653,12 @@ const SPACE: readonly Candidate[] = [
   },
   { name: 'file-stack', note: 'The same claim, filed rather than pinned. Heavier at 14px.' },
   { name: 'box', note: 'A container with contents. No collision with Diagram or Graph.' },
-  { name: 'boxes', note: 'Many contained things. Busier; blurs at 14px.' },
+  { name: 'boxes', note: 'Many contained shapes. Busier; blurs at 14px.' },
   { name: 'square-stack', note: 'Cards stacked in one place. Close to a duplicate mark.' },
   { name: 'layers', note: 'Depth. Reads as z-order, which a Space is not.' },
   { name: 'door-open', note: 'You go in. The one glyph that draws the verb.' },
   { name: 'map', note: 'A territory you navigate. Strong, and a different vocabulary.' },
-  { name: 'orbit', note: 'Things around a centre. Pretty; says little.' },
+  { name: 'orbit', note: 'Shapes around a centre. Pretty; says little.' },
   { name: 'frame', note: 'A canvas. Collides with PanelsTopLeft — reads as a Diagram.' },
 ];
 
@@ -673,7 +673,7 @@ const SPACE: readonly Candidate[] = [
  * **What settles it is that a Space Card can be an Alias's Target too.** A
  * single Alias glyph can say *that* a Card refers elsewhere but never *what it
  * refers to*, so an Alias of a Space and an Alias of a Markdown Card would draw
- * identically — and the kind of the thing on the canvas is exactly what the
+ * identically — and the kind of the Card on the canvas is exactly what the
  * glyph exists to carry. A decoration composes: the base says which kind, the
  * badge says it is a view of one. Every option below is therefore drawn twice,
  * on the Card glyph and on the Space glyph.
@@ -784,7 +784,7 @@ const DIAGRAM: readonly Candidate[] = [
   },
   {
     name: 'triangle-square-circle',
-    note: 'Three unlike things placed apart. Says arrangement without saying grid. Lucide calls it `shapes`; keyed by what it draws here because the anti-slop naming rule reads an object key as a symbol name.',
+    note: 'Three unlike shapes placed apart. Says arrangement without saying grid. Lucide calls it `shapes`; keyed by what it draws here because the anti-slop naming rule reads an object key as a symbol name.',
   },
   {
     name: 'square-mouse-pointer',

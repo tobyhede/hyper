@@ -171,7 +171,7 @@ A card occupies exactly one position in the graph; there is no placement layer l
 Validation happens in two layers:
 
 - **Shape** — Zod schemas (`@project/core`) validate the space file and each card file's frontmatter.
-- **References** — `@project/graph` checks that both ends of every Graph Edge resolve to a Card, that no Graph contains an exact duplicate Edge, that a Diagram positions and shows only things the Space has, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
+- **References** — `@project/graph` checks that both ends of every Graph Edge resolve to a Card, that no Graph contains an exact duplicate Edge, that a Diagram positions and shows only Cards the Space has, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
 
 `@project/graph` also derives the Graph handles and edges (`buildCardHandles`, `buildGraphRenderEdges`); `@project/react-flow-adapter` projects colored card nodes and edges (`projectCardNodes`, `projectGraphEdges`).
 

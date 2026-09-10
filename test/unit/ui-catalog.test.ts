@@ -286,7 +286,7 @@ describe('UI catalogue', () => {
 
 describe('production component coverage', () => {
   const storyRendering = (specifier: string): string =>
-    `import { Thing } from '${specifier}';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Thing;\n`;
+    `import { Widget } from '${specifier}';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Widget;\n`;
 
   it('reports a production component no stable story renders', () => {
     const root = fixture();
@@ -299,7 +299,7 @@ describe('production component coverage', () => {
 
   it('follows a relative import out of a story into the component it renders', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -319,9 +319,9 @@ describe('production component coverage', () => {
       'packages/ui/package.json',
       '{"imports":{"#components/*":"./src/components/*.tsx"}}',
     );
-    write(root, 'packages/ui/src/index.ts', "export { Thing } from './Sidebar';");
-    write(root, 'packages/ui/src/Sidebar.tsx', "export { Thing } from '#components/sheet';");
-    write(root, 'packages/ui/src/components/sheet.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/index.ts', "export { Widget } from './Sidebar';");
+    write(root, 'packages/ui/src/Sidebar.tsx', "export { Widget } from '#components/sheet';");
+    write(root, 'packages/ui/src/components/sheet.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -333,8 +333,8 @@ describe('production component coverage', () => {
 
   it('resolves a package entry point written as index.tsx', () => {
     const root = fixture();
-    write(root, 'packages/react-flow-adapter/src/index.tsx', "export { Thing } from './Node';");
-    write(root, 'packages/react-flow-adapter/src/Node.tsx', 'export const Thing = null;');
+    write(root, 'packages/react-flow-adapter/src/index.tsx', "export { Widget } from './Node';");
+    write(root, 'packages/react-flow-adapter/src/Node.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -346,7 +346,7 @@ describe('production component coverage', () => {
 
   it('follows a public package subpath directly to the component it renders', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/MarkdownSourceEditor.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/MarkdownSourceEditor.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -359,7 +359,7 @@ describe('production component coverage', () => {
   it('resolves a subpath entry declared without a wildcard', () => {
     const root = fixture();
     write(root, 'packages/app/package.json', '{"imports":{"#shell":"./src/Shell.tsx"}}');
-    write(root, 'packages/app/src/Shell.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/Shell.tsx', 'export const Widget = null;');
     write(root, 'packages/app/stories/components/button.stories.tsx', storyRendering('#shell'));
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -375,11 +375,11 @@ describe('production component coverage', () => {
       '{"imports":{"#shell":"./src/Shell.tsx","#components/*":"./src/components/*.tsx"}}',
     );
     write(root, 'packages/app/src/Shell.tsx', 'export const Shell = null;');
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      `import { Thing } from '#components/NewAlias';\nimport { Shell } from '#shell';\nexport default { title: 'Components/Button' };\nexport const Primary = () => [Thing, Shell];\n`,
+      `import { Widget } from '#components/NewAlias';\nimport { Shell } from '#shell';\nexport default { title: 'Components/Button' };\nexport const Primary = () => [Widget, Shell];\n`,
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -392,7 +392,7 @@ describe('production component coverage', () => {
       'packages/app/package.json',
       '{"imports":{"#components/*":"./src/components/*.tsx"}}',
     );
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -407,9 +407,9 @@ describe('production component coverage', () => {
     write(
       root,
       'packages/ui/src/index.ts',
-      "export { Thing } from './Rendered';\nexport { Other } from './Unrendered';",
+      "export { Widget } from './Rendered';\nexport { Other } from './Unrendered';",
     );
-    write(root, 'packages/ui/src/Rendered.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
     write(root, 'packages/ui/src/Unrendered.tsx', 'export const Other = null;');
     write(
       root,
@@ -423,11 +423,11 @@ describe('production component coverage', () => {
   });
 
   it.each([
-    ["import type { Thing } from '../../src/components/NewAlias';", 'a type-only declaration'],
-    ["import { type Thing } from '../../src/components/NewAlias';", 'a type-only specifier'],
+    ["import type { Widget } from '../../src/components/NewAlias';", 'a type-only declaration'],
+    ["import { type Widget } from '../../src/components/NewAlias';", 'a type-only specifier'],
   ])('does not treat %s as rendering the module it names', (statement) => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export type Thing = string;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export type Widget = string;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -444,14 +444,14 @@ describe('production component coverage', () => {
     write(
       root,
       'packages/ui/src/index.ts',
-      "export { Thing } from './Rendered';\nexport { Other } from './Unrendered';",
+      "export { Widget } from './Rendered';\nexport { Other } from './Unrendered';",
     );
-    write(root, 'packages/ui/src/Rendered.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
     write(root, 'packages/ui/src/Unrendered.tsx', 'export const Other = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      "import * as UI from '@project/ui';\nexport default { title: 'Components/Button' };\nexport const Primary = () => UI.Thing;\n",
+      "import * as UI from '@project/ui';\nexport default { title: 'Components/Button' };\nexport const Primary = () => UI.Widget;\n",
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
@@ -468,10 +468,10 @@ describe('production component coverage', () => {
     write(
       root,
       'packages/ui/src/index.ts',
-      "export { Thing } from './Rendered';\nexport { Thing as Aliased } from './Unrendered';",
+      "export { Widget } from './Rendered';\nexport { Widget as Aliased } from './Unrendered';",
     );
-    write(root, 'packages/ui/src/Rendered.tsx', 'export const Thing = null;');
-    write(root, 'packages/ui/src/Unrendered.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
+    write(root, 'packages/ui/src/Unrendered.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -485,8 +485,8 @@ describe('production component coverage', () => {
 
   it('follows an aliased re-export when the story imports the alias', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/index.ts', "export { Thing as Aliased } from './Rendered';");
-    write(root, 'packages/ui/src/Rendered.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/index.ts', "export { Widget as Aliased } from './Rendered';");
+    write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -502,7 +502,7 @@ describe('production component coverage', () => {
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      "import Thing, { type Props } from '../../src/components/NewAlias';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Thing as Props;\n",
+      "import Widget, { type Props } from '../../src/components/NewAlias';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Widget as Props;\n",
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -525,7 +525,7 @@ describe('production component coverage', () => {
 
   it('rejects the same module recorded twice', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
@@ -545,7 +545,7 @@ describe('production component coverage', () => {
 
   it('reads the exported list, not a same-named local declaration above it', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
@@ -585,7 +585,7 @@ describe('production component coverage', () => {
 
   it('rejects a recorded reason for a component a stable story does render', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -620,11 +620,11 @@ describe('production component coverage', () => {
 
   it('does not ask a review-only story to catalogue anything', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/review/proposal.stories.tsx',
-      `import { Thing } from '../../src/components/NewAlias';\nexport default { title: 'Review/Proposal' };\nexport const Draft = () => Thing;\n`,
+      `import { Widget } from '../../src/components/NewAlias';\nexport default { title: 'Review/Proposal' };\nexport const Draft = () => Widget;\n`,
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
@@ -634,13 +634,13 @@ describe('production component coverage', () => {
 
   it('lets a review-only surface appear beside its future Space stories', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/review/multiple-spaces.stories.tsx',
-      `import { Thing } from '../../src/components/NewAlias';
+      `import { Widget } from '../../src/components/NewAlias';
 export default { title: 'Space/Multiple Spaces' };
-export const MultipleSpaces = () => Thing;
+export const MultipleSpaces = () => Widget;
 `,
     );
 

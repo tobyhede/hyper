@@ -271,7 +271,7 @@ describe('the story Spaces', () => {
     expect(commandDockSpace.graphs.filter((graph) => graph.color !== undefined)).toEqual([]);
   });
   /**
-   * **A Space, its Diagrams and its Graphs are four kinds of thing with one
+   * **A Space, its Diagrams and its Graphs are four kinds of entity with one
    * spelling for identity, so a fixture that reuses a value hides the mistake
    * a real reader would make.** Meta's own Id was written as a literal and its
    * Catalogue Diagram as `metaId(0)`, which is the same UUID — so the product

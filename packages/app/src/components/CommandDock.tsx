@@ -773,13 +773,13 @@ function IdentityName({
  * 0073's pair, the same one a Card rail is built from — so the controls share a
  * box treatment with the rail, the whole bar is one tab stop, and the arrows
  * cross a group boundary exactly as they cross any other gap. What the grouping
- * says is that these are commands *on* one named thing, which is exactly what a
+ * says is that these are commands *on* one named entity, which is exactly what a
  * rail says about a Card.
  *
  * Only Rename left the menu, because the name is right there and clicking a
  * name to change it needs no menu at all. Everything else stays behind the
  * chevron — including New, which is a command about the *set* rather than
- * about the named thing the cluster is showing, and so belongs with the list
+ * about the named entity the cluster is showing, and so belongs with the list
  * of that set rather than beside its current member. Present is the exception
  * on the Graph side: it acts on the Active Graph the cluster is naming.
  */
@@ -894,7 +894,7 @@ function GraphControls({
    * **Present leads along a row and trails down a column**, and this is the one
    * thing in the Dock the edge reorders.
    *
-   * Along a row it leads: it acts on the named thing the cluster is showing, so
+   * Along a row it leads: it acts on the named entity the cluster is showing, so
    * it sits at the edge the eye enters from, ahead of the name it acts on.
    *
    * Down a column it cannot, because a column pays for it differently. A
@@ -938,7 +938,7 @@ function GraphControls({
       {/* The one identity that carries colour, and it carries it on the glyph
           alone — the stroke the Edges of this Graph are drawn in. A neutral
           swatch stood here and said only "a colour applies"; a Graph glyph
-          says which *kind* of thing the colour belongs to, and it is
+          says which *kind* of entity the colour belongs to, and it is
           `@project/ui`'s own `GraphIcon` rather than a mark this module
           invents. */}
       <IdentityName
@@ -1151,7 +1151,7 @@ function CreateMenu({
  *
  * It carries a chevron because it discloses a list, which is what the chevron
  * says next to it on the other three. What it does **not** carry is the name as
- * a control: Space, Diagram and Graph name one thing each, so clicking that
+ * a control: Space, Diagram and Graph name one entity each, so clicking that
  * name to rename it is the whole of `IdentityName`. "Cards" names a set, and a
  * set has no name to edit — so the word is a label inside the trigger rather
  * than a button of its own, and the cluster is one target instead of two.
@@ -1387,7 +1387,7 @@ function CardsControl({
   return (
     <ToolbarGroup aria-label="Cards" className="command-dock__cluster">
       {/* **The surface carries no commands, and that is the shape rather than a
-          gap in it.** Cards names no one thing — a Card's own commands are the
+          gap in it.** Cards names no one entity — a Card's own commands are the
           Card rail's (ADR 0073) and this Dock deliberately carries none — and
           its one set command, Create, is the `+` beside this trigger.
           Repeating Create inside the list as well would be the second path to
@@ -1398,9 +1398,9 @@ function CardsControl({
           list's. */}
       {cards.surface}
       {/* **Trailing, where Present leads**, and the asymmetry is the point.
-          Present acts on the named thing the cluster is showing — present *this
+          Present acts on the named entity the cluster is showing — present *this
           Graph* — so it sits at the edge the eye enters from, ahead of the name
-          it acts on. Create acts on the **set**: Cards names no one thing, which
+          it acts on. Create acts on the **set**: Cards names no one entity, which
           is why it has no name to edit, and a command about the set reads after
           the disclosure that lists it. `[▢ Cards ⌄][+]` is "the Cards, and add
           one"; `[+][▢ Cards ⌄]` would be a verb with no subject in front of it.

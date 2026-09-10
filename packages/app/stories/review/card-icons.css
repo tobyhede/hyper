@@ -209,7 +209,7 @@ html:has(.icons) {
   list-style: none;
 }
 
-/* The entity name, so a row says which thing the glyph is for as well as
+/* The entity name, so a row says which entity the glyph is for as well as
    showing the glyph beside a real title. */
 .icons__row-label {
   width: 52px;

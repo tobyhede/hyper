@@ -478,8 +478,8 @@ export const createApp = (
                   kind: 'alias',
                   // The single-hop rule read forwards (ADR 0009): a Target must
                   // own its Markdown content. The Space's own Cards, not the
-                  // Diagram's — an Alias points at content, and content is not a
-                  // thing a Diagram owns.
+                  // Diagram's — an Alias points at content, and content is not
+                  // something a Diagram owns.
                   targets: currentSpace().cards.filter((card) => card.kind === 'markdown'),
                 },
                 listing: null,

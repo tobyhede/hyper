@@ -1110,7 +1110,7 @@ describe('CanvasCard Space front', () => {
     expect(screen.getByRole('combobox', { name: 'Diagram' })).toHaveTextContent('Collection 1');
   });
 
-  /** A Space with no Graphs is an ordinary thing to reference. */
+  /** A Space with no Graphs is an ordinary entity to reference. */
   it('draws an empty list as unavailable rather than opening onto nothing', () => {
     render(
       <CanvasCard

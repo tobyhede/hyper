@@ -13,7 +13,7 @@ import type { Space } from './space';
  *
  * The values are built once, during intake, and closed over by
  * {@link SpaceLookup}. Nothing outside this module can reach the Maps behind it,
- * which is what makes "the index" a thing a Space *has* rather than a set of
+ * which is what makes "the index" something a Space *has* rather than a set of
  * parallel collections every caller may read, index a second way, or disagree
  * with.
  */
