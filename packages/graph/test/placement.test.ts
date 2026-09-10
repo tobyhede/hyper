@@ -435,6 +435,73 @@ describe('Placement.displace', () => {
   });
 });
 
+describe('Placement.reclaim', () => {
+  it("gives an Open Card's room back to the Cards beyond it, entry untouched", () => {
+    // 400x300 Open against a 260x146 collapsed rect is a growth of 140x154,
+    // already written into CARD_B's coordinates by the Open Edit.
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } }],
+      [CARD_B, { x: 140, y: 154, open: false }],
+    ]);
+
+    expect(asObject(Placement.reclaim(authored, CARD_A))).toEqual({
+      // Still Open, and still remembering the size: reclaiming is the
+      // displacement half alone, and the caller writes the entry it wants.
+      [CARD_A]: { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } },
+      [CARD_B]: { x: 0, y: 0, open: false },
+    });
+  });
+
+  it('reclaims nothing for a Closed Card that remembers an Open Size', () => {
+    // A remembered Open Size is not room the Card holds — nothing was displaced
+    // for it — so there is nothing to give back (ADR 0066).
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 0, y: 0, open: false, openSize: { width: 400, height: 300 } }],
+      [CARD_B, { x: 140, y: 154, open: false }],
+    ]);
+
+    expect(Placement.reclaim(authored, CARD_A)).toBe(authored);
+  });
+
+  it('reclaims nothing for a Card the placement does not hold', () => {
+    const authored = at({ [CARD_A]: [0, 0] });
+    expect(Placement.reclaim(authored, CARD_B)).toBe(authored);
+  });
+
+  it('undoes exactly the Open that applied the growth', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, open: false }],
+      [CARD_B, { x: 400, y: 400, open: false }],
+    ]);
+    const openSize = { width: 560, height: 420 };
+    const opened = Placement.place(
+      Placement.displace(authored, CARD_A, Placement.growth(openSize)),
+      CARD_A,
+      { x: 10, y: 20, open: true, openSize },
+    );
+
+    expect(asObject(Placement.reclaim(opened, CARD_A))).toEqual({
+      [CARD_A]: { x: 10, y: 20, open: true, openSize },
+      [CARD_B]: { x: 400, y: 400, open: false },
+    });
+  });
+
+  it('reclaims from where the subject is now, not from where it was Opened', () => {
+    // The moved-*subject* face of ADR 0084's memorylessness, and the mirror of
+    // the moved-neighbour one the ADR states: a reclaim reads the Layout as it
+    // stands, so a subject dragged past its own displaced neighbours finds
+    // nobody beyond it and gives nothing back. Deliberate — recording where a
+    // particular Open happened is the per-Card history ADR 0084 rejected.
+    const openSize = { width: 560, height: 420 };
+    const opened = Placement.fromEntries([
+      [CARD_A, { x: 5000, y: 5000, open: true, openSize }],
+      [CARD_B, { x: 600, y: 474, open: false }],
+    ]);
+
+    expect(Placement.reclaim(opened, CARD_A)).toBe(opened);
+  });
+});
+
 describe('Placement.empty', () => {
   it('hands each caller its own map rather than one shared instance', () => {
     // Space Authoring installs the Placement it is handed without copying it, so

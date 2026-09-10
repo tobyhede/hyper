@@ -95,6 +95,16 @@ export const withoutIncidentEdges = (graphs: readonly Graph[], cardId: CardId): 
  * remain, because deleting a Card is not an instruction to delete either
  * (ADR 0040).
  *
+ * Every Layout that held the Card **Open** also gets the room it was holding
+ * back, through the same `Placement.reclaim` the single-Layout removal uses.
+ * Under the derivation ADR 0084 removed, dropping the entry dropped its
+ * displacement with it and this could be a filter; now the room lives in the
+ * neighbours' own stored coordinates, so a Layout the Edit is not drawing would
+ * otherwise keep it forever — with no Card left on that canvas to Close and no
+ * Edit that could give it back. Open/Closed is Layout-owned (ADR 0064), so
+ * whether there is any room to reclaim is asked of each Layout separately and
+ * is not what the drawing one answered.
+ *
  * Answers the snapshot it was given when no Layout held the Card, so a deletion
  * that only ever affected the current Layout — which the caller writes
  * separately — does not rebuild every other Layout to say nothing about them.
@@ -115,8 +125,8 @@ export const withCardRemovedFromLayouts = (base: SpaceSnapshot, cardId: CardId):
       ...base.document,
       layouts: layouts.map((layout) => ({
         ...layout,
-        positions: Object.fromEntries(
-          Object.entries(layout.positions).filter(([id]) => id !== cardId),
+        positions: Placement.toPositions(
+          Placement.remove(Placement.reclaim(Placement.fromLayout(layout), cardId), cardId),
         ),
         graphs: withoutIncidentEdges(layout.graphs, cardId),
       })),
