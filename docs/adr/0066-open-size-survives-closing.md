@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0064
-Refined by: 0084
+Refined by: 0083, 0084
 
 Opening and size are separate facts in a Layout's Placement. Every entry carries
 an explicit Open or Closed state; an Open Size is absent only until that Card
