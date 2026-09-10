@@ -38,6 +38,10 @@ test-results/
 !.scratch/**/*.md
 # Generated dogfood Spaces are rebuilt from their release tag and issue blockers.
 .scratch/**/roadmap-space/**
+# `pnpm spaces` mints these from docs/adr and the issue files; the Markdown it
+# copies in is tracked at its source, so a tracked second copy is state that can
+# disagree with the code generating it (ADR 0056).
+.scratch/spaces/**
 
 # Package-local spike harnesses: runnable code that proved something and was
 # never meant to ship. What they proved belongs in a finding or an ADR, in

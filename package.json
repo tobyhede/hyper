@@ -42,6 +42,8 @@
     "roadmap": "tsx scripts/roadmap.ts",
     "roadmap:html": "tsx scripts/roadmap.ts --html --open",
     "roadmap:space": "tsx scripts/roadmap.ts --space",
+    "spaces": "tsx scripts/knowledge-spaces.ts",
+    "dev:spaces": "pnpm spaces && pnpm --filter @project/app dev:spaces",
     "ui:catalog": "tsx scripts/ui-catalog.ts",
     "ui:catalog:check": "tsx scripts/ui-catalog.ts --check",
     "e2e:postgres": "playwright test --config playwright.postgres.config.ts",
