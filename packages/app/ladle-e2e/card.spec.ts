@@ -56,6 +56,34 @@ test(
     // the card to fit a title that overruns it.
     const box = await longTitle.boundingBox();
     expect(box?.height ?? 0).toBeLessThan(80);
+
+    // And the wrapping is *within* one Title Line, not a ladder (ADR 0083). A
+    // break the box chose is not a break the author typed, so a long Title with
+    // no newline in it stays a single `title`-role element however many visual
+    // lines it takes — this is the specimen where the two can be told apart,
+    // jsdom having no line boxes to wrap.
+    const lines = longTitle.locator('.canvas-card__title-line');
+    await expect(lines).toHaveCount(1);
+    await expect(lines).toHaveAttribute('data-role', 'title');
+    const drawn = await lines.evaluate((line) => {
+      const style = getComputedStyle(line);
+      return {
+        fontSize: Number.parseFloat(style.fontSize),
+        fontWeight: style.fontWeight,
+        lineHeight: Number.parseFloat(style.lineHeight),
+        letterSpacing: Number.parseFloat(style.letterSpacing),
+        // Its own box is taller than one line, which is what makes this a
+        // wrapped Title rather than a short one that proves nothing.
+        height: line.getBoundingClientRect().height,
+      };
+    });
+    // The Title Hyper has always drawn: 18px, weight 600, leading 1.12 and
+    // tracking -0.02em, resolved against its own size.
+    expect(drawn.fontSize).toBeCloseTo(18, 2);
+    expect(drawn.fontWeight).toBe('600');
+    expect(drawn.lineHeight).toBeCloseTo(18 * 1.12, 2);
+    expect(drawn.letterSpacing).toBeCloseTo(18 * -0.02, 2);
+    expect(drawn.height).toBeGreaterThan(40);
   },
 );
 
