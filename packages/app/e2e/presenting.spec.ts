@@ -57,7 +57,7 @@ test('traverses the graph, and the space is still what you are looking at', asyn
   await present(page);
 
   // No second surface (ADR 0027): every card is still drawn, on the same canvas.
-  await expect(page.locator('.react-flow__node')).toHaveCount(5);
+  await expect(page.locator('.react-flow__node')).toHaveCount(6);
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
 
   // Long starts at A — the card no edge arrives at, not the first in any list.
@@ -81,10 +81,10 @@ test('the active card draws its content rendered, and only that card does', asyn
   await expect(content).not.toContainText('**A**');
   await expect(content.locator('strong')).toHaveText('A');
 
-  // Content is not embedded in every node (ADR 0006) — the other nine still draw
+  // Content is not embedded in every node (ADR 0006) — the other five still draw
   // their titles. Counted inside the nodes: the Alt-drop preview draws the same
   // `CanvasCard`, so an unscoped count would include a Card that does not exist.
-  await expect(page.locator('.react-flow__node').getByTestId('card')).toHaveCount(4);
+  await expect(page.locator('.react-flow__node').getByTestId('card')).toHaveCount(5);
 });
 
 test('a body heading is just a heading, drawn once alongside the title (ADR 0020)', async ({
@@ -239,7 +239,7 @@ test('returning to the overview restores the space and its gestures', async ({ p
   await expect(page.getByTestId('presenting-chrome')).toHaveCount(0);
   // No card is active, so every node is back to drawing its title.
   await expect(activeCard(page)).toHaveCount(0);
-  await expect(page.locator('.react-flow__node').getByTestId('card')).toHaveCount(5);
+  await expect(page.locator('.react-flow__node').getByTestId('card')).toHaveCount(6);
 
   // Opening works again — through the Card's own control, which is the only
   // pointer graph to it (ADR 0036, 0037).
