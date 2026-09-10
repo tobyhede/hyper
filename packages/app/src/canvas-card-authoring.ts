@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
+  CARD_TITLE_REQUIRED,
   cardDocumentSchema,
-  normalizeTitle,
   uuidSchema,
   SPACE_CARD_MIN_OPEN_SIZE,
   type CardDocument,
@@ -228,12 +228,16 @@ export function useCanvasCardAuthoring({
       // The draft goes to the schema as it was typed: normalization is that
       // boundary's (ADR 0083), and a `trim()` here would be the rule written a
       // second time and disagreeing about the line breaks the author meant.
-      // `normalizeTitle` answers only which refusal this is — a draft that
-      // normalizes to nothing carries no name, and that refusal has a stable
-      // domain code whose sentence is written once, in `authoring-refusal.ts`.
+      // Which refusal this is comes off the issue the schema raised rather than
+      // being re-derived from the draft — the domain owns the code and this
+      // composes its sentence (ADR 0057), and re-deciding it here would be the
+      // same rule kept in two places, free to drift apart.
       const parsed = cardDocumentSchema.safeParse({ ...stored.document, title });
       if (!parsed.success) {
-        return normalizeTitle(title).length === 0
+        const titleRequired = parsed.error.issues.some(
+          (issue) => issue.code === 'custom' && issue.params?.['code'] === CARD_TITLE_REQUIRED,
+        );
+        return titleRequired
           ? describeAuthoringRefusal({ code: 'card-title-required' })
           : (parsed.error.issues[0]?.message ?? 'The Card title is invalid.');
       }
