@@ -166,7 +166,7 @@ const STATE_BY_WORD = new Map<string, IssueState>([
 
 const SETTLED_STATES = new Set<IssueState>(['done', 'dropped', 'accepted']);
 
-const isSettled = (state: IssueState): boolean => SETTLED_STATES.has(state);
+export const isSettled = (state: IssueState): boolean => SETTLED_STATES.has(state);
 
 const markdownFilesIn = (directory: string): readonly string[] => {
   if (!existsSync(directory)) return [];

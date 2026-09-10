@@ -6,11 +6,18 @@ import { importFixture, importSpaceDirectory } from './import-fixture';
 
 export type E2eHttpRuntimeOptions = {
   startup?: boolean;
-} & ({ catalog: 'fixture' | 'empty' } | { catalog: 'directory'; directory: string });
+} & (
+  | { catalog: 'fixture' | 'empty' }
+  | { catalog: 'directory'; directory: string }
+  /** A Meta-rooted aggregate directory, imported whole so its Space Resources resolve. */
+  | { catalog: 'aggregate'; directory: string }
+);
 
 const importCatalog = (repository: E2eMemorySpaceRepository, options: E2eHttpRuntimeOptions) => {
   if (options.catalog === 'fixture') return importFixture(repository);
   if (options.catalog === 'directory') return importSpaceDirectory(repository, options.directory);
+  if (options.catalog === 'aggregate')
+    return importFixture(repository, { directory: options.directory });
   return Promise.resolve(undefined);
 };
 
