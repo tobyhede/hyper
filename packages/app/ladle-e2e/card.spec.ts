@@ -230,6 +230,29 @@ test(
     // outside, its name became the control's and the Title Lines were reachable
     // through nothing. jsdom computes this differently from a browser, so this
     // is the assertion that holds it.
+    //
+    // On the **laddered** specimen, because a single-line Title cannot tell the
+    // arrangements apart: `Edit Title <name>` and the heading's own name are
+    // then the same string, and an implementation that drew the name and
+    // dropped every line after it reads as correct — which is exactly the
+    // regression ADR 0083's sentence about the Card front's own heading exists
+    // to prevent. The separator is one space per line because each Title Line
+    // is its own block box, which is the name computation's rule and not this
+    // test's.
+    const ladderGroup = page
+      .getByRole('region', { name: 'Laddered Card title editing' })
+      .getByTestId('card-group');
+    const ladderControl = ladderGroup.getByRole('button', { name: 'Edit Title Auth' });
+    const ladderHeading = ladderGroup.getByRole('heading');
+    await expect(ladderControl).toHaveAccessibleName('Edit Title Auth');
+    await expect(ladderHeading).toHaveAccessibleName('Auth how tokens are minted draft, 2026');
+    expect(await ladderHeading.evaluate((element) => element.closest('button') !== null)).toBe(
+      true,
+    );
+
+    // And the same control on the single-line Title, where the two names
+    // coincide — the arrangement is one rule and does not change with the
+    // number of lines.
     await expect(control).toHaveAccessibleName('Edit Title Draft entry');
     await expect(heading).toHaveAccessibleName('Draft entry');
     expect(await heading.evaluate((element) => element.closest('button') !== null)).toBe(true);
@@ -298,3 +321,67 @@ test(
     await expect(openGroup.getByRole('heading', { name: 'Open Card body' })).toBeVisible();
   },
 );
+
+/**
+ * A Title is clamped to the room available and never accommodated (ADR 0014,
+ * ADR 0083), and the field an author types it into is not exempt from that.
+ *
+ * The field grows with its content, which is the whole point of it, inside a
+ * Card whose height is authored. Uncapped, the fifth line took the Card's own
+ * rail with it: the body is bottom-pinned, so it grows *upward*, and the rail
+ * above it was pushed out of the top of the Card and clipped away by the Card's
+ * `overflow: hidden` — the kind glyph, the Actions menu and Open all gone while
+ * the author was still typing the name.
+ *
+ * A browser test and not a stylesheet one, because what is being asserted is
+ * where the boxes end up rather than which declaration put them there; the
+ * declarations themselves are held by
+ * `packages/ui/test/canvas-card-title-ladder.test.ts`.
+ */
+test('a Title being written on more lines than fit does not push the rail out of its Card', async ({
+  page,
+}) => {
+  await page.goto('/?story=components--card--editing--title&mode=preview');
+
+  const group = page
+    .getByRole('region', { name: 'Laddered Card title editing' })
+    .getByTestId('card-group');
+  const card = group.locator('.canvas-card');
+  const rail = group.locator('.card-rail');
+  await group.getByRole('button', { name: 'Edit Title Auth' }).click();
+
+  const field = page.getByRole('textbox', { name: 'Card title' });
+  await expect(field).toBeFocused();
+
+  /** The field's drawn height, and whether the rail is still inside the Card. */
+  const geometry = async () => {
+    const cardBox = await card.boundingBox();
+    const railBox = await rail.boundingBox();
+    const fieldBox = await field.boundingBox();
+    if (cardBox === null || railBox === null || fieldBox === null) {
+      throw new Error('Card geometry unavailable');
+    }
+    return {
+      fieldHeight: Math.round(fieldBox.height),
+      // The border, which the rail sits inside of. A rail pushed above it is
+      // not merely misplaced, it is clipped.
+      railAboveCard: railBox.y < cardBox.y,
+    };
+  };
+
+  // Four lines is the ladder's ceiling, and the field draws all four.
+  await field.fill('Auth\nhow tokens are minted\ndraft, 2026\nand a fourth');
+  const atCeiling = await geometry();
+  expect(atCeiling.railAboveCard).toBe(false);
+
+  // The sixth line is where the field used to take the rail with it. It stops
+  // at the same height instead, and the lines past the ceiling are reachable by
+  // scrolling rather than lost.
+  await field.fill(
+    'Auth\nhow tokens are minted\ndraft, 2026\nand a fourth\nand a fifth\nand a sixth',
+  );
+  const pastCeiling = await geometry();
+  expect(pastCeiling.railAboveCard).toBe(false);
+  expect(pastCeiling.fieldHeight).toBe(atCeiling.fieldHeight);
+  expect(await field.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+});

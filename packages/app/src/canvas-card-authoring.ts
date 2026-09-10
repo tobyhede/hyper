@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
+  CARD_TITLE_REQUIRED,
   cardDocumentSchema,
   uuidSchema,
   SPACE_CARD_MIN_OPEN_SIZE,
@@ -238,11 +239,20 @@ export function useCanvasCardAuthoring({
       if (!cardId.success) return 'This Card is no longer available.';
       const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId.data);
       if (stored === undefined) return 'This Card is no longer available.';
-      const named = title.trim();
-      const parsed = cardDocumentSchema.safeParse({ ...stored.document, title: named });
+      // The draft goes to the schema as it was typed: normalization is that
+      // boundary's (ADR 0083), and a `trim()` here would be the rule written a
+      // second time and disagreeing about the line breaks the author meant.
+      // Which refusal this is comes off the issue the schema raised rather than
+      // being re-derived from the draft — the domain owns the code and this
+      // composes its sentence (ADR 0057), and re-deciding it here would be the
+      // same rule kept in two places, free to drift apart.
+      const parsed = cardDocumentSchema.safeParse({ ...stored.document, title });
       if (!parsed.success) {
-        return named.length === 0
-          ? 'A Card title is required.'
+        const titleRequired = parsed.error.issues.some(
+          (issue) => issue.code === 'custom' && issue.params?.['code'] === CARD_TITLE_REQUIRED,
+        );
+        return titleRequired
+          ? describeAuthoringRefusal({ code: CARD_TITLE_REQUIRED })
           : (parsed.error.issues[0]?.message ?? 'The Card title is invalid.');
       }
       const result = authoring.complete({

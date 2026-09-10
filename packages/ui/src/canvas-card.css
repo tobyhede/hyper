@@ -468,21 +468,43 @@
   display: block;
 }
 
+/* The field an author writes the Title in, drawn as the Title it is replacing.
+   Its type comes from the same two tokens the heading and the rungs take, so
+   there is one size and one leading on this Card and not two — restated here,
+   the field kept 18px while a change to `--canvas-card-title-size` moved
+   everything around it, and the Title jumped size and baseline at the one
+   moment the drawn Title and the field are meant to be indistinguishable.
+
+   And it stops growing where the drawn ladder stops. `field-sizing: content`
+   is what makes the field exactly as tall as the Title being written, and
+   uncapped that is a box with no limit inside a Card whose height is authored
+   (ADR 0014, ADR 0083): at the fifth line the body — bottom-pinned, so it
+   grows upward — pushes the rail off the top of a Closed Card, where the
+   Card's own `overflow: hidden` takes the kind glyph, the Actions menu and
+   Open with it while the author is still typing. The ceiling is the ladder's
+   own, so what an author can see while writing is what the Card will draw.
+   Scrolled rather than clipped, because the field is the one place the whole
+   Title has to stay reachable however many lines it has. */
 .canvas-card .card__title-input {
   display: block;
   height: auto;
   min-height: 0;
+  max-height: calc(
+    var(--canvas-card-title-size) * var(--canvas-card-title-leading) *
+      var(--canvas-card-title-ladder-lines)
+  );
   padding: 0;
   border: 0;
   border-radius: 0;
   outline: 0;
+  overflow-y: auto;
   background: transparent;
   box-shadow: inset 0 -3px 0 var(--canvas-card-graph);
   color: var(--canvas-card-title);
   font: inherit;
-  font-size: 18px;
+  font-size: var(--canvas-card-title-size);
   font-weight: 600;
-  line-height: 1.12;
+  line-height: var(--canvas-card-title-leading);
   letter-spacing: -0.02em;
   text-align: left;
 }
