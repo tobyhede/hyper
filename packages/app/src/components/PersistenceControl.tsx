@@ -217,6 +217,13 @@ function ConflictControl({
  * them apart. The acknowledgement therefore records *which failure* was
  * dismissed and is spent the moment the session hands over another.
  *
+ * That makes a fresh failure per publication load-bearing rather than
+ * incidental, so it is pinned where it is produced rather than assumed here:
+ * `http-backend.test.ts`'s 'mints a distinct failure for each rejected commit'.
+ * A sequence number would have to be minted by the session and carried on
+ * `SpaceSessionState`, which is a persistence contract widened to hold one
+ * component's bookkeeping.
+ *
  * This is not a remount, deliberately. The control used to rely on being
  * unmounted between rejections by the `pending` state in between, and the
  * coordinated path does not guarantee one: `prepareCoordinatedCommit` installs

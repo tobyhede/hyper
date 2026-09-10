@@ -153,6 +153,33 @@ describe('HTTP Space backend failure mapping', () => {
     });
   });
 
+  /**
+   * Two commits rejected alike are two rejections.
+   *
+   * `PersistenceControl` acknowledges a rejection by the identity of the failure
+   * the session published, because nothing in the value separates two now that
+   * `message` is unread (ADR 0057) — two `forbidden` rejections are equal field
+   * for field. That makes "a fresh result per commit" load-bearing rather than
+   * incidental: a backend that answered a memoised `CommitResult` would leave
+   * the second rejection acknowledged by the author's dismissal of the first,
+   * and the dialog would never draw. Pinned here, at the one production backend
+   * that mints them, rather than left to the component to defend.
+   */
+  it('mints a distinct failure for each rejected commit', async () => {
+    // A fresh Response per call, because a body is read once. Two commits over
+    // one backend is the shape under test; one Response reused would fail as a
+    // `protocol` decode error rather than the second `forbidden`.
+    const backend = new HttpSpaceBackend('http://example.test', {
+      fetch: () => Promise.resolve(problemResponse('forbidden', 'No access')),
+    });
+
+    const first = await backend.commit(commit);
+    const second = await backend.commit(commit);
+
+    expect(first).toEqual(second);
+    expect(first).not.toBe(second);
+  });
+
   it('requires Problem Details for an ordinary error response', async () => {
     await expect(
       backendAnswering(jsonResponse({ message: 'old shape' }, 400)).commit(commit),
