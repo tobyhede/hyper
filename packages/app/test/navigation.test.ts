@@ -212,6 +212,29 @@ it('presents a fully cyclic Graph, which has no entry Card', () => {
   expect(navigation.moves()).toEqual([{ cardId: card, title: 'A', selected: true }]);
 });
 
+/**
+ * A move names the Card it goes to by that Card's **name** (ADR 0083).
+ *
+ * `moves()` is what the presenting chrome draws a row from and what a move's
+ * accessible name is composed of, so a Title's later lines reaching it would
+ * arrive on screen as a run-together label rather than as an error. The ladder
+ * is the Card front's and does not travel.
+ */
+it('names a move by the Card’s name, not by its whole Title', () => {
+  const cardA = uuid('00000000-0000-4000-8000-000000000002');
+  const cardB = uuid('00000000-0000-4000-8000-000000000003');
+  const space = spaceOwning(
+    'Presented',
+    [{ id: GRAPH_ONE, title: 'One', edges: [{ from: cardA, to: cardB }] }],
+    [{ id: cardA }, { id: cardB, title: 'Auth\nHow a session begins' }],
+  );
+  const navigation = navigationFor(() => space, LAYOUT);
+
+  navigation.present();
+
+  expect(navigation.moves()).toEqual([{ cardId: cardB, title: 'Auth', selected: true }]);
+});
+
 /*
  * Traversal history may contain the same Card twice. Cycles and self-Edges are legal
  * authored structure (ADR 0032), so a presenter traversing a loop accumulates a

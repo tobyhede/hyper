@@ -360,6 +360,30 @@ describe('SpaceSidebar', () => {
     expect(onSelect).toHaveBeenCalledOnce();
   });
 
+  /**
+   * The Sidebar lists a Card, so it shows the Card's **name** (ADR 0083).
+   *
+   * The row, the menu that hangs off it and the Delete control beside it are
+   * three places one Title reaches, and a line break in any of them draws as a
+   * broken-looking label — the ladder is the Card front's alone.
+   */
+  it('names the selected Card by its name and not by its whole Title', () => {
+    const props: SpaceSidebarProps = {
+      ...settledProps(),
+      selectedCard: {
+        card: { ...SELECTED_CARD, title: 'Start here\nAnd read this next' },
+        onDelete: () => null,
+      },
+      entityActions: cardActions(vi.fn()),
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    expect(screen.getByTestId('selected-card-row')).toHaveTextContent('Start here');
+    expect(screen.getByTestId('selected-card-row')).not.toHaveTextContent('And read this next');
+    expect(screen.getByRole('button', { name: 'Actions for Card Start here' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Delete Card Start here' })).toBeVisible();
+  });
+
   it('leaves the footer empty when the canvas has selected no Card', () => {
     draw(<SpaceSidebar {...settledProps()} />);
 

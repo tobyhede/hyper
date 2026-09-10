@@ -1,5 +1,5 @@
 import { useCallback, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { titleLines } from '@project/core';
+import { titleLines, titleName } from '@project/core';
 import { Button } from './Button';
 import {
   CardRailAction,
@@ -239,6 +239,16 @@ const opacityTransitionMs = (element: HTMLElement): number => {
  */
 export function CanvasCard(props: CanvasCardProps) {
   const { front, title, graphColor, entityActions, state, readOnly = false } = props;
+  /**
+   * What this Card is called wherever it is *named* rather than drawn.
+   *
+   * The Title's first line (ADR 0083). The visible heading below still draws
+   * the whole ladder — that is what the Card front is for — but every
+   * accessible name here is one line, because a screen reader announcing three
+   * lines as one control's name reads as a control with a paragraph for a name.
+   * A reader who wants the rest reads the heading.
+   */
+  const name = titleName(title);
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   /** The kinds that draw a Markdown document below their Title. */
@@ -309,7 +319,7 @@ export function CanvasCard(props: CanvasCardProps) {
   const card = (
     <Card
       role="article"
-      aria-label={title}
+      aria-label={name}
       className="canvas-card"
       data-testid="card"
       data-kind={visualKind}
@@ -342,7 +352,7 @@ export function CanvasCard(props: CanvasCardProps) {
           // nothing on another kind; opening and closing is every Card's, and
           // stays in the same place whatever kind it is drawn on.
           <CardRailActions
-            aria-label={`Card ${title}`}
+            aria-label={`Card ${name}`}
             className="canvas-card__actions"
             data-testid="canvas-card-actions"
           >
@@ -351,14 +361,14 @@ export function CanvasCard(props: CanvasCardProps) {
                 beginContentEdit !== undefined && (
                   <CardRailAction
                     ref={editControl}
-                    aria-label={`Edit Card ${title}`}
+                    aria-label={`Edit Card ${name}`}
                     onClick={beginContentEdit}
                   >
                     <EditIcon data-icon="inline-start" />
                   </CardRailAction>
                 )
               ) : (
-                <ContentEditActions title={title} edit={visibleContentEdit} />
+                <ContentEditActions name={name} edit={visibleContentEdit} />
               )}
             </CardRailKindActions>
             <CardRailSharedActions>
@@ -370,13 +380,13 @@ export function CanvasCard(props: CanvasCardProps) {
               {actionableEntityActions && (
                 <EntityActionsTrigger
                   groups={entityActions}
-                  label={`Actions for Card ${title}`}
+                  label={`Actions for Card ${name}`}
                   render={<CardRailAction />}
                 />
               )}
               {onOpenChange !== undefined && (
                 <CardRailAction
-                  aria-label={`${open ? 'Close' : 'Open'} Card ${title}`}
+                  aria-label={`${open ? 'Close' : 'Open'} Card ${name}`}
                   // Closing mid-edit would drop the Card's box out from under a
                   // live caret with a draft in it. The control keeps its slot and
                   // goes unavailable rather than disappearing: the rail's row does
@@ -419,7 +429,7 @@ export function CanvasCard(props: CanvasCardProps) {
             data-editable={onBeginTitleEdit !== undefined && visibleContentEdit === null}
             role="heading"
             aria-level={2}
-            aria-label={title}
+            aria-label={name}
           >
             {onBeginTitleEdit === undefined || visibleContentEdit !== null ? (
               <TitleLadder title={title} />
@@ -431,7 +441,7 @@ export function CanvasCard(props: CanvasCardProps) {
               <Button
                 variant="ghost"
                 className="canvas-card__title-control nodrag nopan"
-                aria-label={`Edit Title ${title}`}
+                aria-label={`Edit Title ${name}`}
                 onClick={(event) => {
                   event.stopPropagation();
                   onBeginTitleEdit();
@@ -464,7 +474,7 @@ export function CanvasCard(props: CanvasCardProps) {
           <CardContentEditProvider value={setContentEdit}>
             <MarkdownCardBody
               source={contentFront.source}
-              ariaLabel={`Markdown source of ${title}`}
+              ariaLabel={`Markdown source of ${name}`}
               {...markdownBodyProps}
             />
           </CardContentEditProvider>
@@ -646,7 +656,8 @@ function SpaceCardSelector({
 }
 
 interface ContentEditActionsProps {
-  readonly title: string;
+  /** The Card's name, which is what an accessible name says (ADR 0083). */
+  readonly name: string;
   readonly edit: CardContentEdit;
 }
 
@@ -666,12 +677,12 @@ interface ContentEditActionsProps {
  * focus leaving the writing surface, mid-edit and for a control that may well
  * be Cancel.
  */
-function ContentEditActions({ title, edit }: ContentEditActionsProps) {
+function ContentEditActions({ name, edit }: ContentEditActionsProps) {
   return (
     <>
       <CardRailAction
         holdFocus
-        aria-label={`Save Card ${title}`}
+        aria-label={`Save Card ${name}`}
         aria-keyshortcuts="Meta+Enter Control+Enter"
         onClick={edit.onSave}
       >
@@ -679,7 +690,7 @@ function ContentEditActions({ title, edit }: ContentEditActionsProps) {
       </CardRailAction>
       <CardRailAction
         holdFocus
-        aria-label={`Cancel editing Card ${title}`}
+        aria-label={`Cancel editing Card ${name}`}
         aria-keyshortcuts="Escape"
         onClick={edit.onCancel}
       >

@@ -20,7 +20,7 @@ import {
   type OnReconnect,
 } from '@xyflow/react';
 import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
-import { uuidSchema } from '@project/core';
+import { titleName, uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { CardChoice } from '@project/ui';
 import { describeAuthoringRefusal } from './authoring-refusal';
@@ -478,8 +478,10 @@ export function useEdgeAuthoring({
     });
   }, []);
 
+  // Names rather than Titles: these are read into an Edge's accessible name
+  // below, and a name is one line (ADR 0083).
   const cardTitles = useMemo(
-    () => new Map(placedCards.map((card) => [card.id, card.title])),
+    () => new Map(placedCards.map((card) => [card.id, titleName(card.title)])),
     [placedCards],
   );
   const graphTitles = useMemo(

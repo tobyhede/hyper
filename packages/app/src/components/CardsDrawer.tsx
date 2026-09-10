@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react';
-import type { Card, CardId, UUID } from '@project/core';
+import { titleName, type Card, type CardId, type UUID } from '@project/core';
 import {
   Button,
   Alert,
@@ -153,9 +153,13 @@ export function CardsDrawer({
               .toLocaleLowerCase()
               .includes(query.trim().toLocaleLowerCase()),
         )
+        // Ordered by name, which is the string the reader is scanning down
+        // (ADR 0083): a Card's later Title Lines would sort it by prose nobody
+        // is reading in this list.
         .sort(
           (left, right) =>
-            left.card.title.localeCompare(right.card.title) || left.index - right.index,
+            titleName(left.card.title).localeCompare(titleName(right.card.title)) ||
+            left.index - right.index,
         )
         .map(({ card }) => card),
     [titleById, spaceTitles, cards, kind, query],
@@ -283,8 +287,12 @@ export function CardsDrawer({
                         setRefusal(onAdd(card, event.detail === 0 ? 'keyboard' : 'pointer'))
                       }
                       className="block rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      aria-label={`Add ${card.title} to Layout`}
+                      aria-label={`Add ${titleName(card.title)} to Layout`}
                     >
+                      {/* The whole Title, because this *is* a Card front and
+                          the front is the one surface that draws the ladder —
+                          Open, Closed, and here (ADR 0083). The row around it
+                          is what names the Card, and that says the name. */}
                       <CanvasCard
                         front={frontOf(card)}
                         title={card.title}

@@ -1014,7 +1014,9 @@ describe('the Layout an Open Space Card draws', () => {
         {
           id: GONE_A_CARD_ID,
           document: {
-            title: 'First gone',
+            // Two Title Lines, so the sentence below is read for the name
+            // it names the Card by rather than for the whole Title (ADR 0083).
+            title: 'First gone\nA Space that left',
             kind: 'space',
             spaceId: GONE_A_ID,
             layout: GONE_LAYOUT_ID,
@@ -1066,7 +1068,11 @@ describe('the Layout an Open Space Card draws', () => {
     });
     const initial = await spaces.open(HOME_ID);
     render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
-    expect((await screen.findByText(new RegExp(GONE_A_ID))).textContent).toContain('First gone');
+    const first = await screen.findByText(new RegExp(GONE_A_ID));
+    expect(first.textContent).toContain('First gone:');
+    // The Card's name and no more of its Title: this is one sentence, and a
+    // line break inside it would draw as a broken-looking label.
+    expect(first.textContent).not.toContain('A Space that left');
     expect((await screen.findByText(new RegExp(GONE_B_ID))).textContent).toContain('Second gone');
 
     act(() => {
