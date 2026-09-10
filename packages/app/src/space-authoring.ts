@@ -495,21 +495,24 @@ const freeAnchor = (placement: Placement, anchor: LayoutPosition): LayoutPositio
 type Extent = { readonly width: number; readonly height: number };
 
 /**
- * The room a Card's neighbours gain when its rect goes from one size to
+ * The room a Card's neighbours gain when its rect goes from one Open Size to
  * another: the difference between the two growths, per axis (ADR 0084).
  *
- * Negative on an axis the Card shrank on, which is legitimate. It is the whole
- * of a shrinking Resize, and it is also the whole of Close — the collapsed
- * rect's growth is zero, so closing is simply the move to it. That is why Close
- * and the magnetic snap (ADR 0066) share one code path below rather than each
- * stating the rule: a second copy is exactly where a snapped Close comes to
- * reclaim the collapsed proposal's zero growth instead of the growth of the
- * size the Card was actually Open at.
+ * Resize's alone. Close hands its whole growth back rather than a difference,
+ * and says so in one place — `Placement.reclaim` — which is where a Card that
+ * leaves a Layout and a Card deleted from the Space say it too.
  *
- * The nonnegative bound `Placement.growth` documents is about the Open/Close
- * pair, not about this difference. Every negative room produced here reverses
- * part of a growth a previous Edit already applied, so the Cards it reclaims
- * from are still beyond the subject when it runs.
+ * Negative on an axis the Card shrank on, which is legitimate and is the whole
+ * of a shrinking Resize. It is **not** the involution the Open/Close pair is,
+ * and the bound `Placement.growth` documents does not extend to it: a negative
+ * room reverses a growth only for the Cards that growth was applied to, and a
+ * Card the author placed beyond the subject *after* the Open was never one of
+ * them. Such a Card can be carried back across the subject — subject Open at
+ * `x = 0`, a Card dropped at `x = 1`, a shrink of 200 — and growing back skips
+ * it as no longer beyond, so it keeps the 200. That is the same memorylessness
+ * ADR 0084 chose for Close, which reclaims from every Card currently beyond the
+ * closing Card including the ones the author moved there; remembering which
+ * Cards a growth actually pushed is the per-Card history the ADR rejected.
  */
 const roomBetween = (from: Extent, to: Extent): Extent => {
   const before = Placement.growth(from);
@@ -539,29 +542,34 @@ const withRoomFor = (
 ): Placement => Placement.displace(Placement.place(placement, cardId, at), cardId, room);
 
 /**
- * The placement after a Card Closes: Closed on its own entry, and the whole
- * growth of the size it was Open at given back to every Card beyond it.
+ * The placement after a Card Closes: Closed on its own entry, and the room it
+ * held given back by `Placement.reclaim`.
  *
  * Both ways a Card closes end here — the Close completion, and a resize
- * proposal the magnet has taken to the collapsed size (ADR 0066) — so the rule
- * has one statement. The remembered Open Size rides through untouched
- * (ADR 0066), which is what makes the next Open apply exactly what this gives
- * back.
+ * proposal the magnet has taken to the collapsed size (ADR 0066) — so this
+ * Layout's two Close gestures reach the shared rule through one line rather
+ * than each restating it. That matters most for the magnetic one, which is
+ * where a restatement would reclaim the collapsed proposal's zero growth
+ * instead of the growth of the size the Card was actually Open at.
+ *
+ * The reclaim runs first and the Closed entry is written over the result,
+ * because `Placement.reclaim` reads the Open Size off the entry it is given and
+ * a Closed entry no longer holds any room. The coordinates do not depend on the
+ * order — `displace` moves every Card against the subject's own `x`/`y`, and
+ * neither step moves the subject — so this is about what each step can still
+ * see, not about where anything lands. The remembered Open Size rides through
+ * untouched (ADR 0066), which is what makes the next Open apply exactly what
+ * this gives back.
  */
 const closedCard = (
   placement: Placement,
   cardId: CardId,
   at: Extract<CardPlacement, { readonly open: true }>,
 ): Placement =>
-  withRoomFor(
-    placement,
-    cardId,
-    { ...at, open: false },
-    roomBetween(at.openSize, COLLAPSED_CARD_SIZE),
-  );
+  Placement.place(Placement.reclaim(placement, cardId), cardId, { ...at, open: false });
 
 /**
- * The placement after a Card leaves the Layout, with the room it held given
+ * The placement after a Card leaves this Layout, with the room it held given
  * back.
  *
  * Leaving is a Close the Card does not come back from, so it reclaims exactly
@@ -572,23 +580,19 @@ const closedCard = (
  * leaves a hole with nothing on the canvas left to explain it and no Edit that
  * can give it back.
  *
- * The reclaim runs **before** the removal, because `Placement.displace` answers
- * the placement unchanged for a subject the map does not hold — after
- * `Placement.remove` there is no subject left to compare the neighbours
- * against.
+ * The reclaim runs **before** the removal, because `Placement.reclaim` reads
+ * the Card's own entry — after `Placement.remove` there is neither an Open Size
+ * to read nor a subject to compare the neighbours against.
  *
- * Both ways a Card leaves end here, the way both ways it closes end at
- * `closedCard`: `removed-card-from-layout`, and the deletion applied with the
- * other membership changes below.
+ * Two of the three ways a Card leaves end here — `removed-card-from-layout`,
+ * and the deletion applied with the other membership changes below — and both
+ * of those write *this* Layout. The third is the same deletion cascading into
+ * every other Layout, which no single-Layout write can reach;
+ * `withCardRemovedFromLayouts` performs it, and reaches the same rule through
+ * `Placement.reclaim` rather than through this function.
  */
-const removedCard = (placement: Placement, cardId: CardId): Placement => {
-  const at = placement.get(cardId);
-  const reclaimed =
-    at?.open === true
-      ? Placement.displace(placement, cardId, roomBetween(at.openSize, COLLAPSED_CARD_SIZE))
-      : placement;
-  return Placement.remove(reclaimed, cardId);
-};
+const removedCard = (placement: Placement, cardId: CardId): Placement =>
+  Placement.remove(Placement.reclaim(placement, cardId), cardId);
 
 /** Two Edges are the same Edge when they join the same Cards the same way (ADR 0032). */
 const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>

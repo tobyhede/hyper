@@ -360,8 +360,8 @@ const NUDGE = 2;
  * the defect ADR 0084 removes moved a neighbour as the dragged Card crossed its
  * origin and moved it back before release, so a test that reads only the before
  * and after sees a gesture that did nothing. The callback runs after the first
- * move, so the Card is already past the halfway point of the delta — a crossing
- * a caller wants observed belongs in the first half of the drag.
+ * move, which lands on exactly the halfway point of the delta — a crossing a
+ * caller wants observed belongs strictly before that halfway mark.
  */
 export async function dragBy(
   page: Page,

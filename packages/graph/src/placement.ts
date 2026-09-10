@@ -323,16 +323,30 @@ function growth(openSize: Extent): Extent {
  * `g`. The bound is load-bearing rather than a convenience. Applying a negative
  * growth *first* can carry a Card back across the subject, and the negation then
  * skips it as no longer beyond — subject at `x = 0`, neighbour at `x = 1`,
- * `growth.width = -2`. That is unreachable in the product: `growth` above floors
- * Open's at zero, and Close only ever negates a growth already applied, so every
- * Card Close must reclaim from is still beyond the subject when it runs. The
- * asymmetry is therefore stated rather than repaired — clamping it, or
- * remembering which Cards a particular Open pushed, is the per-Card history
- * ADR 0084 rejected for making two identical Layouts behave differently.
+ * `growth.width = -2`. `growth` above floors Open's at zero, so no Open reaches
+ * it — but Close and a shrinking Resize both apply a negative growth, and the
+ * Cards they reach are whichever ones are beyond the subject *now*, not the
+ * ones the Open pushed. A Card the author dropped inside an Open Card's rect is
+ * beyond it and was never displaced by it, so closing carries that Card back
+ * across the subject and the reopen leaves it there. The asymmetry is therefore
+ * stated rather than repaired — clamping it, or remembering which Cards a
+ * particular Open pushed, is the per-Card history ADR 0084 rejected for making
+ * two identical Layouts behave differently.
+ *
+ * The same memorylessness read from the subject's side: a subject the author
+ * has dragged past the neighbours its own Open displaced finds nobody beyond it
+ * and gives nothing back, so that room stays where it is and a further
+ * Open/drag/Close cycle adds more. ADR 0084 states this face for a moved
+ * *neighbour*; it is one rule, and the subject is not exempt from it, because
+ * this compares against wherever the subject now sits rather than wherever it
+ * was when it Opened.
  *
  * Open/Closed state and the remembered Open Size ride through untouched; only
- * `x` and `y` move (ADR 0066). Answers the placement it was given when the
- * subject is not a member or the growth is zero on both axes — like `remove`,
+ * `x` and `y` move (ADR 0066). Answers the placement it was given whenever no
+ * Card actually moves — a subject the map does not hold, a growth that is zero
+ * on both axes, and the case neither of those catches: a nonzero growth with
+ * nothing beyond the subject on either axis, which `reclaim` reaches for a
+ * subject the author dragged past its own displaced neighbours. Like `remove`,
  * so an Edit that moves nothing keeps the placement's identity and a settled
  * graph is not laid out again.
  */
@@ -342,12 +356,43 @@ function displace(placement: Placement, subjectId: CardId, growth: Extent): Plac
   if (growth.width === 0 && growth.height === 0) return placement;
 
   const displaced = new Map<CardId, CardPlacement>();
+  let moved = false;
   for (const [cardId, at] of placement) {
     const x = at.x > subject.x ? at.x + growth.width : at.x;
     const y = at.y > subject.y ? at.y + growth.height : at.y;
+    if (x !== at.x || y !== at.y) moved = true;
     displaced.set(cardId, point({ ...at, x, y }));
   }
-  return brand(displaced);
+  return moved ? brand(displaced) : placement;
+}
+
+/**
+ * The placement with the room an Open Card holds given back to every Card
+ * beyond it, the Card's own entry left exactly as it was.
+ *
+ * The displacement half of every way an Open Card stops holding its room, and
+ * the one statement of it (ADR 0084). A Card closes, leaves a Layout, or is
+ * deleted from the Space, and all three owe the same negation of the growth of
+ * the size it is Open at — the size read off its own entry, not off whatever
+ * rect the gesture is proposing. That is why this is a member here beside
+ * `growth` and `displace` rather than a line each caller writes: the third
+ * caller is how a Card deleted from a Layout the Edit was not drawing came to
+ * strand its room permanently, and a rule with three owners has none.
+ *
+ * Answers the placement it was given for a Card that is Closed or not a member,
+ * neither of which holds any room. A Closed Card's remembered Open Size is not
+ * room it holds — nothing was displaced for it — so it is deliberately not read
+ * here (ADR 0066).
+ *
+ * Separate from `remove` rather than folded into it, because removing a key is
+ * also how a placement is reconciled against a Layout that has already
+ * reclaimed, and reclaiming there would give the room back twice.
+ */
+function reclaim(placement: Placement, cardId: CardId): Placement {
+  const at = placement.get(cardId);
+  if (at?.open !== true) return placement;
+  const held = growth(at.openSize);
+  return displace(placement, cardId, { width: -held.width, height: -held.height });
 }
 
 export const Placement = {
@@ -358,6 +403,7 @@ export const Placement = {
   equals,
   growth,
   displace,
+  reclaim,
   next,
   place,
   remove,

@@ -242,3 +242,41 @@ it('cascades a deleted Card out of every Layout that held it', () => {
 it('answers the snapshot it was given when no Layout held the Card', () => {
   expect(withCardRemovedFromLayouts(snapshot, UNHELD_CARD)).toBe(snapshot);
 });
+
+/**
+ * The cascade half of Delete Card from Space owes the reclaim the single-Layout
+ * half owes (ADR 0084). Under the derivation ADR 0084 removed, dropping a
+ * Card's entry dropped its displacement with it; now the room an Open Card
+ * holds is written into its neighbours' own coordinates, so a Layout the Edit
+ * is not drawing would keep that room forever — with no Card left on that
+ * canvas to Close and no Edit that could give it back.
+ */
+it('reclaims the room an Open Card held in every Layout it is deleted from', () => {
+  // CARD_A is Open at 800x600 in the second Layout, so its growth of 540x454
+  // is already written into CARD_B's coordinates there: (100, 100) + (540, 454).
+  const withLayouts = spaceSnapshotSchema.parse({
+    ...snapshot,
+    document: {
+      ...snapshot.document,
+      layouts: [
+        ...(snapshot.document.layouts ?? []),
+        {
+          id: OTHER_LAYOUT_ID,
+          title: 'Other',
+          kind: 'positioned',
+          positions: {
+            [CARD_A]: { x: 0, y: 0, open: true, openSize: { width: 800, height: 600 } },
+            [CARD_B]: { x: 640, y: 554, open: false },
+          },
+          graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
+        },
+      ],
+    },
+  });
+
+  const changed = withCardRemovedFromLayouts(withLayouts, CARD_A);
+
+  expect(changed.document.layouts?.[1]?.positions).toEqual({
+    [CARD_B]: { x: 100, y: 100, open: false },
+  });
+});
