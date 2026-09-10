@@ -16,12 +16,19 @@ import {
   Button,
   PersistenceIndicator,
 } from '@project/ui';
-import { describeAggregateRefusal } from '../authoring-refusal';
+import {
+  describeAggregateRefusal,
+  describeConflictRecovery,
+  describePersistenceFailure,
+  describeStoredSpaceRefusal,
+  type ConflictRecovery,
+} from '../authoring-refusal';
+import type { StoredSpaceRefusal } from '../space-authoring';
 
 export interface PersistenceControlProps {
   readonly active?: boolean;
   readonly persistence: SpaceSessionState['persistence'];
-  readonly onAcceptRemote: () => string | null;
+  readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
 }
 
@@ -29,37 +36,13 @@ type Persistence = SpaceSessionState['persistence'];
 type Rejection = Extract<Persistence, { kind: 'rejected' }>;
 type Conflict = Extract<Persistence, { kind: 'conflicted' }>;
 
-/**
- * What accepting the stored side would do here, which is not one thing.
- *
- * `reload` is the ordinary case: the repository answered with a newer Space.
- * `revert` is a participant the conflict never named — the coordinated edit did
- * not commit, so what is stored for this Space is the baseline it held before
- * the edit, and accepting it discards the edit's effect here. `none` is the
- * Space with no stored snapshot. Accepting the stored side still coordinates
- * recovery across every participant, while keeping local work re-commits this
- * Space as a create.
- */
-type ConflictRecovery = 'reload' | 'revert' | 'none';
-
 const conflictRecovery = ({ current, baseline }: Conflict): ConflictRecovery =>
   current !== undefined ? 'reload' : baseline !== undefined ? 'revert' : 'none';
 
-const CONFLICT_DESCRIPTIONS = {
-  reload:
-    'A newer version of this space is available. Reload discards your local changes; keeping your local version tries to save it again.',
-  revert:
-    'A related space changed while this coordinated edit was saving. Reload returns this space to how it was before the edit; keeping your local version tries to save it again.',
-  none: 'There is no stored version of this space. Keep your local version to restore it.',
-} satisfies Record<ConflictRecovery, string>;
-
 const rejectionDescription = ({ failure }: Rejection): string =>
-  failure.kind === 'aggregate-refused' ? describeAggregateRefusal(failure.errors) : failure.message;
-
-const rejectionIdentity = ({ failure }: Rejection): string =>
   failure.kind === 'aggregate-refused'
-    ? JSON.stringify(failure.errors)
-    : `${failure.code}:${failure.message}`;
+    ? describeAggregateRefusal(failure.errors)
+    : describePersistenceFailure(failure);
 
 /**
  * Production persistence feedback and recovery at the application boundary.
@@ -76,20 +59,41 @@ export function PersistenceControl({
   onAcceptRemote,
   onKeepLocal,
 }: PersistenceControlProps) {
+  const rejection = persistence.kind === 'rejected' ? persistence : null;
+  /*
+   * The acknowledgement lives here rather than in `RejectionControl` because
+   * `active` is what Open Spaces moves, and a dismissal is spent by the
+   * next failure rather than by looking away. Every managed Space stays mounted
+   * (`OpenSpacesApplication.tsx`), so this component survives the switch that
+   * unmounts everything it returns.
+   */
+  const [acknowledged, setAcknowledged] = useState<Rejection['failure'] | null>(null);
+  // Derived from a prop during render rather than in an effect, the way
+  // `PersistenceIndicator`'s own cue is: the dialog is right on the first
+  // render of a new failure instead of flashing dismissed and correcting.
+  if (acknowledged !== null && acknowledged !== rejection?.failure) setAcknowledged(null);
+
   if (!active) return null;
   if (persistence.kind === 'conflicted') {
     return (
       <ConflictControl
-        key={persistence.current?.revision.toString() ?? 'coordinated'}
-        recovery={conflictRecovery(persistence)}
+        conflict={persistence}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={onKeepLocal}
       />
     );
   }
 
-  if (persistence.kind === 'rejected') {
-    return <RejectionControl key={rejectionIdentity(persistence)} persistence={persistence} />;
+  if (rejection !== null) {
+    if (acknowledged !== null) return <PersistenceIndicator state="rejected" />;
+    return (
+      <RejectionControl
+        persistence={rejection}
+        onAcknowledge={() => {
+          setAcknowledged(rejection.failure);
+        }}
+      />
+    );
   }
 
   return <PersistenceIndicator state={persistence.kind} />;
@@ -120,7 +124,7 @@ export function PersistenceNotice({ persistence, onRetry }: PersistenceNoticePro
     <Alert variant="destructive" data-testid="persistence-failure">
       <AlertIcon />
       <AlertTitle>Changes not saved</AlertTitle>
-      <AlertDescription>{persistence.failure.message}</AlertDescription>
+      <AlertDescription>{describePersistenceFailure(persistence.failure)}</AlertDescription>
       <AlertAction>
         <Button
           variant="secondary"
@@ -135,16 +139,34 @@ export function PersistenceNotice({ persistence, onRetry }: PersistenceNoticePro
   );
 }
 
+/**
+ * A refusal belongs to the conflict that raised it.
+ *
+ * The conflict object the session published is what separates two, for the same
+ * reason it separates two rejections above: a coordinated conflict carries no
+ * stored revision to key on, so two of them are equal by value, and the
+ * coordinated path installs its states without notifying (`session.ts`) — the
+ * render that would otherwise unmount this control between them is not
+ * guaranteed to happen. Keyed on a revision, both were `'coordinated'` and the
+ * first refusal stayed on screen over the second conflict.
+ */
 function ConflictControl({
-  recovery,
+  conflict,
   onAcceptRemote,
   onKeepLocal,
 }: {
-  readonly recovery: ConflictRecovery;
-  readonly onAcceptRemote: () => string | null;
+  readonly conflict: Conflict;
+  readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
 }) {
-  const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
+  const recovery = conflictRecovery(conflict);
+  const [refused, setRefused] = useState<{
+    readonly conflict: Conflict;
+    readonly refusal: StoredSpaceRefusal;
+  } | null>(null);
+
+  if (refused !== null && refused.conflict !== conflict) setRefused(null);
+  const remoteRefusal = refused !== null && refused.conflict === conflict ? refused.refusal : null;
 
   return (
     // A conflict has no safe dismissal: the revision conflict doesn't resolve
@@ -156,19 +178,22 @@ function ConflictControl({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Changes conflict</AlertDialogTitle>
-          <AlertDialogDescription>{CONFLICT_DESCRIPTIONS[recovery]}</AlertDialogDescription>
+          <AlertDialogDescription>{describeConflictRecovery(recovery)}</AlertDialogDescription>
         </AlertDialogHeader>
         {remoteRefusal === null ? null : (
           <Alert variant="destructive" data-testid="persistence-remote-refused">
             <AlertTitle>Unable to reload</AlertTitle>
-            <AlertDescription>{remoteRefusal}</AlertDescription>
+            <AlertDescription>{describeStoredSpaceRefusal(remoteRefusal)}</AlertDescription>
           </Alert>
         )}
         <AlertDialogFooter>
           <Button
             variant="secondary"
             data-testid="persistence-accept-remote"
-            onClick={() => setRemoteRefusal(onAcceptRemote())}
+            onClick={() => {
+              const refusal = onAcceptRemote();
+              setRefused(refusal === null ? null : { conflict, refusal });
+            }}
           >
             Reload
           </Button>
@@ -181,13 +206,48 @@ function ConflictControl({
   );
 }
 
-function RejectionControl({ persistence }: { readonly persistence: Rejection }) {
-  const [open, setOpen] = useState(true);
-
-  if (!open) return <PersistenceIndicator state="rejected" />;
-
+/**
+ * Two rejections of one code are two rejections.
+ *
+ * Dismissing this dialog acknowledges the failure in front of the author, not
+ * every failure after it, so the next one draws again. What separates two is
+ * that they are different publications rather than anything they say: the
+ * transport's `message` is unread now (ADR 0057), so two `invalid-commit`
+ * rejections are equal by value and a key derived from the failure cannot tell
+ * them apart. The acknowledgement therefore records *which failure* was
+ * dismissed and is spent the moment the session hands over another.
+ *
+ * That makes a fresh failure per publication load-bearing rather than
+ * incidental, so it is pinned where it is produced rather than assumed here:
+ * `http-backend.test.ts`'s 'mints a distinct failure for each rejected commit'.
+ * A sequence number would have to be minted by the session and carried on
+ * `SpaceSessionState`, which is a persistence contract widened to hold one
+ * component's bookkeeping.
+ *
+ * This is not a remount, deliberately. The control used to rely on being
+ * unmounted between rejections by the `pending` state in between, and the
+ * coordinated path does not guarantee one: `prepareCoordinatedCommit` installs
+ * `pending` without notifying (`session.ts`), so the render that resets local
+ * state may never happen.
+ *
+ * The acknowledgement itself is `PersistenceControl`'s, one level up, because
+ * that is the component Open Spaces leaves mounted — see the note
+ * beside it.
+ */
+function RejectionControl({
+  persistence,
+  onAcknowledge,
+}: {
+  readonly persistence: Rejection;
+  readonly onAcknowledge: () => void;
+}) {
   return (
-    <AlertDialog open onOpenChange={setOpen}>
+    <AlertDialog
+      open
+      onOpenChange={(next: boolean) => {
+        if (!next) onAcknowledge();
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Changes couldn’t be saved</AlertDialogTitle>

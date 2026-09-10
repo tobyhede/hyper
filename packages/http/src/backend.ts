@@ -21,15 +21,6 @@ import { hc } from 'hono/client';
 import type { SpaceHttpApp } from './index';
 import { hasValidUniqueMediaTypeParameters } from './media-type';
 
-/**
- * What a network failure says when the thrown value carries no message.
- *
- * Named rather than inline so a story can draw this state without transcribing
- * a sentence the application would have to keep matching by hand — ADR 0052
- * parity is derived, not promised in a comment.
- */
-export const NETWORK_FAILURE_MESSAGE = 'Network request failed';
-
 type SpaceHttpClient = ReturnType<typeof hc<SpaceHttpApp>>;
 
 const protocolFailure = (message: string): CommitResult => ({
@@ -155,7 +146,9 @@ export class HttpSpaceBackend implements SpaceBackend {
       return {
         kind: 'retryable-failure',
         code: 'network',
-        message: error instanceof Error ? error.message : NETWORK_FAILURE_MESSAGE,
+        // Inline: the sentence the author reads comes from the code, so this
+        // field is a diagnostic and there is no display constant to name.
+        message: error instanceof Error ? error.message : 'Network request failed',
       };
     }
   }
@@ -209,10 +202,11 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
       // A 422 carrying `invalid-snapshot` cannot reach this exhaustive mapping:
       // commit/decodeCommitRefusal rejects a problem whose code mismatches its status.
       return { kind: 'permanent-failure', code: 'invalid-commit', message: problem.detail };
+    case 'payload-too-large':
+      return { kind: 'permanent-failure', code: 'payload-too-large', message: problem.detail };
     case 'not-found':
     case 'invalid-space-id':
     case 'unsupported-media-type':
-    case 'payload-too-large':
     case 'method-not-allowed':
       return protocolFailure(problem.detail);
   }

@@ -655,9 +655,7 @@ describe('Open Spaces', () => {
 
     // Keeping local work is this one's recovery — it re-commits as a create —
     // so accepting answers with the reason and changes nothing.
-    expect(other.app.authoring.acceptStoredSpace()).toBe(
-      'This Space was deleted while the coordinated edit was saving. Keep your local version to restore it.',
-    );
+    expect(other.app.authoring.acceptStoredSpace()).toEqual({ code: 'stored-space-deleted' });
     expect(other.app.authoring.getState().replacementEpoch).toBe(before.replacementEpoch);
     expect(other.session.getState().persistence.kind).toBe('conflicted');
   });

@@ -23,8 +23,11 @@ notice, `FieldError` for correctable input, and the screen-fixed
 `.canvas-refusal` sentence for the one case with no surface left to attach to.
 `docs/agents/authoring-refusal-cascade.md` caches the whole cascade.
 
-**Persistence is not the pattern-setter. It is the one surface that departs from
-it**, in three ways:
+**Persistence is not the pattern-setter. It was the one surface that departed
+from it**, in the three ways below. All three are closed — `issues/01` landed
+on 2026-09-10 — and the findings are kept in the present tense they were
+written in, because they are the record of what was wrong rather than a
+description of the tree. Read `issues/01` for what it left behind.
 
 1. It keeps its own copy tables. `AGGREGATE_REFUSAL_REASONS`
    (`PersistenceControl.tsx:69`) and `CONFLICT_DESCRIPTIONS` (`:47`) do
@@ -42,10 +45,19 @@ it**, in three ways:
    Authoring* (`space-authoring.ts:1418`, `:1422`) — prose crossing the seam
    ADR 0057 is about.
 
-So extracting persistence as the template would propagate the violation. The
-work is the other direction: bring persistence onto the pattern the rest of the
-application already follows, then close the two places the pattern is a
-convention rather than a mechanism.
+So extracting persistence as the template would have propagated the violation.
+The work was the other direction: bring persistence onto the pattern the rest of
+the application already follows, then close the two places the pattern is a
+convention rather than a mechanism. The first half is done; `02` and `03` are
+the two places.
+
+Writing the copy also exposed something none of the three departures named. A
+sentence per code is only right where the code names one condition, and
+`protocol` did not: it carried `payload-too-large` alongside the format
+disagreements, and that one is actionable. `01` split it. The general lesson is
+worth keeping for `02` and `03` — **writing an identity's sentence is how you
+find out the identity is a bucket**, and a bucket is a spec question rather
+than a copy one.
 
 ## Settled — do not re-litigate
 
@@ -66,7 +78,7 @@ convention rather than a mechanism.
 ## The three changes
 
 1. `issues/01` — bring persistence onto the refusal pattern: copy tables for
-   the seven transport codes, no `problem.detail` on screen, codes rather than
+   the eight transport codes, no `problem.detail` on screen, codes rather than
    sentences out of `acceptStoredSpace`.
 2. `issues/02` — every surface receives the identity, not the sentence. Four
    call sites take a pre-described `string` today — `01` owns the fifth — and
@@ -98,15 +110,20 @@ not go looking for a dependency that was removed.
 
 ## One documentation defect found on the way
 
-ADR 0057's status block says `Build status: not built`; `docs/agents/ui.md` says
-the same decision is "built through Authoring, UI and HTTP". One of the two is
-stale. Correcting it belongs with `01`, which is the change that makes the
-"built" reading true.
+ADR 0057's status block said `Build status: not built` while `docs/agents/ui.md`
+said the same decision was "built through Authoring, UI and HTTP". `01` closed
+it: the tree now matches ui.md's claim, including its "UI code does not branch
+on wire prose", so the ADR's line was the stale one and now reads `built`.
 
 ## Status
 
-- `01` — `ready-for-agent`. No open questions.
-- `02` — `ready-for-agent`, blocked by nothing. `01` owns the `acceptStoredSpace`
-  arm, which `02` does not touch, so either may land first.
+- `01` — **landed 2026-09-10** on `feat/persistence-refusal-copy` (PR 177), with
+  two residues recorded in the ticket and in ADR 0057's status block:
+  `CommitResult`'s now-unread `message` field, whose deletion waits on
+  `command-dock/07`, and the Space id that field alone carries for `session.ts`'s
+  two synthesised `protocol` failures.
+- `02` — `ready-for-agent`, blocked by nothing. `01` owned the
+  `acceptStoredSpace` arm and has retired it, so the four call sites `02` names
+  are now the whole of what remains.
 - `03` — `ready-for-agent` as of 2026-09-04; its title-voice decision is taken
   and recorded in the ticket.

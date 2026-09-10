@@ -26,7 +26,7 @@ import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { createContinuation, renameReturn } from '#src/continuation';
 import { spaceEntityActions } from '#src/entity-actions';
 import { createWorkingSpaceReader, snapshotFromSpace } from '#src/snapshot';
-import { createSpaceAuthoring } from '#src/space-authoring';
+import { createSpaceAuthoring, type StoredSpaceRefusal } from '#src/space-authoring';
 import { ChromeContinuation } from '#components/ChromeContinuation';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import {
@@ -63,7 +63,7 @@ export interface SpaceSidebarFixtureProps {
   readonly persistence?: SpaceSessionState['persistence'];
   readonly presenting?: boolean;
   readonly authoringDisabled?: boolean;
-  readonly remoteRefusal?: string | null;
+  readonly remoteRefusal?: StoredSpaceRefusal | null;
   readonly acknowledgedRevision?: bigint;
   readonly onRetry?: () => void;
   /** Real AppShell canvas content supplied by a story-specific fixture. */

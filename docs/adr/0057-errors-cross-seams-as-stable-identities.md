@@ -4,7 +4,23 @@ Status: accepted
 Refines: 0042
 Refined by: 0068
 Related: 0030, 0048, 0056
-Build status: not built
+Build status: built
+
+Persistence was the one surface that departed from this decision and now
+follows it: the eight `retryable-failure` and `permanent-failure` codes have
+application-owned copy, `problem.detail` no longer reaches any screen, the
+conflict sentences left the component that drew them, and `acceptStoredSpace`
+answers a `StoredSpaceRefusal` rather than English.
+
+Two residues are tracked in `.scratch/error-feedback-pattern/issues/01`, which
+records both. `CommitResult`'s two failure arms still carry a `message` field
+that nothing now reads — not a surface, not a log — so it is dead rather than
+diagnostic; deleting it touches roughly fifty construction sites and waits on
+`command-dock/07`, which is rewriting several of them. With it unread, the two
+broken-invariant paths that synthesise a `protocol` failure carry the offending
+Space id in that message and nowhere else, so that id currently reaches nobody.
+Neither is a regression this decision introduced — both are what finishing it
+exposed.
 
 An expected failure has a stable machine identity and typed context at every
 interface it crosses. Space Authoring's `refused` result therefore carries a

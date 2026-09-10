@@ -1,7 +1,6 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
 import { uuidSchema, type Card } from '@project/core';
-import { NETWORK_FAILURE_MESSAGE } from '@project/http';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { CardsDrawer } from '#components/CardsDrawer';
 import { PersistenceNotice } from '#components/PersistenceControl';
@@ -146,10 +145,10 @@ export const PersistenceFailure: Story = () => (
           failure: {
             kind: 'retryable-failure',
             code: 'network',
-            // The message production emits, imported rather than transcribed:
-            // `PersistenceNotice` renders `failure.message` verbatim, so a
-            // sentence invented here would prove nothing about the app.
-            message: NETWORK_FAILURE_MESSAGE,
+            // Deliberately the transport's own voice. `PersistenceNotice`
+            // describes the code, so what this story proves is that this
+            // sentence is the one the author does *not* read (ADR 0057).
+            message: 'Failed to fetch',
           },
         }}
         onRetry={() => undefined}

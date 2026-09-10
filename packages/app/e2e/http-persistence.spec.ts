@@ -181,7 +181,11 @@ test(
     await dragBy(page, card, 0, 180);
 
     const rejection = page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' });
-    await expect(rejection).toContainText('Permission denied');
+    // The application's sentence for `forbidden`, not the server's `detail`.
+    // This is the whole rule end to end: a real 403 carrying real problem
+    // prose, and none of that prose on the screen (ADR 0057).
+    await expect(rejection).toContainText('You do not have permission to save this space.');
+    await expect(rejection).not.toContainText('Permission denied');
     await rejection.getByRole('button', { name: 'Continue editing' }).click();
     await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
     await expect(card).toBeVisible();

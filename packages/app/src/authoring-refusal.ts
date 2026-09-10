@@ -1,5 +1,6 @@
-import type { SpaceAggregateError } from '@project/graph';
-import type { AuthoringRefusal, EdgeEndpoint } from './space-authoring';
+import type { SpaceAggregateError, SpaceError } from '@project/graph';
+import type { SpaceSessionState } from '@project/persistence';
+import type { AuthoringRefusal, EdgeEndpoint, StoredSpaceRefusal } from './space-authoring';
 import type { SpaceCardLifecycleResult } from './space-card-lifecycle';
 import { failureMessage } from './failure-message';
 
@@ -282,6 +283,147 @@ const AGGREGATE_REFUSAL_REASONS = {
  */
 export const describeAggregateRefusal = (errors: readonly SpaceAggregateError[]): string =>
   [...new Set(errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ');
+
+/**
+ * The sentence, without the detail that only some intake errors can supply.
+ */
+const STORED_SPACE_INVALID = 'The remote space is invalid and was not accepted.';
+
+/**
+ * How many references the sentence recites before counting the rest.
+ *
+ * The alert announces what it contains, so the recital is a handle for a bug
+ * report rather than an inventory: three ids identify the failure, and thirty
+ * read aloud is the illegibility the aggregate table is written to avoid,
+ * arriving by another route.
+ */
+const STORED_SPACE_REFS_RECITED = 3;
+
+/**
+ * What the application can name about one intake error: the id that failed to
+ * resolve, the card file that would not parse, or nothing.
+ *
+ * Never `error.message`. Intake writes those for a CLI and a log, in
+ * `@project/graph`'s vocabulary, and a sentence the application did not write
+ * is the thing ADR 0057 exists to keep off the screen. A shape or version
+ * error names nothing here because there is nothing in it to name — the
+ * document as a whole is what failed.
+ *
+ * It reads the fields rather than switching on `kind` because the identity is
+ * carried by two shapes across fifteen-odd kinds, and a switch would be that
+ * list written out to say one of two things. The cost is that the compiler
+ * does not hold the sentence above: an arm added with its identity under a
+ * third field name returns `null` here and no test fails. The sentence still
+ * stands on its own in that case, which is why this is a legibility loss
+ * rather than a defect.
+ */
+const namedInStoredSpace = (error: SpaceError): string | null =>
+  'ref' in error ? error.ref : 'path' in error ? error.path : null;
+
+/**
+ * Why accepting the stored side of a conflict was refused, in the author's
+ * terms.
+ *
+ * Both sentences say what to do next, because both leave the conflict standing
+ * and every control on screen.
+ */
+export const describeStoredSpaceRefusal = (refusal: StoredSpaceRefusal): string => {
+  switch (refusal.code) {
+    case 'stored-space-deleted':
+      return 'This Space was deleted while the coordinated edit was saving. Keep your local version to restore it.';
+    case 'stored-space-invalid': {
+      const named = [
+        ...new Set(refusal.errors.map(namedInStoredSpace).filter((ref) => ref !== null)),
+      ];
+      if (named.length === 0) return STORED_SPACE_INVALID;
+      const recited = named.slice(0, STORED_SPACE_REFS_RECITED);
+      const remaining = named.length - recited.length;
+      const more = remaining === 0 ? '' : ` and ${remaining} more`;
+      return `${STORED_SPACE_INVALID} Affected: ${recited.join(', ')}${more}.`;
+    }
+  }
+};
+
+/**
+ * What accepting the stored side of a conflict would do, which is not one
+ * thing.
+ *
+ * `reload` is the ordinary case: the repository answered with a newer Space.
+ * `revert` is a participant the conflict never named — the coordinated edit did
+ * not commit, so what is stored for this Space is the baseline it held before
+ * the edit, and accepting it discards the edit's effect here. `none` is the
+ * Space with no stored snapshot. Accepting the stored side still coordinates
+ * recovery across every participant, while keeping local work re-commits this
+ * Space as a create.
+ *
+ * Which of the three a conflict is stays with the surface that reads the two
+ * snapshots; only the sentences are here, beside every other sentence the
+ * author reads.
+ */
+export type ConflictRecovery = 'reload' | 'revert' | 'none';
+
+const CONFLICT_DESCRIPTIONS = {
+  reload:
+    'A newer version of this space is available. Reload discards your local changes; keeping your local version tries to save it again.',
+  revert:
+    'A related space changed while this coordinated edit was saving. Reload returns this space to how it was before the edit; keeping your local version tries to save it again.',
+  none: 'There is no stored version of this space. Keep your local version to restore it.',
+} satisfies Record<ConflictRecovery, string>;
+
+/** Application-owned copy for the recovery a conflict offers. */
+export const describeConflictRecovery = (recovery: ConflictRecovery): string =>
+  CONFLICT_DESCRIPTIONS[recovery];
+
+/**
+ * Every persistence failure that reaches the author as a code rather than a
+ * structured refusal — the retryable four and the permanent four.
+ *
+ * Derived from the session state rather than imported as a union, because
+ * `CommitResult` is not on `@project/persistence`'s surface and the two states
+ * that carry these failures are.
+ */
+type Persistence = SpaceSessionState['persistence'];
+type Rejected = Extract<Persistence, { kind: 'rejected' }>['failure'];
+export type PersistenceFailure =
+  | Extract<Persistence, { kind: 'failed' }>['failure']
+  | Exclude<Rejected, { kind: 'aggregate-refused' }>;
+
+/**
+ * What each persistence failure means, in the author's terms rather than the
+ * transport's.
+ *
+ * Every one of these also carries a `message`, and that message is the wire's:
+ * `problem.detail` from the server, or a thrown `Error`'s own text. ADR 0057
+ * rejected `{ message: string }` by name for exactly this — the code is the
+ * identity that crosses the seam and the sentence is the application's, so the
+ * message is a diagnostic and never what the author reads.
+ *
+ * The sentences complement their surfaces rather than repeating them. A
+ * retryable failure is drawn under "Changes not saved" beside a Retry button
+ * and a rejection under "Changes couldn't be saved", so no entry here restates
+ * either.
+ */
+const PERSISTENCE_FAILURE_REASONS = {
+  network: 'Your device could not reach the server.',
+  timeout: 'The server did not respond in time.',
+  unavailable: 'The server is temporarily unable to store changes.',
+  'rate-limited':
+    'Changes were sent faster than the server accepts. Wait a moment before retrying.',
+  'invalid-commit': 'These changes are not in a form the server can store.',
+  forbidden: 'You do not have permission to save this space.',
+  // The limit is on the whole change, not one Card: a Space can exceed it on
+  // Card count with nothing long in it. And the rejection dialog offers only
+  // Continue editing, so this names no retry.
+  'payload-too-large':
+    'This space is larger than the server accepts in one save. Shortening its longest cards is what brings it under the limit.',
+  protocol: 'The application and the server disagree about how changes are saved.',
+  // `satisfies` for the reason the aggregate table above gives: it still fails
+  // the moment a code is added without a sentence, without widening the map.
+} satisfies Record<PersistenceFailure['code'], string>;
+
+/** Application-owned copy for a stable persistence failure identity. */
+export const describePersistenceFailure = (failure: PersistenceFailure): string =>
+  PERSISTENCE_FAILURE_REASONS[failure.code];
 
 /** Why a coordinated Space Card operation refused, in the author's terms. */
 export const describeSpaceCardRefusal = (refusal: SpaceCardRefusal): string => {

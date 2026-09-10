@@ -1,6 +1,6 @@
 # Bring persistence onto the refusal pattern
 
-Status: ready-for-agent
+Status: mostly built — two residues remain, both recorded below
 
 Surfaced by: investigating whether persistence error handling should be
 extracted as the application-wide error pattern. It should not — see `spec.md`.
@@ -111,22 +111,89 @@ fixture's `remoteRefusal` prop (`SpaceSidebarFixture.tsx:63`, `:264`).
 
 ## Acceptance
 
-- [ ] Every sentence a persistence failure shows the author is produced by the
+- [x] Every sentence a persistence failure shows the author is produced by the
       application from a stable code, not read from the wire.
-- [ ] The seven `retryable-failure`/`permanent-failure` codes each have copy,
-      and the mapping is exhaustive by construction — a new code fails to
-      compile until it has a sentence.
-- [ ] `NETWORK_FAILURE_MESSAGE` no longer exists in `@project/http`, and no
-      display copy does.
-- [ ] `acceptStoredSpace` answers a stable identity rather than prose, and the
+- [x] The `retryable-failure`/`permanent-failure` codes each have copy, and the
+      mapping is exhaustive by construction — a new code fails to compile until
+      it has a sentence. **Eight, not seven**: writing the copy exposed that
+      `protocol` was a bucket carrying `payload-too-large`, the one permanent
+      failure an author can act on. Its previous verbatim message ("Send a
+      request body no larger than 1048576 bytes.") was the only instruction
+      they had, and a shared sentence about format disagreement would have
+      dropped it. This ticket's "the codes stay as they are" line was written
+      to stop churn for copy's sake, and is deliberately departed from here —
+      the split preserves behaviour rather than re-partitioning for tidiness.
+- [x] `NETWORK_FAILURE_MESSAGE` no longer exists in `@project/http`, and no
+      display copy does. Its one use — the message for a thrown non-`Error` —
+      is inline at the site.
+- [x] `acceptStoredSpace` answers a stable identity rather than prose, and the
       intake-failure case carries its errors as typed context — with the
       offending Card ids still in the alert's own text, which
-      `packages/app/test/SpaceApp.test.tsx:216` pins.
-- [ ] `CONFLICT_DESCRIPTIONS` lives beside the other copy rather than in the
-      component that draws it. `AGGREGATE_REFUSAL_REASONS` is untouched unless
-      `v1-release/17` has already landed.
-- [ ] ADR 0057's `Build status:` line and `docs/agents/ui.md`'s claim agree with
+      `packages/app/test/SpaceApp.test.tsx` pins. The recital is capped at
+      three ids and a count, because the alert announces what it contains.
+- [x] `CONFLICT_DESCRIPTIONS` lives beside the other copy rather than in the
+      component that draws it. `AGGREGATE_REFUSAL_REASONS` was already there —
+      it moved before this ticket ran, so there was nothing to coordinate with
+      `v1-release/17` over.
+- [x] ADR 0057's `Build status:` line and `docs/agents/ui.md`'s claim agree with
       each other and with the tree.
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass. All three apply: this
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass. All three apply: this
       changes application code, a persistence surface the browser reaches, and
       two components with stories.
+
+## What the review pass added
+
+Three defects and a missing pin, found reviewing this branch before it merged.
+None of them moves an acceptance criterion above; they are recorded because they
+landed on this branch and inside this ticket's surface.
+
+- **The `payload-too-large` sentence named the wrong thing twice.** It blamed a
+  long Card for a limit `MAX_COMMIT_BODY_BYTES` applies to the whole serialised
+  snapshot — a Space can exceed it on Card *count* with nothing long in it — and
+  told the author to "try again" in the one state whose dialog offers only
+  Continue editing, `PersistenceNotice` drawing nothing for `rejected`. It now
+  names the change and the Cards that shorten it.
+
+- **`ConflictControl` kept a refusal across two conflicts.** Its remount key was
+  the stored revision, which collapses to the constant `'coordinated'` for every
+  conflict carrying no stored snapshot, so two coordinated conflicts reused the
+  instance and the first's "Unable to reload" alert stood over the second —
+  whose stored side may load perfectly well. The key is gone and the refusal is
+  held beside the conflict that raised it.
+
+- **A dismissed rejection returned on the way back to the Space.** The
+  acknowledgement sat below `PersistenceControl`'s `active` gate, which unmounts
+  everything that component returns; it moved up one level, to the component
+  Open Spaces leaves mounted. The test written with the original fix pinned
+  nothing either — its two rejections differed in `message`, which the
+  `${code}:${message}` key it replaced also told apart. They are byte-identical
+  now, which is the pair the fix is for.
+
+- **The invariant the acknowledgement rests on is pinned rather than assumed.**
+  Two rejections are separated by the identity of the failure the session
+  published, because nothing in the value separates them once `message` is
+  unread. That makes a fresh result per commit load-bearing:
+  `http-backend.test.ts`'s "mints a distinct failure for each rejected commit".
+  The alternative — a sequence number in the acknowledgement — has to be minted
+  by the session and carried on `SpaceSessionState`, which widens a persistence
+  contract to hold one component's bookkeeping.
+
+## What remains, and why it is not here
+
+Both residues are named in ADR 0057's status block, which points at this file.
+
+- **`CommitResult`'s `message` field.** No surface reads it and nothing else
+  does either, so it is dead rather than diagnostic. Deleting it stops roughly
+  fifty construction sites compiling across twenty files, five of them being
+  rewritten by `command-dock/07` — the Dock prototype builds its own failures.
+  It is a mechanical follow-up the moment that branch lands.
+
+- **The synthesised `protocol` failures lose their Space id.** `session.ts` two
+  broken-invariant paths (a commit result omitting a revision, a conflict
+  result omitting the current Space) put the offending Space id in `message`
+  and nowhere else. With `message` unread, that id now reaches nobody. Giving
+  those two arms typed context is the fix, and it is re-partitioning of the
+  kind this ticket declined to do on spec; it belongs with the field's
+  deletion, when the arm is being edited anyway. Showing them was never right —
+  a broken invariant is not an authored condition — so this is a diagnosability
+  gap, not a user-facing one.

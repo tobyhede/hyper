@@ -2,12 +2,20 @@
 
 Status: ready-for-agent
 
-Blocked by: nothing. `01-bring-persistence-onto-the-refusal-pattern.md` owns the
-fifth prose site, `acceptStoredSpace`, because that one *originates* the
-sentence and needs new codes minted for it. The four here only describe too
-early and mint nothing, so the two tickets are independent and either may land
-first. Together they retire the last operation in the tree that answers a
-refusal as `string`.
+Blocked by: nothing. `01-bring-persistence-onto-the-refusal-pattern.md` owned
+the fifth prose site, `acceptStoredSpace`, because that one *originates* the
+sentence and needed new codes minted for it. **`01` landed on 2026-09-10**, so
+that site is gone: it answers a `StoredSpaceRefusal` and `ConflictControl`
+describes it. The sites here are now the whole of what still answers a refusal
+as `string` — five at the last count, not the four this ticket was filed with;
+see the Context below.
+
+**Sequence this after `command-dock/07`.** Three of them live in
+`SpaceSidebar.tsx` and `OpenSpaceSidebars.tsx`, which that ticket deletes
+outright — its acceptance criterion is that both files are gone rather than
+unused. Doing `02` first means writing the fix into files that then vanish, and
+the Dock inherits the same two contracts unexamined. `CardsDrawer`'s is the one
+site independent of it.
 
 Surfaced by: investigating whether persistence error handling should be
 extracted as the application-wide error pattern — see `spec.md`.
@@ -20,29 +28,40 @@ The tree has that boundary in two places, and which one a call site uses is
 arbitrary.
 
 `SpaceSidebar` takes both contracts in one props type. `createLayout.refusal` is
-an `AuthoringRefusal` (`packages/app/src/components/SpaceSidebar.tsx:124`) and
-the component describes it itself (`:592`). `selectedCard.onDelete` answers
-`() => string | null` (`:145`) — a sentence someone else already wrote — and the
-component stores and renders it as opaque text (`:169`, `:189`). `titleEdit` is
-the second instance of the same pairing: `error` is a `string | null` (`:233`)
-and `onComplete` answers one (`:243`), both filled by `App.tsx:384-395`'s
-`completeSpaceChromeTitle`, which calls `describeAuthoringRefusal` at `:390` and
-hands the sidebar the finished sentence. Two rules, one file, same kind of thing
-— and twice over, because both prose members sit in that props type beside the
-structured `createLayout.refusal`.
+an `AuthoringRefusal` (`packages/app/src/components/SpaceSidebar.tsx:141`) and
+the component describes it itself (`:719`). `selectedCard.onDelete` answers
+`() => string | null | Promise<string | null>` (`:173`, and `:218` on the row
+component) — a sentence someone else already wrote — and the component stores
+and renders it as opaque text (`:282`). `titleEdit` is the second instance of
+the same pairing: `error` is a `string | null` (`:324`) and `onComplete` answers
+one (`:333`), both filled by `App.tsx:635`'s `completeSpaceChromeTitle`, which
+calls `describeAuthoringRefusal` and hands the sidebar the finished sentence.
+Two rules, one file, same kind of thing — and twice over, because both prose
+members sit in that props type beside the structured `createLayout.refusal`.
 
-The other two on the prose side:
+The rest of the prose side:
 
 - `CardsDrawer` holds `useState<string | null>` for its Add refusal
-  (`packages/app/src/components/CardsDrawer.tsx:108`, rendered `:189`).
-- `SpaceSidebar`'s `onDelete` chain at `:733` forwards the sidebar's string
-  upward through `OpenSpaceSidebars`.
+  (`packages/app/src/components/CardsDrawer.tsx:149`) and takes an `onAdd`
+  answering one (`:44`).
+- `SpaceSidebar`'s `onDelete` chain forwards the sidebar's string upward through
+  `OpenSpaceSidebars` (`SpaceSidebar.tsx:868`).
+- `EmbeddedLayoutAuthoring` takes a `removeCard` answering `string | null`
+  (`packages/app/src/components/EmbeddedLayoutAuthoring.tsx:24`) and fills it by
+  calling `describeAuthoringRefusal` itself (`:158-163`); `SpaceCanvas:788`
+  stores what comes back as opaque text. **This one post-dates the survey
+  above** — it arrived with the embedded Layout work — so the count is five, not
+  four, and a sixth may exist by the time this is worked. Re-derive the set with
+  `grep -rn "=> string | null" packages/app/src/` rather than trusting the
+  list.
 
-A fifth site, `App.tsx:787`'s `onAcceptRemote`, is the same defect but not the
-same change: `acceptStoredSpace` writes its sentences itself
-(`space-authoring.ts:1418`, `:1422`) rather than describing a code someone else
-produced, so giving it an identity means minting codes. That is `01`'s, and
-`ConflictControl` (`PersistenceControl.tsx:178`, `:195`) moves with it.
+A fifth site, `App.tsx`'s `onAcceptRemote`, was the same defect but not the
+same change: `acceptStoredSpace` wrote its sentences itself rather than
+describing a code someone else produced, so giving it an identity meant minting
+codes. That was `01`'s, and it is done — `StoredSpaceRefusal` crosses the seam
+and `ConflictControl` describes it, with `App.tsx` unchanged because it passes
+the function straight through. It is recorded here as the worked example of
+what the rest need.
 
 This is not cosmetic. A surface handed a sentence cannot decide the channel,
 cannot attribute the refusal to a field, and cannot be held to an exhaustive
@@ -52,8 +71,9 @@ compiler check that a new refusal code has somewhere to go.
 
 ## What to build
 
-Move all four to the identity. Each surface receives the structured refusal and
-calls the one translator at the point it renders.
+Move them all to the identity. Each surface receives the structured refusal and
+calls the one translator at the point it renders. Re-derive the set first — it
+has grown once already.
 
 ## Direction
 
@@ -77,9 +97,11 @@ a second exhaustive record saying `form` twenty-four times.
 
 ## Acceptance
 
-- [ ] The four sites here answer a structured refusal or `null`: `onDelete`,
-      its `OpenSpaceSidebars` chain, `titleEdit`'s `error` and `onComplete`, and
-      the Cards drawer's Add.
+- [ ] Every site here answers a structured refusal or `null`: `onDelete`, its
+      `OpenSpaceSidebars` chain, `titleEdit`'s `error` and `onComplete`, the
+      Cards drawer's Add, and `EmbeddedLayoutAuthoring`'s `removeCard` — plus
+      anything `grep -rn "=> string | null" packages/app/src/` finds that this
+      list does not name.
 - [ ] `describeAuthoringRefusal` is the only function in the tree that produces
       a refusal sentence, and a test or lint holds that. With `01` landed this
       is exhaustive; alone it leaves `acceptStoredSpace` as the one exception,
