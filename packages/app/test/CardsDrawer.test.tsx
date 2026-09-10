@@ -126,7 +126,7 @@ describe('CardsDrawer', () => {
     expect(cardButtons().map((card) => card.textContent)).toEqual([
       'Alpha',
       'Alpha',
-      'ConstraintsAlpha',
+      'Constraints',
       'Zulu',
     ]);
     expect(document.querySelector('.react-flow__handle')).not.toBeInTheDocument();
@@ -215,7 +215,7 @@ describe('CardsDrawer', () => {
     expect(cardButtons()).toHaveLength(4);
   });
 
-  it('finds an Alias by its visible Target title', async () => {
+  it('finds an Alias by its Target title', async () => {
     render(<Fixture />);
     await openDrawer();
     fireEvent.change(screen.getByRole('textbox', { name: 'Search cards' }), {
@@ -225,7 +225,7 @@ describe('CardsDrawer', () => {
     expect(screen.getByRole('button', { name: 'Add Constraints to Layout' })).toBeVisible();
   });
 
-  it('finds a Space Card by the target Space title it draws', async () => {
+  it('finds a Space Card by its target Space title', async () => {
     render(<Fixture spaceTitleById={new Map([[id('000000000012'), 'Roadmap']])} />);
     await openDrawer();
     fireEvent.change(screen.getByRole('textbox', { name: 'Search cards' }), {
@@ -250,14 +250,13 @@ describe('CardsDrawer', () => {
     expect(screen.getByRole('button', { name: 'Add Alpha to Layout' })).toBeVisible();
   });
 
-  it('shows no Target name for an Alias whose Target is absent from allCards', async () => {
+  it('lists an Alias whose Target is absent from allCards', async () => {
     const dangling: readonly Card[] = [
       { id: id('000000000005'), title: 'Stray', kind: 'alias', target: id('000000000009') },
     ];
     render(<Fixture cards={dangling} allCards={dangling} />);
     await openDrawer();
 
-    const card = screen.getByRole('button', { name: 'Add Stray to Layout' });
-    expect(card).not.toHaveTextContent('Unavailable Card');
+    expect(screen.getByRole('button', { name: 'Add Stray to Layout' })).toHaveTextContent('Stray');
   });
 });

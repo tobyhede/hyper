@@ -64,11 +64,9 @@ export type CardNodeData = {
   /**
    * What kind of Card this is, drawn as a persistent glyph on the Front.
    *
-   * Carried rather than derived from `aliasOf` below. The two answer different
-   * questions — one is the Card's kind, the other is the title of the Card an
-   * occurrence redraws — and reading the first off the second answers by proxy,
-   * which is exactly what goes wrong for the next kind that resolves its
-   * content elsewhere.
+   * Carried rather than inferred from whether this node's content resolved
+   * elsewhere: that answers the Card's kind by proxy, which is exactly what
+   * goes wrong for the next kind that resolves its content elsewhere too.
    */
   kind: Card['kind'];
   /** Local Card-authoring controls supplied by the application composition. */
@@ -161,19 +159,15 @@ export type CardNodeData = {
     onResizeEnd: () => void;
     onResizeCancel: () => void;
   };
-  /** For an alias, the title of the card it shows — so the node can name what it
-   *  redraws. Absent on non-alias cards. */
-  aliasOf?: string;
   /**
-   * For a space card, the Title of the Space it references, and what that
-   * Space offers its selections to be chosen from.
+   * For a space card, what the Space it references offers its selections to be
+   * chosen from.
    *
-   * Neither is derived here, and neither could be: both describe a *second*
-   * Space, which this projection has no reader for and no business loading.
-   * The composition that read the target supplies them, exactly as it supplies
-   * every other operation on this node (ADR 0068, ADR 0074).
+   * Not derived here, and it could not be: it describes a *second* Space, which
+   * this projection has no reader for and no business loading. The composition
+   * that read the target supplies it, exactly as it supplies every other
+   * operation on this node (ADR 0068, ADR 0074).
    */
-  spaceTitle?: string;
   spaceSelection?: CanvasSpaceCardSelection;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
@@ -374,8 +368,6 @@ export function projectCardNodes(
     // only thing standing between a stored Open state and the Card that state
     // is about.
     const open = options.openCardIds?.has(card.id) === true;
-    // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
-    const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).
     const body = showContent || open ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
     const portsById = new Map((cardLayout?.ports ?? []).map((port) => [port.id, port]));
@@ -434,8 +426,6 @@ export function projectCardNodes(
         cardLayout,
       );
     }
-    // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
-    if (aliasOf !== undefined) node.data.aliasOf = aliasOf;
     if (body !== undefined) node.data.body = body;
     if (open) {
       node.data.expanded = true;

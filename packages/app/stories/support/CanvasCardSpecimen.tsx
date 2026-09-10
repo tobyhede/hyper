@@ -3,7 +3,6 @@ import { CanvasCard, type CanvasCardFront, type CanvasCardState } from '@project
 interface CanvasCardSpecimenProps {
   readonly title: string;
   readonly kind?: CanvasCardFront['kind'];
-  readonly aliasOf?: string;
   readonly state?: Exclude<CanvasCardState, 'editing'>;
   readonly graphColor?: string;
 }
@@ -12,13 +11,12 @@ interface CanvasCardSpecimenProps {
 export function CanvasCardSpecimen({
   title,
   kind = 'markdown',
-  aliasOf = 'Opening',
   state = 'rest',
   graphColor = '#ffc53d',
 }: CanvasCardSpecimenProps) {
   const front: CanvasCardFront =
     kind === 'alias'
-      ? { kind: 'alias', aliasOf, source: '', open: false }
+      ? { kind: 'alias', source: '', open: false }
       : { kind: 'markdown', source: '', open: false };
   return <CanvasCard front={front} title={title} state={state} graphColor={graphColor} />;
 }

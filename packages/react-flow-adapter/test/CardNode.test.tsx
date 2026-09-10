@@ -149,7 +149,6 @@ interface Overrides {
   isConnectable?: boolean;
   title?: string;
   kind?: CardNodeData['kind'];
-  aliasOf?: string;
   titleEditingEnabled?: boolean;
   cardEditingEnabled?: boolean;
   titleEditor?: CardTitleEditor;
@@ -171,7 +170,6 @@ function props({
   isConnectable = true,
   title = 'A',
   kind = 'markdown',
-  aliasOf,
   titleEditingEnabled = false,
   cardEditingEnabled = false,
   titleEditor,
@@ -202,7 +200,6 @@ function props({
     targetHandles,
     readOnly,
   };
-  if (aliasOf !== undefined) data.aliasOf = aliasOf;
   if (onEditCard !== undefined)
     data.onEditCard = (open) => {
       onEditCard(open);
@@ -259,11 +256,10 @@ describe('CardNode canvas Card state adapter', () => {
   });
 
   it('renders an Alias through the shared kind treatment', () => {
-    render(<CardNode {...props({ kind: 'alias', title: 'A, again', aliasOf: 'A' })} />);
+    render(<CardNode {...props({ kind: 'alias', title: 'A, again' })} />);
 
     expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
     expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
-    expect(screen.getByTestId('alias-marker')).toHaveTextContent('A');
   });
 
   it('passes the Alias metadata Open operation through its own front', () => {
@@ -273,7 +269,6 @@ describe('CardNode canvas Card state adapter', () => {
         {...props({
           kind: 'alias',
           title: 'A, again',
-          aliasOf: 'A',
           cardEditingEnabled: true,
           onEditCard,
         })}
@@ -282,24 +277,6 @@ describe('CardNode canvas Card state adapter', () => {
 
     screen.getByRole('button', { name: 'Open Card A, again' }).click();
     expect(onEditCard).toHaveBeenCalledWith(true);
-  });
-
-  /**
-   * `projection.ts` omits `aliasOf` whenever the Target title does not resolve.
-   * Intake makes that unreachable for a Space that loads — `validate.ts` refuses
-   * `unresolved-alias-target` and `alias-targets-alias` — but the adapter still
-   * has to hand `CanvasCard` a front, and the Alias front the spec specifies
-   * carries a required Target title. Naming nothing is what an absent Target
-   * means, so the line the Alias would have drawn is not drawn at all: the
-   * marker is the Target's name, and an empty one nudges the title down by its
-   * own margin while answering `getByTestId('alias-marker')` with nothing.
-   */
-  it('draws no Target line for an Alias whose Target title did not resolve', () => {
-    render(<CardNode {...props({ kind: 'alias', title: 'A, again' })} />);
-
-    expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
-    expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
-    expect(screen.queryByTestId('alias-marker')).toBeNull();
   });
 
   it('draws a Markdown Card kind glyph like any other kind', () => {
@@ -750,7 +727,6 @@ describe('CardNode Expanded Card front', () => {
         {...props({
           kind: 'alias',
           title: 'Return',
-          aliasOf: 'Strategies',
           expanded: true,
           body: SOURCE,
           cardEditingEnabled: true,
@@ -765,7 +741,6 @@ describe('CardNode Expanded Card front', () => {
     expect(screen.queryByRole('button', { name: /Edit Card/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close Card Return' })).toBeVisible();
     expect(screen.getByTestId('card')).toHaveAttribute('data-expanded', 'true');
-    expect(screen.getByTestId('alias-marker')).toHaveTextContent('Strategies');
   });
 
   it('keeps Expanding and renaming independent, because one is authored and the other a gesture', () => {
@@ -918,9 +893,7 @@ describe('CardNode Expanded Card front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(
-      <CardNode {...props({ kind: 'alias', aliasOf: 'Strategies', expanded: true, resize })} />,
-    );
+    render(<CardNode {...props({ kind: 'alias', expanded: true, resize })} />);
 
     // `projection.ts` never marks an Alias Expanded in production (ADR 0064), but
     // this Card's own resize gate must not repeat that as a second opinion —

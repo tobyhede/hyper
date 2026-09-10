@@ -1129,13 +1129,16 @@ export function createSpaceAuthoring({
         completion.anchor,
       );
     } else if (completion.kind === 'created-alias') {
-      // An empty title takes the Target's as a convenient initial value; text
-      // the author already entered is never overwritten. `??` cannot express
-      // this — the empty string is a value the picker really sends, and the
-      // whole point is that it does not count as one.
+      // An empty title mints the same neutral `Card N` every other created Card
+      // gets; text the author already entered is never overwritten. `??` cannot
+      // express this — the empty string is a value the picker really sends, and
+      // the whole point is that it does not count as one. Copying the Target's
+      // Title is what this replaced: it produced two Cards with one name by
+      // default, and the creation flow asks for a name at this moment anyway
+      // (ADR 0070).
       const entered = completion.title?.trim() ?? '';
       const document: CardDocument = {
-        title: entered.length > 0 ? entered : (space.lookup.card(completion.target)?.title ?? ''),
+        title: entered.length > 0 ? entered : nextCardTitle(snapshot),
         kind: 'alias',
         target: completion.target,
       };
