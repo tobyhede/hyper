@@ -110,19 +110,29 @@ only a reader can check.
       mounted. It now mounts `CARDS_TRIGGER`, the Command Dock's own exported
       Cards-trigger treatment, in a `Toolbar`, so the class under test is the
       class the Dock ships.
-- [x] **`test/key-bindings.ts`** lost the Sidebar's `Mod-B` entry, and
-      `vitest.setup.ts` lost the `matchMedia` shim that existed only for
-      `useIsMobile`. Nothing else in the repository, in `@base-ui/react` or in
-      `cmdk` reads `matchMedia`, and the suite is green without it.
+- [x] **`test/key-bindings.ts`** lost the Sidebar's `Mod-B` entry.
+      **`vitest.setup.ts` keeps its `matchMedia` shim**, and the claim that it
+      existed only for `useIsMobile` was wrong: removing it turned
+      `packages/app/test/space-card-embedded-layout.test.tsx`'s
+      embedded-persistence case red, bisected to that file alone. React Flow's
+      `getMediaQuery()` reads `window.matchMedia('(prefers-color-scheme: dark)')`
+      and answers `null` without it, so the canvas mounts down a different
+      colour-mode path than the browser takes; `@codemirror/view` and Base UI's
+      `unstable-use-media-query` read it too. The shim's doc comment now names
+      React Flow rather than the deleted hook.
 - [x] **`.oxlintrc.json`** lost its `no-module-mocking` exception for
       `packages/ui/test/AddCardControl-base-ui.test.tsx`, a file that no longer
       exists.
 
 **One thing deliberately kept:** `packages/ui/package.json`'s `#hooks/*` subpath
-import, now pointing at a directory with nothing in it. It is the destination
-`packages/ui/components.json` names for a generated hook, so removing one without
-the other would break the next `shadcn add` that ships one. The pair is
-generator infrastructure rather than a claim that a hook exists.
+import and its public `./hooks/*` counterpart, now pointing at a directory that
+does not exist at all — git tracks no empty directory, so deleting the one hook
+took `packages/ui/src/hooks` with it. Both are the destination
+`packages/ui/components.json` names for a generated hook, so removing them
+without it would break the next `shadcn add` that ships one. Subpath patterns
+resolve only on use and there is no importer, so a dangling pattern costs
+nothing today. The set is generator infrastructure rather than a claim that a
+hook exists.
 
 **One pre-existing defect fixed in passing:** `design-system-inventory.ts`'s
 `Command.tsx` reason read *"Deliberately without a consumer, like `Select`
@@ -133,25 +143,60 @@ to be a property of its subject, so the dead cross-reference went and
 
 ## Evidence
 
+The first pass at this ticket was committed from a mixed tree and its Evidence
+block claimed a `verify` green that did not hold: `typecheck`,
+`ui:catalog:check` and `test` were all red on the committed tree. Three changes
+nothing here asked for had come with it, and the review that found them is what
+this section now records.
+
+**Reverted as undisclosed scope, not part of this ticket:**
+
+- `packages/app/src/dock-model.ts`'s session prototype — `opened`,
+  `editDocument`, `editSelectedLayout`, `exitSpace`, `OpenEntry`,
+  `SessionState` and `SpaceExit`, 248 lines. `packages/app/test/dock-session.test.ts`
+  and `packages/app/stories/support/CommandDockFixture.tsx` both still import
+  them, so deleting them took both typechecks, the test suite and every
+  `space--command-dock--*` story with them. Only the file's `openSpaceStatusLabel`
+  paragraph was ever in scope, and that is all that is changed here.
+- `packages/app/stories/design-system-inventory.ts`'s `SpaceApp.tsx` and
+  `startup.tsx` entries. Neither module is a Sidebar-era primitive, neither was
+  deleted, and neither has a stable story — removing the entries failed
+  `ui:catalog:check` outright.
+- `packages/app/ladle-e2e/command-dock.spec.ts`'s behavioural rewrite: real
+  `navigator.clipboard` polling against an `https://example.test` origin, and
+  `.locator('visible=true')` on some twenty assertions. The fixture implements
+  copy by setting `document.body.dataset['copyCommand']` and nothing writes to
+  the clipboard for that story, so the rewrite asserted against a fixture that
+  never landed; and `toBeHidden()` on a filtered locator passes on zero
+  elements, which is weaker than what it replaced. Only the prose repoint
+  remains.
+
+**Also corrected:** `.oxlintrc.json` kept a second `sidebar.tsx` entry, in the
+`anti-slop/no-runtime-typeof` exception list, which only the
+`no-unknown-returns` prune had caught. `packages/ui/src/components/field.tsx`
+cited the deleted `components/tabs.tsx` twice and now cites `separator.tsx`,
+which reads `data-orientation` the same way. `dock-report.test.ts`'s `it(...)`
+name still promised a comparison against the deleted strip.
+
+**The gates, run on the tree these words are committed with:**
+
 - `pnpm verify` — **green**: toolchain, both typechecks, UI catalogue, ESLint
   (with `--prune-suppressions`, which shrank `eslint-suppressions.json`),
   anti-slop, formatting, and **197 test files, 2453 passed, 2 skipped**.
-- `pnpm e2e` — **180 passed**. Not strictly owed under this ticket's original
-  evidence rule, since none of the seven has a story and none reaches a
-  production surface, but `packages/ui/src/index.ts` changed and a barrel is not
-  something to assume about.
-- `pnpm e2e:ladle` — **82 passed**, on the third run. The first two runs failed
-  and the failures were **not** this change: run one failed four Card CSS
-  assertions, run two failed one embedded-Layout assertion, and each failing
-  test passed in isolation against this same tree, while the Card pair also
-  passed on the stashed clean tree. Different tests failing on each run of an
-  unchanged tree is the intermittency `11` already records under "Earlier runs
-  are not hidden" — including an embedded-Layout wait that "then passed all 16
-  tests in isolation". Nothing was weakened to get the green run. Locally
-  `retries: 0`, so a flake fails outright here where CI would retry it and
-  report it as flaky.
+- `pnpm e2e` — **180 passed**. Not strictly owed, since none of the seven has a
+  story and none reaches a production surface, but `packages/ui/src/index.ts`
+  changed and a barrel is not something to assume about.
+- `pnpm e2e:ladle` — **82 passed**, first run, no retries. This is the suite the
+  first pass could not have run: every `space--command-dock--*` story crashed on
+  a fixture importing the deleted session model.
 
 ## Comments
 
-The work sits on `main` at `d6ba07bc` and is uncommitted. `AGENTS.md`'s standing
-rule is to branch before committing on the default branch.
+The work is committed on `refactor/retire-sidebar-era-primitives`, off `main` at
+`d6ba07bc`.
+
+The lesson of the first pass is `AGENTS.md`'s own: a `verify` reported without
+having been run on the tree being committed is worse than no evidence, because
+it is what a reader trusts. The three reverted changes were all present in the
+working tree when the suite was run and all absent from — or partly absent
+from — what was committed.

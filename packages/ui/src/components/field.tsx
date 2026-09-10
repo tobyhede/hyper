@@ -121,11 +121,12 @@ function FieldTitle({ className, ...props }: React.ComponentProps<'div'>) {
  * The supporting line under a field's label.
  *
  * Taken as generated bar **one correction**, the same class of registry drift
- * `components/tabs.tsx` records. The registry balances the text on
+ * `components/separator.tsx` records — `components/tabs.tsx` recorded it too
+ * until `.scratch/command-dock/issues/08` deleted it. The registry balances the text on
  * `group-has-data-horizontal/field:`, which asks for a descendant carrying a
  * bare `data-horizontal`; nothing in the tree emits that attribute. `Field`
- * writes its orientation as `data-orientation` — which is what `tabs.tsx` and
- * `separator.tsx` already read — so the rule is inert as generated and a
+ * writes its orientation as `data-orientation` — which is what
+ * `separator.tsx` already reads — so the rule is inert as generated and a
  * horizontal field's description never balances. The selector is respelled to
  * the attribute this version actually has and nothing else is: same rule, same
  * intent. `responsive` is deliberately not included, being `vertical` until its

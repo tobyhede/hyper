@@ -23,7 +23,7 @@ import {
  * someone edits a row.
  */
 describe('the Command Dock reports an unwell Space', () => {
-  it('in the same words as the open-Spaces strip it replaces', () => {
+  it('in the words `openSpaceStatusLabel` decides', () => {
     expect(unwellReport({ kind: 'failed', failure: retryable })).toBe(
       openSpaceStatusLabel('failed'),
     );

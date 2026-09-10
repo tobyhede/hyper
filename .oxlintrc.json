@@ -266,7 +266,6 @@
       // has anywhere further to push to.
       "files": [
         "vitest.setup.ts",
-        "packages/ui/src/components/sidebar.tsx",
         "packages/react-flow-adapter/test/GraphHud.test.tsx",
         "test/unit/raw-http-request.test.ts",
         "test/unit/vite-hono-host.test.ts",

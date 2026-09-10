@@ -36,8 +36,18 @@
  */
 export const uncataloguedComponents = [
   {
+    module: 'packages/app/src/SpaceApp.tsx',
+    reason:
+      'Isolated single-Space mounting adapter. The shared error boundary and managed application are catalogued through the embedded Diagram story.',
+  },
+  {
     module: 'packages/app/src/main.tsx',
     reason: 'The browser entry point: one `createRoot` call and startup composition.',
+  },
+  {
+    module: 'packages/app/src/startup.tsx',
+    reason:
+      'Startup composition. It renders one opened outcome by mounting the application, while `operational-feedback-startup-failure` catalogues its failure panel.',
   },
   {
     module: 'packages/react-flow-adapter/src/CardNode.tsx',

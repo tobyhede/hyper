@@ -225,6 +225,55 @@ if (typeof Range !== 'undefined' && !('getBoundingClientRect' in Range.prototype
 }
 
 /**
+ * jsdom ships no `matchMedia`, and React Flow asks for one.
+ *
+ * `useColorModeClass` calls `getMediaQuery()`, which reads
+ * `window.matchMedia('(prefers-color-scheme: dark)')` and returns `null` when
+ * the function is absent — so without this the canvas resolves a different
+ * colour-mode class and mounts down a different path than the browser takes.
+ * jsdom has no layout and no media engine, so the honest answer is a query that
+ * never matches and never changes: every rendering test then exercises the
+ * light canvas, which is the surface those tests are about.
+ *
+ * **This outlived the Sidebar it was written for.**
+ * `.scratch/command-dock/issues/08` deleted `hooks/use-mobile.ts` and recorded
+ * that the shim existed solely for it. It did not: removing the shim turned
+ * `space-card-embedded-diagram.test.tsx`'s embedded-persistence case red, and
+ * `@codemirror/view` and Base UI's `unstable-use-media-query` read it too. The
+ * consumer named above is the one a bisect actually found, and it is why this
+ * is not a stub waiting for its reason to be deleted again.
+ *
+ * Guarded like the stubs above — the setup file also runs under
+ * `environment: 'node'`, and any environment that implements the real thing
+ * keeps it. The guard reads the value rather than asking `in`, because jsdom
+ * *declares* `matchMedia` and leaves it `undefined`: the property is there and
+ * calling it throws. Read off a widened alias so the check is about the value
+ * this environment actually holds rather than about the DOM lib's promise,
+ * which is what would make it a condition lint can prove pointless.
+ */
+// SAFETY: this file runs under both `jsdom` and `node` test environments, so
+// `window` may not exist on `globalThis` at all — the narrow optional shape
+// reads whatever is actually there instead of asserting the DOM lib's promise
+// that `window` (and `matchMedia` on it) is always defined.
+const declaredMatchMedia = (globalThis as { window?: { matchMedia?: unknown } }).window?.matchMedia;
+if (typeof window !== 'undefined' && typeof declaredMatchMedia !== 'function') {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
+/**
  * jsdom ships no `PointerEvent`, and Base UI constructs one to activate a
  * toolbar item from the keyboard.
  *

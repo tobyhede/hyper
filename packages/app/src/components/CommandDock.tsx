@@ -1857,8 +1857,8 @@ function ParentSpace({
  * separate list of open Spaces beside a trail of ancestors, and no tooltip
  * carrying depth — the Open Spaces menu's indent carries it. The Sidebar's tab strip
  * (`OpenSpaces`, deleted by `.scratch/command-dock/issues/08`) is not carried
- * over as a strip, but this is what it modelled: the *set* of open Spaces. What it could not model is the crossing, and the
- * parent step is that.
+ * over as a strip, but this is what it modelled: the *set* of open Spaces. What
+ * it could not model is the crossing, and the parent step is that.
  *
  * **What depth costs is width, and the two parts are how it is paid.** Only one
  * step is ever a word, so a fourth crossing costs nothing at all on the bar; and
