@@ -56,6 +56,34 @@ test(
     // the card to fit a title that overruns it.
     const box = await longTitle.boundingBox();
     expect(box?.height ?? 0).toBeLessThan(80);
+
+    // And the wrapping is *within* one Title Line, not a ladder (ADR 0083). A
+    // break the box chose is not a break the author typed, so a long Title with
+    // no newline in it stays a single `title`-role element however many visual
+    // lines it takes — this is the specimen where the two can be told apart,
+    // jsdom having no line boxes to wrap.
+    const lines = longTitle.locator('.canvas-card__title-line');
+    await expect(lines).toHaveCount(1);
+    await expect(lines).toHaveAttribute('data-role', 'title');
+    const drawn = await lines.evaluate((line) => {
+      const style = getComputedStyle(line);
+      return {
+        fontSize: Number.parseFloat(style.fontSize),
+        fontWeight: style.fontWeight,
+        lineHeight: Number.parseFloat(style.lineHeight),
+        letterSpacing: Number.parseFloat(style.letterSpacing),
+        // Its own box is taller than one line, which is what makes this a
+        // wrapped Title rather than a short one that proves nothing.
+        height: line.getBoundingClientRect().height,
+      };
+    });
+    // The Title Hyper has always drawn: 18px, weight 600, leading 1.12 and
+    // tracking -0.02em, resolved against its own size.
+    expect(drawn.fontSize).toBeCloseTo(18, 2);
+    expect(drawn.fontWeight).toBe('600');
+    expect(drawn.lineHeight).toBeCloseTo(18 * 1.12, 2);
+    expect(drawn.letterSpacing).toBeCloseTo(18 * -0.02, 2);
+    expect(drawn.height).toBeGreaterThan(40);
   },
 );
 
@@ -195,15 +223,27 @@ test(
     await expect(heading).toContainText('Draft entry', {
       timeout: 20_000,
     });
+
+    // The nesting, proved where accessible names are real (ADR 0065, ADR 0083).
+    // The control wraps the heading, so the control keeps the short action name
+    // and the heading is named by the Title Lines it draws. With the heading
+    // outside, its name became the control's and the Title Lines were reachable
+    // through nothing. jsdom computes this differently from a browser, so this
+    // is the assertion that holds it.
+    await expect(control).toHaveAccessibleName('Edit Title Draft entry');
+    await expect(heading).toHaveAccessibleName('Draft entry');
+    expect(await heading.evaluate((element) => element.closest('button') !== null)).toBe(true);
+
     await control.hover();
-    // The pointer is on the control, but the treatment is the Title's:
+    // The pointer is on the control, but the treatment is the Title's box:
     // `canvas-card.css` draws it on `.canvas-card__title:has(…__title-control:hover)`
-    // so the tint and rule span the whole heading rather than the text's own box.
+    // so the tint and rule span the whole Title rather than the text's own box.
+    const titleBand = group.locator('.canvas-card__title');
     await expect
-      .poll(() => heading.evaluate((element) => getComputedStyle(element).boxShadow))
+      .poll(() => titleBand.evaluate((element) => getComputedStyle(element).boxShadow))
       .not.toBe('none');
     await expect
-      .poll(() => heading.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .poll(() => titleBand.evaluate((element) => getComputedStyle(element).backgroundColor))
       .not.toBe('rgba(0, 0, 0, 0)');
     await control.focus();
     await expect(control).toHaveCSS('outline-style', 'solid');

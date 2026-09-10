@@ -361,7 +361,9 @@ describe('CardNode withholds a control the composition supplied no operation for
     render(<CardNode {...props({ selected: true, titleEditingEnabled: true })} />);
     const heading = screen.getByRole('heading', { name: 'A' });
 
-    expect(heading).toHaveAttribute('data-editable', 'false');
+    // The heading is the Title Lines; `data-editable` is the Title's own box,
+    // which the activation control wraps when there is one (ADR 0083).
+    expect(heading.closest('.canvas-card__title')).toHaveAttribute('data-editable', 'false');
     fireEvent.click(heading);
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });

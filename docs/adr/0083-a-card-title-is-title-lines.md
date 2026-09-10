@@ -26,6 +26,10 @@ Capping the *count* was considered and rejected: refusing a fourth line means th
 
 Every surface that **lists or refers to** a Card shows `titleName` and nothing else: the Cards drawer, `CardSearchCombobox`'s selected value, `GraphHud`, presenting chrome, the Space Card selectors, the Delete question, and every accessible name. Only the Card front draws the ladder, and it draws it whether the Card is Open or Closed — a Title that changes shape when a Card opens teaches an author that Opening edits it.
 
+"Every accessible name" means the name of every **control and row that refers to** a Card. It does not mean the Card front's own heading, which is named by the Title Lines it draws — that is how a reader reaches the lines below the name.
+
+Those two sentences constrain the DOM, and in one direction only. An accessible name comes from an element's own label first and its content second, so a heading that *contains* a labelled control is named by that control. ADR 0065's one-activation control therefore **wraps** the heading rather than sitting inside it: the control keeps the short action name ADR 0065 asks for, and the heading keeps the Title Lines. Nested the other way, the heading reads `Edit Title <name>` and the lines below the name are reachable through nothing.
+
 `CardSearchCombobox` is the one place the two come apart on purpose: it **filters on the whole Title and displays the name**. An author's recall does not respect which line they typed a word on, and a Card that is visibly named `Auth` and cannot be found by a word from its own subtitle reads as broken search.
 
 ## An authored break is not a wrapped break

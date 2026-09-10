@@ -1,4 +1,5 @@
 import { useCallback, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { titleLines } from '@project/core';
 import { Button } from './Button';
 import {
   CardRailAction,
@@ -416,17 +417,26 @@ export function CanvasCard(props: CanvasCardProps) {
           <CardTitle
             className="canvas-card__title"
             data-editable={onBeginTitleEdit !== undefined && visibleContentEdit === null}
-            role="heading"
-            aria-level={2}
-            aria-label={title}
           >
             {onBeginTitleEdit === undefined || visibleContentEdit !== null ? (
-              title
+              <TitleHeading title={title} />
             ) : (
-              // ADR 0065 composes the shared shadcn/Base Button inside the
-              // heading: the primitive owns Enter/Space activation and button
-              // semantics, while the wrapper preserves the Title's document
-              // relationship and this variant keeps its heading treatment.
+              // ADR 0065's one-activation control, wrapping the heading rather
+              // than sitting inside it (ADR 0083).
+              //
+              // The nesting is the whole point and it is the opposite of the
+              // obvious arrangement. An accessible name comes from an element's
+              // own label first and its content second, so a heading that
+              // *contains* a labelled control is named by that control: with
+              // the control inside, the heading read `Edit Title <name>` and
+              // the Title Lines were reachable through nothing. With the
+              // control outside, the control keeps the short action name ADR
+              // 0065 asks for and the heading is named by the Title Lines it
+              // draws, which is how a reader reaches the lines below the name.
+              //
+              // Verified in Chromium, not inferred: `heading` survives inside
+              // `button` un-ignored, with both names as intended. jsdom
+              // disagrees with a browser here, so `ladle-e2e` owns the proof.
               <Button
                 variant="ghost"
                 className="canvas-card__title-control nodrag nopan"
@@ -438,7 +448,7 @@ export function CanvasCard(props: CanvasCardProps) {
                 onPointerDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                {title}
+                <TitleHeading title={title} />
               </Button>
             )}
           </CardTitle>
@@ -472,6 +482,66 @@ export function CanvasCard(props: CanvasCardProps) {
     </Card>
   );
   return actionableEntityActions ? <EntityActions groups={entityActions} render={card} /> : card;
+}
+
+interface TitleLadderProps {
+  readonly title: string;
+}
+
+/**
+ * A Card's Title drawn as its Title Lines (ADR 0083).
+ *
+ * The Card front is the only surface that draws the ladder — everywhere else
+ * shows the name, which is the first line — and it draws it identically whether
+ * the Card is Open or Closed and whatever kind the Card is. A Title that
+ * changed shape on Opening would teach an author that Opening edits it.
+ *
+ * Each line is **its own block element carrying its role**, and that is the
+ * whole of the structure: the roles come from `titleLines`, which is where the
+ * domain settles what an author's second line means, and the type ladder,
+ * clamping and colour come from `canvas-card.css`. Nothing here reads a
+ * newline, because a `split('\n')` at a call site is exactly what ADR 0083
+ * bought the named operation to prevent.
+ *
+ * The distinction the block-per-line is here for: a break the **author typed**
+ * starts a rung and a break the **box chose** does not. Each element wraps
+ * freely within its own role, so a subtitle that runs to two visual lines is
+ * one subtitle rather than a subtitle and a caption, and a long single-line
+ * Title still draws entirely at the `title` role, as it always has.
+ *
+ * Keyed by position because position *is* the identity here — it is what gives
+ * a line its role — and two lines of a Title may legitimately read the same.
+ */
+function TitleLadder({ title }: TitleLadderProps) {
+  return (
+    <>
+      {titleLines(title).map((line, index) => (
+        <span key={index} className="canvas-card__title-line" data-role={line.role}>
+          {line.text}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * The Card's Title Lines, as the one heading the Card front draws.
+ *
+ * A `span` and not a `div` or an `h2`: a `button`'s content model is phrasing
+ * content, and this element sits inside ADR 0065's activation control whenever
+ * the Title is editable. `role="heading"` with `aria-level` is the ARIA
+ * spelling of what a native `h2` would say, taken because the native element
+ * cannot legally go where this one has to.
+ *
+ * It carries no `aria-label`. Its name is the Title Lines it draws, which is
+ * the whole reason the control wraps it rather than the other way round.
+ */
+function TitleHeading({ title }: TitleLadderProps) {
+  return (
+    <span className="canvas-card__title-heading" role="heading" aria-level={2}>
+      <TitleLadder title={title} />
+    </span>
+  );
 }
 
 interface SpaceCardSelectorsProps {
