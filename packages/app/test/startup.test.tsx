@@ -1,3 +1,5 @@
+import { StrictMode } from 'react';
+import { Application } from '../src/components/Application';
 import { act, waitFor, within } from '@testing-library/react';
 import { createRoot } from 'react-dom/client';
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -41,7 +43,7 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
-it('mounts an opened startup result without interpreting the browser path again', async () => {
+it('opens once under StrictMode and mounts without interpreting the browser path again', async () => {
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
@@ -55,12 +57,27 @@ it('mounts an opened startup result without interpreting the browser path again'
   const opened = await spaces.open(SPACE_ID);
   window.history.replaceState(null, '', '/already-resolved-by-startup');
 
+  let openings = 0;
   try {
-    await act(async () => {
-      await startApplication(root, () =>
-        Promise.resolve({ kind: 'opened', opened, browserLocation: spaces.browserLocation }),
+    await act(() => {
+      root.render(
+        <StrictMode>
+          <Application
+            resolve={() => {
+              openings += 1;
+              return Promise.resolve({
+                kind: 'opened',
+                opened,
+                spaces,
+                browserLocation: spaces.browserLocation,
+              });
+            }}
+          />
+        </StrictMode>,
       );
+      return Promise.resolve();
     });
+    expect(openings).toBe(1);
 
     // The Space's name, on the bar. It was an `h1` in the Sidebar's header; the
     // Command Dock draws it as one of four names in a strip, so it is a name

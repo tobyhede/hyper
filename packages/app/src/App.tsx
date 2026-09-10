@@ -1134,11 +1134,8 @@ export const createApp = (
     /**
      * The Space the canvas draws, its open set, and the exit that leaves one.
      *
-     * `openTree` takes the rows rather than the session because the session has
-     * two shapes — `OpenSpacesState` keeps the Opener in a map beside its
-     * entries, deliberately off them, while the catalogue fixture holds stored
-     * snapshots — and a model that took either would be one its other caller had
-     * to reshape itself for (`dock-model.ts`).
+     * `openTree` derives presentation from the production Open Spaces state,
+     * also used by the catalogue through the same application composition.
      *
      * Each row's persistence is read off that Space's **own** session, which is
      * the whole of ADR 0082's clause about naming which open Space is unwell: a
