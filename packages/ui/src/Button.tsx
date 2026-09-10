@@ -21,9 +21,23 @@ const quietAppearance = 'border-transparent bg-transparent text-muted-foreground
  * fill and the hover ink and leaves the border alone. The Command Dock's own
  * stylesheet used to declare this over its whole surface, which made an
  * application sheet a second owner of a shared Button's appearance.
+ *
+ * **Unavailable is spelled twice, because a toolbar item spells it the other
+ * way.** `:disabled` is the native property; a Base UI toolbar item stays
+ * focusable while unavailable and so carries `aria-disabled` and *not* the
+ * property (`components/toolbar.tsx`) — which `:disabled` does not match, and
+ * `disabled:opacity-50` therefore never reached a single command on the Command
+ * Dock or on a Thing's rail. Left there, an unavailable command was drawn at full
+ * ink and still took the hover fill, so it read as operable and did nothing:
+ * Close during a Markdown edit is exactly that control (ADR 0064 keeps its slot
+ * and makes it unavailable). The quieting is the same opacity the property gets,
+ * in the base recipe below; what belongs here is withdrawing the *feedback*, so
+ * an unavailable control does not light up under a pointer that cannot use it.
+ * The Thing used to correct this from `canvas-thing.css` with a box of its own,
+ * which is why one surface had it and the other never did.
  */
 const quietFeedback =
-  'hover:border-border hover:bg-secondary hover:text-secondary-foreground aria-expanded:bg-secondary aria-expanded:text-secondary-foreground disabled:opacity-50';
+  'hover:border-border hover:bg-secondary hover:text-secondary-foreground aria-expanded:bg-secondary aria-expanded:text-secondary-foreground disabled:opacity-50 aria-disabled:hover:border-transparent aria-disabled:hover:bg-transparent aria-disabled:hover:text-muted-foreground';
 
 /**
  * shadcn-style button. Variants map to the command-surface palette (see
@@ -31,7 +45,7 @@ const quietFeedback =
  * button, `destructive` the panel button with the danger border.
  */
 const buttonVariants = cva(
-  'inline-flex cursor-pointer items-center justify-center rounded-[6px] border text-[0.85rem] whitespace-nowrap transition-[color,background-color,border-color,opacity] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed',
+  'inline-flex cursor-pointer items-center justify-center rounded-[6px] border text-[0.85rem] whitespace-nowrap transition-[color,background-color,border-color,opacity] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
   {
     variants: {
       variant: {

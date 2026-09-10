@@ -105,9 +105,21 @@ test(
   },
 );
 
+/**
+ * **The requested treatment change, read off the running application**
+ * (`.scratch/command-dock/issues/12`).
+ *
+ * This test used to assert the opposite — that a selected Thing's rail painted
+ * the Active Graph's colour. Three things replace it, and none of them is a
+ * weaker version of the claim: the band paints nothing; the commands on it are
+ * the *same* surface the Command Dock is drawn on, compared property by property
+ * against the Dock actually on screen rather than against numbers copied out of
+ * a stylesheet; and the Graph's colour is still on the Thing, on the handles an
+ * Edge of that Graph leaves it from.
+ */
 test(
-  "a selected Thing's rail carries the Active Graph's own colour",
-  { tag: '@parity:canvas-thing-shows-active-graph-colour' },
+  "a selected Thing's commands are the Dock's own surface, and the Graph's colour stays on its handles",
+  { tag: '@parity:canvas-thing-toolbar-is-neutral-and-graph-colour-stays-on-connections' },
   async ({ page }) => {
     await page.goto('/');
     await activateGraph(page, 'Long');
@@ -115,7 +127,39 @@ test(
 
     const thing = nodeByTitle(page, 'A').first();
     await thing.click();
-    await expect(thing.locator('.canvas-thing__rail')).toHaveCSS('background-color', graphColor);
+
+    // No band, at the one state that used to carry the loudest one.
+    await expect(thing.locator('.canvas-thing__rail')).toHaveCSS(
+      'background-color',
+      'rgba(0, 0, 0, 0)',
+    );
+
+    // One surface, drawn twice. Read off both elements in the page, so a change
+    // to either that the other did not follow fails here.
+    const treatment = (locator: Locator) =>
+      locator.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return {
+          background: style.backgroundColor,
+          borderRadius: style.borderTopLeftRadius,
+          borderColor: style.borderTopColor,
+          borderWidth: style.borderTopWidth,
+          padding: style.paddingTop,
+          gap: style.columnGap,
+        };
+      });
+    const commands = thing.getByTestId('canvas-thing-actions');
+    await expect(commands).toHaveCSS('opacity', '1');
+    expect(await treatment(commands)).toEqual(
+      await treatment(page.locator('.command-dock__surface:visible')),
+    );
+    expect((await treatment(commands)).background).not.toBe(graphColor);
+
+    // And the colour identifies the Graph where a Graph is: the points its Edges
+    // leave the Thing from.
+    const handle = thing.locator('.rf-thing-node__authoring-handle--source').first();
+    await expect(handle).toHaveCSS('opacity', '1');
+    await expect(handle).toHaveCSS('background-color', graphColor);
   },
 );
 

@@ -217,9 +217,21 @@ test(
   },
 );
 
+/**
+ * **The inverse of the claim this story used to carry, across the same palette.**
+ *
+ * It proved the rail painted the exact colour its label advertised. The rail is
+ * neutral now and the commands on it are the Command Dock's own surface
+ * (`.scratch/command-dock/issues/12`), so what has to hold at every colour is
+ * that the strip does *not* move — and that the colour is still on the Thing,
+ * which is the half a "the band is gone" assertion on its own would not say.
+ *
+ * Every specimen is the real `ThingNode`, drawn selected, so the commands and the
+ * authoring handles are both up without a pointer.
+ */
 test(
-  "a selected Thing's rail carries the exact colour supplied to it, across the full palette",
-  { tag: '@parity:canvas-thing-shows-active-graph-colour' },
+  "a Thing's commands stay neutral across the full palette while its handles carry the colour",
+  { tag: '@parity:canvas-thing-toolbar-is-neutral-and-graph-colour-stays-on-connections' },
   async ({ page }) => {
     await page.goto('/?story=components--thing--colours&mode=preview');
 
@@ -228,15 +240,13 @@ test(
     const count = await specimens.count();
     expect(count).toBeGreaterThan(1);
 
+    const surfaces = new Set<string>();
     for (let index = 0; index < count; index += 1) {
       const item = specimens.nth(index);
       const label = (await item.locator('.inv-specimen__label').innerText()).trim();
-      const railColor = await item
-        .locator('.canvas-thing__rail')
-        .evaluate((el) => getComputedStyle(el).backgroundColor);
       // Resolve the label's own hex text through the browser's colour parser
-      // rather than hand-computing rgb(), so this proves the rail paints
-      // exactly the colour the label advertises.
+      // rather than hand-computing rgb(), so this compares against exactly the
+      // colour the label advertises.
       const expectedColor = await page.evaluate((hex) => {
         const probe = document.createElement('div');
         probe.style.color = hex;
@@ -245,8 +255,26 @@ test(
         probe.remove();
         return resolved;
       }, label);
-      expect(railColor).toBe(expectedColor);
+
+      // The band behind the commands paints nothing at all.
+      await expect(item.locator('.canvas-thing__rail')).toHaveCSS(
+        'background-color',
+        'rgba(0, 0, 0, 0)',
+      );
+      const commands = item.getByTestId('canvas-thing-actions');
+      await expect(commands).toHaveCSS('opacity', '1');
+      const surface = await commands.evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(surface).not.toBe(expectedColor);
+      surfaces.add(surface);
+
+      // And the colour is where it identifies a Graph: the points an Edge of it
+      // leaves the Thing from.
+      const handle = item.locator('.rf-thing-node__authoring-handle--source').first();
+      await expect(handle).toHaveCSS('opacity', '1');
+      await expect(handle).toHaveCSS('background-color', expectedColor);
     }
+    // One surface, not six that each happen not to be their own Graph's colour.
+    expect([...surfaces]).toHaveLength(1);
   },
 );
 

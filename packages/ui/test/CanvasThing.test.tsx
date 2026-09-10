@@ -1071,12 +1071,14 @@ describe('CanvasThing Space front', () => {
       />,
     );
 
-    // Named by their labels, not only reachable by test id: the two controls
-    // are one word apart and an author has to be able to tell which is which.
-    expect(screen.getByRole('combobox', { name: 'Diagram' })).toHaveTextContent('Collection 1');
-    expect(screen.getByRole('combobox', { name: 'Graph' })).toHaveTextContent('Long');
-    expect(screen.getByTestId('space-thing-diagram')).toBeEnabled();
-    expect(screen.getByTestId('space-thing-graph')).toBeEnabled();
+    // Named by the set they choose from as well as by what they hold, not only
+    // reachable by test id: the two controls are one word apart and an author
+    // has to be able to tell which is which by ear.
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Graph: Long' })).toBeEnabled();
+    // And each draws the title it holds, which is what a reader sees.
+    expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
+    expect(screen.getByTestId('space-thing-graph')).toHaveTextContent('Long');
   });
 
   /**
@@ -1099,15 +1101,14 @@ describe('CanvasThing Space front', () => {
       />,
     );
 
-    // Opened and chosen from the keyboard: the list is Base UI's own, and its
-    // arrow navigation is the path a pointer's click ends at anyway.
-    fireEvent.keyDown(screen.getByTestId('space-thing-diagram'), { key: 'ArrowDown' });
-    const chosen = screen.getByRole('option', { name: 'Collection 2' });
-    fireEvent.keyDown(chosen, { key: 'ArrowDown' });
-    fireEvent.keyDown(chosen, { key: 'Enter' });
+    // The shared `ChoiceMenu` the Command Dock's own Diagram list is: a menu of
+    // radio rows, one marked, opened from its trigger. Its keyboard is Base UI's
+    // and is not restated here.
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Collection 2' }));
 
     expect(onDiagramChange).toHaveBeenCalledWith('l2');
-    expect(screen.getByRole('combobox', { name: 'Diagram' })).toHaveTextContent('Collection 1');
+    expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
   });
 
   /** A Space with no Graphs is an ordinary entity to reference. */

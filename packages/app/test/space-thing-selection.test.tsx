@@ -247,16 +247,29 @@ async function openSpaceThing(): Promise<HTMLElement> {
 /**
  * Choose one row of a Space Thing selector.
  *
- * Base UI's own list: a keyboard press on the trigger opens it, and the row is
- * committed with the full pointer sequence, because a bare `click` reaches the
- * item before the pointer handlers that select it.
+ * The shared `ChoiceMenu` the Command Dock's Diagram and Graph lists are: a menu
+ * of radio rows behind the control that names what is chosen. Reached the same
+ * way `packages/app/test/command-dock.ts` reaches the Dock's — press the
+ * trigger, press the row.
  */
 function choose(testId: string, name: string): void {
-  fireEvent.keyDown(screen.getByTestId(testId), { key: 'ArrowDown' });
-  const option = screen.getByRole('option', { name });
-  fireEvent.pointerDown(option, { button: 0 });
-  fireEvent.pointerUp(option, { button: 0 });
-  fireEvent.click(option);
+  fireEvent.click(screen.getByTestId(testId));
+  fireEvent.click(screen.getByRole('menuitemradio', { name }));
+}
+
+/**
+ * The two controls an Open Space Thing publishes its choices through, and nothing
+ * else.
+ *
+ * Addressed through the shared command surface they sit on rather than by role
+ * over the whole Thing: the Thing's rail carries a menu trigger of its own (its
+ * entity actions), so a count of menu buttons on the Thing would not be a count
+ * of its choices.
+ */
+function choiceControls(thing: HTMLElement): HTMLElement[] {
+  const surface = thing.querySelector('[data-slot="command-surface"]');
+  if (!(surface instanceof HTMLElement)) throw new Error('the Space Thing draws no choice surface');
+  return within(surface).getAllByRole('button');
 }
 
 beforeAll(() => {
@@ -294,10 +307,10 @@ describe('an Open Space Thing', () => {
 
     const thing = await openSpaceThing();
 
-    expect(within(thing).getByRole('combobox', { name: 'Diagram' })).toBeEnabled();
+    expect(within(thing).getByRole('button', { name: 'Diagram: none' })).toBeEnabled();
     // Nothing is selected yet, so the Diagram offers the target's two and the
     // Graph beside it has no Diagram to draw from.
-    expect(within(thing).getByRole('combobox', { name: 'Graph' })).toBeDisabled();
+    expect(within(thing).getByRole('button', { name: 'Graph: none' })).toBeDisabled();
     await settled(session);
   });
 
@@ -421,10 +434,8 @@ describe('an Open Space Thing', () => {
     const reopened = mount(written);
 
     const thing = await openSpaceThing();
-    expect(within(thing).getByRole('combobox', { name: 'Diagram' })).toHaveTextContent(
-      'Collection 2',
-    );
-    expect(within(thing).getByRole('combobox', { name: 'Graph' })).toHaveTextContent('Second pass');
+    expect(within(thing).getByTestId('space-thing-diagram')).toHaveTextContent('Collection 2');
+    expect(within(thing).getByTestId('space-thing-graph')).toHaveTextContent('Second pass');
     await settled(reopened);
   });
 
@@ -441,9 +452,9 @@ describe('an Open Space Thing', () => {
 
     // Exactly two, named: a third would be the retarget control this Thing is
     // not allowed to have, whatever it happened to be labelled.
-    expect(within(thing).getAllByRole('combobox')).toHaveLength(2);
-    expect(within(thing).getByRole('combobox', { name: 'Diagram' })).toBeInTheDocument();
-    expect(within(thing).getByRole('combobox', { name: 'Graph' })).toBeInTheDocument();
+    expect(choiceControls(thing)).toHaveLength(2);
+    expect(within(thing).getByRole('button', { name: 'Diagram: none' })).toBeInTheDocument();
+    expect(within(thing).getByRole('button', { name: 'Graph: none' })).toBeInTheDocument();
     await settled(session);
   });
 });

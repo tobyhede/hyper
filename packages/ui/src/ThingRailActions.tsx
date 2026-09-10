@@ -1,21 +1,23 @@
 import { Children, forwardRef, type ComponentProps } from 'react';
 import type { Thing } from '@project/core';
 import { thingKindName } from './ThingKindIcon';
-import {
-  Toolbar,
-  ToolbarButton,
-  ToolbarGroup,
-  type ToolbarButtonProps,
-} from './components/toolbar';
+import { CommandToolbar } from './CommandSurface';
+import { ToolbarButton, ToolbarGroup, type ToolbarButtonProps } from './components/toolbar';
 import { cn } from './lib/utils';
 
 /**
  * The command cluster at a Thing rail's trailing edge, as one toolbar (ADR 0073).
  *
  * The rail itself is `ThingRail` and stays a plain band: it has a kind at one
- * edge and a slot at the other, and the Alias metadata editor mounts that same
- * band with a single Close control and no toolbar at all. This is what a Thing
- * that carries several commands puts in that slot.
+ * edge and a slot at the other. This is what a Thing that carries several
+ * commands puts in that slot.
+ *
+ * **It is `CommandToolbar`, which is what the Command Dock is** — the one
+ * neutral command surface, drawn here over a Thing and there over the canvas
+ * (`.scratch/command-dock/issues/12`). A Thing's commands and a Space's commands
+ * are both chrome, so sharing the component is what makes them one language
+ * rather than two stylesheets that agree today. The Thing used to draw its own
+ * box on a Graph-coloured band; both are gone.
  *
  * The keydown stop lives here rather than on each control. React Flow
  * subscribes its own keys on `document`, and an arrow pressed on the rail must
@@ -24,16 +26,17 @@ import { cn } from './lib/utils';
  * handler sits, so the arrows would move nothing. Base UI merges its handler
  * with this one, so the composite still sees the key first.
  *
- * It draws nothing: the row, the gap and when the cluster is revealed are the
- * mounting Thing's, which is why `className` arrives from the caller and reaches
- * the toolbar untouched.
+ * The row, the gap, the border and the paper are the shared surface's; **when**
+ * the cluster is revealed is the mounting Thing's, which is why `className`
+ * arrives from the caller and reaches the surface to be merged rather than
+ * replaced.
  */
-export type ThingRailActionsProps = ComponentProps<typeof Toolbar>;
+export type ThingRailActionsProps = ComponentProps<typeof CommandToolbar>;
 
 export const ThingRailActions = forwardRef<HTMLDivElement, ThingRailActionsProps>(
   function ThingRailActions({ onKeyDown, ...props }, ref) {
     return (
-      <Toolbar
+      <CommandToolbar
         ref={ref}
         data-slot="thing-rail-actions"
         onKeyDown={(event) => {
@@ -53,8 +56,16 @@ export const ThingRailActions = forwardRef<HTMLDivElement, ThingRailActionsProps
 const emptyGroup = (children: ComponentProps<typeof ToolbarGroup>['children']): boolean =>
   Children.toArray(children).length === 0;
 
-/** A group's own row and gap; the rail's spacing between groups stays the rail's. */
-const GROUP_LAYOUT = 'inline-flex items-center gap-1';
+/**
+ * A group's own row and gap.
+ *
+ * **Tighter than the gap between groups**, which is the shared command
+ * surface's 2px — so a group reads as one run and the boundary between two of
+ * them reads as a seam. The Command Dock's clusters are the same pair the other
+ * way round from the surface's own gap (`command-dock.css`), and a group spaced
+ * *wider* than the boundary would say the opposite of what the grouping means.
+ */
+const GROUP_LAYOUT = 'inline-flex items-center gap-px';
 
 /**
  * Whose command is this?
@@ -136,9 +147,17 @@ export const ThingRailSharedActions = forwardRef<HTMLDivElement, ThingRailShared
  * same trailing cluster, whatever the command is (ADR 0073).
  *
  * `variant` and `size` are deliberately not offered. One rail, one control
- * treatment — a command that carried its own box would read as a different
- * kind of thing to the ones it sits beside — and `thing__rail-action` is where
- * that treatment is written.
+ * treatment — a command that carried its own box would read as a different kind
+ * of thing to the ones it sits beside — and the treatment is `ToolbarButton`'s
+ * own default, which is the quiet icon button every command in the Command Dock
+ * is drawn as. The Thing used to override it with a hand-drawn 22px box in
+ * `canvas-thing.css`, inked from the Thing's own paper because it sat on a
+ * Graph-coloured band; the band is gone and so is the override, so "the Thing's
+ * commands look like the Dock's" is now one recipe rather than two
+ * (`.scratch/command-dock/issues/12`).
+ *
+ * `thing__rail-action` survives as the canvas hook this component needs and not
+ * as a second appearance.
  *
  * It also owns the three things every rail control has to do to sit on a
  * canvas, so no call site restates them:

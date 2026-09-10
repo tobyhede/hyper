@@ -23,28 +23,17 @@
 
 /* ------------------------------------------------------------------ frame */
 
-/* Every dock shares one treatment so the variants differ by arrangement
-   rather than by decoration. Chrome is *about* the canvas, so it reads as a
-   layer over it: translucent, blurred, and never the paper a Thing is. */
-.command-dock__surface {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: color-mix(in oklab, var(--card) 92%, transparent);
-  /* The ink, washed — `rgb(31 41 51)` is `--foreground` spelled out, and
-     spelling it out is what made the paragraph above this file untrue. */
-  box-shadow:
-    0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
-    0 6px 18px color-mix(in oklab, var(--foreground) 10%, transparent);
-  backdrop-filter: blur(8px);
-}
+/* **The treatment is not here.** Every dock shares one, and so does the strip
+   a Thing reveals on hover: translucent, blurred, hairline-bordered, and never
+   the paper a Thing is. That is `.command-surface` in
+   `packages/ui/src/command-surface.css`, which `CommandToolbar` wears and this
+   surface mounts — so the Dock and the Thing read as one language because they
+   are one surface drawn twice, rather than because two stylesheets were kept in
+   step (`.scratch/command-dock/issues/12`). The axis is there too, read off the
+   same `data-orientation` Base UI is given.
 
-.command-dock__surface[data-orientation='vertical'] {
-  flex-direction: column;
-}
+   What is left below is the Dock's own: where it sits, how large it may grow,
+   what scrolls, what a drag does to it, and how a column arranges its rows. */
 
 /* The bottom edge is contested: the macOS Dock, its auto-reveal strip, the window
    resize handle and the browser's own download bar all sit in the last few
@@ -251,26 +240,19 @@
 
 /* Which Diagram and which Graph are active. The name is always drawn — the
    three collapse modes a narrow dock was compared through are gone, because a
-   vertical dock stacks into named rows rather than shrinking into a rail. */
-/* **The gap belongs to the control, not to the label.** This used to carry
+   vertical dock stacks into named rows rather than shrinking into a rail.
+
+   **How a name is drawn is not here either.** Ellipsed rather than wrapped, and
+   never widening the strip it is on, is `CommandName` in `@project/ui` — shared
+   with an Open Space Thing, which names a Diagram and a Graph exactly as this
+   surface does.
+
+   **The gap belongs to the control, not to the label.** The label used to carry
    `margin-inline-start: 6px`, which separated a name from the glyph before it —
    and gave a label with no glyph a 6px indent from nothing. The one trigger
    without a glyph is the Open Spaces menu at the root, and that is where it showed. The
    space between a glyph and its name now comes from the button's own `gap`
    below, which every named control in the Dock shares. */
-.command-dock__ident {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: 2px;
-  overflow: hidden;
-}
-
-.command-dock__ident-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* No cap: the dock is a fixed column now, so the name track is what bounds a
    title and a number here would only be a second, quieter bound that disagrees
@@ -535,7 +517,7 @@
 
 /* The parent's own row: glyph and name at one weight, so the two follow the
    button's colour together. */
-.command-dock__crumb .command-dock__ident-text {
+.command-dock__crumb .command-name {
   margin-inline-start: 6px;
 }
 

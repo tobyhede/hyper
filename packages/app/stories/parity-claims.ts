@@ -162,10 +162,18 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Alias front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
   },
   {
-    id: 'canvas-thing-shows-active-graph-colour',
+    // **The former coloured-rail claim, changed rather than dropped.**
+    // It read "a selected Thing's rail carries the Active Graph's own colour",
+    // which was true and is now deliberately false: the rail is neutral and the
+    // commands on it are the Command Dock's own surface
+    // (`.scratch/command-dock/issues/12`). The claim keeps the palette sweep,
+    // because what has to hold at every colour is the *opposite* of what it used
+    // to be — and adds the half that says where the colour went.
+    id: 'canvas-thing-toolbar-is-neutral-and-graph-colour-stays-on-connections',
     storyFile: 'components/thing.stories.tsx',
     storyExport: 'Colours',
-    claim: "A selected Thing's rail carries the Active Graph's own colour.",
+    claim:
+      "A Thing's revealed commands are drawn on the same neutral command surface as the Command Dock at every Active Graph colour, while the Thing's authoring handles and its Edges keep that colour.",
   },
   {
     id: 'canvas-thing-hover-reveals-actions-and-handles-together',
@@ -520,6 +528,13 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'SelectedDiagram',
     claim:
       "An Open Space Thing draws the Diagram it selects — the target Space's own Things and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Thing's own rect.",
+  },
+  {
+    id: 'open-space-thing-chooses-its-context-on-the-shared-controls',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      "An Open Space Thing's Diagram and Graph choices are drawn on the Command Dock's own command surface and through the same shared control and list, and choosing one writes the Thing's stored context without moving the containing Space.",
   },
   {
     id: 'embedded-diagram-things-author-target',

@@ -99,28 +99,24 @@
   transform: rotate(-1deg);
 }
 
-/* The rail's geometry and its Active-Graph band are `ThingRail`'s, in
-   `thing-rail.css`. What belongs to the canvas Thing is *when* it shows: a resting
-   Thing on the canvas is quiet, and reveals its rail with itself. That is this
-   Thing's state, not the rail's, so the resting case is written here as the
-   negation of the same "not resting" set the face and the glyph use — a Thing at
-   rest that no pointer is over, that no authoring handle of its own is under,
-   **and that is not running an edit**. Everything else, selection and dragging
-   included, leaves the rail as `ThingRail` draws it.
+/* The rail's geometry is `ThingRail`'s, in `thing-rail.css`, and it has no colour
+   at all: what used to be an Active-Graph band behind the commands is gone, and
+   the commands sit on the shared neutral command surface instead
+   (`.scratch/command-dock/issues/12`). So there is no resting band to quiet
+   here, and the two things that are still the canvas Thing's are *when* its
+   commands show and how quiet its kind glyph is at rest.
+
+   The resting case is written as the negation of the same "not resting" set the
+   face uses — a Thing at rest that no pointer is over, that no authoring handle
+   of its own is under, **and that is not running an edit**. Everything else,
+   selection and dragging included, draws the glyph at full strength.
 
    A running edit belongs in that set because it outlives every other reason the
-   rail is up. The caret is in the body, so no hover, selection or focus of the
-   rail's own is true — and a blur ends nothing (ADR 0064), so deselecting a Thing
-   mid-edit used to quiet the band and the glyph while leaving Save, Cancel and
-   Close lit on top of nothing. The exits stay visible because the ADR says they
-   do; this is what stops them being the only thing left. */
-.canvas-thing[data-state='rest']:not(:hover):not(
-    :has(~ .rf-thing-node__authoring-handle:hover)
-  ):not([data-content-editing='true'])
-  .thing-rail {
-  background: transparent;
-}
-
+   commands are up. The caret is in the body, so no hover, selection or focus of
+   the rail's own is true — and a blur ends nothing (ADR 0064), so deselecting a
+   Thing mid-edit used to quiet the glyph while leaving Save, Cancel and Close lit
+   beside it. The exits stay visible because the ADR says they do; this is what
+   stops them standing alone on a Thing that looks asleep. */
 .canvas-thing .thing-rail__kind {
   color: var(--canvas-thing-ink);
 }
@@ -132,10 +128,12 @@
   opacity: 0.28;
 }
 
+/* **Only the reveal is here.** The row, the gap, the padding, the border, the
+   corners, the paper and the shadow are the shared `.command-surface`'s, which
+   `ThingRailActions` mounts — the same surface the Command Dock wears. What is
+   the Thing's is that a resting Thing on the canvas is quiet and shows its
+   commands with itself. */
 .canvas-thing__actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
@@ -155,58 +153,26 @@
   pointer-events: auto;
 }
 
-.canvas-thing .thing__rail-action {
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--canvas-thing-ink);
-  border-radius: 0;
-  padding: 0;
-  background: var(--canvas-thing-face);
-  color: var(--canvas-thing-ink);
-  transition:
-    color var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease),
-    background-color var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
-}
+/* A rail command's own appearance is **not declared here any more**. It is
+   `ToolbarButton`'s quiet icon button — the control treatment every command in
+   the Command Dock is drawn as — and it sits on the shared command surface
+   rather than on a Graph-coloured band, so there is nothing left for this
+   stylesheet to correct (`.scratch/command-dock/issues/12`).
 
-/* Unavailable, at any rail colour.
+   What went, and why none of it is owed: a 22px hand-drawn box with the Thing's
+   own ink and paper; an inverted hover that painted the glyph in the Active
+   Graph's colour; and an `aria-disabled` rule that restored opacity and mixed a
+   border from the Thing's ink, because a semi-transparent control on a coloured
+   band read as a differently-coloured control rather than an unavailable one.
 
-   Matched on `aria-disabled`, not `:disabled`. A rail control is a toolbar item
-   (ADR 0073) and a toolbar item stays focusable while unavailable, so it carries
-   the attribute rather than the native property — `:disabled` matches none of
-   them, and `Button`'s own `disabled:` utilities do not apply either.
-
-   Two things go wrong on a coloured band and both are fixed the same way. First,
-   a semi-transparent control lets the rail's Active-Graph colour through — the
-   paper and the ink both take that colour on, and the result reads as a
-   differently-coloured control rather than an unavailable one. Second, a border
-   pulled close to the paper leaves an edgeless square floating on the band,
-   which washes out against a mid-tone rail and disappears entirely against a
-   pale one.
-
-   So: full opacity, opaque paper, and a border that is still unambiguously an
-   edge. Every value is mixed from the Thing's own **ink** and **paper** and
-   nothing is mixed from the rail, which is what makes one rule hold for every
-   Graph colour the Space has. The quieting is a step down from the ink the
-   enabled controls use, not a step toward whatever is behind. */
-.canvas-thing .thing__rail-action[aria-disabled='true'],
-.canvas-thing .thing__rail-action[aria-disabled='true']:hover {
-  opacity: 1;
-  border-color: color-mix(in srgb, var(--canvas-thing-ink) 45%, var(--canvas-thing-face));
-  background: var(--canvas-thing-face);
-  color: color-mix(in srgb, var(--canvas-thing-ink) 32%, var(--canvas-thing-face));
-  cursor: not-allowed;
-}
-
-.canvas-thing .thing__rail-action:not([aria-disabled='true']):hover {
-  border-color: var(--canvas-thing-ink);
-  background: var(--canvas-thing-ink);
-  color: var(--canvas-thing-graph);
-}
-
-.canvas-thing .thing__rail-action:focus-visible {
-  outline: 2px solid var(--canvas-thing-ink);
-  outline-offset: 2px;
-}
+   **The third of those said something true that the shared recipe was not
+   saying**, and it is said there now rather than dropped: a toolbar item stays
+   focusable while unavailable, so it carries `aria-disabled` and not the native
+   property, which `disabled:` utilities do not match — so an unavailable command
+   was quietened on a Thing by this file and nowhere else, the Command Dock's own
+   having never been quietened at all. `Button`'s recipe carries it now
+   (`Button.tsx`), which is one answer for both surfaces instead of one surface's
+   correction. */
 
 .canvas-thing__body {
   display: flex;
@@ -214,7 +180,11 @@
   flex-direction: column;
   justify-content: flex-end;
   min-height: 0;
-  padding: 10px 12px;
+  /* 8px and not 10px: the rail above is the command strip's own height, and a
+     Closed Thing's remaining room still has to hold the whole Title ladder —
+     which `packages/ui/test/canvas-thing-title-ladder.test.ts` computes from this
+     number, the rail's and the border's. */
+  padding: 8px 12px;
 }
 
 /* The heading box holds the ladder and caps it. Its own type is the `title`
@@ -333,66 +303,35 @@
   line-height: 1.2;
 }
 
-.canvas-thing__space-selectors {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* The two choices an Open Space Thing publishes, on the shared command surface.
+
+   **Nothing here paints them.** The panel, its border, its corners, its padding
+   and the column it stacks in are `.command-surface`'s, and each row is the
+   shared quiet button the Command Dock's own controls are — which is the whole
+   of what "a Space Thing uses the Dock's Diagram and Graph controls" means
+   (`.scratch/command-dock/issues/12`). The two rules below are arrangement, and
+   arrangement is what a mounting surface keeps: where the panel sits on the
+   Thing, and that its rows fill it.
+
+   The surface is a neutral panel on cream paper, exactly as the Thing's own
+   command strip is — so the Select trigger's four Thing-inked overrides that used
+   to live here are gone with the control they corrected. */
+.canvas-thing__space-choices {
   margin-top: 8px;
 }
 
-/* Label above field rather than beside it. A Thing is narrow and both labels are
-   one short word, so a row would spend the width the titles need on two columns
-   that never fill. */
-.canvas-thing__space-selector {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* Through the enclosing selector for the reason given on the trigger below:
-   `Label` brings its own equal-specificity type scale. */
-.canvas-thing__space-selector .canvas-thing__space-selector-label {
-  color: var(--canvas-thing-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-/* The trigger's own palette is the toolbar's — dark panel, dark text — and this
-   Thing is cream. So it takes the Thing's ink and paper, exactly as the rail's
-   controls do, rather than carrying the surrounding theme onto the one surface
-   that is not in it.
-
-   Written through the enclosing selector for the same reason `thing__rail-action`
-   is: `SelectTrigger` carries Tailwind utilities of equal specificity, and one
-   class against one class is decided by whichever stylesheet the bundler
-   happened to emit last. */
-.canvas-thing__space-selector .canvas-thing__space-selector-trigger {
+/* A column of named rows: each fills the panel's width and reads from its glyph
+   rather than floating in the middle of a width the longest title happened to
+   set — the same rule, and the same reason, as the vertical Command Dock's. The
+   name takes the slack so every chevron lands in one column. */
+.canvas-thing__space-choice {
   width: 100%;
-  min-width: 0;
-  border-color: var(--canvas-thing-ink);
-  background: var(--canvas-thing-face);
-  color: var(--canvas-thing-title);
-  font-size: 12px;
+  justify-content: flex-start;
+  gap: 6px;
 }
 
-/* The selected title, which is as long as an author's Diagram names are and the
-   Thing is as wide as a Thing. */
-.canvas-thing__space-selector .canvas-thing__space-selector-trigger > span:first-of-type {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.canvas-thing__space-selector .canvas-thing__space-selector-trigger:disabled {
-  color: var(--canvas-thing-muted);
-}
-
-.canvas-thing__space-selector .canvas-thing__space-selector-trigger:focus-visible {
-  outline: 2px solid var(--canvas-thing-graph);
-  outline-offset: 2px;
+.canvas-thing__space-choice .command-name {
+  flex: 1 1 auto;
 }
 
 /* An Open Space Thing draws the Diagram it selects (ADR 0068), and that view
@@ -520,8 +459,7 @@
 @media (prefers-reduced-motion: reduce) {
   .canvas-thing,
   .canvas-thing__actions,
-  .canvas-thing__content,
-  .canvas-thing .thing__rail-action {
+  .canvas-thing__content {
     transition: none;
   }
 

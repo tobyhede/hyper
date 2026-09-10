@@ -37,6 +37,20 @@ export type {
   ThingRailKindActionsProps,
   ThingRailSharedActionsProps,
 } from './ThingRailActions';
+export { CommandName, CommandSurface, CommandToolbar } from './CommandSurface';
+export type {
+  CommandNameProps,
+  CommandSurfaceOrientation,
+  CommandSurfaceProps,
+  CommandToolbarProps,
+} from './CommandSurface';
+export { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
+export type {
+  ChoiceMenuChoice,
+  ChoiceMenuProps,
+  ChoiceMenuSide,
+  ChoiceMenuTriggerProps,
+} from './ChoiceMenu';
 export { ThingKindIcon, thingKindName } from './ThingKindIcon';
 export type { ThingKindIconProps } from './ThingKindIcon';
 export { ThingSearchCombobox } from './ThingSearchCombobox';
