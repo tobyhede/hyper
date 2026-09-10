@@ -59,6 +59,12 @@ test(
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A')).toBeVisible();
+    // The same gate every other test in this file opens with, and the one this
+    // test was missing. A visible node says the projection arrived, not that
+    // the opening camera animation has stopped — and animation frames still
+    // being spent on the canvas are what stretch a menu's own exit animation in
+    // wall-clock time, which is the gap the press below has to clear.
+    await settled(page);
     await dock(page)
       .getByRole('button', { name: /^Move Command Dock/ })
       .click();
