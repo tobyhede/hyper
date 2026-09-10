@@ -75,7 +75,12 @@ than the opening Card's `x` gains `g.width`, and independently, every Card whose
 sign reversed. Resizing applies the difference between the old and new growth.
 
 The comparison is strict and per-axis, exactly as `drawn` had it, so a Layout
-opened and immediately closed returns to the positions it started from.
+opened and immediately closed returns to the positions it started from. That
+round trip rests on the growth being **nonnegative**, which the floor guarantees:
+every Card the Open pushed beyond the subject is still beyond it when the Close
+runs, so the negation reclaims from exactly the set the Open moved. Applying a
+negative growth *first* is not an involution and is not reachable — Close only
+ever negates a growth already applied.
 
 ## Closing reclaims from where things are now
 

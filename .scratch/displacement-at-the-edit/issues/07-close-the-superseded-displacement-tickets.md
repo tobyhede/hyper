@@ -19,5 +19,9 @@ or pick one of 07's three treatments for a band that is gone.
 - [ ] The e2e test 06 added is gone (ticket `04`), and `07`'s measured sweep is
       preserved in this effort's `05` as the case that must now land at the drop
       point.
-- [ ] ADR 0064's displacement section and `docs/agents/rendering.md` agree with
-      0084. Neither describes a derived displacement or two interaction drafts.
+- [ ] `docs/agents/rendering.md` describes neither a derived displacement nor
+      two interaction drafts. **ADR 0064's body is not touched**: an accepted ADR
+      is append-only and its status line is the only edit it ever receives
+      (`docs/agents/workflow.md`). It already carries `Refined by: 0084`, and the
+      reversal is stated in 0084 alone — a reader arriving at 0064 follows the
+      link rather than finding it rewritten.

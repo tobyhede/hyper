@@ -18,8 +18,20 @@ band. Deleting them is the point of the work, not a tidy-up after it.
       strictly greater gains `growth.height`. The subject itself never moves. A
       negative growth is how Close is expressed; the operation does not care.
 - [ ] The comparison is strict and per-axis, exactly as `drawn` had it, so
-      `displace(displace(p, c, g), c, negate(g))` is `p` for any `p`, `c`, `g` —
-      asserted as a property, since it is what makes Open/Close a round trip.
+      `displace(displace(p, c, g), c, negate(g))` is `p` for any `p`, any `c`,
+      and any **nonnegative** `g` — asserted as a property, since it is what
+      makes Open/Close a round trip.
+
+      **The bound is load-bearing, not a generator convenience.** The involution
+      is false for a negative initial growth, and deliberately so: with the
+      subject at `x = 0`, a neighbour at `x = 1` and `growth.width = -2`, the
+      first call moves the neighbour to `-1`, and the second skips it because it
+      is no longer beyond the subject. That is not reachable in the product —
+      Open always applies a nonnegative growth and Close always applies the
+      negation of one already applied, so every Card that Close must reclaim
+      from is still beyond the subject when it runs. Do not "fix" the asymmetry
+      by clamping or by remembering who moved; state the bound and keep the
+      operation total.
 - [ ] `Placement.drawn` is **deleted**. Its one production caller,
       `packages/graph/src/positioned.ts:27`, reads the placement directly.
 - [ ] `Placement.authoredPoint` is **deleted**. `Placement.next` merges what the
