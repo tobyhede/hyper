@@ -1,4 +1,5 @@
 import { useCallback, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { titleLines } from '@project/core';
 import { Button } from './Button';
 import {
   CardRailAction,
@@ -421,7 +422,7 @@ export function CanvasCard(props: CanvasCardProps) {
             aria-label={title}
           >
             {onBeginTitleEdit === undefined || visibleContentEdit !== null ? (
-              title
+              <TitleLadder title={title} />
             ) : (
               // ADR 0065 composes the shared shadcn/Base Button inside the
               // heading: the primitive owns Enter/Space activation and button
@@ -438,7 +439,7 @@ export function CanvasCard(props: CanvasCardProps) {
                 onPointerDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                {title}
+                <TitleLadder title={title} />
               </Button>
             )}
           </CardTitle>
@@ -475,6 +476,46 @@ export function CanvasCard(props: CanvasCardProps) {
     <EntityActions groups={entityActions}>{card}</EntityActions>
   ) : (
     card
+  );
+}
+
+interface TitleLadderProps {
+  readonly title: string;
+}
+
+/**
+ * A Card's Title drawn as its Title Lines (ADR 0083).
+ *
+ * The Card front is the only surface that draws the ladder — everywhere else
+ * shows the name, which is the first line — and it draws it identically whether
+ * the Card is Open or Closed and whatever kind the Card is. A Title that
+ * changed shape on Opening would teach an author that Opening edits it.
+ *
+ * Each line is **its own block element carrying its role**, and that is the
+ * whole of the structure: the roles come from `titleLines`, which is where the
+ * domain settles what an author's second line means, and the type ladder,
+ * clamping and colour come from `canvas-card.css`. Nothing here reads a
+ * newline, because a `split('\n')` at a call site is exactly what ADR 0083
+ * bought the named operation to prevent.
+ *
+ * The distinction the block-per-line is here for: a break the **author typed**
+ * starts a rung and a break the **box chose** does not. Each element wraps
+ * freely within its own role, so a subtitle that runs to two visual lines is
+ * one subtitle rather than a subtitle and a caption, and a long single-line
+ * Title still draws entirely at the `title` role, as it always has.
+ *
+ * Keyed by position because position *is* the identity here — it is what gives
+ * a line its role — and two lines of a Title may legitimately read the same.
+ */
+function TitleLadder({ title }: TitleLadderProps) {
+  return (
+    <>
+      {titleLines(title).map((line, index) => (
+        <span key={index} className="canvas-card__title-line" data-role={line.role}>
+          {line.text}
+        </span>
+      ))}
+    </>
   );
 }
 
