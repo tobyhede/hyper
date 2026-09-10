@@ -712,7 +712,13 @@ describe('render adapter', () => {
     expect(store.getState().resizeDraft?.cardId).toBe(CARD_A);
   });
 
-  it('previews one resize through a derived Placement and completes only its final size', () => {
+  it('previews the resizing Card and nobody else, and completes only its final size', () => {
+    // The draft layers the proposed Open Size over the authored Placement and
+    // nothing more. B keeps its authored coordinate through the whole gesture
+    // although A grows past it, because a Card's neighbours do not move until
+    // the Edit lands (ADR 0084) — there is no derived layer left to preview.
+    // This is what stops the render adapter reacquiring a `move` draft: a
+    // dragged Card displaces nobody either.
     const authored = Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       [CARD_B, { x: 300, y: 200, open: false }],

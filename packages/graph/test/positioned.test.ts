@@ -46,7 +46,7 @@ const at = (entries: Record<string, [number, number]>): Placement =>
   Placement.fromEntries(Object.entries(entries).map(([id, [x, y]]) => [uuid(id), { x, y }]));
 
 describe('positionedStrategy', () => {
-  it('draws authored expansion and neighbour displacement', async () => {
+  it('draws an Open Card at its authored rect and moves nobody for it', async () => {
     const positions = Placement.fromEntries([
       [
         uuid('00000000-0000-4000-8000-000000000002'),
@@ -62,9 +62,12 @@ describe('positionedStrategy', () => {
       edges: [],
     });
 
+    // The Open Card's own rect is authored, so this reads it. Its neighbour is
+    // not moved here: displacement was applied by the Edit that opened the Card
+    // and is already in the coordinates this reads (ADR 0084).
     expect(laid.cards).toMatchObject([
       { x: 0, y: 0, width: 360, height: 196 },
-      { x: 400, y: 250 },
+      { x: 300, y: 200 },
     ]);
   });
 

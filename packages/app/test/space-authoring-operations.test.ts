@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  COLLAPSED_CARD_SIZE,
+  DEFAULT_OPEN_SIZE,
   uuidSchema,
+  type CardPlacement,
   type Graph,
   type LayoutId,
   type SpaceSnapshot,
@@ -31,6 +34,8 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const CARD_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const CARD_E = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -206,7 +211,7 @@ describe('Add Card', () => {
     expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24, open: false }]);
   });
 
-  it('stores a canvas anchor without the displacement already drawn into it', () => {
+  it('stores the canvas anchor as authored, whatever else is Open', () => {
     const expandedSnapshot: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
@@ -232,9 +237,12 @@ describe('Add Card', () => {
 
     authoring.complete({ kind: 'created-card', anchor: { x: 500, y: 400 } });
 
+    // A canvas coordinate is an authored one: A being Open moved its neighbours
+    // when the Edit that opened it ran, and nothing converts a drop point on the
+    // way in any more (ADR 0084). The Card lands where it was dropped.
     expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[MINTED]).toEqual({
-      x: 200,
-      y: 126,
+      x: 500,
+      y: 400,
       open: false,
     });
   });
@@ -300,6 +308,83 @@ describe('Edit Card', () => {
 });
 
 describe('Expanded Card geometry', () => {
+  /**
+   * What {@link DEFAULT_OPEN_SIZE} displaces by: the Open rect less the
+   * collapsed one, per axis (ADR 0084). Named rather than derived so the
+   * coordinates below read as positions instead of as arithmetic.
+   */
+  const GROWTH = { width: 300, height: 274 };
+
+  /**
+   * Five Cards at every relation to CARD_A the per-axis comparison
+   * distinguishes: beyond on `x` and level on `y`, level on `x` and beyond on
+   * `y`, beyond on both, and before on both.
+   */
+  const displacementSnapshot: SpaceSnapshot = {
+    ...positionedSnapshot,
+    cards: [
+      ...positionedSnapshot.cards,
+      { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      { id: CARD_D, document: { title: 'D', kind: 'markdown', body: 'D' } },
+      { id: CARD_E, document: { title: 'E', kind: 'markdown', body: 'E' } },
+    ],
+    document: {
+      ...positionedSnapshot.document,
+      layouts: [
+        {
+          id: LAYOUT_ID,
+          title: 'Layout 1',
+          kind: 'positioned',
+          positions: {
+            [CARD_A]: { x: 100, y: 100, open: false },
+            [CARD_B]: { x: 300, y: 100, open: false },
+            [CARD_C]: { x: 100, y: 300, open: false },
+            [CARD_D]: { x: 500, y: 500, open: false },
+            [CARD_E]: { x: 40, y: 40, open: false },
+          },
+          graphs: [MAIN_GRAPH],
+        },
+      ],
+      defaultLayout: LAYOUT_ID,
+    },
+  };
+
+  const openDisplacement = () => {
+    const opened = open(displacementSnapshot);
+    // The geometry the canvas has reported by now: the Layout as authored.
+    place(opened.authoring, {
+      [CARD_A]: [100, 100],
+      [CARD_B]: [300, 100],
+      [CARD_C]: [100, 300],
+      [CARD_D]: [500, 500],
+      [CARD_E]: [40, 40],
+    });
+    return opened;
+  };
+
+  /** Every origin the Layout authors, so a whole Layout can be compared at once. */
+  const originsOf = (session: ReturnType<typeof open>['session']) => {
+    const origins = new Map<string, readonly [number, number]>();
+    const positions = layoutOf(session.getState().working, LAYOUT_ID)?.positions ?? {};
+    for (const [cardId, at] of Object.entries(positions)) {
+      if (at !== undefined) origins.set(cardId, [at.x, at.y]);
+    }
+    return Object.fromEntries(origins);
+  };
+
+  /**
+   * Report canvas geometry that keeps an Open Card Open, which {@link place}
+   * cannot: it reports plain points, and every one of those is Closed.
+   */
+  const reportPlacement = (
+    authoring: SpaceAuthoring,
+    entries: Record<string, CardPlacement>,
+  ): void => {
+    authoring.replacePlacement(
+      Placement.fromEntries(Object.entries(entries).map(([id, at]) => [uuidSchema.parse(id), at])),
+    );
+  };
+
   it('restores a resized Open Size after Closing and Opening again', () => {
     const { authoring, session } = openPositioned();
 
@@ -375,6 +460,208 @@ describe('Expanded Card geometry', () => {
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'card-not-expanded' } });
     expect(session.getState().working).toBe(before);
+  });
+
+  it('moves the Cards strictly beyond the opening Card by that axis growth, and nobody else', () => {
+    const { authoring, session } = openDisplacement();
+
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(originsOf(session)).toEqual({
+      // A Card does not displace itself.
+      [CARD_A]: [100, 100],
+      // Beyond on `x` and level on `y`, so it moves right and not down.
+      [CARD_B]: [300 + GROWTH.width, 100],
+      // The mirror of it: level on `x` and beyond on `y`.
+      [CARD_C]: [100, 300 + GROWTH.height],
+      [CARD_D]: [500 + GROWTH.width, 500 + GROWTH.height],
+      // Before the Card on both axes: the room is made after it, not around it.
+      [CARD_E]: [40, 40],
+    });
+  });
+
+  it('returns every position to exactly what it was when the Card Closes again', () => {
+    const { authoring, session } = openDisplacement();
+    const before = originsOf(session);
+
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+    expect(authoring.complete({ kind: 'closed-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(originsOf(session)).toEqual(before);
+  });
+
+  it('reclaims from a Card the author moved beyond the Open Card, which the Open never pushed', () => {
+    // ADR 0084: Open and Close each read the Layout as it is at that moment and
+    // remember nothing about who was pushed, so Close reclaims from everything
+    // currently beyond the closing Card. This is the deliberate memoryless
+    // behaviour and not a defect — recording which Cards a particular Open moved
+    // is the per-Card history that ADR rejected, because it goes stale the
+    // moment the author moves anything and makes two identical Layouts behave
+    // differently.
+    const { authoring, session } = openDisplacement();
+
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+    // The author drags E from before the Open Card to beyond it on both axes.
+    reportPlacement(authoring, {
+      [CARD_A]: { x: 100, y: 100, open: true, openSize: DEFAULT_OPEN_SIZE },
+      [CARD_B]: { x: 600, y: 100, open: false },
+      [CARD_C]: { x: 100, y: 574, open: false },
+      [CARD_D]: { x: 800, y: 774, open: false },
+      [CARD_E]: { x: 900, y: 900, open: false },
+    });
+
+    expect(authoring.complete({ kind: 'closed-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(originsOf(session)).toEqual({
+      [CARD_A]: [100, 100],
+      [CARD_B]: [300, 100],
+      [CARD_C]: [100, 300],
+      [CARD_D]: [500, 500],
+      // Never pushed by the Open, and moved back by the Close all the same.
+      [CARD_E]: [900 - GROWTH.width, 900 - GROWTH.height],
+    });
+  });
+
+  it('takes an already Open Card room as it finds it, with nothing summed over Open Cards', () => {
+    const { authoring, session } = openDisplacement();
+
+    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    // B is at (600, 100) by now, and its own growth is measured from there.
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_B })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(originsOf(session)).toEqual({
+      // Level with B on `y` and before it on `x`: A does not move for it.
+      [CARD_A]: [100, 100],
+      [CARD_B]: [600, 100],
+      [CARD_C]: [100, 574 + GROWTH.height],
+      [CARD_D]: [800 + GROWTH.width, 774 + GROWTH.height],
+      [CARD_E]: [40, 40],
+    });
+  });
+
+  it('refuses a subject the Layout does not hold and moves nobody', () => {
+    const { authoring, session } = openDisplacement();
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'opened-card', cardId: UNKNOWN_CARD })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'card-not-in-layout' },
+    });
+    expect(authoring.complete({ kind: 'closed-card', cardId: UNKNOWN_CARD })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'card-not-in-layout' },
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('moves neighbours by the difference between the old growth and the new one', () => {
+    const { authoring, session } = openDisplacement();
+    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+
+    expect(
+      authoring.complete({
+        kind: 'resized-card',
+        cardId: CARD_A,
+        size: { width: 860, height: 720 },
+      }),
+    ).toEqual({ kind: 'completed' });
+
+    // 860x720 grows by (600, 574); the Open already applied (300, 274); the
+    // difference this Edit applies is (300, 300).
+    expect(originsOf(session)).toEqual({
+      [CARD_A]: [100, 100],
+      [CARD_B]: [900, 100],
+      [CARD_C]: [100, 874],
+      [CARD_D]: [1100, 1074],
+      [CARD_E]: [40, 40],
+    });
+  });
+
+  it('moves neighbours on one axis only when only one axis of the size changed', () => {
+    const { authoring, session } = openDisplacement();
+    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+
+    // 100 wider at the same height, so the height difference is zero.
+    authoring.complete({
+      kind: 'resized-card',
+      cardId: CARD_A,
+      size: { width: 660, height: 420 },
+    });
+
+    expect(originsOf(session)).toEqual({
+      [CARD_A]: [100, 100],
+      [CARD_B]: [700, 100],
+      [CARD_C]: [100, 574],
+      [CARD_D]: [900, 774],
+      [CARD_E]: [40, 40],
+    });
+  });
+
+  it('is unchanged and moves nobody when the proposal is the size the Card already has', () => {
+    const { authoring, session } = openDisplacement();
+    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    const before = session.getState().working;
+
+    expect(
+      authoring.complete({ kind: 'resized-card', cardId: CARD_A, size: DEFAULT_OPEN_SIZE }),
+    ).toEqual({ kind: 'unchanged' });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('returns every position to where it started through Open, resize, resize back and Close', () => {
+    const { authoring, session } = openDisplacement();
+    const before = originsOf(session);
+
+    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    authoring.complete({
+      kind: 'resized-card',
+      cardId: CARD_A,
+      size: { width: 860, height: 720 },
+    });
+    authoring.complete({ kind: 'resized-card', cardId: CARD_A, size: DEFAULT_OPEN_SIZE });
+    authoring.complete({ kind: 'closed-card', cardId: CARD_A });
+
+    expect(originsOf(session)).toEqual(before);
+  });
+
+  it('reclaims the whole growth of the size it was Open at when a resize snaps to Closed', () => {
+    const { authoring, session } = openDisplacement();
+    const before = originsOf(session);
+
+    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    authoring.complete({
+      kind: 'resized-card',
+      cardId: CARD_A,
+      size: { width: 860, height: 720 },
+    });
+
+    // The magnetic Close (ADR 0066) arrives as a resize proposal at exactly the
+    // collapsed size. What it gives back is (600, 574) — the growth of the
+    // 860x720 the Card was actually Open at — and not the zero growth of the
+    // collapsed rect being proposed.
+    expect(
+      authoring.complete({ kind: 'resized-card', cardId: CARD_A, size: COLLAPSED_CARD_SIZE }),
+    ).toEqual({ kind: 'completed' });
+
+    expect(originsOf(session)).toEqual(before);
+    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_A]).toEqual({
+      x: 100,
+      y: 100,
+      open: false,
+      openSize: { width: 860, height: 720 },
+    });
   });
 });
 
@@ -1126,7 +1413,7 @@ describe('Layout membership', () => {
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
   });
 
-  it('inverts drawn displacement when adding an absent Card to a Layout', () => {
+  it('places a Card added to a Layout at the anchor given, whatever is Open', () => {
     const expandedSparse: SpaceSnapshot = {
       ...sparse,
       document: {
@@ -1156,9 +1443,10 @@ describe('Layout membership', () => {
       anchor: { x: 500, y: 400 },
     });
 
+    // As above: the anchor is authorship, not a drawn coordinate to invert.
     expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_C]).toEqual({
-      x: 200,
-      y: 126,
+      x: 500,
+      y: 400,
       open: false,
     });
   });

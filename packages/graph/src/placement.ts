@@ -177,6 +177,18 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * a drag still in progress. A card that really moved arrives in `placed`, so
  * nothing legitimate needs the wider read.
  *
+ * What the report says is taken **as it stands**. Nothing sits between the
+ * Layout's positions and the canvas any more — displacement is applied by the
+ * Edit that causes it (ADR 0084), so a canvas coordinate already is an authored
+ * one and there is no derivation left to invert. A settled drag therefore
+ * authors the drop point exactly, whatever is Open and wherever it sits. The
+ * conversion this used to run could not be total, and the band it could not
+ * cover was the room the derivation itself invented.
+ *
+ * The card's own Open/Closed state and Open Size survive the merge: a renderer
+ * reports React Flow node positions and nothing else, so only `x` and `y` are
+ * read out of it.
+ *
  * Returns `authored` itself when nothing changes, so an unchanged placement
  * keeps its identity and a settled graph is not re-arranged by the projection
  * that reports it. A report that names no card is the common one — every
@@ -195,14 +207,13 @@ function next(
     const at = rendered.get(cardId);
     const original = authored.get(cardId);
     if (at !== undefined) {
-      const authoredAt = authoredPoint(authored, at, cardId);
       merged.set(
         cardId,
         point({
           ...at,
           ...original,
-          x: authoredAt.x,
-          y: authoredAt.y,
+          x: at.x,
+          y: at.y,
         }),
       );
     }
@@ -210,59 +221,6 @@ function next(
 
   const nextPlacement = brand(merged);
   return equals(authored, nextPlacement) ? authored : nextPlacement;
-}
-
-/**
- * Convert one point from drawn canvas coordinates back to Layout authorship.
- *
- * Each Expanded Card creates a step after its authored origin. In drawn space
- * that step ends after the accumulated growth before it, so iterating origins in
- * order identifies exactly the growth already present in a reachable drawn
- * coordinate. `movingCardId` excludes the Card being moved: a Card never
- * displaces itself, even when it is Expanded.
- *
- * Coordinates inside a step's unreachable gap stay on its near side. That is
- * ADR 0064's accepted step boundary; every coordinate produced by `drawn`
- * remains an exact inverse.
- */
-function authoredPoint(
-  placement: Placement,
-  at: LayoutPosition,
-  movingCardId?: CardId,
-): LayoutPosition {
-  const expanded = [...placement]
-    .filter(([cardId, point]) => cardId !== movingCardId && point.open)
-    .map(([, point]) => point);
-
-  const invert = (coordinate: 'x' | 'y', size: 'width' | 'height', collapsed: number): number => {
-    const ordered = [...expanded].sort((left, right) => left[coordinate] - right[coordinate]);
-    let growth = 0;
-    let authored = at[coordinate];
-    for (const point of ordered) {
-      if (!point.open) continue;
-      const rect = point.openSize;
-      // Floored for the same reason `drawn` floors it: a rect smaller than the
-      // collapsed constant would otherwise displace backwards, and an inverse
-      // of a backwards step is not one.
-      const step = Math.max(0, rect[size] - collapsed);
-      const drawnOrigin = point[coordinate] + growth;
-      growth += step;
-      if (at[coordinate] > point[coordinate] + growth) {
-        authored -= step;
-      } else if (at[coordinate] > drawnOrigin) {
-        // Inside the step's unreachable gap, which is the Expanded Card's own
-        // drawn box. Authoring the near side is what makes the drop settle where
-        // it was released instead of jumping the full growth one frame later.
-        authored = point[coordinate];
-      }
-    }
-    return authored;
-  };
-
-  return {
-    x: invert('x', 'width', COLLAPSED_CARD_SIZE.width),
-    y: invert('y', 'height', COLLAPSED_CARD_SIZE.height),
-  };
 }
 
 /**
@@ -309,25 +267,87 @@ function toPositions(placement: Placement): Record<CardId, CardPlacement> {
  */
 const empty = (): Placement => brand(new Map());
 
-/** The derived rects drawn on the canvas, including displacement from Expanded Cards. */
-function drawn(placement: Placement): Placement {
-  const result = new Map<CardId, CardPlacement>();
+/**
+ * A width and a height together: the shape an Open Size, the collapsed constant
+ * and a growth all share. Local, because none of the three is a domain entity —
+ * they are the two numbers displacement is arithmetic over.
+ */
+type Extent = { readonly width: number; readonly height: number };
+
+/**
+ * The growth an Open Card displaces its neighbours by: its Open rect less the
+ * collapsed one, floored at zero on each axis independently.
+ *
+ * The conversion sits beside `displace` because the floor is part of the rule
+ * rather than a caller's precaution, and a rule with two owners has none. Open
+ * passes this, Close passes its negation and Resize passes the difference
+ * between two of them, so every growth that reaches `displace` in production has
+ * come through here.
+ *
+ * The floor is not defensive arithmetic. Nothing authors a rect below
+ * `COLLAPSED_CARD_SIZE` — the resizer's minimum is exactly that, and
+ * `cardPlacementSchema` refuses a smaller one — but a stored Space is bytes, and
+ * a negative growth would pull neighbours backwards over the Card that caused
+ * it, past the subject, where the negating Close can no longer find them. So the
+ * floor is also what makes the Open/Close round trip below hold. A rect smaller
+ * than a collapsed Card displaces nobody, which is the honest reading of it: it
+ * is not a shrink of its neighbours.
+ */
+function growth(openSize: Extent): Extent {
+  return {
+    width: Math.max(0, openSize.width - COLLAPSED_CARD_SIZE.width),
+    height: Math.max(0, openSize.height - COLLAPSED_CARD_SIZE.height),
+  };
+}
+
+/**
+ * The placement with every Card beyond a subject moved by a growth.
+ *
+ * This is the whole of displacement (ADR 0084). Opening a Card applies its
+ * growth here as part of the Open Edit, and the coordinates it writes are
+ * authored ones with the same standing as any other — the author opened the
+ * Card, and opening is a Layout decision. Closing applies the negation, and
+ * resizing the difference. Between those Edits nothing derives anything: the
+ * Layout's positions are what the canvas draws.
+ *
+ * The comparison is **strict and per-axis**. A Card whose authored `x` is
+ * strictly greater than the subject's takes `growth.width`, and its `y` is
+ * decided separately against `growth.height`, so a Card below the subject and
+ * level with it moves down and not right. A Card sharing the subject's
+ * coordinate on an axis does not move on that axis, and the subject itself never
+ * moves on either: a Card does not displace itself.
+ *
+ * A negative growth is how Close is expressed and nothing here special-cases it,
+ * because the round trip is what makes Open and Close a pair:
+ * `displace(displace(p, c, g), c, negate(g))` is `p` for every **nonnegative**
+ * `g`. The bound is load-bearing rather than a convenience. Applying a negative
+ * growth *first* can carry a Card back across the subject, and the negation then
+ * skips it as no longer beyond — subject at `x = 0`, neighbour at `x = 1`,
+ * `growth.width = -2`. That is unreachable in the product: `growth` above floors
+ * Open's at zero, and Close only ever negates a growth already applied, so every
+ * Card Close must reclaim from is still beyond the subject when it runs. The
+ * asymmetry is therefore stated rather than repaired — clamping it, or
+ * remembering which Cards a particular Open pushed, is the per-Card history
+ * ADR 0084 rejected for making two identical Layouts behave differently.
+ *
+ * Open/Closed state and the remembered Open Size ride through untouched; only
+ * `x` and `y` move (ADR 0066). Answers the placement it was given when the
+ * subject is not a member or the growth is zero on both axes — like `remove`,
+ * so an Edit that moves nothing keeps the placement's identity and a settled
+ * graph is not laid out again.
+ */
+function displace(placement: Placement, subjectId: CardId, growth: Extent): Placement {
+  const subject = placement.get(subjectId);
+  if (subject === undefined) return placement;
+  if (growth.width === 0 && growth.height === 0) return placement;
+
+  const displaced = new Map<CardId, CardPlacement>();
   for (const [cardId, at] of placement) {
-    let x = at.x;
-    let y = at.y;
-    for (const [otherId, other] of placement) {
-      if (otherId === cardId || !other.open) continue;
-      // Floored: an Expanded rect smaller than the collapsed constant is not a
-      // shrink of its neighbours. Nothing authors one today — the resizer's
-      // minimum is the collapsed size — but a stored Space is bytes, and a
-      // negative step would displace neighbours backwards over the Card that
-      // caused it and leave `authoredPoint` with no inverse to compute.
-      if (at.x > other.x) x += Math.max(0, other.openSize.width - COLLAPSED_CARD_SIZE.width);
-      if (at.y > other.y) y += Math.max(0, other.openSize.height - COLLAPSED_CARD_SIZE.height);
-    }
-    result.set(cardId, point({ ...at, x, y }));
+    const x = at.x > subject.x ? at.x + growth.width : at.x;
+    const y = at.y > subject.y ? at.y + growth.height : at.y;
+    displaced.set(cardId, point({ ...at, x, y }));
   }
-  return brand(result);
+  return brand(displaced);
 }
 
 export const Placement = {
@@ -336,8 +356,8 @@ export const Placement = {
   fromLayoutStrategyGraph,
   fromEntries,
   equals,
-  drawn,
-  authoredPoint,
+  growth,
+  displace,
   next,
   place,
   remove,

@@ -192,14 +192,18 @@ describe('an embedded production projection', () => {
     );
   });
 
-  it('uses the target projection for Open Alias content and displaced neighbours', async () => {
+  it('uses the target projection for Open Alias content and its authored placement', async () => {
     const { drawn } = await draw(true);
     expect(drawn.nodes.find((node) => node.data.cardId === ALIAS)).toMatchObject({
       width: 560,
       height: 420,
       data: { expanded: true, body: 'Target content', kind: 'alias' },
     });
-    expect(drawn.nodes.find((node) => node.data.cardId === B)?.position).toEqual({ x: 716, y: 42 });
+    // B sits at the target Layout's authored 400 plus the embedding offset, and
+    // the Open Alias below it moves nothing: displacement is applied by the Edit
+    // that opens a Card, so it is already in the coordinates the target Space
+    // stores (ADR 0084).
+    expect(drawn.nodes.find((node) => node.data.cardId === B)?.position).toEqual({ x: 416, y: 42 });
   });
 
   it('remaps Edge endpoints while preserving the production handle declarations', async () => {

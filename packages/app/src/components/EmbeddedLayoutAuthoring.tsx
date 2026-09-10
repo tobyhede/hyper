@@ -129,7 +129,7 @@ export function EmbeddedLayoutAuthoring({
     spaceCardTargets: targets,
   });
   const [origin] = useState(() => {
-    const positions = [...Placement.drawn(authored).values()];
+    const positions = [...authored.values()];
     return {
       x: positions.length === 0 ? 0 : Math.min(...positions.map((at) => at.x)),
       y: positions.length === 0 ? 0 : Math.min(...positions.map((at) => at.y)),

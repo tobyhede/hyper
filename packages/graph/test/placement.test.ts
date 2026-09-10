@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { COLLAPSED_CARD_SIZE } from '@project/core';
 import type { CardId, CardPlacement, Layout } from '@project/core';
 import { Placement, positionedStrategy } from '../src/index';
 import type { LayoutStrategyCard, LayoutStrategyGraph } from '../src/index';
@@ -79,7 +80,7 @@ describe('Placement.fromLayoutStrategyGraph', () => {
     });
   });
 
-  it('carries no expansion across, which is why only a View may be converted', async () => {
+  it('carries no Open state across, which is why only a View may be converted', async () => {
     const authored = Placement.fromEntries([
       [CARD_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
       [CARD_B, { x: 300, y: 0, open: false }],
@@ -92,13 +93,13 @@ describe('Placement.fromLayoutStrategyGraph', () => {
     const converted = Placement.fromLayoutStrategyGraph(laid);
 
     // Nothing comes back Open: a converted Layout is authored from an
-    // empty Placement, where nothing is (ADR 0025, ADR 0064).
+    // empty Placement, where nothing is (ADR 0025, ADR 0064). A's remembered
+    // Open Size is what conversion drops on the floor, and there is no way back
+    // to it — which is why only a Layout with nothing Open may be converted.
     expect([...converted.values()].every((at) => !at.open)).toBe(true);
-    // And B comes back at its *drawn* x, carrying A's growth as authorship.
-    // That is the whole reason this may only ever be handed a strategy graph
-    // with nothing Open in it: conversion has no inverse, and
-    // `Placement.next` is the one door that does.
-    expect(converted.get(CARD_B)).toEqual({ x: 600, y: 0, open: false });
+    // B's coordinate survives untouched, because A being Open never moved it at
+    // render time: the Edit that opened A did (ADR 0084).
+    expect(converted.get(CARD_B)).toEqual({ x: 300, y: 0, open: false });
   });
 
   it('omits a card no strategy placed, rather than calling it the origin', () => {
@@ -109,21 +110,23 @@ describe('Placement.fromLayoutStrategyGraph', () => {
 });
 
 describe('Placement.next', () => {
-  it('inverts Expanded Card displacement before authoring a rendered position', () => {
+  it('authors what the canvas reports, whatever else is Open', () => {
+    // Nothing is inverted any more: displacement was applied by the Edit that
+    // opened A, so B's reported coordinate is already B's authored one and the
+    // report round-trips as itself (ADR 0084).
     const authored = Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 360, height: 196 } }],
       [CARD_B, { x: 300, y: 200, open: false }],
     ]);
-    const drawn = Placement.drawn(authored);
+    const rendered = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, open: false }],
+      [CARD_B, { x: 300, y: 200, open: false }],
+    ]);
 
-    expect(asObject(drawn)).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: true, openSize: { width: 360, height: 196 } },
-      [CARD_B]: { x: 400, y: 250, open: false },
-    });
-    expect(Placement.next(authored, drawn, [CARD_A, CARD_B])).toBe(authored);
+    expect(Placement.next(authored, rendered, [CARD_A, CARD_B])).toBe(authored);
   });
 
-  it('preserves an Expanded Card rect when the renderer reports only its moved position', () => {
+  it('preserves an Open Card rect when the renderer reports only its moved position', () => {
     const authored = Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
     ]);
@@ -134,35 +137,18 @@ describe('Placement.next', () => {
     });
   });
 
-  it('inverts displacement when admitting a Card the Layout did not yet place', () => {
+  it('admits a Card the Layout did not yet place at the point reported', () => {
+    // Admission reads the report as authorship too. A's Open rect decides
+    // nothing about where B lands.
     const authored = Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
     ]);
     const rendered = Placement.fromEntries([[CARD_B, { x: 500, y: 400, open: false }]]);
 
-    const next = Placement.next(authored, rendered, [CARD_B]);
-    expect(asObject(next)).toEqual({
+    expect(asObject(Placement.next(authored, rendered, [CARD_B]))).toEqual({
       [CARD_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
-      [CARD_B]: { x: 200, y: 126, open: false },
+      [CARD_B]: { x: 500, y: 400, open: false },
     });
-    expect(Placement.drawn(next).get(CARD_B)).toEqual({ x: 500, y: 400, open: false });
-  });
-
-  it('clamps a rendered coordinate inside an expansion gap to its near boundary', () => {
-    const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 0, open: true, openSize: { width: 360, height: 196 } }],
-      [CARD_B, { x: 300, y: 0, open: false }],
-    ]);
-    const rendered = Placement.place(Placement.drawn(authored), CARD_B, {
-      x: 60,
-      y: 0,
-      open: false,
-    });
-
-    const next = Placement.next(authored, rendered, [CARD_B]);
-
-    expect(next.get(CARD_B)).toEqual({ x: 10, y: 0, open: false });
-    expect(Placement.drawn(next).get(CARD_B)).toEqual({ x: 10, y: 0, open: false });
   });
 
   it('adopts the whole rendered map when nothing is authored yet', () => {
@@ -290,6 +276,165 @@ describe('Placement.remove', () => {
   });
 });
 
+describe('Placement.growth', () => {
+  it('answers the Open rect less the collapsed one, per axis', () => {
+    expect(Placement.growth({ width: 560, height: 420 })).toEqual({ width: 300, height: 274 });
+  });
+
+  it('is zero for a Card Open at exactly the collapsed size', () => {
+    expect(Placement.growth(COLLAPSED_CARD_SIZE)).toEqual({ width: 0, height: 0 });
+  });
+
+  it('floors a stored rect smaller than a collapsed Card at zero on each axis', () => {
+    // Nothing authors one — the resizer's minimum is the collapsed size — but a
+    // stored Space is bytes. A negative growth would pull neighbours back over
+    // the Card that caused it, past the subject, where the negating Close can no
+    // longer reach them. A rect smaller than a collapsed Card is not a shrink of
+    // its neighbours, so it displaces nobody.
+    expect(Placement.growth({ width: 100, height: 100 })).toEqual({ width: 0, height: 0 });
+    expect(Placement.growth({ width: 100, height: 700 })).toEqual({ width: 0, height: 554 });
+  });
+
+  it('displaces nobody when the growth it computed is a floored one', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 0, y: 0, open: true, openSize: { width: 100, height: 100 } }],
+      [CARD_B, { x: 400, y: 400, open: false }],
+    ]);
+
+    expect(
+      Placement.displace(authored, CARD_A, Placement.growth({ width: 100, height: 100 })),
+    ).toBe(authored);
+  });
+});
+
+describe('Placement.displace', () => {
+  const growth = { width: 300, height: 274 };
+
+  it('moves the Cards strictly beyond the subject and leaves the rest', () => {
+    // Strict, per axis: a Card level with the subject on an axis does not move
+    // on that axis, and one unit beyond it does.
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, open: false }],
+      [CARD_B, { x: 10, y: 20, open: false }],
+      [CARD_C, { x: 11, y: 21, open: false }],
+    ]);
+
+    expect(asObject(Placement.displace(authored, CARD_A, growth))).toEqual({
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 10, y: 20, open: false },
+      [CARD_C]: { x: 311, y: 295, open: false },
+    });
+  });
+
+  it('decides each axis on its own', () => {
+    // A Card below the subject and level with it moves down and not right, and
+    // the mirror image moves right and not down.
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 100, y: 100, open: false }],
+      [CARD_B, { x: 100, y: 500, open: false }],
+      [CARD_C, { x: 500, y: 100, open: false }],
+    ]);
+
+    expect(asObject(Placement.displace(authored, CARD_A, growth))).toEqual({
+      [CARD_A]: { x: 100, y: 100, open: false },
+      [CARD_B]: { x: 100, y: 774, open: false },
+      [CARD_C]: { x: 800, y: 100, open: false },
+    });
+  });
+
+  it('never moves the subject, whatever the growth', () => {
+    // A Card does not displace itself, and `>` is what says so — the subject is
+    // not strictly beyond its own coordinate on either axis.
+    const authored = Placement.fromEntries([[CARD_A, { x: -50, y: -50, open: false }]]);
+
+    expect(Placement.displace(authored, CARD_A, growth).get(CARD_A)).toEqual({
+      x: -50,
+      y: -50,
+      open: false,
+    });
+  });
+
+  it('reclaims the room again under the negated growth', () => {
+    // How Close is expressed: the same operation, the sign reversed.
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 0, y: 0, open: false }],
+      [CARD_B, { x: 400, y: 400, open: false }],
+    ]);
+    const opened = Placement.displace(authored, CARD_A, growth);
+
+    expect(opened.get(CARD_B)).toEqual({ x: 700, y: 674, open: false });
+    expect(
+      asObject(
+        Placement.displace(opened, CARD_A, { width: -growth.width, height: -growth.height }),
+      ),
+    ).toEqual(asObject(authored));
+  });
+
+  it('is not an involution when the negative growth is applied first', () => {
+    // The counter-example the round-trip property's nonnegative bound names,
+    // made executable so the bound is a fact rather than prose. B at x = 1 is
+    // carried to x = -1 by a width of -2, and the negation that follows skips it
+    // because it is no longer strictly beyond A. Unreachable in the product:
+    // Open floors its growth at zero and Close only negates one already applied.
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 0, y: 0, open: false }],
+      [CARD_B, { x: 1, y: 0, open: false }],
+    ]);
+    const shrunk = Placement.displace(authored, CARD_A, { width: -2, height: 0 });
+    const restored = Placement.displace(shrunk, CARD_A, { width: 2, height: 0 });
+
+    expect(shrunk.get(CARD_B)).toEqual({ x: -1, y: 0, open: false });
+    expect(restored.get(CARD_B)).toEqual({ x: -1, y: 0, open: false });
+  });
+
+  it('carries Open/Closed state and the remembered Open Size through untouched', () => {
+    // Only `x` and `y` move. Open Size is stored on the Card's own entry and
+    // survives everything that happens to its neighbours (ADR 0066).
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
+      [CARD_B, { x: 400, y: 400, open: true, openSize: { width: 800, height: 600 } }],
+      [CARD_C, { x: 400, y: 400, open: false, openSize: { width: 700, height: 500 } }],
+    ]);
+
+    expect(asObject(Placement.displace(authored, CARD_A, growth))).toEqual({
+      [CARD_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
+      [CARD_B]: { x: 700, y: 674, open: true, openSize: { width: 800, height: 600 } },
+      [CARD_C]: { x: 700, y: 674, open: false, openSize: { width: 700, height: 500 } },
+    });
+  });
+
+  it('answers the placement it was given when the subject is not a member', () => {
+    // Identity, not just equality, for the reason `remove` answers it: an Edit
+    // that moved nothing must not re-arrange a settled graph.
+    const authored = at({ '00000000-0000-4000-8000-000000000002': [10, 20] });
+
+    expect(Placement.displace(authored, CARD_C, growth)).toBe(authored);
+  });
+
+  it('answers the placement it was given when the growth is zero on both axes', () => {
+    const authored = at({
+      '00000000-0000-4000-8000-000000000002': [10, 20],
+      '00000000-0000-4000-8000-000000000003': [300, 40],
+    });
+
+    expect(Placement.displace(authored, CARD_A, { width: 0, height: 0 })).toBe(authored);
+  });
+
+  it('leaves the placement it was given alone', () => {
+    const authored = at({
+      '00000000-0000-4000-8000-000000000002': [0, 0],
+      '00000000-0000-4000-8000-000000000003': [400, 400],
+    });
+
+    Placement.displace(authored, CARD_A, growth);
+
+    expect(asObject(authored)).toEqual({
+      [CARD_A]: { x: 0, y: 0, open: false },
+      [CARD_B]: { x: 400, y: 400, open: false },
+    });
+  });
+});
+
 describe('Placement.empty', () => {
   it('hands each caller its own map rather than one shared instance', () => {
     // Space Authoring installs the Placement it is handed without copying it, so
@@ -398,43 +543,56 @@ const openSizeArb = fc.record({
 });
 
 describe('Placement properties', () => {
-  it('round-trips every authored rect through a production-shaped drawn report', () => {
+  it('round-trips a Layout through opening and closing, for any nonnegative growth', () => {
+    // The property Open and Close rest on (ADR 0084): closing reclaims exactly
+    // the room opening made, so a Layout opened and immediately closed is the
+    // Layout it started as — every Card back on its own coordinate, not merely
+    // an equal map.
+    //
+    // The **nonnegative** bound is load-bearing and is not here to keep the
+    // generator tidy. `displace` is not an involution for a negative initial
+    // growth, and deliberately: the counter-example below is executable. It is
+    // unreachable in the product because Open always applies a growth floored at
+    // zero and Close always applies the negation of a growth already applied, so
+    // every Card Close must reclaim from is still beyond the subject when it
+    // runs. The fix is to state the bound, not to clamp the operation or make it
+    // remember which Cards a particular Open pushed.
     fc.assert(
       fc.property(
         idsArb,
         fc.array(coordArb, { minLength: 16, maxLength: 16 }),
-        fc.array(fc.option(openSizeArb, { nil: undefined }), {
-          minLength: 8,
-          maxLength: 8,
-        }),
-        (ids, coords, openSizes) => {
-          const authored = Placement.fromEntries(
+        fc.nat({ max: 8 }),
+        fc.record({ width: fc.nat({ max: 640 }), height: fc.nat({ max: 480 }) }),
+        fc.array(fc.option(openSizeArb, { nil: undefined }), { minLength: 8, maxLength: 8 }),
+        (ids, coords, subjectIndex, growth, openSizes) => {
+          const placement = Placement.fromEntries(
             ids.map((id, index) => {
-              const at = {
+              const point = {
                 x: coords[index * 2] ?? 0,
                 y: coords[index * 2 + 1] ?? 0,
               };
-              // A generated Open Size makes the Card Open — the only entry that
-              // displaces its neighbours, so it is the only one that gives the
-              // inverse below anything to undo.
+              // Open entries are in the generator because the round trip has to
+              // hold over a Layout with Cards already Open in it — Open Size
+              // rides through untouched, and only the coordinates move.
               const openSize = openSizes[index];
               return [
                 id,
-                openSize === undefined ? { ...at, open: false } : { ...at, open: true, openSize },
+                openSize === undefined
+                  ? { ...point, open: false as const }
+                  : { ...point, open: true as const, openSize },
               ] as const;
             }),
           );
-          // Production reports React Flow node positions only. Keeping the
-          // authored Open Size on this report would make the inverse test
-          // vacuous and is the defect this property exists to prevent.
-          const rendered = Placement.fromEntries(
-            [...Placement.drawn(authored)].map(([id, at]) => [
-              id,
-              { x: at.x, y: at.y, open: false },
-            ]),
-          );
+          const subject = ids[subjectIndex % ids.length];
+          if (subject === undefined) return;
 
-          expect(Placement.next(authored, rendered, [...authored.keys()])).toBe(authored);
+          const opened = Placement.displace(placement, subject, growth);
+          const closed = Placement.displace(opened, subject, {
+            width: -growth.width,
+            height: -growth.height,
+          });
+
+          expect(asObject(closed)).toEqual(asObject(placement));
         },
       ),
     );
@@ -515,33 +673,21 @@ describe('Placement properties', () => {
   });
 });
 
-describe('Placement.next over an Expanded Card', () => {
-  it('authors a drop inside an Expanded Card on the near side of its step', () => {
+describe('Placement.next over an Open Card', () => {
+  it('authors a drop on top of an Open Card exactly where it was released', () => {
+    // The clamp band is gone with the derivation that created it (ADR 0084).
+    // There is no longer a range of canvas coordinates no authored point can
+    // name, so a Card dropped over an Open one lands on the drop point.
     const authored = Placement.fromEntries([
       [CARD_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
       [CARD_B, { x: 1000, y: 1000, open: false }],
     ]);
-    // Dropped on top of A, inside the band of drawn coordinates no authored
-    // point draws into — the step ADR 0064 accepts.
     const rendered = Placement.fromEntries([[CARD_B, { x: 50, y: 30, open: false }]]);
 
-    const next = Placement.next(authored, rendered, [CARD_B]);
-
-    expect(next.get(CARD_B)).toEqual({ x: 0, y: 0, open: false });
-    // The near side is a fixed point, so the Card settles where it was dropped
-    // rather than jumping the full growth on the frame after release.
-    expect(Placement.drawn(next).get(CARD_B)).toEqual({ x: 0, y: 0, open: false });
-  });
-});
-
-describe('Placement.drawn under a stored rect smaller than a collapsed Card', () => {
-  it('displaces nothing rather than displacing backwards', () => {
-    const authored = Placement.fromEntries([
-      [CARD_A, { x: 0, y: 0, open: true, openSize: { width: 100, height: 100 } }],
-      [CARD_B, { x: 400, y: 400, open: false }],
-    ]);
-
-    expect(Placement.drawn(authored).get(CARD_B)).toEqual({ x: 400, y: 400, open: false });
-    expect(Placement.next(authored, Placement.drawn(authored), [CARD_B])).toBe(authored);
+    expect(Placement.next(authored, rendered, [CARD_B]).get(CARD_B)).toEqual({
+      x: 50,
+      y: 30,
+      open: false,
+    });
   });
 });
