@@ -345,6 +345,49 @@ describe('authoring a Card title on the graph', () => {
     expect(cardTitleOf(session, CARD_ID)).toBe('Renamed A');
     await settled(session);
   });
+
+  /**
+   * A Title written on more than one line reaches the Card whole (ADR 0083).
+   *
+   * The line breaks are the author's and the schema is where a Title is
+   * normalized, so what this holds is that nothing between the field and the
+   * stored document trims them back to one line.
+   */
+  it('stores a Title written on more than one line', async () => {
+    const session = mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+
+    fireEvent.change(input, {
+      target: { value: 'Auth  \nThe service, not the screen\n\nOwned by platform\n' },
+    });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(cardTitleOf(session, CARD_ID)).toBe(
+      'Auth\nThe service, not the screen\n\nOwned by platform',
+    );
+    await settled(session);
+  });
+
+  /**
+   * Blank is still the empty case wearing different bytes, and a draft of
+   * nothing but line breaks is the shape the capability adds. The sentence is
+   * the application's for the domain's stable code (ADR 0057).
+   */
+  it('refuses a Title of nothing but line breaks and keeps the draft', async () => {
+    const session = mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+
+    fireEvent.change(input, { target: { value: '\n  \n\n' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    expect(input).toHaveValue('\n  \n\n');
+    expect(input).toHaveFocus();
+    expect(cardTitleOf(session, CARD_ID)).toBe('A');
+    await settled(session);
+  });
 });
 
 /**

@@ -63,6 +63,19 @@ const token = (name: string, unit = ''): number => {
 
 const rung = (role: string): string => block(`.canvas-card__title-line[data-role='${role}']`);
 
+/**
+ * Every declaration the editing field takes, in cascade order.
+ *
+ * The field is written by two rules — one it shares with its wrapper and one of
+ * its own — and {@link block} answers the first rule whose selector opens a
+ * line, which is the shared one. Joining them is what the browser does anyway,
+ * and the property this file asks after is declared exactly once across the two.
+ */
+const titleInput = (): string =>
+  [...stylesheet.matchAll(/^\.canvas-card \.card__title-input\s*\{([^}]*)\}/gmu)]
+    .map((found) => found[1] ?? '')
+    .join(';');
+
 describe('a single-line Title', () => {
   /**
    * The regression. These are the four values the heading carried before the
@@ -195,5 +208,50 @@ describe('the ladder ceiling', () => {
     expect(declared(heading, 'overflow')).toBe('hidden');
     expect(declared(heading, 'height')).toBeUndefined();
     expect(declared(heading, 'min-height')).toBeUndefined();
+  });
+});
+
+describe('the field that writes the Title', () => {
+  /**
+   * The one size and the one leading are authored on the Card, and the field an
+   * author types into is drawn by the same two. Restating them here is what lets
+   * the ladder and the field disagree: move `--canvas-card-title-size` and the
+   * heading, all three rungs and the clamp follow it while the field stays where
+   * it was, so the Title changes size and baseline the moment it is clicked into
+   * — which is the one moment the two are meant to be indistinguishable.
+   */
+  it('takes its type from the ladder tokens rather than restating them', () => {
+    const input = titleInput();
+    expect(declared(input, 'font-size')).toBe('var(--canvas-card-title-size)');
+    expect(declared(input, 'line-height')).toBe('var(--canvas-card-title-leading)');
+    expect(declared(input, 'font-weight')).toBe('600');
+    expect(declared(input, 'letter-spacing')).toBe('-0.02em');
+  });
+
+  /**
+   * And it stops growing where the drawn ladder stops.
+   *
+   * A Title is clamped to the room available and never accommodated (ADR 0083),
+   * and the field is not exempt from that: it grows with its content, inside a
+   * Card whose height is authored. Uncapped, the fifth line pushes the Card's
+   * own rail up out of the top of a Closed Card, where `overflow: hidden` takes
+   * it — the kind glyph, the Actions menu and Open all gone while the author is
+   * still typing. Capping it at the ladder's own ceiling makes what an author
+   * can see while writing exactly what the Card will draw.
+   */
+  it('is capped at the ceiling the drawn ladder is capped at', () => {
+    const input = titleInput();
+    const cap = declared(input, 'max-height') ?? '';
+    expect(cap.startsWith('calc(')).toBe(true);
+    for (const name of [
+      '--canvas-card-title-size',
+      '--canvas-card-title-leading',
+      '--canvas-card-title-ladder-lines',
+    ]) {
+      expect(cap).toContain(name);
+    }
+    // Scrolled rather than clipped: the field is the one place the whole Title
+    // has to stay reachable, however many lines the author has typed.
+    expect(declared(input, 'overflow-y')).toBe('auto');
   });
 });
