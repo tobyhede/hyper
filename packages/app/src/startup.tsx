@@ -1,9 +1,7 @@
 import { StrictMode, type ReactNode } from 'react';
-import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import { OpenSpacesApplication } from './components/OpenSpacesApplication';
 import type { DestinationOpening } from './destination-opening';
-import { mountSpaceApp } from './SpaceApp';
 import { StartupFailure } from './components/StartupFailure';
 
 export interface ApplicationRoot {
@@ -13,31 +11,23 @@ export interface ApplicationRoot {
 export interface OpenedApplicationStartup {
   kind: 'opened';
   opened: OpenSpace;
-  spaces?: OpenSpaces;
-  /** The session's one browser location, already following the opened Space. */
-  browserLocation: BrowserLocation;
+  /**
+   * The session the opened Space belongs to.
+   *
+   * **Required, and not optional.** It was optional while a second startup
+   * shape existed — one opened Space and no session, mounted through
+   * `mountSpaceApp`. Every host sets it now (`space.ts`, the catalogue's
+   * `storyOpening`, `startup.test.tsx`), so the arm that read its absence was
+   * reachable from nothing and is gone with it. Optional here would be an
+   * invitation to a branch that no longer exists.
+   */
+  spaces: OpenSpaces;
   opening?: DestinationOpening | undefined;
 }
 
 export type ApplicationStartupResult = OpenedApplicationStartup;
 
 export type ApplicationStartupResolver = () => Promise<ApplicationStartupResult>;
-
-const renderOpenedSpace = (
-  root: ApplicationRoot,
-  opened: OpenSpace,
-  browserLocation: BrowserLocation,
-  opening?: DestinationOpening,
-): void => {
-  mountSpaceApp(
-    opened,
-    browserLocation,
-    (app) => {
-      root.render(<StrictMode>{app}</StrictMode>);
-    },
-    opening,
-  );
-};
 
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'An unknown startup error occurred.';
@@ -53,19 +43,15 @@ export const startApplication = async (
 ): Promise<void> => {
   try {
     const startup = await resolveStartup();
-    if (startup.spaces !== undefined) {
-      root.render(
-        <StrictMode>
-          <OpenSpacesApplication
-            spaces={startup.spaces}
-            initial={startup.opened}
-            opening={startup.opening}
-          />
-        </StrictMode>,
-      );
-      return;
-    }
-    renderOpenedSpace(root, startup.opened, startup.browserLocation, startup.opening);
+    root.render(
+      <StrictMode>
+        <OpenSpacesApplication
+          spaces={startup.spaces}
+          initial={startup.opened}
+          opening={startup.opening}
+        />
+      </StrictMode>,
+    );
   } catch (error) {
     renderStartupError(root, error);
   }

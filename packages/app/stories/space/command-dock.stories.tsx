@@ -1,3 +1,11 @@
+/**
+ * The Command Dock over the production application (ADR 0082).
+ *
+ * **`iframed` is written out on every story below, and cannot be factored out.**
+ * Ladle parses each `meta` statically and rejects anything that is not an object
+ * literal, so a shared constant — or a spread of one — compiles and then silently
+ * stops iframing these stories. The repetition is the constraint, not an oversight.
+ */
 import type { Story } from '@ladle/react';
 import { CommandDockFixture, LeftDockFixture } from '../support/CommandDockFixture';
 
@@ -63,12 +71,15 @@ Narrow.meta = { iframed: true };
 export const SaveFailed: Story = () => <CommandDockFixture scenario="save-failed" />;
 SaveFailed.meta = { iframed: true };
 
+/** A permanently rejected save: the Dock names the Space and offers no retry. */
 export const SaveRejected: Story = () => <CommandDockFixture scenario="save-rejected" />;
 SaveRejected.meta = { iframed: true };
 
+/** A conflicting save: recovery is resolve-conflict rather than retry. */
 export const SaveConflict: Story = () => <CommandDockFixture scenario="save-conflict" />;
 SaveConflict.meta = { iframed: true };
 
+/** The unwell Space is one crossing up, so the Dock names it rather than the canvas. */
 export const SaveFailedElsewhere: Story = () => (
   <CommandDockFixture scenario="save-failed-elsewhere" />
 );

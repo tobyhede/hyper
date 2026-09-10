@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { newUuid } from '@project/core';
-import { MemorySpaceBackendTestControl } from '@project/persistence';
+import { MemorySpaceBackendTestControl, type SpaceSessionState } from '@project/persistence';
 import { Application } from '#components/Application';
 import { snapshotFromSpace } from '#src/snapshot';
 import { storyOpening, storySpaces } from './application';
+import type { OpenSpace, OpenSpaces } from '#src/open-spaces';
 import {
   authoredSnapshot,
   commandDockSnapshot,
@@ -23,6 +24,61 @@ export type DockScenario =
   | 'save-rejected'
   | 'save-conflict'
   | 'save-failed-elsewhere';
+
+/** The persistence state each failure scenario is arranged to reach. */
+const UNWELL = {
+  'save-failed': 'failed',
+  'save-failed-elsewhere': 'failed',
+  'save-rejected': 'rejected',
+  'save-conflict': 'conflicted',
+} as const satisfies Partial<Record<DockScenario, SpaceSessionState['persistence']['kind']>>;
+
+const isUnwell = (scenario: DockScenario): scenario is keyof typeof UNWELL => scenario in UNWELL;
+
+/**
+ * Wait for the state the scenario is arranging, not for "no longer pending".
+ *
+ * `SpaceSession.submit` publishes no `pending` at all when the session is
+ * coordinating or persistence-paused — it parks the snapshot and returns — so a
+ * "not pending" test can be true before the commit has begun, and hand the
+ * catalogue a well Space that turns unwell some unbounded number of ticks after
+ * it mounted. Naming the state cannot pass early.
+ */
+const reaches = (
+  session: OpenSpace['session'],
+  kind: SpaceSessionState['persistence']['kind'],
+): Promise<void> =>
+  new Promise((resolve) => {
+    const arrived = () => session.getState().persistence.kind === kind;
+    const unsubscribe = session.subscribe(() => {
+      if (arrived()) {
+        unsubscribe();
+        resolve();
+      }
+    });
+    if (arrived()) {
+      unsubscribe();
+      resolve();
+    }
+  });
+
+/** No open Space has a commit in flight, which is what makes the next queued result this one's. */
+const quiesced = async (spaces: OpenSpaces): Promise<void> => {
+  await Promise.all(
+    spaces.getState().entries.map((entry) =>
+      entry.session.getState().persistence.kind === 'pending'
+        ? new Promise<void>((resolve) => {
+            const unsubscribe = entry.session.subscribe(() => {
+              if (entry.session.getState().persistence.kind !== 'pending') {
+                unsubscribe();
+                resolve();
+              }
+            });
+          })
+        : Promise.resolve(),
+    ),
+  );
+};
 
 /** Open the authored crossing chain through the real session owner. */
 export async function openDockStory(scenario: DockScenario) {
@@ -69,10 +125,15 @@ export async function openDockStory(scenario: DockScenario) {
   await spaces.switchTo(rendering.id);
 
   if (scenario === 'presenting') rendering.app.navigation.present();
-  if (scenario.startsWith('save-')) {
+  if (isUnwell(scenario)) {
     const target =
       scenario === 'save-failed-elsewhere' ? spaces.entry(designSystemSnapshot.id) : rendering;
     if (target === undefined) throw new Error('The failure scenario has no open target.');
+    // The queue is the *backend's*, not a Space's, so whichever commit reaches
+    // it first takes what is on it. Arming it while a crossing's commit is
+    // still in flight would put the failure on that Space instead — and for
+    // `save-failed-elsewhere`, on the very Space the scenario says is well.
+    await quiesced(spaces);
     const stored = target.session.getState();
     if (scenario === 'save-conflict') {
       control.queueResult({
@@ -111,19 +172,7 @@ export async function openDockStory(scenario: DockScenario) {
     });
     if (result.kind !== 'completed')
       throw new Error('The failure scenario did not complete an Edit.');
-    await new Promise<void>((resolve) => {
-      const settled = () => target.session.getState().persistence.kind !== 'pending';
-      const unsubscribe = target.session.subscribe(() => {
-        if (settled()) {
-          unsubscribe();
-          resolve();
-        }
-      });
-      if (settled()) {
-        unsubscribe();
-        resolve();
-      }
-    });
+    await reaches(target.session, UNWELL[scenario]);
   }
   return storyOpening(spaces, rendering);
 }
@@ -132,6 +181,42 @@ export async function openDockStory(scenario: DockScenario) {
 export function CommandDockFixture({ scenario = 'default' }: { readonly scenario?: DockScenario }) {
   return <Application resolve={() => openDockStory(scenario)} />;
 }
+
+/**
+ * The Dock's grip, whichever slot it is currently in.
+ *
+ * Matched on the stable half of its accessible name rather than on the whole
+ * composed sentence: the slot half (`Top edge, centre.`) is presentation this
+ * fixture has no stake in, and pinning it made a label rename look like a
+ * missing control.
+ */
+const dockGrip = (root: ParentNode): HTMLElement | null => {
+  const grip = [...root.querySelectorAll('button[aria-label^="Move Command Dock."]')].find(
+    (button) => button.closest('[hidden]') === null,
+  );
+  return grip instanceof HTMLElement ? grip : null;
+};
+
+/**
+ * The centre stop of the **left** edge, found through its own group.
+ *
+ * **Not `findLast('Middle')`.** Both vertical edges label their centre stop
+ * `Middle` (`ALONG_LABEL.vertical.center`), so picking the last one selects the
+ * left edge only because `left` happens to sit last in `DOCK_EDGES` — and a
+ * reorder of that tuple would silently dock this story to the *right*, which
+ * the e2e could not see while it asserted orientation alone. Walking forward
+ * from the `Left edge` group label names the edge itself, so the worst a
+ * rename can now do is stall, which shows up as a Dock still at the top.
+ */
+const leftEdgeMiddle = (): HTMLElement | null => {
+  const items = [...document.querySelectorAll('[role="menuitemradio"], [role="group"] > *')];
+  const label = items.findIndex((item) => item.textContent === 'Left edge');
+  if (label === -1) return null;
+  const slot = items
+    .slice(label + 1)
+    .find((item) => item.getAttribute('role') === 'menuitemradio' && item.textContent === 'Middle');
+  return slot instanceof HTMLElement ? slot : null;
+};
 
 /** Reach the side-edge scenario through the actual position menu, once per mount. */
 export function LeftDockFixture() {
@@ -142,21 +227,17 @@ export function LeftDockFixture() {
     let opened = false;
     const observer = new MutationObserver(() => {
       if (!opened) {
-        const grip = [
-          ...root.querySelectorAll('button[aria-label="Move Command Dock. Top edge, centre."]'),
-        ].find((button) => button.closest('[hidden]') === null);
-        if (grip instanceof HTMLElement && grip.closest('[hidden]') === null) {
+        const grip = dockGrip(root);
+        if (grip !== null) {
           opened = true;
           grip.click();
         }
-      } else {
-        const slot = [...document.querySelectorAll('[role="menuitemradio"]')].findLast(
-          (item) => item.textContent === 'Middle',
-        );
-        if (slot instanceof HTMLElement) {
-          observer.disconnect();
-          slot.click();
-        }
+        return;
+      }
+      const slot = leftEdgeMiddle();
+      if (slot !== null) {
+        observer.disconnect();
+        slot.click();
       }
     });
     observer.observe(document.body, { childList: true, subtree: true, attributes: true });

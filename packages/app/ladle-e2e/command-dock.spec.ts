@@ -257,6 +257,10 @@ test(
   async ({ page }) => {
     await page.goto(story('docked-left'));
 
+    // The edge and not just the orientation: `right` is vertical too, and the
+    // story reaches this slot by pressing the position menu, so an assertion
+    // that cannot tell the two vertical edges apart would pass on either.
+    await expect(dock(page)).toHaveAttribute('data-edge', 'left');
     await expect(surface(page)).toHaveAttribute('data-orientation', 'vertical');
     await expect(page.getByTestId('space-title').locator('visible=true')).toContainText(
       'Rendering',

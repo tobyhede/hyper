@@ -73,7 +73,6 @@ export const createSpaceStartup = (
         opened,
         spaces,
         opening,
-        browserLocation: spaces.browserLocation,
       };
     },
   };

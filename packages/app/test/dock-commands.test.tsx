@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Application } from '../src/components/Application';
 import { MemorySpaceBackendTestControl } from '@project/persistence';
 import { storyOpening, storySpaces } from '../stories/support/application';
+import type { OpenSpace } from '../src/open-spaces';
 import {
   metaSnapshot,
   commandDockSnapshot,
@@ -480,6 +481,36 @@ describe('an unwell Space the reader is not in', () => {
   });
 });
 
+/**
+ * The parent's commit, waited for on the session itself.
+ *
+ * **Not testing-library's `waitFor`.** This runs inside `Application`'s startup
+ * resolver, which `renderDock`'s `act` scope has already returned from — so a
+ * `waitFor` here opens a nested act scope of its own, and the `setView` that
+ * follows it lands under neither. React reports that as "An update to
+ * Application inside a test was not wrapped in act(...)". A plain subscription
+ * schedules nothing of its own, leaving the flush to the act-wrapped `waitFor`
+ * in `renderDock`.
+ *
+ * The wait is for the state it wants rather than for "no longer pending":
+ * `submit` publishes no `pending` at all when the session is coordinating or
+ * paused, so "not pending" can be true before the commit has begun.
+ */
+const failedCommit = (session: OpenSpace['session']): Promise<void> =>
+  new Promise((resolve) => {
+    const failed = () => session.getState().persistence.kind === 'failed';
+    const unsubscribe = session.subscribe(() => {
+      if (failed()) {
+        unsubscribe();
+        resolve();
+      }
+    });
+    if (failed()) {
+      unsubscribe();
+      resolve();
+    }
+  });
+
 /** Two real open Spaces; the parent's backend rejects its completed Edit. */
 function TwoSpacesWithAnUnwellParent() {
   return (
@@ -507,14 +538,17 @@ function TwoSpacesWithAnUnwellParent() {
         control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'Unavailable' });
         const card = parent.cards[0];
         if (card === undefined) throw new Error('The parent needs a Card');
-        openedParent.app.authoring.complete({
+        const edit = openedParent.app.authoring.complete({
           kind: 'edited-card',
           cardId: card.id,
           document: { ...card.document, title: 'An edited Card' },
         });
-        await waitFor(() =>
-          expect(openedParent.session.getState().persistence.kind).toBe('failed'),
-        );
+        // A refused Edit commits nothing, so the wait below would spend its
+        // whole timeout and then report the persistence state rather than the
+        // refusal that caused it. `openDockStory` checks the same thing.
+        if (edit.kind !== 'completed')
+          throw new Error(`The parent's Edit was ${edit.kind}, so no commit failed.`);
+        await failedCommit(openedParent.session);
         return storyOpening(spaces, await spaces.enter(commandDockSnapshot.id));
       }}
     />

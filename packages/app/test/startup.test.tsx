@@ -69,7 +69,6 @@ it('opens once under StrictMode and mounts without interpreting the browser path
                 kind: 'opened',
                 opened,
                 spaces,
-                browserLocation: spaces.browserLocation,
               });
             }}
           />

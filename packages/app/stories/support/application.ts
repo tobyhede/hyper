@@ -37,5 +37,4 @@ export const storyOpening = (spaces: OpenSpaces, opened: OpenSpace) => ({
   kind: 'opened' as const,
   spaces,
   opened,
-  browserLocation: spaces.browserLocation,
 });
