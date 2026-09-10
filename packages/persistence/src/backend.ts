@@ -10,8 +10,8 @@ export interface LoadedSpace {
   snapshot: SpaceSnapshot;
   revision: bigint;
   exportedRevision: bigint | null;
-  /** Present only for the client whose working read created the empty Layout. */
-  initialization?: 'created-layout';
+  /** Present only for the client whose working read created the empty Diagram. */
+  initialization?: 'created-diagram';
 }
 
 export interface LoadedAggregate {

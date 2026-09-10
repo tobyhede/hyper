@@ -139,7 +139,7 @@ describe('InlineTitleEditor multiline capability', () => {
     const onComplete = vi.fn(() => null);
     render(
       <InlineTitleEditor
-        title="Layout"
+        title="Diagram"
         label="Title"
         variant="header"
         onComplete={onComplete}
@@ -151,7 +151,7 @@ describe('InlineTitleEditor multiline capability', () => {
     const consumed = fireEvent.keyDown(titleField(), { key: 'Enter', shiftKey: true });
     expect(consumed).toBe(false);
     expect(onComplete).toHaveBeenCalledOnce();
-    expect(onComplete).toHaveBeenCalledWith('Layout');
+    expect(onComplete).toHaveBeenCalledWith('Diagram');
   });
 
   /** Escape cancels, blur completes, and a refused draft stays open and focused. */

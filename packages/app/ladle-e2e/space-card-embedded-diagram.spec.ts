@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-const STORY = '/?story=surfaces--space-card-embedded-layout--selected-layout&mode=preview';
+const STORY = '/?story=surfaces--space-card-embedded-diagram--selected-diagram&mode=preview';
 
 /** The containing Space Card, by the Card id the story Space declares for it. */
 const spaceCard = (page: Page): Locator =>
@@ -20,14 +20,14 @@ const embeddedNodes = (page: Page): Locator =>
 const open = async (page: Page): Promise<void> => {
   await page.goto(STORY);
   // The target Space is read asynchronously — it is a different Space, stored
-  // beside this one — so the Card draws before its Layout can, and waiting on
+  // beside this one — so the Card draws before its Diagram can, and waiting on
   // the Card alone would race the read this story is about.
   await expect(embeddedNodes(page)).toHaveCount(2, { timeout: 20_000 });
 };
 
 test(
-  'an Open Space Card draws the Layout it selects inside its own rect',
-  { tag: '@parity:open-space-card-draws-its-selected-layout' },
+  'an Open Space Card draws the Diagram it selects inside its own rect',
+  { tag: '@parity:open-space-card-draws-its-selected-diagram' },
   async ({ page }) => {
     await open(page);
 
@@ -35,7 +35,7 @@ test(
     // carries — so a node drawing one could not have come from anywhere else.
     await expect(embeddedNodes(page).getByRole('heading', { name: 'Intake' })).toBeVisible();
     await expect(embeddedNodes(page).getByRole('heading', { name: 'Storage' })).toBeVisible();
-    // The selected Graph is drawn with them: an embedded Layout is the Cards
+    // The selected Graph is drawn with them: an embedded Diagram is the Cards
     // *and* the one Graph the Card selects across them.
     await expect(
       page.locator('.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"]'),
@@ -60,7 +60,7 @@ test(
 
 test(
   'editing the embedded Card updates its target Space',
-  { tag: '@parity:embedded-layout-cards-author-target' },
+  { tag: '@parity:embedded-diagram-cards-author-target' },
   async ({ page }) => {
     await open(page);
     const embedded = embeddedNodes(page).filter({
@@ -71,9 +71,9 @@ test(
     await embedded.getByRole('button', { name: 'Edit Card Intake' }).click();
     await embedded
       .getByRole('textbox', { name: 'Markdown source of Intake' })
-      .fill('Edited in the embedded Layout');
+      .fill('Edited in the embedded Diagram');
     await embedded.getByRole('button', { name: 'Save Card Intake' }).click();
-    await expect(embedded).toContainText('Edited in the embedded Layout');
+    await expect(embedded).toContainText('Edited in the embedded Diagram');
     // Crossing into the target Space to read the same edit there. The vertical
     // tab strip that used to do this went with the Space Sidebar (ADR 0082), so
     // the move is the Command Dock's Open Spaces menu — and the assertion is on
@@ -87,12 +87,12 @@ test(
     const intake = page
       .locator('.react-flow__node:visible')
       .filter({ has: page.getByRole('heading', { name: 'Intake', exact: true }) });
-    await expect(intake).toContainText('Edited in the embedded Layout');
+    await expect(intake).toContainText('Edited in the embedded Diagram');
   },
 );
 
-test('the embedded Layout story is isolated from the Ladle catalogue', async ({ page }) => {
-  await page.goto('/?story=surfaces--space-card-embedded-layout--selected-layout');
+test('the embedded Diagram story is isolated from the Ladle catalogue', async ({ page }) => {
+  await page.goto('/?story=surfaces--space-card-embedded-diagram--selected-diagram');
 
   const storyFrame = page.frameLocator('iframe');
   await expect(storyFrame.locator('.react-flow__node[data-id^="embedded:"]').first()).toBeVisible({

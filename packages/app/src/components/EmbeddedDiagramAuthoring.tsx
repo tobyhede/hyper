@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { Edge, NodeChange } from '@xyflow/react';
-import { SPACE_CARD_EMBED_INSET, type CardId, type GraphId, type LayoutId } from '@project/core';
+import { SPACE_CARD_EMBED_INSET, type CardId, type GraphId, type DiagramId } from '@project/core';
 import { Placement, positionedStrategy } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { authoringAvailability } from '../authoring-availability';
 import { canvasProjection } from '../canvas-projection';
 import { useCanvasCardAuthoring } from '../canvas-card-authoring';
 import { createEmbeddedAuthoring } from '../embedded-authoring';
-import { constrainEmbeddedPosition, embeddedLayout, type EmbeddedBounds } from '../embedded-layout';
+import {
+  constrainEmbeddedPosition,
+  embeddedDiagram,
+  type EmbeddedBounds,
+} from '../embedded-diagram';
 import type { OpenSpace } from '../open-spaces';
 import { usePlacementRendering } from '../placement-rendering';
 import { useSpaceCardTargets } from '../space-card-targets';
@@ -15,7 +19,7 @@ import { describeAuthoringRefusal } from '../authoring-refusal';
 
 export interface EmbeddedPublication {
   readonly entry: OpenSpace;
-  readonly layoutId: LayoutId;
+  readonly diagramId: DiagramId;
   readonly bodyEditing: boolean;
   readonly titleEditing: boolean;
   readonly nodes: readonly CardFlowNode[];
@@ -26,11 +30,11 @@ export interface EmbeddedPublication {
 
 const EMPTY_NODES: readonly CardFlowNode[] = [];
 
-/** Reuse production projection and Card controls over an explicitly addressed target Layout. */
-export function EmbeddedLayoutAuthoring({
+/** Reuse production projection and Card controls over an explicitly addressed target Diagram. */
+export function EmbeddedDiagramAuthoring({
   parent,
   entry,
-  layoutId,
+  diagramId,
   graphId,
   enabled,
   bounds: { left, top, right, bottom },
@@ -38,7 +42,7 @@ export function EmbeddedLayoutAuthoring({
 }: {
   readonly parent: CardFlowNode;
   readonly entry: OpenSpace;
-  readonly layoutId: LayoutId;
+  readonly diagramId: DiagramId;
   readonly graphId: GraphId | null;
   readonly enabled: boolean;
   readonly bounds: EmbeddedBounds;
@@ -47,18 +51,18 @@ export function EmbeddedLayoutAuthoring({
   // The target's own composition names where this reports (ADR 0016); nothing
   // here holds a second sink, and a default in the module would be one.
   const [composition] = useState(() =>
-    createEmbeddedAuthoring(entry, layoutId, entry.app.reportObserverError),
+    createEmbeddedAuthoring(entry, diagramId, entry.app.reportObserverError),
   );
   useEffect(() => composition.observe(), [composition]);
   const state = composition.adapter();
   const space = entry.app.currentSpace();
-  const resolved = space.lookup.layout(layoutId);
+  const resolved = space.lookup.diagram(diagramId);
   const pending = useMemo(
     () => (resolved === undefined ? null : canvasProjection(space, resolved)),
     [space, resolved],
   );
   const authored = useMemo(
-    () => (resolved === undefined ? Placement.empty() : Placement.fromLayout(resolved.layout)),
+    () => (resolved === undefined ? Placement.empty() : Placement.fromDiagram(resolved.diagram)),
     [resolved],
   );
   const strategy = useMemo(() => positionedStrategy(authored), [authored]);
@@ -110,11 +114,11 @@ export function EmbeddedLayoutAuthoring({
         cardIsOpen: false,
         editingChromeTitle: false,
         spaceOnCanvas: enabled,
-        // Never this embedding's own fact. A Space Card *inside* this Layout is
+        // Never this embedding's own fact. A Space Card *inside* this Diagram is
         // drawn by the containing `SpaceCanvas` too — its queue descends into
         // the nodes this one publishes — so a nested edit is reported into that
         // one Set, and reaches back here as `enabled` rather than from below.
-        editingEmbeddedLayout: false,
+        editingEmbeddedDiagram: false,
       }),
     [enabled],
   );
@@ -140,7 +144,7 @@ export function EmbeddedLayoutAuthoring({
     [origin],
   );
   const value = useMemo((): EmbeddedPublication => {
-    const { nodes, edges } = embeddedLayout({
+    const { nodes, edges } = embeddedDiagram({
       parent,
       projection: { nodes: authoring.nodes, edges: state.projection?.edges ?? [] },
       offset,
@@ -150,7 +154,7 @@ export function EmbeddedLayoutAuthoring({
     const localIds = new Map(nodes.map((node) => [node.id, node.data.cardId]));
     return {
       entry,
-      layoutId,
+      diagramId,
       nodes,
       edges,
       bodyEditing: authoring.bodyEditing,
@@ -158,7 +162,10 @@ export function EmbeddedLayoutAuthoring({
       removeCard: (id) => {
         const cardId = localIds.get(id);
         if (cardId === undefined) return null;
-        const result = composition.authoring.complete({ kind: 'removed-card-from-layout', cardId });
+        const result = composition.authoring.complete({
+          kind: 'removed-card-from-diagram',
+          cardId,
+        });
         return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
       },
       changeNodes: (changes) => {
@@ -199,7 +206,7 @@ export function EmbeddedLayoutAuthoring({
     enabled,
     composition,
     entry,
-    layoutId,
+    diagramId,
     left,
     top,
     right,

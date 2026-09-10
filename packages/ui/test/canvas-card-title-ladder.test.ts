@@ -21,7 +21,7 @@ import { COLLAPSED_CARD_SIZE } from '@project/core';
  *
  * jsdom computes no CSS, so a rendering test cannot see any of it; the browser
  * suites see the drawn result but not which declaration produced it. Reading
- * the source is what is left, and `canvas-card-embedded-layout.test.ts` already
+ * the source is what is left, and `canvas-card-embedded-diagram.test.ts` already
  * does it for the one other number this stylesheet shares with the domain.
  */
 

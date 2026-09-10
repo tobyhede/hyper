@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type LayoutId, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type DiagramId, type SpaceSnapshot, type UUID } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
@@ -33,8 +33,8 @@ const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const THIRD_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
@@ -59,15 +59,15 @@ const automaticSnapshot: SpaceSnapshot = {
   ],
 };
 
-/** One Layout holding all three Cards, with two Graphs over them. */
+/** One Diagram holding all three Cards, with two Graphs over them. */
 const positionedSnapshot: SpaceSnapshot = {
   ...automaticSnapshot,
   document: {
     ...automaticSnapshot.document,
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout 1',
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [CARD_A]: { x: 10, y: 20, open: false },
@@ -80,27 +80,27 @@ const positionedSnapshot: SpaceSnapshot = {
         ],
       },
       {
-        id: OTHER_LAYOUT_ID,
-        title: 'Layout 2',
+        id: OTHER_DIAGRAM_ID,
+        title: 'Diagram 2',
         kind: 'positioned',
         positions: { [CARD_C]: { x: 0, y: 0, open: false } },
         graphs: [{ id: THIRD_GRAPH_ID, title: 'Third', edges: [] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
 };
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  layoutId: LayoutId = LAYOUT_ID,
+  diagramId: DiagramId = DIAGRAM_ID,
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const { navigation, authoring, adapter, continuation, edgeAuthoring } = composeApp({
     spaceSession: session,
-    selection: layoutId,
+    selection: diagramId,
     newId,
     initialPlacement: Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: false }],
@@ -113,7 +113,7 @@ function open(
 }
 
 const graphsOf = (snapshot: SpaceSnapshot) =>
-  (snapshot.document.layouts ?? []).flatMap((layout) => layout.graphs);
+  (snapshot.document.diagrams ?? []).flatMap((diagram) => diagram.graphs);
 
 describe('the one Edge interaction draft', () => {
   it('holds at most one draft, whichever kind starts next', () => {
@@ -180,7 +180,7 @@ describe('a refused proposal', () => {
     const { edges } = open();
     edges.openEdgeEditor(SUBJECT);
 
-    // A Card outside this Layout, so the rule is Authoring's rather than this
+    // A Card outside this Diagram, so the rule is Authoring's rather than this
     // module's — which is the point: the identity comes from where the rule is,
     // and the endpoint beside it is the only context presentation needs to mark
     // one Field and not the other.
@@ -196,7 +196,7 @@ describe('a refused proposal', () => {
     expect(edges.getState().refusal).toEqual({
       kind: 'reconnection',
       endpoint: 'to',
-      refusal: { code: 'edge-card-outside-layout' },
+      refusal: { code: 'edge-card-outside-diagram' },
     });
   });
 
@@ -316,11 +316,11 @@ describe('deleting an Edge', () => {
  * it is *about*; an unrelated completed Edit leaves it standing.
  */
 describe('draft invalidation', () => {
-  it('cancels the draft when the selected Layout changes', () => {
+  it('cancels the draft when the selected Diagram changes', () => {
     const { edges, navigation } = open();
     edges.beginPointerConnect(CARD_A);
 
-    navigation.selectLayout(OTHER_LAYOUT_ID);
+    navigation.selectDiagram(OTHER_DIAGRAM_ID);
 
     expect(edges.getState().draft).toBeNull();
   });
@@ -355,7 +355,7 @@ describe('draft invalidation', () => {
     const session = openSpaceSession(backend, loaded);
     const { authoring, edgeAuthoring: edges } = composeApp({
       spaceSession: session,
-      selection: LAYOUT_ID,
+      selection: DIAGRAM_ID,
       initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20, open: false }],
         [CARD_B, { x: 300, y: 40, open: false }],
@@ -401,8 +401,8 @@ describe('draft invalidation', () => {
       ({ navigation }: ReturnType<typeof open>) => navigation.activateGraph(OTHER_GRAPH_ID),
     ],
     [
-      'the Layout changes',
-      ({ navigation }: ReturnType<typeof open>) => navigation.selectLayout(OTHER_LAYOUT_ID),
+      'the Diagram changes',
+      ({ navigation }: ReturnType<typeof open>) => navigation.selectDiagram(OTHER_DIAGRAM_ID),
     ],
   ])('clears a refusal left by a finished gesture when %s', (_name, change) => {
     const opened = open();
@@ -577,7 +577,7 @@ describe('completing a pointer connection', () => {
     const { edges } = open();
     begin(edges);
     // Both refuse for a reason Space Authoring owns: A→B already exists in this
-    // Graph, and this Card is not in this Layout.
+    // Graph, and this Card is not in this Diagram.
     if (edges.getState().draft?.kind === 'pointer-connect') edges.connect(CARD_A, CARD_B, null);
     else edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
     expect(edges.getState().refusal).not.toBeNull();

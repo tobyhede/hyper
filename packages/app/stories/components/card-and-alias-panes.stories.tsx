@@ -43,7 +43,7 @@ const markdown: Extract<Card, { kind: 'markdown' }> = {
   kind: 'markdown',
   body: `## Placement
 
-Placement is authored, not computed. A Layout owns an explicitly positioned subset of Cards.
+Placement is authored, not computed. A Diagram owns an explicitly positioned subset of Cards.
 
 ## Strategies
 

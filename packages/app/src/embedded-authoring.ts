@@ -1,4 +1,4 @@
-import type { LayoutId } from '@project/core';
+import type { DiagramId } from '@project/core';
 import { Placement } from '@project/graph';
 import {
   createNonThrowingReporter,
@@ -23,7 +23,7 @@ const NOTHING_AUTHORED = { kind: 'unchanged' } as const;
  */
 export function createEmbeddedAuthoring(
   entry: OpenSpace,
-  layoutId: LayoutId,
+  diagramId: DiagramId,
   reportObserverError: ObserverErrorReporter,
 ) {
   const report = createNonThrowingReporter(reportObserverError);
@@ -37,15 +37,15 @@ export function createEmbeddedAuthoring(
       completion.kind === 'resized-card' ||
       completion.kind === 'edited-card' ||
       completion.kind === 'settled-card-movement' ||
-      completion.kind === 'removed-card-from-layout'
+      completion.kind === 'removed-card-from-diagram'
     ) {
-      return entry.app.authoring.completeInLayout(layoutId, completion);
+      return entry.app.authoring.completeInDiagram(diagramId, completion);
     }
     /**
      * Anything else is a broken invariant, not a refusal.
      *
      * The six kinds above are the whole of what the surfaces holding this
-     * `authoring` produce — `EmbeddedLayoutAuthoring`, the render adapter's
+     * `authoring` produce — `EmbeddedDiagramAuthoring`, the render adapter's
      * resize and movement settlements, and Canvas Card Authoring — and Edge
      * Authoring is never composed over an embedded adapter. So a seventh kind
      * arriving here is a wiring defect, and `AuthoringResult`'s own rule
@@ -53,8 +53,8 @@ export function createEmbeddedAuthoring(
      * through the non-throwing reporter — dressing a programming defect as a
      * refusal would put it in front of the author as their own mistake". The
      * refusal that used to stand here did exactly that, and with an unrelated
-     * sentence: `edge-card-outside-layout` presents as "An Edge can only join
-     * Cards in this Layout."
+     * sentence: `edge-card-outside-diagram` presents as "An Edge can only join
+     * Cards in this Diagram."
      *
      * Reported rather than thrown, under the canvas-wide rule recorded once in
      * `docs/agents/rendering.md` ("React Flow itself") and argued in
@@ -63,7 +63,7 @@ export function createEmbeddedAuthoring(
      */
     report(
       new Error(
-        `A ${completion.kind} completion reached an embedded Layout, which supports only Open, Close, Edit, Resize, movement and Remove from Layout.`,
+        `A ${completion.kind} completion reached an embedded Diagram, which supports only Open, Close, Edit, Resize, movement and Remove from Diagram.`,
       ),
     );
     return NOTHING_AUTHORED;
@@ -72,10 +72,10 @@ export function createEmbeddedAuthoring(
     getState: entry.app.authoring.getState,
     complete,
     authoredPlacement: () => {
-      const resolved = entry.app.currentSpace().lookup.layout(layoutId);
-      return resolved === undefined ? null : Placement.fromLayout(resolved.layout);
+      const resolved = entry.app.currentSpace().lookup.diagram(diagramId);
+      return resolved === undefined ? null : Placement.fromDiagram(resolved.diagram);
     },
-    // The embedded projection is derived from this Layout on every Edit. Its
+    // The embedded projection is derived from this Diagram on every Edit. Its
     // transient render reports must never replace the full canvas's placement.
     reportRendered: () => undefined,
     replacePlacement: () => undefined,

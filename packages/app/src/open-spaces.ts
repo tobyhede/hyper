@@ -1,4 +1,4 @@
-import type { LayoutId, UUID } from '@project/core';
+import type { DiagramId, UUID } from '@project/core';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { resolveProductDestination } from '@project/http';
 import {
@@ -30,8 +30,8 @@ export interface OpenSpace {
    * able to author a Space Card.
    */
   readonly spaceCards: SpaceCardAuthoring;
-  /** Set when this Space's first working load authored its opening Layout. */
-  readonly initialization?: 'created-layout';
+  /** Set when this Space's first working load authored its opening Diagram. */
+  readonly initialization?: 'created-diagram';
 }
 
 export interface OpenSpacesState {
@@ -85,14 +85,14 @@ export interface OpenSpaces {
   readonly getState: () => OpenSpacesState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;
-  readonly open: (spaceId: UUID, selection?: LayoutId) => Promise<OpenSpace>;
+  readonly open: (spaceId: UUID, selection?: DiagramId) => Promise<OpenSpace>;
   /** Keep the containing canvas active while opening a target for embedded editing. */
   readonly embed: (spaceId: UUID) => Promise<OpenSpace>;
   readonly openPath: (pathname: string) => Promise<{
     readonly opened: OpenSpace;
     readonly opening?: DestinationOpening;
   }>;
-  readonly enter: (spaceId: UUID, selection?: LayoutId) => Promise<OpenSpace>;
+  readonly enter: (spaceId: UUID, selection?: DiagramId) => Promise<OpenSpace>;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
   readonly exit: (
     spaceId: UUID,
@@ -152,7 +152,7 @@ export function createOpenSpaces({
   const report: ObserverErrorReporter =
     reportObserverError ?? console.error.bind(console, 'Open Spaces observer failed');
   const registry = createSpaceSessionRegistry(backend, { reportObserverError: report });
-  // Opening a Space is a working load, so it initializes a stored layoutless
+  // Opening a Space is a working load, so it initializes a stored diagramless
   // Space before anything composes against it (ADR 0079).
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
   const spaceCards = createSpaceCardLifecycle({ backend, registry, newId });
@@ -300,7 +300,7 @@ export function createOpenSpaces({
     followActiveSpace();
   };
 
-  const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: LayoutId): OpenSpace => {
+  const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: DiagramId): OpenSpace => {
     const spaceId = loaded.snapshot.id;
     // A session the registry already holds keeps the snapshot it was opened on
     // and discards this one, so anything read off `loaded` afterwards describes
@@ -322,13 +322,13 @@ export function createOpenSpaces({
       if (!state.entries.some((entry) => entry.session === session)) return;
       observable.publish({ ...state, entries: [...state.entries] });
     });
-    if (reused || loaded.initialization !== 'created-layout') return opened;
-    return { ...opened, initialization: 'created-layout' };
+    if (reused || loaded.initialization !== 'created-diagram') return opened;
+    return { ...opened, initialization: 'created-diagram' };
   };
 
   const composeValidated = async (
     validated: ValidatedLoadedSpace,
-    selection?: LayoutId,
+    selection?: DiagramId,
   ): Promise<OpenSpace> => {
     const { loaded } = validated;
     const spaceId = loaded.snapshot.id;
@@ -341,7 +341,7 @@ export function createOpenSpaces({
     return opening;
   };
 
-  const compose = async (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> => {
+  const compose = async (spaceId: UUID, selection?: DiagramId): Promise<OpenSpace> => {
     await exiting.get(spaceId);
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
@@ -379,7 +379,7 @@ export function createOpenSpaces({
 
   const activate = async (
     spaceId: UUID,
-    selection: LayoutId | undefined,
+    selection: DiagramId | undefined,
     from: UUID | null,
   ): Promise<OpenSpace> => {
     // Numbered before the Space is loaded, not after: composition is itself a
@@ -395,7 +395,7 @@ export function createOpenSpaces({
   };
 
   /** Open a Space directly, which is not a crossing and records no opener. */
-  const open = (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> =>
+  const open = (spaceId: UUID, selection?: DiagramId): Promise<OpenSpace> =>
     activate(spaceId, selection, null);
 
   /**
@@ -406,7 +406,7 @@ export function createOpenSpaces({
    * reader was standing in when they pressed — not whichever Space the canvas
    * happens to hold once the load settles.
    */
-  const enter = (spaceId: UUID, selection?: LayoutId): Promise<OpenSpace> =>
+  const enter = (spaceId: UUID, selection?: DiagramId): Promise<OpenSpace> =>
     activate(spaceId, selection, observable.getState().activeSpaceId);
 
   /**
@@ -436,7 +436,7 @@ export function createOpenSpaces({
     request: number,
   ): ReturnType<OpenSpaces['openPath']> => {
     // Resolving an address is a working load, so it initializes a stored
-    // layoutless Space before the destination is read off it (ADR 0079).
+    // diagramless Space before the destination is read off it (ADR 0079).
     const resolution = await resolveProductDestination({ loadSpace: loadWorkingSpace }, pathname);
     if (resolution.kind === 'outside') throw new Error('The URL is outside product addressing.');
     if (resolution.kind === 'malformed') throw new Error('The product URL is malformed.');
@@ -452,9 +452,9 @@ export function createOpenSpaces({
     );
     // A Space already open keeps the selection it is being worked in, so the
     // URL's is only a proposal. Report the one that holds: a caller opening the
-    // named Graph does so against the selected Layout, and the two disagreeing
-    // is how a Graph lands on a Layout nobody named.
-    const selection = opened.app.navigation.getState().selectedLayoutId;
+    // named Graph does so against the selected Diagram, and the two disagreeing
+    // is how a Graph lands on a Diagram nobody named.
+    const selection = opened.app.navigation.getState().selectedDiagramId;
     const opening: DestinationOpening =
       selection === destination.selection ? destination : { ...destination, selection };
     return { opened, opening };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { LayoutId } from '@project/core';
+import type { DiagramId } from '@project/core';
 import { graphStartCard, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
-import { requireDefaultLayout } from '../src/layout-resolution';
+import { requireDefaultDiagram } from '../src/diagram-resolution';
 import {
   authoredSnapshot,
   authoredSpace,
@@ -21,77 +21,77 @@ import {
  *
  * ADR 0052 makes a stable story evidence about the UI Hyper ships, and its
  * negative to remember forbids making one possible by "translating its state in
- * the harness". Where a Space opens is `requireDefaultLayout` reading
- * `space.defaultLayout` — so the story fixture must not answer that question
+ * the harness". Where a Space opens is `requireDefaultDiagram` reading
+ * `space.defaultDiagram` — so the story fixture must not answer that question
  * itself, and these Spaces have to *declare* what the Ladle specs then assert.
  *
  * That is what this file pins. `issue-14-space-sidebar.spec.ts` proves the
  * rendered story presses Collection 1; this proves the story is entitled to,
  * because the Space says so through the same call production makes. Delete the
- * `defaultLayout` and this fails here rather than in a browser.
+ * `defaultDiagram` and this fails here rather than in a browser.
  */
-/** The title of the Layout an id names, asked of the Space that declares it. */
-const openedLayoutTitle = (space: Space, id: LayoutId): string | undefined =>
-  space.lookup.layout(id)?.layout.title;
+/** The title of the Diagram an id names, asked of the Space that declares it. */
+const openedDiagramTitle = (space: Space, id: DiagramId): string | undefined =>
+  space.lookup.diagram(id)?.diagram.title;
 
 describe('the story Spaces', () => {
-  it('opens the authored Space on the Layout its stories press', () => {
-    const opens = requireDefaultLayout(authoredSpace);
+  it('opens the authored Space on the Diagram its stories press', () => {
+    const opens = requireDefaultDiagram(authoredSpace);
 
-    expect(opens).toBe(authoredSpace.defaultLayout);
-    expect(openedLayoutTitle(authoredSpace, opens)).toBe('Collection 1');
+    expect(opens).toBe(authoredSpace.defaultDiagram);
+    expect(openedDiagramTitle(authoredSpace, opens)).toBe('Collection 1');
   });
 
   /**
-   * The Cards drawer's Refused story needs a Layout that is *missing* Cards, and
-   * it must not find one by indexing into `layouts` — that follows array order,
-   * so inserting a Layout would silently move the story to a different one.
+   * The Cards drawer's Refused story needs a Diagram that is *missing* Cards, and
+   * it must not find one by indexing into `diagrams` — that follows array order,
+   * so inserting a Diagram would silently move the story to a different one.
    */
-  it('opens the sparse authored Space on a Layout some Cards are absent from', () => {
+  it('opens the sparse authored Space on a Diagram some Cards are absent from', () => {
     const space = loadSpaceSnapshot(sparseAuthoredSnapshot);
     if (!space.ok) throw new Error('sparse story Space did not load');
-    const opens = requireDefaultLayout(space.space);
+    const opens = requireDefaultDiagram(space.space);
 
-    expect(opens).toBe(space.space.defaultLayout);
-    const layout = space.space.lookup.layout(opens)?.layout;
-    expect(openedLayoutTitle(space.space, opens)).toBe('Collection 2');
+    expect(opens).toBe(space.space.defaultDiagram);
+    const diagram = space.space.lookup.diagram(opens)?.diagram;
+    expect(openedDiagramTitle(space.space, opens)).toBe('Collection 2');
     expect(
-      space.space.cards.filter((card) => layout?.positions[card.id] === undefined),
+      space.space.cards.filter((card) => diagram?.positions[card.id] === undefined),
     ).not.toHaveLength(0);
   });
 
   /** ADR 0080 makes a newly created Space complete before it is first opened. */
-  it('opens the newly created Space on its authored Layout', () => {
-    const opens = requireDefaultLayout(newSpaceFixture);
+  it('opens the newly created Space on its authored Diagram', () => {
+    const opens = requireDefaultDiagram(newSpaceFixture);
 
-    expect(opens).toEqual(newSpaceFixture.layouts[0]?.id);
-    expect(newSpaceFixture.layouts).toHaveLength(1);
+    expect(opens).toEqual(newSpaceFixture.diagrams[0]?.id);
+    expect(newSpaceFixture.diagrams).toHaveLength(1);
     expect(newSpaceFixture.graphs).toHaveLength(1);
-    expect(openedLayoutTitle(newSpaceFixture, opens)).toBe('Layout 1');
+    expect(openedDiagramTitle(newSpaceFixture, opens)).toBe('Diagram 1');
   });
 
   /**
    * The retryable story hands the fixture a Space that changes: it opens on
    * `authoredSnapshot` and submits `editedSnapshot`. The fixture seeds `selected`
-   * once and never reconciles it, so an Edit withdrawing the opened Layout would
-   * leave the sidebar with no Layout to press — a blank story rather than a
+   * once and never reconciles it, so an Edit withdrawing the opened Diagram would
+   * leave the sidebar with no Diagram to press — a blank story rather than a
    * degraded one. The Edit appends, and this is what says so, at `verify` rather
    * than in a browser — including that it appends *something*, since an
    * `editedSnapshot` that stopped differing from what the session loaded would
    * leave the story's claim with nothing to show.
    */
-  it('keeps the opened Layout when the retryable story submits its Edit', () => {
+  it('keeps the opened Diagram when the retryable story submits its Edit', () => {
     const edited = loadSpaceSnapshot(editedSnapshot);
     if (!edited.ok) throw new Error(edited.errors.map((error) => error.message).join('\n'));
 
-    const opens = requireDefaultLayout(authoredSpace);
+    const opens = requireDefaultDiagram(authoredSpace);
 
-    expect(openedLayoutTitle(edited.space, opens)).toBe('Collection 1');
-    expect(edited.space.layouts.slice(0, authoredSpace.layouts.length)).toEqual(
-      authoredSpace.layouts,
+    expect(openedDiagramTitle(edited.space, opens)).toBe('Collection 1');
+    expect(edited.space.diagrams.slice(0, authoredSpace.diagrams.length)).toEqual(
+      authoredSpace.diagrams,
     );
     expect(
-      edited.space.layouts.slice(authoredSpace.layouts.length).map((layout) => layout.title),
+      edited.space.diagrams.slice(authoredSpace.diagrams.length).map((diagram) => diagram.title),
     ).toEqual(['Collection 3']);
   });
 
@@ -118,7 +118,7 @@ describe('the story Spaces', () => {
       ...[authoredSpace, edited.space, traversalSpace, deepDiveSpace, commandDockSpace].flatMap(
         (space) => [
           ...space.cards.map((card) => card.id),
-          ...space.layouts.map((layout) => layout.id),
+          ...space.diagrams.map((diagram) => diagram.id),
           ...space.graphs.map((graph) => graph.id),
         ],
       ),
@@ -152,19 +152,19 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * The traversal Spaces open where they say, on the one Graph their Layout
+   * The traversal Spaces open where they say, on the one Graph their Diagram
    * owns — so a presenting story calls `present()` and nothing else, and the
-   * Graph it presents is the one `requireDefaultLayout` and ADR 0026 answer rather
+   * Graph it presents is the one `requireDefaultDiagram` and ADR 0026 answer rather
    * than one the harness picked.
    */
-  it('opens each traversal Space on the Layout and Graph it declares', () => {
+  it('opens each traversal Space on the Diagram and Graph it declares', () => {
     for (const [space, title] of [
       [traversalSpace, 'Traversal'],
       [deepDiveSpace, 'Deep dive'],
     ] as const) {
-      const opens = requireDefaultLayout(space);
-      expect(opens).toBe(space.defaultLayout);
-      expect(openedLayoutTitle(space, opens)).toBe(title);
+      const opens = requireDefaultDiagram(space);
+      expect(opens).toBe(space.defaultDiagram);
+      expect(openedDiagramTitle(space, opens)).toBe(title);
       expect(space.graphs.map((graph) => graph.title)).toEqual([title]);
     }
   });
@@ -194,7 +194,7 @@ describe('the story Spaces', () => {
   /**
    * The Graph colours the sidebar draws are derived, not transcribed. The four
    * Graphs carry no colour of their own, so each takes a palette slot by its
-   * position in the flatten across Layouts (ADR 0045) — which is what let the
+   * position in the flatten across Diagrams (ADR 0045) — which is what let the
    * fixture's four hex literals go.
    */
   it('carries no Graph colour of its own, leaving the palette to answer', () => {
@@ -210,31 +210,31 @@ describe('the story Spaces', () => {
   /**
    * The Command Dock's Space, held to the three things it exists to supply.
    *
-   * The prototype it feeds compares list surfaces, Layout switching and Graph
+   * The prototype it feeds compares list surfaces, Diagram switching and Graph
    * emphasis, and each of those needs a shape no other fixture has: **more
-   * unplaced Cards than a popover can comfortably hold**, **two Layouts**, and
+   * unplaced Cards than a popover can comfortably hold**, **two Diagrams**, and
    * **three Graphs over the opening one** so emphasis is a real choice rather
    * than a one-member list. Pinned here because all three are quietly easy to
    * lose — a Card placed while adjusting the fixture empties the Cards list,
    * and a Graph removed makes emphasis unjudgeable — and the loss would show up
    * as a prototype that reads fine and settles nothing.
    */
-  it('gives the Command Dock two Layouts, three Graphs over the first, and Cards outside it', () => {
-    const opens = requireDefaultLayout(commandDockSpace);
-    const layout = commandDockSpace.lookup.layout(opens)?.layout;
+  it('gives the Command Dock two Diagrams, three Graphs over the first, and Cards outside it', () => {
+    const opens = requireDefaultDiagram(commandDockSpace);
+    const diagram = commandDockSpace.lookup.diagram(opens)?.diagram;
 
-    expect(opens).toBe(commandDockSpace.defaultLayout);
-    expect(openedLayoutTitle(commandDockSpace, opens)).toBe('Collection 1');
-    expect(commandDockSpace.layouts.map((entry) => entry.title)).toEqual([
+    expect(opens).toBe(commandDockSpace.defaultDiagram);
+    expect(openedDiagramTitle(commandDockSpace, opens)).toBe('Collection 1');
+    expect(commandDockSpace.diagrams.map((entry) => entry.title)).toEqual([
       'Collection 1',
       'Collection 2',
     ]);
-    expect(layout?.graphs.map((graph) => graph.title)).toEqual(['Long', 'Mid', 'Short']);
+    expect(diagram?.graphs.map((graph) => graph.title)).toEqual(['Long', 'Mid', 'Short']);
 
     const unplaced = commandDockSpace.cards.filter(
-      (card) => layout?.positions[card.id] === undefined,
+      (card) => diagram?.positions[card.id] === undefined,
     );
-    expect(unplaced.length).toBeGreaterThan(Object.keys(layout?.positions ?? {}).length * 4);
+    expect(unplaced.length).toBeGreaterThan(Object.keys(diagram?.positions ?? {}).length * 4);
   });
 
   /**
@@ -246,16 +246,16 @@ describe('the story Spaces', () => {
    * being wrong.
    */
   it('carries every Card kind on the Command Dock canvas and in its Cards list', () => {
-    const opens = requireDefaultLayout(commandDockSpace);
-    const layout = commandDockSpace.lookup.layout(opens)?.layout;
+    const opens = requireDefaultDiagram(commandDockSpace);
+    const diagram = commandDockSpace.lookup.diagram(opens)?.diagram;
     const kinds = (cards: readonly { readonly kind: string }[]): readonly string[] =>
       [...new Set(cards.map((card) => card.kind))].sort();
 
     const placed = commandDockSpace.cards.filter(
-      (card) => layout?.positions[card.id] !== undefined,
+      (card) => diagram?.positions[card.id] !== undefined,
     );
     const unplaced = commandDockSpace.cards.filter(
-      (card) => layout?.positions[card.id] === undefined,
+      (card) => diagram?.positions[card.id] === undefined,
     );
 
     expect(kinds(placed)).toEqual(['alias', 'markdown', 'space']);
@@ -271,22 +271,22 @@ describe('the story Spaces', () => {
     expect(commandDockSpace.graphs.filter((graph) => graph.color !== undefined)).toEqual([]);
   });
   /**
-   * **A Space, its Layouts and its Graphs are four kinds of thing with one
+   * **A Space, its Diagrams and its Graphs are four kinds of thing with one
    * spelling for identity, so a fixture that reuses a value hides the mistake
    * a real reader would make.** Meta's own Id was written as a literal and its
-   * Catalogue Layout as `metaId(0)`, which is the same UUID — so the product
-   * URL ADR 0069 builds for it read `/spaces/<X>/views/<X>`, and any assertion
-   * that a Layout is not its Space passed here without meaning anything.
+   * Catalogue Diagram as `metaId(0)`, which is the same UUID — so the product
+   * URL ADR 0069 builds for it read `/spaces/<X>/diagrams/<X>`, and any assertion
+   * that a Diagram is not its Space passed here without meaning anything.
    */
-  it('gives the Meta Space an identity none of its own Layouts or Graphs shares', () => {
-    const { layouts } = metaSnapshot.document;
-    if (layouts === undefined) throw new Error('The Meta Space declares no Layout.');
-    const layoutIds = layouts.map(({ id }) => id);
-    const graphIds = layouts.flatMap(({ graphs }) => graphs.map(({ id }) => id));
-    const owned = [...layoutIds, ...graphIds];
+  it('gives the Meta Space an identity none of its own Diagrams or Graphs shares', () => {
+    const { diagrams } = metaSnapshot.document;
+    if (diagrams === undefined) throw new Error('The Meta Space declares no Diagram.');
+    const diagramIds = diagrams.map(({ id }) => id);
+    const graphIds = diagrams.flatMap(({ graphs }) => graphs.map(({ id }) => id));
+    const owned = [...diagramIds, ...graphIds];
 
     expect(owned).not.toContain(metaSnapshot.id);
-    // And the Layouts and Graphs are distinct from each other, which is the
+    // And the Diagrams and Graphs are distinct from each other, which is the
     // same rule one level down.
     expect(new Set(owned).size).toBe(owned.length);
   });

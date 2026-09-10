@@ -479,11 +479,11 @@ export interface CommitRefusalBody {
       }
     | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: string }
     | {
-        readonly kind: 'space-card-layout-missing';
+        readonly kind: 'space-card-diagram-missing';
         readonly spaceId: string;
         readonly cardId: string;
         readonly targetSpaceId: string;
-        readonly layoutId: string;
+        readonly diagramId: string;
       }
     | {
         readonly kind: 'space-card-graph-missing';
@@ -493,11 +493,11 @@ export interface CommitRefusalBody {
         readonly graphId: string;
       }
     | {
-        readonly kind: 'space-card-graph-outside-layout';
+        readonly kind: 'space-card-graph-outside-diagram';
         readonly spaceId: string;
         readonly cardId: string;
         readonly targetSpaceId: string;
-        readonly layoutId: string;
+        readonly diagramId: string;
         readonly graphId: string;
       }
   )[];
@@ -554,13 +554,13 @@ const decodeSpaceError = (value: unknown): SpaceError => {
     }
     case 'duplicate-card-id':
     case 'duplicate-graph-id':
-    case 'duplicate-layout-id':
-    case 'layout-member-missing-card':
-    case 'layout-active-graph-missing':
-    case 'layout-active-graph-outside-layout':
+    case 'duplicate-diagram-id':
+    case 'diagram-member-missing-card':
+    case 'diagram-active-graph-missing':
+    case 'diagram-active-graph-outside-diagram':
     case 'graph-edge-missing-card':
-    case 'graph-edge-card-outside-layout':
-    case 'unresolved-default-layout':
+    case 'graph-edge-card-outside-diagram':
+    case 'unresolved-default-diagram':
     case 'duplicate-graph-edge':
     case 'unresolved-alias-target':
     case 'alias-self-reference':
@@ -646,16 +646,16 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       const error = exactRecord(value, ['kind', 'spaceId'], 'unreferenced Space refusal');
       return { kind, spaceId: requiredUuid(error['spaceId'], 'unreferenced Space id') };
     }
-    case 'space-card-layout-missing': {
+    case 'space-card-diagram-missing': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'layoutId'],
-        'Space Card Layout refusal',
+        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'diagramId'],
+        'Space Card Diagram refusal',
       );
       return {
         kind,
         ...decodeSpaceCardLocation(error),
-        layoutId: requiredUuid(error['layoutId'], 'Space Card Layout id'),
+        diagramId: requiredUuid(error['diagramId'], 'Space Card Diagram id'),
       };
     }
     case 'space-card-graph-missing': {
@@ -670,16 +670,16 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
         graphId: requiredUuid(error['graphId'], 'Space Card Graph id'),
       };
     }
-    case 'space-card-graph-outside-layout': {
+    case 'space-card-graph-outside-diagram': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'layoutId', 'graphId'],
+        ['kind', 'spaceId', 'cardId', 'targetSpaceId', 'diagramId', 'graphId'],
         'Space Card Graph membership refusal',
       );
       return {
         kind,
         ...decodeSpaceCardLocation(error),
-        layoutId: requiredUuid(error['layoutId'], 'Space Card Layout id'),
+        diagramId: requiredUuid(error['diagramId'], 'Space Card Diagram id'),
         graphId: requiredUuid(error['graphId'], 'Space Card Graph id'),
       };
     }

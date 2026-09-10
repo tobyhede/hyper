@@ -23,7 +23,7 @@ const MAIN = {
   ],
 };
 
-/** The Layout that owns `MAIN`; its position keys are its Card membership. */
+/** The Diagram that owns `MAIN`; its position keys are its Card membership. */
 const WORKING = {
   id: uuid('00000000-0000-4000-8000-000000000022'),
   title: 'Working',
@@ -39,11 +39,11 @@ const validInput = {
   version: 1,
   id: uuid('00000000-0000-4000-8000-000000000001'),
   title: 'Test space',
-  layouts: [WORKING],
+  diagrams: [WORKING],
 };
 
-/** The same input with no Layouts, and so no Graphs (ADR 0015). */
-const noStructure = { ...validInput, layouts: [] };
+/** The same input with no Diagrams, and so no Graphs (ADR 0015). */
+const noStructure = { ...validInput, diagrams: [] };
 
 const validCards = [
   cardFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
@@ -59,7 +59,7 @@ describe('loadSpace', () => {
     expect(result.space.title).toBe('Test space');
     expect(result.space.cards).toHaveLength(2);
     expect(result.space.graphs).toHaveLength(1);
-    expect(result.space.layouts).toHaveLength(1);
+    expect(result.space.diagrams).toHaveLength(1);
   });
 
   it('builds each card from its file, body included', () => {
@@ -130,8 +130,8 @@ describe('loadSpace', () => {
 
   it('rejects a version 2 document by its version, not by every key that moved', () => {
     // The disposable pre-release shape carried a space-level `graphs` array and
-    // layouts with none of their own. Read against version 1 it fails twice over
-    // — once per layout missing the graphs it now owns — and none of those
+    // diagrams with none of their own. Read against version 1 it fails twice over
+    // — once per diagram missing the graphs it now owns — and none of those
     // issues says the thing worth saying. Hyper is unreleased, so the answer is
     // rejection naming the version, never a migration (ADR 0040).
     const result = loadSpace(
@@ -140,7 +140,7 @@ describe('loadSpace', () => {
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Test space',
         graphs: [MAIN],
-        layouts: [
+        diagrams: [
           {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
@@ -178,8 +178,8 @@ describe('loadSpace', () => {
     expect(result.errors[0]?.message).toContain('graphs');
   });
 
-  it('accepts a version 1 space whose only graphs are the ones its Layouts own', () => {
-    // The other side of the check above: ownership nested under a Layout is the
+  it('accepts a version 1 space whose only graphs are the ones its Diagrams own', () => {
+    // The other side of the check above: ownership nested under a Diagram is the
     // shape, so the key it looks for is absent and nothing is rejected.
     expect(loadSpace(validInput, validCards).ok).toBe(true);
   });
@@ -192,24 +192,24 @@ describe('loadSpace', () => {
     expect(result.errors.every((e) => e.kind === 'invalid-shape')).toBe(true);
   });
 
-  it('gives a space with no declared layouts an empty list, never undefined', () => {
-    const { layouts: _layouts, ...withoutLayouts } = validInput;
-    const result = loadSpace(withoutLayouts, validCards);
+  it('gives a space with no declared diagrams an empty list, never undefined', () => {
+    const { diagrams: _diagrams, ...withoutDiagrams } = validInput;
+    const result = loadSpace(withoutDiagrams, validCards);
     if (!result.ok) throw new Error('expected a valid space');
-    expect(result.space.layouts).toEqual([]);
+    expect(result.space.diagrams).toEqual([]);
     expect(result.space.graphs).toEqual([]);
-    expect(result.space.defaultLayout).toBeUndefined();
+    expect(result.space.defaultDiagram).toBeUndefined();
   });
 
-  it('carries a declared layout’s positions through unchanged', () => {
+  it('carries a declared diagram’s positions through unchanged', () => {
     const result = loadSpace(
-      { ...validInput, defaultLayout: uuid('00000000-0000-4000-8000-000000000022') },
+      { ...validInput, defaultDiagram: uuid('00000000-0000-4000-8000-000000000022') },
       validCards,
     );
     if (!result.ok) throw new Error('expected a valid space');
-    expect(result.space.defaultLayout).toBe(uuid('00000000-0000-4000-8000-000000000022'));
+    expect(result.space.defaultDiagram).toBe(uuid('00000000-0000-4000-8000-000000000022'));
     expect(
-      result.space.lookup.layout(uuid('00000000-0000-4000-8000-000000000022'))?.layout.positions[
+      result.space.lookup.diagram(uuid('00000000-0000-4000-8000-000000000022'))?.diagram.positions[
         uuid('00000000-0000-4000-8000-000000000003')
       ],
     ).toEqual({ x: 320, y: 0, open: false });
@@ -217,14 +217,14 @@ describe('loadSpace', () => {
 
   /**
    * The one intake refuses a stale authored file outright rather than reading
-   * the version 2 filter as a layout that owns nothing. Shape, not reference:
+   * the version 2 filter as a diagram that owns nothing. Shape, not reference:
    * a graph id is not a graph, so no reference check ever runs over it.
    */
-  it('rejects a layout whose graphs are ids rather than owned values', () => {
+  it('rejects a diagram whose graphs are ids rather than owned values', () => {
     const result = loadSpace(
       {
         ...validInput,
-        layouts: [{ ...WORKING, graphs: [uuid('00000000-0000-4000-8000-000000000004')] }],
+        diagrams: [{ ...WORKING, graphs: [uuid('00000000-0000-4000-8000-000000000004')] }],
       },
       validCards,
     );

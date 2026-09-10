@@ -750,16 +750,16 @@ export const writeReleaseSpace = (
     }),
   );
 
-  const layoutId = stableRoadmapUuid(`layout:${release.tag}`);
+  const diagramId = stableRoadmapUuid(`diagram:${release.tag}`);
   const criticalGraphId = stableRoadmapUuid(`graph:${release.tag}:critical`);
   const parallelGraphId = stableRoadmapUuid(`graph:${release.tag}:parallel`);
   const space = {
     version: 1,
     id: stableRoadmapUuid(`space:${release.tag}`),
     title: `${release.title} roadmap`,
-    layouts: [
+    diagrams: [
       {
-        id: layoutId,
+        id: diagramId,
         title: 'Release dependency map',
         kind: 'positioned',
         positions,
@@ -780,7 +780,7 @@ export const writeReleaseSpace = (
         activeGraph: criticalGraphId,
       },
     ],
-    defaultLayout: layoutId,
+    defaultDiagram: diagramId,
   };
   mkdirSync(destination, { recursive: true });
   writeFileSync(join(destination, 'space.json'), `${JSON.stringify(space, null, 2)}\n`);

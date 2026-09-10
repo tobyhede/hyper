@@ -6,7 +6,7 @@ import {
   uuidSchema,
   type CardPlacement,
   type Graph,
-  type LayoutId,
+  type DiagramId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -23,7 +23,7 @@ import { mintingIds } from './minting';
  * Graph authoring experience, asserted through the interface that owns them.
  *
  * Every case here is a row of the handoff's domain transition matrix: what one
- * completed Edit writes, what creating a Layout does to it, and the
+ * completed Edit writes, what creating a Diagram does to it, and the
  * invariant or no-op that row names. Deliberately separate from
  * `space-authoring.test.ts`, which owns the lifecycle around a completion —
  * ordering, the install gate, persistence and replacement — rather than the
@@ -38,14 +38,14 @@ const CARD_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const CARD_E = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
 /** The second identity an Edit mints, for the tests that create twice. */
 const SECOND_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
-/** A Graph identity minted by Layout creation. */
+/** A Graph identity minted by Diagram creation. */
 const MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
-/** What a second Layout creation would mint. */
+/** What a second Diagram creation would mint. */
 const UNKNOWN_CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
@@ -53,7 +53,7 @@ const CENTRE = { x: 400, y: 300, open: false };
 
 const MAIN_GRAPH: Graph = { id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] };
 
-/** A Space with no Layouts, and so with no Graphs at all (ADR 0040). */
+/** A Space with no Diagrams, and so with no Graphs at all (ADR 0040). */
 const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
@@ -63,15 +63,15 @@ const automaticSnapshot: SpaceSnapshot = {
   ],
 };
 
-/** One Layout placing both Cards and owning the Graph over them. */
+/** One Diagram placing both Cards and owning the Graph over them. */
 const positionedSnapshot: SpaceSnapshot = {
   ...automaticSnapshot,
   document: {
     ...automaticSnapshot.document,
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout 1',
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [CARD_A]: { x: 10, y: 20, open: false },
@@ -80,19 +80,19 @@ const positionedSnapshot: SpaceSnapshot = {
         graphs: [MAIN_GRAPH],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
 };
 
 const graphsOf = (snapshot: SpaceSnapshot): readonly Graph[] =>
-  (snapshot.document.layouts ?? []).flatMap((layout) => layout.graphs);
+  (snapshot.document.diagrams ?? []).flatMap((diagram) => diagram.graphs);
 
-const layoutOf = (snapshot: SpaceSnapshot, layoutId: string) =>
-  (snapshot.document.layouts ?? []).find((layout) => layout.id === layoutId);
+const diagramOf = (snapshot: SpaceSnapshot, diagramId: string) =>
+  (snapshot.document.diagrams ?? []).find((diagram) => diagram.id === diagramId);
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  layoutId: LayoutId = LAYOUT_ID,
+  diagramId: DiagramId = DIAGRAM_ID,
   // The ids this Edit will mint, named by the test that asserts on them rather
   // than taken from the ambient generator (ADR 0016, and `./minting`).
   newId: () => UUID = mintingIds(MINTED),
@@ -101,7 +101,7 @@ function open(
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const { navigation, authoring } = composeApp({
     spaceSession: session,
-    selection: layoutId,
+    selection: diagramId,
     newId,
     // These cases install whatever geometry they are about through `place`.
     initialPlacement: null,
@@ -127,20 +127,20 @@ const openPositioned = (newId?: () => UUID) => {
   return opened;
 };
 
-describe('Add Layout', () => {
-  it('creates and selects an empty Layout with one empty Active Graph', () => {
+describe('Add Diagram', () => {
+  it('creates and selects an empty Diagram with one empty Active Graph', () => {
     const { authoring, navigation, session } = open(
       positionedSnapshot,
-      LAYOUT_ID,
+      DIAGRAM_ID,
       mintingIds(MINTED, MINTED_GRAPH),
     );
-    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
+    expect(authoring.complete({ kind: 'created-diagram' })).toEqual({ kind: 'completed' });
 
-    expect(session.getState().working.document.layouts).toEqual([
-      positionedSnapshot.document.layouts![0],
+    expect(session.getState().working.document.diagrams).toEqual([
+      positionedSnapshot.document.diagrams![0],
       {
         id: MINTED,
-        title: 'Layout 2',
+        title: 'Diagram 2',
         kind: 'positioned',
         positions: {},
         graphs: [
@@ -154,20 +154,20 @@ describe('Add Layout', () => {
         activeGraph: MINTED_GRAPH,
       },
     ]);
-    expect(session.getState().working.document.defaultLayout).toBe(MINTED);
-    expect(navigation.getState().selectedLayoutId).toBe(MINTED);
+    expect(session.getState().working.document.defaultDiagram).toBe(MINTED);
+    expect(navigation.getState().selectedDiagramId).toBe(MINTED);
   });
 
   it('does not require the current canvas placement to resolve', () => {
     const { authoring, navigation, session } = open(
       positionedSnapshot,
-      LAYOUT_ID,
+      DIAGRAM_ID,
       mintingIds(MINTED, MINTED_GRAPH),
     );
 
-    expect(authoring.complete({ kind: 'created-layout' })).toEqual({ kind: 'completed' });
-    expect(session.getState().working.document.layouts).toHaveLength(2);
-    expect(navigation.getState().selectedLayoutId).toBe(MINTED);
+    expect(authoring.complete({ kind: 'created-diagram' })).toEqual({ kind: 'completed' });
+    expect(session.getState().working.document.diagrams).toHaveLength(2);
+    expect(navigation.getState().selectedDiagramId).toBe(MINTED);
   });
 });
 
@@ -184,7 +184,7 @@ describe('Add Card', () => {
       id: MINTED,
       document: { title: 'Card 1', kind: 'markdown', body: '' },
     });
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20, open: false },
       [CARD_B]: { x: 300, y: 40, open: false },
       [MINTED]: CENTRE,
@@ -202,7 +202,7 @@ describe('Add Card', () => {
     authoring.complete({ kind: 'created-card', anchor: CENTRE });
     authoring.complete({ kind: 'created-card', anchor: CENTRE });
 
-    const positions = layoutOf(session.getState().working, LAYOUT_ID)?.positions ?? {};
+    const positions = diagramOf(session.getState().working, DIAGRAM_ID)?.positions ?? {};
     const stacked = Object.values(positions).filter(
       (at) => at !== undefined && at.x >= CENTRE.x && at.y >= CENTRE.y,
     );
@@ -216,9 +216,9 @@ describe('Add Card', () => {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        layouts: [
+        diagrams: [
           {
-            ...positionedSnapshot.document.layouts![0]!,
+            ...positionedSnapshot.document.diagrams![0]!,
             positions: {
               [CARD_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
               [CARD_B]: { x: 300, y: 40, open: false },
@@ -240,7 +240,7 @@ describe('Add Card', () => {
     // A canvas coordinate is an authored one: A being Open moved its neighbours
     // when the Edit that opened it ran, and nothing converts a drop point on the
     // way in any more (ADR 0084). The Card lands where it was dropped.
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[MINTED]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[MINTED]).toEqual({
       x: 500,
       y: 400,
       open: false,
@@ -335,10 +335,10 @@ describe('Expanded Card geometry', () => {
     ],
     document: {
       ...positionedSnapshot.document,
-      layouts: [
+      diagrams: [
         {
-          id: LAYOUT_ID,
-          title: 'Layout 1',
+          id: DIAGRAM_ID,
+          title: 'Diagram 1',
           kind: 'positioned',
           positions: {
             [CARD_A]: { x: 100, y: 100, open: false },
@@ -350,13 +350,13 @@ describe('Expanded Card geometry', () => {
           graphs: [MAIN_GRAPH],
         },
       ],
-      defaultLayout: LAYOUT_ID,
+      defaultDiagram: DIAGRAM_ID,
     },
   };
 
   const openDisplacement = () => {
     const opened = open(displacementSnapshot);
-    // The geometry the canvas has reported by now: the Layout as authored.
+    // The geometry the canvas has reported by now: the Diagram as authored.
     place(opened.authoring, {
       [CARD_A]: [100, 100],
       [CARD_B]: [300, 100],
@@ -367,10 +367,10 @@ describe('Expanded Card geometry', () => {
     return opened;
   };
 
-  /** Every origin the Layout authors, so a whole Layout can be compared at once. */
+  /** Every origin the Diagram authors, so a whole Diagram can be compared at once. */
   const originsOf = (session: ReturnType<typeof open>['session']) => {
     const origins = new Map<string, readonly [number, number]>();
-    const positions = layoutOf(session.getState().working, LAYOUT_ID)?.positions ?? {};
+    const positions = diagramOf(session.getState().working, DIAGRAM_ID)?.positions ?? {};
     for (const [cardId, at] of Object.entries(positions)) {
       if (at !== undefined) origins.set(cardId, [at.x, at.y]);
     }
@@ -406,7 +406,7 @@ describe('Expanded Card geometry', () => {
     expect(authoring.complete({ kind: 'closed-card', cardId: CARD_A })).toEqual({
       kind: 'completed',
     });
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_A]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_A]).toEqual({
       x: 10,
       y: 20,
       open: false,
@@ -416,7 +416,7 @@ describe('Expanded Card geometry', () => {
     expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
       kind: 'completed',
     });
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_A]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_A]).toEqual({
       x: 10,
       y: 20,
       open: true,
@@ -445,7 +445,7 @@ describe('Expanded Card geometry', () => {
         size: { width: 260, height: 146 },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_A]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_A]).toEqual({
       x: 10,
       y: 20,
       open: false,
@@ -502,12 +502,12 @@ describe('Expanded Card geometry', () => {
   });
 
   it('reclaims from a Card the author moved beyond the Open Card, which the Open never pushed', () => {
-    // ADR 0084: Open and Close each read the Layout as it is at that moment and
+    // ADR 0084: Open and Close each read the Diagram as it is at that moment and
     // remember nothing about who was pushed, so Close reclaims from everything
     // currently beyond the closing Card. This is the deliberate memoryless
     // behaviour and not a defect — recording which Cards a particular Open moved
     // is the per-Card history that ADR rejected, because it goes stale the
-    // moment the author moves anything and makes two identical Layouts behave
+    // moment the author moves anything and makes two identical Diagrams behave
     // differently.
     const { authoring, session } = openDisplacement();
 
@@ -556,17 +556,17 @@ describe('Expanded Card geometry', () => {
     });
   });
 
-  it('refuses a subject the Layout does not hold and moves nobody', () => {
+  it('refuses a subject the Diagram does not hold and moves nobody', () => {
     const { authoring, session } = openDisplacement();
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'opened-card', cardId: UNKNOWN_CARD })).toEqual({
       kind: 'refused',
-      refusal: { code: 'card-not-in-layout' },
+      refusal: { code: 'card-not-in-diagram' },
     });
     expect(authoring.complete({ kind: 'closed-card', cardId: UNKNOWN_CARD })).toEqual({
       kind: 'refused',
-      refusal: { code: 'card-not-in-layout' },
+      refusal: { code: 'card-not-in-diagram' },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -661,7 +661,7 @@ describe('Expanded Card geometry', () => {
     ).toEqual({ kind: 'completed' });
 
     expect(originsOf(session)).toEqual(before);
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_A]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_A]).toEqual({
       x: 100,
       y: 100,
       open: false,
@@ -670,21 +670,21 @@ describe('Expanded Card geometry', () => {
   });
 
   /**
-   * A Card that leaves the Layout takes its room with it.
+   * A Card that leaves the Diagram takes its room with it.
    *
    * Under the derived model this reclaimed itself: the entry carried the Open
    * state, so removing the entry removed the displacement. Now the room is
    * written into the neighbours' own coordinates, and a removal that only drops
    * the entry leaves a hole with nothing left on the canvas to explain it and no
-   * Edit that can give it back. Leaving the Layout is a Close the Card does not
+   * Edit that can give it back. Leaving the Diagram is a Close the Card does not
    * come back from, so it reclaims exactly as Close does (ADR 0084).
    */
-  it('reclaims the room an Open Card held when it is removed from the Layout', () => {
+  it('reclaims the room an Open Card held when it is removed from the Diagram', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
     authoring.complete({ kind: 'opened-card', cardId: CARD_A });
-    expect(authoring.complete({ kind: 'removed-card-from-layout', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_A })).toEqual({
       kind: 'completed',
     });
 
@@ -707,11 +707,11 @@ describe('Expanded Card geometry', () => {
     expect(originsOf(session)).toEqual(remaining);
   });
 
-  it('moves nobody when the Card leaving the Layout was Closed', () => {
+  it('moves nobody when the Card leaving the Diagram was Closed', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    expect(authoring.complete({ kind: 'removed-card-from-layout', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_A })).toEqual({
       kind: 'completed',
     });
 
@@ -736,7 +736,7 @@ describe('Add Alias', () => {
       id: MINTED,
       document: { title: 'Card 1', kind: 'alias', target: CARD_A },
     });
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[MINTED]).toEqual(CENTRE);
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[MINTED]).toEqual(CENTRE);
   });
 
   /**
@@ -819,16 +819,16 @@ describe('Add Alias', () => {
 });
 
 describe('Add Graph', () => {
-  it('rotates colour by its appended position in the owning Layout', () => {
+  it('rotates colour by its appended position in the owning Diagram', () => {
     const snapshot: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        layouts: [
-          positionedSnapshot.document.layouts![0]!,
+        diagrams: [
+          positionedSnapshot.document.diagrams![0]!,
           {
-            id: OTHER_LAYOUT_ID,
-            title: 'Layout 2',
+            id: OTHER_DIAGRAM_ID,
+            title: 'Diagram 2',
             kind: 'positioned',
             positions: {
               [CARD_A]: { x: 20, y: 30, open: false },
@@ -847,7 +847,7 @@ describe('Add Graph', () => {
       createdGraphId: MINTED,
     });
 
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.graphs.at(-1)?.color).toBe(
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.graphs.at(-1)?.color).toBe(
       GRAPH_PALETTE[1],
     );
   });
@@ -864,7 +864,7 @@ describe('Add Graph', () => {
       MAIN_GRAPH,
       { id: MINTED, title: 'Graph 1', color: GRAPH_PALETTE[1], edges: [] },
     ]);
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.activeGraph).toBe(MINTED);
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.activeGraph).toBe(MINTED);
     expect(navigation.getState().activeGraphId).toBe(MINTED);
     expect(session.getState().working.cards).toEqual(positionedSnapshot.cards);
   });
@@ -928,17 +928,17 @@ describe('Edit Graph', () => {
   });
 });
 
-describe('Rename Layout', () => {
-  it('trims and replaces only the Layout title', () => {
+describe('Rename Diagram', () => {
+  it('trims and replaces only the Diagram title', () => {
     const { authoring, session } = openPositioned();
-    const before = layoutOf(session.getState().working, LAYOUT_ID);
+    const before = diagramOf(session.getState().working, DIAGRAM_ID);
 
     expect(
-      authoring.complete({ kind: 'renamed-layout', layoutId: LAYOUT_ID, title: '  Workshop  ' }),
+      authoring.complete({ kind: 'renamed-diagram', diagramId: DIAGRAM_ID, title: '  Workshop  ' }),
     ).toEqual({
       kind: 'completed',
     });
-    const after = layoutOf(session.getState().working, LAYOUT_ID);
+    const after = diagramOf(session.getState().working, DIAGRAM_ID);
     expect(after?.title).toBe('Workshop');
     expect(after?.id).toBe(before?.id);
     expect(after?.positions).toEqual(before?.positions);
@@ -950,50 +950,54 @@ describe('Rename Layout', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete({ kind: 'renamed-layout', layoutId: LAYOUT_ID, title: '   ' }),
+      authoring.complete({ kind: 'renamed-diagram', diagramId: DIAGRAM_ID, title: '   ' }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'layout-title-required' },
+      refusal: { code: 'diagram-title-required' },
     });
     expect(session.getState().working).toBe(before);
     expect(
-      authoring.complete({ kind: 'renamed-layout', layoutId: LAYOUT_ID, title: ' Layout 1 ' }),
+      authoring.complete({ kind: 'renamed-diagram', diagramId: DIAGRAM_ID, title: ' Diagram 1 ' }),
     ).toEqual({
       kind: 'unchanged',
     });
   });
 
   /**
-   * The Edit is addressed by Layout id, as Rename Graph is by Graph id. Without
-   * that the rename lands on whichever Layout the resolver happens to answer,
-   * so a draft begun on one Layout and completed after the drawing Layout
-   * changed writes the title onto a Layout the author never named.
+   * The Edit is addressed by Diagram id, as Rename Graph is by Graph id. Without
+   * that the rename lands on whichever Diagram the resolver happens to answer,
+   * so a draft begun on one Diagram and completed after the drawing Diagram
+   * changed writes the title onto a Diagram the author never named.
    */
-  it('refuses a rename addressed to a Layout other than the one drawing', () => {
+  it('refuses a rename addressed to a Diagram other than the one drawing', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(
-      authoring.complete({ kind: 'renamed-layout', layoutId: OTHER_LAYOUT_ID, title: 'Workshop' }),
+      authoring.complete({
+        kind: 'renamed-diagram',
+        diagramId: OTHER_DIAGRAM_ID,
+        title: 'Workshop',
+      }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'layout-not-found' },
+      refusal: { code: 'diagram-not-found' },
     });
     expect(session.getState().working).toBe(before);
   });
 });
 
-describe('Delete Layout', () => {
+describe('Delete Diagram', () => {
   const otherGraph: Graph = { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] };
-  const twoLayouts: SpaceSnapshot = {
+  const twoDiagrams: SpaceSnapshot = {
     ...positionedSnapshot,
     document: {
       ...positionedSnapshot.document,
-      layouts: [
-        positionedSnapshot.document.layouts![0]!,
+      diagrams: [
+        positionedSnapshot.document.diagrams![0]!,
         {
-          id: OTHER_LAYOUT_ID,
-          title: 'Layout 2',
+          id: OTHER_DIAGRAM_ID,
+          title: 'Diagram 2',
           kind: 'positioned',
           positions: {
             [CARD_B]: {
@@ -1010,30 +1014,30 @@ describe('Delete Layout', () => {
     },
   };
 
-  it('deletes only the selected Layout and continues in the first survivor', () => {
-    const { authoring, navigation, session } = open(twoLayouts, OTHER_LAYOUT_ID);
+  it('deletes only the selected Diagram and continues in the first survivor', () => {
+    const { authoring, navigation, session } = open(twoDiagrams, OTHER_DIAGRAM_ID);
     place(authoring, { [CARD_B]: [80, 90] });
 
-    expect(authoring.complete({ kind: 'deleted-layout', layoutId: OTHER_LAYOUT_ID })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-diagram', diagramId: OTHER_DIAGRAM_ID })).toEqual({
       kind: 'completed',
     });
 
-    expect(session.getState().working.cards).toEqual(twoLayouts.cards);
-    expect(session.getState().working.document.layouts).toEqual([
-      positionedSnapshot.document.layouts![0]!,
+    expect(session.getState().working.cards).toEqual(twoDiagrams.cards);
+    expect(session.getState().working.document.diagrams).toEqual([
+      positionedSnapshot.document.diagrams![0]!,
     ]);
-    expect(navigation.getState().selectedLayoutId).toBe(LAYOUT_ID);
+    expect(navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
     expect(authoring.authoredPlacement()?.get(CARD_A)).toEqual({ x: 10, y: 20, open: false });
   });
 
-  it('refuses to delete the last Layout with a stable identity', () => {
+  it('refuses to delete the last Diagram with a stable identity', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'deleted-layout', layoutId: LAYOUT_ID })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-diagram', diagramId: DIAGRAM_ID })).toEqual({
       kind: 'refused',
-      refusal: { code: 'space-must-keep-layout' },
+      refusal: { code: 'space-must-keep-diagram' },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -1044,9 +1048,9 @@ describe('Delete Graph', () => {
     ...positionedSnapshot,
     document: {
       ...positionedSnapshot.document,
-      layouts: [
+      diagrams: [
         {
-          ...positionedSnapshot.document.layouts![0]!,
+          ...positionedSnapshot.document.diagrams![0]!,
           graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
           activeGraph: OTHER_GRAPH_ID,
         },
@@ -1066,8 +1070,8 @@ describe('Delete Graph', () => {
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
     // Cards and positions are untouched; only the Graph left.
     expect(session.getState().working.cards).toEqual(positionedSnapshot.cards);
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions).toEqual(
-      positionedSnapshot.document.layouts![0]!.positions,
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions).toEqual(
+      positionedSnapshot.document.diagrams![0]!.positions,
     );
   });
 
@@ -1080,27 +1084,27 @@ describe('Delete Graph', () => {
     expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
   });
 
-  it("refuses to delete a Layout's last Graph", () => {
+  it("refuses to delete a Diagram's last Graph", () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID })).toEqual({
       kind: 'refused',
-      refusal: { code: 'layout-must-keep-graph' },
+      refusal: { code: 'diagram-must-keep-graph' },
     });
     expect(session.getState().working).toBe(before);
   });
 
-  it('refuses a Graph another Layout owns, although the Space plainly holds it', () => {
-    const twoLayouts: SpaceSnapshot = {
+  it('refuses a Graph another Diagram owns, although the Space plainly holds it', () => {
+    const twoDiagrams: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        layouts: [
-          positionedSnapshot.document.layouts![0]!,
+        diagrams: [
+          positionedSnapshot.document.diagrams![0]!,
           {
-            id: OTHER_LAYOUT_ID,
-            title: 'Layout 2',
+            id: OTHER_DIAGRAM_ID,
+            title: 'Diagram 2',
             kind: 'positioned',
             positions: { [CARD_A]: { x: 0, y: 400, open: false } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
@@ -1108,7 +1112,7 @@ describe('Delete Graph', () => {
         ],
       },
     };
-    const { authoring } = open(twoLayouts);
+    const { authoring } = open(twoDiagrams);
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
@@ -1128,9 +1132,9 @@ describe('Edge lifecycle', () => {
       ],
       document: {
         ...positionedSnapshot.document,
-        layouts: [
+        diagrams: [
           {
-            ...positionedSnapshot.document.layouts![0]!,
+            ...positionedSnapshot.document.diagrams![0]!,
             positions: {
               [CARD_A]: { x: 10, y: 20, open: false },
               [CARD_B]: { x: 300, y: 40, open: false },
@@ -1193,9 +1197,9 @@ describe('Edge lifecycle', () => {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        layouts: [
+        diagrams: [
           {
-            ...positionedSnapshot.document.layouts![0]!,
+            ...positionedSnapshot.document.diagrams![0]!,
             graphs: [
               {
                 id: GRAPH_ID,
@@ -1224,7 +1228,7 @@ describe('Edge lifecycle', () => {
     ).toEqual({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
   });
 
-  it('refuses a reconnection onto a Card this Layout does not hold', () => {
+  it('refuses a reconnection onto a Card this Diagram does not hold', () => {
     const sparse: SpaceSnapshot = {
       ...positionedSnapshot,
       cards: [
@@ -1243,7 +1247,7 @@ describe('Edge lifecycle', () => {
         endpoint: 'to',
         cardId: CARD_C,
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-layout' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } });
   });
 
   it('refuses an Edge the Graph no longer holds', () => {
@@ -1270,7 +1274,7 @@ describe('Edge lifecycle', () => {
     ).toEqual({ kind: 'completed' });
 
     // Removing the last Edge retains the Graph: Graphs go only through Delete
-    // Graph, and this Layout has just the one anyway.
+    // Graph, and this Diagram has just the one anyway.
     expect(graphsOf(session.getState().working)).toEqual([
       { id: GRAPH_ID, title: 'Main', edges: [] },
     ]);
@@ -1295,7 +1299,7 @@ describe('Edge eligibility', () => {
     endpoint: 'to',
   } as const;
 
-  /** What a pointer gesture reports: where React Flow has drawn the Layout's Cards. */
+  /** What a pointer gesture reports: where React Flow has drawn the Diagram's Cards. */
   const RENDERED = Placement.fromEntries([
     [CARD_A, { x: 10, y: 20, open: false }],
     [CARD_B, { x: 300, y: 40, open: false }],
@@ -1337,7 +1341,7 @@ describe('Edge eligibility', () => {
     });
   });
 
-  it('refuses a Card the selected Layout does not hold', () => {
+  it('refuses a Card the selected Diagram does not hold', () => {
     const sparse: SpaceSnapshot = {
       ...positionedSnapshot,
       cards: [
@@ -1350,11 +1354,11 @@ describe('Edge eligibility', () => {
 
     expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_C })).toEqual({
       kind: 'refused',
-      refusal: { code: 'edge-card-outside-layout' },
+      refusal: { code: 'edge-card-outside-diagram' },
     });
     expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: CARD_C })).toEqual({
       kind: 'refused',
-      refusal: { code: 'edge-card-outside-layout' },
+      refusal: { code: 'edge-card-outside-diagram' },
     });
   });
 
@@ -1391,7 +1395,7 @@ describe('Edge eligibility', () => {
     });
   });
 
-  it('refuses a reconnection onto a Card outside this Layout, and completes the same way', () => {
+  it('refuses a reconnection onto a Card outside this Diagram, and completes the same way', () => {
     const sparse: SpaceSnapshot = {
       ...positionedSnapshot,
       cards: [
@@ -1402,7 +1406,7 @@ describe('Edge eligibility', () => {
     const { authoring } = open(sparse);
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
 
-    const refusal = { kind: 'refused', refusal: { code: 'edge-card-outside-layout' } };
+    const refusal = { kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } };
     expect(authoring.edgeEligibility({ ...RECONNECT, cardId: CARD_C })).toEqual(refusal);
     expect(authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: CARD_C })).toEqual(
       refusal,
@@ -1418,17 +1422,17 @@ describe('Edge eligibility', () => {
    */
   it('refuses a reconnection onto a Card the Space no longer holds', () => {
     const { authoring } = openPositioned();
-    // Placed, so the Layout would take it — but never a Card of this Space.
+    // Placed, so the Diagram would take it — but never a Card of this Space.
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40], [UNKNOWN_CARD]: [600, 40] });
 
-    const refusal = { kind: 'refused', refusal: { code: 'edge-card-outside-layout' } };
+    const refusal = { kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } };
     expect(authoring.edgeEligibility({ ...RECONNECT, cardId: UNKNOWN_CARD })).toEqual(refusal);
     expect(
       authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: UNKNOWN_CARD }),
     ).toEqual(refusal);
   });
 
-  it('refuses a reconnection naming a Graph this Layout does not own', () => {
+  it('refuses a reconnection naming a Graph this Diagram does not own', () => {
     const { authoring } = openPositioned();
 
     expect(
@@ -1441,7 +1445,7 @@ describe('Edge eligibility', () => {
    * it would go unnoticed: an Edge the Graph no longer holds indexes at `-1`, so
    * the `map` that writes the reconnection replaces nothing and the Edit answers
    * as though it had — `unchanged` when the snapshot is otherwise untouched,
-   * `completed` when writing the Layout back settles something else, and the
+   * `completed` when writing the Diagram back settles something else, and the
    * refusal the author is owed never said either way.
    */
   it('refuses an Edge the Graph no longer holds, and completes the same way', () => {
@@ -1454,8 +1458,8 @@ describe('Edge eligibility', () => {
   });
 });
 
-describe('Layout membership', () => {
-  /** A Space holding a third Card the Layout does not place. */
+describe('Diagram membership', () => {
+  /** A Space holding a third Card the Diagram does not place. */
   const sparse: SpaceSnapshot = {
     ...positionedSnapshot,
     cards: [
@@ -1469,10 +1473,10 @@ describe('Layout membership', () => {
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
 
     expect(
-      authoring.complete({ kind: 'added-card-to-layout', cardId: CARD_C, anchor: CENTRE }),
+      authoring.complete({ kind: 'added-card-to-diagram', cardId: CARD_C, anchor: CENTRE }),
     ).toEqual({ kind: 'completed' });
 
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20, open: false },
       [CARD_B]: { x: 300, y: 40, open: false },
       [CARD_C]: CENTRE,
@@ -1480,14 +1484,14 @@ describe('Layout membership', () => {
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
   });
 
-  it('places a Card added to a Layout at the anchor given, whatever is Open', () => {
+  it('places a Card added to a Diagram at the anchor given, whatever is Open', () => {
     const expandedSparse: SpaceSnapshot = {
       ...sparse,
       document: {
         ...sparse.document,
-        layouts: [
+        diagrams: [
           {
-            ...sparse.document.layouts![0]!,
+            ...sparse.document.diagrams![0]!,
             positions: {
               [CARD_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
               [CARD_B]: { x: 300, y: 40, open: false },
@@ -1505,13 +1509,13 @@ describe('Layout membership', () => {
     );
 
     authoring.complete({
-      kind: 'added-card-to-layout',
+      kind: 'added-card-to-diagram',
       cardId: CARD_C,
       anchor: { x: 500, y: 400 },
     });
 
     // As above: the anchor is authorship, not a drawn coordinate to invert.
-    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_C]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_C]).toEqual({
       x: 500,
       y: 400,
       open: false,
@@ -1522,34 +1526,34 @@ describe('Layout membership', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'added-card-to-layout', cardId: UNKNOWN_CARD, anchor: CENTRE }),
+      authoring.complete({ kind: 'added-card-to-diagram', cardId: UNKNOWN_CARD, anchor: CENTRE }),
     ).toEqual({ kind: 'refused', refusal: { code: 'card-not-found' } });
   });
 
-  it('refuses a Card the Layout already holds', () => {
+  it('refuses a Card the Diagram already holds', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'added-card-to-layout', cardId: CARD_A, anchor: CENTRE }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'card-already-in-layout' } });
+      authoring.complete({ kind: 'added-card-to-diagram', cardId: CARD_A, anchor: CENTRE }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'card-already-in-diagram' } });
   });
 
-  it('removes membership and every incident Edge, in this Layout only', () => {
-    const twoLayouts: SpaceSnapshot = {
+  it('removes membership and every incident Edge, in this Diagram only', () => {
+    const twoDiagrams: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        layouts: [
+        diagrams: [
           {
-            ...positionedSnapshot.document.layouts![0]!,
+            ...positionedSnapshot.document.diagrams![0]!,
             graphs: [
               MAIN_GRAPH,
               { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: CARD_B, to: CARD_A }] },
             ],
           },
           {
-            id: OTHER_LAYOUT_ID,
-            title: 'Layout 2',
+            id: OTHER_DIAGRAM_ID,
+            title: 'Diagram 2',
             kind: 'positioned',
             positions: {
               [CARD_A]: { x: 0, y: 400, open: false },
@@ -1560,47 +1564,47 @@ describe('Layout membership', () => {
         ],
       },
     };
-    const { authoring, session } = open(twoLayouts);
+    const { authoring, session } = open(twoDiagrams);
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
 
-    expect(authoring.complete({ kind: 'removed-card-from-layout', cardId: CARD_B })).toEqual({
+    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_B })).toEqual({
       kind: 'completed',
     });
 
     const working = session.getState().working;
-    expect(layoutOf(working, LAYOUT_ID)?.positions).toEqual({
+    expect(diagramOf(working, DIAGRAM_ID)?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20, open: false },
     });
-    expect(layoutOf(working, LAYOUT_ID)?.graphs).toEqual([
+    expect(diagramOf(working, DIAGRAM_ID)?.graphs).toEqual([
       { id: GRAPH_ID, title: 'Main', edges: [] },
       { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
     ]);
-    // The Card stays in the Space and in every other Layout, Edges and all.
+    // The Card stays in the Space and in every other Diagram, Edges and all.
     expect(working.cards).toEqual(positionedSnapshot.cards);
-    expect(layoutOf(working, OTHER_LAYOUT_ID)).toEqual(twoLayouts.document.layouts![1]);
+    expect(diagramOf(working, OTHER_DIAGRAM_ID)).toEqual(twoDiagrams.document.diagrams![1]);
   });
 
-  it('refuses removing a Card the Layout does not hold', () => {
+  it('refuses removing a Card the Diagram does not hold', () => {
     const { authoring } = open(sparse);
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
 
-    expect(authoring.complete({ kind: 'removed-card-from-layout', cardId: CARD_C })).toEqual({
+    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_C })).toEqual({
       kind: 'refused',
-      refusal: { code: 'card-not-in-layout' },
+      refusal: { code: 'card-not-in-diagram' },
     });
   });
 });
 
 describe('Delete Card from Space', () => {
-  const twoLayouts: SpaceSnapshot = {
+  const twoDiagrams: SpaceSnapshot = {
     ...positionedSnapshot,
     document: {
       ...positionedSnapshot.document,
-      layouts: [
-        positionedSnapshot.document.layouts![0]!,
+      diagrams: [
+        positionedSnapshot.document.diagrams![0]!,
         {
-          id: OTHER_LAYOUT_ID,
-          title: 'Layout 2',
+          id: OTHER_DIAGRAM_ID,
+          title: 'Diagram 2',
           kind: 'positioned',
           positions: {
             [CARD_A]: { x: 0, y: 400, open: false },
@@ -1621,8 +1625,8 @@ describe('Delete Card from Space', () => {
     },
   };
 
-  it('deletes the Card and cascades it out of every Layout at once', () => {
-    const { authoring, session } = open(twoLayouts);
+  it('deletes the Card and cascades it out of every Diagram at once', () => {
+    const { authoring, session } = open(twoDiagrams);
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_B })).toEqual({
@@ -1631,16 +1635,16 @@ describe('Delete Card from Space', () => {
 
     const working = session.getState().working;
     expect(working.cards).toEqual([positionedSnapshot.cards[0]]);
-    expect(layoutOf(working, LAYOUT_ID)?.positions).toEqual({
+    expect(diagramOf(working, DIAGRAM_ID)?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20, open: false },
     });
-    expect(layoutOf(working, LAYOUT_ID)?.graphs).toEqual([{ ...MAIN_GRAPH, edges: [] }]);
-    expect(layoutOf(working, OTHER_LAYOUT_ID)?.positions).toEqual({
+    expect(diagramOf(working, DIAGRAM_ID)?.graphs).toEqual([{ ...MAIN_GRAPH, edges: [] }]);
+    expect(diagramOf(working, OTHER_DIAGRAM_ID)?.positions).toEqual({
       [CARD_A]: { x: 0, y: 400, open: false },
     });
-    // Empty Graphs and Layouts remain: deleting a Card is not an instruction to
+    // Empty Graphs and Diagrams remain: deleting a Card is not an instruction to
     // delete either.
-    expect(layoutOf(working, OTHER_LAYOUT_ID)?.graphs).toEqual([
+    expect(diagramOf(working, OTHER_DIAGRAM_ID)?.graphs).toEqual([
       { id: OTHER_GRAPH_ID, title: 'Elsewhere', edges: [] },
     ]);
     expect(loadSpaceSnapshot(working).ok).toBe(true);
@@ -1712,7 +1716,7 @@ describe('Delete Card from Space', () => {
     expect(session.getState().working.cards).toEqual([positionedSnapshot.cards[0]]);
   });
 
-  it('removing a Card from one Layout is never blocked by an incoming Alias', () => {
+  it('removing a Card from one Diagram is never blocked by an incoming Alias', () => {
     const aliased: SpaceSnapshot = {
       ...positionedSnapshot,
       cards: [
@@ -1723,7 +1727,7 @@ describe('Delete Card from Space', () => {
     const { authoring, session } = open(aliased);
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
 
-    expect(authoring.complete({ kind: 'removed-card-from-layout', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_A })).toEqual({
       kind: 'completed',
     });
     expect(session.getState().working.cards).toEqual(aliased.cards);
@@ -1758,7 +1762,7 @@ describe('Keep local', () => {
     const session = openSpaceSession(backend, local);
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: LAYOUT_ID,
+      selection: DIAGRAM_ID,
       initialPlacement: null,
     });
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });

@@ -1,6 +1,6 @@
 import { openSpaceStatusLabel, type OpenSpaceStatus } from '@project/ui';
 import type { SpaceSessionState } from '@project/persistence';
-import type { GraphId, Layout, LayoutId, SpaceSnapshot, UUID } from '@project/core';
+import type { GraphId, Diagram, DiagramId, SpaceSnapshot, UUID } from '@project/core';
 import type { ExitSpaceResult, RejectedExitConfirmation } from './open-spaces';
 
 /**
@@ -329,16 +329,16 @@ export interface OpenEntry {
   readonly snapshot: SpaceSnapshot;
   readonly from: UUID | null;
   /**
-   * The Layout this entry is showing, or nothing.
+   * The Diagram this entry is showing, or nothing.
    *
-   * **Nullable because `defaultLayout` is optional and a Delete can empty it.**
-   * ADR 0079 makes the stored `defaultLayout` the durable opening selection and
-   * leaves it absent on a stored layoutless Space until first working load
-   * initializes one, so "no Layout selected" is a state the entry has to be able
+   * **Nullable because `defaultDiagram` is optional and a Delete can empty it.**
+   * ADR 0079 makes the stored `defaultDiagram` the durable opening selection and
+   * leaves it absent on a stored diagramless Space until first working load
+   * initializes one, so "no Diagram selected" is a state the entry has to be able
    * to hold. `null` is how it holds it; the render's fallback to the first
-   * Layout is what turns it back into something to draw.
+   * Diagram is what turns it back into something to draw.
    */
-  readonly layoutId: LayoutId | null;
+  readonly diagramId: DiagramId | null;
   readonly graphId: GraphId | null;
   /**
    * How this Space's last commit went — **per open Space, and not per session**.
@@ -353,62 +353,62 @@ export interface OpenEntry {
 }
 
 /**
- * A Space opened from nothing stored: where it opens is `defaultLayout`, as in
+ * A Space opened from nothing stored: where it opens is `defaultDiagram`, as in
  * the app.
  *
  * **`?? null` and not `String(...)`.** The laundering that stood here answered
- * the five-letter string `"undefined"` for a layoutless Space — an id no Layout
+ * the five-letter string `"undefined"` for a diagramless Space — an id no Diagram
  * can carry, in the field the whole surface reads to decide what is drawing. It
  * compiled because everything downstream was declared `string`; branding
- * `layoutId` is what made it unrepresentable, and `dock-session.test.ts` is what
+ * `diagramId` is what made it unrepresentable, and `dock-session.test.ts` is what
  * says it stays that way.
  */
 export const opened = (snapshot: SpaceSnapshot, from: UUID | null): OpenEntry => ({
   snapshot,
   from,
-  layoutId: snapshot.document.defaultLayout ?? null,
+  diagramId: snapshot.document.defaultDiagram ?? null,
   graphId: null,
   persistence: { kind: 'settled' },
 });
 
-const storedLayouts = (snapshot: SpaceSnapshot): readonly Layout[] =>
-  snapshot.document.layouts ?? [];
+const storedDiagrams = (snapshot: SpaceSnapshot): readonly Diagram[] =>
+  snapshot.document.diagrams ?? [];
 
 /** One Edit on the stored document, which the reload then validates. */
 export const editDocument = (
   snapshot: SpaceSnapshot,
-  edit: (layouts: readonly Layout[]) => readonly Layout[],
+  edit: (diagrams: readonly Diagram[]) => readonly Diagram[],
 ): SpaceSnapshot => ({
   ...snapshot,
-  document: { ...snapshot.document, layouts: [...edit(storedLayouts(snapshot))] },
+  document: { ...snapshot.document, diagrams: [...edit(storedDiagrams(snapshot))] },
 });
 
 /**
- * One Edit on whichever Layout the entry selects.
+ * One Edit on whichever Diagram the entry selects.
  *
  * **The entry is the argument because the entry is the only thing that can
  * answer.** The hook resolved this from a `selectedId` read during render and
  * then spent it inside a functional state updater that had correctly gone and
  * fetched the *live* entry — so what was being written and what said where to
  * write it came from two different moments. React flushes discrete events, so
- * it usually agreed; a gesture that selected a Layout and edited it in one tick
- * did not, and wrote into the Layout that had been selected before it.
+ * it usually agreed; a gesture that selected a Diagram and edited it in one tick
+ * did not, and wrote into the Diagram that had been selected before it.
  *
  * The same stale-closure class the drag gesture had, and the same answer: take
  * the state being written rather than closing over a rendered copy of it. Made
  * an argument, a captured id is not merely wrong — it cannot be expressed.
  *
- * The fallback is the render's: a `layoutId` naming no stored Layout selects
+ * The fallback is the render's: a `diagramId` naming no stored Diagram selects
  * the first, which is what `useChrome` draws and so what an Edit must agree
- * with. ADR 0079 keeps at least one Layout, so an empty document is not a state
+ * with. ADR 0079 keeps at least one Diagram, so an empty document is not a state
  * this has to answer for — it edits nothing and says so by changing nothing.
  */
-export const editSelectedLayout = (
+export const editSelectedDiagram = (
   entry: OpenEntry,
-  edit: (layout: Layout) => Layout,
+  edit: (diagram: Diagram) => Diagram,
 ): OpenEntry => {
-  const layouts = storedLayouts(entry.snapshot);
-  const selected = layouts.find((each) => each.id === entry.layoutId) ?? layouts[0];
+  const diagrams = storedDiagrams(entry.snapshot);
+  const selected = diagrams.find((each) => each.id === entry.diagramId) ?? diagrams[0];
   if (selected === undefined) return entry;
   return {
     ...entry,

@@ -24,7 +24,7 @@ import { uuid } from './card-files';
 const ID = uuid('00000000-0000-4000-8000-000000000101');
 const TARGET = uuid('00000000-0000-4000-8000-000000000102');
 const SPACE_ID = uuid('00000000-0000-4000-8000-000000000103');
-const LAYOUT_ID = uuid('00000000-0000-4000-8000-000000000104');
+const DIAGRAM_ID = uuid('00000000-0000-4000-8000-000000000104');
 const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000105');
 
 type CardKind = Card['kind'];
@@ -44,7 +44,7 @@ function cardOf(kind: CardKind, title: string): Card {
     case 'alias':
       return { id: ID, title, kind, target: TARGET };
     case 'space':
-      return { id: ID, title, kind, spaceId: SPACE_ID, layout: LAYOUT_ID, graph: GRAPH_ID };
+      return { id: ID, title, kind, spaceId: SPACE_ID, diagram: DIAGRAM_ID, graph: GRAPH_ID };
   }
 }
 

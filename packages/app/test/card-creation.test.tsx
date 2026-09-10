@@ -22,7 +22,7 @@ import { createCard, presentControlBehindAModal, unavailable } from './command-d
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
@@ -32,10 +32,10 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: {
           [CARD_ID]: { x: 10, y: 20, open: false },
@@ -44,7 +44,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
@@ -57,11 +57,11 @@ const aliased: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
     ...snapshot.document,
-    layouts: [
+    diagrams: [
       {
-        ...snapshot.document.layouts![0],
+        ...snapshot.document.diagrams![0],
         positions: {
-          ...snapshot.document.layouts![0]!.positions,
+          ...snapshot.document.diagrams![0]!.positions,
           [ALIAS_ID]: { x: 600, y: 20, open: false },
         },
       },
@@ -85,16 +85,16 @@ const noCards: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [],
 });
@@ -123,7 +123,7 @@ function mount(value: SpaceSnapshot = snapshot): SpaceSession {
 }
 
 const cardsOf = (session: SpaceSession) => session.getState().working.cards;
-const layoutsOf = (session: SpaceSession) => session.getState().working.document.layouts ?? [];
+const diagramsOf = (session: SpaceSession) => session.getState().working.document.diagrams ?? [];
 const cardTitles = (session: SpaceSession) => cardsOf(session).map((card) => card.document.title);
 
 /**
@@ -180,7 +180,7 @@ describe('Add Card', () => {
 
     expect(cardTitles(session)).toEqual(['A', 'B', 'Card 1']);
     const created = cardsOf(session)[2]!;
-    expect(layoutsOf(session)[0]?.positions[created.id]).toBeDefined();
+    expect(diagramsOf(session)[0]?.positions[created.id]).toBeDefined();
     // The neutral title is selected in the editor, so typing replaces it. The
     // editor arrives with the projection that first draws the created Card.
     const input = await screen.findByRole('textbox', { name: 'Card title' });
@@ -269,21 +269,21 @@ describe('Add Card', () => {
   });
 
   /**
-   * An empty Layout is the state Add Layout leaves behind, and the one a
-   * layoutless Space is initialized into (ADR 0079). A Space with no Layout at
-   * all no longer reaches this surface — `SpaceApp.test.tsx` owns Add Layout
-   * itself, and working-state initialization owns the Layout being there.
+   * An empty Diagram is the state Add Diagram leaves behind, and the one a
+   * diagramless Space is initialized into (ADR 0079). A Space with no Diagram at
+   * all no longer reaches this surface — `SpaceApp.test.tsx` owns Add Diagram
+   * itself, and working-state initialization owns the Diagram being there.
    */
-  it('creates the first Card of an empty Layout as its only member', async () => {
+  it('creates the first Card of an empty Diagram as its only member', async () => {
     const session = mount(noCards);
 
     await readyToAuthor();
     createCard('Markdown Card');
 
-    const layout = layoutsOf(session)[0]!;
+    const diagram = diagramsOf(session)[0]!;
     expect(cardTitles(session)).toEqual(['Card 1']);
-    expect(layout.graphs).toEqual([expect.objectContaining({ edges: [] })]);
-    expect(Object.keys(layout.positions)).toHaveLength(1);
+    expect(diagram.graphs).toEqual([expect.objectContaining({ edges: [] })]);
+    expect(Object.keys(diagram.positions)).toHaveLength(1);
     await settled(session);
   });
 });

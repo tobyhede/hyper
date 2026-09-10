@@ -54,13 +54,13 @@ const problemResponse = (
 };
 
 describe('HTTP Space backend aggregate protocol', () => {
-  it('reports when this working load created the stored Space Layout', async () => {
+  it('reports when this working load created the stored Space Diagram', async () => {
     const response = jsonResponse(encodeLoadedSpace(loaded));
-    response.headers.set('X-Hyper-Space-Initialization', 'created-layout');
+    response.headers.set('X-Hyper-Space-Initialization', 'created-diagram');
 
     await expect(backendAnswering(response).loadSpace(SPACE_ID)).resolves.toEqual({
       ...loaded,
-      initialization: 'created-layout',
+      initialization: 'created-diagram',
     });
   });
 

@@ -130,9 +130,9 @@ test('a second Space Card may reference the Space the first one created', async 
  * target's context — and nothing that would change the Space it points at.
  *
  * A created target Space is complete (ADR 0080): the one Space initializer gives
- * it an authored default Layout and one empty Active Graph, so its selectors
- * offer that Layout and its Graph rather than opening onto nothing. The Card has
- * chosen neither yet — storing the target's default Layout and Graph on the Card
+ * it an authored default Diagram and one empty Active Graph, so its selectors
+ * offer that Diagram and its Graph rather than opening onto nothing. The Card has
+ * chosen neither yet — storing the target's default Diagram and Graph on the Card
  * at creation is `layout-only-v1/04`.
  */
 test('an Open Space Card offers its target’s selections and no way to change it', async ({
@@ -161,14 +161,14 @@ test('an Open Space Card offers its target’s selections and no way to change i
   // Enabled rather than merely present: a selector over a target with nothing
   // to choose is disabled, so this is what says the created Space arrived
   // complete rather than blank.
-  const layoutSelector = card.getByTestId('space-card-layout');
-  await expect(layoutSelector).toBeEnabled();
-  await expect(layoutSelector).toHaveText('No Layout');
-  await layoutSelector.click();
-  await expect(page.getByRole('option', { name: 'Layout 1' })).toBeVisible();
-  await page.getByRole('option', { name: 'Layout 1' }).click();
+  const diagramSelector = card.getByTestId('space-card-diagram');
+  await expect(diagramSelector).toBeEnabled();
+  await expect(diagramSelector).toHaveText('No Diagram');
+  await diagramSelector.click();
+  await expect(page.getByRole('option', { name: 'Diagram 1' })).toBeVisible();
+  await page.getByRole('option', { name: 'Diagram 1' }).click();
   await settled(page);
-  await expect(layoutSelector).toHaveText('Layout 1');
+  await expect(diagramSelector).toHaveText('Diagram 1');
   await expect(card.getByTestId('space-card-graph')).toHaveText('Graph 1');
   // The containing Card offers Close and its own title editing. The embedded
   // target Cards carry their own content-editing controls.
@@ -224,7 +224,7 @@ test('deleting the last Space Card deletes the Space it referenced', async ({ pa
 });
 
 /* -------------------------------------------------------------------------- */
-/* The Layout an Open Space Card draws                                        */
+/* The Diagram an Open Space Card draws                                        */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -239,7 +239,7 @@ const embeddedNodes = (page: Page): Locator =>
   page.locator('.react-flow__node[data-id^="embedded:"]');
 
 /**
- * Create a Space Card, Open it, and point it at its target's one Layout.
+ * Create a Space Card, Open it, and point it at its target's one Diagram.
  *
  * Spelled out once rather than three times because every claim about what an
  * Open Space Card *shows* starts from the same place, and none of the steps is
@@ -249,7 +249,7 @@ const embeddedNodes = (page: Page): Locator =>
  * created Card lands at the visible centre, partly under a fixture Card, so its
  * rail is not reliably clickable until it is Open and drawn over its neighbour.
  */
-async function openSpaceCardOnItsLayout(page: Page): Promise<Locator> {
+async function openSpaceCardOnItsDiagram(page: Page): Promise<Locator> {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -265,17 +265,17 @@ async function openSpaceCardOnItsLayout(page: Page): Promise<Locator> {
   await card.focus();
   await card.press('Enter');
 
-  const layoutSelector = card.getByTestId('space-card-layout');
-  await expect(layoutSelector).toBeEnabled();
-  await layoutSelector.click();
-  await page.getByRole('option', { name: 'Layout 1' }).click();
-  await expect(layoutSelector).toHaveText('Layout 1');
+  const diagramSelector = card.getByTestId('space-card-diagram');
+  await expect(diagramSelector).toBeEnabled();
+  await diagramSelector.click();
+  await page.getByRole('option', { name: 'Diagram 1' }).click();
+  await expect(diagramSelector).toHaveText('Diagram 1');
   await settled(page);
   return card;
 }
 
 /**
- * Selecting a Layout draws it: the target Space's own Cards arrive inside the
+ * Selecting a Diagram draws it: the target Space's own Cards arrive inside the
  * Space Card, in the containing canvas, as sub-flow children (ADR 0068).
  *
  * The unit and application tests hold the projection to the Card's selection;
@@ -290,10 +290,10 @@ async function openSpaceCardOnItsLayout(page: Page): Promise<Locator> {
  * visibility check on one of them.
  */
 test(
-  'selecting a Layout draws the target Space inside the Open Space Card',
-  { tag: '@parity:open-space-card-draws-its-selected-layout' },
+  'selecting a Diagram draws the target Space inside the Open Space Card',
+  { tag: '@parity:open-space-card-draws-its-selected-diagram' },
   async ({ page }) => {
-    const card = await openSpaceCardOnItsLayout(page);
+    const card = await openSpaceCardOnItsDiagram(page);
 
     await expect(embeddedNodes(page)).toHaveCount(1);
     await expect(embeddedNodes(page).getByRole('heading', { name: 'Card 1' })).toBeVisible();
@@ -307,24 +307,24 @@ test(
     expect(inner.y).toBeGreaterThanOrEqual(outer.y);
     expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
     expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
-    const layout = await boxOf(card.getByTestId('space-card-layout'), 'Layout selector');
+    const diagram = await boxOf(card.getByTestId('space-card-diagram'), 'Diagram selector');
     const graph = await boxOf(card.getByTestId('space-card-graph'), 'Graph selector');
     // **Below where the embedding begins, not below every embedded box.** An
     // embedded Card that runs past the region is *clipped* rather than
-    // shortened (`embedded-layout.ts`), so its layout box is the clip's input
+    // shortened (`embedded-diagram.ts`), so its layout box is the clip's input
     // and says nothing about what is drawn — comparing against it held only at
     // the zoom the old chrome happened to produce.
-    expect(layout.y).toBeGreaterThan(inner.y);
-    expect(graph.y).toBeGreaterThanOrEqual(layout.y + layout.height);
+    expect(diagram.y).toBeGreaterThan(inner.y);
+    expect(graph.y).toBeGreaterThanOrEqual(diagram.y + diagram.height);
     expect(graph.y + graph.height).toBeLessThan(outer.y + outer.height);
   },
 );
 
 test(
   'editing inside an Open Space Card saves the target and refuses cross-Space connections',
-  { tag: '@parity:embedded-layout-cards-author-target' },
+  { tag: '@parity:embedded-diagram-cards-author-target' },
   async ({ page }) => {
-    await openSpaceCardOnItsLayout(page);
+    await openSpaceCardOnItsDiagram(page);
     const embedded = embeddedNodes(page);
     await expect(embedded).toHaveCount(1);
     await embedded.hover();
@@ -356,12 +356,12 @@ test(
  * markup inside the Card, so nothing removes them by unmounting the Card's
  * body: the projection has to stop asking for them. A Closed Space Card that
  * left its children behind would leave another Space's Cards loose on this
- * canvas, drawn over whatever the Layout actually places there — so this is the
+ * canvas, drawn over whatever the Diagram actually places there — so this is the
  * claim that the sub flow is owned by the Open state rather than merely started
  * by it.
  */
-test('closing a Space Card removes the embedded Layout it was drawing', async ({ page }) => {
-  const card = await openSpaceCardOnItsLayout(page);
+test('closing a Space Card removes the embedded Diagram it was drawing', async ({ page }) => {
+  const card = await openSpaceCardOnItsDiagram(page);
   await expect(embeddedNodes(page)).toHaveCount(1);
 
   await card.hover();
@@ -369,15 +369,15 @@ test('closing a Space Card removes the embedded Layout it was drawing', async ({
   await settled(page);
 
   await expect(embeddedNodes(page)).toHaveCount(0);
-  // The Space Card itself is untouched — Closing is a Layout Edit about this
+  // The Space Card itself is untouched — Closing is a Diagram Edit about this
   // Card's Open state and says nothing about the Space it references.
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
 });
 
-test('an embedded Card can move, open with the keyboard and resize in its target Layout', async ({
+test('an embedded Card can move, open with the keyboard and resize in its target Diagram', async ({
   page,
 }) => {
-  const parent = await openSpaceCardOnItsLayout(page);
+  const parent = await openSpaceCardOnItsDiagram(page);
   const embedded = embeddedNodes(page);
   await expect(embedded).toHaveCount(1);
   await expectCardFillsNode(parent);
@@ -443,27 +443,27 @@ test(
   'entering a Space names the Space it was entered from, and Exit returns',
   { tag: '@parity:command-dock-marks-the-space-one-crossing-up' },
   async ({ page }) => {
-    await openSpaceCardOnItsLayout(page);
+    await openSpaceCardOnItsDiagram(page);
 
     // Two Spaces open and neither entered, so the bar carries the Open Spaces
-    // menu and no parent step: there is nothing above `Layout fixture`.
+    // menu and no parent step: there is nothing above `Diagram fixture`.
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
     await switchToSpace(page, 'Architecture');
 
     // Entered, so the crossing is named — and named as the Space, with the
     // parent glyph carrying the relation rather than a word.
-    const parent = page.getByRole('button', { name: 'Go to Layout fixture' });
+    const parent = page.getByRole('button', { name: 'Go to Diagram fixture' });
     await expect(parent).toBeVisible();
     // The mark contributes nothing to the name: the cube is `aria-hidden`, so
     // the control is named for the Space alone and the glyph carries the
     // relation to it.
-    await expect(parent).toHaveAccessibleName('Go to Layout fixture');
-    await expect(parent).toContainText('Layout fixture');
+    await expect(parent).toHaveAccessibleName('Go to Diagram fixture');
+    await expect(parent).toContainText('Diagram fixture');
     await expect(parent.locator('svg[data-icon="parent"][aria-hidden="true"]')).toBeVisible();
 
     await exitSpace(page);
 
-    await expect(showingSpace(page)).toContainText('Layout fixture');
+    await expect(showingSpace(page)).toContainText('Diagram fixture');
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
     const embedded = embeddedNodes(page);
     await expect(embedded).toHaveCount(1);
@@ -475,7 +475,7 @@ test(
 );
 
 test('a Space Card resizes to Close and remembers its Open Size', async ({ page }) => {
-  const parent = await openSpaceCardOnItsLayout(page);
+  const parent = await openSpaceCardOnItsDiagram(page);
   await parent.evaluate(async (element) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
@@ -514,7 +514,7 @@ test(
     tag: '@parity:command-dock-names-an-unwell-open-space',
   },
   async ({ page }) => {
-    await openSpaceCardOnItsLayout(page);
+    await openSpaceCardOnItsDiagram(page);
     await switchToSpace(page, 'Architecture');
     await settled(page);
     // Only the next Edit is failed, while Architecture is the working Space.
@@ -526,7 +526,7 @@ test(
     await card.focus();
     await card.press('Enter');
     await expect(page.getByTestId('persistence-failure')).toBeVisible();
-    await page.getByRole('button', { name: 'Go to Layout fixture', exact: true }).click();
+    await page.getByRole('button', { name: 'Go to Diagram fixture', exact: true }).click();
     const trigger = page.getByRole('button', { name: 'Spaces. 2 open, 1 needs attention.' });
     await expect(trigger.locator('[data-unwell]')).toBeVisible();
     await trigger.click({ delay: 120 });

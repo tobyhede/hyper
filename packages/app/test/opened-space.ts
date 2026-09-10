@@ -36,7 +36,7 @@ export interface TestOpenedSpace {
 export const openTestSpace = (
   backend: SpaceBackend,
   loaded: LoadedSpace,
-  /** Mints the Space, Card and Layout identities a lifecycle Edit creates (ADR 0016). */
+  /** Mints the Space, Card and Diagram identities a lifecycle Edit creates (ADR 0016). */
   newId: () => UUID = newUuid,
 ): TestOpenedSpace => {
   const registry = createSpaceSessionRegistry(backend);

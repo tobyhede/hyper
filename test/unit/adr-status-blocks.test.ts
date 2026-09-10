@@ -271,7 +271,7 @@ const locationFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
  */
 const indexFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] => {
   const index = readFileSync(join(adrDir, 'README.md'), 'utf8');
-  // A row's link, e.g. `| [0040](0040-layouts-own-....md) | ... |`.
+  // A row's link, e.g. `| [0040](0040-diagrams-own-....md) | ... |`.
   const listed = new Set([...index.matchAll(/^\| \[(\d{4})\]\(/gm)].map((row) => row[1] ?? ''));
 
   const accepted = [...adrs].flatMap(([number, adr]) =>

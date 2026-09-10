@@ -6,8 +6,8 @@ import type { Placement } from './placement';
  *
  * The third strategy, and the only one that *reads* geometry rather than
  * computing it — placement is authored content, not an artifact of an algorithm
- * (ADR 0025). It is the one strategy with a **Layout** behind it: the Placement
- * it takes is that Layout's, and `Placement.fromLayoutStrategyGraph` is this same
+ * (ADR 0025). It is the one strategy with a **Diagram** behind it: the Placement
+ * it takes is that Diagram's, and `Placement.fromLayoutStrategyGraph` is this same
  * conversion run backwards. The Placement is read exactly as authored — an Open
  * Card's neighbours were moved by the Edit that opened it (ADR 0084), so there
  * is no derived layer between those positions and the ones drawn, and this reads
@@ -18,8 +18,8 @@ import type { Placement } from './placement';
  * to know about ports or routing, the seam has leaked.
  *
  * Positions are deliberately **sparse**. A space can hold several positioned
- * layouts, so a card created while one was active genuinely has no position in
- * another; that is Layout non-membership rather than a hole to backfill. Cards
+ * diagrams, so a card created while one was active genuinely has no position in
+ * another; that is Diagram non-membership rather than a hole to backfill. Cards
  * the map omits are therefore omitted from the projected graph and remain
  * available through the Cards drawer.
  */

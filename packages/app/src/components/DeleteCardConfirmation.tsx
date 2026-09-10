@@ -30,7 +30,7 @@ import { failureMessage } from '../failure-message';
  * compiles.
  */
 const DELETES_THE_CARD =
-  'This removes the Card from the Space, every Layout that contains it, and every Edge connected to it.';
+  'This removes the Card from the Space, every Diagram that contains it, and every Edge connected to it.';
 
 const DELETION_DESCRIPTIONS = {
   markdown: DELETES_THE_CARD,

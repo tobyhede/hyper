@@ -103,8 +103,8 @@ function PrototypeBanner({ children }: { readonly children: string }) {
  */
 export const CardRail: Story = () => {
   const { log, record } = useActivityLog();
-  const layout = authoredSpace.layouts[0];
-  if (layout === undefined) throw new Error('CardRail fixture requires an authored Layout');
+  const diagram = authoredSpace.diagrams[0];
+  if (diagram === undefined) throw new Error('CardRail fixture requires an authored Diagram');
   const actions = spaceEntityActions({
     spaceId: authoredSpace.id,
     spaceTitle: authoredSpace.title,
@@ -115,7 +115,7 @@ export const CardRail: Story = () => {
       return true;
     },
     onRename: null,
-    onDeleteLayout: null,
+    onDeleteDiagram: null,
   });
   const cards = authoredSpace.cards.slice(0, 4);
   return (
@@ -139,7 +139,7 @@ export const CardRail: Story = () => {
                 title={card.title}
                 state={state}
                 graphColor="#ffc53d"
-                entityActions={actions({ kind: 'card', card, layout })}
+                entityActions={actions({ kind: 'card', card, diagram })}
               />
             </div>
           );

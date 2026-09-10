@@ -11,7 +11,7 @@ import { canvasProjection } from '#src/canvas-projection';
 import { cardChoiceOf } from '#src/card-choice';
 import type { SelectedEdgeRefusal } from '#src/edge-authoring';
 import { edgeSelectionOf } from '#src/render-adapter';
-import { requireDefaultLayout, resolveLayout } from '#src/layout-resolution';
+import { requireDefaultDiagram, resolveDiagram } from '#src/diagram-resolution';
 import { AuthorableEdge } from '#components/AuthorableEdge';
 // `#components/*` maps to `src/components/*.tsx`; this seam is a `.ts`, so it
 // comes through `#src/*` instead. Naming the wrong one resolves to nothing and
@@ -47,17 +47,17 @@ const SPACE = authoredSpace;
 const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
 
 /**
- * The Layout the story opens on: the Space's declared default, which is its
- * first positioned Layout — so the placement comes from authored positions
+ * The Diagram the story opens on: the Space's declared default, which is its
+ * first positioned Diagram — so the placement comes from authored positions
  * rather than from running elkjs inside a story.
  */
-const LAYOUT = resolveLayout(SPACE, requireDefaultLayout(SPACE));
+const DIAGRAM = resolveDiagram(SPACE, requireDefaultDiagram(SPACE));
 
-const PENDING = canvasProjection(SPACE, LAYOUT);
+const PENDING = canvasProjection(SPACE, DIAGRAM);
 
-const STRATEGY = positionedStrategy(Placement.fromLayout(LAYOUT.layout));
+const STRATEGY = positionedStrategy(Placement.fromDiagram(DIAGRAM.diagram));
 
-const ACTIVE_GRAPH: GraphId | null = LAYOUT.layout.graphs[0]?.id ?? null;
+const ACTIVE_GRAPH: GraphId | null = DIAGRAM.diagram.graphs[0]?.id ?? null;
 
 export interface SelectedEdgeCanvasFixtureProps {
   /**

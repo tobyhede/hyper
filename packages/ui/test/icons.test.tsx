@@ -9,7 +9,7 @@ import {
   EditIcon,
   FitViewIcon,
   GraphIcon,
-  LayoutIcon,
+  DiagramIcon,
   MarkdownIcon,
   OpenCardIcon,
   PlusIcon,
@@ -23,8 +23,8 @@ describe('the public icon facade', () => {
   it('uses Lucide for every general-purpose interface glyph', () => {
     render(
       <div>
-        <span data-testid="layout">
-          <LayoutIcon />
+        <span data-testid="diagram">
+          <DiagramIcon />
         </span>
         <span data-testid="graph">
           <GraphIcon color="#123456" />
@@ -75,7 +75,7 @@ describe('the public icon facade', () => {
     // glyph the facade composes rather than forwards, so its outer element is
     // ours and only the base inside it is Lucide's.
     const expectedLucideName = {
-      layout: 'layout-grid',
+      diagram: 'layout-grid',
       graph: 'route',
       present: 'play',
       'stop-presenting': 'square',

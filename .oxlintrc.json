@@ -152,10 +152,10 @@
       }
     },
     {
-      // `LAYOUT_ONLY` is genuinely sparse: indexed by the full
+      // `DIAGRAM_ONLY` is genuinely sparse: indexed by the full
       // `AuthoringCompletion['kind']` union at its one call site
-      // (`LAYOUT_ONLY[completion.kind]`), it lists only the completion kinds
-      // that need a Layout, not every kind that union has. `Partial<Record<...>>`
+      // (`DIAGRAM_ONLY[completion.kind]`), it lists only the completion kinds
+      // that need a Diagram, not every kind that union has. `Partial<Record<...>>`
       // is what makes that indexing return `string | undefined` safely; a named
       // interface would have to enumerate every kind as optional, which
       // duplicates (and can drift from) the union instead of tracking it.

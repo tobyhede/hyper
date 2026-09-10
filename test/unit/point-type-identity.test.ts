@@ -13,20 +13,20 @@ const typeScriptSourceFiles = (directory: string): readonly string[] =>
     .map((entry) => join(directory, entry));
 
 /**
- * ADR 0038: `core`'s schema-derived `LayoutPosition` is the one representation of
+ * ADR 0038: `core`'s schema-derived `DiagramPosition` is the one representation of
  * a point, and `graph` carries it instead of declaring its own.
  *
  * This reads the declarations because **no type-level assertion can check it**.
- * TypeScript is structural, so a re-declared `interface LayoutPoint { x: number;
- * y: number }` *is* `LayoutPosition` as far as the type system is concerned —
+ * TypeScript is structural, so a re-declared `interface DiagramPoint { x: number;
+ * y: number }` *is* `DiagramPosition` as far as the type system is concerned —
  * measured, not assumed: restoring the duplicate and typing `Placement` over it
  * leaves `expectTypeOf<Placement>().toExtend<ReadonlyMap<CardId,
- * Readonly<LayoutPosition>>>()` in `packages/graph/test/identity-types.test.ts`
+ * Readonly<DiagramPosition>>>()` in `packages/graph/test/identity-types.test.ts`
  * green, along with both typechecks and lint. That assertion pins the shape, and
  * the shape is exactly what the two types agree on. Only the declarations differ,
  * so the declarations are what has to be read.
  *
- * The check is structural rather than a search for the name `LayoutPoint`: it
+ * The check is structural rather than a search for the name `DiagramPoint`: it
  * finds a point re-declared under any name, and it stays silent about the many
  * legitimate uses of `x` and `y` next door (`LayoutStrategyCard`, `LayoutStrategyPort`), whose
  * members are optional and not alone.
@@ -84,7 +84,7 @@ describe('a point has one type', () => {
           statement.importClause?.namedBindings !== undefined &&
           ts.isNamedImports(statement.importClause.namedBindings) &&
           statement.importClause.namedBindings.elements.some(
-            (element) => element.name.text === 'LayoutPosition',
+            (element) => element.name.text === 'DiagramPosition',
           ),
       ),
     );

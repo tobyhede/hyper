@@ -38,6 +38,11 @@ test-results/
 !.scratch/**/*.md
 # Generated dogfood Spaces are rebuilt from their release tag and issue blockers.
 .scratch/**/roadmap-space/**
+# ADR 0083's rename codemods are the exception to "runnable code here is a
+# working file". They are tracked because a branch that was in flight when a
+# rename landed replays one instead of hand-merging it, which only works if
+# every branch can reach the same script. They go when the second rename lands.
+!.scratch/thing-and-diagram/rename-*.mjs
 
 # Package-local spike harnesses: runnable code that proved something and was
 # never meant to ship. What they proved belongs in a finding or an ADR, in

@@ -234,7 +234,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    *
    * **Not a fourth arm of the branch below.** It is a prop handed to whichever
    * arm the *title* state selects, so a Card can be open while it is being
-   * renamed — Opening is what the Layout authored and the caret is a gesture,
+   * renamed — Opening is what the Diagram authored and the caret is a gesture,
    * and a branch would have made them exclusive. It is not `showContent`
    * either: both presenting and Opening draw through the one rendered-Markdown
    * seam, while the open Card swaps that display for source only during an

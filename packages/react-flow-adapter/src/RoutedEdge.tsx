@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { BaseEdge, getBezierPath, type Edge, type EdgeProps } from '@xyflow/react';
-import type { LayoutPosition, GraphId } from '@project/core';
+import type { DiagramPosition, GraphId } from '@project/core';
 
 /**
  * React Flow custom edge that draws the polyline ELK routed, not a bezier.
@@ -16,13 +16,13 @@ import type { LayoutPosition, GraphId } from '@project/core';
  *
  * The points are in the same coordinate space as the node positions (both come
  * from ELK verbatim), so they map straight onto React Flow's flow coordinates.
- * When a layout places no routing (grid, or before ELK resolves on first paint)
+ * When a strategy places no routing (grid, or before ELK resolves on first paint)
  * we fall back to a bezier between the handles React Flow already knows.
  */
 export type RoutedEdgeData = {
   graphId: GraphId;
-  /** ELK's routed path, start → bends → end. Absent until a routing layout runs. */
-  points?: LayoutPosition[];
+  /** ELK's routed path, start → bends → end. Absent until a routing strategy runs. */
+  points?: DiagramPosition[];
 };
 
 /**
@@ -37,7 +37,7 @@ function roundCoordinate(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-function polyline(points: LayoutPosition[]): string {
+function polyline(points: DiagramPosition[]): string {
   return points
     .map(
       (point, index) =>
@@ -48,7 +48,7 @@ function polyline(points: LayoutPosition[]): string {
 
 /** Where a routed polyline reads as its middle: the point half its length along,
  *  interpolated within whichever segment spans it rather than snapped to a bend. */
-function polylineMidpoint(points: LayoutPosition[]): LayoutPosition {
+function polylineMidpoint(points: DiagramPosition[]): DiagramPosition {
   const lengths = points.map((point, index) => {
     const previous = points[index - 1];
     if (previous === undefined) return 0;
@@ -85,7 +85,7 @@ export interface RoutedEdgeGeometry {
  * Exported because an application may compose a richer Edge over this one —
  * selection controls, a toolbar — and such an Edge needs the same midpoint the
  * path implies. Recomputing it beside the composition would be a second answer
- * to "is this Edge routed", and the two would disagree the first time a layout
+ * to "is this Edge routed", and the two would disagree the first time a diagram
  * stopped placing sections.
  */
 export function routedEdgeGeometry({

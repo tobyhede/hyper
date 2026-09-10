@@ -13,7 +13,7 @@ import {
   importSpaceCardFrontmatterSchema,
   markdownCardFrontmatterSchema,
   normalizeTitle,
-  positionedLayoutSchema,
+  positionedDiagramSchema,
   spaceCardFrontmatterSchema,
   spaceFileSchema,
   titleLines,
@@ -23,7 +23,7 @@ import {
 const CARD_ID = '00000000-0000-4000-8000-000000000001';
 const TARGET_ID = '00000000-0000-4000-8000-000000000002';
 const SPACE_ID = '00000000-0000-4000-8000-000000000003';
-const LAYOUT_ID = '00000000-0000-4000-8000-000000000004';
+const DIAGRAM_ID = '00000000-0000-4000-8000-000000000004';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000005';
 
 /**
@@ -238,7 +238,7 @@ describe('a Card Title carries at least one non-empty line', () => {
   });
 });
 
-describe('Space, Layout and Graph titles are untouched', () => {
+describe('Space, Diagram and Graph titles are untouched', () => {
   it('keeps a Space title exactly as written', () => {
     const parsed = spaceFileSchema.parse({ version: 1, id: SPACE_ID, title: 'Deck  ' });
 
@@ -251,9 +251,9 @@ describe('Space, Layout and Graph titles are untouched', () => {
     );
   });
 
-  it('keeps a Layout title exactly as written', () => {
-    const parsed = positionedLayoutSchema.parse({
-      id: LAYOUT_ID,
+  it('keeps a Diagram title exactly as written', () => {
+    const parsed = positionedDiagramSchema.parse({
+      id: DIAGRAM_ID,
       title: 'Working ',
       kind: 'positioned',
       positions: {},

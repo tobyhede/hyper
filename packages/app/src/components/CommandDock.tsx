@@ -15,12 +15,12 @@
  * The command set, in the order containment gives it:
  *
  *   Spaces  — which Space this is, rename it, cross into and out of one
- *   Layouts — which is drawing, select another, add/rename/delete
+ *   Diagrams — which is drawing, select another, add/rename/delete
  *   Graphs  — which is active, select another, present, add/rename/delete
  *   Cards   — Create, and the Cards this Space holds
  *
  * **A Card's own commands are absent on purpose.** Open, Edit, Delete, a Card's
- * links and taking a Card back out of a Layout belong to the Card rail (ADR
+ * links and taking a Card back out of a Diagram belong to the Card rail (ADR
  * 0073), which draws them on the Card itself. This surface is *about* the
  * canvas; a Card is the literal object on it. That is a dependency and not just
  * an exclusion — the Space Sidebar carried a Card's links and its Delete in a
@@ -94,7 +94,7 @@ import {
   FALLBACK_GRAPH_COLOR,
   GraphIcon,
   InlineTitleEditor,
-  LayoutIcon,
+  DiagramIcon,
   ParentIcon,
   PlusIcon,
   PresentIcon,
@@ -103,7 +103,7 @@ import {
   ToolbarButton,
   ToolbarGroup,
 } from '@project/ui';
-import type { Graph, GraphId, Layout, LayoutId, UUID } from '@project/core';
+import type { Graph, GraphId, Diagram, DiagramId, UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
@@ -199,8 +199,8 @@ const DISCLOSURE_WIDTH = 'w-72';
  *
  * **What is unbound is not a narrower check but no check.** An item left to
  * infer its own `Value` binds to nothing: `<DropdownMenuRadioItem value="none">`
- * inside a group of `LayoutId`s infers `'none'`, compiles, and comes back out of
- * `onValueChange` wearing the brand — so `onSelect(layoutId: LayoutId)` is
+ * inside a group of `DiagramId`s infers `'none'`, compiles, and comes back out of
+ * `onValueChange` wearing the brand — so `onSelect(diagramId: DiagramId)` is
  * handed a string that is not one, and its declared type is a lie the compiler
  * helped tell. Bound, that literal is a `TS2322` where it is written.
  * `CardsDrawer`'s `KindFilterItem` binds the same way, and
@@ -214,7 +214,7 @@ const DISCLOSURE_WIDTH = 'w-72';
  * the value it trusts is one the parser produced rather than one the JSX
  * claimed.
  */
-const LayoutItem = DropdownMenuRadioItem<LayoutId>;
+const DiagramItem = DropdownMenuRadioItem<DiagramId>;
 const GraphItem = DropdownMenuRadioItem<GraphId>;
 const SpaceItem = DropdownMenuRadioItem<UUID>;
 
@@ -228,12 +228,12 @@ const SpaceItem = DropdownMenuRadioItem<UUID>;
  * components — so `PresentingExit`, which reads four of them, was declared to
  * take every command in the surface, and no signature in the file said what any
  * component actually used. `SpaceSidebar` did not do that: it took `canvas`,
- * `graph`, `addCard`, `createLayout`, `persistence`, `selectedCard`,
+ * `graph`, `addCard`, `createDiagram`, `persistence`, `selectedCard`,
  * `entityActions` and `titleEdit`, and each of its own pieces took the group it
  * drew.
  *
  * The groups here are named after it wherever there is a counterpart —
- * `canvas` is the Layouts and the one that is drawing, `graph` is the Graphs
+ * `canvas` is the Diagrams and the one that is drawing, `graph` is the Graphs
  * and Present, `persistence` is the report and its recoveries — which is what
  * made promoting this surface a move rather than a translation.
  *
@@ -266,13 +266,13 @@ export interface DockChrome {
    *
    * **The one fact that ends a rename which no identity in the bar can see
    * coming.** Every other ending is visible from here: the author presses Enter
-   * or Escape, moves to another Layout, or the rename stops being available. A
+   * or Escape, moves to another Diagram, or the rename stops being available. A
    * replacement is none of those — accepting the stored Space installs a
    * different Space's document under the same ids, so the slot names the same
-   * Layout, `chromeTitleEdit` is unchanged once placement resolves, and an
+   * Diagram, `chromeTitleEdit` is unchanged once placement resolves, and an
    * editor left open goes on standing over a Space that is gone, reseeded from
    * the accepted title. Completing it then writes a name the author typed
-   * against a Layout they never saw.
+   * against a Diagram they never saw.
    *
    * It is a counter and not a `replaced` flag for the reason `replacementEpoch`
    * is one everywhere else: two replacements in a row are two facts, and a
@@ -312,7 +312,7 @@ export interface DockSpace {
    *
    * **Null in the application today, and that is a fact rather than a gap this
    * surface can close.** Space Authoring's completion union has
-   * `renamed-layout` and `renamed-graph` and no `renamed-space`: a Space's title
+   * `renamed-diagram` and `renamed-graph` and no `renamed-space`: a Space's title
    * lives on the stored document, and a Space is named from outside by the Space
    * Card that references it (ADR 0074), so what a rename from *inside* does to
    * that Card is a domain question rather than a control this component can
@@ -383,40 +383,40 @@ export interface SpaceExitReport {
 }
 
 /**
- * The canvas's one exclusive choice: which authored Layout is drawing (ADR
+ * The canvas's one exclusive choice: which authored Diagram is drawing (ADR
  * 0079, ADR 0082).
  *
  * Named `canvas` after the group the Space Sidebar carried for the same thing,
- * and carrying `selected` as the Layout rather than as an id for the same reason
- * that one did — the title belongs to the Layout, so a cluster naming what is
- * drawing reads it off the Layout instead of deriving a second title.
+ * and carrying `selected` as the Diagram rather than as an id for the same reason
+ * that one did — the title belongs to the Diagram, so a cluster naming what is
+ * drawing reads it off the Diagram instead of deriving a second title.
  */
 export interface DockCanvas {
-  /** The Space's authored Layouts, in the order it declares them. */
-  readonly layouts: readonly Layout[];
-  /** The Layout that is drawing. */
-  readonly selected: Layout;
-  readonly onSelect: (layoutId: LayoutId) => void;
+  /** The Space's authored Diagrams, in the order it declares them. */
+  readonly diagrams: readonly Diagram[];
+  /** The Diagram that is drawing. */
+  readonly selected: Diagram;
+  readonly onSelect: (diagramId: DiagramId) => void;
   /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
-  readonly onRename: ((layoutId: LayoutId, title: string) => string | null) | null;
+  readonly onRename: ((diagramId: DiagramId, title: string) => string | null) | null;
   readonly onCreate: () => void;
   /**
-   * Whether New Layout may run.
+   * Whether New Diagram may run.
    *
-   * Its own term beyond Create Card's: creating a Layout **selects** it, and the
-   * created Layout is empty — so the canvas re-derives with no nodes and a Card
+   * Its own term beyond Create Card's: creating a Diagram **selects** it, and the
+   * created Diagram is empty — so the canvas re-derives with no nodes and a Card
    * holding a live title draft unmounts, taking the draft, the announced reason
    * and the caret with it. A valid draft is safe, because pressing the control
    * blurs the input and a valid blur completes the Title (ADR 0065); a refused
    * one is re-focused instead and the press lands anyway.
    */
   readonly createDisabled: boolean;
-  readonly onDelete: (layoutId: LayoutId) => void;
+  readonly onDelete: (diagramId: DiagramId) => void;
   /**
-   * Whether Delete Layout may run, beyond the rule the row already knows.
+   * Whether Delete Diagram may run, beyond the rule the row already knows.
    *
-   * The last Layout cannot be deleted (ADR 0079) and the surface reads that off
-   * `layouts` itself — but that is one of *two* rules, and the second is not
+   * The last Diagram cannot be deleted (ADR 0079) and the surface reads that off
+   * `diagrams` itself — but that is one of *two* rules, and the second is not
    * derivable here: every entity Edit is withdrawn while a title editor or a
    * live content edit owns the caret (`authoring-availability.ts`). The command
    * this row dispatches does not exist in that state, so a row that read only
@@ -424,19 +424,19 @@ export interface DockCanvas {
    */
   readonly deleteDisabled: boolean;
   /**
-   * Copy the drawing Layout's address — the one form a Layout has.
+   * Copy the drawing Diagram's address — the one form a Diagram has.
    *
-   * A Layout offers no permanent link because it has no second address to be
+   * A Diagram offers no permanent link because it has no second address to be
    * permanent *against*: its own address is the only one there is
-   * (`entity-actions.tsx`), where a Graph and a Card each have a within-Layout
+   * (`entity-actions.tsx`), where a Graph and a Card each have a within-Diagram
    * form as well.
    */
   readonly onCopyLink: () => void;
 }
 
-/** The Graphs the selected Layout owns, the Active one, and Present. */
+/** The Graphs the selected Diagram owns, the Active one, and Present. */
 export interface DockGraph {
-  /** The Graphs the selected Layout owns, which are the only ones it draws. */
+  /** The Graphs the selected Diagram owns, which are the only ones it draws. */
   readonly graphs: readonly Graph[];
   readonly active: Graph;
   /** Every visible Graph's resolved colour, derived by the production palette. */
@@ -457,19 +457,19 @@ export interface DockGraph {
    * not by three: New Graph, Colour and Delete are entity Edits, and no entity
    * Edit runs while a title editor or a live content edit owns the caret
    * (`authoring-availability.ts`). Delete carries the ADR 0079 rule on top of
-   * this one, read off `graphs` here; the Layout cluster splits create from
-   * delete because creating a Layout **selects** it and so has a second reason
+   * this one, read off `graphs` here; the Diagram cluster splits create from
+   * delete because creating a Diagram **selects** it and so has a second reason
    * of its own, which no Graph command has.
    */
   readonly editsDisabled: boolean;
   /**
    * The two addresses a Graph always has, and why both are offered.
    *
-   * A Layout **owns** its Graphs (ADR 0040), so a Graph always has a
-   * within-Layout address as well as its own. "Copy link" reproduces what is on
-   * screen — this Graph inside this Layout, so a recipient lands where the
+   * A Diagram **owns** its Graphs (ADR 0040), so a Graph always has a
+   * within-Diagram address as well as its own. "Copy link" reproduces what is on
+   * screen — this Graph inside this Diagram, so a recipient lands where the
    * sender was — and "Copy permanent link" is the Graph's own address, which
-   * survives the sender's Layout being renamed, redrawn or deleted.
+   * survives the sender's Diagram being renamed, redrawn or deleted.
    */
   readonly onCopyLink: () => void;
   readonly onCopyPermanentLink: () => void;
@@ -478,7 +478,7 @@ export interface DockGraph {
   /**
    * Whether Present may begin a traversal.
    *
-   * An empty Graph is legal and ordinary — creating a Layout mints one — and it
+   * An empty Graph is legal and ordinary — creating a Diagram mints one — and it
    * has nothing to traverse, so `present()` would return having changed nothing
    * and an enabled control would swallow the press. Unavailable rather than
    * absent: a control that disappears teaches nothing about why.
@@ -496,7 +496,7 @@ export interface DockCards {
    * them; the Popover won that comparison. What settled it the other way is that
    * the application already had `CardsDrawer` — a production surface with its
    * own stable story, its own behaviour tests and seven parity claims — and two
-   * surfaces offering "add an existing Card to this Layout" is the second place
+   * surfaces offering "add an existing Card to this Diagram" is the second place
    * commands live that ADR 0082 rules out. So the Dock offers the *way* to the
    * Cards and the drawer is what it opens; re-deciding which of the two the
    * product wants is a promotion of its own rather than a side effect of this
@@ -591,7 +591,7 @@ function IdentityLabel({ children }: { readonly children: ReactNode }) {
 }
 
 /**
- * The Space, Layout or Graph name, renamed in place by clicking it.
+ * The Space, Diagram or Graph name, renamed in place by clicking it.
  *
  * This is `InlineTitleEditor` — the component Cards and the Space Sidebar
  * already rename through — in its `header` variant, which exists for named
@@ -624,7 +624,7 @@ function IdentityName({
    *
    * The three identities are one component drawn three times, so an accessible
    * name is the only thing distinguishing them — and a test that reached for
-   * `Rename Layout: Collection 1` would have to know the title to find the
+   * `Rename Diagram: Collection 1` would have to know the title to find the
    * control that names it, which is the assertion inverted. The id names the
    * slot; the text in it is what is under test.
    */
@@ -647,7 +647,7 @@ function IdentityName({
    * One slot under the whole bar makes that unrepresentable rather than
    * guarded: at most one name can be the renaming one, so the flag has one
    * writer, and the two endings no gesture can see coming — the reader moving
-   * to another Layout, and ADR 0042's replacement — are the slot's own and are
+   * to another Diagram, and ADR 0042's replacement — are the slot's own and are
    * answered once in {@link CommandDock} instead of three times here.
    */
   const { renaming, onRenaming } = useContext(DockRenamingContext);
@@ -665,7 +665,7 @@ function IdentityName({
    *
    * Only the editor's own three exits spend this. The endings the slot answers
    * for the bar end a rename too, and they must not — the reader moved to
-   * another Layout from the menu beside this name, and pulling the caret onto
+   * another Diagram from the menu beside this name, and pulling the caret onto
    * the name they just moved away from is taking focus, not returning it.
    */
   const nameRef = useRef<HTMLButtonElement>(null);
@@ -704,7 +704,7 @@ function IdentityName({
    * A name with no rename behind it is a **label**, not a disabled button.
    *
    * A control that is present and unavailable teaches that the command exists
-   * and is out of reach now, which is right for Delete on the last Layout. This
+   * and is out of reach now, which is right for Delete on the last Diagram. This
    * is the other case: the product has no such Edit at all, so a greyed-out
    * name would be advertising a command nobody can ever run. It keeps the
    * treatment and the `testId` either way, so the surface reads the same and a
@@ -733,7 +733,7 @@ function IdentityName({
           const named = next.trim();
           if (named === '') return `A ${kind} needs a name.`;
           // **The Edit's answer, not the press.** A rename can be refused for
-          // more than a blank name — a Layout that has stopped drawing, a title
+          // more than a blank name — a Diagram that has stopped drawing, a title
           // Authoring will not take — and `InlineTitleEditor` holds a refused
           // draft open and editable for exactly that. Closing on the press
           // instead would drop the author's words on the floor and leave the
@@ -767,7 +767,7 @@ function IdentityName({
 }
 
 /**
- * Layout: `[name][v]`. Graph: `[name][v][>]`.
+ * Diagram: `[name][v]`. Graph: `[name][v][>]`.
  *
  * Each is one named `ToolbarGroup` inside the Dock's single `Toolbar` — ADR
  * 0073's pair, the same one a Card rail is built from — so the controls share a
@@ -783,7 +783,7 @@ function IdentityName({
  * of that set rather than beside its current member. Present is the exception
  * on the Graph side: it acts on the Active Graph the cluster is naming.
  */
-function LayoutControls({
+function DiagramControls({
   canvas,
   side = 'bottom',
 }: {
@@ -792,10 +792,10 @@ function LayoutControls({
 }) {
   const { id: triggerId, open, onOpenChange } = useDockDisclosure();
   return (
-    <ToolbarGroup aria-label="Layout" className="command-dock__cluster">
+    <ToolbarGroup aria-label="Diagram" className="command-dock__cluster">
       <IdentityName
-        icon={<LayoutIcon />}
-        kind="Layout"
+        icon={<DiagramIcon />}
+        kind="Diagram"
         testId="selected-canvas"
         title={canvas.selected.title}
         onRename={
@@ -808,8 +808,8 @@ function LayoutControls({
         <DropdownMenuTrigger
           id={triggerId}
           className="nokey command-dock__disclose"
-          aria-label={`Layout: ${canvas.selected.title}`}
-          title="Switch Layout"
+          aria-label={`Diagram: ${canvas.selected.title}`}
+          title="Switch Diagram"
           render={<ToolbarButton variant="ghost" size="icon" />}
         >
           <ChevronDownIcon />
@@ -824,16 +824,16 @@ function LayoutControls({
             value={canvas.selected.id}
             onValueChange={(next) => canvas.onSelect(next)}
           >
-            <DropdownMenuLabel>Layouts</DropdownMenuLabel>
-            {canvas.layouts.map((layout) => (
-              <LayoutItem key={layout.id} value={layout.id} closeOnClick>
-                {layout.title}
-              </LayoutItem>
+            <DropdownMenuLabel>Diagrams</DropdownMenuLabel>
+            {canvas.diagrams.map((diagram) => (
+              <DiagramItem key={diagram.id} value={diagram.id} closeOnClick>
+                {diagram.title}
+              </DiagramItem>
             ))}
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
           {/* The same order the Spaces popover pins below its scroll: the set
-              first, then the commands on the one it is naming. A Layout list is
+              first, then the commands on the one it is naming. A Diagram list is
               short enough that nothing scrolls, so the end of the list and the
               pinned position are the same place — which is why one rule covers
               both and neither has to know which case it is. */}
@@ -844,13 +844,13 @@ function LayoutControls({
               onClick={canvas.onCreate}
             >
               <PlusIcon />
-              New Layout
+              New Diagram
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2" onClick={canvas.onCopyLink}>
               <CopyIcon />
               Copy link
             </DropdownMenuItem>
-            {/* The last Layout cannot be deleted (ADR 0079), so the command is
+            {/* The last Diagram cannot be deleted (ADR 0079), so the command is
                 present and unavailable rather than absent — a control that
                 disappears teaches nothing about why. */}
             {/* Delete is destructive and sits behind its own rule, away from
@@ -860,7 +860,7 @@ function LayoutControls({
             <DropdownMenuItem
               variant="destructive"
               className="gap-2"
-              disabled={canvas.deleteDisabled || canvas.layouts.length <= 1}
+              disabled={canvas.deleteDisabled || canvas.diagrams.length <= 1}
               onClick={() => canvas.onDelete(canvas.selected.id)}
             >
               <DeleteIcon />
@@ -879,13 +879,13 @@ function LayoutControls({
  */
 function GraphControls({
   graph,
-  layoutTitle,
+  diagramTitle,
   side = 'bottom',
   vertical = false,
 }: {
   readonly graph: DockGraph;
-  /** Only to caption the list: the Graphs a menu offers are the ones this Layout owns. */
-  readonly layoutTitle: string;
+  /** Only to caption the list: the Graphs a menu offers are the ones this Diagram owns. */
+  readonly diagramTitle: string;
   readonly side?: MenuSide;
   readonly vertical?: boolean;
 }) {
@@ -972,7 +972,7 @@ function GraphControls({
             value={graph.active.id}
             onValueChange={(next) => graph.onActivate(next)}
           >
-            <DropdownMenuLabel>Graphs in {layoutTitle}</DropdownMenuLabel>
+            <DropdownMenuLabel>Graphs in {diagramTitle}</DropdownMenuLabel>
             {graph.graphs.map((each) => {
               const color = graph.colorByGraphId[each.id] ?? FALLBACK_GRAPH_COLOR;
               return (
@@ -1038,17 +1038,17 @@ function GraphControls({
                 covers nothing: "Link not copied" is pinned in the shell at every
                 width, so the in-place swap has lost the reason it existed for.
                 The Card rail keeps it, being a menu on the canvas itself. */}
-            {/* Both forms, always: a Layout owns its Graphs (ADR 0040), so a
-                Graph always has a within-Layout address as well as its own —
+            {/* Both forms, always: a Diagram owns its Graphs (ADR 0040), so a
+                Graph always has a within-Diagram address as well as its own —
                 which is exactly what `spaceEntityActions` offers on a Graph.
 
                 They are not the same address. "Copy link" reproduces *what is
-                on screen*: this Graph inside this Layout, so a recipient lands
+                on screen*: this Graph inside this Diagram, so a recipient lands
                 where the sender was. "Copy permanent link" is the Graph's own
-                address and always opens it in whichever Layout draws it, which
-                survives the sender's Layout being renamed, redrawn or deleted.
+                address and always opens it in whichever Diagram draws it, which
+                survives the sender's Diagram being renamed, redrawn or deleted.
                 The second form is offered only where it differs from the first,
-                which on a Graph is always — a Layout row shows one link for the
+                which on a Graph is always — a Diagram row shows one link for the
                 same reason, having only its own. */}
             <DropdownMenuItem className="gap-2" onClick={graph.onCopyLink}>
               <CopyIcon />
@@ -1084,8 +1084,8 @@ function GraphControls({
  * adding an existing Card, which is the list's drag.
  *
  * **This is the one New that stayed a control**, against the rule that put New
- * Layout and New Graph inside their menus, and it is an exception on two
- * stated grounds. Frequency: Layouts and Graphs are made rarely and Cards
+ * Diagram and New Graph inside their menus, and it is an exception on two
+ * stated grounds. Frequency: Diagrams and Graphs are made rarely and Cards
  * constantly, which is the same thing that earns Present its own control on
  * the Graph cluster rather than a menu row. And shape: the other two disclose
  * a short exclusive list, so a New at the end of it costs nothing, while the
@@ -1146,12 +1146,12 @@ function CreateMenu({
 }
 
 /**
- * `Cards ⌄` — the same shape as `Layout ⌄` and `Graph ⌄` beside it, and one
+ * `Cards ⌄` — the same shape as `Diagram ⌄` and `Graph ⌄` beside it, and one
  * trigger whichever surface opens.
  *
  * It carries a chevron because it discloses a list, which is what the chevron
  * says next to it on the other three. What it does **not** carry is the name as
- * a control: Space, Layout and Graph name one thing each, so clicking that
+ * a control: Space, Diagram and Graph name one thing each, so clicking that
  * name to rename it is the whole of `IdentityName`. "Cards" names a set, and a
  * set has no name to edit — so the word is a label inside the trigger rather
  * than a button of its own, and the cluster is one target instead of two.
@@ -1180,7 +1180,7 @@ function SetTrigger({
 export function CardsTrigger() {
   return (
     /* The Card glyph the rows in its own list carry, not `OpenCardIcon`'s
-       expand arrows: beside a Space, a Layout and a Graph's colour, the icon
+       expand arrows: beside a Space, a Diagram and a Graph's colour, the icon
        slot names what the cluster is about, and "expand" named a gesture this
        cluster does not have. */
     <SetTrigger icon={<CardKindIcon kind="markdown" />}>Cards</SetTrigger>
@@ -1213,7 +1213,7 @@ const DockDisclosureContext = createContext<DockDisclosure>({
 });
 
 /** Which of the bar's three names a rename can be running on. */
-type DockIdentity = 'Space' | 'Layout' | 'Graph';
+type DockIdentity = 'Space' | 'Diagram' | 'Graph';
 
 /**
  * Which name in the bar is being renamed, if any.
@@ -1228,7 +1228,7 @@ type DockIdentity = 'Space' | 'Layout' | 'Graph';
  * fact is the bar's, so it is held once and read by every name.
  *
  * A context for the same reason the disclosure is one: threading it through
- * `SpacesControl`, `LayoutControls` and `GraphControls` to reach a leaf is the
+ * `SpacesControl`, `DiagramControls` and `GraphControls` to reach a leaf is the
  * shape that makes the next person keep it locally instead. The default is an
  * inert slot, so an identity mounted outside a provider draws its name and
  * never opens an editor, rather than opening one nothing can end.
@@ -1250,8 +1250,8 @@ const DockRenamingContext = createContext<DockRenaming>({
  *
  * **Three rules that were three copies of themselves, answered once.**
  *
- * *A rename cannot outlive its subject.* The slot remembers the Layout or Graph
- * the rename was begun against, so a reader who moves to another Layout from
+ * *A rename cannot outlive its subject.* The slot remembers the Diagram or Graph
+ * the rename was begun against, so a reader who moves to another Diagram from
  * the menu beside the name releases it — the editor is seeded from a title, and
  * leaving it open would put the caret in a field editing something the reader
  * has already left. Read as a render-time transition rather than an effect,
@@ -1260,7 +1260,7 @@ const DockRenamingContext = createContext<DockRenaming>({
  * render.
  *
  * *A replacement ends it too, and nothing else can (ADR 0042).* The accepted
- * Space carries the same Layout and Graph ids, so the subject is unchanged
+ * Space carries the same Diagram and Graph ids, so the subject is unchanged
  * across the very transition that discards the draft, and the application's own
  * `editingChromeTitle` is the *report* rather than the editor — lowering it
  * neither closes the editor nor stops it being completed. Nor can the
@@ -1268,7 +1268,7 @@ const DockRenamingContext = createContext<DockRenaming>({
  * passes through a render where `onRename` is `null` and the name draws as a
  * static label with the slot still taken. That looks like the draft going. It
  * comes back the moment placement resolves, reseeded from the *accepted*
- * Layout's title — an editor the author never opened, over a Space they never
+ * Diagram's title — an editor the author never opened, over a Space they never
  * saw, one Enter away from renaming it. The caret is deliberately not returned
  * on either ending: the author did not end this, and pulling focus onto a name
  * in a Space that has just been replaced under them is taking focus rather than
@@ -1291,7 +1291,7 @@ function useDockRenaming(chrome: DockChrome): DockRenaming {
    */
   const identities = {
     Space: { subject: chrome.space.currentSpaceId, renameable: chrome.space.onRename !== null },
-    Layout: { subject: chrome.canvas.selected.id, renameable: chrome.canvas.onRename !== null },
+    Diagram: { subject: chrome.canvas.selected.id, renameable: chrome.canvas.onRename !== null },
     Graph: { subject: chrome.graph.active.id, renameable: chrome.graph.onRename !== null },
   } satisfies Record<DockIdentity, { readonly subject: string; readonly renameable: boolean }>;
 
@@ -1414,7 +1414,7 @@ function CardsControl({
 }
 
 /**
- * The Space's chevron: an ordinary menu, the same one Layout and Graph carry.
+ * The Space's chevron: an ordinary menu, the same one Diagram and Graph carry.
  *
  * **It used to disclose a list of Spaces and that list is gone.** A Space is a
  * Space Card, so the Spaces in this Space are Cards in it, and the surface that
@@ -1422,7 +1422,7 @@ function CardsControl({
  * the duplication, and the one that had to go is the one whose set was a
  * subset.
  *
- * What is left is what a Layout and a Graph disclose minus the part that names
+ * What is left is what a Diagram and a Graph disclose minus the part that names
  * a set: New and Copy link, in that order, in one group. The list of Spaces
  * this control does *not* draw is the **open** set, and that belongs to the
  * Open Spaces menu beside the parent step, where the question is which Space you are
@@ -1441,7 +1441,7 @@ function CardsControl({
  * recovery each has, warn and permit for `rejected` — is implemented there, and
  * `ExitReport` below draws the three arms of the `ExitSpaceResult` it answers.
  *
- * There is still no **Delete**, which a Layout and a Graph both offer: deleting
+ * There is still no **Delete**, which a Diagram and a Graph both offer: deleting
  * the Space you are standing in has nowhere to leave you, and this surface does
  * not answer that. Exit is not it — exiting discards a session's place in a
  * Space, and the Space is untouched.
@@ -1484,7 +1484,7 @@ function SpaceMenu({
             <CopyIcon />
             Copy link
           </DropdownMenuItem>
-          {/* Behind its own rule, like Delete on the Layout and Graph menus:
+          {/* Behind its own rule, like Delete on the Diagram and Graph menus:
               the commands above make something, this one takes something away.
               It is **not** destructive though, and does not draw as it — exiting
               a Space discards a session's place in it, not the Space, and
@@ -1753,7 +1753,7 @@ function ParentSpace({
                 sideOffset={DISCLOSURE_SIDE_OFFSET}
                 className={`nokey ${DISCLOSURE_WIDTH}`}
               >
-                {/* A radio group, as Layout and Graph both use, because this is
+                {/* A radio group, as Diagram and Graph both use, because this is
                     the same question those ask: which of a set is the one you
                     are looking at. What differs is only that the set is nested,
                     and the indent is the whole of that difference. */}
@@ -1836,7 +1836,7 @@ function ParentSpace({
  * marked with a direction rather than the Space glyph because both are Spaces
  * and only their position differs, and the `⌄` beside it switches among every
  * open Space (`ParentSpace` above).
- * The **cluster** is the Space you are in — a Layout or Graph cluster in every
+ * The **cluster** is the Space you are in — a Diagram or Graph cluster in every
  * respect: a name you click to rename, and a chevron opening an ordinary menu.
  *
  * **The Spaces inside this one are not in either.** They are Space Cards, so
@@ -2569,20 +2569,20 @@ export function CommandDock({
           label="Command Dock"
           report={<PersistenceReport persistence={chrome.persistence} edge={dock.edge} />}
         >
-          {/* Space | Layout Graph | Cards.
+          {/* Space | Diagram Graph | Cards.
             The three selections first, then the inventory. Which Space, which
-            Layout and which Graph are one question asked three times — each names
+            Diagram and which Graph are one question asked three times — each names
             the current one, discloses the set, and promotes at most one verb — and
-            Layout and Graph are divided like the rest. They used to run together
-            on the grounds that a Graph is authored over a Layout and so they are
+            Diagram and Graph are divided like the rest. They used to run together
+            on the grounds that a Graph is authored over a Diagram and so they are
             one region — which stopped being legible the moment Present moved to
             the head of the Graph cluster: an unseparated `[Collection 1 ⌄][▶ Long
-            ⌄]` reads as a Present belonging to the Layout beside it. The
+            ⌄]` reads as a Present belonging to the Diagram beside it. The
             containment is still true and the order still says it; the rule no
             longer has to be carried by an absent line.
             Cards comes last because it is the odd cluster and should read as one:
             it names a set rather than a selection, so it has no name to edit and
-            nothing to promote but Create. Between Layout and Space it looked like
+            nothing to promote but Create. Between Diagram and Space it looked like
             a fourth selection that had lost its name. */}
           {/* One open-id under the whole row, spent by every disclosure through
             `useDockDisclosure` — that, and not a convention each control keeps,
@@ -2590,11 +2590,11 @@ export function CommandDock({
             obviously wants cannot be used inside Toolbars. */}
           <SpacesControl space={chrome.space} side={side} vertical={vertical} />
           <Divider orientation={divider} />
-          <LayoutControls canvas={chrome.canvas} side={side} />
+          <DiagramControls canvas={chrome.canvas} side={side} />
           <Divider orientation={divider} />
           <GraphControls
             graph={chrome.graph}
-            layoutTitle={chrome.canvas.selected.title}
+            diagramTitle={chrome.canvas.selected.title}
             side={side}
             vertical={vertical}
           />
@@ -2618,5 +2618,5 @@ export function CommandDock({
  *
  * Drag a Card out of the Cards popover onto the canvas, or press the row where
  * it stands. Both are real and both are the same Edit: the Card joins the
- * Layout and the popover stays open, so the next one costs nothing either way.
+ * Diagram and the popover stays open, so the next one costs nothing either way.
  */

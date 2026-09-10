@@ -14,16 +14,16 @@ const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const UNOPENED_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const META_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const META_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const META_GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const META_GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const META_SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 const MINTED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
-const SECOND_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
+const SECOND_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
 const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e');
 /**
  * A third Space, which is what a crossing needs to be a tree rather than a line.
@@ -33,12 +33,12 @@ const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e')
  */
 const THIRD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000f');
 const THIRD_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
-const THIRD_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
+const THIRD_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
 const THIRD_GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const THIRD_GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
 
 /**
- * Two aggregate-valid Spaces. Every Card, Layout and Graph id is distinct
+ * Two aggregate-valid Spaces. Every Card, Diagram and Graph id is distinct
  * across them, because a Space Card coordination validates the whole aggregate
  * and refuses a duplicate id wherever it appears — and Meta carries the Space
  * Card that owns the ordinary Space, which the same intake requires.
@@ -47,7 +47,7 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
   const meta = id === META_ID;
   const third = id === THIRD_ID;
   const cardId = meta ? CARD_ID : third ? THIRD_CARD_ID : OTHER_CARD_ID;
-  const layoutId = meta ? META_LAYOUT_ID : third ? THIRD_LAYOUT_ID : LAYOUT_ID;
+  const diagramId = meta ? META_DIAGRAM_ID : third ? THIRD_DIAGRAM_ID : DIAGRAM_ID;
   const graphOne = meta ? META_GRAPH_ONE : third ? THIRD_GRAPH_ONE : GRAPH_ONE;
   const graphTwo = meta ? META_GRAPH_TWO : third ? THIRD_GRAPH_TWO : GRAPH_TWO;
   return {
@@ -55,11 +55,11 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
     document: {
       version: 1,
       title,
-      defaultLayout: layoutId,
-      layouts: [
+      defaultDiagram: diagramId,
+      diagrams: [
         {
-          id: layoutId,
-          title: 'Layout',
+          id: diagramId,
+          title: 'Diagram',
           kind: 'positioned',
           positions: meta
             ? {
@@ -73,16 +73,16 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
           ],
           activeGraph: graphOne,
         },
-        // A second Layout, so a selection made in an open Space can differ from
+        // A second Diagram, so a selection made in an open Space can differ from
         // the one an address proposes. Only the Space those tests use needs it,
-        // and its ids are its own — every Layout and Graph id is distinct across
+        // and its ids are its own — every Diagram and Graph id is distinct across
         // the three Spaces, because a Space Card coordination validates the
         // whole aggregate and refuses a duplicate wherever it appears.
         ...(id === OTHER_ID
           ? [
               {
-                id: SECOND_LAYOUT_ID,
-                title: 'Second Layout',
+                id: SECOND_DIAGRAM_ID,
+                title: 'Second Diagram',
                 kind: 'positioned' as const,
                 positions: {},
                 graphs: [{ id: SECOND_GRAPH_ID, title: 'Second', edges: [] }],
@@ -156,26 +156,27 @@ const edit = (space: SpaceSnapshot): SpaceSnapshot => ({
 });
 
 describe('Open Spaces', () => {
-  it('authors the embedded Layout while preserving the full canvas selection', async () => {
+  it('authors the embedded Diagram while preserving the full canvas selection', async () => {
     const { openSpaces } = setup();
-    const target = await openSpaces.open(OTHER_ID, SECOND_LAYOUT_ID);
+    const target = await openSpaces.open(OTHER_ID, SECOND_DIAGRAM_ID);
     const before = target.session.getState().working;
     expect(
-      target.app.authoring.completeInLayout(LAYOUT_ID, {
+      target.app.authoring.completeInDiagram(DIAGRAM_ID, {
         kind: 'opened-card',
         cardId: OTHER_CARD_ID,
       }).kind,
     ).toBe('completed');
     const after = target.session.getState().working;
     expect(
-      after.document.layouts?.find((layout) => layout.id === LAYOUT_ID)?.positions[OTHER_CARD_ID]
-        ?.open,
+      after.document.diagrams?.find((diagram) => diagram.id === DIAGRAM_ID)?.positions[
+        OTHER_CARD_ID
+      ]?.open,
     ).toBe(true);
-    expect(after.document.layouts?.find((layout) => layout.id === SECOND_LAYOUT_ID)).toEqual(
-      before.document.layouts?.find((layout) => layout.id === SECOND_LAYOUT_ID),
+    expect(after.document.diagrams?.find((diagram) => diagram.id === SECOND_DIAGRAM_ID)).toEqual(
+      before.document.diagrams?.find((diagram) => diagram.id === SECOND_DIAGRAM_ID),
     );
-    expect(target.app.navigation.getState().selectedLayoutId).toBe(SECOND_LAYOUT_ID);
-    expect(after.document.defaultLayout).toBe(before.document.defaultLayout);
+    expect(target.app.navigation.getState().selectedDiagramId).toBe(SECOND_DIAGRAM_ID);
+    expect(after.document.defaultDiagram).toBe(before.document.defaultDiagram);
   });
 
   it('opens an embedded target in the shared entry without leaving the containing Space', async () => {
@@ -211,11 +212,11 @@ describe('Open Spaces', () => {
     other.app.navigation.activateGraph(GRAPH_TWO);
     await openSpaces.open(META_ID);
 
-    const reopened = await openSpaces.enter(OTHER_ID, SECOND_LAYOUT_ID);
+    const reopened = await openSpaces.enter(OTHER_ID, SECOND_DIAGRAM_ID);
 
     expect(reopened).toBe(other);
     expect(reopened.app.navigation.getState()).toMatchObject({
-      selectedLayoutId: LAYOUT_ID,
+      selectedDiagramId: DIAGRAM_ID,
       activeGraphId: GRAPH_TWO,
     });
   });
@@ -303,7 +304,7 @@ describe('Open Spaces', () => {
     expect(reopened).not.toBe(first);
     expect(reopened.session).not.toBe(first.session);
     expect(reopened.app.navigation.getState()).toMatchObject({
-      selectedLayoutId: LAYOUT_ID,
+      selectedDiagramId: DIAGRAM_ID,
       activeGraphId: GRAPH_ONE,
     });
   });
@@ -336,7 +337,7 @@ describe('Open Spaces', () => {
     const release = control.deferNextCommit();
     const creating = openSpaces.spaceCards.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'Child',
       position: { x: 10, y: 10 },
     });
@@ -371,7 +372,7 @@ describe('Open Spaces', () => {
     const releaseFirst = control.deferNextCommit();
     const first = openSpaces.spaceCards.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'First child',
       position: { x: 10, y: 10 },
     });
@@ -384,7 +385,7 @@ describe('Open Spaces', () => {
     const exiting = openSpaces.exit(OTHER_ID);
     const second = openSpaces.spaceCards.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'Second child',
       position: { x: 20, y: 20 },
     });
@@ -529,13 +530,13 @@ describe('Open Spaces', () => {
     const { openSpaces, history } = setup();
     await openSpaces.open(META_ID);
     const metaPath = productDestinationPath({
-      kind: 'layout',
+      kind: 'diagram',
       spaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
     });
     const other = await openSpaces.open(OTHER_ID);
     const otherPath = history.pathname();
-    other.app.navigation.selectLayout(SECOND_LAYOUT_ID);
+    other.app.navigation.selectDiagram(SECOND_DIAGRAM_ID);
     const writes = [...history.writes];
 
     history.popTo(metaPath);
@@ -544,7 +545,7 @@ describe('Open Spaces', () => {
 
     history.popTo(otherPath);
     await vi.waitFor(() => expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID));
-    expect(other.app.navigation.getState().selectedLayoutId).toBe(LAYOUT_ID);
+    expect(other.app.navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
     expect(history.writes).toEqual(writes);
   });
 
@@ -566,20 +567,20 @@ describe('Open Spaces', () => {
   it('reports the selection an already-open Space actually kept', async () => {
     const { openSpaces } = setup();
     const path = productDestinationPath({
-      kind: 'layout',
+      kind: 'diagram',
       spaceId: OTHER_ID,
-      layoutId: LAYOUT_ID,
+      diagramId: DIAGRAM_ID,
     });
     const first = await openSpaces.openPath(path);
-    first.opened.app.navigation.selectLayout(SECOND_LAYOUT_ID);
+    first.opened.app.navigation.selectDiagram(SECOND_DIAGRAM_ID);
 
     // The Space is already open, so it keeps the selection it is being worked
     // in. Reporting the URL's selection anyway would have the caller open a
-    // Graph against a Layout that was never selected.
+    // Graph against a Diagram that was never selected.
     const again = await openSpaces.openPath(path);
 
     expect(again.opened).toBe(first.opened);
-    expect(again.opening?.selection).toBe(SECOND_LAYOUT_ID);
+    expect(again.opening?.selection).toBe(SECOND_DIAGRAM_ID);
   });
 
   it('detaches an exited Space\u2019s composition from its retired session', async () => {
@@ -694,7 +695,7 @@ describe('Open Spaces', () => {
     // recording Other here would put Third under a Space it was never entered
     // from, only standing beside.
     await openSpaces.openPath(
-      productDestinationPath({ kind: 'layout', spaceId: THIRD_ID, layoutId: THIRD_LAYOUT_ID }),
+      productDestinationPath({ kind: 'diagram', spaceId: THIRD_ID, diagramId: THIRD_DIAGRAM_ID }),
     );
 
     expect(openSpaces.getState().openedFrom.get(THIRD_ID)).toBe(null);
@@ -721,7 +722,7 @@ describe('Open Spaces', () => {
     // settles before it reaches the record at all.
     await openSpaces.switchTo(META_ID);
     await openSpaces.openPath(
-      productDestinationPath({ kind: 'layout', spaceId: OTHER_ID, layoutId: LAYOUT_ID }),
+      productDestinationPath({ kind: 'diagram', spaceId: OTHER_ID, diagramId: DIAGRAM_ID }),
     );
 
     expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);

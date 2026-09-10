@@ -44,13 +44,13 @@ export type SpaceAggregateError =
   | ({ readonly kind: 'space-card-reference-cycle' } & SpaceCardLocation)
   | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: UUID }
   | ({
-      readonly kind: 'space-card-layout-missing';
-      readonly layoutId: UUID;
+      readonly kind: 'space-card-diagram-missing';
+      readonly diagramId: UUID;
     } & SpaceCardLocation)
   | ({ readonly kind: 'space-card-graph-missing'; readonly graphId: UUID } & SpaceCardLocation)
   | ({
-      readonly kind: 'space-card-graph-outside-layout';
-      readonly layoutId: UUID;
+      readonly kind: 'space-card-graph-outside-diagram';
+      readonly diagramId: UUID;
       readonly graphId: UUID;
     } & SpaceCardLocation);
 
@@ -138,8 +138,8 @@ export function loadSpaceAggregate({
       if (card.kind !== 'space') continue;
       const target = byId.get(card.spaceId);
       if (target === undefined) continue;
-      const layoutId = card.layout ?? target.defaultLayout;
-      if (layoutId === undefined) {
+      const diagramId = card.diagram ?? target.defaultDiagram;
+      if (diagramId === undefined) {
         if (card.graph !== undefined && target.lookup.graph(card.graph) === undefined) {
           errors.push({
             kind: 'space-card-graph-missing',
@@ -151,14 +151,14 @@ export function loadSpaceAggregate({
         }
         continue;
       }
-      const resolvedLayout = target.lookup.layout(layoutId);
-      if (resolvedLayout === undefined) {
+      const resolvedDiagram = target.lookup.diagram(diagramId);
+      if (resolvedDiagram === undefined) {
         errors.push({
-          kind: 'space-card-layout-missing',
+          kind: 'space-card-diagram-missing',
           spaceId: space.id,
           cardId: card.id,
           targetSpaceId: target.id,
-          layoutId,
+          diagramId,
         });
         continue;
       }
@@ -173,14 +173,14 @@ export function loadSpaceAggregate({
         });
         continue;
       }
-      const subjectGraphs = resolvedLayout.layout.graphs;
+      const subjectGraphs = resolvedDiagram.diagram.graphs;
       if (!subjectGraphs.some((graph) => graph.id === card.graph)) {
         errors.push({
-          kind: 'space-card-graph-outside-layout',
+          kind: 'space-card-graph-outside-diagram',
           spaceId: space.id,
           cardId: card.id,
           targetSpaceId: target.id,
-          layoutId,
+          diagramId,
           graphId: card.graph,
         });
       }

@@ -26,11 +26,11 @@ function load(
 /**
  * A version 1 space document over the given graphs.
  *
- * A graph is an owned value of the layout that holds it now (ADR 0040), and
- * every edge endpoint must be a card of *that* layout, so the one layout below
+ * A graph is an owned value of the diagram that holds it now (ADR 0040), and
+ * every edge endpoint must be a card of *that* diagram, so the one diagram below
  * takes membership of every card the graphs touch. The positions are arbitrary
  * — nothing in this file reads them — and what they express here is membership,
- * which is what a layout's position keys are.
+ * which is what a diagram's position keys are.
  *
  * Returned as `SpaceFile` rather than as `unknown`, although `loadSpace` takes
  * `unknown` and would accept either. The literal is the whole point: typed, the
@@ -46,10 +46,10 @@ function spaceFile(
     version: 1,
     id: uuid('00000000-0000-4000-8000-000000000001'),
     title: 'Test',
-    layouts: [
+    diagrams: [
       {
         id: uuid('00000000-0000-4000-8000-000000000050'),
-        title: 'Only layout',
+        title: 'Only diagram',
         kind: 'positioned',
         positions: Object.fromEntries(
           members.map((id, index) => [uuid(id), { x: index * 300, y: 0, open: false }]),
@@ -128,7 +128,7 @@ describe('projectCardNodes', () => {
     expect(typeof a.data.sourceHandles[0]!.offsetY).toBe('number');
   });
 
-  it('uses the port offsets and positions a layout put on the cards', () => {
+  it('uses the port offsets and positions a diagram put on the cards', () => {
     const nodes = projectCardNodes(space, handles, colors, {
       strategyGraph: {
         cards: [
@@ -149,7 +149,7 @@ describe('projectCardNodes', () => {
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     expect(a.position).toEqual({ x: 500, y: 600 });
     expect(a.data.sourceHandles[0]!.offsetY).toBe(42);
-    // card b is absent from the layout → falls back to the origin (no authored position).
+    // card b is absent from the diagram → falls back to the origin (no authored position).
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.position).toEqual({
       x: 0,
       y: 0,
@@ -161,7 +161,7 @@ describe('projectCardNodes', () => {
     // ever differs for an Expanded one (ADR 0064) — and it has to differ, or an
     // Edge attaches partway down a box the Card no longer occupies. `ports` is
     // left empty because `positionedStrategy` places none: this is the fallback
-    // spread, which is what an authored Layout actually draws.
+    // spread, which is what an authored Diagram actually draws.
     const expanded = projectCardNodes(space, handles, colors, {
       nodeHeight: 146,
       strategyGraph: {
@@ -183,7 +183,7 @@ describe('projectCardNodes', () => {
     expect(a.data.sourceHandles[0]!.offsetY).toBe(210);
     expect(a.data.targetHandles[0]!.offsetY).toBe(210);
 
-    // The constant still answers for a card no layout has placed yet.
+    // The constant still answers for a card no strategy has placed yet.
     const unplaced = projectCardNodes(space, handles, colors, { nodeHeight: 146 });
     expect(
       unplaced.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!.data.sourceHandles[0]!
@@ -191,7 +191,7 @@ describe('projectCardNodes', () => {
     ).toBe(73);
   });
 
-  it('declares an attachment point for every Graph on a card the layout has placed', () => {
+  it('declares an attachment point for every Graph on a card the strategy has placed', () => {
     // A third Graph that never touches card A, so "every Graph" is distinguishable
     // from "every Graph this card is already on". A self-edge is authored structure
     // (ADR 0032), which is the cheapest way to keep it away from A.
@@ -305,7 +305,7 @@ describe('projectCardNodes', () => {
     ]);
   });
 
-  it('declares no geometry for a card the layout has not placed, leaving React Flow to measure it', () => {
+  it('declares no geometry for a card the strategy has not placed, leaving React Flow to measure it', () => {
     const nodes = projectCardNodes(space, handles, colors, {
       strategyGraph: {
         cards: [
@@ -402,7 +402,7 @@ describe('projectGraphEdges', () => {
     expect(mainEdge.style?.stroke).toBe('#111111');
   });
 
-  it("carries ELK's routed points when a layout has placed them", () => {
+  it("carries ELK's routed points when a strategy has placed them", () => {
     const edges = projectGraphEdges(graphRenderEdges, colors, {
       strategyGraph: {
         cards: [],
@@ -432,7 +432,7 @@ describe('projectGraphEdges', () => {
         { x: 10, y: 4 },
       ],
     });
-    // An edge the layout did not route carries no `points` key at all (bezier
+    // An edge the diagram did not route carries no `points` key at all (bezier
     // fallback). The key is omitted, not set to undefined (exactOptionalPropertyTypes).
     expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).not.toHaveProperty('points');
   });

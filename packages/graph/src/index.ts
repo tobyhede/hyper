@@ -57,13 +57,13 @@ export type {
 // through `space.lookup`, which the Space carries, so the shallow `get*` pairs
 // that used to sit beside it have no callers left to name.
 export { resolveContentCard } from './lookup';
-export type { OwnedGraph, ResolvedContentCard, ResolvedLayout, SpaceLookup } from './lookup';
+export type { OwnedGraph, ResolvedContentCard, ResolvedDiagram, SpaceLookup } from './lookup';
 
 export { initializeSpace, newSpace } from './new-space';
 export type { InitializeSpaceOptions, NewSpace } from './new-space';
 
 // One name carrying both the branded map type and the module that builds it.
-// Unpacking it would put `fromLayout`, `equals` and `next` in this surface.
+// Unpacking it would put `fromDiagram`, `equals` and `next` in this surface.
 export { Placement } from './placement';
 
 export { positionedStrategy } from './positioned';

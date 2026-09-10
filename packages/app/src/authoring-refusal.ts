@@ -11,16 +11,16 @@ type PresentedAuthoringRefusal =
   AuthoringRefusal | { readonly code: 'placement-failed'; readonly error: Error };
 
 /**
- * The one sentence for a Layout the Space no longer holds.
+ * The one sentence for a Diagram the Space no longer holds.
  *
  * Both switches in this module answer that fact — an ordinary Authoring
- * refusal and a coordinated Space Card one — and a Layout that has gone means
+ * refusal and a coordinated Space Card one — and a Diagram that has gone means
  * the same thing either way. It is written here rather than in each arm for
  * the reason the Space Card translation below states for aggregate refusals:
  * the two can reach the author on the same screen, so one of them reading
  * differently would be a difference nothing could explain.
  */
-const LAYOUT_NO_LONGER_IN_SPACE = 'This Layout is no longer part of the Space.';
+const DIAGRAM_NO_LONGER_IN_SPACE = 'This Diagram is no longer part of the Space.';
 
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
@@ -29,20 +29,20 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return `This view could not place its Cards: ${refusal.error.message}`;
     case 'placement-pending':
       return 'This view has not finished placing its Cards, so there is nowhere to write yet.';
-    case 'layout-not-found':
-      return LAYOUT_NO_LONGER_IN_SPACE;
-    case 'layout-required':
-      if (refusal.operation === 'added-card-to-layout')
-        return 'Select a Layout to add an existing Card to it.';
-      if (refusal.operation === 'removed-card-from-layout')
-        return 'Select a Layout to remove a Card from it.';
+    case 'diagram-not-found':
+      return DIAGRAM_NO_LONGER_IN_SPACE;
+    case 'diagram-required':
+      if (refusal.operation === 'added-card-to-diagram')
+        return 'Select a Diagram to add an existing Card to it.';
+      if (refusal.operation === 'removed-card-from-diagram')
+        return 'Select a Diagram to remove a Card from it.';
       if (
         refusal.operation === 'renamed-graph' ||
         refusal.operation === 'recolored-graph' ||
         refusal.operation === 'deleted-graph'
       )
-        return 'Select a Layout to manage its Graphs.';
-      return 'Select a Layout to edit its Edges.';
+        return 'Select a Diagram to manage its Graphs.';
+      return 'Select a Diagram to edit its Edges.';
     case 'card-not-found':
       return 'This Card is no longer part of the Space.';
     case 'card-kind-immutable':
@@ -55,36 +55,36 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'Deleting this Space Card requires a coordinated multi-Space Edit, which this control cannot perform.';
     case 'card-title-required':
       return 'A Card title is required.';
-    case 'layout-title-required':
-      return 'A Layout title is required.';
-    case 'space-must-keep-layout':
-      return 'A Space keeps at least one Layout.';
+    case 'diagram-title-required':
+      return 'A Diagram title is required.';
+    case 'space-must-keep-diagram':
+      return 'A Space keeps at least one Diagram.';
     case 'alias-target-not-found':
       return 'That Target is no longer part of the Space.';
     case 'alias-target-must-own-content':
       return 'An Alias must target a Card that owns its content.';
-    case 'card-already-in-layout':
-      return 'This Card is already in this Layout.';
-    case 'card-not-in-layout':
-      return 'This Card is not in this Layout.';
+    case 'card-already-in-diagram':
+      return 'This Card is already in this Diagram.';
+    case 'card-not-in-diagram':
+      return 'This Card is not in this Diagram.';
     case 'card-not-expanded':
       return 'Open this Card before resizing it.';
     case 'card-has-aliases':
       return `Delete the Aliases of this Card first: ${refusal.aliasTitles.join(', ')}.`;
     case 'graph-title-required':
       return 'A Graph title is required.';
-    case 'layout-must-keep-graph':
-      return 'A Layout keeps at least one Graph.';
+    case 'diagram-must-keep-graph':
+      return 'A Diagram keeps at least one Graph.';
     case 'graph-not-owned':
-      return 'That Graph is not one this Layout owns.';
+      return 'That Graph is not one this Diagram owns.';
     case 'edge-not-found':
       return 'That Edge is no longer in this Graph.';
-    case 'edge-card-outside-layout':
-      return 'An Edge can only join Cards in this Layout.';
+    case 'edge-card-outside-diagram':
+      return 'An Edge can only join Cards in this Diagram.';
     case 'edge-already-exists':
       return 'These Cards are already connected in this Graph.';
-    case 'layout-active-graph-required':
-      return 'This Layout has no active Graph for the connection to join.';
+    case 'diagram-active-graph-required':
+      return 'This Diagram has no active Graph for the connection to join.';
   }
 };
 
@@ -112,29 +112,29 @@ const form = null;
 /** Alias creation owns Title and Target, and nothing else. */
 const titleAndTargetPlacements = {
   'placement-pending': form,
-  'layout-not-found': form,
-  'layout-required': form,
+  'diagram-not-found': form,
+  'diagram-required': form,
   'card-not-found': form,
   'card-kind-immutable': form,
   'alias-target-immutable': form,
   'space-card-target-immutable': form,
   'space-card-deletion-unsupported': form,
   'card-title-required': 'title',
-  'layout-title-required': form,
-  'space-must-keep-layout': form,
+  'diagram-title-required': form,
+  'space-must-keep-diagram': form,
   'alias-target-not-found': 'target',
   'alias-target-must-own-content': 'target',
-  'card-already-in-layout': form,
-  'card-not-in-layout': form,
+  'card-already-in-diagram': form,
+  'card-not-in-diagram': form,
   'card-not-expanded': form,
   'card-has-aliases': form,
   'graph-title-required': form,
-  'layout-must-keep-graph': form,
+  'diagram-must-keep-graph': form,
   'graph-not-owned': form,
   'edge-not-found': form,
-  'edge-card-outside-layout': form,
+  'edge-card-outside-diagram': form,
   'edge-already-exists': form,
-  'layout-active-graph-required': form,
+  'diagram-active-graph-required': form,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | 'target' | null>>;
 
 /**
@@ -154,8 +154,8 @@ export const presentNewAliasRefusal = (refusal: AuthoringRefusal): CardCreationR
  * Whether choosing another Card would answer this refusal.
  *
  * A picker refusal is *correctable* exactly when it is about the choice: the
- * Card lies outside this Layout, or the Edge it would produce is one the Graph
- * already holds. Everything else — a placement still resolving, a Layout or
+ * Card lies outside this Diagram, or the Edge it would produce is one the Graph
+ * already holds. Everything else — a placement still resolving, a Diagram or
  * Graph the Space no longer holds, an Edge that has gone — describes the
  * subject rather than the choice, and no row in either list would fix it.
  *
@@ -165,29 +165,29 @@ export const presentNewAliasRefusal = (refusal: AuthoringRefusal): CardCreationR
  */
 const correctableByCardChoice = {
   'placement-pending': false,
-  'layout-not-found': false,
-  'layout-required': false,
+  'diagram-not-found': false,
+  'diagram-required': false,
   'card-not-found': false,
   'card-kind-immutable': false,
   'alias-target-immutable': false,
   'space-card-target-immutable': false,
   'space-card-deletion-unsupported': false,
   'card-title-required': false,
-  'layout-title-required': false,
-  'space-must-keep-layout': false,
+  'diagram-title-required': false,
+  'space-must-keep-diagram': false,
   'alias-target-not-found': false,
   'alias-target-must-own-content': false,
-  'card-already-in-layout': false,
-  'card-not-in-layout': false,
+  'card-already-in-diagram': false,
+  'card-not-in-diagram': false,
   'card-not-expanded': false,
   'card-has-aliases': false,
   'graph-title-required': false,
-  'layout-must-keep-graph': false,
+  'diagram-must-keep-graph': false,
   'graph-not-owned': false,
   'edge-not-found': false,
-  'edge-card-outside-layout': true,
+  'edge-card-outside-diagram': true,
   'edge-already-exists': true,
-  'layout-active-graph-required': false,
+  'diagram-active-graph-required': false,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, boolean>>;
 
 export type EdgeEndpointRefusalErrors = AuthoringRefusalErrors<EdgeEndpoint>;
@@ -267,9 +267,9 @@ const AGGREGATE_REFUSAL_REASONS = {
   'space-card-target-missing': 'A space card points at a space that no longer exists.',
   'space-card-reference-cycle': 'A space card would make a space contain itself.',
   'ordinary-space-unreferenced': 'A space would be left with nothing pointing at it.',
-  'space-card-layout-missing': 'A space card points at a Layout that no longer exists.',
+  'space-card-diagram-missing': 'A space card points at a Diagram that no longer exists.',
   'space-card-graph-missing': 'A space card points at a Graph that no longer exists.',
-  'space-card-graph-outside-layout': 'A space card names a Graph that its Layout does not own.',
+  'space-card-graph-outside-diagram': 'A space card names a Graph that its Diagram does not own.',
   // `satisfies` rather than an annotation: it still fails the moment a refusal
   // kind is added without a sentence, and it keeps each value's literal type
   // instead of widening the map to an open dictionary.
@@ -428,8 +428,8 @@ export const describePersistenceFailure = (failure: PersistenceFailure): string 
 /** Why a coordinated Space Card operation refused, in the author's terms. */
 export const describeSpaceCardRefusal = (refusal: SpaceCardRefusal): string => {
   switch (refusal.code) {
-    case 'layout-not-found':
-      return LAYOUT_NO_LONGER_IN_SPACE;
+    case 'diagram-not-found':
+      return DIAGRAM_NO_LONGER_IN_SPACE;
     case 'space-card-not-found':
       return 'This Space Card is no longer part of the Space.';
     case 'persistence-recovery-required':
@@ -447,7 +447,7 @@ export const describeSpaceCardRefusal = (refusal: SpaceCardRefusal): string => {
  * Error placement for Space Card creation, which owns Title and Target.
  *
  * Only `aggregate-refused` reaches the Target field, and it is the one that
- * has to: a cycle, a target that has gone and a Layout the target no
+ * has to: a cycle, a target that has gone and a Diagram the target no
  * longer holds are all answered by choosing a different Space. The rest
  * describe the containing Space or the repository, which no row in that list
  * would fix.

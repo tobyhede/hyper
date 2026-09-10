@@ -8,17 +8,17 @@ for (const delay of [0, 120]) {
     await expect(nodeByTitle(page, 'A')).toBeVisible();
     await settled(page);
     const surface = dock(page);
-    await surface.getByRole('button', { name: /^Layout: / }).click({ delay });
-    await expect(page.getByRole('menuitem', { name: 'New Layout', exact: true })).toBeVisible();
+    await surface.getByRole('button', { name: /^Diagram: / }).click({ delay });
+    await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toBeVisible();
     await surface.getByRole('button', { name: /^Active Graph: / }).click({ delay });
     await expect(page.getByRole('menuitem', { name: 'New Graph', exact: true })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: 'New Layout', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toHaveCount(0);
     await surface.getByRole('button', { name: /^Space: / }).click({ delay });
     await expect(page.getByRole('menuitem', { name: 'New Space', exact: true })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'New Graph', exact: true })).toHaveCount(0);
   });
 
-  for (const kind of ['Layout', 'Graph']) {
+  for (const kind of ['Diagram', 'Graph']) {
     test(`${kind} rename is isolated from the canvas with a menu open (${delay}ms)`, async ({
       page,
     }) => {
@@ -80,11 +80,11 @@ test(
     // is exactly the problem: this failed on CI's first attempt and passed on
     // retry #1, which `failOnFlakyTests` correctly refuses to call a pass.
     await expect(page.getByRole('menu')).toHaveCount(0);
-    await expect(page.getByTestId('space-title')).toHaveText('Layout fixture');
+    await expect(page.getByTestId('space-title')).toHaveText('Diagram fixture');
     await expect(page.getByTestId('selected-canvas')).toHaveText('Collection 1');
     await expect(page.getByTestId('active-graph')).toHaveText('Long');
     await dock(page)
-      .getByRole('button', { name: /^Layout: / })
+      .getByRole('button', { name: /^Diagram: / })
       .click();
     const menu = page.getByRole('menu');
     await expect(menu).toBeVisible();
@@ -175,7 +175,7 @@ async function reportOverAnOverlappingDock(page: Page): Promise<Locator> {
     .click();
   await page.getByRole('menuitemradio', { name: 'Right', exact: true }).first().click();
   await dock(page)
-    .getByRole('button', { name: /^Layout: / })
+    .getByRole('button', { name: /^Diagram: / })
     .click({ delay: 120 });
   await page.getByRole('menuitem', { name: /^Copy link/ }).click();
   const notice = page.getByRole('alert').filter({ hasText: 'Link not copied' });
@@ -236,7 +236,7 @@ test('a reported failure is dismissed off the Dock it covers', async ({ page }) 
   expect(covered).toBe(false);
   // And the bar takes the next press where the report was standing.
   await dock(page)
-    .getByRole('button', { name: /^Layout: / })
+    .getByRole('button', { name: /^Diagram: / })
     .click({ delay: 120 });
-  await expect(page.getByRole('menuitem', { name: 'New Layout', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toBeVisible();
 });

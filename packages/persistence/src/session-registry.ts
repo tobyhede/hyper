@@ -1,7 +1,7 @@
 import {
   SPACE_FILE_VERSION,
   type CardDocument,
-  type LayoutPosition,
+  type DiagramPosition,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -81,13 +81,13 @@ export interface SpaceSessionRegistry {
 
 export interface CreateSpaceCardInput {
   readonly containingSpaceId: UUID;
-  readonly layoutId: UUID;
+  readonly diagramId: UUID;
   readonly title: string;
-  readonly position: LayoutPosition;
+  readonly position: DiagramPosition;
 }
 export interface LinkSpaceCardInput extends CreateSpaceCardInput {
   readonly targetSpaceId: UUID;
-  readonly layout?: UUID;
+  readonly diagram?: UUID;
   readonly graph?: UUID;
 }
 export interface DeleteSpaceCardInput {
@@ -100,7 +100,7 @@ export type SpaceCardLifecycleResult =
   | {
       readonly kind: 'refused';
       readonly refusal:
-        | { readonly code: 'layout-not-found'; readonly layoutId: UUID }
+        | { readonly code: 'diagram-not-found'; readonly diagramId: UUID }
         | { readonly code: 'space-card-not-found'; readonly cardId: UUID }
         | {
             readonly code: 'persistence-recovery-required';
@@ -123,8 +123,8 @@ const snapshotFromSpace = (space: Space): SpaceSnapshot => {
     version: SPACE_FILE_VERSION,
     title: space.title,
   };
-  if (space.layouts.length > 0) document.layouts = [...space.layouts];
-  if (space.defaultLayout !== undefined) document.defaultLayout = space.defaultLayout;
+  if (space.diagrams.length > 0) document.diagrams = [...space.diagrams];
+  if (space.defaultDiagram !== undefined) document.defaultDiagram = space.defaultDiagram;
   return {
     id: space.id,
     document,
@@ -136,12 +136,12 @@ const removeSpaceCard = (snapshot: SpaceSnapshot, cardId: UUID): SpaceSnapshot =
   cards: snapshot.cards.filter(({ id }) => id !== cardId),
   document: {
     ...snapshot.document,
-    layouts: (snapshot.document.layouts ?? []).map((layout) => ({
-      ...layout,
+    diagrams: (snapshot.document.diagrams ?? []).map((diagram) => ({
+      ...diagram,
       positions: Object.fromEntries(
-        Object.entries(layout.positions).filter(([id]) => id !== cardId),
+        Object.entries(diagram.positions).filter(([id]) => id !== cardId),
       ),
-      graphs: layout.graphs.map((graph) => ({
+      graphs: diagram.graphs.map((graph) => ({
         ...graph,
         edges: graph.edges.filter(({ from, to }) => from !== cardId && to !== cardId),
       })),
@@ -150,19 +150,22 @@ const removeSpaceCard = (snapshot: SpaceSnapshot, cardId: UUID): SpaceSnapshot =
 });
 const addSpaceCard = (
   snapshot: SpaceSnapshot,
-  layoutId: UUID,
+  diagramId: UUID,
   cardId: UUID,
   document: CardDocument,
-  position: LayoutPosition,
+  position: DiagramPosition,
 ): SpaceSnapshot => ({
   ...snapshot,
   cards: [...snapshot.cards, { id: cardId, document }],
   document: {
     ...snapshot.document,
-    layouts: (snapshot.document.layouts ?? []).map((layout) =>
-      layout.id === layoutId
-        ? { ...layout, positions: { ...layout.positions, [cardId]: { ...position, open: false } } }
-        : layout,
+    diagrams: (snapshot.document.diagrams ?? []).map((diagram) =>
+      diagram.id === diagramId
+        ? {
+            ...diagram,
+            positions: { ...diagram.positions, [cardId]: { ...position, open: false } },
+          }
+        : diagram,
     ),
   },
 });
@@ -606,10 +609,10 @@ export function createSpaceSessionRegistry(
         refusal = recoveryRefusal(input.containingSpaceId);
         if (refusal !== undefined) return undefined;
         const source = working(input.containingSpaceId);
-        if (!(source.document.layouts ?? []).some(({ id }) => id === input.layoutId)) {
+        if (!(source.document.diagrams ?? []).some(({ id }) => id === input.diagramId)) {
           refusal = {
             kind: 'refused',
-            refusal: { code: 'layout-not-found', layoutId: input.layoutId },
+            refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
           };
           return undefined;
         }
@@ -618,7 +621,7 @@ export function createSpaceSessionRegistry(
           kind: 'space',
           spaceId: input.targetSpaceId,
         };
-        if (input.layout !== undefined) document = { ...document, layout: input.layout };
+        if (input.diagram !== undefined) document = { ...document, diagram: input.diagram };
         if (input.graph !== undefined) document = { ...document, graph: input.graph };
         const cardId = newId();
         return [
@@ -626,7 +629,7 @@ export function createSpaceSessionRegistry(
             kind: 'update',
             spaceId: input.containingSpaceId,
             edit: (current) =>
-              addSpaceCard(current, input.layoutId, cardId, document, input.position),
+              addSpaceCard(current, input.diagramId, cardId, document, input.position),
           },
         ];
       });
@@ -645,10 +648,10 @@ export function createSpaceSessionRegistry(
           refusal = recoveryRefusal(input.containingSpaceId);
           if (refusal !== undefined) return undefined;
           const source = working(input.containingSpaceId);
-          if (!(source.document.layouts ?? []).some(({ id }) => id === input.layoutId)) {
+          if (!(source.document.diagrams ?? []).some(({ id }) => id === input.diagramId)) {
             refusal = {
               kind: 'refused',
-              refusal: { code: 'layout-not-found', layoutId: input.layoutId },
+              refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
             };
             return undefined;
           }
@@ -664,7 +667,7 @@ export function createSpaceSessionRegistry(
               edit: (current) =>
                 addSpaceCard(
                   current,
-                  input.layoutId,
+                  input.diagramId,
                   cardId,
                   { title: input.title, kind: 'space', spaceId: target.id },
                   input.position,

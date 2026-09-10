@@ -103,7 +103,7 @@ export interface EdgeAuthoringInput {
   readonly selection: CanvasSelection;
   readonly activeGraphId: GraphId | null;
   readonly graphs: readonly Graph[];
-  /** The Cards this Layout places — what a picker may offer. */
+  /** The Cards this Diagram places — what a picker may offer. */
   readonly placedCards: readonly Card[];
   readonly newCardTitle: string;
   /**
@@ -119,7 +119,7 @@ export interface EdgeAuthoringInput {
    * reachable behind it — and it withdraws this lifecycle because a second
    * authoring surface must not start over a live one.
    *
-   * Placement readiness is separate from Layout existence because the
+   * Placement readiness is separate from Diagram existence because the
    * positioned strategy resolves asynchronously.
    */
   readonly enabled: boolean;
@@ -493,7 +493,7 @@ export function useEdgeAuthoring({
    * Decorate the projected Edges with the authoring facts React Flow reads.
    *
    * Only the Active Graph's Edges are selectable, focusable and reconnectable;
-   * an Edge belonging to another Graph the Layout draws is there to be seen, and
+   * an Edge belonging to another Graph the Diagram draws is there to be seen, and
    * putting it in the tab order would place inert stops between a keyboard
    * author and the Edges they can act on. Reconnection narrows further to the
    * *selected* Edge, so both transparent endpoint anchors are not permanently

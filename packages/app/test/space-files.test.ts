@@ -4,7 +4,7 @@ import { loadSpace, type CardFile } from '@project/graph';
 import fixtureJson from '../fixture/space.json';
 import exampleJson from '../example/space.json';
 
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
 
 /**
  * The two spaces on disk, loaded exactly as authored.
@@ -15,10 +15,10 @@ const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
  * test that the card files are still authored correctly — a missing fence or an
  * unquoted title in a card's frontmatter fails here.
  *
- * Both declare Layouts, because both hold Graphs and a Layout is what owns one
+ * Both declare Diagrams, because both hold Graphs and a Diagram is what owns one
  * (ADR 0040). The fixture explicitly opens in Flow; the example still relies on
  * the transitional fallback. That makes the fixture's Space-subject flatten,
- * across two Layouts, the thing the app and the e2e suite actually exercise. The fixture is separately
+ * across two Diagrams, the thing the app and the e2e suite actually exercise. The fixture is separately
  * proven by the app booting; `example/` is dormant and nothing else would notice
  * it breaking.
  */
@@ -38,34 +38,40 @@ function cardFiles(dir: string): CardFile[] {
 
 describe.each([
   // The fixture is two disconnected collections sharing no cards, so it splits
-  // into two Layouts; the example is one connected collection, so its three
+  // into two Diagrams; the example is one connected collection, so its three
   // Graphs are owned by one.
   [
     'fixture',
     fixtureJson,
     {
       cards: 11,
-      layouts: 2,
+      diagrams: 2,
       graphs: 4,
       unreached: { 'Collection 1': ['T'], 'Collection 2': [] },
-      defaultLayout: LAYOUT_ID,
+      defaultDiagram: DIAGRAM_ID,
     },
   ],
   [
     'example',
     exampleJson,
-    { cards: 7, layouts: 1, graphs: 3, unreached: { Walkthroughs: [] }, defaultLayout: undefined },
+    {
+      cards: 7,
+      diagrams: 1,
+      graphs: 3,
+      unreached: { Walkthroughs: [] },
+      defaultDiagram: undefined,
+    },
   ],
 ])('%s/', (name, json, expected) => {
-  it('loads as a version 1 Space whose Layouts own every Graph, and opens in Flow', () => {
+  it('loads as a version 1 Space whose Diagrams own every Graph, and opens in Flow', () => {
     const result = loadSpace(json, cardFiles(name));
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
-    expect(result.space.layouts).toHaveLength(expected.layouts);
-    // `space.graphs` is the flatten across those Layouts, never a stored
+    expect(result.space.diagrams).toHaveLength(expected.diagrams);
+    // `space.graphs` is the flatten across those Diagrams, never a stored
     // collection beside them (ADR 0045).
     expect(result.space.graphs).toHaveLength(expected.graphs);
-    expect(result.space.defaultLayout).toBe(expected.defaultLayout);
+    expect(result.space.defaultDiagram).toBe(expected.defaultDiagram);
   });
 
   it('makes every Edge endpoint a member, and names the members no Edge reaches', () => {
@@ -76,8 +82,8 @@ describe.each([
     // refused an Edge endpoint that is not a member. What it cannot refuse is a
     // member no Edge reaches — which is both a legitimate authored state (Add
     // Card and the Cards drawer each leave one) and what a Card stranded in a
-    // Layout it does not belong to looks like. So the strays are named, by Card
-    // and by the Layout holding them, rather than counted: a count cannot tell a
+    // Diagram it does not belong to looks like. So the strays are named, by Card
+    // and by the Diagram holding them, rather than counted: a count cannot tell a
     // Card that became connected apart from a different Card stranded in the
     // same fixture edit, and lets the two regressions through together. The
     // fixture strands exactly `T`, whose three-line Title draws the ladder
@@ -86,15 +92,15 @@ describe.each([
       result.space.cards.map((card) => [card.id, titleName(card.title)]),
     );
     const unreached = Object.fromEntries(
-      result.space.layouts.map((layout): readonly [string, readonly string[]] => {
-        const endpoints = layout.graphs.flatMap((graph) =>
+      result.space.diagrams.map((diagram): readonly [string, readonly string[]] => {
+        const endpoints = diagram.graphs.flatMap((graph) =>
           graph.edges.flatMap((edge) => [edge.from, edge.to]),
         );
-        for (const endpoint of endpoints) expect(layout.positions[endpoint]).toBeDefined();
+        for (const endpoint of endpoints) expect(diagram.positions[endpoint]).toBeDefined();
         const connected = new Set<string>(endpoints);
         return [
-          layout.title,
-          Object.keys(layout.positions)
+          diagram.title,
+          Object.keys(diagram.positions)
             .filter((card) => !connected.has(card))
             .map((card) => nameById.get(card) ?? card)
             .sort(),
@@ -102,14 +108,14 @@ describe.each([
       }),
     );
 
-    // Keyed by Layout title, so two Layouts sharing one would fold together and
+    // Keyed by Diagram title, so two Diagrams sharing one would fold together and
     // take a stray in the second with them.
-    expect(Object.keys(unreached)).toHaveLength(expected.layouts);
+    expect(Object.keys(unreached)).toHaveLength(expected.diagrams);
     expect(unreached).toEqual(expected.unreached);
 
-    // Every Card is in exactly one Layout, so nothing is left over and nothing
+    // Every Card is in exactly one Diagram, so nothing is left over and nothing
     // is in both.
-    const memberships = result.space.layouts.flatMap((layout) => Object.keys(layout.positions));
+    const memberships = result.space.diagrams.flatMap((diagram) => Object.keys(diagram.positions));
     expect(memberships).toHaveLength(expected.cards);
     expect(new Set(memberships).size).toBe(expected.cards);
   });

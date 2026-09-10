@@ -36,7 +36,7 @@ interface InlineTitleEditorBase {
    *
    * A capability the caller opts into rather than a reading of `variant`. A
    * Card's Title is Title Lines and the Card front draws the ladder; a Space,
-   * Layout or Graph title is a label in a list with no front to draw one on,
+   * Diagram or Graph title is a label in a list with no front to draw one on,
    * and giving all three the capability because they share a field type would
    * be the model following the implementation. Where a Title stands in that
    * decision is the mounting surface's to know, so `CanvasCard` sets this and
@@ -102,7 +102,7 @@ export type InlineTitleEditorProps = InlineTitleEditorBase &
  *   selects; product identity and authorship stay in the caller.
  * - Tests: `InlineTitleEditor.test.tsx`, `CanvasCard.test.tsx` for the `card` variant and
  *   `SpaceApp.test.tsx` for the `header` one, which is where the Command Dock renames a
- *   Layout and a Graph now that ADR 0082 has retired the Sidebar that used to; application
+ *   Diagram and a Graph now that ADR 0082 has retired the Sidebar that used to; application
  *   Playwright in `e2e/editing.spec.ts` and Ladle Playwright in
  *   `ladle-e2e/command-dock.spec.ts`.
  */

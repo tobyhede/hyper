@@ -10,7 +10,7 @@
  * domain identity (ADR 0057) that nothing caught here answers to.
  *
  * Its own module because its callers have nothing else in common — a startup
- * that failed to render, a Layout deletion that rejected, and a creation whose
+ * that failed to render, a Diagram deletion that rejected, and a creation whose
  * coordination broke — and the five copies of this expression that preceded it
  * were five places to fix a wording once.
  */

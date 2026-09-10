@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { COLLAPSED_CARD_SIZE } from '@project/core';
-import type { CardId, CardPlacement, Layout } from '@project/core';
+import type { CardId, CardPlacement, Diagram } from '@project/core';
 import { Placement, positionedStrategy } from '../src/index';
 import type { LayoutStrategyCard, LayoutStrategyGraph } from '../src/index';
 import { uuid } from './card-files';
@@ -30,11 +30,11 @@ const at = (entries: Record<string, [number, number]>) =>
 
 const asObject = (placement: Placement) => Object.fromEntries(placement);
 
-describe('Placement.fromLayout', () => {
-  it('reads the positions a Layout authored', () => {
-    const layout: Layout = {
+describe('Placement.fromDiagram', () => {
+  it('reads the positions a Diagram authored', () => {
+    const diagram: Diagram = {
       id: uuid('00000000-0000-4000-8000-000000000021'),
-      title: 'Layout 1',
+      title: 'Diagram 1',
       kind: 'positioned',
       positions: {
         [CARD_A]: { x: 10, y: 20, open: false },
@@ -43,23 +43,23 @@ describe('Placement.fromLayout', () => {
       graphs: [],
     };
 
-    expect(asObject(Placement.fromLayout(layout))).toEqual({
+    expect(asObject(Placement.fromDiagram(diagram))).toEqual({
       [CARD_A]: { x: 10, y: 20, open: false },
       [CARD_B]: { x: 300, y: 40, open: false },
     });
   });
 
-  it('carries a Layout that authors no card at all', () => {
-    const layout: Layout = {
+  it('carries a Diagram that authors no card at all', () => {
+    const diagram: Diagram = {
       id: uuid('00000000-0000-4000-8000-000000000021'),
-      title: 'Layout 1',
+      title: 'Diagram 1',
       kind: 'positioned',
       positions: {},
       graphs: [],
     };
 
-    // Distinct from having no Layout: this one exists and authors nothing yet.
-    expect(Placement.fromLayout(layout).size).toBe(0);
+    // Distinct from having no Diagram: this one exists and authors nothing yet.
+    expect(Placement.fromDiagram(diagram).size).toBe(0);
   });
 });
 
@@ -92,10 +92,10 @@ describe('Placement.fromLayoutStrategyGraph', () => {
 
     const converted = Placement.fromLayoutStrategyGraph(laid);
 
-    // Nothing comes back Open: a converted Layout is authored from an
+    // Nothing comes back Open: a converted Diagram is authored from an
     // empty Placement, where nothing is (ADR 0025, ADR 0064). A's remembered
     // Open Size is what conversion drops on the floor, and there is no way back
-    // to it — which is why only a Layout with nothing Open may be converted.
+    // to it — which is why only a Diagram with nothing Open may be converted.
     expect([...converted.values()].every((at) => !at.open)).toBe(true);
     // B's coordinate survives untouched, because A being Open never moved it at
     // render time: the Edit that opened A did (ADR 0084).
@@ -137,7 +137,7 @@ describe('Placement.next', () => {
     });
   });
 
-  it('admits a Card the Layout did not yet place at the point reported', () => {
+  it('admits a Card the Diagram did not yet place at the point reported', () => {
     // Admission reads the report as authorship too. A's Open rect decides
     // nothing about where B lands.
     const authored = Placement.fromEntries([
@@ -254,7 +254,7 @@ describe('Placement.place', () => {
 
 describe('Placement.remove', () => {
   it('drops one Card from the placement and leaves the rest where they are', () => {
-    // Removing a Card from a Layout removes its membership, and membership *is*
+    // Removing a Card from a Diagram removes its membership, and membership *is*
     // the position key (ADR 0040) — so this is the whole of what that Edit does
     // to the map.
     const authored = at({
@@ -488,7 +488,7 @@ describe('Placement.reclaim', () => {
 
   it('reclaims from where the subject is now, not from where it was Opened', () => {
     // The moved-*subject* face of ADR 0084's memorylessness, and the mirror of
-    // the moved-neighbour one the ADR states: a reclaim reads the Layout as it
+    // the moved-neighbour one the ADR states: a reclaim reads the Diagram as it
     // stands, so a subject dragged past its own displaced neighbours finds
     // nobody beyond it and gives nothing back. Deliberate — recording where a
     // particular Open happened is the per-Card history ADR 0084 rejected.
@@ -558,7 +558,7 @@ describe('Placement.equals', () => {
   });
 
   it('separates null from empty', () => {
-    // No Layout selected at all, versus a Layout that authors nothing.
+    // No Diagram selected at all, versus a Diagram that authors nothing.
     expect(Placement.equals(null, Placement.empty())).toBe(false);
     expect(Placement.equals(null, null)).toBe(true);
   });
@@ -583,20 +583,20 @@ describe('Placement.equals', () => {
 });
 
 describe('Placement.toPositions', () => {
-  it('round-trips through the record a Layout stores', () => {
+  it('round-trips through the record a Diagram stores', () => {
     const placement = at({
       '00000000-0000-4000-8000-000000000002': [10, 20],
       '00000000-0000-4000-8000-000000000003': [300, 40],
     });
-    const layout: Layout = {
+    const diagram: Diagram = {
       id: uuid('00000000-0000-4000-8000-000000000021'),
-      title: 'Layout 1',
+      title: 'Diagram 1',
       kind: 'positioned',
       positions: Placement.toPositions(placement),
       graphs: [],
     };
 
-    expect(Placement.equals(Placement.fromLayout(layout), placement)).toBe(true);
+    expect(Placement.equals(Placement.fromDiagram(diagram), placement)).toBe(true);
   });
 });
 
@@ -610,10 +610,10 @@ const openSizeArb = fc.record({
 });
 
 describe('Placement properties', () => {
-  it('round-trips a Layout through opening and closing, for any nonnegative growth', () => {
+  it('round-trips a Diagram through opening and closing, for any nonnegative growth', () => {
     // The property Open and Close rest on (ADR 0084): closing reclaims exactly
-    // the room opening made, so a Layout opened and immediately closed is the
-    // Layout it started as — every Card back on its own coordinate, not merely
+    // the room opening made, so a Diagram opened and immediately closed is the
+    // Diagram it started as — every Card back on its own coordinate, not merely
     // an equal map.
     //
     // The **nonnegative** bound is load-bearing and is not here to keep the
@@ -639,7 +639,7 @@ describe('Placement properties', () => {
                 y: coords[index * 2 + 1] ?? 0,
               };
               // Open entries are in the generator because the round trip has to
-              // hold over a Layout with Cards already Open in it — Open Size
+              // hold over a Diagram with Cards already Open in it — Open Size
               // rides through untouched, and only the coordinates move.
               const openSize = openSizes[index];
               return [
@@ -667,7 +667,7 @@ describe('Placement properties', () => {
 
   it('round-trips: replaying a laid-out graph reproduces its placement', async () => {
     // The property that makes conversion a capture rather than a reinterpretation:
-    // what the automatic strategy computed is exactly what the Layout means.
+    // what the automatic strategy computed is exactly what the Diagram means.
     await fc.assert(
       fc.asyncProperty(idsArb, fc.array(coordArb, { minLength: 60 }), async (ids, coords) => {
         const positions = Placement.fromEntries(
@@ -701,7 +701,7 @@ describe('Placement properties', () => {
             { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
           ]),
         );
-        // A positioned projection contains exactly the authored Layout members.
+        // A positioned projection contains exactly the authored Diagram members.
         const laid = await positionedStrategy(authored)({ cards: cardsOf(...ids), edges: [] });
         const rendered = Placement.fromLayoutStrategyGraph(laid);
 

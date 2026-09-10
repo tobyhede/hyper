@@ -1,29 +1,29 @@
-import { uuidSchema, type Card, type Layout, type UUID } from '@project/core';
+import { uuidSchema, type Card, type Diagram, type UUID } from '@project/core';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
- * The cards and layouts a reference check reads. Structural so it accepts both
+ * The cards and diagrams a reference check reads. Structural so it accepts both
  * a freshly parsed space file (inside `loadSpace`) and an already-built
- * `Space`. `layouts` and `defaultLayout` are optional: a space may declare
+ * `Space`. `diagrams` and `defaultDiagram` are optional: a space may declare
  * neither and open in an automatic view (ADR 0025).
  *
  * There is no `graphs` here, and that is the whole of ADR 0040 in one shape: a
- * graph is reached through the layout that owns it, so a check written over a
+ * graph is reached through the diagram that owns it, so a check written over a
  * space-level collection could not ask the question that now matters — whether
- * an edge endpoint is a card of *that* layout.
+ * an edge endpoint is a card of *that* diagram.
  */
 export interface Referenceable {
   readonly id: UUID;
   readonly cards: readonly Card[];
-  readonly layouts?: readonly Layout[] | undefined;
-  readonly defaultLayout?: UUID | undefined;
+  readonly diagrams?: readonly Diagram[] | undefined;
+  readonly defaultDiagram?: UUID | undefined;
 }
 
 /**
  * Why a Space failed its reference check.
  *
  * The membership kinds name **ownership**, which is the era the aggregate is in
- * (ADR 0040): a Layout's position keys are its Card membership, and every Edge
+ * (ADR 0040): a Diagram's position keys are its Card membership, and every Edge
  * of an owned Graph is closed over exactly that set. Where the superseded
  * vocabulary had one kind for "does not resolve", there are now two — the Card
  * or Graph does not exist at all, or it exists and belongs somewhere else. They
@@ -33,18 +33,18 @@ export interface Referenceable {
 export type SpaceReferenceErrorKind =
   | 'duplicate-card-id'
   | 'duplicate-graph-id'
-  | 'duplicate-layout-id'
-  /** A Layout's position names a Card the Space does not hold. */
-  | 'layout-member-missing-card'
-  /** A Layout opens active on a Graph no Layout in the Space owns. */
-  | 'layout-active-graph-missing'
-  /** A Layout opens active on a Graph another Layout owns. */
-  | 'layout-active-graph-outside-layout'
+  | 'duplicate-diagram-id'
+  /** A Diagram's position names a Card the Space does not hold. */
+  | 'diagram-member-missing-card'
+  /** A Diagram opens active on a Graph no Diagram in the Space owns. */
+  | 'diagram-active-graph-missing'
+  /** A Diagram opens active on a Graph another Diagram owns. */
+  | 'diagram-active-graph-outside-diagram'
   /** An Edge endpoint names a Card the Space does not hold. */
   | 'graph-edge-missing-card'
-  /** An Edge endpoint names a Space Card that is not a member of its own Layout. */
-  | 'graph-edge-card-outside-layout'
-  | 'unresolved-default-layout'
+  /** An Edge endpoint names a Space Card that is not a member of its own Diagram. */
+  | 'graph-edge-card-outside-diagram'
+  | 'unresolved-default-diagram'
   | 'duplicate-graph-edge'
   | 'unresolved-alias-target'
   | 'alias-self-reference'
@@ -76,9 +76,9 @@ function duplicates(ids: readonly string[]): string[] {
   return [...dupes];
 }
 
-/** Where one occurrence of a graph id sits: the layout owning it, and its index there. */
+/** Where one occurrence of a graph id sits: the diagram owning it, and its index there. */
 interface GraphOccurrence {
-  readonly layout: Layout;
+  readonly diagram: Diagram;
   readonly index: number;
 }
 
@@ -107,12 +107,12 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     errors.push({ kind: 'duplicate-card-id', ref: id, message: `Duplicate card id "${id}"` });
   }
 
-  const layouts = space.layouts ?? [];
-  for (const id of duplicates(layouts.map((l) => l.id))) {
-    errors.push({ kind: 'duplicate-layout-id', ref: id, message: `Duplicate layout id "${id}"` });
+  const diagrams = space.diagrams ?? [];
+  for (const id of duplicates(diagrams.map((d) => d.id))) {
+    errors.push({ kind: 'duplicate-diagram-id', ref: id, message: `Duplicate diagram id "${id}"` });
   }
 
-  // A graph id is unique across the **space**, although one layout owns it
+  // A graph id is unique across the **space**, although one diagram owns it
   // (ADR 0045). The flatten a space-subject view draws keys colour, handle ids
   // (`<graphId>::out`/`::in`) and activation on the id alone, and the lookup
   // intake builds would drop one of a pair in silence while both stayed in the
@@ -121,20 +121,20 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   // Every occurrence is collected before anything is reported, because the fault
   // is the *id*, not its second appearance: an id used four times is one thing
   // wrong with the document, and the message that helps an author is the list of
-  // where to look. Same-layout repeats and cross-layout ones are the same kind
+  // where to look. Same-diagram repeats and cross-diagram ones are the same kind
   // for the same reason — they differ only in where the fix goes.
   const occurrencesByGraphId = new Map<string, GraphOccurrence[]>();
-  for (const layout of layouts) {
-    layout.graphs.forEach((graph, index) => {
+  for (const diagram of diagrams) {
+    diagram.graphs.forEach((graph, index) => {
       const occurrences = occurrencesByGraphId.get(graph.id);
-      if (occurrences === undefined) occurrencesByGraphId.set(graph.id, [{ layout, index }]);
-      else occurrences.push({ layout, index });
+      if (occurrences === undefined) occurrencesByGraphId.set(graph.id, [{ diagram, index }]);
+      else occurrences.push({ diagram, index });
     });
   }
   for (const [graphId, occurrences] of occurrencesByGraphId) {
     if (occurrences.length < 2) continue;
     const where = occurrences
-      .map(({ layout, index }) => `layout "${layout.id}" graph ${index}`)
+      .map(({ diagram, index }) => `diagram "${diagram.id}" graph ${index}`)
       .join(', ');
     errors.push({
       kind: 'duplicate-graph-id',
@@ -143,9 +143,9 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     });
   }
 
-  for (const layout of layouts) {
-    // A layout's position keys **are** its card membership (ADR 0040). They may
-    // omit cards — a card the map leaves out is simply not in this layout — but
+  for (const diagram of diagrams) {
+    // A diagram's position keys **are** its card membership (ADR 0040). They may
+    // omit cards — a card the map leaves out is simply not in this diagram — but
     // may not name a card that does not exist, a position left behind by a
     // deleted card (ADR 0025).
     //
@@ -153,25 +153,25 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     // this the *only* thing said about it: an edge into that card is then a
     // consequence of this fault rather than a second one.
     const members = new Set<string>();
-    for (const key of Object.keys(layout.positions)) {
+    for (const key of Object.keys(diagram.positions)) {
       const cardId = uuidSchema.parse(key);
       members.add(cardId);
       if (!cardIds.has(cardId)) {
         errors.push({
-          kind: 'layout-member-missing-card',
+          kind: 'diagram-member-missing-card',
           ref: cardId,
-          message: `Layout "${layout.id}" holds a position for card "${cardId}", which the space does not hold`,
+          message: `Diagram "${diagram.id}" holds a position for card "${cardId}", which the space does not hold`,
         });
       }
     }
 
-    // Every edge endpoint of an owned graph names a card **in that layout** —
+    // Every edge endpoint of an owned graph names a card **in that diagram** —
     // one rule, and the two kinds below are two readings of failing it rather
     // than two rules. An endpoint naming no card at all is a dangling reference;
-    // one naming a card another layout holds is a closure failure, and telling
+    // one naming a card another diagram holds is a closure failure, and telling
     // an author which they have is the difference between hunting for a deleted
     // card and adding a member.
-    for (const graph of layout.graphs) {
+    for (const graph of diagram.graphs) {
       // Asked once, up front, and read inside the loop below so a graph's
       // diagnostics still arrive in edge order rather than in two passes.
       const repeats = repeatedGraphEdges(graph.edges);
@@ -181,9 +181,9 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
           errors.push(
             cardIds.has(edge[end])
               ? {
-                  kind: 'graph-edge-card-outside-layout',
+                  kind: 'graph-edge-card-outside-diagram',
                   ref: edge[end],
-                  message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which is a card of the space but not a member of its layout "${layout.id}"`,
+                  message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which is a card of the space but not a member of its diagram "${diagram.id}"`,
                 }
               : {
                   kind: 'graph-edge-missing-card',
@@ -205,36 +205,36 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       });
     }
 
-    // A layout also points at one graph — the one that opens active (ADR 0026)
-    // — and it must be one the layout **owns**. Split the same way the endpoints
+    // A diagram also points at one graph — the one that opens active (ADR 0026)
+    // — and it must be one the diagram **owns**. Split the same way the endpoints
     // above are: a graph nothing in the space owns is missing, while one a
-    // second layout owns exists and is simply not this layout's to open on.
-    const activeGraph = layout.activeGraph;
-    if (activeGraph !== undefined && !layout.graphs.some((g) => g.id === activeGraph)) {
+    // second diagram owns exists and is simply not this diagram's to open on.
+    const activeGraph = diagram.activeGraph;
+    if (activeGraph !== undefined && !diagram.graphs.some((g) => g.id === activeGraph)) {
       errors.push(
         occurrencesByGraphId.has(activeGraph)
           ? {
-              kind: 'layout-active-graph-outside-layout',
+              kind: 'diagram-active-graph-outside-diagram',
               ref: activeGraph,
-              message: `Layout "${layout.id}" opens active on graph "${activeGraph}", which another layout owns`,
+              message: `Diagram "${diagram.id}" opens active on graph "${activeGraph}", which another diagram owns`,
             }
           : {
-              kind: 'layout-active-graph-missing',
+              kind: 'diagram-active-graph-missing',
               ref: activeGraph,
-              message: `Layout "${layout.id}" opens active on graph "${activeGraph}", which no layout in the space owns`,
+              message: `Diagram "${diagram.id}" opens active on graph "${activeGraph}", which no diagram in the space owns`,
             },
       );
     }
   }
 
-  // `defaultLayout` names a declared Layout and nothing else.
-  if (space.defaultLayout !== undefined) {
-    const declared = new Set(layouts.map((l) => l.id));
-    if (!declared.has(space.defaultLayout)) {
+  // `defaultDiagram` names a declared Diagram and nothing else.
+  if (space.defaultDiagram !== undefined) {
+    const declared = new Set(diagrams.map((d) => d.id));
+    if (!declared.has(space.defaultDiagram)) {
       errors.push({
-        kind: 'unresolved-default-layout',
-        ref: space.defaultLayout,
-        message: `defaultLayout "${space.defaultLayout}" does not name a declared Layout`,
+        kind: 'unresolved-default-diagram',
+        ref: space.defaultDiagram,
+        message: `defaultDiagram "${space.defaultDiagram}" does not name a declared Diagram`,
       });
     }
   }

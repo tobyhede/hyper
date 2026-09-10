@@ -17,7 +17,7 @@
  * refusal code and no reason field, because no consumer can draw one.
  * `EntityActionsMenu` has no disabled item at all — a command the entity does
  * not have is simply absent — and the Dock's own unavailable controls carry no
- * reason surface either. `layout-resolution.ts` records the same standing
+ * reason surface either. `diagram-resolution.ts` records the same standing
  * decision against a `reason` union whose second arm has no thrower.
  *
  * A pure function rather than a hook, deliberately: the rules are then provable
@@ -28,7 +28,7 @@
 /** The nine facts every answer below is derived from. */
 export interface AuthoringInProgress {
   /**
-   * Whether the selected Layout's placement is ready for authoring.
+   * Whether the selected Diagram's placement is ready for authoring.
    *
    * `App` reads it as `liveProjection !== null` — the projection it pushed into
    * the render adapter, read back out — so it is false through the window in
@@ -51,37 +51,37 @@ export interface AuthoringInProgress {
   readonly editingCardBody: boolean;
   /** A Card's inline title edit is running on the canvas (ADR 0065). */
   readonly editingCardTitle: boolean;
-  /** Some Card of the selected Layout is Open (ADR 0064). */
+  /** Some Card of the selected Diagram is Open (ADR 0064). */
   readonly cardIsOpen: boolean;
-  /** A Layout or Graph rename is running in the Space chrome. */
+  /** A Diagram or Graph rename is running in the Space chrome. */
   readonly editingChromeTitle: boolean;
   /**
    * This Space's canvas is the one the session is authoring right now.
    *
    * A mounted canvas is not by itself *the* canvas, in two ways: several Spaces
    * are open at once and each keeps its whole application mounted behind the
-   * one on screen, and a Space Card embeds another Space's Layout inside this
+   * one on screen, and a Space Card embeds another Space's Diagram inside this
    * one. Nothing may be authored on a canvas that is not the one, for the
    * reason the two surfaces above share — the canvas that *is* being authored
    * is the authoring surface already running.
    *
    * `App` reads it as "no open-set context, or this Space is the active one";
    * an isolated single-Space mount is always the Space on the canvas.
-   * `EmbeddedLayoutAuthoring` reads the containing canvas's own answer for the
+   * `EmbeddedDiagramAuthoring` reads the containing canvas's own answer for the
    * embedding it draws, which is this same question one level down.
    */
   readonly spaceOnCanvas: boolean;
   /**
-   * Some embedded Layout on this canvas is running a Card edit of its own.
+   * Some embedded Diagram on this canvas is running a Card edit of its own.
    *
-   * A Space Card draws another Space's Layout inside this one, and a Card edit
+   * A Space Card draws another Space's Diagram inside this one, and a Card edit
    * begun in there is a second authoring surface exactly as a creation pane is
    * — held apart from `editingCardBody` and `editingCardTitle` because those
    * name an edit of *this* Space's own Cards, and this one is an edit of a
    * different Space that happens to be drawn within a Card of this one.
    *
    * **Whether one is running, never which one.** Which embedding holds the
-   * edit is what reinstates that embedding through `authorInEmbeddedLayout`
+   * edit is what reinstates that embedding through `authorInEmbeddedDiagram`
    * below, and it is a question about a Card of this canvas rather than about
    * what is in progress — so the identity stays with the canvas that draws the
    * embeddings and only this aggregate reaches here.
@@ -90,14 +90,14 @@ export interface AuthoringInProgress {
    * that store is what re-renders the Space's command surface and the canvas
    * together, where a report through a callback prop would land an effect late.
    */
-  readonly editingEmbeddedLayout: boolean;
+  readonly editingEmbeddedDiagram: boolean;
 }
 
 /** What each authoring operation answers to the surfaces that offer it. */
 export interface AuthoringAvailability {
   /** The Cards View may be opened, and may stay open. */
   readonly cardsView: boolean;
-  /** A Layout or Graph rename may run in the chrome. */
+  /** A Diagram or Graph rename may run in the chrome. */
   readonly chromeTitleEdit: boolean;
   /** An entity menu may offer its Rename and its Delete. */
   readonly entityEdits: boolean;
@@ -107,12 +107,12 @@ export interface AuthoringAvailability {
   readonly present: boolean;
   /** A Card may be created — from the toolbar, or by the canvas's own `C`. */
   readonly addCard: boolean;
-  /** A Layout may be created. */
-  readonly createLayout: boolean;
+  /** A Diagram may be created. */
+  readonly createDiagram: boolean;
   /** The canvas's Card controls and the whole Edge lifecycle may run. */
   readonly authorOnCanvas: boolean;
-  /** An embedded Layout drawn on this canvas may author the Space it draws. */
-  readonly authorInEmbeddedLayout: boolean;
+  /** An embedded Diagram drawn on this canvas may author the Space it draws. */
+  readonly authorInEmbeddedDiagram: boolean;
   /** A live Card content editor may stay mounted on the canvas. */
   readonly editCardBody: boolean;
   /** A drag may begin at a Card's authoring handles. */
@@ -133,7 +133,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     cardIsOpen,
     editingChromeTitle,
     spaceOnCanvas,
-    editingEmbeddedLayout,
+    editingEmbeddedDiagram,
   } = inProgress;
 
   /**
@@ -164,7 +164,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * what a reader can perceive or reach — during a chrome rename a reader
    * reaches every node. It answers only what may be *started*.
    *
-   * An Open Card is deliberately neither: Opening is an ordinary Layout Edit on
+   * An Open Card is deliberately neither: Opening is an ordinary Diagram Edit on
    * the canvas (ADR 0064), so it takes nothing away.
    *
    * It reached the canvas as a prop named `titleEditingEnabled` — named for the
@@ -186,7 +186,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
   const cardsView = !presenting && !creatingCard;
 
   /**
-   * Whether a Layout or Graph rename may run in the chrome at all.
+   * Whether a Diagram or Graph rename may run in the chrome at all.
    *
    * `editable` is a term because while placement is pending there is no
    * projected canvas: a rename begun there is an editor with nothing behind it,
@@ -203,8 +203,8 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * render — so this reads that answer itself rather than a second spelling of
    * it that can fall behind. It once was one, and what the copy dropped was
    * `editable`: while placement is pending, Rename opened an editor the effect
-   * closed immediately and Delete Layout ran a real Edit against a Space with
-   * nothing drawn. Delete Layout goes with Rename rather than standing alone in
+   * closed immediately and Delete Diagram ran a real Edit against a Space with
+   * nothing drawn. Delete Diagram goes with Rename rather than standing alone in
    * a menu whose other item cannot run.
    *
    * `editingChromeTitle` is the term `chromeTitleEdit` does not carry: it is
@@ -224,7 +224,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * what a menu's Edits read — including `editingCardTitle`, which names the
    * selected Card, and destroying the subject of a live rename is the edit
    * answering itself. Withdrawing it while a Card is open is what keeps the
-   * Layout's Open state from outliving the Card it names: nothing clears that
+   * Diagram's Open state from outliving the Card it names: nothing clears that
    * state on a Delete, so every affordance reading it would stay withdrawn with
    * no pane left to close.
    */
@@ -251,16 +251,16 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * then swallowed the naming it exists to begin.
    *
    * It omits `editingCardTitle` deliberately: Add Card *begins* a title edit
-   * rather than outliving one. Add Layout below takes the same condition and
+   * rather than outliving one. Add Diagram below takes the same condition and
    * that one term more.
    */
   const addCard = !presenting && !creatingCard && !editingCardBody && !editingChromeTitle;
 
   /**
-   * Add Layout is Add Card plus `editingCardTitle`, and the extra term is this
+   * Add Diagram is Add Card plus `editingCardTitle`, and the extra term is this
    * control's own.
    *
-   * Creating a Layout selects it, and the created Layout is empty — so the
+   * Creating a Diagram selects it, and the created Diagram is empty — so the
    * canvas re-derives with no nodes and a Card mid-rename unmounts, taking the
    * draft, the reason it was refused and the caret with it. A valid draft would
    * have been committed by the blur this button's own mousedown causes
@@ -268,10 +268,10 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * withdrawing for: it is re-focused rather than settled, and nothing else
    * stands between the click and the Card that holds it.
    */
-  const createLayout = addCard && !editingCardTitle;
+  const createDiagram = addCard && !editingCardTitle;
 
   /**
-   * What an embedded Layout drawn on this canvas may author — and the three
+   * What an embedded Diagram drawn on this canvas may author — and the three
    * ways this canvas is not the place an Edit is being made: no Cards on it to
    * write into, another authoring surface already running, and a presentation
    * running.
@@ -280,11 +280,11 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * drawing it: a pane covers the embedding along with everything else on the
    * graph, a presentation replaces what is drawn, a chrome rename is the one
    * authoring surface, and a canvas that is not the one being authored cannot
-   * have an authored embedding within it. `EmbeddedLayoutAuthoring` hands this
+   * have an authored embedding within it. `EmbeddedDiagramAuthoring` hands this
    * down as its own `spaceOnCanvas`, which is the same question one level down.
    *
    * The one term it does **not** take is the one it is about,
-   * `editingEmbeddedLayout`. An embedded edit is a second authoring surface for
+   * `editingEmbeddedDiagram`. An embedded edit is a second authoring surface for
    * the canvas *around* it, and withdrawing every embedding for it would end
    * the very edit that reported it — a title caret is dropped the moment its
    * canvas loses `authorOnCanvas`, so the edit would cancel itself on the
@@ -296,7 +296,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * canvas drawing it: a pane covers the embedding along with everything else
    * on the graph, a presentation replaces what is drawn, a chrome rename is the
    * one authoring surface, and a canvas that is not the one being authored
-   * cannot have an authored embedding within it. The `EmbeddedLayoutAuthoring`
+   * cannot have an authored embedding within it. The `EmbeddedDiagramAuthoring`
    * that reads this hands it down as its own `spaceOnCanvas`, which is the same
    * question one level down.
    *
@@ -309,7 +309,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * canvas's own question: it takes this answer and reinstates nothing, or
    * withdraws every embedding but the one that is editing.
    */
-  const authorInEmbeddedLayout = editable && soleAuthoringSurface && !presenting;
+  const authorInEmbeddedDiagram = editable && soleAuthoringSurface && !presenting;
 
   /**
    * One rule for everything the canvas authors — the Card controls *and* the
@@ -320,7 +320,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * shorter rule**, and the gap was not cosmetic: a pane covering the canvas
    * must withdraw its keyboard commands as well as its spatial gestures.
    *
-   * `editingEmbeddedLayout` is the fourth term, and it is deliberately **not**
+   * `editingEmbeddedDiagram` is the fourth term, and it is deliberately **not**
    * in `soleAuthoringSurface`. It withdraws exactly what an embedded edit must
    * not be interrupted by: every control drawn on a containing Card, and the
    * whole Edge editing lifecycle. It leaves `connectOnCanvas` alone, which is
@@ -331,7 +331,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * about the product rather than the collapse that moved this term off the
    * canvas.
    */
-  const authorOnCanvas = authorInEmbeddedLayout && !editingEmbeddedLayout;
+  const authorOnCanvas = authorInEmbeddedDiagram && !editingEmbeddedDiagram;
 
   /**
    * **The one authoring gesture presenting does not withdraw**, which is why
@@ -385,9 +385,9 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     deleteCard,
     present,
     addCard,
-    createLayout,
+    createDiagram,
     authorOnCanvas,
-    authorInEmbeddedLayout,
+    authorInEmbeddedDiagram,
     editCardBody,
     connectOnCanvas,
     dragNodes,

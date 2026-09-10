@@ -1,11 +1,11 @@
 import type { CardId, GraphId } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
-import type { LayoutId } from '@project/core';
-import { requireDefaultLayout } from './layout-resolution';
+import type { DiagramId } from '@project/core';
+import { requireDefaultDiagram } from './diagram-resolution';
 
 export interface DestinationOpening {
-  readonly selection: LayoutId;
+  readonly selection: DiagramId;
   readonly cardId: CardId | null;
   readonly graphId: GraphId | null;
   readonly presentationCardId: CardId | null;
@@ -18,31 +18,31 @@ export function destinationOpening(
 ): DestinationOpening {
   if (destination.kind === 'space') {
     return {
-      selection: requireDefaultLayout(space),
+      selection: requireDefaultDiagram(space),
       cardId: null,
       graphId: null,
       presentationCardId: null,
     };
   }
-  if (destination.kind === 'layout') {
+  if (destination.kind === 'diagram') {
     return {
-      selection: destination.layoutId,
+      selection: destination.diagramId,
       cardId: null,
       graphId: null,
       presentationCardId: null,
     };
   }
-  if (destination.kind === 'layout-card') {
+  if (destination.kind === 'diagram-card') {
     return {
-      selection: destination.layoutId,
+      selection: destination.diagramId,
       cardId: destination.cardId,
       graphId: null,
       presentationCardId: null,
     };
   }
-  if (destination.kind === 'layout-graph') {
+  if (destination.kind === 'diagram-graph') {
     return {
-      selection: destination.layoutId,
+      selection: destination.diagramId,
       cardId: null,
       graphId: destination.graphId,
       presentationCardId: null,
@@ -50,7 +50,7 @@ export function destinationOpening(
   }
   if (destination.kind === 'presentation') {
     return {
-      selection: destination.layoutId,
+      selection: destination.diagramId,
       cardId: null,
       graphId: destination.graphId,
       presentationCardId: destination.cardId,
@@ -62,14 +62,14 @@ export function destinationOpening(
       throw new Error(`The resolved Graph ${destination.graphId} does not exist.`);
     }
     return {
-      selection: owned.owner.layout.id,
+      selection: owned.owner.diagram.id,
       cardId: null,
       graphId: destination.graphId,
       presentationCardId: null,
     };
   }
   return {
-    selection: requireDefaultLayout(space),
+    selection: requireDefaultDiagram(space),
     cardId: destination.cardId,
     graphId: null,
     presentationCardId: null,

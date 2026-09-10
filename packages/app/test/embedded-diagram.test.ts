@@ -6,15 +6,15 @@ import { canvasProjection } from '../src/canvas-projection';
 import {
   clipEmbeddedNode,
   constrainEmbeddedPosition,
-  embeddedLayout,
+  embeddedDiagram,
   embeddedNodeId,
-} from '../src/embedded-layout';
-import { resolveLayout } from '../src/layout-resolution';
+} from '../src/embedded-diagram';
+import { resolveDiagram } from '../src/diagram-resolution';
 
 const id = (value: number) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`);
 const SPACE = id(1);
-const LAYOUT = id(2);
+const DIAGRAM = id(2);
 const GRAPH = id(3);
 const A = id(4);
 const B = id(5);
@@ -28,11 +28,11 @@ async function projection(open = false) {
       document: {
         version: 1,
         title: 'Target',
-        defaultLayout: LAYOUT,
-        layouts: [
+        defaultDiagram: DIAGRAM,
+        diagrams: [
           {
-            id: LAYOUT,
-            title: 'Layout',
+            id: DIAGRAM,
+            title: 'Diagram',
             kind: 'positioned',
             positions: {
               [A]: { x: 0, y: 0, open: false },
@@ -53,10 +53,10 @@ async function projection(open = false) {
     }),
   );
   if (!loaded.ok) throw new Error('Invalid fixture');
-  const resolved = resolveLayout(loaded.space, LAYOUT);
+  const resolved = resolveDiagram(loaded.space, DIAGRAM);
   const pending = canvasProjection(loaded.space, resolved);
   return pending.project(
-    await positionedStrategy(Placement.fromLayout(resolved.layout))(pending.strategyGraph),
+    await positionedStrategy(Placement.fromDiagram(resolved.diagram))(pending.strategyGraph),
     {
       activeGraphId: GRAPH,
       activeCardId: null,
@@ -84,7 +84,7 @@ async function draw(open = false, width = 1000, height = 1000) {
   return {
     projected,
     parent: parent(first, width, height),
-    drawn: embeddedLayout({
+    drawn: embeddedDiagram({
       parent: parent(first, width, height),
       projection: projected,
       offset: { x: 16, y: 42 },
@@ -99,7 +99,7 @@ const embedded = (nodes: readonly CardFlowNode[], cardId: string): CardFlowNode 
   return node;
 };
 
-/** The region `embeddedLayout` clips into when no narrower bounds are given. */
+/** The region `embeddedDiagram` clips into when no narrower bounds are given. */
 const view = (parent: {
   readonly width?: number | undefined;
   readonly height?: number | undefined;
@@ -131,7 +131,7 @@ describe('an embedded production projection', () => {
   it('draws a Card beyond the containing bounds where it was authored, clipped rather than moved', async () => {
     // React Flow applies a numeric `extent` in `adoptUserNodes`, which is
     // rendering and not only dragging, so an extent narrower than the authored
-    // placement silently redraws the Layout. Clipping is what a Card that no
+    // placement silently redraws the Diagram. Clipping is what a Card that no
     // longer fits gets; the containing bounds constrain gesture proposals
     // instead (`constrainEmbeddedPosition`).
     const { drawn } = await draw(false, 400, 400);
@@ -199,7 +199,7 @@ describe('an embedded production projection', () => {
       height: 420,
       data: { expanded: true, body: 'Target content', kind: 'alias' },
     });
-    // B sits at the target Layout's authored 400 plus the embedding offset, and
+    // B sits at the target Diagram's authored 400 plus the embedding offset, and
     // the Open Alias below it moves nothing: displacement is applied by the Edit
     // that opens a Card, so it is already in the coordinates the target Space
     // stores (ADR 0084).
@@ -220,7 +220,7 @@ describe('an embedded production projection', () => {
 
   it('gives two embeddings of the same Space distinct node and Edge identities', async () => {
     const { drawn, projected, parent } = await draw();
-    const second = embeddedLayout({
+    const second = embeddedDiagram({
       parent: { ...parent, id: id(8) },
       projection: projected,
       offset: { x: 16, y: 42 },

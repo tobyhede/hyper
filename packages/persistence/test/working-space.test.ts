@@ -9,9 +9,9 @@ import {
 
 const SPACE = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const layoutless: SpaceSnapshot = {
+const diagramless: SpaceSnapshot = {
   id: SPACE,
   document: { version: 1, title: 'Imported' },
   cards: [{ id: CARD, document: { title: 'A', kind: 'markdown', body: '' } }],
@@ -29,7 +29,7 @@ interface RepositoryHarness {
 }
 
 const repository = (): RepositoryHarness => {
-  let current = { snapshot: structuredClone(layoutless), revision: 7n, exportedRevision: 5n };
+  let current = { snapshot: structuredClone(diagramless), revision: 7n, exportedRevision: 5n };
   const commits: SpaceSnapshot[] = [];
   return {
     commits,
@@ -54,9 +54,9 @@ const repository = (): RepositoryHarness => {
 };
 
 describe('loadWorkingSpace', () => {
-  it('persists an empty default Layout before returning a layoutless stored Space', async () => {
+  it('persists an empty default Diagram before returning a diagramless stored Space', async () => {
     const { store, commits } = repository();
-    const ids = [LAYOUT, GRAPH];
+    const ids = [DIAGRAM, GRAPH];
 
     const loaded = await loadWorkingSpace(store, SPACE, () => {
       const id = ids.shift();
@@ -68,36 +68,36 @@ describe('loadWorkingSpace', () => {
     expect(commits).toHaveLength(1);
     expect(loaded).toEqual({
       snapshot: {
-        ...layoutless,
+        ...diagramless,
         document: {
-          ...layoutless.document,
-          layouts: [
+          ...diagramless.document,
+          diagrams: [
             {
-              id: LAYOUT,
-              title: 'Layout 1',
+              id: DIAGRAM,
+              title: 'Diagram 1',
               kind: 'positioned',
               positions: {},
               graphs: [{ id: GRAPH, title: 'Graph 1', edges: [] }],
               activeGraph: GRAPH,
             },
           ],
-          defaultLayout: LAYOUT,
+          defaultDiagram: DIAGRAM,
         },
       },
       revision: 8n,
       exportedRevision: 5n,
-      initialization: 'created-layout',
+      initialization: 'created-diagram',
     });
   });
 
-  it('adopts the first existing Layout without creating another Layout or Graph', async () => {
+  it('adopts the first existing Diagram without creating another Diagram or Graph', async () => {
     const existing = {
-      ...layoutless,
+      ...diagramless,
       document: {
-        ...layoutless.document,
-        layouts: [
+        ...diagramless.document,
+        diagrams: [
           {
-            id: LAYOUT,
+            id: DIAGRAM,
             title: 'First',
             kind: 'positioned' as const,
             positions: {},
@@ -130,19 +130,19 @@ describe('loadWorkingSpace', () => {
       throw new Error('default adoption must not mint identities');
     });
 
-    expect(committed?.document.layouts).toEqual(existing.document.layouts);
-    expect(committed?.document.defaultLayout).toBe(LAYOUT);
+    expect(committed?.document.diagrams).toEqual(existing.document.diagrams);
+    expect(committed?.document.defaultDiagram).toBe(DIAGRAM);
     expect(loaded).not.toHaveProperty('initialization');
   });
 
-  it('does not write a Space that already has a durable default Layout', async () => {
+  it('does not write a Space that already has a durable default Diagram', async () => {
     const complete = {
-      ...layoutless,
+      ...diagramless,
       document: {
-        ...layoutless.document,
-        layouts: [
+        ...diagramless.document,
+        diagrams: [
           {
-            id: LAYOUT,
+            id: DIAGRAM,
             title: 'First',
             kind: 'positioned' as const,
             positions: {},
@@ -150,7 +150,7 @@ describe('loadWorkingSpace', () => {
             activeGraph: GRAPH,
           },
         ],
-        defaultLayout: LAYOUT,
+        defaultDiagram: DIAGRAM,
       },
     };
     const commit = vi.fn();
@@ -160,7 +160,7 @@ describe('loadWorkingSpace', () => {
       commit,
     };
 
-    await expect(loadWorkingSpace(store, SPACE, () => LAYOUT)).resolves.toMatchObject({
+    await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).resolves.toMatchObject({
       snapshot: complete,
       revision: 3n,
     });
@@ -169,25 +169,25 @@ describe('loadWorkingSpace', () => {
 
   it('accepts a concurrently initialized winner as ordinary working state', async () => {
     const winner = {
-      ...layoutless,
+      ...diagramless,
       document: {
-        ...layoutless.document,
-        layouts: [
+        ...diagramless.document,
+        diagrams: [
           {
-            id: LAYOUT,
-            title: 'Layout 1',
+            id: DIAGRAM,
+            title: 'Diagram 1',
             kind: 'positioned' as const,
             positions: {},
             graphs: [{ id: GRAPH, title: 'Graph 1', edges: [] }],
             activeGraph: GRAPH,
           },
         ],
-        defaultLayout: LAYOUT,
+        defaultDiagram: DIAGRAM,
       },
     };
     const store = {
       loadSpace: () =>
-        Promise.resolve({ snapshot: layoutless, revision: 7n, exportedRevision: 5n }),
+        Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: 5n }),
       commit: () =>
         Promise.resolve({
           kind: 'conflict' as const,
@@ -200,22 +200,22 @@ describe('loadWorkingSpace', () => {
         }),
     };
 
-    await expect(loadWorkingSpace(store, SPACE, () => LAYOUT)).resolves.toEqual({
+    await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).resolves.toEqual({
       snapshot: winner,
       revision: 8n,
       exportedRevision: 5n,
     });
   });
 
-  it('retries initialization after an unrelated layoutless edit wins the conflict', async () => {
+  it('retries initialization after an unrelated diagramless edit wins the conflict', async () => {
     const concurrentlyEdited = {
-      ...layoutless,
-      document: { ...layoutless.document, title: 'Renamed while opening' },
+      ...diagramless,
+      document: { ...diagramless.document, title: 'Renamed while opening' },
     };
     let commits = 0;
     const store = {
       loadSpace: () =>
-        Promise.resolve({ snapshot: layoutless, revision: 7n, exportedRevision: null }),
+        Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: null }),
       commit: () => {
         commits += 1;
         if (commits === 1) {
@@ -241,7 +241,7 @@ describe('loadWorkingSpace', () => {
       },
     };
     const ids = [
-      LAYOUT,
+      DIAGRAM,
       GRAPH,
       uuidSchema.parse('00000000-0000-4000-8000-000000000005'),
       uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -256,7 +256,7 @@ describe('loadWorkingSpace', () => {
     expect(commits).toBe(2);
     expect(loaded).toMatchObject({
       revision: 9n,
-      initialization: 'created-layout',
+      initialization: 'created-diagram',
       snapshot: { document: { title: 'Renamed while opening' } },
     });
   });
@@ -271,7 +271,7 @@ describe('loadWorkingSpace', () => {
   it('answers undefined when the conflict reports the Space deleted', async () => {
     const store = {
       loadSpace: () =>
-        Promise.resolve({ snapshot: layoutless, revision: 7n, exportedRevision: null }),
+        Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: null }),
       commit: () =>
         Promise.resolve({
           kind: 'conflict' as const,
@@ -279,14 +279,14 @@ describe('loadWorkingSpace', () => {
         }),
     };
 
-    await expect(loadWorkingSpace(store, SPACE, () => LAYOUT)).resolves.toBeUndefined();
+    await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).resolves.toBeUndefined();
   });
 
   it('throws when the conflict never names the Space it refused', async () => {
     const other = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
     const store = {
       loadSpace: () =>
-        Promise.resolve({ snapshot: layoutless, revision: 7n, exportedRevision: null }),
+        Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: null }),
       commit: () =>
         Promise.resolve({
           kind: 'conflict' as const,
@@ -294,7 +294,7 @@ describe('loadWorkingSpace', () => {
         }),
     };
 
-    await expect(loadWorkingSpace(store, SPACE, () => LAYOUT)).rejects.toThrow(
+    await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).rejects.toThrow(
       'changed without returning its current working state',
     );
   });
@@ -308,11 +308,11 @@ describe('loadWorkingSpace', () => {
     async (result) => {
       const store = {
         loadSpace: () =>
-          Promise.resolve({ snapshot: layoutless, revision: 7n, exportedRevision: null }),
+          Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: null }),
         commit: () => Promise.resolve(result),
       };
 
-      await expect(loadWorkingSpace(store, SPACE, () => LAYOUT)).rejects.toThrow(
+      await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).rejects.toThrow(
         `could not initialize its working state: ${result.kind}`,
       );
     },

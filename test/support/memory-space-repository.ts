@@ -52,16 +52,16 @@ const loadedAggregate = (metaSpaceId: UUID, spaces: Iterable<LoadedSpace>): Load
 });
 
 /**
- * A layout's own id and the ids of the graphs it owns are minted in one pass,
+ * A diagram's own id and the ids of the graphs it owns are minted in one pass,
  * because a graph is reached only through its owner now (ADR 0040) — there is no
  * space-level collection left to walk instead. `resolveImport` in
  * `PostgresSpaceRepository` mints the same way and for the same reason; the
  * shared contract holds the two to it.
  */
 const identifyImport = (input: ImportSpace): SpaceSnapshot => {
-  const { layouts: importedLayouts, ...document } = input.document;
-  const layouts = importedLayouts?.map(({ id, graphs, ...layout }) => ({
-    ...layout,
+  const { diagrams: importedDiagrams, ...document } = input.document;
+  const diagrams = importedDiagrams?.map(({ id, graphs, ...diagram }) => ({
+    ...diagram,
     id: id ?? newUuid(),
     graphs: graphs.map(({ id: graphId, ...graph }) => ({ ...graph, id: graphId ?? newUuid() })),
   }));
@@ -72,7 +72,7 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
     // there. Rebuilding it stamped `version` with a constant, which quietly
     // rewrote an unsupported document into a supported one — the one thing a
     // double of an insert-only importer must not do.
-    document: layouts === undefined ? { ...document } : { ...document, layouts },
+    document: diagrams === undefined ? { ...document } : { ...document, diagrams },
     cards: input.cards.map(({ id, ...card }) => ({ ...card, id: id ?? newUuid() })),
   };
 };

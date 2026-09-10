@@ -42,12 +42,12 @@ const canonicalPlacement = (point: CardPlacement): CardPlacement => {
 };
 
 /**
- * A layout's graphs, rebuilt key by key and emitted in the order the layout
+ * A diagram's graphs, rebuilt key by key and emitted in the order the diagram
  * holds them.
  *
  * Ordering is the one thing this does *not* impose, and the asymmetry with the
  * positions beside it comes from how the document is stored. `jsonb` reorders
- * an object's keys on write and preserves an array's order. A layout's
+ * an object's keys on write and preserves an array's order. A diagram's
  * positions are an object, so the order they were written in is gone by the
  * time they are read back and the sort below is what gives them one again —
  * without it a re-export of untouched content produces a diff. Its graphs are
@@ -61,8 +61,8 @@ const canonicalPlacement = (point: CardPlacement): CardPlacement => {
  * a spread would export that order.
  */
 const canonicalGraphs = (
-  graphs: NonNullable<SpaceFile['layouts']>[number]['graphs'],
-): NonNullable<SpaceFile['layouts']>[number]['graphs'] =>
+  graphs: NonNullable<SpaceFile['diagrams']>[number]['graphs'],
+): NonNullable<SpaceFile['diagrams']>[number]['graphs'] =>
   graphs.map((graph) => {
     const edges = graph.edges.map(({ from, to }) => ({ from, to }));
     // Two full literals rather than a base object with `color` assigned after:
@@ -74,13 +74,13 @@ const canonicalGraphs = (
   });
 
 const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
-  const layouts = snapshot.document.layouts?.map((layout) => {
-    const layoutBase: Omit<NonNullable<SpaceFile['layouts']>[number], 'activeGraph'> = {
-      id: layout.id,
-      title: layout.title,
-      kind: layout.kind,
+  const diagrams = snapshot.document.diagrams?.map((diagram) => {
+    const diagramBase: Omit<NonNullable<SpaceFile['diagrams']>[number], 'activeGraph'> = {
+      id: diagram.id,
+      title: diagram.title,
+      kind: diagram.kind,
       positions: Object.fromEntries(
-        Object.entries(layout.positions)
+        Object.entries(diagram.positions)
           .sort(([left], [right]) => compareOrdinal(left, right))
           // The point is rebuilt too, not passed through: a stored `{"y":…,"x":…}`
           // would otherwise export in that order. An absent value cannot come off
@@ -92,21 +92,21 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
             return [[id, canonicalPlacement(point)]];
           }),
       ),
-      graphs: canonicalGraphs(layout.graphs),
+      graphs: canonicalGraphs(diagram.graphs),
     };
-    return layout.activeGraph === undefined
-      ? layoutBase
-      : { ...layoutBase, activeGraph: layout.activeGraph };
+    return diagram.activeGraph === undefined
+      ? diagramBase
+      : { ...diagramBase, activeGraph: diagram.activeGraph };
   });
   const fileBase: Pick<SpaceFile, 'version' | 'id' | 'title'> = {
     version: SPACE_FILE_VERSION,
     id: snapshot.id,
     title: snapshot.document.title,
   };
-  const withLayouts = layouts === undefined ? fileBase : { ...fileBase, layouts };
-  return snapshot.document.defaultLayout === undefined
-    ? withLayouts
-    : { ...withLayouts, defaultLayout: snapshot.document.defaultLayout };
+  const withDiagrams = diagrams === undefined ? fileBase : { ...fileBase, diagrams };
+  return snapshot.document.defaultDiagram === undefined
+    ? withDiagrams
+    : { ...withDiagrams, defaultDiagram: snapshot.document.defaultDiagram };
 };
 
 const canonicalCard = (
@@ -124,7 +124,7 @@ const canonicalCard = (
       kind: 'space',
       spaceId: document.spaceId,
     };
-    if (document.layout !== undefined) card.layout = document.layout;
+    if (document.diagram !== undefined) card.diagram = document.diagram;
     if (document.graph !== undefined) card.graph = document.graph;
     return card;
   }

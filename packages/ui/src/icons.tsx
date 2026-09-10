@@ -29,21 +29,21 @@ type CardActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
 
 /**
- * An authored Layout: the Cards a Space placed, and the Graphs over them.
+ * An authored Diagram: the Cards a Space placed, and the Graphs over them.
  *
  * Placements on a plane. This was `PanelsTopLeft` — a header, a sidebar and a
  * content well, which is a *web page chrome* and describes nothing the product
- * does. A Layout is authored placement (ADR 0014 — placement is authored, not
+ * does. A Diagram is authored placement (ADR 0014 — placement is authored, not
  * computed), so the glyph is the placements.
  */
-export const LayoutIcon = () => <LayoutGrid size={16} />;
+export const DiagramIcon = () => <LayoutGrid size={16} />;
 
 /**
  * A directed Graph, including its branches and joins.
  *
  * A path from a start pin to an end pin. This was `Network` — one node above
  * two, joined by a bracket — which draws a *hierarchy*, and a Graph is a
- * curated traversal over Cards a Layout has already placed. Present is what a
+ * curated traversal over Cards a Diagram has already placed. Present is what a
  * Graph is for, and a path is the thing you present.
  *
  * Drawn heavier than Lucide's default 2. This is the only glyph in the set

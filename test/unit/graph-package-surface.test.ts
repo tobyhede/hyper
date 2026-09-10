@@ -27,7 +27,7 @@ import * as graphPackage from '@project/graph';
  * `space.lookup`, which the Space carries, so the shallow `get*` pairs that used
  * to be listed here have no callers left to name — and `buildSpaceLookup` is
  * intake's, called by `space` and by nothing outside the package. Its
- * contextual types come with the module, which is why `ResolvedLayout`,
+ * contextual types come with the module, which is why `ResolvedDiagram`,
  * `OwnedGraph` and `SpaceLookup` are listed below.
  *
  * Adding a name here is the deliberate act this guard exists to require. It is
@@ -84,7 +84,7 @@ const OFFERED_TYPES = [
   'ParseImportCardFileResult',
   'OwnedGraph',
   'ResolvedContentCard',
-  'ResolvedLayout',
+  'ResolvedDiagram',
   'GraphRenderHandleRef',
   'Space',
   'SpaceAggregate',

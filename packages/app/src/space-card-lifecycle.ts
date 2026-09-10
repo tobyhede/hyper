@@ -5,7 +5,7 @@ import type {
   SpaceSessionRegistry,
   SpaceSummary,
 } from '@project/persistence';
-import type { GraphId, Layout, UUID } from '@project/core';
+import type { GraphId, Diagram, UUID } from '@project/core';
 
 export type {
   CreateSpaceCardInput,
@@ -16,7 +16,7 @@ export type {
 } from '@project/persistence';
 
 /** The target's choices; rendering uses its live Space's production projection. */
-export interface SpaceCardTargetLayout {
+export interface SpaceCardTargetDiagram {
   readonly id: UUID;
   readonly title: string;
   readonly graphs: readonly { readonly id: GraphId; readonly title: string }[];
@@ -26,7 +26,7 @@ export interface SpaceCardTargetLayout {
 export interface SpaceCardTarget {
   readonly id: UUID;
   readonly title: string;
-  readonly layouts: readonly SpaceCardTargetLayout[];
+  readonly diagrams: readonly SpaceCardTargetDiagram[];
 }
 
 /**
@@ -35,7 +35,7 @@ export interface SpaceCardTarget {
  * The three writes are ADR 0076's, unchanged and still the module's public
  * interface. The two reads are here rather than beside them on a backend
  * because they answer the same question the writes do — *which Space, and which
- * of its Layouts and Graphs* — and a surface that had to reach a backend for
+ * of its Diagrams and Graphs* — and a surface that had to reach a backend for
  * them would be composing its own answer to a question this module already
  * owns.
  */
@@ -55,7 +55,7 @@ export interface SpaceCardAuthoring extends SpaceCardLifecycle {
    * What one target Space offers a Space Card to select, or `undefined` where
    * it is gone or no longer passes intake.
    *
-   * Read through the live session where one is open, so a Layout authored in a
+   * Read through the live session where one is open, so a Diagram authored in a
    * Space this browser also has open is selectable before it has committed.
    */
   readonly target: (spaceId: UUID) => Promise<SpaceCardTarget | undefined>;
@@ -67,13 +67,13 @@ export interface SpaceCardLifecycleOptions {
   readonly newId: () => UUID;
 }
 
-const targetLayout = (layout: Layout): SpaceCardTargetLayout => {
+const targetDiagram = (diagram: Diagram): SpaceCardTargetDiagram => {
   const read = {
-    id: layout.id,
-    title: layout.title,
-    graphs: layout.graphs.map(({ id, title }) => ({ id, title })),
+    id: diagram.id,
+    title: diagram.title,
+    graphs: diagram.graphs.map(({ id, title }) => ({ id, title })),
   };
-  return layout.activeGraph === undefined ? read : { ...read, activeGraph: layout.activeGraph };
+  return diagram.activeGraph === undefined ? read : { ...read, activeGraph: diagram.activeGraph };
 };
 
 export function createSpaceCardLifecycle({
@@ -103,6 +103,6 @@ export function spaceCardTarget(space: Space): SpaceCardTarget {
   return {
     id: space.id,
     title: space.title,
-    layouts: space.layouts.map(targetLayout),
+    diagrams: space.diagrams.map(targetDiagram),
   };
 }

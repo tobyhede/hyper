@@ -1,13 +1,13 @@
-import type { Card, CardId, Graph, GraphId, Layout, UUID } from '@project/core';
+import type { Card, CardId, Graph, GraphId, Diagram, UUID } from '@project/core';
 import type { Space } from './space';
 
 /**
  * Contextual entity resolution over a validated Space.
  *
- * A Layout owns its Graphs (ADR 0040) and `space.graphs` is a flatten across
- * every Layout (ADR 0045), so an id taken off that collection has lost the one
- * thing ownership adds — which Layout's Cards its Edges are closed over, and
- * which Layout an Edit to it belongs in. Every answer here therefore arrives
+ * A Diagram owns its Graphs (ADR 0040) and `space.graphs` is a flatten across
+ * every Diagram (ADR 0045), so an id taken off that collection has lost the one
+ * thing ownership adds — which Diagram's Cards its Edges are closed over, and
+ * which Diagram an Edit to it belongs in. Every answer here therefore arrives
  * with its context already resolved, rather than as a bare value a caller has to
  * go looking for the rest of.
  *
@@ -19,37 +19,37 @@ import type { Space } from './space';
  */
 
 /**
- * A Layout, and the Graph it opens active on.
+ * A Diagram, and the Graph it opens active on.
  *
  * The Active Graph is resolved once, here, rather than at each reader: it is the
- * Graph the Layout names, or its first (ADR 0026). Resolving it does **not**
- * fill the authored optional — `layout` is the exact authored value, so a
+ * Graph the Diagram names, or its first (ADR 0026). Resolving it does **not**
+ * fill the authored optional — `diagram` is the exact authored value, so a
  * snapshot or an export written from it preserves the absence.
  */
-export interface ResolvedLayout {
-  /** The exact authored value in `space.layouts`. */
-  readonly layout: Layout;
+export interface ResolvedDiagram {
+  /** The exact authored value in `space.diagrams`. */
+  readonly diagram: Diagram;
   /** The exact owned Graph: the authored choice, or the first-Graph fallback. */
   readonly activeGraph: Graph;
 }
 
-/** A Graph, and the Layout that owns it. */
+/** A Graph, and the Diagram that owns it. */
 export interface OwnedGraph {
   /** The exact nested value, also present in `space.graphs`. */
   readonly graph: Graph;
-  /** The canonical contextual value `lookup.layout` answers for its owner. */
-  readonly owner: ResolvedLayout;
+  /** The canonical contextual value `lookup.diagram` answers for its owner. */
+  readonly owner: ResolvedDiagram;
 }
 
 /**
  * The one interface for identity lookup over a Space. O(1), total over the
  * Space's own entities, and canonical: two calls with one id answer the same
- * value, and a Graph's `owner` is the very value its owning Layout's id resolves
+ * value, and a Graph's `owner` is the very value its owning Diagram's id resolves
  * to.
  */
 export interface SpaceLookup {
   card(id: CardId): Card | undefined;
-  layout(id: UUID): ResolvedLayout | undefined;
+  diagram(id: UUID): ResolvedDiagram | undefined;
   graph(id: GraphId): OwnedGraph | undefined;
 }
 
@@ -77,42 +77,42 @@ export function resolveContentCard(space: Space, cardId: CardId): ResolvedConten
 
 /**
  * The one failure building the lookup can meet, and it is not one a document can
- * reach: `positionedLayoutSchema` requires at least one Graph, and every Space
+ * reach: `positionedDiagramSchema` requires at least one Graph, and every Space
  * arrives through that parse.
  *
  * It survives because `min(1)` does not reach the type — `noUncheckedIndexedAccess`
  * widens the first read to `| undefined` — so a total function needs an answer
  * for a state no document is in. Reporting it as a shape failure naming the
- * Layout says exactly what the schema would have, in the one place still able to
+ * Diagram says exactly what the schema would have, in the one place still able to
  * observe it, rather than inventing a Graph or asserting the read away.
  */
 type SpaceLookupResult =
   | { readonly ok: true; readonly lookup: SpaceLookup }
-  | { readonly ok: false; readonly layoutWithoutGraph: UUID };
+  | { readonly ok: false; readonly diagramWithoutGraph: UUID };
 
 /**
  * Build the lookup over an already reference-checked Space.
  *
- * Order matters: every `ResolvedLayout` is built first, so the `OwnedGraph`
+ * Order matters: every `ResolvedDiagram` is built first, so the `OwnedGraph`
  * values below can close over the *same* value the owner's id answers with. Two
  * passes rather than one is what makes `lookup.graph(id)?.owner ===
- * lookup.layout(ownerId)` hold as identity rather than as equality.
+ * lookup.diagram(ownerId)` hold as identity rather than as equality.
  */
 export function buildSpaceLookup(input: {
   readonly cards: readonly Card[];
-  readonly layouts: readonly Layout[];
+  readonly diagrams: readonly Diagram[];
 }): SpaceLookupResult {
-  const resolvedLayouts = new Map<UUID, ResolvedLayout>();
-  for (const layout of input.layouts) {
+  const resolvedDiagrams = new Map<UUID, ResolvedDiagram>();
+  for (const diagram of input.diagrams) {
     const activeGraph =
-      layout.graphs.find((graph) => graph.id === layout.activeGraph) ?? layout.graphs[0];
-    if (activeGraph === undefined) return { ok: false, layoutWithoutGraph: layout.id };
-    resolvedLayouts.set(layout.id, { layout, activeGraph });
+      diagram.graphs.find((graph) => graph.id === diagram.activeGraph) ?? diagram.graphs[0];
+    if (activeGraph === undefined) return { ok: false, diagramWithoutGraph: diagram.id };
+    resolvedDiagrams.set(diagram.id, { diagram, activeGraph });
   }
 
   const ownedGraphs = new Map<GraphId, OwnedGraph>();
-  for (const owner of resolvedLayouts.values()) {
-    for (const graph of owner.layout.graphs) {
+  for (const owner of resolvedDiagrams.values()) {
+    for (const graph of owner.diagram.graphs) {
       ownedGraphs.set(graph.id, { graph, owner });
     }
   }
@@ -122,7 +122,7 @@ export function buildSpaceLookup(input: {
     ok: true,
     lookup: {
       card: (id) => cards.get(id),
-      layout: (id) => resolvedLayouts.get(id),
+      diagram: (id) => resolvedDiagrams.get(id),
       graph: (id) => ownedGraphs.get(id),
     },
   };

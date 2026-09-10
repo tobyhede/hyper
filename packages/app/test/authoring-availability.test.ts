@@ -20,7 +20,7 @@ const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   cardIsOpen: false,
   editingChromeTitle: false,
   spaceOnCanvas: true,
-  editingEmbeddedLayout: false,
+  editingEmbeddedDiagram: false,
 };
 
 const ALL_AVAILABLE: AuthoringAvailability = {
@@ -30,9 +30,9 @@ const ALL_AVAILABLE: AuthoringAvailability = {
   deleteCard: true,
   present: true,
   addCard: true,
-  createLayout: true,
+  createDiagram: true,
   authorOnCanvas: true,
-  authorInEmbeddedLayout: true,
+  authorInEmbeddedDiagram: true,
   editCardBody: true,
   connectOnCanvas: true,
   dragNodes: true,
@@ -54,7 +54,7 @@ describe('authoring availability', () => {
         entityEdits: false,
         deleteCard: false,
         authorOnCanvas: false,
-        authorInEmbeddedLayout: false,
+        authorInEmbeddedDiagram: false,
         editCardBody: false,
         connectOnCanvas: false,
         dragNodes: false,
@@ -70,9 +70,9 @@ describe('authoring availability', () => {
         entityEdits: false,
         deleteCard: false,
         addCard: false,
-        createLayout: false,
+        createDiagram: false,
         authorOnCanvas: false,
-        authorInEmbeddedLayout: false,
+        authorInEmbeddedDiagram: false,
         editCardBody: false,
         dragNodes: false,
         selectNodes: false,
@@ -88,9 +88,9 @@ describe('authoring availability', () => {
         entityEdits: false,
         deleteCard: false,
         addCard: false,
-        createLayout: false,
+        createDiagram: false,
         authorOnCanvas: false,
-        authorInEmbeddedLayout: false,
+        authorInEmbeddedDiagram: false,
         connectOnCanvas: false,
       },
     ],
@@ -104,7 +104,7 @@ describe('authoring availability', () => {
         deleteCard: false,
         present: false,
         addCard: false,
-        createLayout: false,
+        createDiagram: false,
       },
     ],
     [
@@ -115,7 +115,7 @@ describe('authoring availability', () => {
         chromeTitleEdit: false,
         entityEdits: false,
         deleteCard: false,
-        createLayout: false,
+        createDiagram: false,
       },
     ],
     ['an Open Card', { cardIsOpen: true }, { ...ALL_AVAILABLE, deleteCard: false }],
@@ -128,9 +128,9 @@ describe('authoring availability', () => {
         deleteCard: false,
         present: false,
         addCard: false,
-        createLayout: false,
+        createDiagram: false,
         authorOnCanvas: false,
-        authorInEmbeddedLayout: false,
+        authorInEmbeddedDiagram: false,
         connectOnCanvas: false,
       },
     ],
@@ -140,13 +140,13 @@ describe('authoring availability', () => {
       {
         ...ALL_AVAILABLE,
         authorOnCanvas: false,
-        authorInEmbeddedLayout: false,
+        authorInEmbeddedDiagram: false,
         connectOnCanvas: false,
       },
     ],
     [
-      'a live Card edit inside an embedded Layout',
-      { editingEmbeddedLayout: true },
+      'a live Card edit inside an embedded Diagram',
+      { editingEmbeddedDiagram: true },
       { ...ALL_AVAILABLE, authorOnCanvas: false },
     ],
   ])('withdraws what %s takes away', (_what, inProgress, expected) => {
@@ -156,14 +156,14 @@ describe('authoring availability', () => {
   });
 
   describe('the asymmetries', () => {
-    it('offers Add Card during a live Card rename and withholds Add Layout', () => {
+    it('offers Add Card during a live Card rename and withholds Add Diagram', () => {
       const availability = authoringAvailability({
         ...NOTHING_IN_PROGRESS,
         editingCardTitle: true,
       });
 
       expect(availability.addCard).toBe(true);
-      expect(availability.createLayout).toBe(false);
+      expect(availability.createDiagram).toBe(false);
     });
 
     it('withholds only Delete Card while a Card is open', () => {
@@ -197,17 +197,17 @@ describe('authoring availability', () => {
       expect(availability.authorOnCanvas).toBe(false);
     });
 
-    it('leaves an embedded Layout authorable while withdrawing the canvas around it', () => {
+    it('leaves an embedded Diagram authorable while withdrawing the canvas around it', () => {
       const availability = authoringAvailability({
         ...NOTHING_IN_PROGRESS,
-        editingEmbeddedLayout: true,
+        editingEmbeddedDiagram: true,
       });
 
       expect(availability.authorOnCanvas).toBe(false);
-      expect(availability.authorInEmbeddedLayout).toBe(true);
+      expect(availability.authorInEmbeddedDiagram).toBe(true);
     });
 
-    it('withdraws an embedded Layout for every reason that is not its own edit', () => {
+    it('withdraws an embedded Diagram for every reason that is not its own edit', () => {
       for (const inProgress of [
         { editable: false },
         { presenting: true },
@@ -216,7 +216,7 @@ describe('authoring availability', () => {
         { spaceOnCanvas: false },
       ]) {
         expect(
-          authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress }).authorInEmbeddedLayout,
+          authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress }).authorInEmbeddedDiagram,
         ).toBe(false);
       }
     });

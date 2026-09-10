@@ -2,7 +2,7 @@ import {
   uuidSchema,
   type Card,
   type Graph,
-  type Layout,
+  type Diagram,
   type SpaceFile,
   type UUID,
 } from '@project/core';
@@ -37,7 +37,7 @@ export const graphIds = {
   short: id('8de1c2da-0798-42f4-9baf-9ecdafec4f68'),
 } as const;
 
-export const layoutId = id('9ef2d3eb-18a9-4305-8cba-afdeb0fd5a79');
+export const diagramId = id('9ef2d3eb-18a9-4305-8cba-afdeb0fd5a79');
 export const spaceId = id('a0f3e4fc-29ba-4416-9dcb-b0efc10e6b8a');
 
 /** The application palette, reused rather than translated for the catalogue. */
@@ -130,9 +130,9 @@ export const positions = {
   [cardIds.closing]: { x: 1060, y: 330, open: false },
 } as const;
 
-export const layouts: readonly Layout[] = [
+export const diagrams: readonly Diagram[] = [
   {
-    id: layoutId,
+    id: diagramId,
     kind: 'positioned',
     title: 'Collection 1',
     positions: Object.fromEntries(
@@ -154,7 +154,7 @@ const spaceFile: SpaceFile = {
   version: 1,
   id: spaceId,
   title: spaceTitle,
-  layouts: [...layouts],
+  diagrams: [...diagrams],
 };
 
 const loaded = loadSpace(spaceFile, cardFiles);

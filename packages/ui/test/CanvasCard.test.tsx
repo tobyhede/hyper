@@ -60,7 +60,7 @@ describe('CanvasCard kind and interaction state', () => {
     expect(card).toHaveAttribute('data-state', 'rest');
     // Every kind draws its glyph, Markdown included — CardKindIcon has no
     // silent-nothing case, and the rail is not the centred, icon-optional
-    // layout the pre-design-system Card used.
+    // diagram the pre-design-system Card used.
     expect(screen.getByRole('img', { name: 'Markdown Card' })).toBeVisible();
   });
 
@@ -984,7 +984,7 @@ describe('CanvasCard open Markdown front', () => {
       />,
     );
 
-    // Expansion is what the Layout authored and the caret is a gesture, so the
+    // Expansion is what the Diagram authored and the caret is a gesture, so the
     // two are independent rather than exclusive (ADR 0064).
     expect(screen.getByRole('textbox', { name: 'Card title' })).toBeVisible();
     expect(screen.getByText('the Card’s own source')).toBeVisible();
@@ -993,14 +993,14 @@ describe('CanvasCard open Markdown front', () => {
 
 describe('CanvasCard Space front', () => {
   const selection = (over: Partial<CanvasSpaceCardSelection> = {}): CanvasSpaceCardSelection => ({
-    layouts: [
+    diagrams: [
       { id: 'l1', title: 'Collection 1' },
       { id: 'l2', title: 'Collection 2' },
     ],
     graphs: [{ id: 'g1', title: 'Long' }],
-    layoutId: 'l1',
+    diagramId: 'l1',
     graphId: 'g1',
-    onLayoutChange: vi.fn(),
+    onDiagramChange: vi.fn(),
     onGraphChange: vi.fn(),
     ...over,
   });
@@ -1021,7 +1021,7 @@ describe('CanvasCard Space front', () => {
 
     const card = screen.getByRole('article', { name: 'Strategy elsewhere' });
     expect(card).toHaveAttribute('data-kind', 'space');
-    expect(screen.queryByTestId('space-card-layout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-card-diagram')).not.toBeInTheDocument();
     expect(screen.queryByTestId('space-card-graph')).not.toBeInTheDocument();
   });
 
@@ -1071,25 +1071,25 @@ describe('CanvasCard Space front', () => {
 
     // Named by their labels, not only reachable by test id: the two controls
     // are one word apart and an author has to be able to tell which is which.
-    expect(screen.getByRole('combobox', { name: 'Layout' })).toHaveTextContent('Collection 1');
+    expect(screen.getByRole('combobox', { name: 'Diagram' })).toHaveTextContent('Collection 1');
     expect(screen.getByRole('combobox', { name: 'Graph' })).toHaveTextContent('Long');
-    expect(screen.getByTestId('space-card-layout')).toBeEnabled();
+    expect(screen.getByTestId('space-card-diagram')).toBeEnabled();
     expect(screen.getByTestId('space-card-graph')).toBeEnabled();
   });
 
   /**
    * The Card publishes the choice and authors nothing itself — the selected
-   * Layout is the caller's to store and hand back, which is what makes the
-   * Graph list beside it the selected Layout's rather than a stale one.
+   * Diagram is the caller's to store and hand back, which is what makes the
+   * Graph list beside it the selected Diagram's rather than a stale one.
    */
-  it('publishes a chosen Layout without selecting it itself', () => {
-    const onLayoutChange = vi.fn();
+  it('publishes a chosen Diagram without selecting it itself', () => {
+    const onDiagramChange = vi.fn();
     render(
       <CanvasCard
         front={{
           kind: 'space',
           open: true,
-          selection: selection({ onLayoutChange }),
+          selection: selection({ onDiagramChange }),
         }}
         state="rest"
         title="Elsewhere"
@@ -1099,13 +1099,13 @@ describe('CanvasCard Space front', () => {
 
     // Opened and chosen from the keyboard: the list is Base UI's own, and its
     // arrow navigation is the path a pointer's click ends at anyway.
-    fireEvent.keyDown(screen.getByTestId('space-card-layout'), { key: 'ArrowDown' });
+    fireEvent.keyDown(screen.getByTestId('space-card-diagram'), { key: 'ArrowDown' });
     const chosen = screen.getByRole('option', { name: 'Collection 2' });
     fireEvent.keyDown(chosen, { key: 'ArrowDown' });
     fireEvent.keyDown(chosen, { key: 'Enter' });
 
-    expect(onLayoutChange).toHaveBeenCalledWith('l2');
-    expect(screen.getByRole('combobox', { name: 'Layout' })).toHaveTextContent('Collection 1');
+    expect(onDiagramChange).toHaveBeenCalledWith('l2');
+    expect(screen.getByRole('combobox', { name: 'Diagram' })).toHaveTextContent('Collection 1');
   });
 
   /** A Space with no Graphs is an ordinary thing to reference. */
@@ -1139,7 +1139,7 @@ describe('CanvasCard Space front', () => {
     );
 
     expect(screen.getByText('Reading the referenced Space…')).toBeVisible();
-    expect(screen.queryByTestId('space-card-layout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-card-diagram')).not.toBeInTheDocument();
     expect(screen.queryByTestId('space-card-graph')).not.toBeInTheDocument();
     // One note, not a live region: a canvas of Space Cards resolving would
     // otherwise announce each one, for a wait nobody asked for.
@@ -1157,7 +1157,7 @@ describe('CanvasCard Space front', () => {
       />,
     );
 
-    expect(screen.queryByTestId('space-card-layout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-card-diagram')).not.toBeInTheDocument();
     expect(screen.queryByTestId('space-card-graph')).not.toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@ A local prototype that proves one idea:
 
 > A technical deck can be authored as Markdown cards on a spatial graph, then presented as a curated Graph through that graph.
 
-Content can be authored in version-controlled files and imported into the live persistence model. A space directory holds a space file naming the layouts and the graphs each one owns, plus one Markdown file per card. [React Flow](https://reactflow.dev) draws **every** Graph at once, each in its own colour, and [elkjs](https://github.com/kieler/elkjs) lays them out automatically (layered, left→right). A Card exposes an outbound handle for each Graph with an outgoing Edge and an inbound handle for each Graph with an incoming Edge (the "multiple handles" approach). Choosing a Graph in the toolbar emphasises it without hiding the others.
+Content can be authored in version-controlled files and imported into the live persistence model. A space directory holds a space file naming the diagrams and the graphs each one owns, plus one Markdown file per card. [React Flow](https://reactflow.dev) draws **every** Graph at once, each in its own colour, and [elkjs](https://github.com/kieler/elkjs) lays them out automatically (layered, left→right). A Card exposes an outbound handle for each Graph with an outgoing Edge and an inbound handle for each Graph with an incoming Edge (the "multiple handles" approach). Choosing a Graph in the toolbar emphasises it without hiding the others.
 
 **Presenting is the same canvas, closer in.** There is no deck and no second surface ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): pressing Present moves React Flow's camera to the Graph's first card and draws that card's content rendered. Arrow keys traverse the Graph's edges — Right follows the selected one, Left goes back along the path taken, Up and Down choose among a fork's branches without moving the camera ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
 
@@ -27,7 +27,7 @@ Then:
 3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart.
 4. Hover or select a card to reveal its four authoring handles. Drag to another card to add an Edge to the active Graph. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Card N`, its placement and the Edge.
 5. Press **Present** to traverse the Graph: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
-6. Watch the address bar. The Space, a Layout, a Card, a Graph and each Active Card reached while Presenting have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)); the Sidebar and the presenting chrome offer **Copy link** for the current one, browser Back and Forward follow the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
+6. Watch the address bar. The Space, a Diagram, a Card, a Graph and each Active Card reached while Presenting have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)); the Sidebar and the presenting chrome offer **Copy link** for the current one, browser Back and Forward follow the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
 
 The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored Graph edges stay legible.
 
@@ -87,19 +87,19 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
 
 ### Durable URLs and HTTP resources
 
-Every addressable entity has a durable product URL built from its UUID. Product URLs encode UUIDs as unpadded 22-character base64url values; titles never participate in identity. A URL may name an entity canonically or add the Layout and Graph context needed to reopen the same canvas or Active Card while Presenting:
+Every addressable entity has a durable product URL built from its UUID. Product URLs encode UUIDs as unpadded 22-character base64url values; titles never participate in identity. A URL may name an entity canonically or add the Diagram and Graph context needed to reopen the same canvas or Active Card while Presenting:
 
 | Product URL | Destination |
 | --- | --- |
 | `/spaces/:spaceId` | Space |
-| `/spaces/:spaceId/cards/:cardId` | Card, using the Space's current Layout when it contains the Card |
-| `/spaces/:spaceId/graphs/:graphId` | Graph in its owning Layout |
-| `/spaces/:spaceId/views/:layoutId` | Authored Layout |
-| `/spaces/:spaceId/views/:layoutId/cards/:cardId` | Card in an explicit Layout |
-| `/spaces/:spaceId/views/:layoutId/graphs/:graphId` | Graph in an explicit Layout |
-| `/spaces/:spaceId/views/:layoutId/graphs/:graphId/present/:cardId` | Presenting at its Active Card |
+| `/spaces/:spaceId/cards/:cardId` | Card, using the Space's current Diagram when it contains the Card |
+| `/spaces/:spaceId/graphs/:graphId` | Graph in its owning Diagram |
+| `/spaces/:spaceId/diagrams/:diagramId` | Authored Diagram |
+| `/spaces/:spaceId/diagrams/:diagramId/cards/:cardId` | Card in an explicit Diagram |
+| `/spaces/:spaceId/diagrams/:diagramId/graphs/:graphId` | Graph in an explicit Diagram |
+| `/spaces/:spaceId/diagrams/:diagramId/graphs/:graphId/present/:cardId` | Presenting at its Active Card |
 
-These are navigation addresses, not persistence resources: resolving one never edits a Layout, Active Graph or Card. The browser and Node host share the same destination contract, so malformed addresses receive `400`, unresolved entities receive `404`, and direct requests return the same application destination that client-side navigation opens ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)).
+These are navigation addresses, not persistence resources: resolving one never edits a Diagram, Active Graph or Card. The browser and Node host share the same destination contract, so malformed addresses receive `400`, unresolved entities receive `404`, and direct requests return the same application destination that client-side navigation opens ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)).
 
 The JSON API deliberately stays smaller and keeps UUIDs in canonical spelling:
 
@@ -109,7 +109,7 @@ The JSON API deliberately stays smaller and keeps UUIDs in canonical spelling:
 | `GET /api/spaces/:uuid` | Load one Space snapshot and revision |
 | `PUT /api/spaces/:uuid` | Commit a complete Space snapshot against an expected revision |
 
-Cards, Layouts and Graphs are parts of the Space aggregate, so they have product URLs but no independent persistence endpoints. API failures use RFC 9457 Problem Details (`application/problem+json`).
+Cards, Diagrams and Graphs are parts of the Space aggregate, so they have product URLs but no independent persistence endpoints. API failures use RFC 9457 Problem Details (`application/problem+json`).
 
 ### `space.json`
 
@@ -118,7 +118,7 @@ Cards, Layouts and Graphs are parts of the Space aggregate, so they have product
   "version": 1,
   "id": "00000000-0000-4000-8000-000000000041",
   "title": "Graph-Native Technical Presentations",
-  "layouts": [
+  "diagrams": [
     {
       "id": "00000000-0000-4000-8000-000000000048",
       "title": "Working",
@@ -142,17 +142,17 @@ Cards, Layouts and Graphs are parts of the Space aggregate, so they have product
       "activeGraph": "00000000-0000-4000-8000-000000000004"
     }
   ],
-  "defaultLayout": "00000000-0000-4000-8000-000000000048"
+  "defaultDiagram": "00000000-0000-4000-8000-000000000048"
 }
 ```
 
 | Key | Meaning |
 | --- | --- |
-| `version` | `1` is the first-public shape. Version 2 was the disposable pre-release one, which carried a space-level `graphs` array beside layouts that owned none; Hyper is unreleased, so it is rejected by name rather than migrated ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)). |
+| `version` | `1` is the first-public shape. Version 2 was the disposable pre-release one, which carried a space-level `graphs` array beside diagrams that owned none; Hyper is unreleased, so it is rejected by name rather than migrated ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)). |
 | `id`, `title` | What names the space. Every explicit id is a UUID; an import may omit ids for the persistence layer to allocate. The id is not the title and not the file name. |
-| `layouts` | Optional authored card-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). A layout's position keys **are** its card membership: sparse relative to the space — it may omit cards, but may not name one the space lacks. Each layout owns a non-empty ordered `graphs` collection and may name which of them opens **active** (`activeGraph`; absent means the first it owns) — [ADR 0026](docs/adr/superseded/0026-a-route-is-active-and-the-layout-may-name-it.md). A space with no layouts has no graphs, which is what a **new space** is: it renders and cannot be presented ([ADR 0015](docs/adr/0015-a-space-may-have-no-routes.md)). |
-| `layouts[].graphs` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between cards **of that layout** ([ADR 0032](docs/adr/0032-routes-may-contain-cycles.md)). Forks, merges, disconnected components, cycles and self-edges are legal; an exact duplicate Edge within one Graph is not, and an endpoint naming a card the owning layout omits is a load error. A graph belongs to exactly one layout, and there is no space-level collection beside them ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)); its id is nonetheless unique across the whole space, because a view drawing every graph flattened across layouts keys colour, handles and activation on that id alone ([ADR 0045](docs/adr/superseded/0045-a-view-takes-cards-and-graphs-and-returns-a-layout.md), superseded by [ADR 0079](docs/adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md)). The edge set may be empty. Graphs are a layout's only connection structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges and handles are derived from them. |
-| `defaultLayout` | The declared Layout UUID the Space opens in. |
+| `diagrams` | Optional authored card-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). A diagram's position keys **are** its card membership: sparse relative to the space — it may omit cards, but may not name one the space lacks. Each diagram owns a non-empty ordered `graphs` collection and may name which of them opens **active** (`activeGraph`; absent means the first it owns) — [ADR 0026](docs/adr/superseded/0026-a-route-is-active-and-the-layout-may-name-it.md). A space with no diagrams has no graphs, which is what a **new space** is: it renders and cannot be presented ([ADR 0015](docs/adr/0015-a-space-may-have-no-routes.md)). |
+| `diagrams[].graphs` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between cards **of that diagram** ([ADR 0032](docs/adr/0032-routes-may-contain-cycles.md)). Forks, merges, disconnected components, cycles and self-edges are legal; an exact duplicate Edge within one Graph is not, and an endpoint naming a card the owning diagram omits is a load error. A graph belongs to exactly one diagram, and there is no space-level collection beside them ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)); its id is nonetheless unique across the whole space, because a view drawing every graph flattened across diagrams keys colour, handles and activation on that id alone ([ADR 0045](docs/adr/superseded/0045-a-view-takes-cards-and-graphs-and-returns-a-layout.md), superseded by [ADR 0079](docs/adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md)). The edge set may be empty. Graphs are a diagram's only connection structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges and handles are derived from them. |
+| `defaultDiagram` | The declared Diagram UUID the Space opens in. |
 
 ### Graphs as color-coded flows
 
@@ -171,19 +171,19 @@ A card occupies exactly one position in the graph; there is no placement layer l
 Validation happens in two layers:
 
 - **Shape** — Zod schemas (`@project/core`) validate the space file and each card file's frontmatter.
-- **References** — `@project/graph` checks that both ends of every Graph Edge resolve to a Card, that no Graph contains an exact duplicate Edge, that a Layout positions and shows only things the Space has, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
+- **References** — `@project/graph` checks that both ends of every Graph Edge resolve to a Card, that no Graph contains an exact duplicate Edge, that a Diagram positions and shows only things the Space has, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
 
 `@project/graph` also derives the Graph handles and edges (`buildCardHandles`, `buildGraphRenderEdges`); `@project/react-flow-adapter` projects colored card nodes and edges (`projectCardNodes`, `projectGraphEdges`).
 
-### Layouts
+### Diagrams
 
-A **Layout** is authored data: a named card-to-position map stored with the space. A **LayoutStrategy** is behaviour: it takes the layout-strategy graph to arrange and asynchronously returns that same value with geometry on its cards and handles ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)):
+A **Diagram** is authored data: a named card-to-position map stored with the space. A **LayoutStrategy** is behaviour: it takes the layout-strategy graph to arrange and asynchronously returns that same value with geometry on its cards and handles ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)):
 
 ```ts
 type LayoutStrategy = (graph: LayoutStrategyGraph) => Promise<LayoutStrategyGraph>;
 ```
 
-Three ship. `elkStrategy` (in `@project/react-flow-adapter`, the only package that may touch elkjs) is one automatic strategy and runs ELK layered left→right. `gridStrategy` (in `@project/graph`) is a pure automatic strategy that places cards on a grid. `positionedStrategy` reads an authored Layout. Which cards a strategy arranges is the view's choice, not the strategy's.
+Three ship. `elkStrategy` (in `@project/react-flow-adapter`, the only package that may touch elkjs) is one automatic strategy and runs ELK layered left→right. `gridStrategy` (in `@project/graph`) is a pure automatic strategy that places cards on a grid. `positionedStrategy` reads an authored Diagram. Which cards a strategy arranges is the view's choice, not the strategy's.
 
 ## Architecture
 

@@ -1,4 +1,4 @@
-import type { CardId, GraphId, LayoutId } from '@project/core';
+import type { CardId, GraphId, DiagramId } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import { openingPlacement, type ComposedApp } from './compose-app';
@@ -9,7 +9,7 @@ import {
   type AddressedPosition,
 } from './destination-coordination';
 import type { DestinationOpening } from './destination-opening';
-import { resolveLayout } from './layout-resolution';
+import { resolveDiagram } from './diagram-resolution';
 import { navigationAddress } from './navigation';
 
 /**
@@ -60,7 +60,7 @@ export interface BrowserLocation {
   readonly follow: (app: ComposedApp) => void;
   /** A deliberate switch between already composed Spaces updates the address. */
   readonly activate: (app: ComposedApp) => void;
-  readonly chooseLayout: (layoutId: LayoutId) => void;
+  readonly chooseDiagram: (diagramId: DiagramId) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   /** The absolute URL of a destination, for the clipboard to carry. */
   readonly href: (destination: ProductDestination) => string;
@@ -194,7 +194,7 @@ export function createBrowserLocation(
    * update is a plain store write that cannot fail.
    *
    * Private, because arriving is not a capability a surface spends: both the
-   * reader's Back and their Layout choice are arrivals, and a third caller
+   * reader's Back and their Diagram choice are arrivals, and a third caller
    * would be a third answer to "what does this destination open".
    */
   const arriveAt = (opening: DestinationOpening): void => {
@@ -204,9 +204,9 @@ export function createBrowserLocation(
     // answers it whether or not the choice moves the address — so this
     // belongs to the choice rather than to the history entry it may not earn.
     destinationNotFound = false;
-    const resolved = resolveLayout(app.currentSpace(), opening.selection);
-    const changesLayout = app.navigation.getState().selectedLayoutId !== opening.selection;
-    if (opening.graphId === null) app.navigation.selectLayout(opening.selection);
+    const resolved = resolveDiagram(app.currentSpace(), opening.selection);
+    const changesDiagram = app.navigation.getState().selectedDiagramId !== opening.selection;
+    if (opening.graphId === null) app.navigation.selectDiagram(opening.selection);
     else if (opening.presentationCardId === null) {
       app.navigation.openGraph(opening.selection, opening.graphId);
     } else {
@@ -217,22 +217,22 @@ export function createBrowserLocation(
       );
     }
     // A current row can be chosen again. Its UUID is already the Navigation
-    // value, so no Layout dependency will change and no placement effect will
+    // value, so no Diagram dependency will change and no placement effect will
     // rerun; clearing the published projection here would strand the canvas in
     // its pending state. Navigation still receives the choice so it can apply
-    // its own same-Layout semantics.
-    if (!changesLayout) return;
-    app.adapter.getState().selectLayout(openingPlacement(resolved));
+    // its own same-Diagram semantics.
+    if (!changesDiagram) return;
+    app.adapter.getState().selectDiagram(openingPlacement(resolved));
   };
 
   /**
    * A move the reader made: it clears the addressed Card and answers the report.
    *
    * Shared rather than written out per operation, because the two that make one
-   * — choosing a Layout row and activating a Graph — differed only in that one
+   * — choosing a Diagram row and activating a Graph — differed only in that one
    * of them got the report clear transitively and the other hand-rolled it.
    * What they still differ in is the render adapter, and that difference is the
-   * point: activating a Graph does not change the Layout, so it must not clear
+   * point: activating a Graph does not change the Diagram, so it must not clear
    * the published projection.
    */
   const deliberateMove = (move: () => void): void => {
@@ -243,18 +243,18 @@ export function createBrowserLocation(
   };
 
   /**
-   * Choosing a Layout row, including the row already current.
+   * Choosing a Diagram row, including the row already current.
    *
    * The repeated choice is not a no-op and must not be skipped:
-   * `navigation.selectLayout` publishes `mode: 'overview'`, so choosing the
+   * `navigation.selectDiagram` publishes `mode: 'overview'`, so choosing the
    * current row is how an author leaves a presentation. Whether that earns a
    * history entry is not asked here at all — the position it produces is what
    * the sync decides from (ADR 0081).
    */
-  const chooseLayout = (layoutId: LayoutId): void => {
+  const chooseDiagram = (diagramId: DiagramId): void => {
     deliberateMove(() => {
       arriveAt({
-        selection: layoutId,
+        selection: diagramId,
         graphId: null,
         presentationCardId: null,
         cardId: null,
@@ -263,7 +263,7 @@ export function createBrowserLocation(
   };
 
   /**
-   * Same rule as {@link chooseLayout}, for the same reason: activating the
+   * Same rule as {@link chooseDiagram}, for the same reason: activating the
    * Graph that is already active publishes `mode: 'overview'`, which is how the
    * Graph row leaves a presentation, so the call may not be skipped.
    */
@@ -369,7 +369,7 @@ export function createBrowserLocation(
       follow(app);
       // Back and Forward have already moved the browser. Restore that complete
       // destination before deriving a write from the arriving Space's retained
-      // Navigation, which may still name a different Layout or Graph.
+      // Navigation, which may still name a different Diagram or Graph.
       const restoration = destinationRestoration(
         app.currentSpace(),
         app.authoring.getState().session.working,
@@ -384,7 +384,7 @@ export function createBrowserLocation(
         settle();
       }
     },
-    chooseLayout,
+    chooseDiagram,
     activateGraph,
     href: (destination) => new URL(productDestinationPath(destination), history.href()).href,
     dispose: () => {

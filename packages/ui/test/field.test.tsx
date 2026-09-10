@@ -15,7 +15,7 @@ import { Field } from '../src/index';
  *
  * What is asserted here is the attribute the corrected selector depends on, the
  * way `Separator.test.tsx` asserts its own. The selector itself is not: jsdom
- * has no layout, so a class assertion would restate the source line rather than
+ * has no diagram, so a class assertion would restate the source line rather than
  * catch the defect, and the defect is one only the surface shows.
  */
 describe('Field', () => {

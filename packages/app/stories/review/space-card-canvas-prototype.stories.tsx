@@ -56,7 +56,7 @@ export default { title: 'Review/Space Card Canvas Architecture' };
 
 type PrototypeVariant = 'nested' | 'compound';
 type CanvasScope = 'parent' | 'child';
-type LayoutChoice = 'Architecture layout' | 'Flow view';
+type DiagramChoice = 'Architecture diagram' | 'Flow view';
 type GraphChoice = 'Main thread' | 'Decision fork';
 type PresentationCard =
   | 'parent-intro'
@@ -84,11 +84,11 @@ type PrototypeNode = MarkdownNode | SpaceNode;
 
 interface SpaceCardState {
   readonly open: boolean;
-  readonly activeView: LayoutChoice;
+  readonly activeView: DiagramChoice;
   readonly activeGraph: GraphChoice;
   readonly entered: boolean;
   readonly setOpen: (open: boolean) => void;
-  readonly setActiveView: (view: LayoutChoice) => void;
+  readonly setActiveView: (view: DiagramChoice) => void;
   readonly setActiveGraph: (graph: GraphChoice) => void;
   readonly setEntered: (entered: boolean) => void;
   readonly renameCard: (scope: CanvasScope, id: string, title: string) => void;
@@ -525,14 +525,14 @@ function SpaceCardHeader({ independent = false }: { readonly independent?: boole
       <Select
         value={state.activeView}
         onValueChange={(value) => {
-          if (value === 'Architecture layout' || value === 'Flow view') state.setActiveView(value);
+          if (value === 'Architecture diagram' || value === 'Flow view') state.setActiveView(value);
         }}
       >
-        <SelectTrigger className="space-card-prototype__selector" aria-label="Layout">
+        <SelectTrigger className="space-card-prototype__selector" aria-label="Diagram">
           <SelectValue />
         </SelectTrigger>
         <SelectContent alignItemWithTrigger={false}>
-          <SelectItem value="Architecture layout">Architecture layout</SelectItem>
+          <SelectItem value="Architecture diagram">Architecture diagram</SelectItem>
           <SelectItem value="Flow view">Flow view</SelectItem>
         </SelectContent>
       </Select>
@@ -852,7 +852,7 @@ function VariantSwitcher({
 function IndependentSpaceRoot() {
   const [nodes, , onNodesChange] = useNodesState<PrototypeNode>(INITIAL_CHILD_NODES);
   const [edges, setEdges, onEdgesChange] = useEdgesState(INITIAL_CHILD_EDGES);
-  const [activeView, setActiveView] = useState<LayoutChoice>('Architecture layout');
+  const [activeView, setActiveView] = useState<DiagramChoice>('Architecture diagram');
   const [activeGraph, setActiveGraph] = useState<GraphChoice>('Decision fork');
   const bridge = useMemo<BridgeControls>(() => ({ begin: () => undefined }), []);
   const childCanvas = useMemo<ChildCanvasState>(
@@ -917,7 +917,7 @@ function Prototype() {
   const [variant, setVariantState] = useState<PrototypeVariant>(initialVariant);
   const [open, setOpenState] = useState(true);
   const [entered, setEntered] = useState(false);
-  const [activeView, setActiveView] = useState<LayoutChoice>('Architecture layout');
+  const [activeView, setActiveView] = useState<DiagramChoice>('Architecture diagram');
   const [activeGraph, setActiveGraph] = useState<GraphChoice>('Decision fork');
   const [presentationHistory, setPresentationHistory] = useState<readonly PresentationCard[]>([]);
   const [status, setStatus] = useState(
@@ -966,7 +966,7 @@ function Prototype() {
       setCompoundEdges((edges) => edges.map((edge) => ({ ...edge, hidden: !next })));
       setStatus(
         next
-          ? 'Space Card opened on its remembered Layout and Graph.'
+          ? 'Space Card opened on its remembered Diagram and Graph.'
           : 'Cross-Space Edges collapsed to authored entry and exit markers.',
       );
       requestAnimationFrame(bumpGeometry);

@@ -125,7 +125,7 @@ body {
   height: 100%;
 }
 
-/* An Expanded Card is whatever rect the Layout authored, so the node's own
+/* An Expanded Card is whatever rect the Diagram authored, so the node's own
    subtree stops declaring the collapsed constant and fills the box React Flow
    sized from `node.width`/`node.height` (ADR 0064). The declared width stays the
    default because a Card is drawn before any layout resolves, and 100% of an
@@ -368,7 +368,7 @@ body {
 
 /* ---- The Card reached during traversal ---- */
 /* Presenting draws the active card's content instead of its title (ADR 0027).
-   Same box as every other card — the layout's 16:9 frame, which the camera then
+   Same box as every other card — the diagram's 16:9 frame, which the camera then
    fills the screen with — so the type is sized in *container* units and scales
    with the frame. Setting it in pixels would size it against a box that is about
    to be magnified by an arbitrary factor. Content that still overflows is

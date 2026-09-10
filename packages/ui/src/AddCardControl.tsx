@@ -33,7 +33,7 @@ export interface AddCardControlProps {
 /**
  * Creating a Card: one action, plus the kinds that need more than a click.
  *
- * A **split control**, and the split is the design rather than a layout choice.
+ * A **split control**, and the split is the design rather than a diagram choice.
  * Add Card completes an Edit on one activation — no placement mode, no ghost, no
  * creation draft — so putting it behind a menu would add a step to the common
  * action to make room for the rare one. The other two kinds cannot complete on

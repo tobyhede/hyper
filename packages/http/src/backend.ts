@@ -90,8 +90,8 @@ export class HttpSpaceBackend implements SpaceBackend {
         if (response.status === 404) return undefined;
         if (!response.ok) throw new Error(`Unable to load space: HTTP ${response.status}`);
         const loaded = decodeLoadedSpace(await response.json());
-        return response.headers.get('X-Hyper-Space-Initialization') === 'created-layout'
-          ? { ...loaded, initialization: 'created-layout' }
+        return response.headers.get('X-Hyper-Space-Initialization') === 'created-diagram'
+          ? { ...loaded, initialization: 'created-diagram' }
           : loaded;
       },
     );

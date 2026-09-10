@@ -4,7 +4,7 @@ import { initializeSpace, loadSpace, newSpace } from '../src/index';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 describe('newSpace', () => {
@@ -19,7 +19,7 @@ describe('newSpace', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
     expect(result.space.cards).toHaveLength(1);
-    expect(result.space.layouts).toHaveLength(1);
+    expect(result.space.diagrams).toHaveLength(1);
     expect(result.space.graphs).toHaveLength(1);
   });
 
@@ -39,12 +39,12 @@ describe('newSpace', () => {
     const result = loadSpace(file, cardFiles);
     if (!result.ok) throw new Error('should load');
 
-    const layout = result.space.layouts[0]!;
+    const diagram = result.space.diagrams[0]!;
     const card = result.space.cards[0]!;
-    expect(layout).toMatchObject({ title: 'Layout 1', activeGraph: layout.graphs[0]?.id });
-    expect(layout.graphs).toMatchObject([{ title: 'Graph 1', edges: [] }]);
-    expect(layout.positions[card.id]).toEqual({ x: 0, y: 0, open: false });
-    expect(result.space.defaultLayout).toBe(layout.id);
+    expect(diagram).toMatchObject({ title: 'Diagram 1', activeGraph: diagram.graphs[0]?.id });
+    expect(diagram.graphs).toMatchObject([{ title: 'Graph 1', edges: [] }]);
+    expect(diagram.positions[card.id]).toEqual({ x: 0, y: 0, open: false });
+    expect(result.space.defaultDiagram).toBe(diagram.id);
   });
 
   it('mints fresh UUID identity for each new space and its first card', () => {
@@ -70,7 +70,7 @@ describe('newSpace', () => {
 
 describe('initializeSpace', () => {
   it('creates the same complete one-Card shape as newSpace from one identity source', () => {
-    const ids = [SPACE_ID, CARD_ID, LAYOUT_ID, GRAPH_ID];
+    const ids = [SPACE_ID, CARD_ID, DIAGRAM_ID, GRAPH_ID];
     const initialized = initializeSpace({
       title: 'Architecture',
       newId: () => {
@@ -90,16 +90,16 @@ describe('initializeSpace', () => {
       title: 'Architecture',
       cards: [{ id: CARD_ID, title: 'Card 1', kind: 'markdown', body: '' }],
     });
-    expect(result.space.layouts).toEqual([
+    expect(result.space.diagrams).toEqual([
       {
-        id: LAYOUT_ID,
-        title: 'Layout 1',
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: GRAPH_ID,
       },
     ]);
-    expect(result.space.defaultLayout).toBe(LAYOUT_ID);
+    expect(result.space.defaultDiagram).toBe(DIAGRAM_ID);
   });
 });

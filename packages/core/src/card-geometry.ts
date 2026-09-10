@@ -7,7 +7,7 @@ export const DEFAULT_OPEN_SIZE = { width: 560, height: 420 } as const;
 export const DEFAULT_SPACE_CARD_OPEN_SIZE = { width: 960, height: 720 } as const;
 
 /**
- * What an Open Space Card reserves around the Layout it embeds (ADR 0068).
+ * What an Open Space Card reserves around the Diagram it embeds (ADR 0068).
  *
  * The embedded Cards are sub-flow nodes in the containing React Flow instance,
  * so they are positioned on the canvas rather than inside the Card's own DOM —
@@ -15,7 +15,7 @@ export const DEFAULT_SPACE_CARD_OPEN_SIZE = { width: 960, height: 720 } as const
  * get is therefore a number both sides read: the projection places a child
  * inside this inset, and `canvas-card.css` gives the Card's own passengers a
  * footer of exactly `bottom` so a selector can never grow into the view drawn
- * over it. `packages/ui/test/canvas-card-embedded-layout.test.ts` holds the
+ * over it. `packages/ui/test/canvas-card-embedded-diagram.test.ts` holds the
  * stylesheet and this constant to the same number.
  *
  * Measured from the node's own box, so `left`, `right` and `bottom` each carry
@@ -33,7 +33,7 @@ export const SPACE_CARD_FOOTER_HEIGHT = 176;
  *
  * The Close magnet is evaluated before this floor. Every other Open Card floors at {@link COLLAPSED_CARD_SIZE}, because every
  * other Open Card's content shrinks with it. A Space Card's does not: the
- * embedded Layout is painted over the Card at the sizes the target Space
+ * embedded Diagram is painted over the Card at the sizes the target Space
  * authored, and the Card's own passengers hold a footer of exactly
  * {@link SPACE_CARD_FOOTER_HEIGHT} so the two can never overlap. Both of those
  * are fixed, so a Space Card taken to the collapsed height would have its

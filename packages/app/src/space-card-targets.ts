@@ -54,7 +54,7 @@ const nextTargets = (
  *
  * Asynchronous because a target is a *different* Space: it is stored beside
  * this one rather than inside it, so nothing about the containing Space's
- * working state can say what its Layouts are called (ADR 0068). The map is
+ * working state can say what its Diagrams are called (ADR 0068). The map is
  * therefore incomplete on the first render after a Space Card appears, and every
  * surface reading it draws that Card without its target's context until the read
  * lands — which is why `CanvasCard` takes an absent selection as a state rather

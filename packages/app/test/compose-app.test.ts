@@ -21,17 +21,17 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout 1',
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [CARD_A]: { x: 10, y: 20, open: false },
@@ -40,7 +40,7 @@ const snapshot: SpaceSnapshot = {
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -96,10 +96,10 @@ describe('what the composition opens on', () => {
   it('opens in the Space default when no selection is named', () => {
     const { navigation } = composeCore({ spaceSession: openSession() });
 
-    expect(navigation.getState().selectedLayoutId).toEqual(LAYOUT_ID);
+    expect(navigation.getState().selectedDiagramId).toEqual(DIAGRAM_ID);
   });
 
-  it('opens a selected Layout on the placement that Layout already authored', () => {
+  it('opens a selected Diagram on the placement that Diagram already authored', () => {
     const { authoring } = composeApp({ spaceSession: openSession() });
 
     expect(authoring.authoredPlacement()).toEqual(

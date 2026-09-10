@@ -3,8 +3,8 @@ import {
   type Card,
   type Graph,
   type GraphId,
-  type Layout,
-  type LayoutId,
+  type Diagram,
+  type DiagramId,
   type UUID,
 } from '@project/core';
 import type { ProductDestination } from '@project/http';
@@ -29,7 +29,7 @@ import {
  *
  * **It has two consumers and they spend it differently.** A Card's own rail
  * draws the `card` arm as a menu (ADR 0073), and the Command Dock spends the
- * other three one command at a time — its Layout, Graph and Space clusters are
+ * other three one command at a time — its Diagram, Graph and Space clusters are
  * menus of their own with a radio group in them, so what they take from here is
  * the *decision* about which address an entity offers rather than a list to
  * render. Either way the decision is made once: the two surfaces cannot come to
@@ -49,7 +49,7 @@ import {
  * it stays because the answer is still the only way to tell a Delete that ran
  * from one the domain refused.
  */
-export const DELETE_LAYOUT_ACTION_ID = 'delete-layout';
+export const DELETE_DIAGRAM_ACTION_ID = 'delete-diagram';
 
 /**
  * The two addresses, spelled once.
@@ -67,26 +67,27 @@ export const COPY_PERMANENT_LINK_ACTION_ID = 'copy-permanent-link';
 
 /** The commands a surface may ask this list for by id. */
 export type EntityCommandId =
-  | typeof DELETE_LAYOUT_ACTION_ID
+  | typeof DELETE_DIAGRAM_ACTION_ID
   | typeof COPY_LINK_ACTION_ID
   | typeof COPY_PERMANENT_LINK_ACTION_ID;
 
 /**
  * An entity a surface offers commands for, named the way that surface knows it.
  *
- * It carries the whole `Layout`/`Graph`/`Card` rather than an id: handed an id,
+ * It carries the whole `Diagram`/`Graph`/`Card` rather than an id: handed an id,
  * a caller has to find the thing again down a second path, and the surface and
  * the menu it draws are then free to disagree about what they are naming.
  */
 export type SpaceEntity =
   | { readonly kind: 'space' }
-  | { readonly kind: 'layout'; readonly layout: Layout }
-  | { readonly kind: 'graph'; readonly graph: Graph; readonly layout: Layout }
-  | { readonly kind: 'card'; readonly card: Card; readonly layout: Layout };
+  | { readonly kind: 'diagram'; readonly diagram: Diagram }
+  | { readonly kind: 'graph'; readonly graph: Graph; readonly diagram: Diagram }
+  | { readonly kind: 'card'; readonly card: Card; readonly diagram: Diagram };
 
 /** What an inline rename names, for the two entities that have one. */
 export type SpaceChromeTitleSubject =
-  { readonly kind: 'layout'; readonly id: UUID } | { readonly kind: 'graph'; readonly id: GraphId };
+  | { readonly kind: 'diagram'; readonly id: UUID }
+  | { readonly kind: 'graph'; readonly id: GraphId };
 export interface SpaceEntityActionsOptions {
   readonly spaceId: UUID;
   /** Named in the Space's own destination sentence. */
@@ -110,7 +111,7 @@ export interface SpaceEntityActionsOptions {
    */
   readonly onRename: ((subject: SpaceChromeTitleSubject, title: string) => void) | null;
   /**
-   * Deletes the Layout, answering whether it went, or `null` while no Layout
+   * Deletes the Diagram, answering whether it went, or `null` while no Diagram
    * Edit may run.
    *
    * The answer is not decoration: it is the only way a caller can tell a Delete
@@ -118,7 +119,7 @@ export interface SpaceEntityActionsOptions {
    * outcome left the item answering `done` either way. Same shape and same
    * reason as `onCopy` above.
    */
-  readonly onDeleteLayout: ((layoutId: LayoutId) => boolean) | null;
+  readonly onDeleteDiagram: ((diagramId: DiagramId) => boolean) | null;
 }
 
 /**
@@ -126,7 +127,7 @@ export interface SpaceEntityActionsOptions {
  * them (`.scratch/link-ux/issues/01`, Terminology).
  *
  * **"Copy link" is whichever address reproduces what is on screen** — the one
- * within the drawing Layout where that address exists, the entity's own where
+ * within the drawing Diagram where that address exists, the entity's own where
  * it does not — and **"Copy permanent link" is offered only when it differs**.
  * Neither label says "canonical" or "contextual"; those words stay in the code
  * and out of the product.
@@ -173,7 +174,7 @@ export function spaceEntityActions({
   spaceTitle,
   onCopy,
   onRename,
-  onDeleteLayout,
+  onDeleteDiagram,
 }: SpaceEntityActionsOptions): (entity: SpaceEntity) => readonly EntityActionGroup[] {
   const renameAction = (subject: SpaceChromeTitleSubject, title: string): EntityActionGroup =>
     onRename === null
@@ -201,7 +202,7 @@ export function spaceEntityActions({
       // One address, and it is the Space's **own** — the one place this module
       // departs from the rule above, so it is written down rather than left to
       // be discovered. An address that reproduces what is on screen does exist:
-      // the drawing Layout's. Copying that here would hand a recipient the
+      // the drawing Diagram's. Copying that here would hand a recipient the
       // Collection the reader is looking at, and would give this menu the
       // second form ("Copy permanent link") it has never had. It would also
       // stop the Space's link meaning the Space. Which of the two a Space title
@@ -214,7 +215,7 @@ export function spaceEntityActions({
           copy(
             COPY_LINK_ACTION_ID,
             COPY_LINK,
-            `Opens ${spaceTitle} at the Layout it opens on`,
+            `Opens ${spaceTitle} at the Diagram it opens on`,
             { kind: 'space', spaceId },
             onCopy,
           ),
@@ -223,58 +224,59 @@ export function spaceEntityActions({
       ];
     }
 
-    if (entity.kind === 'layout') {
-      const { id: layoutId, title } = entity.layout;
+    if (entity.kind === 'diagram') {
+      const { id: diagramId, title } = entity.diagram;
       return [
-        renameAction({ kind: 'layout', id: layoutId }, title),
+        renameAction({ kind: 'diagram', id: diagramId }, title),
         [
           copy(
             COPY_LINK_ACTION_ID,
             COPY_LINK,
             `Opens ${title} exactly as it draws now`,
-            { kind: 'layout', spaceId, layoutId },
+            { kind: 'diagram', spaceId, diagramId },
             onCopy,
           ),
         ],
-        onDeleteLayout === null
+        onDeleteDiagram === null
           ? []
           : [
               {
                 // Named from the constant above rather than written out, so a
                 // caller that recognises this one command spells it the same
                 // way this does.
-                id: DELETE_LAYOUT_ACTION_ID,
-                label: 'Delete Layout',
+                id: DELETE_DIAGRAM_ACTION_ID,
+                label: 'Delete Diagram',
                 icon: <DeleteIcon />,
                 variant: 'destructive',
                 // The Edit's prose report is the application's own refusal
                 // alert, and this item carries no words of its own to swap — so
                 // what the outcome is read for is not the label. It is what
                 // tells a caller whether the Delete had a canvas result at all.
-                onSelect: (): EntityActionOutcome => (onDeleteLayout(layoutId) ? 'done' : 'failed'),
+                onSelect: (): EntityActionOutcome =>
+                  onDeleteDiagram(diagramId) ? 'done' : 'failed',
               },
             ],
       ];
     }
 
     if (entity.kind === 'graph') {
-      // A Layout **owns** its Graphs (ADR 0040), so a Graph row always has a
-      // within-Layout address and both link forms are always offered here.
-      const { graph, layout } = entity;
+      // A Diagram **owns** its Graphs (ADR 0040), so a Graph row always has a
+      // within-Diagram address and both link forms are always offered here.
+      const { graph, diagram } = entity;
       return [
         renameAction({ kind: 'graph', id: graph.id }, graph.title),
         [
           copy(
             COPY_LINK_ACTION_ID,
             COPY_LINK,
-            `Opens ${graph.title} inside ${layout.title}`,
-            { kind: 'layout-graph', spaceId, layoutId: layout.id, graphId: graph.id },
+            `Opens ${graph.title} inside ${diagram.title}`,
+            { kind: 'diagram-graph', spaceId, diagramId: diagram.id, graphId: graph.id },
             onCopy,
           ),
           copy(
             COPY_PERMANENT_LINK_ACTION_ID,
             COPY_PERMANENT_LINK,
-            `Always opens ${graph.title}, in whichever Layout draws it`,
+            `Always opens ${graph.title}, in whichever Diagram draws it`,
             { kind: 'graph', spaceId, graphId: graph.id },
             onCopy,
           ),
@@ -283,27 +285,27 @@ export function spaceEntityActions({
       ];
     }
 
-    const { card, layout } = entity;
+    const { card, diagram } = entity;
     // A menu row names the Card, so it says the Card's name (ADR 0083).
     const cardName = titleName(card.title);
     const permanent: ProductDestination = { kind: 'card', spaceId, cardId: card.id };
-    // A Layout's members *are* its position keys (ADR 0040). A Card the Cards
-    // drawer reveals but this Layout does not place has no within-Layout
+    // A Diagram's members *are* its position keys (ADR 0040). A Card the Cards
+    // drawer reveals but this Diagram does not place has no within-Diagram
     // address at all, so the one link it has is its own — and there is nothing
     // left for a permanent link to differ from. Withheld, never shown and
-    // refused: `layout-card` would 404 on the address it copied.
-    const placed = layout.positions[card.id] !== undefined;
+    // refused: `diagram-card` would 404 on the address it copied.
+    const placed = diagram.positions[card.id] !== undefined;
     return [
       // No Rename: a Card's title is renamed in place on the canvas, and the
-      // chrome title edit takes Layout and Graph subjects only.
+      // chrome title edit takes Diagram and Graph subjects only.
       [],
       placed
         ? [
             copy(
               COPY_LINK_ACTION_ID,
               COPY_LINK,
-              `Opens ${cardName} inside ${layout.title}, selected the way it is now`,
-              { kind: 'layout-card', spaceId, layoutId: layout.id, cardId: card.id },
+              `Opens ${cardName} inside ${diagram.title}, selected the way it is now`,
+              { kind: 'diagram-card', spaceId, diagramId: diagram.id, cardId: card.id },
               onCopy,
             ),
             copy(
@@ -318,7 +320,7 @@ export function spaceEntityActions({
             copy(
               COPY_LINK_ACTION_ID,
               COPY_LINK,
-              `Opens ${cardName} on its own — ${layout.title} does not place it`,
+              `Opens ${cardName} on its own — ${diagram.title} does not place it`,
               permanent,
               onCopy,
             ),

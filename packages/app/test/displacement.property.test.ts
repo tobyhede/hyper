@@ -6,7 +6,7 @@ import {
   DEFAULT_OPEN_SIZE,
   uuidSchema,
   type CardPlacement,
-  type Layout,
+  type Diagram,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -22,7 +22,7 @@ import { composeApp } from '../src/compose-app';
  * here is driven through `SpaceAuthoring.complete` against a real session, so
  * what it holds is the whole of what an Open, a Close and a Resize choose to
  * apply — which growth each reads off which entry, in which order, and what
- * they write back into the Layout. The transform can be an exact involution and
+ * they write back into the Diagram. The transform can be an exact involution and
  * the Edits still drift, if an Open reads the default Open Size while the Close
  * reads the remembered one. That is the gap this covers, and it is why ticket 06
  * is blocked by the two tickets that wrote those arms.
@@ -33,10 +33,10 @@ import { composeApp } from '../src/compose-app';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
-/** The Cards every generated Layout positions. Five, as the exampled block has. */
+/** The Cards every generated Diagram positions. Five, as the exampled block has. */
 const CARD_IDS = [
   uuidSchema.parse('00000000-0000-4000-8000-000000000002'),
   uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
@@ -75,7 +75,7 @@ const COVERAGE_FLOOR = 40;
 
 type Extent = { readonly width: number; readonly height: number };
 
-/** A generated Layout entry, before it becomes the discriminated `CardPlacement`. */
+/** A generated Diagram entry, before it becomes the discriminated `CardPlacement`. */
 type GeneratedEntry = {
   readonly x: number;
   readonly y: number;
@@ -153,7 +153,7 @@ const placing = (
     index === at ? { ...entry, x: point.x, y: point.y, open: false } : entry,
   );
 
-/** One Space, one Layout, one empty Graph: the geometry is the whole subject. */
+/** One Space, one Diagram, one empty Graph: the geometry is the whole subject. */
 const snapshotOf = (entries: readonly GeneratedEntry[]): SpaceSnapshot => {
   const positions: Record<string, CardPlacement> = {};
   CARD_IDS.forEach((cardId, index) => {
@@ -165,16 +165,16 @@ const snapshotOf = (entries: readonly GeneratedEntry[]): SpaceSnapshot => {
     document: {
       version: 1,
       title: 'Space',
-      layouts: [
+      diagrams: [
         {
-          id: LAYOUT_ID,
-          title: 'Layout 1',
+          id: DIAGRAM_ID,
+          title: 'Diagram 1',
           kind: 'positioned',
           positions,
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
         },
       ],
-      defaultLayout: LAYOUT_ID,
+      defaultDiagram: DIAGRAM_ID,
     },
     cards: CARD_IDS.map((cardId, index) => ({
       id: cardId,
@@ -184,7 +184,7 @@ const snapshotOf = (entries: readonly GeneratedEntry[]): SpaceSnapshot => {
 };
 
 /**
- * A composed Space over the generated Layout, with the geometry the canvas
+ * A composed Space over the generated Diagram, with the geometry the canvas
  * would have reported by now already installed.
  */
 const openAuthoring = (entries: readonly GeneratedEntry[]) => {
@@ -193,23 +193,23 @@ const openAuthoring = (entries: readonly GeneratedEntry[]) => {
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const { authoring } = composeApp({
     spaceSession: session,
-    selection: LAYOUT_ID,
+    selection: DIAGRAM_ID,
     initialPlacement: null,
   });
-  const layout = snapshot.document.layouts?.[0];
-  if (layout === undefined) throw new Error('the generated Space must hold its Layout');
-  authoring.replacePlacement(Placement.fromLayout(layout));
+  const diagram = snapshot.document.diagrams?.[0];
+  if (diagram === undefined) throw new Error('the generated Space must hold its Diagram');
+  authoring.replacePlacement(Placement.fromDiagram(diagram));
   return { session, authoring };
 };
 
 type Session = ReturnType<typeof openAuthoring>['session'];
 
-const layoutIn = (snapshot: SpaceSnapshot): Layout | undefined =>
-  (snapshot.document.layouts ?? []).find((layout) => layout.id === LAYOUT_ID);
+const diagramIn = (snapshot: SpaceSnapshot): Diagram | undefined =>
+  (snapshot.document.diagrams ?? []).find((diagram) => diagram.id === DIAGRAM_ID);
 
-/** Every origin the Layout authors, so a whole Layout can be compared at once. */
+/** Every origin the Diagram authors, so a whole Diagram can be compared at once. */
 const originsOf = (session: Session) => {
-  const positions = layoutIn(session.getState().working)?.positions ?? {};
+  const positions = diagramIn(session.getState().working)?.positions ?? {};
   const origins: Record<string, readonly [number, number]> = {};
   for (const [cardId, at] of Object.entries(positions)) {
     if (at !== undefined) origins[cardId] = [at.x, at.y];
@@ -218,7 +218,7 @@ const originsOf = (session: Session) => {
 };
 
 const entryIn = (session: Session, cardId: UUID): CardPlacement | undefined =>
-  layoutIn(session.getState().working)?.positions[cardId];
+  diagramIn(session.getState().working)?.positions[cardId];
 
 /** The geometry React Flow would report with one Card dragged to a new point. */
 const renderedWith = (
@@ -226,7 +226,7 @@ const renderedWith = (
   movedId: UUID,
   to: { readonly x: number; readonly y: number },
 ): Placement => {
-  const positions = layoutIn(session.getState().working)?.positions ?? {};
+  const positions = diagramIn(session.getState().working)?.positions ?? {};
   return Placement.fromEntries(
     CARD_IDS.flatMap((cardId) => {
       const at = positions[cardId];
@@ -295,7 +295,7 @@ const expectEveryRelationGenerated = (counts: CoverageCounts): void => {
 };
 
 /**
- * A generated Layout may hand the pair a subject that is already Open, and the
+ * A generated Diagram may hand the pair a subject that is already Open, and the
  * pair's claim does not start there: `displace` is an involution for a
  * **nonnegative** growth applied first, which is the Open. Closing first
  * applies the negation first, and a Card less than one growth beyond the
@@ -304,7 +304,7 @@ const expectEveryRelationGenerated = (counts: CoverageCounts): void => {
  * Close only ever negates a growth an Open already applied.
  *
  * So an Open subject is Closed here as **setup**, before the round trip is
- * measured. That keeps the generator free to produce Layouts with Open Cards in
+ * measured. That keeps the generator free to produce Diagrams with Open Cards in
  * them — including the subject — while every measured sequence is one the
  * product can actually perform.
  */
@@ -324,7 +324,7 @@ describe('Displacement at the Edit', () => {
     // The property the memoryless pair rests on (ADR 0084): Close reclaims from
     // where things are rather than from a record of who was pushed, and that is
     // only defensible if the untouched case is exact — otherwise repeated
-    // open/close drifts the Layout, which is the one failure the derived model
+    // open/close drifts the Diagram, which is the one failure the derived model
     // could not have had.
     const coverage = createCoverage();
     fc.assert(
@@ -366,7 +366,7 @@ describe('Displacement at the Edit', () => {
 
   it('round-trips every position through Open, any number of Resizes and Close', () => {
     // Resize applies the *difference* between two growths rather than a growth,
-    // so a Layout can only come back if every difference sums to the growth the
+    // so a Diagram can only come back if every difference sums to the growth the
     // Close then reclaims. Generating shrinks as well as grows is what makes
     // that a claim about the arithmetic rather than about monotone sequences.
     const coverage = createCoverage();
@@ -416,13 +416,13 @@ describe('Displacement at the Edit', () => {
 
   it('reclaims from a Card the author moved beyond the Open Card, which the Open never pushed', () => {
     // ADR 0084, "Closing reclaims from where things are now": Open and Close
-    // each read the Layout as it is at that moment and remember nothing about
+    // each read the Diagram as it is at that moment and remember nothing about
     // how it got there, so a Card dragged beyond the Open Card *while it is
     // open* moves back with everything else beyond it. That is deliberate and
     // it is what makes the pair memoryless. The alternative the ADR rejects is
     // recording which Cards a particular Open pushed and by how much: it is
     // per-open-Card stored state, it goes stale the moment the author moves
-    // anything, and it makes two Layouts with identical positions behave
+    // anything, and it makes two Diagrams with identical positions behave
     // differently because of history neither of them shows.
     //
     // A dedicated arbitrary here rather than a counter: the witness is placed

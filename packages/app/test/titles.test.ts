@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
-import { nextCardTitle, nextGraphTitle, nextLayoutTitle } from '../src/titles';
+import { nextCardTitle, nextGraphTitle, nextDiagramTitle } from '../src/titles';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
 /** A Space holding exactly the Card Titles named, and nothing else of interest. */
@@ -13,16 +13,16 @@ const spaceOf = (...titles: readonly string[]): SpaceSnapshot =>
     document: {
       version: 1,
       title: 'Space',
-      layouts: [
+      diagrams: [
         {
-          id: LAYOUT_ID,
-          title: 'Layout 1',
+          id: DIAGRAM_ID,
+          title: 'Diagram 1',
           kind: 'positioned',
           positions: {},
           graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
       ],
-      defaultLayout: LAYOUT_ID,
+      defaultDiagram: DIAGRAM_ID,
     },
     cards: titles.map((title, index) => ({
       // Distinct ids, minted from the index rather than a generator: nothing
@@ -66,9 +66,9 @@ describe('the titles an Edit mints', () => {
     expect(nextCardTitle(spaceOf('Auth\nCard 9'))).toBe('Card 1');
   });
 
-  /** Layouts and Graphs keep a single-line title, and number the same way. */
-  it('numbers Layouts and Graphs on their own titles', () => {
-    expect(nextLayoutTitle(spaceOf())).toBe('Layout 2');
+  /** Diagrams and Graphs keep a single-line title, and number the same way. */
+  it('numbers Diagrams and Graphs on their own titles', () => {
+    expect(nextDiagramTitle(spaceOf())).toBe('Diagram 2');
     expect(nextGraphTitle([{ id: GRAPH_ID, title: 'Graph 1', edges: [] }])).toBe('Graph 2');
   });
 });

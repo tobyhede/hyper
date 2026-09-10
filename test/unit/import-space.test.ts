@@ -140,7 +140,7 @@ describe('importSingleSpace', () => {
   });
 
   it('refuses a version 2 space directory rather than migrating it', async () => {
-    // The disposable pre-release shape: graphs beside the layouts instead of
+    // The disposable pre-release shape: graphs beside the diagrams instead of
     // inside them. Hyper is unreleased, so it has no compatibility claim on the
     // first-public document and never enters (ADR 0040).
     //
@@ -159,7 +159,7 @@ describe('importSingleSpace', () => {
         id: SPACE_ID,
         title: 'Pre-release talk',
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
-        layouts: [{ id: '55555555-5555-4555-8555-555555555555', title: 'Working', positions: {} }],
+        diagrams: [{ id: '55555555-5555-4555-8555-555555555555', title: 'Working', positions: {} }],
       }),
     );
     const repository = new RecordingRepository({ kind: 'imported', spaces: [storedSpace] });

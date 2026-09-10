@@ -5,16 +5,16 @@ const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const CARD_A = '00000000-0000-4000-8000-000000000002';
 const CARD_B = '00000000-0000-4000-8000-000000000003';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000004';
-const LAYOUT_ID = '00000000-0000-4000-8000-000000000005';
+const DIAGRAM_ID = '00000000-0000-4000-8000-000000000005';
 
 const identified = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Test space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
+        id: DIAGRAM_ID,
         title: 'Working',
         kind: 'positioned' as const,
         positions: {
@@ -24,7 +24,7 @@ const identified = {
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown' as const, body: 'A' } },
@@ -32,14 +32,14 @@ const identified = {
   ],
 };
 
-/** The one layout, and the one graph it owns. */
-const layout = identified.document.layouts[0]!;
-const graph = layout.graphs[0]!;
+/** The one diagram, and the one graph it owns. */
+const diagram = identified.document.diagrams[0]!;
+const graph = diagram.graphs[0]!;
 
-/** The same aggregate with its one layout replaced. */
-const withLayout = (next: unknown) => ({
+/** The same aggregate with its one diagram replaced. */
+const withDiagram = (next: unknown) => ({
   ...identified,
-  document: { ...identified.document, layouts: [next] },
+  document: { ...identified.document, diagrams: [next] },
 });
 
 describe('import space schema', () => {
@@ -47,9 +47,9 @@ describe('import space schema', () => {
     const parsed = importSpaceFileSchema.parse({
       version: 1,
       title: 'Import input',
-      layouts: [
+      diagrams: [
         {
-          title: 'Generated layout',
+          title: 'Generated diagram',
           positions: { [CARD_A]: { x: 0, y: 0, open: false } },
           graphs: [{ title: 'Generated graph', edges: [{ from: CARD_A, to: CARD_B }] }],
         },
@@ -57,14 +57,14 @@ describe('import space schema', () => {
     });
 
     expect(parsed.id).toBeUndefined();
-    expect(parsed.layouts?.[0]?.id).toBeUndefined();
-    expect(parsed.layouts?.[0]?.graphs[0]?.id).toBeUndefined();
+    expect(parsed.diagrams?.[0]?.id).toBeUndefined();
+    expect(parsed.diagrams?.[0]?.graphs[0]?.id).toBeUndefined();
     expect(
       importSpaceFileSchema.safeParse({
         ...parsed,
-        layouts: [
+        diagrams: [
           {
-            ...parsed.layouts?.[0],
+            ...parsed.diagrams?.[0],
             graphs: [{ title: 'Generated graph', edges: [{ from: 'card-a', to: CARD_B }] }],
           },
         ],
@@ -76,7 +76,7 @@ describe('import space schema', () => {
     const input = {
       document: {
         ...identified.document,
-        layouts: [
+        diagrams: [
           {
             title: 'Working',
             positions: { [CARD_A]: { x: 0, y: 0, open: false } },
@@ -88,30 +88,32 @@ describe('import space schema', () => {
     };
 
     const parsed = importSpaceSchema.parse(input);
-    expect(parsed.document.layouts?.[0]?.kind).toBe('positioned');
+    expect(parsed.document.diagrams?.[0]?.kind).toBe('positioned');
     expect(parsed.id).toBeUndefined();
-    expect(parsed.document.layouts?.[0]?.id).toBeUndefined();
-    expect(parsed.document.layouts?.[0]?.graphs[0]?.id).toBeUndefined();
+    expect(parsed.document.diagrams?.[0]?.id).toBeUndefined();
+    expect(parsed.document.diagrams?.[0]?.graphs[0]?.id).toBeUndefined();
     expect(parsed.cards.at(-1)?.id).toBeUndefined();
   });
 
   /**
    * The import shape relaxes identity and nothing else. Ownership is not
-   * relaxed: a layout that names graph *ids* — the version 2 filter, which
+   * relaxed: a diagram that names graph *ids* — the version 2 filter, which
    * shares this key — cannot enter through the CLI what the space file rejects,
    * and neither can one owning none.
    */
-  it('rejects an imported layout whose graphs are ids rather than owned values', () => {
-    expect(importSpaceSchema.safeParse(withLayout({ ...layout, graphs: [GRAPH_ID] })).success).toBe(
+  it('rejects an imported diagram whose graphs are ids rather than owned values', () => {
+    expect(
+      importSpaceSchema.safeParse(withDiagram({ ...diagram, graphs: [GRAPH_ID] })).success,
+    ).toBe(false);
+  });
+
+  it('rejects an imported diagram that owns no graphs', () => {
+    expect(importSpaceSchema.safeParse(withDiagram({ ...diagram, graphs: [] })).success).toBe(
       false,
     );
   });
 
-  it('rejects an imported layout that owns no graphs', () => {
-    expect(importSpaceSchema.safeParse(withLayout({ ...layout, graphs: [] })).success).toBe(false);
-  });
-
-  it('rejects a version 2 document, whose graphs sat beside its layouts', () => {
+  it('rejects a version 2 document, whose graphs sat beside its diagrams', () => {
     expect(
       importSpaceSchema.safeParse({
         ...identified,
@@ -123,8 +125,8 @@ describe('import space schema', () => {
   it('rejects a non-UUID whenever an import entity id is explicit', () => {
     for (const input of [
       { ...identified, id: 'space' },
-      withLayout({ ...layout, graphs: [{ ...graph, id: 'main' }] }),
-      withLayout({ ...layout, id: 'working' }),
+      withDiagram({ ...diagram, graphs: [{ ...graph, id: 'main' }] }),
+      withDiagram({ ...diagram, id: 'working' }),
       { ...identified, cards: [{ ...identified.cards[0], id: 'a' }] },
     ]) {
       expect(importSpaceSchema.safeParse(input).success).toBe(false);
@@ -138,10 +140,10 @@ describe('space snapshot schema', () => {
     expect(spaceSnapshotSchema.safeParse({ ...identified, id: undefined }).success).toBe(false);
     expect(
       spaceSnapshotSchema.safeParse(
-        withLayout({ ...layout, graphs: [{ ...graph, id: undefined }] }),
+        withDiagram({ ...diagram, graphs: [{ ...graph, id: undefined }] }),
       ).success,
     ).toBe(false);
-    expect(spaceSnapshotSchema.safeParse(withLayout({ ...layout, id: undefined })).success).toBe(
+    expect(spaceSnapshotSchema.safeParse(withDiagram({ ...diagram, id: undefined })).success).toBe(
       false,
     );
     expect(

@@ -146,7 +146,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal={presentNewAliasRefusal({ code: 'layout-not-found' })}
+        refusal={presentNewAliasRefusal({ code: 'diagram-not-found' })}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={() => undefined}
@@ -154,7 +154,7 @@ describe('NewAlias', () => {
     );
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('This Layout is no longer part of the Space.');
+    expect(alert).toHaveTextContent('This Diagram is no longer part of the Space.');
     expect(alert.closest('.card-pane__fields')).toBeNull();
     expect(screen.getByTestId('new-alias-title')).toHaveAttribute('aria-invalid', 'false');
     expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(

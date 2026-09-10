@@ -399,8 +399,8 @@ export const createSpaceHttpApp = (
         if (loaded === undefined) {
           return problem(context, 'not-found', `Choose a Space that exists; Space ${id} does not.`);
         }
-        if (loaded.initialization === 'created-layout') {
-          context.header('X-Hyper-Space-Initialization', 'created-layout');
+        if (loaded.initialization === 'created-diagram') {
+          context.header('X-Hyper-Space-Initialization', 'created-diagram');
         }
         return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {

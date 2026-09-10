@@ -16,13 +16,13 @@ import { createSpaceCardLifecycle } from '../src/space-card-lifecycle';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const META_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const META_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const META_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const TARGET_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
-const TARGET_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
+const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
-const SECOND_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000019');
+const SECOND_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000019');
 const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001a');
 const THIRD_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001b');
 
@@ -31,11 +31,11 @@ const metaSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Meta',
-    defaultLayout: META_LAYOUT_ID,
-    layouts: [
+    defaultDiagram: META_DIAGRAM_ID,
+    diagrams: [
       {
-        id: META_LAYOUT_ID,
-        title: 'Layout 1',
+        id: META_DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: { [META_CARD_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -51,11 +51,11 @@ const targetSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Architecture',
-    defaultLayout: TARGET_LAYOUT_ID,
-    layouts: [
+    defaultDiagram: TARGET_DIAGRAM_ID,
+    diagrams: [
       {
-        id: TARGET_LAYOUT_ID,
-        title: 'Layout 1',
+        id: TARGET_DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: { [TARGET_CARD_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -79,7 +79,7 @@ const idSource = (ids: readonly UUID[]) => {
  * The two reads beside the three writes.
  *
  * They are on the same module rather than on a backend because they answer the
- * question the writes do — *which Space, and which of its Layouts and Graphs* —
+ * question the writes do — *which Space, and which of its Diagrams and Graphs* —
  * and a surface that had to compose its own answer would be deciding twice.
  */
 describe('what a Space Card may reference', () => {
@@ -103,20 +103,20 @@ describe('what a Space Card may reference', () => {
   });
 
   /**
-   * The Graphs come back inside the Layout that owns them rather than in one
+   * The Graphs come back inside the Diagram that owns them rather than in one
    * list beside it (ADR 0040), because that ownership is the whole reason the
    * Card's two selections are not independent.
    */
-  it('answers a target with each of its Layouts and the Graphs that Layout owns', async () => {
-    const twoLayouts: SpaceSnapshot = {
+  it('answers a target with each of its Diagrams and the Graphs that Diagram owns', async () => {
+    const twoDiagrams: SpaceSnapshot = {
       ...targetSnapshot,
       document: {
         ...targetSnapshot.document,
-        layouts: [
-          ...(targetSnapshot.document.layouts ?? []),
+        diagrams: [
+          ...(targetSnapshot.document.diagrams ?? []),
           {
-            id: SECOND_LAYOUT_ID,
-            title: 'Layout 2',
+            id: SECOND_DIAGRAM_ID,
+            title: 'Diagram 2',
             kind: 'positioned',
             positions: { [TARGET_CARD_ID]: { x: 200, y: 0, open: false } },
             graphs: [
@@ -129,7 +129,7 @@ describe('what a Space Card may reference', () => {
     };
     const backend = new MemorySpaceBackend(META_ID, [
       { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
-      { snapshot: twoLayouts, revision: 7n, exportedRevision: null },
+      { snapshot: twoDiagrams, revision: 7n, exportedRevision: null },
     ]);
     const registry = createSpaceSessionRegistry(backend);
     const lifecycle = createSpaceCardLifecycle({ backend, registry, newId: idSource([]) });
@@ -137,19 +137,19 @@ describe('what a Space Card may reference', () => {
     await expect(lifecycle.target(TARGET_ID)).resolves.toEqual({
       id: TARGET_ID,
       title: 'Architecture',
-      layouts: [
+      diagrams: [
         {
-          id: TARGET_LAYOUT_ID,
-          title: 'Layout 1',
+          id: TARGET_DIAGRAM_ID,
+          title: 'Diagram 1',
           graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1' }],
-          // Carried where the Layout authored one, because it is what a Card
-          // pointed at this Layout seeds its Graph from (ADR 0026). `Layout 2`
+          // Carried where the Diagram authored one, because it is what a Card
+          // pointed at this Diagram seeds its Graph from (ADR 0026). `Diagram 2`
           // below authored none and so carries none.
           activeGraph: TARGET_GRAPH_ID,
         },
         {
-          id: SECOND_LAYOUT_ID,
-          title: 'Layout 2',
+          id: SECOND_DIAGRAM_ID,
+          title: 'Diagram 2',
           graphs: [
             { id: SECOND_GRAPH_ID, title: 'Graph 2' },
             { id: THIRD_GRAPH_ID, title: 'Graph 3' },
@@ -175,7 +175,7 @@ describe('what a Space Card may reference', () => {
   });
 
   /**
-   * A Layout authored in a Space this browser also has open is selectable
+   * A Diagram authored in a Space this browser also has open is selectable
    * before it has committed, so the read goes through the live session where
    * there is one and falls back to the stored snapshot where there is not.
    */
@@ -200,22 +200,22 @@ describe('what a Space Card may reference', () => {
       exportedRevision: null,
     });
     const lifecycle = createSpaceCardLifecycle({ backend, registry, newId: idSource([]) });
-    const stored = targetSnapshot.document.layouts?.[0];
-    if (stored === undefined) throw new Error('the target fixture has no Layout to rename');
+    const stored = targetSnapshot.document.diagrams?.[0];
+    if (stored === undefined) throw new Error('the target fixture has no Diagram to rename');
 
     target.submit({
       ...targetSnapshot,
       document: {
         ...targetSnapshot.document,
-        layouts: [{ ...stored, title: 'Renamed before saving' }],
+        diagrams: [{ ...stored, title: 'Renamed before saving' }],
       },
     });
 
-    expect((await backend.loadSpace(TARGET_ID))?.snapshot.document.layouts?.[0]?.title).toBe(
-      'Layout 1',
+    expect((await backend.loadSpace(TARGET_ID))?.snapshot.document.diagrams?.[0]?.title).toBe(
+      'Diagram 1',
     );
     await expect(lifecycle.target(TARGET_ID)).resolves.toMatchObject({
-      layouts: [{ id: TARGET_LAYOUT_ID, title: 'Renamed before saving' }],
+      diagrams: [{ id: TARGET_DIAGRAM_ID, title: 'Renamed before saving' }],
     });
 
     release();

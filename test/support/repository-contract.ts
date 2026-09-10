@@ -50,9 +50,9 @@ const MISSING_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016')
 const THIRD_SPACE_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000014');
 const FOURTH_SPACE_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000015');
 const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
-const LAYOUT_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
+const DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
 const SECOND_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000022');
-const SECOND_LAYOUT_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000023');
+const SECOND_DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000023');
 
 const card = (id: UUID, title: string) => ({
   id,
@@ -62,17 +62,17 @@ const card = (id: UUID, title: string) => ({
 const spaceCard = (
   id: UUID,
   target: UUID,
-  selection: { readonly layout?: UUID; readonly graph?: UUID } = {},
+  selection: { readonly diagram?: UUID; readonly graph?: UUID } = {},
 ) => ({
   id,
   document: { title: `Open ${target}`, kind: 'space' as const, spaceId: target, ...selection },
 });
 
 /**
- * A Space with cards and no structure — no layouts, and so no graphs, which is
+ * A Space with cards and no structure — no diagrams, and so no graphs, which is
  * one statement under version 1 (ADR 0040). Most of this suite is about
  * identity, rollback and revisions rather than about structure, so the cases
- * that need a graph build a layout to own it rather than every case carrying an
+ * that need a graph build a diagram to own it rather than every case carrying an
  * empty collection.
  */
 const space = (id: UUID, title: string, cardIds: readonly UUID[]): SpaceSnapshot => ({
@@ -82,11 +82,11 @@ const space = (id: UUID, title: string, cardIds: readonly UUID[]): SpaceSnapshot
 });
 
 /**
- * A Space whose one layout owns one graph with one edge out of the layout.
+ * A Space whose one diagram owns one graph with one edge out of the diagram.
  *
- * Under version 1 an edge endpoint must name a card of the layout that owns the
+ * Under version 1 an edge endpoint must name a card of the diagram that owns the
  * graph, so "dangling" is now a membership failure rather than a space-wide
- * lookup miss — and a graph can only reach domain intake through a layout, so
+ * lookup miss — and a graph can only reach domain intake through a diagram, so
  * the failure cannot be built without one.
  */
 const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSnapshot => ({
@@ -94,9 +94,9 @@ const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSn
   document: {
     version: 1,
     title,
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
+        id: DIAGRAM_ID,
         title: 'Dangling',
         kind: 'positioned',
         positions: { [memberId]: { x: 0, y: 0, open: false } },
@@ -522,17 +522,17 @@ export const spaceRepositoryContract = (
         document: {
           version: 1,
           title: 'Target',
-          defaultLayout: LAYOUT_ID,
-          layouts: [
+          defaultDiagram: DIAGRAM_ID,
+          diagrams: [
             {
-              id: LAYOUT_ID,
+              id: DIAGRAM_ID,
               title: 'First view',
               kind: 'positioned',
               positions: { [OTHER_CARD_ID]: { x: 0, y: 0, open: false } },
               graphs: [{ id: GRAPH_ID, title: 'First graph', edges: [] }],
             },
             {
-              id: SECOND_LAYOUT_ID,
+              id: SECOND_DIAGRAM_ID,
               title: 'Second view',
               kind: 'positioned',
               positions: { [OTHER_CARD_ID]: { x: 100, y: 100, open: false } },
@@ -543,13 +543,13 @@ export const spaceRepositoryContract = (
       };
       const unselected = spaceCard(SECOND_CARD_ID, OTHER_SPACE_ID);
       const selectedView = spaceCard(LINK_CARD_ID, OTHER_SPACE_ID, {
-        layout: SECOND_LAYOUT_ID,
+        diagram: SECOND_DIAGRAM_ID,
       });
       const selectedGraphWithDefaultView = spaceCard(THIRD_SPACE_CARD_ID, OTHER_SPACE_ID, {
         graph: GRAPH_ID,
       });
       const selectedViewAndGraph = spaceCard(FOURTH_SPACE_CARD_ID, OTHER_SPACE_ID, {
-        layout: SECOND_LAYOUT_ID,
+        diagram: SECOND_DIAGRAM_ID,
         graph: SECOND_GRAPH_ID,
       });
       const linked = {
@@ -574,7 +574,7 @@ export const spaceRepositoryContract = (
 
       const retargetedDefault: SpaceSnapshot = {
         ...target,
-        document: { ...target.document, defaultLayout: SECOND_LAYOUT_ID },
+        document: { ...target.document, defaultDiagram: SECOND_DIAGRAM_ID },
       };
       await expect(commitUpdate(repository, retargetedDefault, 0n)).resolves.toMatchObject({
         kind: 'aggregate-refused',
@@ -982,11 +982,11 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * A graph id is minted where the graph now lives — under the layout that owns
-   * it — and in the same pass as that layout's own id, before the snapshot faces
-   * domain intake and before the first card is written. Two id-less layouts,
+   * A graph id is minted where the graph now lives — under the diagram that owns
+   * it — and in the same pass as that diagram's own id, before the snapshot faces
+   * domain intake and before the first card is written. Two id-less diagrams,
    * because minting under one owner reads the same whether the pass walks
-   * layouts or flattens them, and only a second owner tells those apart.
+   * diagrams or flattens them, and only a second owner tells those apart.
    */
   it(`${name} mints every identity an import leaves out, keeping the explicit ones`, async () => {
     await withHarness(async (repository) => {
@@ -994,9 +994,9 @@ export const spaceRepositoryContract = (
         document: {
           version: 1,
           title: 'Partly identified',
-          layouts: [
+          diagrams: [
             {
-              title: 'Minted layout',
+              title: 'Minted diagram',
               kind: 'positioned',
               positions: {
                 [CARD_ID]: { x: 4, y: 8, open: false },
@@ -1005,7 +1005,7 @@ export const spaceRepositoryContract = (
               graphs: [{ title: 'Explicit cards', edges: [{ from: CARD_ID, to: SECOND_CARD_ID }] }],
             },
             {
-              title: 'Second minted layout',
+              title: 'Second minted diagram',
               kind: 'positioned',
               positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
               graphs: [
@@ -1028,17 +1028,18 @@ export const spaceRepositoryContract = (
       if (only === undefined) throw new Error('Import returned no Space');
 
       const minted = only.snapshot.cards.find(({ id }) => id !== CARD_ID && id !== SECOND_CARD_ID);
-      const [layout, second] = only.snapshot.document.layouts ?? [];
+      const [diagram, second] = only.snapshot.document.diagrams ?? [];
       if (minted === undefined) throw new Error('The id-less card kept no identity');
-      if (layout === undefined || second === undefined) throw new Error('Structure was not stored');
-      const graph = layout.graphs[0];
-      if (graph === undefined) throw new Error('The layout owns no graph');
+      if (diagram === undefined || second === undefined)
+        throw new Error('Structure was not stored');
+      const graph = diagram.graphs[0];
+      if (graph === undefined) throw new Error('The diagram owns no graph');
 
-      const identities = [only.snapshot.id, minted.id, graph.id, layout.id, second.id];
+      const identities = [only.snapshot.id, minted.id, graph.id, diagram.id, second.id];
       for (const id of identities) expect(uuidSchema.safeParse(id).success).toBe(true);
       expect(new Set(identities).size).toBe(identities.length);
       expect(graph.edges).toEqual([{ from: CARD_ID, to: SECOND_CARD_ID }]);
-      expect(layout.positions).toEqual({
+      expect(diagram.positions).toEqual({
         [CARD_ID]: { x: 4, y: 8, open: false },
         [SECOND_CARD_ID]: { x: 12, y: 16, open: false },
       });

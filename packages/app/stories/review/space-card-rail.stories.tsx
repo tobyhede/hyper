@@ -5,9 +5,9 @@
  *   - Rail controls are consistent in treatment — same box, same 22px icon
  *     button, same trailing cluster — without being the same set per kind.
  *   - A Space Card has no Edit control. Authoring the embedded Space is done by
- *     working in it, so Edit is implicit in the layout rather than a command on
+ *     working in it, so Edit is implicit in the diagram rather than a command on
  *     the band.
- *   - A Space Card's rail carries Select Layout, Select Graph and Enter,
+ *   - A Space Card's rail carries Select Diagram, Select Graph and Enter,
  *     all as icon buttons. The two selectors open dropdowns; the rail itself
  *     draws no words.
  *
@@ -55,7 +55,7 @@ export default { title: 'Review/Space Card Rail' };
 const GRAPH_COLOR = '#ffc53d';
 const MARKDOWN_SOURCE =
   'Presenting traverses the Active Graph. A fork offers every outgoing Edge at once.';
-const SPACE_VIEWS = ['Architecture layout', 'Flow', 'Grid'] as const;
+const SPACE_DIAGRAMS = ['Architecture diagram', 'Flow', 'Grid'] as const;
 const GRAPHS = ['Main thread', 'Decision fork'] as const;
 
 /** The two Card kinds this surface compares. `space` is not a domain kind yet. */
@@ -88,15 +88,15 @@ const sizeVars = (open: boolean): CardSizeStyle => {
 /**
  * Three glyphs the shipped icon module does not offer at the rail's 14px.
  *
- * `LayoutGlyph` is the same Lucide `layout-grid` the Sidebar's `LayoutIcon`
+ * `DiagramGlyph` is the same Lucide `layout-grid` the Sidebar's `DiagramIcon`
  * draws, redrawn here only because that export fixes its size at 16 and the
- * rail's other glyphs are 14 — production would give `LayoutIcon` a `size` prop
+ * rail's other glyphs are 14 — production would give `DiagramIcon` a `size` prop
  * rather than keep this. `EnterSpaceGlyph` is Lucide `log-in`: an arrow going
  * *into* a container, deliberately unlike the Open control's `maximize-2`,
  * because entering the Space and expanding the Card in place are two different
  * destinations and must not share a symbol. `SpaceKindGlyph` is Lucide `frame`
- * — a bounded region you go into — and it has to differ from `LayoutGlyph`, or
- * the kind at the rail's leading edge and the Layout selector at its trailing
+ * — a bounded region you go into — and it has to differ from `DiagramGlyph`, or
+ * the kind at the rail's leading edge and the Diagram selector at its trailing
  * edge draw the same mark.
  *
  * Both were `panels-top-left` and `square-square` until the entity glyphs were
@@ -125,7 +125,7 @@ const SpaceKindGlyph = () => (
   </svg>
 );
 
-const LayoutGlyph = () => (
+const DiagramGlyph = () => (
   <svg {...glyphProps}>
     <rect width="7" height="7" x="3" y="3" rx="1" />
     <rect width="7" height="7" x="14" y="3" rx="1" />
@@ -323,7 +323,7 @@ function RailSelect({
         <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
           {options.map((option) => (
             // A Base UI radio item keeps its menu open by default, which suits
-            // a set of toggles. Choosing a Layout is one choice and done,
+            // a set of toggles. Choosing a Diagram is one choice and done,
             // so this one closes behind itself.
             <DropdownMenuRadioItem key={option} value={option} closeOnClick>
               {option}
@@ -351,7 +351,7 @@ interface PrototypeCardProps {
  * One prototype Card of either kind, drawn with the shipped Card and rail CSS.
  *
  * A Markdown Card's rail carries Edit and Open/Close, and swaps Edit for Save
- * and Cancel while an edit runs. A Space Card's rail carries Select Layout,
+ * and Cancel while an edit runs. A Space Card's rail carries Select Diagram,
  * Select Graph, Enter and Open/Close — every one of them the same icon button,
  * and no Edit, because the embedded Space is authored by working in it.
  */
@@ -365,7 +365,7 @@ function PrototypeCard({
   editing = false,
   onEditingChange,
 }: PrototypeCardProps) {
-  const [layout, setLayout] = useState<string>(SPACE_VIEWS[0]);
+  const [diagram, setDiagram] = useState<string>(SPACE_DIAGRAMS[0]);
   const [graph, setGraph] = useState<string>(GRAPHS[0]);
   const style: PrototypeCardStyle = {
     ...sizeVars(open),
@@ -393,13 +393,13 @@ function PrototypeCard({
           {kind === 'space' && (
             <>
               <RailSelect
-                label="Layout"
+                label="Diagram"
                 semantics={semantics}
-                value={layout}
-                options={SPACE_VIEWS}
-                onValueChange={setLayout}
+                value={diagram}
+                options={SPACE_DIAGRAMS}
+                onValueChange={setDiagram}
               >
-                <LayoutGlyph />
+                <DiagramGlyph />
               </RailSelect>
               <RailSelect
                 label="Graph"
@@ -464,9 +464,9 @@ function PrototypeCard({
       {open && (
         <div className="canvas-card__content space-rail__content" data-presence="present">
           {kind === 'space' ? (
-            <div className="space-rail__embedded" aria-label="Embedded Layout">
+            <div className="space-rail__embedded" aria-label="Embedded Diagram">
               <span className="space-rail__embedded-note">
-                Research Space · {layout} · {graph}
+                Research Space · {diagram} · {graph}
               </span>
             </div>
           ) : (
@@ -663,7 +663,7 @@ export const RailComposition: Story = () => (
   <div className="inv inv-sheet">
     <CatalogueSection
       title="1 · The Space Card rail"
-      note="Cards are drawn Selected so their rails are up; a resting Card on the canvas hides them until hover. Every rail control is the same 22px icon button. A Space Card carries Select Layout, Select Graph, Enter and Open/Close — four glyphs, no words on the band. Layout and Graph open dropdowns; their current value is the control's accessible name and the marked item in the menu. Enter draws Lucide log-in — an arrow into a container — deliberately unlike Open's maximize-2, because entering the Space and expanding the Card in place are different destinations."
+      note="Cards are drawn Selected so their rails are up; a resting Card on the canvas hides them until hover. Every rail control is the same 22px icon button. A Space Card carries Select Diagram, Select Graph, Enter and Open/Close — four glyphs, no words on the band. Diagram and Graph open dropdowns; their current value is the control's accessible name and the marked item in the menu. Enter draws Lucide log-in — an arrow into a container — deliberately unlike Open's maximize-2, because entering the Space and expanding the Card in place are different destinations."
     >
       <div className="inv-row space-rail__row">
         <Measured label="markdown · open · shipped">
@@ -679,7 +679,7 @@ export const RailComposition: Story = () => (
 
     <CatalogueSection
       title="2 · The selectors"
-      note="Open either dropdown. Each is a radio group over the Space's own Layouts or Graphs, marking the current one. Two things to check: whether a glyph with no visible value is enough to find the selector by, and whether the band is the right place for a choice that belongs to the Card rather than to the containing Graph the band is coloured by."
+      note="Open either dropdown. Each is a radio group over the Space's own Diagrams or Graphs, marking the current one. Two things to check: whether a glyph with no visible value is enough to find the selector by, and whether the band is the right place for a choice that belongs to the Card rather than to the containing Graph the band is coloured by."
     >
       <div className="inv-row space-rail__row">
         <SpaceSpecimen label="space · open · try both menus" initialOpen title="Selectors" />

@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { loadSpace, Placement, positionedStrategy, type CardFile } from '@project/graph';
 import { canvasProjection } from '../src/canvas-projection';
-import { resolveLayout } from '../src/layout-resolution';
+import { resolveDiagram } from '../src/diagram-resolution';
 import { cardFile } from './card-files';
 
 /**
- * That a Layout's projection resolves its own handles.
+ * That a Diagram's projection resolves its own handles.
  *
  * React Flow warning #008 fires when an Edge names a handle that does not
  * resolve on the node it points at. `projection.property.test.ts` in the adapter
@@ -18,7 +18,7 @@ import { cardFile } from './card-files';
  * disagree and render a canvas with unattached Edges.
  */
 
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 
 function uuidFrom(value: number): string {
   return `00000000-0000-4000-8000-${value.toString(16).padStart(12, '0')}`;
@@ -37,14 +37,14 @@ const graphArb = (pool: string[]) =>
   }));
 
 /**
- * One Layout owning several overlapping Graphs and positioning every Card they
+ * One Diagram owning several overlapping Graphs and positioning every Card they
  * connect.
  *
- * A Graph is a nested owned value of its Layout (ADR 0040), so the Cards are
- * derived from the Graphs and then written as the Layout's membership — which is
- * exactly what closes every owned Edge over the Cards the Layout positions.
+ * A Graph is a nested owned value of its Diagram (ADR 0040), so the Cards are
+ * derived from the Graphs and then written as the Diagram's membership — which is
+ * exactly what closes every owned Edge over the Cards the Diagram positions.
  */
-const layoutSpaceArb = cardIdPool.chain((pool) =>
+const diagramSpaceArb = cardIdPool.chain((pool) =>
   fc.array(graphArb(pool), { minLength: 2, maxLength: 4 }).map((graphs) => {
     const cards = [...new Set(graphs.flatMap((graph) => graph.cards))];
     return {
@@ -52,9 +52,9 @@ const layoutSpaceArb = cardIdPool.chain((pool) =>
         version: 1,
         id: '00000000-0000-4000-8000-000000000001',
         title: 'Generated',
-        layouts: [
+        diagrams: [
           {
-            id: LAYOUT_ID,
+            id: DIAGRAM_ID,
             title: 'Working',
             kind: 'positioned',
             positions: Object.fromEntries(
@@ -73,13 +73,13 @@ const layoutSpaceArb = cardIdPool.chain((pool) =>
   }),
 );
 
-async function projectThroughLayout(generated: { file: unknown; cardFiles: CardFile[] }) {
+async function projectThroughDiagram(generated: { file: unknown; cardFiles: CardFile[] }) {
   const result = loadSpace(generated.file, generated.cardFiles);
   if (!result.ok) throw new Error(`generated space should load: ${JSON.stringify(result.errors)}`);
 
-  const resolved = resolveLayout(result.space, LAYOUT_ID);
+  const resolved = resolveDiagram(result.space, DIAGRAM_ID);
   const projection = canvasProjection(result.space, resolved);
-  const laidOut = await positionedStrategy(Placement.fromLayout(resolved.layout))(
+  const laidOut = await positionedStrategy(Placement.fromDiagram(resolved.diagram))(
     projection.strategyGraph,
   );
   return projection.project(laidOut, {
@@ -94,8 +94,8 @@ async function projectThroughLayout(generated: { file: unknown; cardFiles: CardF
 describe('canvasProjection handle invariants', () => {
   it('every drawn Edge names handles that exist on the Cards it connects', async () => {
     await fc.assert(
-      fc.asyncProperty(layoutSpaceArb, async (generated) => {
-        const { nodes, edges } = await projectThroughLayout(generated);
+      fc.asyncProperty(diagramSpaceArb, async (generated) => {
+        const { nodes, edges } = await projectThroughDiagram(generated);
 
         const handleIds = new Map(
           nodes.map((node) => [

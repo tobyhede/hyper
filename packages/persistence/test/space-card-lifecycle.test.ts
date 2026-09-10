@@ -5,11 +5,11 @@ import { createSpaceSessionRegistry } from '../src/session-registry';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const META_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const META_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const META_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const TARGET_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
-const TARGET_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
+const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
 const SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000014');
 const SECOND_SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000015');
@@ -34,11 +34,11 @@ const metaSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Meta',
-    defaultLayout: META_LAYOUT_ID,
-    layouts: [
+    defaultDiagram: META_DIAGRAM_ID,
+    diagrams: [
       {
-        id: META_LAYOUT_ID,
-        title: 'Layout 1',
+        id: META_DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: { [META_CARD_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -68,11 +68,11 @@ const targetSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Architecture',
-    defaultLayout: TARGET_LAYOUT_ID,
-    layouts: [
+    defaultDiagram: TARGET_DIAGRAM_ID,
+    diagrams: [
       {
-        id: TARGET_LAYOUT_ID,
-        title: 'Layout 1',
+        id: TARGET_DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: { [TARGET_CARD_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -124,7 +124,7 @@ describe('Space Card lifecycle', () => {
       const lifecycle = registry.spaceCards(
         idSource(
           operation === 'create'
-            ? [TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]
+            ? [TARGET_ID, TARGET_CARD_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]
             : [SPACE_CARD_ID],
         ),
       );
@@ -133,13 +133,13 @@ describe('Space Card lifecycle', () => {
         operation === 'create'
           ? await lifecycle.create({
               containingSpaceId: META_ID,
-              layoutId: META_LAYOUT_ID,
+              diagramId: META_DIAGRAM_ID,
               title: 'Architecture',
               position: { x: 240, y: 80 },
             })
           : await lifecycle.link({
               containingSpaceId: META_ID,
-              layoutId: META_LAYOUT_ID,
+              diagramId: META_DIAGRAM_ID,
               targetSpaceId: TARGET_ID,
               title: 'Architecture',
               position: { x: 240, y: 80 },
@@ -181,10 +181,10 @@ describe('Space Card lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        layouts: metaSnapshot.document.layouts?.map((layout) => ({
-          ...layout,
+        diagrams: metaSnapshot.document.diagrams?.map((diagram) => ({
+          ...diagram,
           positions: {
-            ...layout.positions,
+            ...diagram.positions,
             [SPACE_CARD_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -246,14 +246,14 @@ describe('Space Card lifecycle', () => {
 
     await lifecycle.link({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       targetSpaceId: TARGET_ID,
       title: 'First',
       position: { x: 240, y: 80 },
     });
     const second = lifecycle.link({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       targetSpaceId: TARGET_ID,
       title: 'Second',
       position: { x: 480, y: 80 },
@@ -295,7 +295,7 @@ describe('Space Card lifecycle', () => {
     await expect(
       lifecycle.link({
         containingSpaceId: META_ID,
-        layoutId: META_LAYOUT_ID,
+        diagramId: META_DIAGRAM_ID,
         targetSpaceId: TARGET_ID,
         title: 'Link',
         position: { x: 240, y: 80 },
@@ -327,7 +327,7 @@ describe('Space Card lifecycle', () => {
 
     await lifecycle.link({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       targetSpaceId: TARGET_ID,
       title: 'Link',
       position: { x: 240, y: 80 },
@@ -392,7 +392,7 @@ describe('Space Card lifecycle', () => {
       await expect(
         lifecycle.link({
           containingSpaceId: META_ID,
-          layoutId: META_LAYOUT_ID,
+          diagramId: META_DIAGRAM_ID,
           targetSpaceId: TARGET_ID,
           title: 'Blocked link',
           position: { x: 240, y: 80 },
@@ -415,10 +415,10 @@ describe('Space Card lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        layouts: metaSnapshot.document.layouts?.map((layout) => ({
-          ...layout,
+        diagrams: metaSnapshot.document.diagrams?.map((diagram) => ({
+          ...diagram,
           positions: {
-            ...layout.positions,
+            ...diagram.positions,
             [SPACE_CARD_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -479,10 +479,10 @@ describe('Space Card lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        layouts: metaSnapshot.document.layouts?.map((layout) => ({
-          ...layout,
+        diagrams: metaSnapshot.document.diagrams?.map((diagram) => ({
+          ...diagram,
           positions: {
-            ...layout.positions,
+            ...diagram.positions,
             [SPACE_CARD_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -559,12 +559,12 @@ describe('Space Card lifecycle', () => {
       }
     });
     const lifecycle = registry.spaceCards(
-      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
     );
 
     await lifecycle.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'Architecture',
       position: { x: 240, y: 80 },
     });
@@ -585,12 +585,12 @@ describe('Space Card lifecycle', () => {
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceCards(
-      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
     );
 
     await lifecycle.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'Architecture',
       position: { x: 240, y: 80 },
     });
@@ -618,12 +618,12 @@ describe('Space Card lifecycle', () => {
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceCards(
-      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
     );
 
     await lifecycle.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'Architecture',
       position: { x: 240, y: 80 },
     });
@@ -657,11 +657,11 @@ describe('Space Card lifecycle', () => {
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceCards(
-      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
     );
     await lifecycle.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'Architecture',
       position: { x: 240, y: 80 },
     });
@@ -696,11 +696,11 @@ describe('Space Card lifecycle', () => {
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceCards(
-      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
     );
     await lifecycle.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'Replacement',
       position: { x: 240, y: 80 },
     });
@@ -746,7 +746,7 @@ describe('Space Card lifecycle', () => {
     const lifecycle = registry.spaceCards(idSource([SPACE_CARD_ID]));
     await lifecycle.link({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       targetSpaceId: TARGET_ID,
       title: 'Target',
       position: { x: 240, y: 80 },
@@ -783,7 +783,7 @@ describe('Space Card lifecycle', () => {
     const lifecycle = registry.spaceCards(idSource([SPACE_CARD_ID]));
     await lifecycle.link({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       targetSpaceId: TARGET_ID,
       title: 'Target',
       position: { x: 240, y: 80 },
@@ -806,12 +806,12 @@ describe('Space Card lifecycle', () => {
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceCards(
-      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
     );
 
     await lifecycle.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'Architecture',
       position: { x: 240, y: 80 },
     });
@@ -853,11 +853,11 @@ describe('Space Card lifecycle', () => {
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceCards(
-      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
     );
     await lifecycle.create({
       containingSpaceId: META_ID,
-      layoutId: META_LAYOUT_ID,
+      diagramId: META_DIAGRAM_ID,
       title: 'Architecture',
       position: { x: 240, y: 80 },
     });
@@ -890,13 +890,13 @@ describe('Space Card lifecycle', () => {
     const registry = createSpaceSessionRegistry(backend);
     registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceCards(
-      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_LAYOUT_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
+      idSource([TARGET_ID, TARGET_CARD_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_CARD_ID]),
     );
 
     await expect(
       lifecycle.create({
         containingSpaceId: META_ID,
-        layoutId: META_LAYOUT_ID,
+        diagramId: META_DIAGRAM_ID,
         title: 'Architecture',
         position: { x: 240, y: 80 },
       }),
@@ -912,7 +912,7 @@ describe('Space Card lifecycle', () => {
       id: SPACE_CARD_ID,
       document: { title: 'Architecture', kind: 'space', spaceId: TARGET_ID },
     });
-    expect(storedMeta?.snapshot.document.layouts?.[0]?.positions[SPACE_CARD_ID]).toEqual({
+    expect(storedMeta?.snapshot.document.diagrams?.[0]?.positions[SPACE_CARD_ID]).toEqual({
       x: 240,
       y: 80,
       open: false,
@@ -925,11 +925,11 @@ describe('Space Card lifecycle', () => {
         document: {
           version: 1,
           title: 'Architecture',
-          defaultLayout: TARGET_LAYOUT_ID,
-          layouts: [
+          defaultDiagram: TARGET_DIAGRAM_ID,
+          diagrams: [
             {
-              id: TARGET_LAYOUT_ID,
-              title: 'Layout 1',
+              id: TARGET_DIAGRAM_ID,
+              title: 'Diagram 1',
               kind: 'positioned',
               positions: { [TARGET_CARD_ID]: { x: 0, y: 0, open: false } },
               graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -962,10 +962,10 @@ describe('Space Card lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        layouts: metaSnapshot.document.layouts?.map((layout) => ({
-          ...layout,
+        diagrams: metaSnapshot.document.diagrams?.map((diagram) => ({
+          ...diagram,
           positions: {
-            ...layout.positions,
+            ...diagram.positions,
             [SPACE_CARD_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -1003,7 +1003,7 @@ describe('Space Card lifecycle', () => {
     await expect(
       lifecycle.link({
         containingSpaceId: META_ID,
-        layoutId: META_LAYOUT_ID,
+        diagramId: META_DIAGRAM_ID,
         targetSpaceId: TARGET_ID,
         title: 'Second link',
         position: { x: 480, y: 80 },
@@ -1087,7 +1087,7 @@ describe('Space Card lifecycle', () => {
   });
 
   it.each(['link', 'create'] as const)(
-    'refuses %s when its containing Layout is absent',
+    'refuses %s when its containing Diagram is absent',
     async (operation) => {
       const backend = new MemorySpaceBackend(META_ID, [
         { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
@@ -1101,21 +1101,21 @@ describe('Space Card lifecycle', () => {
         operation === 'link'
           ? await lifecycle.link({
               containingSpaceId: META_ID,
-              layoutId: TARGET_LAYOUT_ID,
+              diagramId: TARGET_DIAGRAM_ID,
               targetSpaceId: TARGET_ID,
-              title: 'Missing layout',
+              title: 'Missing diagram',
               position: { x: 240, y: 80 },
             })
           : await lifecycle.create({
               containingSpaceId: META_ID,
-              layoutId: TARGET_LAYOUT_ID,
-              title: 'Missing layout',
+              diagramId: TARGET_DIAGRAM_ID,
+              title: 'Missing diagram',
               position: { x: 240, y: 80 },
             });
 
       expect(result).toEqual({
         kind: 'refused',
-        refusal: { code: 'layout-not-found', layoutId: TARGET_LAYOUT_ID },
+        refusal: { code: 'diagram-not-found', diagramId: TARGET_DIAGRAM_ID },
       });
     },
   );

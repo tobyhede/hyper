@@ -68,8 +68,8 @@ const UNRESOLVED_CARD_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-ccccccccccc
 const ORDERED_SPACE_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
 const ALL_IDLESS_CARD_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
 const SECOND_IDLESS_CARD_ID = uuidSchema.parse('fefefefe-fefe-4fef-8fef-fefefefefefe');
-const LAYOUT_ID = uuidSchema.parse('0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a');
-const OTHER_LAYOUT_ID = uuidSchema.parse('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
+const DIAGRAM_ID = uuidSchema.parse('0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
 const ORDERED_CARD_IDS = [
   uuidSchema.parse('eeeeeeee-1111-4eee-8eee-eeeeeeeeeeee'),
   uuidSchema.parse('eeeeeeee-2222-4eee-8eee-eeeeeeeeeeee'),
@@ -142,9 +142,9 @@ const mixedImport: ImportSpace = {
   document: {
     version: 1,
     title: 'Mixed identity space',
-    layouts: [
+    diagrams: [
       {
-        title: 'Mixed layout',
+        title: 'Mixed diagram',
         kind: 'positioned',
         positions: {
           [MIXED_FIRST_CARD_ID]: { x: 40, y: 80, open: false },
@@ -178,7 +178,7 @@ const mixedImport: ImportSpace = {
  * Every id an import may leave out, left out — which under version 1 is
  * everything except the card an edge names.
  *
- * A layout owns at least one graph, a graph holds at least one edge, and an
+ * A diagram owns at least one graph, a graph holds at least one edge, and an
  * edge names its endpoints by id, so a card an edge reaches cannot be id-less
  * and still be reachable: there would be no value to write in the edge. The
  * card id is therefore the one identity supplied, and it is a parameter because
@@ -189,9 +189,9 @@ const idlessImport = (cardId: UUID): ImportSpace => ({
   document: {
     version: 1,
     title: 'All generated identities',
-    layouts: [
+    diagrams: [
       {
-        title: 'Generated layout',
+        title: 'Generated diagram',
         kind: 'positioned',
         positions: { [cardId]: { x: 0, y: 0, open: false } },
         graphs: [{ title: 'Generated graph', edges: [{ from: cardId, to: cardId }] }],
@@ -514,16 +514,16 @@ describe('PostgresSpaceRepository', () => {
     trackImported(imported);
     if (imported.kind !== 'imported') throw new Error(imported.message);
 
-    const ids = [LAYOUT_ID, GRAPH_ID];
+    const ids = [DIAGRAM_ID, GRAPH_ID];
     const first = await createWorkingSpaceLoader(repository, () => {
       const id = ids.shift();
       if (id === undefined) throw new Error('initializer minted too many identities');
       return id;
     })(SPACE_ID);
 
-    expect(first).toMatchObject({ revision: 1n, initialization: 'created-layout' });
-    expect(first?.snapshot.document.layouts?.[0]).toMatchObject({
-      id: LAYOUT_ID,
+    expect(first).toMatchObject({ revision: 1n, initialization: 'created-diagram' });
+    expect(first?.snapshot.document.diagrams?.[0]).toMatchObject({
+      id: DIAGRAM_ID,
       positions: {},
       activeGraph: GRAPH_ID,
     });
@@ -914,9 +914,9 @@ describe('PostgresSpaceRepository', () => {
       ...snapshot,
       document: {
         ...snapshot.document,
-        layouts: [
+        diagrams: [
           {
-            id: LAYOUT_ID,
+            id: DIAGRAM_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
@@ -1147,9 +1147,9 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 1,
         title: 'Invalid later space',
-        layouts: [
+        diagrams: [
           {
-            title: 'Dangling layout',
+            title: 'Dangling diagram',
             kind: 'positioned',
             positions: {},
             graphs: [
@@ -1188,16 +1188,16 @@ describe('PostgresSpaceRepository', () => {
     }
 
     const stored = result.spaces[0]!;
-    const layout = stored.snapshot.document.layouts?.[0];
-    expect(layout).toBeDefined();
-    if (layout === undefined) throw new Error('Generated layout was not returned');
-    const graph = layout.graphs[0]!;
+    const diagram = stored.snapshot.document.diagrams?.[0];
+    expect(diagram).toBeDefined();
+    if (diagram === undefined) throw new Error('Generated diagram was not returned');
+    const graph = diagram.graphs[0]!;
     const generatedCard = stored.snapshot.cards.find(
       ({ id }) => id !== MIXED_FIRST_CARD_ID && id !== MIXED_SECOND_CARD_ID,
     );
     expect(generatedCard).toBeDefined();
     if (generatedCard === undefined) throw new Error('Generated card was not returned');
-    const generatedIds = [stored.snapshot.id, generatedCard.id, graph.id, layout.id];
+    const generatedIds = [stored.snapshot.id, generatedCard.id, graph.id, diagram.id];
 
     for (const id of generatedIds) expect(uuidSchema.safeParse(id).success).toBe(true);
     expect(new Set(generatedIds).size).toBe(4);
@@ -1207,7 +1207,7 @@ describe('PostgresSpaceRepository', () => {
       new Set([MIXED_FIRST_CARD_ID, MIXED_SECOND_CARD_ID, generatedCard.id]),
     );
     expect(graph.edges).toEqual([{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }]);
-    expect(layout.positions).toEqual({
+    expect(diagram.positions).toEqual({
       [MIXED_FIRST_CARD_ID]: { x: 40, y: 80, open: false },
       [MIXED_SECOND_CARD_ID]: { x: 300, y: 80, open: false },
     });
@@ -1234,8 +1234,8 @@ describe('PostgresSpaceRepository', () => {
     // not among them: it was supplied, so asserting it was minted would assert
     // the opposite of what the fixture says.
     const minted = (stored: LoadedSpace): UUID[] => {
-      const layout = stored.snapshot.document.layouts![0]!;
-      return [stored.snapshot.id, layout.id, layout.graphs[0]!.id];
+      const diagram = stored.snapshot.document.diagrams![0]!;
+      return [stored.snapshot.id, diagram.id, diagram.graphs[0]!.id];
     };
     const firstIds = minted(first.spaces[0]!);
     const secondIds = minted(second.spaces[0]!);
@@ -1284,9 +1284,9 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 1,
         title: 'Invalid generated space',
-        layouts: [
+        diagrams: [
           {
-            title: 'Unresolved layout',
+            title: 'Unresolved diagram',
             kind: 'positioned',
             positions: {},
             graphs: [
@@ -1394,10 +1394,10 @@ describe('PostgresSpaceRepository', () => {
 
   it('imports a graph id already nested in another stored space', async () => {
     // A graph id is unique across the space that holds it and no wider — its
-    // owner is one layout (ADR 0040), and the flatten a space-subject view draws
+    // owner is one diagram (ADR 0040), and the flatten a space-subject view draws
     // is what makes the space the scope (ADR 0045). Two spaces reusing one is
     // therefore fine.
-    // There is no graphs table and no layouts table (ADR 0030 keeps both nested),
+    // There is no graphs table and no diagrams table (ADR 0030 keeps both nested),
     // and every query in the repository is by space id or card id, so no lookup
     // anywhere can be made ambiguous by the reuse below. Space and card ids are
     // rows and stay globally unique — enforced by their primary keys, which the
@@ -1410,9 +1410,9 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 1,
         title: 'First space',
-        layouts: [
+        diagrams: [
           {
-            id: LAYOUT_ID,
+            id: DIAGRAM_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
@@ -1439,9 +1439,9 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 1,
         title: 'Second space',
-        layouts: [
+        diagrams: [
           {
-            id: LAYOUT_ID,
+            id: DIAGRAM_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
@@ -1469,13 +1469,13 @@ describe('PostgresSpaceRepository', () => {
 
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       snapshot: {
-        document: { layouts: [{ graphs: [{ id: GRAPH_ID, title: 'Shared graph id' }] }] },
+        document: { diagrams: [{ graphs: [{ id: GRAPH_ID, title: 'Shared graph id' }] }] },
       },
     });
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toMatchObject({
       snapshot: {
         document: {
-          layouts: [{ graphs: [{ id: GRAPH_ID, title: 'Same graph id, other space' }] }],
+          diagrams: [{ graphs: [{ id: GRAPH_ID, title: 'Same graph id, other space' }] }],
         },
       },
     });
@@ -1490,9 +1490,9 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 1,
         title: 'First space',
-        layouts: [
+        diagrams: [
           {
-            id: LAYOUT_ID,
+            id: DIAGRAM_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
@@ -1519,9 +1519,9 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 1,
         title: 'Second space',
-        layouts: [
+        diagrams: [
           {
-            id: LAYOUT_ID,
+            id: DIAGRAM_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
@@ -1560,9 +1560,9 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 1,
         title: 'Graph id equals card id',
-        layouts: [
+        diagrams: [
           {
-            id: LAYOUT_ID,
+            id: DIAGRAM_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
@@ -1605,18 +1605,18 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
   });
 
-  it('rejects two layouts owning a graph under one id', async () => {
+  it('rejects two diagrams owning a graph under one id', async () => {
     // Domain intake's job, not the batch check's — and the reason the batch check
     // does not need to look at graph ids at all. A graph id is unique across the
-    // space although one layout owns it (ADR 0045), so the collision worth
+    // space although one diagram owns it (ADR 0045), so the collision worth
     // catching is the one that spans owners.
     const collidingGraphs: SpaceSnapshot = {
       ...snapshot,
       document: {
         ...snapshot.document,
-        layouts: [
+        diagrams: [
           {
-            id: LAYOUT_ID,
+            id: DIAGRAM_ID,
             title: 'First owner',
             kind: 'positioned',
             positions: {
@@ -1628,7 +1628,7 @@ describe('PostgresSpaceRepository', () => {
             ],
           },
           {
-            id: OTHER_LAYOUT_ID,
+            id: OTHER_DIAGRAM_ID,
             title: 'Second owner',
             kind: 'positioned',
             positions: {

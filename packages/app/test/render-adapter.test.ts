@@ -3,8 +3,8 @@ import { Position, type Edge } from '@xyflow/react';
 
 import {
   uuidSchema,
-  type LayoutId,
-  type LayoutPosition,
+  type DiagramId,
+  type DiagramPosition,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -29,7 +29,7 @@ const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const PROJECTED = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
@@ -50,7 +50,7 @@ const EDGE: Edge = {
 
 interface InstallRecord {
   readonly kind: 'reported' | 'replaced';
-  readonly placement: ReadonlyMap<string, LayoutPosition> | null;
+  readonly placement: ReadonlyMap<string, DiagramPosition> | null;
   /** What the adapter's own state held at the moment the effect ran. */
   readonly nodesAtCall: readonly CardFlowNode[] | null;
 }
@@ -68,7 +68,7 @@ function authoringSpy({ refusing, authoredPlacement = null }: AuthoringCapabilit
   const completions: unknown[] = [];
   let adapter: RenderAdapter | null = null;
   const authoring: SpaceAuthoring = {
-    completeInLayout: () => {
+    completeInDiagram: () => {
       throw new Error('Embedded authoring is outside this adapter test.');
     },
     // SAFETY: `getState` is never read by these tests — the spy only needs to
@@ -76,14 +76,14 @@ function authoringSpy({ refusing, authoredPlacement = null }: AuthoringCapabilit
     getState: () => ({}) as never,
     authoredPlacement: () => authoredPlacement,
     subscribe: () => () => undefined,
-    reportRendered: (placement: ReadonlyMap<string, LayoutPosition>) => {
+    reportRendered: (placement: ReadonlyMap<string, DiagramPosition>) => {
       installs.push({
         kind: 'reported',
         placement,
         nodesAtCall: adapter?.getState().projection?.nodes ?? null,
       });
     },
-    replacePlacement: (placement: ReadonlyMap<string, LayoutPosition> | null) => {
+    replacePlacement: (placement: ReadonlyMap<string, DiagramPosition> | null) => {
       installs.push({
         kind: 'replaced',
         placement,
@@ -92,7 +92,7 @@ function authoringSpy({ refusing, authoredPlacement = null }: AuthoringCapabilit
     },
     edgeEligibility: (proposal: EdgeProposal): EdgeEligibility =>
       proposal.kind === refusing
-        ? { kind: 'refused', refusal: { code: 'edge-card-outside-layout' } }
+        ? { kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } }
         : { kind: 'eligible' },
     complete: (completion): AuthoringResult => {
       completions.push(completion);
@@ -139,11 +139,11 @@ function connections(
  *
  * `initialPlacement` is `null` rather than absent, because these cases install
  * whatever geometry they are about; absent, the composition would open on the
- * selected Layout's own map (ADR 0025), which is a different starting state.
+ * selected Diagram's own map (ADR 0025), which is a different starting state.
  */
 function sessionBackedAdapter(
   snapshot: SpaceSnapshot,
-  layoutId: LayoutId,
+  diagramId: DiagramId,
   initialPlacement: Placement | null = null,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,
@@ -157,7 +157,7 @@ function sessionBackedAdapter(
   const session = openSpaceSession(backend, loaded);
   const { authoring, adapter } = composeApp({
     spaceSession: session,
-    selection: layoutId,
+    selection: diagramId,
     initialPlacement,
     newId,
   });
@@ -165,9 +165,9 @@ function sessionBackedAdapter(
 }
 
 /**
- * A Space whose Layout places Cards A and B, leaving C outside the Layout.
+ * A Space whose Diagram places Cards A and B, leaving C outside the Diagram.
  *
- * The Layout's position keys are its Card membership and every Edge of a Graph
+ * The Diagram's position keys are its Card membership and every Edge of a Graph
  * it owns is closed over them (ADR 0040), so the omitted Card is one the Graph
  * never names — C, which the positioned projection does not draw.
  */
@@ -177,10 +177,10 @@ function sparsePositionedAdapter(newId?: () => UUID) {
     document: {
       version: 1,
       title: 'Space',
-      layouts: [
+      diagrams: [
         {
-          id: LAYOUT_ID,
-          title: 'Layout 1',
+          id: DIAGRAM_ID,
+          title: 'Diagram 1',
           kind: 'positioned',
           positions: {
             [uuidSchema.parse(CARD_A)]: { x: 10, y: 20, open: false },
@@ -195,7 +195,7 @@ function sparsePositionedAdapter(newId?: () => UUID) {
           ],
         },
       ],
-      defaultLayout: LAYOUT_ID,
+      defaultDiagram: DIAGRAM_ID,
     },
     cards: [
       {
@@ -214,7 +214,7 @@ function sparsePositionedAdapter(newId?: () => UUID) {
   };
   return sessionBackedAdapter(
     snapshot,
-    LAYOUT_ID,
+    DIAGRAM_ID,
     Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: false }],
       [CARD_B, { x: 300, y: 20, open: false }],
@@ -231,10 +231,10 @@ function storedSpaceAdapter() {
     document: {
       version: 1,
       title: 'Space',
-      layouts: [
+      diagrams: [
         {
-          id: LAYOUT_ID,
-          title: 'Layout 1',
+          id: DIAGRAM_ID,
+          title: 'Diagram 1',
           kind: 'positioned',
           positions: {
             [uuidSchema.parse(CARD_A)]: { x: 10, y: 20, open: false },
@@ -249,7 +249,7 @@ function storedSpaceAdapter() {
           ],
         },
       ],
-      defaultLayout: LAYOUT_ID,
+      defaultDiagram: DIAGRAM_ID,
     },
     cards: [
       { id: uuidSchema.parse(CARD_A), document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -262,7 +262,7 @@ function storedSpaceAdapter() {
   };
   return sessionBackedAdapter(
     snapshot,
-    LAYOUT_ID,
+    DIAGRAM_ID,
     Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: false }],
       [CARD_B, { x: 300, y: 20, open: false }],
@@ -284,14 +284,14 @@ describe('render adapter', () => {
     expect(adapter().getState().projection).toBeNull();
   });
 
-  it('drops the published Graph Edges with their nodes when the Layout changes', () => {
+  it('drops the published Graph Edges with their nodes when the Diagram changes', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
     store.getState().syncProjection(PROJECTED, [EDGE]);
     expect(store.getState().projection?.edges).toEqual([EDGE]);
 
-    store.getState().selectLayout(null);
+    store.getState().selectDiagram(null);
 
     expect(store.getState().projection).toBeNull();
     expect(spy.installs.at(-1)).toEqual({
@@ -567,7 +567,7 @@ describe('render adapter', () => {
    * A reprojection can land while a Card is in flight — an activated Graph or a
    * selection redraws the graph without the gesture ending. The nodes it reports
    * carry the live position, and the author has settled on nothing, so that
-   * geometry is not theirs to author. Reported at review as reaching the Layout
+   * geometry is not theirs to author. Reported at review as reaching the Diagram
    * through a later connection; it does not, because every completion re-reports
    * first. What it does reach is the in-memory placement, which re-runs the
    * strategy under a gesture still in progress.
@@ -601,7 +601,7 @@ describe('render adapter', () => {
       ),
     ).toEqual({ kind: 'completed', cardId: CREATED_CARD_ID });
 
-    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
+    expect(session.getState().working.document.diagrams?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20, open: false },
       [CARD_B]: { x: 300, y: 20, open: false },
       [CREATED_CARD_ID]: { x: 420, y: 360, open: false },
@@ -611,7 +611,7 @@ describe('render adapter', () => {
   /*
    * Authoring owns eligibility; the coordinator only asks. A refusal has to stop
    * before the placement install, because installing is what commits an
-   * pending placement into a Layout — a gesture Authoring rejected
+   * pending placement into a Diagram — a gesture Authoring rejected
    * would otherwise still author one as a side effect.
    */
   it('installs and completes nothing for a connection Authoring refuses', () => {
@@ -631,7 +631,7 @@ describe('render adapter', () => {
       // The refusal travels with the outcome, so nothing asks eligibility a
       // second time to recover the identity it already had — and it travels
       // structured, because the sentence is the surface's (ADR 0057).
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-layout' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } });
 
     expect(spy.completions).toEqual([]);
     expect(spy.installs).toHaveLength(installedBefore);
@@ -651,7 +651,7 @@ describe('render adapter', () => {
         { x: 420, y: 360 },
         null,
       ),
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-layout' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } });
 
     expect(spy.completions).toEqual([]);
     expect(spy.installs).toHaveLength(installedBefore);
@@ -904,7 +904,7 @@ describe('render adapter', () => {
     spy.attach(store);
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    // A layout's routed Edge geometry describes the placement it computed, so
+    // A diagram's routed Edge geometry describes the placement it computed, so
     // it stops being true the moment a card leaves the place that routing
     // assumed. `App` reads this flag to fall back to plain curves; left false, a
     // dragged graph keeps drawing channels routed for positions nothing is at.
@@ -996,24 +996,24 @@ describe('render adapter', () => {
   });
 
   /*
-   * An embedded Layout's live edit is an Interaction of the canvas, so it is
+   * An embedded Diagram's live edit is an Interaction of the canvas, so it is
    * held beside `resizeDraft` rather than reported up through a callback prop:
    * this store is what re-renders the Space's command surface and the canvas
    * together, and every availability answer is derived once, above both of them
    * (`authoring-availability.ts`).
    */
   it('carries no embedded edit before the canvas has reported one', () => {
-    expect(adapter().getState().editingEmbeddedLayout).toBe(false);
+    expect(adapter().getState().editingEmbeddedDiagram).toBe(false);
   });
 
   it("takes the canvas's report of a live embedded edit and of its end", () => {
     const store = adapter();
 
-    store.getState().reportEmbeddedLayoutEditing(true);
-    expect(store.getState().editingEmbeddedLayout).toBe(true);
+    store.getState().reportEmbeddedDiagramEditing(true);
+    expect(store.getState().editingEmbeddedDiagram).toBe(true);
 
-    store.getState().reportEmbeddedLayoutEditing(false);
-    expect(store.getState().editingEmbeddedLayout).toBe(false);
+    store.getState().reportEmbeddedDiagramEditing(false);
+    expect(store.getState().editingEmbeddedDiagram).toBe(false);
   });
 
   /*
@@ -1026,11 +1026,11 @@ describe('render adapter', () => {
   it('publishes nothing for a report that says what the store already holds', () => {
     const store = adapter();
     const seen: boolean[] = [];
-    store.subscribe((state) => seen.push(state.editingEmbeddedLayout));
+    store.subscribe((state) => seen.push(state.editingEmbeddedDiagram));
 
-    store.getState().reportEmbeddedLayoutEditing(false);
-    store.getState().reportEmbeddedLayoutEditing(true);
-    store.getState().reportEmbeddedLayoutEditing(true);
+    store.getState().reportEmbeddedDiagramEditing(false);
+    store.getState().reportEmbeddedDiagramEditing(true);
+    store.getState().reportEmbeddedDiagramEditing(true);
 
     expect(seen).toEqual([true]);
   });

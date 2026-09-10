@@ -39,7 +39,7 @@ const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const CARD_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
 /** The Graph and Edge an Edge operation is named by, which travel together. */
@@ -51,10 +51,10 @@ const snapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout 1',
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [CARD_A]: { x: 0, y: 0, open: false },
@@ -67,7 +67,7 @@ const snapshot: SpaceSnapshot = {
         ],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -157,17 +157,17 @@ const EDGES = [flowEdge(GRAPH_ID, CARD_A, CARD_B), flowEdge(OTHER_GRAPH_ID, CARD
  *
  * `connections` is overridable because `ConnectionCompletion` is a declared
  * dependency of `createEdgeAuthoring`, and one refusal channel is reachable
- * only through it. `layout-active-graph-required` is the sole refusal that can
+ * only through it. `diagram-active-graph-required` is the sole refusal that can
  * reach `connect-form-refusal` on a connect gesture — the others are
  * `correctableByCardChoice` and mark the Target field instead (ADR 0057,
- * `authoring-refusal.ts`) — and it needs a selected Layout whose Active Graph
- * the Layout does not own. **No legal Space can be in that state**, not merely
- * no gesture over this fixture: `spaceFileSchema` gives a Layout
+ * `authoring-refusal.ts`) — and it needs a selected Diagram whose Active Graph
+ * the Diagram does not own. **No legal Space can be in that state**, not merely
+ * no gesture over this fixture: `spaceFileSchema` gives a Diagram
  * `graphs: z.array(graphSchema).min(1)` (`core/src/schema.ts`, asserted by
- * `core/test/persistence-schema.test.ts`), `ResolvedLayout.activeGraph`
+ * `core/test/persistence-schema.test.ts`), `ResolvedDiagram.activeGraph`
  * resolves named-or-first and is never null, Navigation writes only an Active
- * Graph the selected Layout owns, and Graph deletion refuses the
- * last one (`layout-must-keep-graph`).
+ * Graph the selected Diagram owns, and Graph deletion refuses the
+ * last one (`diagram-must-keep-graph`).
  *
  * So the stand-in is what exercises the channel at all, and the alternative —
  * arranging the fixture so the real completion refuses this way — is not
@@ -176,11 +176,11 @@ const EDGES = [flowEdge(GRAPH_ID, CARD_A, CARD_B), flowEdge(OTHER_GRAPH_ID, CARD
  */
 function compose({
   connections,
-  selection = LAYOUT_ID,
+  selection = DIAGRAM_ID,
 }: {
   connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
-  /** Which Layout opens. */
-  selection?: typeof LAYOUT_ID | undefined;
+  /** Which Diagram opens. */
+  selection?: typeof DIAGRAM_ID | undefined;
 } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
@@ -199,7 +199,7 @@ function compose({
 }
 
 const graphsOf = (working: SpaceSnapshot) =>
-  (working.document.layouts ?? []).flatMap((layout) => layout.graphs);
+  (working.document.diagrams ?? []).flatMap((diagram) => diagram.graphs);
 
 /** One identity, so the memo under test is not defeated by the test's own input. */
 const NO_OP = () => undefined;
@@ -262,7 +262,7 @@ function mountCanvas(
     presenting?: boolean;
     deleteWhenCoveredCommits?: boolean;
     connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
-    selection?: typeof LAYOUT_ID | undefined;
+    selection?: typeof DIAGRAM_ID | undefined;
   } = {},
 ) {
   const composed = compose({ connections, selection });
@@ -345,7 +345,7 @@ function CanvasHarness({
           cardIsOpen: false,
           editingChromeTitle: false,
           spaceOnCanvas: true,
-          editingEmbeddedLayout: false,
+          editingEmbeddedDiagram: false,
         })}
         onNodesChange={adapter.getState().changeNodes}
         onEdgesChange={adapter.getState().changeEdges}
@@ -366,7 +366,7 @@ function CanvasHarness({
           finishResize: () => undefined,
           cancelResize: () => undefined,
         }}
-        reportEmbeddedLayoutEditing={() => undefined}
+        reportEmbeddedDiagramEditing={() => undefined}
         graphs={currentSpace().graphs}
         colorByGraphId={{}}
         activeGraphId={GRAPH_ID}
@@ -390,7 +390,7 @@ const canvasElement = (): HTMLElement => {
 
 /**
  * Only the Active Graph's Edges are tab stops. An Edge belonging to another
- * Graph the Layout draws is there to be seen; putting it in the tab order would
+ * Graph the Diagram draws is there to be seen; putting it in the tab order would
  * place inert stops between a keyboard author and the Edges they can act on.
  */
 describe('decorated Edges', () => {
@@ -472,7 +472,7 @@ describe('the Edge toolbar', () => {
    * The picker's disabled rows are eligibility's answer, so they say whether the
    * right *question* was asked.
    *
-   * `Main` holds A→B, so every Card of this Layout is a legal `to` for it: B is
+   * `Main` holds A→B, so every Card of this Diagram is a legal `to` for it: B is
    * unchanged, C is a new Edge, and A is a self-Edge, which is valid authored
    * structure (ADR 0032). The subject handed in is an `EdgeSelection`, which is
    * what the callbacks really hold and which carries a `kind` of its own —
@@ -536,7 +536,7 @@ describe("the app's canvas delete key", () => {
   });
 
   it.each(DELETE_KEYS)(
-    'removes the selected Card from its Layout when %s is aimed at the canvas',
+    'removes the selected Card from its Diagram when %s is aimed at the canvas',
     (key) => {
       const { adapter, session } = mountCanvas();
       act(() => adapter.getState().selectCard(CARD_A));
@@ -545,7 +545,7 @@ describe("the app's canvas delete key", () => {
 
       const current = session.getState().working;
       expect(current.cards.map(({ id }) => id)).toContain(CARD_A);
-      expect(current.document.layouts?.[0]?.positions[CARD_A]).toBeUndefined();
+      expect(current.document.diagrams?.[0]?.positions[CARD_A]).toBeUndefined();
     },
   );
 
@@ -557,7 +557,7 @@ describe("the app's canvas delete key", () => {
 
       fireEvent.keyDown(screen.getByText('Outside the canvas'), { key });
 
-      expect(session.getState().working.document.layouts?.[0]?.positions[CARD_A]).toBeDefined();
+      expect(session.getState().working.document.diagrams?.[0]?.positions[CARD_A]).toBeDefined();
     },
   );
 
@@ -579,9 +579,9 @@ describe("the app's canvas delete key", () => {
 
     fireEvent.keyDown(focused, { key, bubbles: true });
 
-    const layout = session.getState().working.document.layouts?.[0];
-    expect(layout?.positions[CARD_B]).toBeUndefined();
-    expect(layout?.positions[CARD_A]).toBeDefined();
+    const diagram = session.getState().working.document.diagrams?.[0];
+    expect(diagram?.positions[CARD_B]).toBeUndefined();
+    expect(diagram?.positions[CARD_A]).toBeDefined();
   });
 
   /**
@@ -594,7 +594,7 @@ describe("the app's canvas delete key", () => {
 
     fireEvent.keyDown(document.body, { key: 'Backspace', repeat: true });
 
-    expect(session.getState().working.document.layouts?.[0]?.positions[CARD_A]).toBeDefined();
+    expect(session.getState().working.document.diagrams?.[0]?.positions[CARD_A]).toBeDefined();
   });
 
   /**
@@ -617,7 +617,7 @@ describe("the app's canvas delete key", () => {
 
       fireEvent.keyDown(document.body, { key: 'Backspace', [modifier]: true });
 
-      expect(session.getState().working.document.layouts?.[0]?.positions[CARD_A]).toBeDefined();
+      expect(session.getState().working.document.diagrams?.[0]?.positions[CARD_A]).toBeDefined();
     },
   );
 

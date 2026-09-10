@@ -44,13 +44,13 @@ export const FIXTURE_CARD_COUNT =
   markdownFileCount(fixtureDir) + markdownFileCount(`${fixtureDir}/cards`);
 
 /**
- * Graphs are a Layout's only connection structure, so every Edge the overview
+ * Graphs are a Diagram's only connection structure, so every Edge the overview
  * draws is one of a Graph's authored `{from, to}` pairs — summed across every
- * Layout, because a Graph is a nested owned value of the one that holds it (ADR
- * 0040) and the fixture spreads four Graphs over two Layouts.
+ * Diagram, because a Graph is a nested owned value of the one that holds it (ADR
+ * 0040) and the fixture spreads four Graphs over two Diagrams.
  *
- * This is the count across the fixture's Layouts,
- * Layouts (ADR 0045). A *selected* Layout draws only the Graphs it owns, so it
+ * This is the count across the fixture's Diagrams,
+ * Diagrams (ADR 0045). A *selected* Diagram draws only the Graphs it owns, so it
  * is not the number to assert after a conversion.
  */
 export const FIXTURE_EDGE_COUNT =
@@ -60,11 +60,11 @@ export const FIXTURE_EDGE_COUNT =
   // fields used below.
   (
     JSON.parse(readFileSync(`${fixtureDir}/space.json`, 'utf8')) as {
-      layouts: readonly { graphs: readonly { edges: readonly unknown[] }[] }[];
+      diagrams: readonly { graphs: readonly { edges: readonly unknown[] }[] }[];
     }
-  ).layouts.reduce(
-    (total, layout) =>
-      total + layout.graphs.reduce((edges, graph) => edges + graph.edges.length, 0),
+  ).diagrams.reduce(
+    (total, diagram) =>
+      total + diagram.graphs.reduce((edges, graph) => edges + graph.edges.length, 0),
     0,
   );
 
@@ -131,8 +131,8 @@ export async function openCard(node: Locator, title: string): Promise<void> {
  *
  * **Every helper below opens a menu where it used to press a button**, and that
  * is the whole of what the Command Dock changed for this suite. The Sidebar was
- * a sixteen-rem column with room for a permanent row per Layout, a permanent row
- * per Graph and a permanent Add Layout; the Dock is a strip over the canvas that
+ * a sixteen-rem column with room for a permanent row per Diagram, a permanent row
+ * per Graph and a permanent Add Diagram; the Dock is a strip over the canvas that
  * finds room by disclosure. So the *claims* the specs make are unchanged and the
  * reach is not, which is exactly why the reach lives here — one module rather
  * than the thirty call sites that would otherwise each settle on their own way
@@ -159,12 +159,12 @@ async function disclose(page: Page, name: string | RegExp): Promise<Locator> {
   return menu;
 }
 
-/** The Layout cluster's disclosure: the authored Layouts, then its own commands. */
-export function layoutMenu(page: Page): Promise<Locator> {
-  return disclose(page, /^Layout: /);
+/** The Diagram cluster's disclosure: the authored Diagrams, then its own commands. */
+export function diagramMenu(page: Page): Promise<Locator> {
+  return disclose(page, /^Diagram: /);
 }
 
-/** The Graph cluster's disclosure: the Graphs this Layout owns, then its commands. */
+/** The Graph cluster's disclosure: the Graphs this Diagram owns, then its commands. */
 export function graphMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Active Graph: /);
 }
@@ -180,34 +180,34 @@ export function selectedCanvas(page: Page): Locator {
 }
 
 /**
- * Draw one authored Layout, by title.
+ * Draw one authored Diagram, by title.
  *
- * One exclusive choice over authored Layouts, with no second control and no
+ * One exclusive choice over authored Diagrams, with no second control and no
  * empty value — ADR 0053's one durable clause, which ADR 0082 keeps verbatim.
- * The fixture declares two Layouts (`fixture/space.json`), so a test can open
+ * The fixture declares two Diagrams (`fixture/space.json`), so a test can open
  * one without authoring it first, which is the only way to drag a Card in a
- * Layout that already owns Edges.
+ * Diagram that already owns Edges.
  */
 export async function selectCanvas(page: Page, title: string): Promise<void> {
   // Exact, both times. On a substring the early return fires for `Workshop`
-  // while `Workshop 2` is drawing — the test then runs against the wrong Layout
+  // while `Workshop 2` is drawing — the test then runs against the wrong Diagram
   // and the closing `toContainText` agrees with it.
   const named = (text: string): boolean => text.trim() === title;
   if (named(await selectedCanvas(page).innerText())) return;
-  const menu = await layoutMenu(page);
+  const menu = await diagramMenu(page);
   await menu.getByRole('menuitemradio', { name: title, exact: true }).click();
   await expect(selectedCanvas(page)).toHaveText(title);
 }
 
-/** Create and select an empty Layout owning one empty Graph (ADR 0079, ADR 0080). */
-export async function newLayout(page: Page): Promise<void> {
-  const menu = await layoutMenu(page);
-  await menu.getByRole('menuitem', { name: 'New Layout' }).click();
+/** Create and select an empty Diagram owning one empty Graph (ADR 0079, ADR 0080). */
+export async function newDiagram(page: Page): Promise<void> {
+  const menu = await diagramMenu(page);
+  await menu.getByRole('menuitem', { name: 'New Diagram' }).click();
 }
 
-/** The Layouts the Space offers, read from the one list that offers them. */
-export async function layoutChoices(page: Page): Promise<Locator> {
-  return (await layoutMenu(page)).getByRole('menuitemradio');
+/** The Diagrams the Space offers, read from the one list that offers them. */
+export async function diagramChoices(page: Page): Promise<Locator> {
+  return (await diagramMenu(page)).getByRole('menuitemradio');
 }
 
 /** The Graph the Dock is naming as active, or nothing when none is. */
@@ -224,7 +224,7 @@ export async function activateGraph(page: Page, title: string): Promise<void> {
   await expect(activeGraph(page)).toHaveText(title);
 }
 
-/** The Graphs the selected Layout owns, read from the one list that offers them. */
+/** The Graphs the selected Diagram owns, read from the one list that offers them. */
 export async function graphChoices(page: Page): Promise<Locator> {
   return (await graphMenu(page)).getByRole('menuitemradio');
 }
@@ -390,7 +390,7 @@ export async function dragBy(
   // of a proportion, and **every coordinate below is then measured from the
   // nudge rather than from the press**, so the Card travels exactly `dx`/`dy`
   // flow units. Leaving the nudge uncompensated would have left an error of
-  // `NUDGE / zoom` — small at the fixture's zoom, and growing as a Layout gets
+  // `NUDGE / zoom` — small at the fixture's zoom, and growing as a Diagram gets
   // wider or a viewport narrower, which is precisely the shape of assertion
   // that passes until the day it does not.
   const from = {

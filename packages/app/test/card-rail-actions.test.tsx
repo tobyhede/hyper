@@ -32,7 +32,7 @@ import { mountSpace } from './space-mounting';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
@@ -40,7 +40,7 @@ const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
  * Two placed Cards and no Edges.
  *
  * Two, because the deletion below has to leave a Space behind that is still
- * worth looking at: a Layout that has lost its only Card says nothing about
+ * worth looking at: a Diagram that has lost its only Card says nothing about
  * whether the Edit removed the right one.
  */
 const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
@@ -48,10 +48,10 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: {
           [CARD_ID]: { x: 0, y: 0, open: false },
@@ -60,7 +60,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
@@ -172,15 +172,15 @@ describe('a Card’s commands on the canvas rail', () => {
    */
   it('asks before deleting, and deletes when the question is answered', async () => {
     const session = mount(
-      { selection: LAYOUT_ID, cardId: CARD_ID, graphId: null, presentationCardId: null },
+      { selection: DIAGRAM_ID, cardId: CARD_ID, graphId: null, presentationCardId: null },
       // The location the Card is addressed from: the opening and the pathname
       // the browser location then follows are one position in production, so
       // they are one here.
       recordingHistory(
         productDestinationPath({
-          kind: 'layout-card',
+          kind: 'diagram-card',
           spaceId: SPACE_ID,
-          layoutId: LAYOUT_ID,
+          diagramId: DIAGRAM_ID,
           cardId: CARD_ID,
         }),
       ),
@@ -191,7 +191,7 @@ describe('a Card’s commands on the canvas rail', () => {
 
     // The press asked rather than deleted, and the question says what goes.
     const question = await screen.findByRole('alertdialog', { name: 'Delete Card A?' });
-    expect(question).toHaveTextContent('every Layout that contains it');
+    expect(question).toHaveTextContent('every Diagram that contains it');
     expect(cardIds(session)).toEqual([CARD_ID, OTHER_CARD_ID]);
 
     fireEvent.click(within(question).getByRole('button', { name: 'Delete Card' }));

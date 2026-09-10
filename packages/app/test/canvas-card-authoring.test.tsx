@@ -15,7 +15,7 @@ import { composeApp } from '../src/compose-app';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
@@ -27,10 +27,10 @@ const snapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: {
           [CARD_ID]: { x: 0, y: 0, open: false },
@@ -40,7 +40,7 @@ const snapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
@@ -57,16 +57,16 @@ const snapshotWithoutCard = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [],
 });
@@ -138,7 +138,7 @@ const mountAuthoring = (
           cardIsOpen: false,
           editingChromeTitle: false,
           spaceOnCanvas: true,
-          editingEmbeddedLayout: false,
+          editingEmbeddedDiagram: false,
         }),
         nameOnCreation,
         authoring,
@@ -171,7 +171,7 @@ describe('canvas Card authoring', () => {
       expect(closed.data.onEditCard?.(true)).toBe('completed');
       closed.data.onBeginBodyEditing?.();
     });
-    expect(spaceSession.getState().working.document.layouts?.[0]?.positions[CARD_ID]?.open).toBe(
+    expect(spaceSession.getState().working.document.diagrams?.[0]?.positions[CARD_ID]?.open).toBe(
       true,
     );
     expect(result.current.nodes[0]?.data.bodyEditor).toBeUndefined();
@@ -197,7 +197,7 @@ describe('canvas Card authoring', () => {
     });
 
     act(() => expect(result.current.openCard(ALIAS_ID)).toBe('completed'));
-    expect(spaceSession.getState().working.document.layouts?.[0]?.positions[ALIAS_ID]?.open).toBe(
+    expect(spaceSession.getState().working.document.diagrams?.[0]?.positions[ALIAS_ID]?.open).toBe(
       true,
     );
 
@@ -244,7 +244,7 @@ describe('canvas Card authoring', () => {
 
     act(() => expect(result.current.openCard(CARD_ID)).toBe('retained'));
     expect(
-      spaceSession.getState().working.document.layouts?.[0]?.positions[CARD_ID]?.open,
+      spaceSession.getState().working.document.diagrams?.[0]?.positions[CARD_ID]?.open,
     ).not.toBe(true);
   });
 
@@ -271,7 +271,7 @@ describe('canvas Card authoring', () => {
     });
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeUndefined();
     act(() => expect(result.current.openCard(CARD_ID)).toBe('completed'));
-    expect(spaceSession.getState().working.document.layouts?.[0]?.positions[CARD_ID]?.open).toBe(
+    expect(spaceSession.getState().working.document.diagrams?.[0]?.positions[CARD_ID]?.open).toBe(
       true,
     );
   });
@@ -351,12 +351,12 @@ describe('canvas Card authoring', () => {
   /**
    * An Open Space Card's floor is its own, and taller than every other Card's.
    *
-   * ADR 0068's embedded Layout is painted over the Card, so the Card's own
+   * ADR 0068's embedded Diagram is painted over the Card, so the Card's own
    * passengers hold a fixed footer under a fixed rail and `.canvas-card` hides
    * what will not fit. At the collapsed floor every other Card resizes to, a
    * Space Card's Graph selector is simply cut off — so the capability carries
    * `SPACE_CARD_MIN_OPEN_SIZE`, which is the inset plus the smallest Card the
-   * embedded Layout could hold.
+   * embedded Diagram could hold.
    */
   it('allows a Space Card resize to reach Close while flooring an ordinary Open proposal above its footer', () => {
     const { result, rerender, authoring, adapter, spaceSession } = mountAuthoring(
@@ -383,17 +383,17 @@ describe('canvas Card authoring', () => {
     });
     expect(adapter.getState().resizeDraft?.size).toEqual(SPACE_CARD_MIN_OPEN_SIZE);
     const remembered =
-      spaceSession.getState().working.document.layouts?.[0]?.positions[SPACE_CARD_ID];
+      spaceSession.getState().working.document.diagrams?.[0]?.positions[SPACE_CARD_ID];
     act(() => {
       space.data.resize?.onResize(CARD_SIZE);
       space.data.resize?.onResizeEnd();
     });
-    expect(spaceSession.getState().working.document.layouts?.[0]?.positions[SPACE_CARD_ID]).toEqual(
-      {
-        ...remembered,
-        open: false,
-      },
-    );
+    expect(
+      spaceSession.getState().working.document.diagrams?.[0]?.positions[SPACE_CARD_ID],
+    ).toEqual({
+      ...remembered,
+      open: false,
+    });
   });
 
   it.each(['markdown', 'alias'] as const)(

@@ -32,7 +32,7 @@ export function ChromeContinuation({
    * The subtree this Space's chrome is drawn in.
    *
    * **Scoped rather than `document`-wide**, because every open Space stays
-   * mounted — hidden with `hidden`, not unmounted, so a Space keeps its Layout
+   * mounted — hidden with `hidden`, not unmounted, so a Space keeps its Diagram
    * selection and its traversal (`OpenSpacesApplication.tsx`). A whole-document
    * query takes the first match in document order, which is whichever Space was
    * opened first, and `focus()` on an element inside a `hidden` subtree does

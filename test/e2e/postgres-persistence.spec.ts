@@ -47,7 +47,7 @@ const openImportedSpace = async (
   await page.goto(`/spaces/${encodeCompactUuid(spaceId)}`);
   // **The Space's name is a label, not a heading** (ADR 0082). The Space
   // Sidebar drew it as an `h1`; the Command Dock draws it through the same
-  // `IdentityName` the Layout and Graph use, and a name with no rename Edit
+  // `IdentityName` the Diagram and Graph use, and a name with no rename Edit
   // behind it renders as a `span` rather than as a button or a heading —
   // renaming a Space is not built (`.scratch/command-dock/issues/09`). So the
   // slot is addressed the way every other spec addresses it, and the visible
@@ -64,7 +64,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
   const repository = new PostgresSpaceRepository(db);
   const spaceId = newUuid();
   const cardId = newUuid();
-  const layoutId = newUuid();
+  const diagramId = newUuid();
   const graphId = newUuid();
   const title = `HTTP restart ${spaceId}`;
   let firstHost: ViteDevServer | undefined;
@@ -74,10 +74,10 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
   let spaceRemains: boolean | undefined;
 
   try {
-    // The Layout is part of the fixture, and has to be. A layoutless Space is
+    // The Diagram is part of the fixture, and has to be. A diagramless Space is
     // initialized on its first working load (ADR 0079), and that initialization
-    // mints an *empty* Layout — `positions: {}` in `working-space.ts`. The
-    // imported Card would then belong to the Space and to no Layout, so the
+    // mints an *empty* Diagram — `positions: {}` in `working-space.ts`. The
+    // imported Card would then belong to the Space and to no Diagram, so the
     // canvas would draw nothing and `nodeByTitle` below would wait out the
     // timeout with the Card sitting in the Cards drawer. Placing the Card here
     // also keeps this test about durability alone: initialization is a write,
@@ -89,17 +89,17 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
         document: {
           version: 1,
           title,
-          layouts: [
+          diagrams: [
             {
-              id: layoutId,
-              title: 'Layout 1',
+              id: diagramId,
+              title: 'Diagram 1',
               kind: 'positioned',
               positions: { [cardId]: { x: 0, y: 0, open: false } },
               graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
               activeGraph: graphId,
             },
           ],
-          defaultLayout: layoutId,
+          defaultDiagram: diagramId,
         },
         cards: [
           {

@@ -5,7 +5,7 @@ import type { LoadedSpace, SpaceBackend } from '../src/index';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 export const contractLoaded: LoadedSpace = {
@@ -14,11 +14,11 @@ export const contractLoaded: LoadedSpace = {
     document: {
       version: 1,
       title: 'One',
-      defaultLayout: LAYOUT_ID,
-      layouts: [
+      defaultDiagram: DIAGRAM_ID,
+      diagrams: [
         {
-          id: LAYOUT_ID,
-          title: 'Layout 1',
+          id: DIAGRAM_ID,
+          title: 'Diagram 1',
           kind: 'positioned',
           positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
           graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -110,12 +110,12 @@ export const spaceBackendContract = (
     const harness = await createHarness([contractLoaded]);
     try {
       // Shape-valid and domain-invalid: a graph reaches intake only through the
-      // layout that owns it now (ADR 0040), and its edge endpoints must be cards
-      // of *that* layout, so the dangling end is one the positions omit.
+      // diagram that owns it now (ADR 0040), and its edge endpoints must be cards
+      // of *that* diagram, so the dangling end is one the positions omit.
       const invalid = structuredClone(contractLoaded.snapshot);
-      invalid.document.layouts = [
+      invalid.document.diagrams = [
         {
-          id: LAYOUT_ID,
+          id: DIAGRAM_ID,
           title: 'Owner',
           kind: 'positioned',
           positions: { [CARD_ID]: { x: 0, y: 0, open: false } },

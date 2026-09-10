@@ -26,7 +26,7 @@ import {
  * The dismissal is `AlertAction`, which the shared `Alert` already reserves its
  * right padding for and which `PersistenceNotice` already spends on Retry — a
  * report's own commands belong inside it. It is **acknowledgement and nothing
- * else**: dismissing changes no state the report is about, so a Layout that was
+ * else**: dismissing changes no state the report is about, so a Diagram that was
  * not created is still not created and the next attempt reports again. That is
  * why the retryable persistence failure is not one of these — it is drawn
  * beside the Dock rather than here, it carries Retry, and it stands for a state

@@ -78,12 +78,12 @@ function sampleGraph(): LayoutStrategyGraph {
 }
 
 /**
- * Positions for `positionedStrategy`, which reads an authored Layout.
+ * Positions for `positionedStrategy`, which reads an authored Diagram.
  *
  * Also covers `00000000...0099`, the single card `arranges a single card with
  * no edges` below builds ad hoc: `positionedStrategy` only draws a card its
  * Placement names (ADR 0040), so the shared cross-strategy contract needs this
- * Layout to have authored a position for it too.
+ * Diagram to have authored a position for it too.
  */
 const authored = (): Placement =>
   Placement.fromEntries([

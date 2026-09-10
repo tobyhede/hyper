@@ -11,14 +11,14 @@ This file sits here rather than in `fixture/` on purpose. A space is a directory
 there would be scanned as one and fail to parse for want of frontmatter.
 
 Each space is a directory: `space.json` holding structure — `version`, `id`,
-`title`, `layouts` and `defaultLayout` — and one markdown file per
+`title`, `diagrams` and `defaultDiagram` — and one markdown file per
 card, either beside it or under `cards/`. The fixture uses both locations
 (`a.md` at the top, the rest in `cards/`) so the two-location scan is exercised
 by the space the app actually loads.
 
 Two **disconnected collections** in one space, sharing no cards, which ELK lays
 out as separate bands — and, because a Graph is a nested owned value of the
-Layout that holds it (ADR 0040), **two Layouts**:
+Diagram that holds it (ADR 0040), **two Diagrams**:
 
 ```
 Collection 1   Long   A → B → C → D → A′
@@ -28,7 +28,7 @@ Collection 1   Long   A → B → C → D → A′
 Collection 2   Echo   E → F → G → H → E′
 ```
 
-Each Layout's position keys are its Card membership, and every Edge it owns is
+Each Diagram's position keys are its Card membership, and every Edge it owns is
 closed over that membership — which is why the split follows the collections
 rather than being drawn anywhere else. Membership is the wider of the two: `T`
 is a member of Collection 1 that no Edge reaches, which is what Add Card leaves
@@ -37,15 +37,15 @@ forbids. Between them the two hold every Card once, so nothing is left over and
 nothing is in both.
 
 Their positions are **authored**, as placement always is (ADR 0014): a plain
-hand-set grid, two rows of a Layout apiece, so selecting a Layout draws its Cards
+hand-set grid, two rows of a Diagram apiece, so selecting a Diagram draws its Cards
 where the space file put them and first paint moves nothing.
 
-`defaultLayout` names **Collection 1**, so that is the Layout the fixture opens
-on (ADR 0079). A selected Layout draws only the Graphs it owns, so Collection 2
+`defaultDiagram` names **Collection 1**, so that is the Diagram the fixture opens
+on (ADR 0079). A selected Diagram draws only the Graphs it owns, so Collection 2
 is off the canvas until it is selected.
 
 `example/` is one connected collection of seven Cards, so its three Graphs are
-owned by a **single** Layout. Nothing renders it, so its positions are a plain
+owned by a **single** Diagram. Nothing renders it, so its positions are a plain
 deterministic grid rather than an ELK run.
 
 Each collection returns to its start via an **alias** (`A′` of `A`, `E′` of `E`).
@@ -86,11 +86,11 @@ Between them the shape exercises every behaviour the e2e suite covers:
   of each role — so the Card front's Title ladder is drawn by the space the app
   and Playwright actually load, and a regression in projection or clamping shows
   up on screen rather than only in a unit test.
-- **A Layout member no Edge reaches.** `T` again: it is placed on Collection 1
+- **A Diagram member no Edge reaches.** `T` again: it is placed on Collection 1
   and joins none of its Graphs, so it draws no graph handles and carries no
   Edges. That is the state Add Card and the Cards drawer both author.
 - **Overlay counts.** 11 cards, 13 edges (4 + 3 + 2 + 4), 26 handles, 4 graphs
-  across both Layouts. A *selected* Layout draws only the Graphs it owns: 9
+  across both Diagrams. A *selected* Diagram draws only the Graphs it owns: 9
   edges for Collection 1, 4 for Collection 2 — and 6 Cards on Collection 1,
   which is its 5 Edge endpoints plus `T`.
 

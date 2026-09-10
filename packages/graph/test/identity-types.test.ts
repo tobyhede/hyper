@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from 'vitest';
-import type { CardId, LayoutPosition, GraphId } from '@project/core';
+import type { CardId, DiagramPosition, GraphId } from '@project/core';
 import {
   Placement,
   positionedStrategy,
@@ -10,7 +10,7 @@ import {
 } from '@project/graph';
 
 describe('graph identity types', () => {
-  it('preserves validated identities through projection and layout', () => {
+  it('preserves validated identities through projection and diagram', () => {
     expectTypeOf<GraphRenderEdge['graphId']>().toEqualTypeOf<GraphId>();
     expectTypeOf<GraphRenderEdge['source']>().toEqualTypeOf<CardId>();
     expectTypeOf<GraphRenderEdge['target']>().toEqualTypeOf<CardId>();
@@ -21,16 +21,16 @@ describe('graph identity types', () => {
     expectTypeOf(Placement.fromLayoutStrategyGraph).returns.toEqualTypeOf<Placement>();
     expectTypeOf(positionedStrategy).parameter(0).toEqualTypeOf<Placement>();
     // A Placement is a readable card→position map; writing it is what is closed.
-    expectTypeOf<Placement>().toExtend<ReadonlyMap<CardId, Readonly<LayoutPosition>>>();
+    expectTypeOf<Placement>().toExtend<ReadonlyMap<CardId, Readonly<DiagramPosition>>>();
 
     // @ts-expect-error A plain string has not crossed the UUID validation seam.
     const cardId: LayoutStrategyCard['id'] = 'card';
     // @ts-expect-error A plain string has not crossed the UUID validation seam.
     const graphId: GraphRenderEdge['graphId'] = 'graph';
     // @ts-expect-error Plain strings cannot key a graph-owned position map.
-    positionedStrategy(new Map<string, LayoutPosition>());
+    positionedStrategy(new Map<string, DiagramPosition>());
     // @ts-expect-error A Placement is built through the module, never by hand.
-    positionedStrategy(new Map<CardId, LayoutPosition>());
+    positionedStrategy(new Map<CardId, DiagramPosition>());
     // @ts-expect-error Nor through the sanctioned constructor: closing construction
     // would mean nothing if `fromEntries` re-opened the seam it exists to hold.
     Placement.fromEntries([['card', { x: 0, y: 0, open: false }]]);

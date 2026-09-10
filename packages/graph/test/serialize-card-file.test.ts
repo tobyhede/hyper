@@ -52,7 +52,7 @@ describe('serializeCardFile', () => {
       title: 'Nested space',
       kind: 'space',
       spaceId: uuid('00000000-0000-4000-8000-000000000010'),
-      layout: uuid('00000000-0000-4000-8000-000000000011'),
+      diagram: uuid('00000000-0000-4000-8000-000000000011'),
       graph: uuid('00000000-0000-4000-8000-000000000012'),
     };
 

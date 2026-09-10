@@ -2,7 +2,7 @@ import type { CardId, SpaceSnapshot } from '@project/core';
 import { resolveProductDestinationInSnapshot, type ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
-import { resolveLayout } from './layout-resolution';
+import { resolveDiagram } from './diagram-resolution';
 import { openingGraphId, type NavigationAddress } from './navigation';
 
 export type DestinationRestoration =
@@ -78,7 +78,7 @@ export interface AddressedPosition extends NavigationAddress {
 }
 
 const sameAddress = (one: NavigationAddress, other: NavigationAddress): boolean =>
-  one.selectedLayoutId === other.selectedLayoutId &&
+  one.selectedDiagramId === other.selectedDiagramId &&
   one.activeGraphId === other.activeGraphId &&
   one.presentingCardId === other.presentingCardId;
 
@@ -97,13 +97,13 @@ export const samePosition = (one: AddressedPosition, other: AddressedPosition): 
  * `installDestinationOpening` decides it.
  *
  * A location that names no Graph does not leave the Active Graph unknown: it
- * opens whatever its Layout opens on, which is Navigation's own
+ * opens whatever its Diagram opens on, which is Navigation's own
  * {@link openingGraphId} rather than a second answer written here.
  */
 function openingPosition(space: Space, opening: DestinationOpening): AddressedPosition {
   return {
-    selectedLayoutId: opening.selection,
-    activeGraphId: opening.graphId ?? openingGraphId(resolveLayout(space, opening.selection)),
+    selectedDiagramId: opening.selection,
+    activeGraphId: opening.graphId ?? openingGraphId(resolveDiagram(space, opening.selection)),
     presentingCardId: opening.presentationCardId,
     addressedCardId: opening.cardId,
   };
@@ -118,18 +118,18 @@ function openingPosition(space: Space, opening: DestinationOpening): AddressedPo
  * something it moves to, so writing one would answer a URL no operation asked
  * for: the canonical spelling silently narrowed into its contextual form, the
  * Active Graph dropped out of the address it names nothing of, and, for a Card
- * the Layout omits, a location this Space's own resolver refuses. The Card
+ * the Diagram omits, a location this Space's own resolver refuses. The Card
  * still decides {@link samePosition}, which is how a restored Card location is
  * recognised as already open.
  *
  * Two rules decide whether the URL names the Active Graph. It must, when the
- * Layout would open on some other Graph — a Layout URL that reopens a
+ * Diagram would open on some other Graph — a Diagram URL that reopens a
  * different Graph does not name this position at all. It also keeps naming one
- * the location already named in this same Layout: leaving a presentation
+ * the location already named in this same Diagram: leaving a presentation
  * returns to the Graph the presentation URL spelled out, and widening it to the
- * bare Layout would throw away specificity the reader is holding. That
- * second rule is the surviving half of `adoptedLayoutDestination` — do not
- * widen a URL that already names something inside this Layout.
+ * bare Diagram would throw away specificity the reader is holding. That
+ * second rule is the surviving half of `adoptedDiagramDestination` — do not
+ * widen a URL that already names something inside this Diagram.
  */
 function positionDestination(
   space: Space,
@@ -137,30 +137,30 @@ function positionDestination(
   opening: DestinationOpening | null,
 ): ProductDestination {
   const spaceId = space.id;
-  const { selectedLayoutId, activeGraphId, presentingCardId } = position;
+  const { selectedDiagramId, activeGraphId, presentingCardId } = position;
   if (presentingCardId !== null && activeGraphId !== null) {
     return {
       kind: 'presentation',
       spaceId,
-      layoutId: selectedLayoutId,
+      diagramId: selectedDiagramId,
       graphId: activeGraphId,
       cardId: presentingCardId,
     };
   }
   const namesGraph =
-    opening !== null && opening.selection === selectedLayoutId && opening.graphId !== null;
+    opening !== null && opening.selection === selectedDiagramId && opening.graphId !== null;
   if (
     activeGraphId !== null &&
-    (namesGraph || activeGraphId !== openingGraphId(resolveLayout(space, selectedLayoutId)))
+    (namesGraph || activeGraphId !== openingGraphId(resolveDiagram(space, selectedDiagramId)))
   ) {
     return {
-      kind: 'layout-graph',
+      kind: 'diagram-graph',
       spaceId,
-      layoutId: selectedLayoutId,
+      diagramId: selectedDiagramId,
       graphId: activeGraphId,
     };
   }
-  return { kind: 'layout', spaceId, layoutId: selectedLayoutId };
+  return { kind: 'diagram', spaceId, diagramId: selectedDiagramId };
 }
 
 /**

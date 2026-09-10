@@ -64,7 +64,7 @@ export const DeletionRefusal: Story = () => (
   <SelectedEdgeFixture
     refusal={{
       kind: 'deletion',
-      refusal: { code: 'layout-required', operation: 'deleted-edge' },
+      refusal: { code: 'diagram-required', operation: 'deleted-edge' },
     }}
   />
 );

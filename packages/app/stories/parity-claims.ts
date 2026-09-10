@@ -27,14 +27,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Space, Layout and Graph names share typography; Space remains a non-interactive label, while Layout opens its rename editor and returns focus on Escape.',
+      'Space, Diagram and Graph names share typography; Space remains a non-interactive label, while Diagram opens its rename editor and returns focus on Escape.',
   },
   {
-    id: 'cards-drawer-adds-existing-layout-members',
+    id: 'cards-drawer-adds-existing-diagram-members',
     storyFile: 'surfaces/cards-drawer.stories.tsx',
     storyExport: 'AvailableCards',
     claim:
-      'The right Cards drawer shows full production Card fronts without canvas handles, filters the Cards absent from a Layout, and activates an existing Card through the application Add to Layout path.',
+      'The right Cards drawer shows full production Card fronts without canvas handles, filters the Cards absent from a Diagram, and activates an existing Card through the application Add to Diagram path.',
   },
   {
     id: 'cards-drawer-opens-and-dismisses-without-locking-the-canvas',
@@ -44,10 +44,10 @@ export const parityClaims: readonly ParityClaim[] = [
       'The Cards drawer opens from its own trigger as a dialog named Cards, dismisses on Escape with focus returning to that trigger, and leaves the surface behind it both live and undismissing — which is what dropping a Card onto the canvas is.',
   },
   {
-    id: 'cards-drawer-distinguishes-an-empty-layout',
+    id: 'cards-drawer-distinguishes-an-empty-diagram',
     storyFile: 'surfaces/cards-drawer.stories.tsx',
     storyExport: 'Empty',
-    claim: 'A Layout containing every Space Card names that empty Cards View explicitly.',
+    claim: 'A Diagram containing every Space Card names that empty Cards View explicitly.',
   },
   {
     id: 'cards-drawer-scrolls-a-long-list-on-a-narrow-screen',
@@ -61,7 +61,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/cards-drawer.stories.tsx',
     storyExport: 'Disabled',
     claim:
-      'The Cards trigger is disabled while the Layout cannot accept membership edits — presenting, an open Card, or Alias creation.',
+      'The Cards trigger is disabled while the Diagram cannot accept membership edits — presenting, an open Card, or Alias creation.',
   },
   {
     id: 'cards-drawer-keeps-an-add-refusal-on-its-surface',
@@ -69,7 +69,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'Refused',
     claim: 'A refused Add remains visible in the open Cards drawer that asked for it.',
     applicationEvidence:
-      'No browser gesture reaches a repeated Add. Completing the first one removes the Card from `cardsOutsideSelectedLayout`, so the row unmounts before a second click can land on it, and only two events dispatched inside one task reach the refusal at all. The story is driven to the state instead, through the production Authoring composition, so the sentence it draws is the one `describeAuthoringRefusal` gives the application.',
+      'No browser gesture reaches a repeated Add. Completing the first one removes the Card from `cardsOutsideSelectedDiagram`, so the row unmounts before a second click can land on it, and only two events dispatched inside one task reach the refusal at all. The story is driven to the state instead, through the production Authoring composition, so the sentence it draws is the one `describeAuthoringRefusal` gives the application.',
   },
   {
     id: 'cards-drawer-coexists-with-persistence-failure',
@@ -283,32 +283,32 @@ export const parityClaims: readonly ParityClaim[] = [
    * from here and there is nothing left to claim.
    */
   {
-    id: 'command-dock-marks-one-current-layout',
+    id: 'command-dock-marks-one-current-diagram',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      "Exactly one authored Layout is the one drawing the canvas, chosen from the Layout cluster's single exclusive list, which names the chosen one on the cluster itself.",
+      "Exactly one authored Diagram is the one drawing the canvas, chosen from the Diagram cluster's single exclusive list, which names the chosen one on the cluster itself.",
   },
   {
-    id: 'command-dock-adds-an-empty-layout',
+    id: 'command-dock-adds-an-empty-diagram',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'New Layout sits in the Layout menu beside the list it adds to, and creates and selects an empty Layout without implicitly placing Cards.',
+      'New Diagram sits in the Diagram menu beside the list it adds to, and creates and selects an empty Diagram without implicitly placing Cards.',
   },
   {
     id: 'command-dock-copies-graph-destinations',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      "The Graph menu offers Copy link and Copy permanent link, building the current-Layout address and the Graph's own address respectively.",
+      "The Graph menu offers Copy link and Copy permanent link, building the current-Diagram address and the Graph's own address respectively.",
   },
   {
     id: 'command-dock-edits-identity-names',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'The Layout and Graph names are each their own rename control, editing in place as one refusable draft that keeps a refusal on the field, completes on Enter and cancels on Escape.',
+      'The Diagram and Graph names are each their own rename control, editing in place as one refusable draft that keeps a refusal on the field, completes on Enter and cancels on Escape.',
   },
   {
     id: 'command-dock-marks-the-space-one-crossing-up',
@@ -325,11 +325,11 @@ export const parityClaims: readonly ParityClaim[] = [
       'Docked to a side edge the surface is a column of named rows rather than a rail of glyphs, and its disclosures open away from that edge into the canvas.',
   },
   {
-    id: 'command-dock-names-a-new-spaces-initial-layout-and-graph',
+    id: 'command-dock-names-a-new-spaces-initial-diagram-and-graph',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'NewSpace',
     claim:
-      'A new Space names its initial Layout and its empty Active Graph rather than leaving either cluster blank, and cannot present.',
+      'A new Space names its initial Diagram and its empty Active Graph rather than leaving either cluster blank, and cannot present.',
   },
   {
     id: 'command-dock-withdraws-entirely-while-presenting',
@@ -434,7 +434,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'Placement',
     claim: 'A strategy that cannot produce positions fails placement with its own diagnostic.',
     applicationEvidence:
-      'Selectable V1 Layouts use the in-process positioned strategy, so a browser cannot deterministically block it. Covered by packages/app/test/placement-rendering.test.tsx.',
+      'Selectable V1 Diagrams use the in-process positioned strategy, so a browser cannot deterministically block it. Covered by packages/app/test/placement-rendering.test.tsx.',
   },
   {
     id: 'operational-feedback-placement-pending',
@@ -495,7 +495,7 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'selected-edge-stale-reconnection-uses-the-form-channel',
     storyFile: 'components/selected-edge-controls.stories.tsx',
     storyExport: 'ReconnectionRefusal',
-    claim: 'A stale Layout, Graph or Edge reports on the form channel and marks neither Field.',
+    claim: 'A stale Diagram, Graph or Edge reports on the form channel and marks neither Field.',
     applicationEvidence:
       'The remaining stale conditions need the Space to change under an open editor. Covered instead by packages/app/test/authoring-refusal.test.ts and packages/app/test/SelectedEdgeControls.test.tsx.',
   },
@@ -515,16 +515,16 @@ export const parityClaims: readonly ParityClaim[] = [
       'The themed canvas control continuously zooms with its slider, zooms with its buttons and fits the real React Flow viewport.',
   },
   {
-    id: 'open-space-card-draws-its-selected-layout',
-    storyFile: 'surfaces/space-card-embedded-layout.stories.tsx',
-    storyExport: 'SelectedLayout',
+    id: 'open-space-card-draws-its-selected-diagram',
+    storyFile: 'surfaces/space-card-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
     claim:
-      "An Open Space Card draws the Layout it selects — the target Space's own Cards and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Card's own rect.",
+      "An Open Space Card draws the Diagram it selects — the target Space's own Cards and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Card's own rect.",
   },
   {
-    id: 'embedded-layout-cards-author-target',
-    storyFile: 'surfaces/space-card-embedded-layout.stories.tsx',
-    storyExport: 'SelectedLayout',
+    id: 'embedded-diagram-cards-author-target',
+    storyFile: 'surfaces/space-card-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
     claim:
       'Editing a Card inside an Open Space Card authors its target Space and updates both canvases; cross-Space connection handles remain unavailable.',
   },

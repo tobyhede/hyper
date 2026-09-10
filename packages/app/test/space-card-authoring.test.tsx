@@ -31,14 +31,14 @@ import { createCard, unavailable } from './command-dock';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const META_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const META_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const META_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const META_TO_HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const META_TO_OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const HOME_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
-const HOME_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
+const HOME_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const HOME_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
 const HOME_NEXT_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000014');
 
@@ -59,10 +59,10 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Meta',
-    layouts: [
+    diagrams: [
       {
-        id: META_LAYOUT_ID,
-        title: 'Layout 1',
+        id: META_DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [META_CARD_ID]: { x: 0, y: 0, open: false },
@@ -72,7 +72,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
     ],
-    defaultLayout: META_LAYOUT_ID,
+    defaultDiagram: META_DIAGRAM_ID,
   },
   cards: [
     { id: META_CARD_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
@@ -87,10 +87,10 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Home',
-    layouts: [
+    diagrams: [
       {
-        id: HOME_LAYOUT_ID,
-        title: 'Layout 1',
+        id: HOME_DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [HOME_CARD_ID]: { x: 10, y: 20, open: false },
@@ -108,7 +108,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         ],
       },
     ],
-    defaultLayout: HOME_LAYOUT_ID,
+    defaultDiagram: HOME_DIAGRAM_ID,
   },
   cards: [
     { id: HOME_CARD_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
@@ -645,7 +645,7 @@ describe('a coordination that broke rather than refused', () => {
     createNamed('Architecture');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled());
 
-    act(() => app.navigation.openPresentation(HOME_LAYOUT_ID, HOME_GRAPH_ID, HOME_CARD_ID));
+    act(() => app.navigation.openPresentation(HOME_DIAGRAM_ID, HOME_GRAPH_ID, HOME_CARD_ID));
 
     expect(screen.getByRole('dialog', { name: 'New Space Card' })).toBeVisible();
     await settled(session);

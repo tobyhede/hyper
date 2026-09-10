@@ -13,27 +13,27 @@ export interface HttpLoadedSpace {
   readonly exportedRevision: string | null;
 }
 
-/** The Layout id every seeded scenario writes, so no test asserts against a literal of its own. */
-export const SEEDED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+/** The Diagram id every seeded scenario writes, so no test asserts against a literal of its own. */
+export const SEEDED_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 /**
- * The Graph that Layout owns. A Layout owns at least one (ADR 0040), and seeding
- * one that is empty is what a conversion would have produced — the seeded Layout
- * stands in for the Layout an author's first edit creates, so it starts with
+ * The Graph that Diagram owns. A Diagram owns at least one (ADR 0040), and seeding
+ * one that is empty is what a conversion would have produced — the seeded Diagram
+ * stands in for the Diagram an author's first edit creates, so it starts with
  * nothing authored into it.
  */
 export const SEEDED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
 /**
- * Seed the opened Space with a single positioned Layout, then read it back.
+ * Seed the opened Space with a single positioned Diagram, then read it back.
  *
- * What it buys a test is an app that opens in an authored Layout rather than an
- * default Layout. This goes through the same HTTP boundary the browser uses
+ * What it buys a test is an app that opens in an authored Diagram rather than an
+ * default Diagram. This goes through the same HTTP boundary the browser uses
  * rather than reaching past it, so the seeded revision is one the app will
  * actually observe — hence the read-back: the caller asserts against the
  * revision the commit produced.
  */
-export async function seedPositionedLayout(
+export async function seedPositionedDiagram(
   page: Page,
   title: string,
   positionsFor: (snapshot: SpaceSnapshot) => Record<string, CardPlacement>,
@@ -58,16 +58,16 @@ export async function seedPositionedLayout(
     ...loaded.snapshot,
     document: {
       ...loaded.snapshot.document,
-      layouts: [
+      diagrams: [
         {
-          id: SEEDED_LAYOUT_ID,
+          id: SEEDED_DIAGRAM_ID,
           title,
           kind: 'positioned',
           positions: positionsFor(loaded.snapshot),
           graphs: [{ id: SEEDED_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
       ],
-      defaultLayout: SEEDED_LAYOUT_ID,
+      defaultDiagram: SEEDED_DIAGRAM_ID,
     },
   };
   const commitResponse = await page.request.post('/api/spaces', {

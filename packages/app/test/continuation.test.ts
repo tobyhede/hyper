@@ -19,7 +19,7 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
 
@@ -28,10 +28,10 @@ const snapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout 1',
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [CARD_A]: { x: 10, y: 20, open: false },
@@ -40,7 +40,7 @@ const snapshot: SpaceSnapshot = {
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [EDGE] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -59,7 +59,7 @@ function open(stored: SpaceSnapshot = snapshot, revision = 0n) {
   const session = openSpaceSession(backend, loaded);
   const { authoring, navigation, continuation } = composeApp({
     spaceSession: session,
-    selection: LAYOUT_ID,
+    selection: DIAGRAM_ID,
     initialPlacement: placement,
   });
   return { session, authoring, navigation, continuation };
@@ -129,7 +129,7 @@ describe('the one pending continuation', () => {
 
 /**
  * Two facts discard a continuation, and only two. Over-invalidating is how a
- * legitimate continuation is silently lost — a target in a Layout no longer
+ * legitimate continuation is silently lost — a target in a Diagram no longer
  * drawn simply fails to resolve, which the wait policy answers on its own.
  */
 describe('invalidation', () => {
@@ -158,12 +158,12 @@ describe('invalidation', () => {
     expect(continuation.getState().pending).toBeNull();
   });
 
-  it('keeps one across an ordinary Edit, a Layout choice and an activated Graph', () => {
+  it('keeps one across an ordinary Edit, a Diagram choice and an activated Graph', () => {
     const { authoring, navigation, continuation } = open();
     continuation.request(NAME_A);
 
-    authoring.complete({ kind: 'renamed-layout', layoutId: LAYOUT_ID, title: 'Renamed' });
-    navigation.selectLayout(LAYOUT_ID);
+    authoring.complete({ kind: 'renamed-diagram', diagramId: DIAGRAM_ID, title: 'Renamed' });
+    navigation.selectDiagram(DIAGRAM_ID);
     navigation.activateGraph(GRAPH_ID);
 
     expect(continuation.getState().pending).toEqual(NAME_A);
@@ -202,7 +202,7 @@ describe('the wait policy', () => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(false);
   });
 
-  /** A Card waits whatever it was going to do there — Add to Layout is a `focus`. */
+  /** A Card waits whatever it was going to do there — Add to Diagram is a `focus`. */
   it.each(['nothing', 'focus', 'reveal', 'rename'] as const)(
     'keeps a Card owed whose continuation is %s',
     (then) => {

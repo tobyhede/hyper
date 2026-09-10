@@ -101,7 +101,7 @@ const RETIRED_BARE = new RegExp(`\\b(?:${ENTITY}|${TRAVERSAL})\\b`);
  * legitimately a result, a row, a request or a repository, and the deny-list
  * that follows would never stop growing. Requiring the Graph collection on the
  * same line is what removes that cost entirely — the repo's convention is the
- * domain initial (`(c)` for card, `(l)` for layout, `(e)` for edge), so a
+ * domain initial (`(c)` for card, `(d)` for diagram, `(e)` for edge), so a
  * binding introduced over `graphs` has exactly one correct letter and the
  * retired name's is not it. This is the answer to the open question in
  * `.scratch/graph-rename/issues/03-...`: worth reading, once scoped this way.
@@ -133,7 +133,18 @@ const isImplementationSource = (file: string): boolean =>
  * (`docs/agents/workflow.md`). These are trees rather than paths: a record that
  * moves inside one stays covered, and there is nothing to re-list.
  */
-const HISTORICAL_TREES = ['docs/adr/', 'docs/superpowers/', '.scratch/'] as const;
+const HISTORICAL_TREES = [
+  'docs/adr/',
+  'docs/superpowers/',
+  '.scratch/',
+  // Vendored third-party guidance, pinned by `skills-lock.json`. It is written
+  // in its own vocabulary — shadcn's component categories include a `Layout`
+  // one, and its styling rule is about CSS layout — so the retired word there
+  // is neither ours to sweep nor ours to report. The rename codemod excludes
+  // this tree for the same reason; sweeping it once corrupted the advice and
+  // made the lock record a provenance it no longer described.
+  '.agents/skills/',
+] as const;
 
 /**
  * Live files speaking a different library's routing vocabulary belong here.
@@ -281,7 +292,7 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
       expect(scanned).toContain(file);
       expect(readTracked(file), `${file} is exempted but no longer tracked`).not.toBeNull();
     }
-    expect(hits(`const active${ENTITY} = layout.active${ENTITY};`, RETIRED_COMPOUND)).not.toEqual(
+    expect(hits(`const active${ENTITY} = diagram.active${ENTITY};`, RETIRED_COMPOUND)).not.toEqual(
       [],
     );
   });
@@ -335,7 +346,7 @@ describe('the vocabulary that guard reads', () => {
     const retired = [
       `export type ${ENTITY}Id = string;`,
       `import type { ${ENTITY}Edge } from '@project/core';`,
-      `const active${ENTITY} = layout.active${ENTITY};`,
+      `const active${ENTITY} = diagram.active${ENTITY};`,
       `export const get${ENTITY} = (space: Space) => space.${lower}s[0];`,
       `const ${lower}CardIds = new Set();`,
       `const ${upper}_PALETTE = ['#000'];`,
@@ -364,7 +375,7 @@ describe('the vocabulary that guard reads', () => {
       // Annotated, which the inferred call sites do not write but a new one might.
       `space.graphs.map((${initial}: Graph) => ${initial}.id)`,
       // Any iteration method, not just `map`.
-      `layout.graphs.some((${initial}) => ${initial}.id === graphId)`,
+      `diagram.graphs.some((${initial}) => ${initial}.id === graphId)`,
     ];
 
     for (const line of bound) {
@@ -390,7 +401,7 @@ describe('the vocabulary that guard reads', () => {
       // letter there is bound by `rows`, not by anything this guard governs.
       `const ids = space.graphs.map((graph) => graph.id).concat(rows.map((${initial}) => ${initial}.id));`,
       // `.graphs` reached, but not as the receiver of the callback.
-      `if (layout.graphs.includes(graphId)) return rows.map((${initial}) => ${initial}.id);`,
+      `if (diagram.graphs.includes(graphId)) return rows.map((${initial}) => ${initial}.id);`,
     ];
 
     for (const line of kept) {
@@ -423,11 +434,11 @@ describe('the vocabulary that guard reads', () => {
  * and the header that showed which one won — so every new presentation invited
  * a fourth.
  *
- * ADR 0079 then settled the noun itself: an authored **Layout** is the only
+ * ADR 0079 then settled the noun itself: an authored **Diagram** is the only
  * thing that draws the canvas, and the render-layer word that stood between a
- * Layout id and the Layout it names went with the module it named. Its identity
- * is `LayoutId` in `@project/core` now, resolution is `resolveLayout`, and the
- * Sidebar takes the Space's Layouts rather than a row type derived for it.
+ * Diagram id and the Diagram it names went with the module it named. Its identity
+ * is `DiagramId` in `@project/core` now, resolution is `resolveDiagram`, and the
+ * Sidebar takes the Space's Diagrams rather than a row type derived for it.
  * Every spelling that indirection was written in is retired below, so it cannot
  * grow back under a name a reader would have to follow to recognise.
  *
@@ -474,11 +485,11 @@ const RETIRED_RENDERER_NAMES = [
   ['canvas', '-renderers'],
   ['canvasRenderer', 'Key'],
   ['current', 'Renderer'],
-  // Navigation's field and the two operations that moved between Layouts.
+  // Navigation's field and the two operations that moved between Diagrams.
   ['selected', 'Renderer'],
   ['select', 'Renderer'],
   ['continueIn', 'Renderer'],
-  // The DOM hooks the Layout row carried.
+  // The DOM hooks the Diagram row carried.
   ['data-', 'renderer'],
   ['canvas', '-renderer'],
 ].map((parts) => parts.join(''));
@@ -489,7 +500,7 @@ const RETIRED_RENDERER_NAMES = [
  * It was read as a **whole identifier** while the longer name that extended it
  * was current: the component kept this prefix and gained the render-layer noun,
  * so a prefix read would have reported its own replacement. ADR 0079 retired
- * that longer name too — the header takes a Layout and is named for one — so
+ * that longer name too — the header takes a Diagram and is named for one — so
  * the whole-identifier rule goes with it and this is read as a prefix like
  * every other name above. That is what now makes one entry cover both.
  *
@@ -581,7 +592,7 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
    * reason; the rest are assembled here rather than written out, so this file
    * still reads like every other tracked one under its own scan.
    */
-  it('reports every spelling the Layout indirection was written in', () => {
+  it('reports every spelling the Diagram indirection was written in', () => {
     const aggregate = ['Resolved', 'Renderer'].join('');
     const row = ['Canvas', 'Renderer'].join('');
     const retired = [
@@ -591,7 +602,7 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
       `const current = ${['current', 'Renderer'].join('')}(renderers, navigationState.${['selected', 'Renderer'].join('')});`,
       `const ${['resolve', 'Renderer'].join('')} = ${['createRenderer', 'Resolver'].join('')}();`,
       `function openedState(selection: ${row}Id, view: ${aggregate}) {`,
-      `<button ${['data-', 'renderer'].join('')}={layout.id} data-testid="${['canvas', '-renderer'].join('')}" />`,
+      `<button ${['data-', 'renderer'].join('')}={diagram.id} data-testid="${['canvas', '-renderer'].join('')}" />`,
     ];
 
     for (const line of retired) {
@@ -604,12 +615,12 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
     // three names that are not ours to sweep — React Flow's edge-label renderer
     // and its own class, and the function type that renders a React element.
     const kept = [
-      `export function SelectedLayoutName({ layout }: { readonly layout: Layout }) {`,
-      `import { resolveLayout, layoutCards } from '../layout-resolution';`,
-      `const selected = layouts.find((layout) => layout.id === selectedLayoutId);`,
-      `<button data-layout-id={layout.id} data-testid="layout-row" />`,
-      `navigation.selectLayout(layoutId); navigation.continueInLayout(layoutId, graphId);`,
-      `expect(errors[0]?.kind).toBe('unresolved-default-layout');`,
+      `export function SelectedDiagramName({ diagram }: { readonly diagram: Diagram }) {`,
+      `import { resolveDiagram, diagramCards } from '../diagram-resolution';`,
+      `const selected = diagrams.find((diagram) => diagram.id === selectedDiagramId);`,
+      `<button data-diagram-id={diagram.id} data-testid="diagram-row" />`,
+      `navigation.selectDiagram(diagramId); navigation.continueInDiagram(diagramId, graphId);`,
+      `expect(errors[0]?.kind).toBe('unresolved-default-diagram');`,
       `import { EdgeLabelRenderer } from '@xyflow/react';`,
       `element.className = 'react-flow__renderer';`,
       `export type SpaceAppRenderer = (element: ReactElement) => void;`,
@@ -984,6 +995,272 @@ describe('the retired name for the surface over the open set is gone', () => {
       `.dock__${RETIRED_SURFACE} {`,
     ]) {
       expect(RETIRED_SURFACE_NAME.test(spelling), spelling).toBe(true);
+    }
+  });
+});
+
+/**
+ * ADR 0083 makes Diagram the first-public name for the entity that was a
+ * Layout, and states the same completion criterion ADR 0041 did: a repository
+ * scan finds the retired name only in historical records and in qualified
+ * layout-strategy prose. This is the first of that ADR's two changes; the
+ * second retires the other noun and gains its own block here.
+ *
+ * The shape rule transfers from ADR 0041 exactly, and for the same reason: the
+ * bare English word is legitimate — a strategy lays cards out, the Command Dock
+ * takes no layout space, React Flow's docs have a layouting page — while a
+ * compound is unambiguous. Nothing writes the retired id, the retired
+ * collection or the retired opening field by accident.
+ *
+ * **Two carve-outs are shape rather than exception**, in the `Routed*` idiom
+ * this file already uses:
+ *
+ *  - `LayoutStrategy` and everything built on it keeps its name, which ADR 0083
+ *    records as a negative in as many words. The word there is the verb: two of
+ *    its three implementations read no Diagram at all, so naming the contract
+ *    after the entity would assert a relationship they do not have and would
+ *    reintroduce the conflation ADR 0014 exists to correct.
+ *  - React's `useLayoutEffect` is a hook, not a domain type, and it is spelled
+ *    the one way a lookbehind can separate from the entity.
+ *
+ * What is left needing a **file** exemption is what needs one for the same
+ * reason `packages/ui/src/icons.tsx` already has one above: a foreign name,
+ * with no shape to read. Lucide exports the grid glyph under the retired word,
+ * and elkjs names both its options bag and its per-element field after it —
+ * three identifiers spelled exactly as the entity was, in someone else's
+ * catalogue. Each file is asserted to still be earning itself, so a dependency
+ * that stops exporting one deletes the exemption rather than leaving a hole.
+ * They are not written out here for the reason nothing retired is written out
+ * in this file: it is read by its own scan.
+ */
+const RETIRED_DIAGRAM = ['L', 'ayout'].join('');
+const retiredDiagramLower = RETIRED_DIAGRAM.toLowerCase();
+const RETIRED_DIAGRAM_UPPER = RETIRED_DIAGRAM.toUpperCase();
+
+const RETIRED_DIAGRAM_NAME = new RegExp(
+  [
+    // PascalCase compounds opening with it: its id, its schema, its error. The
+    // lookbehind is React's hook; the lookahead is the strategy contract.
+    `(?<!use)${RETIRED_DIAGRAM}(?!Strategy)[A-Z]`,
+    // Compounds ending in it: the selected one, the default one, the resolved one.
+    // `s?` because a lowercase plural ends the word without a boundary landing
+    // after the retired name, so every compound that ended in its plural — the
+    // `with`, `stored` and `Arb` ones this rename actually carried — was
+    // invisible to this arm until it was there.
+    `[A-Za-z]${RETIRED_DIAGRAM}s?\\b`,
+    // camelCase compounds opening with it: its id, its cards, its title.
+    `\\b${retiredDiagramLower}(?!Strategy)[A-Z]`,
+    // The screaming-case constants: the bare word, its plural, its fixtures.
+    `\\b${RETIRED_DIAGRAM_UPPER}S?\\b`,
+    // Deliberately without a leading `\\b`: `_` is a word character, so a
+    // boundary never lands mid-identifier and the shape most of this rename
+    // was written in — the retired word between two underscores — goes unseen.
+    `${RETIRED_DIAGRAM_UPPER}_[A-Z]`,
+    // The retired field, singular and plural, in a document or an object
+    // literal. The singular is the Space Card frontmatter key, which ADR 0079's
+    // still-open Ticket 04 is the next work to touch.
+    // `(?<!-)` because a hyphen makes it a different word, and prose about
+    // re-running a strategy ends the clause with a colon exactly as a key does.
+    `(?<!-)\\b${retiredDiagramLower}s?["']?\\s*[:=]`,
+    // ...and read back off a value.
+    `\\.${retiredDiagramLower}s\\b`,
+  ].join('|'),
+);
+
+/**
+ * The retired name standing alone, which no compound arm can see. ADR 0083
+ * states the completion criterion ADR 0041 did — the word does not survive as
+ * an alias — and `RETIRED_BARE` above is what holds that for Route. The two
+ * names that keep the word need no exemption here: a boundary cannot land
+ * inside the strategy contract, React's hook or Lucide's glyph.
+ */
+const RETIRED_DIAGRAM_BARE = new RegExp(`\\b${RETIRED_DIAGRAM}\\b`);
+
+/**
+ * The four foreign spellings the exemption below forgives: Lucide's grid glyph,
+ * elkjs's options bag on the type and on the element field, and the screaming
+ * case our own default for that bag is declared in.
+ */
+const FOREIGN_DIAGRAM_SPELLINGS = new RegExp(
+  [
+    `${RETIRED_DIAGRAM}Grid`,
+    `${RETIRED_DIAGRAM}Options`,
+    `${retiredDiagramLower}Options`,
+    `${RETIRED_DIAGRAM_UPPER}_OPTIONS`,
+    // elkjs's own engine method, which is spelled exactly like the retired
+    // singular field the arm above reads.
+    `${retiredDiagramLower}: \\(`,
+  ].join('|'),
+);
+
+/**
+ * An exempted file read with those three spellings masked out. Masking rather
+ * than skipping is the point: a retired domain compound added to one of these
+ * modules is our vocabulary wearing a forgiven file's name, and it stays
+ * visible to the scan.
+ */
+const withoutForeignSpellings = (source: string): string =>
+  source.replace(new RegExp(FOREIGN_DIAGRAM_SPELLINGS.source, 'g'), 'foreign');
+
+/**
+ * A retired name quoted as **history** rather than used as vocabulary.
+ *
+ * ADR 0083 requires this: accepted ADR bodies and resolved records keep the old
+ * words as provenance, and a current-state document that explains what changed
+ * has to be able to name what it changed from. Two do — the trap a persisted-key
+ * rename set twice, and the symbol a stale spike harness went stale against —
+ * and renaming either does not update a record, it falsifies one.
+ *
+ * Masked rather than exempted by file, in the idiom directly above: only these
+ * two quotations are forgiven, and the rest of both documents stays governed.
+ * Each is asserted below to still be present, so a document that stops telling
+ * the story stops carrying the licence to tell it.
+ */
+const HISTORICAL_QUOTATIONS = [
+  ['`default', 'View` → `default', 'Layout`'].join(''),
+  ['elk', 'Layout` → `elkStrategy'].join(''),
+] as const;
+
+const withoutHistoricalQuotations = (source: string): string =>
+  HISTORICAL_QUOTATIONS.reduce((text, quotation) => text.split(quotation).join('history'), source);
+
+/**
+ * The files where the retired spelling is a **foreign** identifier rather than
+ * a domain one — Lucide's glyph and elkjs's options bag. A file exemption
+ * rather than a shape one precisely because there is no shape to read: these
+ * are spelled exactly as the entity was.
+ *
+ * Both are scoped to the module that owns the dependency — `icons.tsx` is the
+ * only module allowed to import Lucide at all, and the elk directory is where
+ * ADR 0014 confines elkjs — so a foreign name cannot spread behind them.
+ */
+const FOREIGN_DIAGRAM_FILES: readonly string[] = [
+  'packages/ui/src/icons.tsx',
+  'packages/react-flow-adapter/src/elk/layout.ts',
+  'packages/react-flow-adapter/src/elk/elk-strategy.ts',
+  'packages/react-flow-adapter/test/elk-strategy.test.ts',
+];
+
+describe('a Diagram is named once (ADR 0083)', () => {
+  const scanned = scannableFiles();
+
+  it('reaches the kinds of file this rename actually touched', () => {
+    // The domain schema, the resolver the app reads a Diagram through, and the
+    // agent-facing document that describes both. A file list that quietly
+    // stopped resolving would report nothing forever.
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('packages/app/src/diagram-resolution.ts');
+    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
+  });
+
+  it('finds no compound of the retired name anywhere it still governs', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      if (source === null) return [];
+      const foreign = FOREIGN_DIAGRAM_FILES.includes(file)
+        ? withoutForeignSpellings(source)
+        : source;
+      return hits(withoutHistoricalQuotations(foreign), RETIRED_DIAGRAM_NAME).map(
+        (hit) => `${file}:${hit}`,
+      );
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no exemption that has stopped earning itself', () => {
+    // Read against the spellings it was granted against: the day a dependency
+    // stops exporting one, the exemption stops being earned and goes.
+    expectEachExemptionEarned(FOREIGN_DIAGRAM_FILES, FOREIGN_DIAGRAM_SPELLINGS);
+
+    // The same rule for the two historical quotations: each is forgiven only
+    // while some tracked document is still telling that story.
+    const everything = scanned.map((file) => readTracked(file) ?? '').join('\n');
+    for (const quotation of HISTORICAL_QUOTATIONS) {
+      expect(everything, `no document still quotes ${quotation}`).toContain(quotation);
+    }
+  });
+
+  it('still reports a domain compound inside a foreign-name exemption', () => {
+    const source = [
+      `import type { ${RETIRED_DIAGRAM}Options } from 'elkjs';`,
+      `const options: ${RETIRED_DIAGRAM}Options = { ...node.${retiredDiagramLower}Options };`,
+      `const chosen = space.default${RETIRED_DIAGRAM};`,
+    ].join('\n');
+
+    expect(hits(withoutForeignSpellings(source), RETIRED_DIAGRAM_NAME)).toEqual([
+      `3: const chosen = space.default${RETIRED_DIAGRAM};`,
+    ]);
+  });
+
+  it('finds no bare retired name in implementation source', () => {
+    const found = scanned.filter(isImplementationSource).flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_DIAGRAM_BARE).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('reports the retired name in every shape it was written in', () => {
+    // Composed rather than written out, in this file's usual idiom: spelled
+    // literally, each fixture would be a hit this scan reports against its own
+    // source.
+    const retired = [
+      `export type ${RETIRED_DIAGRAM}Id = string;`,
+      `import { ${RETIRED_DIAGRAM}NotFoundError } from './${retiredDiagramLower}-resolution';`,
+      `const selected${RETIRED_DIAGRAM} = space.${retiredDiagramLower}s[0];`,
+      `const ${retiredDiagramLower}Cards = resolve${RETIRED_DIAGRAM}(space, id);`,
+      `const ${RETIRED_DIAGRAM_UPPER}_ID = uuidSchema.parse('...');`,
+      `const SECOND_${RETIRED_DIAGRAM_UPPER}_ID = uuidSchema.parse('...');`,
+      `const DELETE_${RETIRED_DIAGRAM_UPPER}_ACTION_ID = 'x';`,
+      `{ "${retiredDiagramLower}s": [], "default${RETIRED_DIAGRAM}": null }`,
+      `for (const entry of space.${retiredDiagramLower}s) {`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_DIAGRAM_NAME.test(line), line).toBe(true);
+    }
+  });
+
+  it('reports the retired name standing alone', () => {
+    for (const line of [
+      `export type ${RETIRED_DIAGRAM} = Diagram;`,
+      `import type { ${RETIRED_DIAGRAM} } from '@project/core';`,
+    ]) {
+      expect(RETIRED_DIAGRAM_BARE.test(line), line).toBe(true);
+    }
+
+    for (const line of [
+      `import type { ${RETIRED_DIAGRAM}Strategy } from './${retiredDiagramLower}';`,
+      `const measured = use${RETIRED_DIAGRAM}Effect(() => measure(), []);`,
+      `import { ${RETIRED_DIAGRAM}Grid } from 'lucide-react';`,
+    ]) {
+      expect(RETIRED_DIAGRAM_BARE.test(line), line).toBe(false);
+    }
+  });
+
+  it('stays silent on the verb, on the foreign names, and on the vocabulary that replaced it', () => {
+    const kept = [
+      // The contract ADR 0083 records as keeping its name, in every shape.
+      `import type { ${RETIRED_DIAGRAM}Strategy, ${RETIRED_DIAGRAM}StrategyGraph } from './${retiredDiagramLower}';`,
+      `export const gridStrategy: ${RETIRED_DIAGRAM}Strategy = async (graph) => graph;`,
+      `const ${retiredDiagramLower}Strategy = elkStrategy();`,
+      // React's hook, which is spelled the one way a lookbehind separates.
+      `const measured = use${RETIRED_DIAGRAM}Effect(() => measure(), []);`,
+      // The verb, in the prose ADR 0083 leaves alone.
+      `// it is furniture over the canvas and takes no ${retiredDiagramLower} space`,
+      `const GROUP_${RETIRED_DIAGRAM_UPPER} = 'inline-flex items-center gap-1';`,
+      `// see reactflow.dev/learn/${retiredDiagramLower}ing/sub-flows for nesting`,
+      // The vocabulary this rename arrived at.
+      `const selectedDiagram = space.diagrams.find((diagram) => diagram.id === id);`,
+      `export type DiagramId = z.infer<typeof uuidSchema>;`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_DIAGRAM_NAME.test(line), line).toBe(false);
     }
   });
 });

@@ -20,28 +20,28 @@ const WIRE = 'the transport said this';
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
 const EVERY_REFUSAL = {
   'placement-pending': { code: 'placement-pending' },
-  'layout-not-found': { code: 'layout-not-found' },
-  'layout-required': { code: 'layout-required', operation: 'added-card-to-layout' },
+  'diagram-not-found': { code: 'diagram-not-found' },
+  'diagram-required': { code: 'diagram-required', operation: 'added-card-to-diagram' },
   'card-not-found': { code: 'card-not-found' },
   'card-kind-immutable': { code: 'card-kind-immutable' },
   'alias-target-immutable': { code: 'alias-target-immutable' },
   'space-card-target-immutable': { code: 'space-card-target-immutable' },
   'card-title-required': { code: 'card-title-required' },
-  'layout-title-required': { code: 'layout-title-required' },
+  'diagram-title-required': { code: 'diagram-title-required' },
   'alias-target-not-found': { code: 'alias-target-not-found', targetId: TARGET_ID },
   'alias-target-must-own-content': { code: 'alias-target-must-own-content', targetId: TARGET_ID },
-  'card-already-in-layout': { code: 'card-already-in-layout' },
-  'card-not-in-layout': { code: 'card-not-in-layout' },
+  'card-already-in-diagram': { code: 'card-already-in-diagram' },
+  'card-not-in-diagram': { code: 'card-not-in-diagram' },
   'card-not-expanded': { code: 'card-not-expanded' },
   'card-has-aliases': { code: 'card-has-aliases', aliasTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },
-  'layout-must-keep-graph': { code: 'layout-must-keep-graph' },
-  'space-must-keep-layout': { code: 'space-must-keep-layout' },
+  'diagram-must-keep-graph': { code: 'diagram-must-keep-graph' },
+  'space-must-keep-diagram': { code: 'space-must-keep-diagram' },
   'graph-not-owned': { code: 'graph-not-owned' },
   'edge-not-found': { code: 'edge-not-found' },
-  'edge-card-outside-layout': { code: 'edge-card-outside-layout' },
+  'edge-card-outside-diagram': { code: 'edge-card-outside-diagram' },
   'edge-already-exists': { code: 'edge-already-exists' },
-  'layout-active-graph-required': { code: 'layout-active-graph-required' },
+  'diagram-active-graph-required': { code: 'diagram-active-graph-required' },
   'space-card-deletion-unsupported': { code: 'space-card-deletion-unsupported' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;
 
@@ -95,11 +95,11 @@ describe('describeAuthoringRefusal', () => {
  * The three Edge surfaces, and the one rule that separates their channels.
  *
  * A refusal a different endpoint or target could correct belongs on the field
- * that names it; a stale Layout, Graph or Edge belongs on the form, because no
+ * that names it; a stale Diagram, Graph or Edge belongs on the form, because no
  * choice in the picker would answer it (ADR 0057).
  */
 const CORRECTABLE_BY_CHOOSING_ANOTHER_CARD = [
-  'edge-card-outside-layout',
+  'edge-card-outside-diagram',
   'edge-already-exists',
 ] as const;
 

@@ -4,11 +4,11 @@ import { titleName, type Graph, type SpaceSnapshot } from '@project/core';
  * The neutral titles the app mints for structure the author did not name.
  *
  * It sits in its own module so every authoring operation shares one numbering
- * rule for Cards, Layouts and Graphs.
+ * rule for Cards, Diagrams and Graphs.
  *
  * Three named operations rather than one helper taking a prefix. What a caller
  * knows is *what it is naming*; the `<Prefix> N` arithmetic and the prefix
- * literal are this module's, so no call site can spell "Layout" a second way or
+ * literal are this module's, so no call site can spell "Diagram" a second way or
  * number one kind of thing differently from another. This is a deterministic
  * rule and stays one — it is not injected, because there is nothing about it a
  * test would want to replace.
@@ -49,11 +49,11 @@ export const nextCardTitle = (snapshot: SpaceSnapshot): string =>
     snapshot.cards.map((card) => titleName(card.document.title)),
   );
 
-/** What an Edit calls the next Layout it creates. */
-export const nextLayoutTitle = (snapshot: SpaceSnapshot): string =>
+/** What an Edit calls the next Diagram it creates. */
+export const nextDiagramTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
-    'Layout',
-    (snapshot.document.layouts ?? []).map((layout) => layout.title),
+    'Diagram',
+    (snapshot.document.diagrams ?? []).map((diagram) => diagram.title),
   );
 
 /** What an Edit calls the next Graph in the supplied collection. */

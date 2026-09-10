@@ -18,7 +18,7 @@ describe('e2e HTTP runtime', () => {
     const second = await startRuntime({ catalog: 'fixture' });
 
     await expect(first.listSpaces()).resolves.toEqual([
-      { id: FIXTURE_ID, title: 'Layout fixture' },
+      { id: FIXTURE_ID, title: 'Diagram fixture' },
     ]);
     const loaded = await first.loadSpace(FIXTURE_ID);
     if (loaded === undefined) throw new Error('Expected fixture space');
@@ -46,7 +46,7 @@ describe('e2e HTTP runtime', () => {
 
     await expect(second.loadSpace(FIXTURE_ID)).resolves.toMatchObject({
       revision: 0n,
-      snapshot: { document: { title: 'Layout fixture' } },
+      snapshot: { document: { title: 'Diagram fixture' } },
     });
   });
 
@@ -72,7 +72,7 @@ describe('e2e HTTP runtime', () => {
     const backend = await startRuntime({ catalog: 'directory', directory });
 
     await expect(backend.listSpaces()).resolves.toEqual([
-      { id: FIXTURE_ID, title: 'Layout fixture' },
+      { id: FIXTURE_ID, title: 'Diagram fixture' },
     ]);
   });
 

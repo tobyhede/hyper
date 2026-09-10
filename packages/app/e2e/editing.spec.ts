@@ -23,9 +23,9 @@ import {
   dock,
   dragBy,
   expectCardFillsNode,
-  layoutChoices,
-  layoutMenu,
-  newLayout,
+  diagramChoices,
+  diagramMenu,
+  newDiagram,
   nodeByTitle,
   openCard,
   positionOf,
@@ -35,7 +35,7 @@ import {
   settled,
   viewportTransform,
 } from './graph';
-import { seedPositionedLayout } from './seed';
+import { seedPositionedDiagram } from './seed';
 
 /**
  * The barrier a *negative* assertion needs.
@@ -56,7 +56,7 @@ async function quiescent(page: Page): Promise<void> {
 
 async function addExistingCard(page: Page, title: string): Promise<void> {
   await page.getByRole('button', { name: 'Cards', exact: true }).click();
-  await page.getByRole('button', { name: `Add ${title} to Layout` }).click();
+  await page.getByRole('button', { name: `Add ${title} to Diagram` }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
 }
@@ -542,9 +542,9 @@ test('opened Markdown editing persists source while expansion displaces and rest
 });
 
 /**
- * Dragging a card writes its placement into the Layout.
+ * Dragging a card writes its placement into the Diagram.
  *
- * The fixture opens in its declared default Layout. A Card goes where the
+ * The fixture opens in its declared default Diagram. A Card goes where the
  * author puts it and nothing else moves.
  */
 
@@ -612,12 +612,12 @@ const NEIGHBOUR = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000003')
 const BEHIND = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000005'), title: 'C' };
 
 /**
- * Open the Space in a Layout whose geometry the test states.
+ * Open the Space in a Diagram whose geometry the test states.
  *
- * The tracked fixture's Layout is ELK-seeded, so a test written against it would
+ * The tracked fixture's Diagram is ELK-seeded, so a test written against it would
  * be reverse-engineering coordinates it never chose — and every claim below is
  * about a distance between two Cards. Seeding goes through the same HTTP
- * boundary the browser uses, so the Layout the app opens is the one written
+ * boundary the browser uses, so the Diagram the app opens is the one written
  * here.
  */
 async function seedGeometry(
@@ -625,7 +625,7 @@ async function seedGeometry(
   title: string,
   positions: Record<string, CardPlacement>,
 ): Promise<void> {
-  const seeded = await seedPositionedLayout(page, title, () => positions);
+  const seeded = await seedPositionedDiagram(page, title, () => positions);
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
   await expect(selectedCanvas(page)).toContainText(title);
   await settled(page);
@@ -774,7 +774,7 @@ test('a closed Card released inside an Open Card lands at the drop point', async
 /**
  * Once, and then not again (ADR 0084).
  *
- * Opening writes the room it takes into the Layout, so the neighbour beyond the
+ * Opening writes the room it takes into the Diagram, so the neighbour beyond the
  * subject on both axes moves by the growth and the Card behind it on both axes
  * does not move at all. From then on those are authored positions like any
  * other: dragging the Open Card past the neighbour is not a second Open, and the
@@ -838,8 +838,8 @@ test('opening a Card displaces its neighbours once, and dragging it never displa
 });
 
 test(
-  'selecting Layouts is navigation and does not persist',
-  { tag: '@parity:command-dock-marks-one-current-layout' },
+  'selecting Diagrams is navigation and does not persist',
+  { tag: '@parity:command-dock-marks-one-current-diagram' },
   async ({ page }) => {
     await page.goto('/');
     const a = nodeByTitle(page, 'A').first();
@@ -848,10 +848,10 @@ test(
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    // One list over the authored Layouts with exactly one checked item, and the
+    // One list over the authored Diagrams with exactly one checked item, and the
     // cluster outside it naming the same one (ADR 0053's surviving clause, kept
     // verbatim by ADR 0082; ADR 0079).
-    const choices = await layoutChoices(page);
+    const choices = await diagramChoices(page);
     await expect(choices).toHaveCount(2);
     await expect(choices.and(page.locator('[aria-checked="true"]'))).toHaveCount(1);
     await expect(choices.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 1');
@@ -860,13 +860,13 @@ test(
     await expect(activeGraph(page)).toContainText('Long');
 
     await selectCanvas(page, 'Collection 2');
-    const afterSwitch = await layoutChoices(page);
+    const afterSwitch = await diagramChoices(page);
     await expect(afterSwitch.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 2');
     await page.keyboard.press('Escape');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
     await selectCanvas(page, 'Collection 1');
-    const afterReturn = await layoutChoices(page);
+    const afterReturn = await diagramChoices(page);
     await expect(afterReturn.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 1');
     await page.keyboard.press('Escape');
     await expect(persistence).toHaveAttribute('data-revision', '0');
@@ -874,8 +874,8 @@ test(
 );
 
 test(
-  'New Layout creates an empty selected Layout and persists it through reload',
-  { tag: '@parity:command-dock-adds-an-empty-layout' },
+  'New Diagram creates an empty selected Diagram and persists it through reload',
+  { tag: '@parity:command-dock-adds-an-empty-diagram' },
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -883,27 +883,27 @@ test(
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    // In the Layout menu, beside the list it adds to — the Sidebar had room for
+    // In the Diagram menu, beside the list it adds to — the Sidebar had room for
     // a permanent control and the Dock finds room by disclosure (ADR 0082).
-    // What the command does is unchanged: an *empty* Layout, created and
+    // What the command does is unchanged: an *empty* Diagram, created and
     // selected in one Edit (ADR 0079, ADR 0080).
-    await newLayout(page);
+    await newDiagram(page);
 
-    await expect(selectedCanvas(page)).toContainText('Layout 1');
+    await expect(selectedCanvas(page)).toContainText('Diagram 1');
     await expect(persistence).toHaveAttribute('data-revision', '1');
     await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
     expect(await allPositions(page)).toEqual({});
     await page.keyboard.press('Escape');
 
     await page.reload();
-    await expect(selectedCanvas(page)).toContainText('Layout 1');
+    await expect(selectedCanvas(page)).toContainText('Diagram 1');
     expect(await allPositions(page)).toEqual({});
 
     // Rename is the name itself rather than a row menu: the Dock draws each
     // name once, so the control the reader presses is the word they are
     // changing.
     await selectedCanvas(page).click();
-    const title = page.getByRole('textbox', { name: 'Layout name' });
+    const title = page.getByRole('textbox', { name: 'Diagram name' });
     await title.fill('Workshop');
     await title.press('Enter');
     await expect(selectedCanvas(page)).toContainText('Workshop');
@@ -911,7 +911,7 @@ test(
 
     await page.reload();
     await expect(selectedCanvas(page)).toContainText('Workshop');
-    const menu = await layoutMenu(page);
+    const menu = await diagramMenu(page);
     await menu.getByRole('menuitem', { name: 'Delete Workshop' }).click();
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -1122,7 +1122,7 @@ test(
 
     // Released, and only now does the neighbour take the room: the completed
     // Resize applied the difference between the old growth and the new one and
-    // wrote B's position into the Layout (ADR 0084). This is the other half of
+    // wrote B's position into the Diagram (ADR 0084). This is the other half of
     // the mid-gesture assertion above — together they place the movement at the
     // Edit rather than at the frame.
     const afterNeighbourPosition = await positionOf(neighbour);
@@ -1564,37 +1564,37 @@ test('opening animates the Card wrapper and displaced neighbours from one durati
   ).toBe(true);
 });
 
-test('New Layout creates an empty Layout and leaves existing Cards in the Cards View', async ({
+test('New Diagram creates an empty Diagram and leaves existing Cards in the Cards View', async ({
   page,
 }) => {
   await page.goto('/');
-  await newLayout(page);
+  await newDiagram(page);
 
   await expect(page.locator('.react-flow__node')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
-  // `Persisted` says the commit was acknowledged, not that this Layout reopens.
-  // Reload against the same repository to prove the empty Layout is durable.
+  // `Persisted` says the commit was acknowledged, not that this Diagram reopens.
+  // Reload against the same repository to prove the empty Diagram is durable.
   await page.reload();
   await expect(page.locator('.react-flow__node')).toHaveCount(0);
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
 test(
-  'adding an existing Card from the Cards drawer authors Layout membership',
-  { tag: '@parity:cards-drawer-adds-existing-layout-members' },
+  'adding an existing Card from the Cards drawer authors Diagram membership',
+  { tag: '@parity:cards-drawer-adds-existing-diagram-members' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
     await page.getByRole('button', { name: 'Cards' }).click();
-    const source = page.getByRole('button', { name: 'Add E to Layout' });
+    const source = page.getByRole('button', { name: 'Add E to Diagram' });
     await expect(source).toBeVisible();
     await source.click();
 
@@ -1605,22 +1605,22 @@ test(
 );
 
 test(
-  'the Cards drawer names an empty Layout after every absent Card is added',
-  { tag: '@parity:cards-drawer-distinguishes-an-empty-layout' },
+  'the Cards drawer names an empty Diagram after every absent Card is added',
+  { tag: '@parity:cards-drawer-distinguishes-an-empty-diagram' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
     await page.getByRole('button', { name: 'Cards' }).click();
-    const choices = page.getByRole('button', { name: /^Add .* to Layout$/ });
+    const choices = page.getByRole('button', { name: /^Add .* to Diagram$/ });
     while ((await choices.count()) > 0) {
       const before = await choices.count();
       await choices.first().click();
       await expect(choices).toHaveCount(before - 1);
     }
 
-    await expect(page.getByText('All Cards are in this Layout.')).toBeVisible();
+    await expect(page.getByText('All Cards are in this Diagram.')).toBeVisible();
   },
 );
 
@@ -1736,7 +1736,7 @@ test('keyboard placement moves focus from the Cards drawer to the added canvas C
   await settled(page);
 
   await page.getByRole('button', { name: 'Cards' }).click();
-  const source = page.getByRole('button', { name: 'Add E to Layout' });
+  const source = page.getByRole('button', { name: 'Add E to Diagram' });
   await source.focus();
   await source.press('Enter');
 
@@ -1783,7 +1783,7 @@ test('Delete Card confirms before removing the Card from the whole Space', async
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
   await page.getByRole('button', { name: 'Cards' }).click();
-  await expect(page.getByRole('button', { name: 'Add B to Layout' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add B to Diagram' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
@@ -1837,7 +1837,7 @@ test('dragging from the Cards drawer uses transformed canvas coordinates then or
   await settled(page);
 
   await page.getByRole('button', { name: 'Cards' }).click();
-  const source = page.getByRole('button', { name: 'Add E to Layout' });
+  const source = page.getByRole('button', { name: 'Add E to Diagram' });
   const pane = page.locator('.react-flow__pane');
   const paneBox = await boxOf(pane, 'the React Flow pane');
   const targetPosition = { x: paneBox.width * 0.5, y: paneBox.height * 0.8 };
@@ -1899,7 +1899,7 @@ test(
   },
 );
 
-test('editing an existing Layout updates it instead of creating another one', async ({ page }) => {
+test('editing an existing Diagram updates it instead of creating another one', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const a = nodeByTitle(page, 'A').first();
@@ -1922,7 +1922,7 @@ test('editing an existing Layout updates it instead of creating another one', as
 });
 
 test(
-  'Layout and Graph names edit from the Dock and survive reload',
+  'Diagram and Graph names edit from the Dock and survive reload',
   { tag: '@parity:command-dock-edits-identity-names' },
   async ({ page }) => {
     await page.goto('/');
@@ -1936,22 +1936,22 @@ test(
     // Dock draws each name once, so the editor replaces the control it began
     // from and there is no second surface to keep in step.
     await selectedCanvas(page).click();
-    const layoutName = page.getByRole('textbox', { name: 'Layout name' });
-    await expect(layoutName).toBeFocused();
-    await layoutName.fill('');
-    await layoutName.press('Enter');
+    const diagramName = page.getByRole('textbox', { name: 'Diagram name' });
+    await expect(diagramName).toBeFocused();
+    await diagramName.fill('');
+    await diagramName.press('Enter');
     // Refused and still open, with the author's words still theirs.
-    await expect(page.getByText('A Layout needs a name.')).toBeVisible();
+    await expect(page.getByText('A Diagram needs a name.')).toBeVisible();
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-    await layoutName.fill('Workshop');
-    await layoutName.press('Enter');
+    await diagramName.fill('Workshop');
+    await diagramName.press('Enter');
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
     await expect(selectedCanvas(page)).toContainText('Workshop');
 
     // Begun again from the same control, and cancelled: Escape drops the draft
     // rather than committing it.
     await selectedCanvas(page).click();
-    const cancelled = page.getByRole('textbox', { name: 'Layout name' });
+    const cancelled = page.getByRole('textbox', { name: 'Diagram name' });
     await cancelled.fill('Studio');
     await cancelled.press('Escape');
     await expect(selectedCanvas(page)).toContainText('Workshop');
@@ -1971,12 +1971,12 @@ test(
 );
 
 /**
- * Dragged in an authored Layout, because that is where a Card and the Edges
+ * Dragged in an authored Diagram, because that is where a Card and the Edges
  * around it stay together.
  *
  * The fixture's own `Collection 1` owns Long,
  * Mid and Short over
- * the spine, so dragging A there updates that Layout in place and its Edges are
+ * the spine, so dragging A there updates that Diagram in place and its Edges are
  * still drawn around the Card that moved.
  */
 test('edges follow a card that has been dragged', async ({ page }) => {
@@ -2075,7 +2075,7 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
   await expect(source).toBeVisible();
   await expect(target).toBeVisible();
 
-  // Explicit creation captures the computed placement into the authored Layout.
+  // Explicit creation captures the computed placement into the authored Diagram.
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await settled(page);
   await source.hover();
@@ -2130,7 +2130,7 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
   await expect(source).toBeVisible();
   await expect(target).toBeVisible();
 
-  // Create a Layout explicitly, then author E → A into its empty Graph. It is that
+  // Create a Diagram explicitly, then author E → A into its empty Graph. It is that
   // Graph's only Edge, so E is where presenting it begins.
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '1');
@@ -2213,7 +2213,7 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
  * Explicit creation preserves the active Graph. A → E is absent from it, so the
  * first is accepted and repeating it is the duplicate refusal asserted below.
  */
-test('drawing an Edge into an explicitly created Layout then refuses its duplicate', async ({
+test('drawing an Edge into an explicitly created Diagram then refuses its duplicate', async ({
   page,
 }) => {
   await page.goto('/');
@@ -2246,7 +2246,7 @@ test('drawing an Edge into an explicitly created Layout then refuses its duplica
   // Adding an Edge moves nothing.
   expect(await allPositions(page)).toEqual(before);
 
-  // Drawn a second time, in the Layout that now owns the Graph holding it, it is
+  // Drawn a second time, in the Diagram that now owns the Graph holding it, it is
   // the duplicate the rule is about — refused, with nothing persisted. The
   // assertions are negative, so they need the barrier to mean anything.
   await source.hover();
@@ -2389,7 +2389,7 @@ for (const key of ['Backspace', 'Delete'] as const) {
   test(`${key} removes the selected Edge from its Graph and nothing else`, async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    // An Edge belongs to a Layout's Graph, so an Edge Edit needs one selected.
+    // An Edge belongs to a Diagram's Graph, so an Edge Edit needs one selected.
     await selectCanvas(page, 'Collection 1');
     await settled(page);
     const drawnCards = await page.locator('.react-flow__node').count();
@@ -2408,12 +2408,12 @@ for (const key of ['Backspace', 'Delete'] as const) {
 }
 
 /**
- * The app-owned canvas key removes a selected Card from this Layout through the
+ * The app-owned canvas key removes a selected Card from this Diagram through the
  * completed Space Edit lifecycle. The Card still belongs to the Space; the
- * projection loses it and the Layout-owned Edges incident to it together.
+ * projection loses it and the Diagram-owned Edges incident to it together.
  */
 for (const key of ['Backspace', 'Delete'] as const) {
-  test(`${key} with a Card selected removes it and its Edges from this Layout`, async ({
+  test(`${key} with a Card selected removes it and its Edges from this Diagram`, async ({
     page,
   }) => {
     await page.goto('/');
@@ -2441,7 +2441,7 @@ for (const key of ['Backspace', 'Delete'] as const) {
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
     await page.getByRole('button', { name: 'Cards' }).click();
-    const restoreMembership = page.getByRole('button', { name: 'Add A to Layout' });
+    const restoreMembership = page.getByRole('button', { name: 'Add A to Diagram' });
     await expect(restoreMembership).toBeVisible();
     await restoreMembership.click();
 
@@ -2463,14 +2463,14 @@ test('the graph advertises its Card and Edge delete commands', async ({ page }) 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
 
   await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/open a Card/i);
-  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/remove.*Layout/i);
+  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/remove.*Diagram/i);
   await expect(page.locator('[id^="react-flow__edge-desc"]')).toContainText(/delete/i);
 });
 
 /**
  * Only the Active Graph's Edges are tab stops, and each is named for a reader.
  *
- * An Edge belonging to another Graph the Layout draws is there to be seen —
+ * An Edge belonging to another Graph the Diagram draws is there to be seen —
  * putting every Edge in the graph into the tab order would place inert stops
  * between a keyboard author and the ones they can act on.
  */
@@ -2493,7 +2493,7 @@ test('only Active Graph Edges are focusable, and focus selects the one reached',
     expect(name).toMatch(/^Edge from .+ to .+ in .+$/);
     expect(name.endsWith(` in ${activeTitle}`), `${name} is not in ${activeTitle}`).toBe(true);
   }
-  // Every other Edge the Layout draws is out of the tab order entirely.
+  // Every other Edge the Diagram draws is out of the tab order entirely.
   expect(await page.locator('.react-flow__edge:not([tabindex])').count()).toBeGreaterThan(0);
 
   // React Flow does not select an Edge that receives focus; Hyper bridges that,
@@ -2551,7 +2551,7 @@ test(
     await selectAnEdge(page);
     await expect(page.getByRole('button', { name: 'Delete this Edge' })).toBeVisible();
 
-    // The endpoints, as the keyboard reaches them: two pickers over this Layout's
+    // The endpoints, as the keyboard reaches them: two pickers over this Diagram's
     // Cards, each showing the Card the Edge currently names.
     await page.getByRole('button', { name: 'Edit this Edge' }).click();
     await expect(page.getByRole('combobox', { name: 'From' })).toBeVisible();
@@ -2653,7 +2653,7 @@ test(
           : null;
       });
     // **The reconnected Edge by name, not merely "some other Edge".** A
-    // Layout overview draws every Graph at once, so "focus moved" is satisfied
+    // Diagram overview draws every Graph at once, so "focus moved" is satisfied
     // by any of a dozen Edges — including one with these very endpoints in
     // another Graph. The decorated label carries all three facts the request is
     // made of (`edge-authoring-react.tsx`: `Edge from X to Y in G`), so naming
@@ -2949,7 +2949,7 @@ test('an Alt-drop released over a Card body creates no Card', async ({ page }) =
  * the gesture for exactly this, and drives the handle's own `valid` state from
  * the answer.
  *
- * It is a rule about the Active Graph of a selected Layout. Explicit creation
+ * It is a rule about the Active Graph of a selected Diagram. Explicit creation
  * preserves its Graphs; the first A → E connection below establishes the duplicate.
  */
 test('a duplicate Edge is marked invalid while the drag is still live', async ({ page }) => {
@@ -2977,7 +2977,7 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
     return handle;
   };
 
-  // Author A→E into the Layout's own Graph, so the Active Graph now holds it.
+  // Author A→E into the Diagram's own Graph, so the Active Graph now holds it.
   await startDrag();
   await expect(await dragOnto('E')).toHaveClass(/valid/);
   await page.mouse.up();
@@ -3005,12 +3005,12 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
 });
 
 /**
- * Add Card after explicit Layout creation, and the naming that follows it.
+ * Add Card after explicit Diagram creation, and the naming that follows it.
  *
  * Explicit creation happens exactly once and the created Card really is under
  * the caret, in a browser where focus is the browser's to give.
  */
-test('Add Card names the new Card in place in the selected Layout', async ({ page }) => {
+test('Add Card names the new Card in place in the selected Diagram', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
@@ -3032,7 +3032,7 @@ test('Add Card names the new Card in place in the selected Layout', async ({ pag
 
   await expect(nodeByTitle(page, 'Consequences')).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await expect(await layoutChoices(page)).toHaveCount(2);
+  await expect(await diagramChoices(page)).toHaveCount(2);
 });
 
 /**

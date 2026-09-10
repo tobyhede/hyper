@@ -6,9 +6,9 @@ import type {
   cardSchema,
   importSpaceFileSchema,
   importSpaceSchema,
-  layoutPositionSchema,
-  layoutSchema,
-  positionedLayoutSchema,
+  diagramPositionSchema,
+  diagramSchema,
+  positionedDiagramSchema,
   graphEdgeSchema,
   graphSchema,
   spaceFileSchema,
@@ -41,22 +41,22 @@ export type CardFrontmatter = z.infer<typeof cardFrontmatterSchema>;
  */
 export type GraphEdge = z.infer<typeof graphEdgeSchema>;
 export type Graph = z.infer<typeof graphSchema>;
-export type LayoutPosition = z.infer<typeof layoutPositionSchema>;
+export type DiagramPosition = z.infer<typeof diagramPositionSchema>;
 export type CardPlacement = z.infer<typeof cardPlacementSchema>;
-export type PositionedLayout = z.infer<typeof positionedLayoutSchema>;
+export type PositionedDiagram = z.infer<typeof positionedDiagramSchema>;
 
 /**
- * A **Layout**: the authored card-to-position map a space carries (ADR 0014).
+ * A **Diagram**: the authored card-to-position map a space carries (ADR 0014).
  * It is data, not behaviour — the thing that arranges cards is a
  * `LayoutStrategy` in `@project/graph`, and `positionedStrategy` is the one that
- * reads this. Only authored layouts exist as values; an automatic strategy has
- * no Layout behind it (ADR 0025).
+ * reads this. Only authored diagrams exist as values; an automatic strategy has
+ * no Diagram behind it (ADR 0025).
  */
-export type Layout = z.infer<typeof layoutSchema>;
+export type Diagram = z.infer<typeof diagramSchema>;
 
 export type CardId = Card['id'];
 export type GraphId = Graph['id'];
-export type LayoutId = Layout['id'];
+export type DiagramId = Diagram['id'];
 
 /**
  * The on-disk shape of a space — what `loadSpace` reads and what a writer emits

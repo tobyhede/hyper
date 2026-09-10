@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
-import { uuidSchema, type CardId, type GraphId, type LayoutId, type UUID } from '@project/core';
+import { uuidSchema, type CardId, type GraphId, type DiagramId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import {
   canRetreat,
@@ -14,10 +14,11 @@ import { cardFile } from './card-files';
 
 const navigationFor = (
   currentSpace: () => Space,
-  initialLayoutId: LayoutId,
+  initialDiagramId: DiagramId,
   initialSpace?: Space,
   options?: NavigationOptions,
-) => createNavigation(currentSpace, initialLayoutId, initialSpace ?? currentSpace(), options ?? {});
+) =>
+  createNavigation(currentSpace, initialDiagramId, initialSpace ?? currentSpace(), options ?? {});
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 
@@ -34,17 +35,17 @@ function traversalHistoryOf(state: NavigationState): readonly CardId[] {
 const GRAPH_ONE = uuid('00000000-0000-4000-8000-000000000031');
 const GRAPH_TWO = uuid('00000000-0000-4000-8000-000000000032');
 const GRAPH_THREE = uuid('00000000-0000-4000-8000-000000000033');
-const FIRST_LAYOUT = uuid('00000000-0000-4000-8000-000000000040');
-const LAYOUT = uuid('00000000-0000-4000-8000-000000000041');
+const FIRST_DIAGRAM = uuid('00000000-0000-4000-8000-000000000040');
+const DIAGRAM = uuid('00000000-0000-4000-8000-000000000041');
 const CARD_A = uuid('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuid('00000000-0000-4000-8000-000000000003');
 const CARD_C = uuid('00000000-0000-4000-8000-000000000004');
 
 /**
- * Two Layouts, each owning one Graph over its own Cards (ADR 0040).
+ * Two Diagrams, each owning one Graph over its own Cards (ADR 0040).
  *
  * Two rather than one deliberately: it is what makes the flatten an Algorithmic
- * View draws differ from what either Layout draws, so both of Navigation's
+ * View draws differ from what either Diagram draws, so both of Navigation's
  * "does not show" refusals name a real state rather than an impossible one.
  */
 function fixture(): Space {
@@ -53,9 +54,9 @@ function fixture(): Space {
       version: 1,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Fixture',
-      layouts: [
+      diagrams: [
         {
-          id: FIRST_LAYOUT,
+          id: FIRST_DIAGRAM,
           title: 'First graph',
           positions: {
             [CARD_A]: { x: 0, y: 0, open: false },
@@ -63,7 +64,7 @@ function fixture(): Space {
           graphs: [{ id: GRAPH_THREE, title: 'Three', edges: [] }],
         },
         {
-          id: LAYOUT,
+          id: DIAGRAM,
           title: 'Second graph',
           positions: {
             [CARD_A]: { x: -320, y: 200, open: false },
@@ -84,9 +85,9 @@ function fixture(): Space {
 }
 
 /**
- * One Layout owning the given Graphs over the given Cards, which is the fewest
+ * One Diagram owning the given Graphs over the given Cards, which is the fewest
  * moving parts a Space with any structure at all has under ADR 0040. Every Card
- * named is a member, so the Layout's Edges are closed over it by construction.
+ * named is a member, so the Diagram's Edges are closed over it by construction.
  */
 function spaceOwning(
   title: string,
@@ -98,9 +99,9 @@ function spaceOwning(
       version: 1,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title,
-      layouts: [
+      diagrams: [
         {
-          id: LAYOUT,
+          id: DIAGRAM,
           title: 'Only',
           positions: Object.fromEntries(
             cards.map((card, index) => [card.id, { x: index * 320, y: 0, open: false }]),
@@ -118,23 +119,23 @@ function spaceOwning(
   return loaded.space;
 }
 
-it('selects a Layout and its active Graph without changing the Space', () => {
+it('selects a Diagram and its active Graph without changing the Space', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   navigation.present();
 
-  navigation.selectLayout(LAYOUT);
+  navigation.selectDiagram(DIAGRAM);
 
   expect(navigation.getState()).toMatchObject({
-    selectedLayoutId: LAYOUT,
+    selectedDiagramId: DIAGRAM,
     activeGraphId: GRAPH_ONE,
     mode: 'overview',
   });
   expect(navigation.activeCardId()).toBeNull();
-  expect(space.defaultLayout).toBeUndefined();
+  expect(space.defaultDiagram).toBeUndefined();
 
-  navigation.selectLayout(FIRST_LAYOUT);
-  expect(navigation.getState().selectedLayoutId).toEqual(FIRST_LAYOUT);
+  navigation.selectDiagram(FIRST_DIAGRAM);
+  expect(navigation.getState().selectedDiagramId).toEqual(FIRST_DIAGRAM);
 });
 
 it('traverses an Edge from the changing working Space without installing a copy', () => {
@@ -142,20 +143,20 @@ it('traverses an Edge from the changing working Space without installing a copy'
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const cardC = uuid('00000000-0000-4000-8000-000000000004');
   let working = fixture();
-  const navigation = navigationFor(() => working, LAYOUT);
+  const navigation = navigationFor(() => working, DIAGRAM);
   navigation.present();
 
   // The same Space with a second Edge out of A, authored into the Graph the
-  // first Layout owns — which means C joins that Layout's membership too.
+  // first Diagram owns — which means C joins that Diagram's membership too.
   const changed = loadSpace(
     {
       version: 1,
       id: working.id,
       title: working.title,
-      layouts: [
-        working.layouts[0]!,
+      diagrams: [
+        working.diagrams[0]!,
         {
-          id: LAYOUT,
+          id: DIAGRAM,
           title: 'Second graph',
           positions: {
             [cardA]: { x: 0, y: 0, open: false },
@@ -171,7 +172,7 @@ it('traverses an Edge from the changing working Space without installing a copy'
                 { from: cardA, to: cardC },
               ],
             },
-            working.layouts[1]!.graphs[1]!,
+            working.diagrams[1]!.graphs[1]!,
           ],
         },
       ],
@@ -204,7 +205,7 @@ it('presents a fully cyclic Graph, which has no entry Card', () => {
     [{ id: GRAPH_ONE, title: 'Loop', edges: [{ from: card, to: card }] }],
     [{ id: card }],
   );
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
 
   navigation.present();
 
@@ -228,7 +229,7 @@ it('names a move by the Card’s name, not by its whole Title', () => {
     [{ id: GRAPH_ONE, title: 'One', edges: [{ from: cardA, to: cardB }] }],
     [{ id: cardA }, { id: cardB, title: 'Auth\nHow a session begins' }],
   );
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
 
   navigation.present();
 
@@ -265,7 +266,7 @@ it('reads the last Card when Traversal history returns to one it has already vis
     ],
     [{ id: cardA }, { id: cardB }],
   );
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
 
   navigation.present();
   navigation.advance();
@@ -301,14 +302,14 @@ it('reads the last Card when Traversal history returns to one it has already vis
  */
 it('leaves no Traversal history behind when presenting ends', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   navigation.present();
   navigation.advance();
 
   navigation.exitPresenting();
 
   expect(navigation.getState()).toEqual({
-    selectedLayoutId: LAYOUT,
+    selectedDiagramId: DIAGRAM,
     activeGraphId: GRAPH_ONE,
     mode: 'overview',
   });
@@ -322,7 +323,7 @@ it('leaves no Traversal history behind when presenting ends', () => {
  */
 it('stands on a Card for as long as it is presenting', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
 
   navigation.present();
 
@@ -335,7 +336,7 @@ it('stands on a Card for as long as it is presenting', () => {
 
 it('activating a Graph ends the current Traversal history without changing the Space', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   navigation.present();
 
   navigation.activateGraph(GRAPH_TWO);
@@ -345,55 +346,55 @@ it('activating a Graph ends the current Traversal history without changing the S
     mode: 'overview',
   });
   expect(navigation.activeCardId()).toBeNull();
-  expect(space.defaultLayout).toBeUndefined();
+  expect(space.defaultDiagram).toBeUndefined();
 });
 
-it('opens a Graph destination in its named Layout with one navigation publication', () => {
+it('opens a Graph destination in its named Diagram with one navigation publication', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   const observed: NavigationState[] = [];
   navigation.subscribe(() => observed.push(navigation.getState()));
 
-  navigation.openGraph(LAYOUT, GRAPH_TWO);
+  navigation.openGraph(DIAGRAM, GRAPH_TWO);
 
   expect(observed).toHaveLength(1);
   expect(navigation.getState()).toEqual({
-    selectedLayoutId: LAYOUT,
+    selectedDiagramId: DIAGRAM,
     activeGraphId: GRAPH_TWO,
     mode: 'overview',
   });
-  expect(space.defaultLayout).toBeUndefined();
+  expect(space.defaultDiagram).toBeUndefined();
 });
 
 it('opens an exact presentation Card with fresh Traversal history in one publication', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   navigation.present();
   navigation.advance();
   const observed: NavigationState[] = [];
   navigation.subscribe(() => observed.push(navigation.getState()));
 
-  navigation.openPresentation(LAYOUT, GRAPH_TWO, CARD_C);
+  navigation.openPresentation(DIAGRAM, GRAPH_TWO, CARD_C);
 
   expect(observed).toHaveLength(1);
   expect(navigation.getState()).toEqual({
-    selectedLayoutId: LAYOUT,
+    selectedDiagramId: DIAGRAM,
     activeGraphId: GRAPH_TWO,
     mode: 'presenting',
     traversalHistory: [CARD_C],
     branchIndex: 0,
   });
   expect(canRetreat(navigation.getState())).toBe(false);
-  expect(space.defaultLayout).toBeUndefined();
+  expect(space.defaultDiagram).toBeUndefined();
 });
 
 it('refuses to activate a Graph the current Space does not hold', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   navigation.present();
   const before = navigation.getState();
 
-  // The same invariant `selectLayout` holds, for the other half of what
+  // The same invariant `selectDiagram` holds, for the other half of what
   // Navigation names. Activating is not an edit, so it cannot mint the Graph it
   // is handed; a Graph the Space does not hold would strand every later read —
   // `moves()`, `present()` and the emphasis — on a lookup that answers nothing.
@@ -404,63 +405,63 @@ it('refuses to activate a Graph the current Space does not hold', () => {
 });
 
 /*
- * Adopting the Layout an Edit wrote carries its Active Graph with it, because
- * under ADR 0040 a Layout and the Graph it opens on are one answer the Edit
+ * Adopting the Diagram an Edit wrote carries its Active Graph with it, because
+ * under ADR 0040 a Diagram and the Graph it opens on are one answer the Edit
  * produced.
  *
- * What the test is for is unchanged, and is the thing `selectLayout` does not
- * do: adopting the Layout an Edit created continues the traversal rather than
+ * What the test is for is unchanged, and is the thing `selectDiagram` does not
+ * do: adopting the Diagram an Edit created continues the traversal rather than
  * ending it, down to the same Traversal history array.
  */
-it('continues the current Traversal history when an Edit keeps the selected Layout', () => {
+it('continues the current Traversal history when an Edit keeps the selected Diagram', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   navigation.activateGraph(GRAPH_TWO);
   navigation.present();
   const traversalHistory = traversalHistoryOf(navigation.getState());
 
-  navigation.continueInLayout(LAYOUT, GRAPH_TWO);
+  navigation.continueInDiagram(DIAGRAM, GRAPH_TWO);
 
   expect(navigation.getState()).toMatchObject({
-    selectedLayoutId: LAYOUT,
+    selectedDiagramId: DIAGRAM,
     activeGraphId: GRAPH_TWO,
     mode: 'presenting',
   });
   expect(traversalHistoryOf(navigation.getState())).toBe(traversalHistory);
 });
 
-/** Adopting a Layout also adopts the Active Graph that Layout owns. */
-it('takes the adopted Layout’s own Active Graph over the one that was emphasised', () => {
+/** Adopting a Diagram also adopts the Active Graph that Diagram owns. */
+it('takes the adopted Diagram’s own Active Graph over the one that was emphasised', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   expect(navigation.getState().activeGraphId).toBe(GRAPH_ONE);
 
-  navigation.continueInLayout(LAYOUT, GRAPH_TWO);
+  navigation.continueInDiagram(DIAGRAM, GRAPH_TWO);
 
   expect(navigation.getState()).toMatchObject({
-    selectedLayoutId: LAYOUT,
+    selectedDiagramId: DIAGRAM,
     activeGraphId: GRAPH_TWO,
   });
 });
 
 /**
- * The refusal that ADR 0040 restored. A Layout draws only the Graphs it owns, so
- * an Edit handing over a Layout and a Graph that Layout does not own has named a
+ * The refusal that ADR 0040 restored. A Diagram draws only the Graphs it owns, so
+ * an Edit handing over a Diagram and a Graph that Diagram does not own has named a
  * pair Navigation may not hold — the Active Graph would ride into the next Edit
- * as that Layout's `activeGraph`, which intake rejects outright.
+ * as that Diagram's `activeGraph`, which intake rejects outright.
  *
- * Constructible against a real Space rather than a hand-built Layout:
- * `GRAPH_ONE` exists and is drawn by the Flow view, and `LAYOUT` simply does not
+ * Constructible against a real Space rather than a hand-built Diagram:
+ * `GRAPH_ONE` exists and is drawn by the Flow view, and `DIAGRAM` simply does not
  * own it. Edit completion cannot reach it, because the pair it passes is the one
  * it wrote into the snapshot a line earlier.
  */
-it('refuses to adopt a Layout that does not draw the Graph handed with it', () => {
+it('refuses to adopt a Diagram that does not draw the Graph handed with it', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   navigation.present();
   const before = navigation.getState();
 
-  expect(() => navigation.continueInLayout(FIRST_LAYOUT, GRAPH_ONE)).toThrow(
+  expect(() => navigation.continueInDiagram(FIRST_DIAGRAM, GRAPH_ONE)).toThrow(
     /does not show the active Graph/,
   );
   expect(navigation.getState()).toBe(before);
@@ -469,12 +470,12 @@ it('refuses to adopt a Layout that does not draw the Graph handed with it', () =
 /**
  * The same refusal from the other side, and the second one ticket 01 left
  * unreachable. Activating is never an Edit (ADR 0028), so it cannot mint the
- * Graph it is handed — nor move it into the selected Layout. `GraphSelector` is
+ * Graph it is handed — nor move it into the selected Diagram. `GraphSelector` is
  * fed the visible Graphs, so this is a caller's mistake rather than an author's.
  */
-it('refuses to activate a Graph the selected Layout does not own', () => {
+it('refuses to activate a Graph the selected Diagram does not own', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, FIRST_LAYOUT);
+  const navigation = navigationFor(() => space, FIRST_DIAGRAM);
   const before = navigation.getState();
   expect(before.activeGraphId).toBe(GRAPH_THREE);
 
@@ -484,7 +485,7 @@ it('refuses to activate a Graph the selected Layout does not own', () => {
 
 it('notifies subscribers synchronously until they unsubscribe', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   const seen: (GraphId | null)[] = [];
   // The seam `useSyncExternalStore` drives. It must notify during the call that
   // changed the state — React reads `getState` straight after and would
@@ -505,7 +506,7 @@ it('notifies subscribers synchronously until they unsubscribe', () => {
 it('contains a failing subscriber and still notifies the ones behind it', () => {
   const space = fixture();
   const reported: unknown[] = [];
-  const navigation = navigationFor(() => space, LAYOUT, space, {
+  const navigation = navigationFor(() => space, DIAGRAM, space, {
     reportObserverError: (error) => reported.push(error),
   });
   const observerError = new Error('observer failed');
@@ -524,38 +525,38 @@ it('contains a failing subscriber and still notifies the ones behind it', () => 
   expect(reported[0]).toBe(observerError);
 });
 
-it('refuses a Layout the current Space does not hold, leaving navigation untouched', () => {
+it('refuses a Diagram the current Space does not hold, leaving navigation untouched', () => {
   const space = fixture();
   const missing = uuid('00000000-0000-4000-8000-000000000099');
-  const navigation = navigationFor(() => space, LAYOUT);
+  const navigation = navigationFor(() => space, DIAGRAM);
   navigation.present();
   const before = navigation.getState();
 
-  // Resolving first is the invariant: Navigation may never name a Layout the
+  // Resolving first is the invariant: Navigation may never name a Diagram the
   // Space does not hold, so an unresolvable selection is refused outright rather
   // than half-applied.
-  expect(() => navigation.selectLayout(missing)).toThrow(/does not exist/);
+  expect(() => navigation.selectDiagram(missing)).toThrow(/does not exist/);
   expect(navigation.getState()).toBe(before);
 
-  expect(() => navigation.continueInLayout(missing, GRAPH_ONE)).toThrow(/does not exist/);
+  expect(() => navigation.continueInDiagram(missing, GRAPH_ONE)).toThrow(/does not exist/);
   expect(navigation.getState()).toBe(before);
 });
 
 /*
- * Opening a replacement Space is not navigating to a Layout within the one
+ * Opening a replacement Space is not navigating to a Diagram within the one
  * already open, and the difference is what each retains. This one retains
  * nothing, because there is no Space left for any of it to belong to.
  */
 it('opens a replacement Space as new navigation, retaining no reading state', () => {
   const space = fixture();
-  const navigation = navigationFor(() => space, FIRST_LAYOUT);
+  const navigation = navigationFor(() => space, FIRST_DIAGRAM);
   navigation.present();
   navigation.advance();
 
-  navigation.openFresh(LAYOUT);
+  navigation.openFresh(DIAGRAM);
 
   expect(navigation.getState()).toEqual({
-    selectedLayoutId: LAYOUT,
+    selectedDiagramId: DIAGRAM,
     activeGraphId: GRAPH_ONE,
     mode: 'overview',
   });
@@ -588,7 +589,7 @@ it('reads the working Space once per moves() call, whatever the branching', () =
       reads += 1;
       return forked;
     },
-    LAYOUT,
+    DIAGRAM,
     forked,
   );
   navigation.present();
@@ -610,13 +611,13 @@ it('reads the working Space once per moves() call, whatever the branching', () =
  *
  * The answer alone cannot tell the two apart, so this counts the calls to the
  * thunk instead. `createNavigation` reads the Space to resolve its initial
- * Layout, and other members read it too, so what is pinned is that this one
+ * Diagram, and other members read it too, so what is pinned is that this one
  * call adds nothing rather than that the total is zero.
  */
 it('answers no moves outside Traversal history without reading the working Space', () => {
   const space = fixture();
   const currentSpace = vi.fn(() => space);
-  const navigation = navigationFor(currentSpace, LAYOUT);
+  const navigation = navigationFor(currentSpace, DIAGRAM);
 
   const before = currentSpace.mock.calls.length;
   const moves = navigation.moves();
@@ -643,7 +644,7 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
     ],
     [{ id: cardA }, { id: cardB }, { id: cardC }],
   );
-  const navigation = navigationFor(() => forked, LAYOUT);
+  const navigation = navigationFor(() => forked, DIAGRAM);
   navigation.present();
 
   navigation.selectBranch(-1);
@@ -669,96 +670,96 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
 describe('the address Navigation answers', () => {
   const addressOf = (navigation: Navigation) => navigationAddress(navigation.getState());
 
-  it('answers the Layout a Space opens in, its Active Graph, and no presented Card', () => {
-    const navigation = navigationFor(fixture, LAYOUT);
+  it('answers the Diagram a Space opens in, its Active Graph, and no presented Card', () => {
+    const navigation = navigationFor(fixture, DIAGRAM);
 
     expect(addressOf(navigation)).toEqual({
-      selectedLayoutId: LAYOUT,
+      selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_ONE,
       presentingCardId: null,
     });
   });
 
-  it('answers the selected Layout\u2019s own Active Graph after selectLayout', () => {
-    const navigation = navigationFor(fixture, FIRST_LAYOUT);
+  it('answers the selected Diagram\u2019s own Active Graph after selectDiagram', () => {
+    const navigation = navigationFor(fixture, FIRST_DIAGRAM);
 
-    navigation.selectLayout(LAYOUT);
+    navigation.selectDiagram(DIAGRAM);
 
     expect(addressOf(navigation)).toEqual({
-      selectedLayoutId: LAYOUT,
+      selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_ONE,
       presentingCardId: null,
     });
   });
 
   it('answers a replacement Space\u2019s opening position after openFresh', () => {
-    const navigation = navigationFor(fixture, LAYOUT);
+    const navigation = navigationFor(fixture, DIAGRAM);
     navigation.present();
 
-    navigation.openFresh(FIRST_LAYOUT);
+    navigation.openFresh(FIRST_DIAGRAM);
 
     expect(addressOf(navigation)).toEqual({
-      selectedLayoutId: FIRST_LAYOUT,
+      selectedDiagramId: FIRST_DIAGRAM,
       activeGraphId: GRAPH_THREE,
       presentingCardId: null,
     });
   });
 
-  it('answers the adopted Layout and the Graph handed with it after continueInLayout', () => {
-    const navigation = navigationFor(fixture, LAYOUT);
+  it('answers the adopted Diagram and the Graph handed with it after continueInDiagram', () => {
+    const navigation = navigationFor(fixture, DIAGRAM);
     navigation.present();
     const presented = navigation.activeCardId();
 
-    navigation.continueInLayout(FIRST_LAYOUT, GRAPH_THREE);
+    navigation.continueInDiagram(FIRST_DIAGRAM, GRAPH_THREE);
 
-    // Adopting a Layout must not interrupt a traversal, so the presented Card
+    // Adopting a Diagram must not interrupt a traversal, so the presented Card
     // is still part of the address it answers.
     expect(addressOf(navigation)).toEqual({
-      selectedLayoutId: FIRST_LAYOUT,
+      selectedDiagramId: FIRST_DIAGRAM,
       activeGraphId: GRAPH_THREE,
       presentingCardId: presented,
     });
   });
 
-  it('answers the addressed Graph in its named Layout after openGraph', () => {
-    const navigation = navigationFor(fixture, FIRST_LAYOUT);
+  it('answers the addressed Graph in its named Diagram after openGraph', () => {
+    const navigation = navigationFor(fixture, FIRST_DIAGRAM);
 
-    navigation.openGraph(LAYOUT, GRAPH_TWO);
+    navigation.openGraph(DIAGRAM, GRAPH_TWO);
 
     expect(addressOf(navigation)).toEqual({
-      selectedLayoutId: LAYOUT,
+      selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_TWO,
       presentingCardId: null,
     });
   });
 
   it('answers the exact Card an addressed presentation starts at after openPresentation', () => {
-    const navigation = navigationFor(fixture, FIRST_LAYOUT);
+    const navigation = navigationFor(fixture, FIRST_DIAGRAM);
 
-    navigation.openPresentation(LAYOUT, GRAPH_TWO, CARD_C);
+    navigation.openPresentation(DIAGRAM, GRAPH_TWO, CARD_C);
 
     expect(addressOf(navigation)).toEqual({
-      selectedLayoutId: LAYOUT,
+      selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_TWO,
       presentingCardId: CARD_C,
     });
   });
 
   it('answers the activated Graph, and no presented Card, after activateGraph', () => {
-    const navigation = navigationFor(fixture, LAYOUT);
+    const navigation = navigationFor(fixture, DIAGRAM);
     navigation.present();
 
     navigation.activateGraph(GRAPH_TWO);
 
     expect(addressOf(navigation)).toEqual({
-      selectedLayoutId: LAYOUT,
+      selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_TWO,
       presentingCardId: null,
     });
   });
 
   it('moves the presented Card through present, advance, retreat and exitPresenting', () => {
-    const navigation = navigationFor(fixture, LAYOUT);
+    const navigation = navigationFor(fixture, DIAGRAM);
 
     navigation.present();
     expect(addressOf(navigation).presentingCardId).toBe(CARD_A);
@@ -771,7 +772,7 @@ describe('the address Navigation answers', () => {
 
     navigation.exitPresenting();
     expect(addressOf(navigation)).toEqual({
-      selectedLayoutId: LAYOUT,
+      selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_ONE,
       presentingCardId: null,
     });
@@ -799,7 +800,7 @@ describe('the address Navigation answers', () => {
       ],
       [{ id: CARD_A }, { id: CARD_B }, { id: CARD_C }],
     );
-    const navigation = navigationFor(() => forked, LAYOUT);
+    const navigation = navigationFor(() => forked, DIAGRAM);
     navigation.present();
     const before = addressOf(navigation);
 

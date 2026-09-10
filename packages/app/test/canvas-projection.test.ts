@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type LayoutId } from '@project/core';
+import { uuidSchema, type DiagramId } from '@project/core';
 import { loadSpace, Placement, positionedStrategy, type Space } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
 import { GRAPH_PALETTE } from '../src/colors';
-import { resolveLayout } from '../src/layout-resolution';
+import { resolveDiagram } from '../src/diagram-resolution';
 import { cardFile } from './card-files';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const DRAWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-const SECOND_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const SECOND_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
 const CARDS = [cardFile(CARD_A), cardFile(CARD_B)];
 
@@ -21,14 +21,14 @@ const OTHER = { id: OTHER_GRAPH, title: 'Other', edges: [{ from: CARD_B, to: CAR
 const EMPTY = { id: DRAWN_GRAPH, title: 'Empty', edges: [] };
 
 /**
- * An authored Layout over both Cards, owning the Graphs it is handed.
+ * An authored Diagram over both Cards, owning the Graphs it is handed.
  *
- * A Graph is a nested owned value of exactly one Layout (ADR 0040), so a Space
- * that holds Graphs is a Space that holds a Layout — and this one positions both
+ * A Graph is a nested owned value of exactly one Diagram (ADR 0040), so a Space
+ * that holds Graphs is a Space that holds a Diagram — and this one positions both
  * Cards, which is what closes every owned Edge over its membership.
  */
-const layoutOwning = (...graphs: readonly object[]) => ({
-  id: LAYOUT,
+const diagramOwning = (...graphs: readonly object[]) => ({
+  id: DIAGRAM,
   title: 'Working',
   kind: 'positioned',
   positions: { [CARD_A]: { x: 0, y: 0, open: false }, [CARD_B]: { x: 400, y: 0, open: false } },
@@ -50,8 +50,8 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
       version: 1,
       id: '00000000-0000-4000-8000-000000000001',
       title: 'T',
-      defaultLayout: LAYOUT,
-      layouts: [layoutOwning(EMPTY)],
+      defaultDiagram: DIAGRAM,
+      diagrams: [diagramOwning(EMPTY)],
       ...extra,
     },
     CARDS,
@@ -60,15 +60,15 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
   return result.space;
 }
 
-/** Arrange through the Layout's own strategy, so a test sees what the app renders. */
+/** Arrange through the Diagram's own strategy, so a test sees what the app renders. */
 async function projectThrough(
   space: Space,
   interaction: CanvasInteraction = AT_REST,
-  selection?: LayoutId,
+  selection?: DiagramId,
 ) {
-  const resolved = resolveLayout(space, selection);
+  const resolved = resolveDiagram(space, selection);
   const projection = canvasProjection(space, resolved);
-  const laidOut = await positionedStrategy(Placement.fromLayout(resolved.layout))(
+  const laidOut = await positionedStrategy(Placement.fromDiagram(resolved.diagram))(
     projection.strategyGraph,
   );
   return { ...projection, ...projection.project(laidOut, interaction) };
@@ -83,22 +83,22 @@ function handledGraphIds(nodes: readonly CardFlowNode[]): string[] {
 }
 
 describe('canvasProjection', () => {
-  it('marks authored Layout Cards editable', async () => {
-    const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
+  it('marks authored Diagram Cards editable', async () => {
+    const space = spaceWith({ diagrams: [diagramOwning(DRAWN)] });
 
-    const authored = await projectThrough(space, AT_REST, LAYOUT);
+    const authored = await projectThrough(space, AT_REST, DIAGRAM);
 
     expect(authored.nodes.map((node) => node.data.readOnly)).toEqual([false, false]);
   });
 
-  it('projects every Layout Card when its Graph is empty', async () => {
+  it('projects every Diagram Card when its Graph is empty', async () => {
     const { nodes } = await projectThrough(spaceWith());
 
     expect(nodes.map((node) => node.id).sort()).toEqual([CARD_A, CARD_B]);
   });
 
   it('emphasises the Active Graph without hiding the rest of the Space', async () => {
-    const space = spaceWith({ layouts: [layoutOwning(DRAWN, OTHER)] });
+    const space = spaceWith({ diagrams: [diagramOwning(DRAWN, OTHER)] });
 
     const equal = await projectThrough(space);
     const emphasised = await projectThrough(space, { ...AT_REST, activeGraphId: DRAWN_GRAPH });
@@ -110,7 +110,7 @@ describe('canvasProjection', () => {
   });
 
   it('colours the authoring handles as the Active Graph, and as the first slot without one', async () => {
-    const space = spaceWith({ layouts: [layoutOwning({ ...DRAWN, color: '#123456' })] });
+    const space = spaceWith({ diagrams: [diagramOwning({ ...DRAWN, color: '#123456' })] });
 
     const active = await projectThrough(space, { ...AT_REST, activeGraphId: DRAWN_GRAPH });
     const none = await projectThrough(spaceWith());
@@ -122,7 +122,7 @@ describe('canvasProjection', () => {
   });
 
   it('recedes the Edges of every Graph but the Active one', async () => {
-    const space = spaceWith({ layouts: [layoutOwning(DRAWN, OTHER)] });
+    const space = spaceWith({ diagrams: [diagramOwning(DRAWN, OTHER)] });
 
     const { edges } = await projectThrough(space, { ...AT_REST, activeGraphId: DRAWN_GRAPH });
 
@@ -133,7 +133,7 @@ describe('canvasProjection', () => {
   });
 
   it('names the traversal position, the authoring selection and what Presenting draws', async () => {
-    const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
+    const space = spaceWith({ diagrams: [diagramOwning(DRAWN)] });
 
     const { nodes } = await projectThrough(space, {
       ...AT_REST,
@@ -150,13 +150,13 @@ describe('canvasProjection', () => {
     expect(byId[CARD_B]?.showContent).toBe(false);
   });
 
-  it('draws every Graph a selected Layout owns', async () => {
-    const space = spaceWith({ layouts: [layoutOwning(DRAWN, OTHER)] });
+  it('draws every Graph a selected Diagram owns', async () => {
+    const space = spaceWith({ diagrams: [diagramOwning(DRAWN, OTHER)] });
 
-    const { visibleGraphs, nodes, edges } = await projectThrough(space, AT_REST, LAYOUT);
+    const { visibleGraphs, nodes, edges } = await projectThrough(space, AT_REST, DIAGRAM);
 
     // Graphs, Edges and handles are derived separately and must agree on the
-    // same set — the Graphs this Layout owns (ADR 0040), which here is both.
+    // same set — the Graphs this Diagram owns (ADR 0040), which here is both.
     expect(visibleGraphs.map((graph) => graph.id)).toEqual([DRAWN_GRAPH, OTHER_GRAPH]);
     expect(edges.map((edge) => edge.data?.['graphId']).sort()).toEqual(
       [DRAWN_GRAPH, OTHER_GRAPH].sort(),
@@ -164,22 +164,22 @@ describe('canvasProjection', () => {
     expect(handledGraphIds(nodes)).toEqual([DRAWN_GRAPH, OTHER_GRAPH].sort());
   });
 
-  it('draws neither the Edge nor the handle of a Graph a sibling Layout owns', async () => {
-    // Two Layouts of one Space place the same Cards, and an embedded sub-flow
+  it('draws neither the Edge nor the handle of a Graph a sibling Diagram owns', async () => {
+    // Two Diagrams of one Space place the same Cards, and an embedded sub-flow
     // merges their projections into one React Flow instance (ADR 0068). Both
     // Cards the unowned Edge names are therefore mounted, so what keeps that
-    // Edge off this Layout is the derivation here and not React Flow dropping
+    // Edge off this Diagram is the derivation here and not React Flow dropping
     // an Edge whose endpoints it cannot resolve. Edges and handles are filtered
     // by the same owned set two lines apart: assert both, because dropping
     // either one alone still leaves the other refusing to draw.
     const space = spaceWith({
-      layouts: [
-        layoutOwning(DRAWN),
-        { ...layoutOwning(OTHER), id: SECOND_LAYOUT, title: 'Sibling' },
+      diagrams: [
+        diagramOwning(DRAWN),
+        { ...diagramOwning(OTHER), id: SECOND_DIAGRAM, title: 'Sibling' },
       ],
     });
 
-    const sibling = await projectThrough(space, AT_REST, SECOND_LAYOUT);
+    const sibling = await projectThrough(space, AT_REST, SECOND_DIAGRAM);
 
     expect(sibling.nodes.map((node) => node.id).sort()).toEqual([CARD_A, CARD_B]);
     expect(sibling.visibleGraphs.map((graph) => graph.id)).toEqual([OTHER_GRAPH]);
@@ -188,21 +188,21 @@ describe('canvasProjection', () => {
   });
 
   it('carries each authored Expanded rect through strategy input and node projection', async () => {
-    const layout = {
-      ...layoutOwning(DRAWN),
+    const diagram = {
+      ...diagramOwning(DRAWN),
       positions: {
         [CARD_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
         [CARD_B]: { x: 700, y: 0, open: false },
       },
     };
-    const space = spaceWith({ layouts: [layout] });
-    const resolved = resolveLayout(space, LAYOUT);
+    const space = spaceWith({ diagrams: [diagram] });
+    const resolved = resolveDiagram(space, DIAGRAM);
     const projection = canvasProjection(space, resolved);
     const strategyCard = projection.strategyGraph.cards.find(({ id }) => id === CARD_A);
 
     expect(strategyCard).toMatchObject({ width: 560, height: 420 });
 
-    const laidOut = await positionedStrategy(Placement.fromLayout(resolved.layout))(
+    const laidOut = await positionedStrategy(Placement.fromDiagram(resolved.diagram))(
       projection.strategyGraph,
     );
     const node = projection.project(laidOut, AT_REST).nodes.find(({ id }) => id === CARD_A);

@@ -59,8 +59,8 @@ export function graphEntryCards(graph: Graph): CardId[] {
  * separate question, and the fallback does not answer it.
  *
  * `undefined` is left for a graph with no edges, and that is a **normal** state
- * rather than an unreachable one: creating a layout creates its initial active
- * graph empty in the same edit (ADR 0040), so every new Layout is in it until
+ * rather than an unreachable one: creating a diagram creates its initial active
+ * graph empty in the same edit (ADR 0040), so every new Diagram is in it until
  * the author draws something. `graphSchema`
  * used to forbid it and no longer does. Callers must answer it — presenting
  * refuses, and the control that offers presenting is disabled — because a graph

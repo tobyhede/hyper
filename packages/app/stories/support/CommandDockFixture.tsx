@@ -2,7 +2,7 @@
  * The Command Dock over a real Space, for the catalogue and its behaviour tests.
  *
  * **What it draws is production's.** The Dock is `#components/CommandDock`
- * unchanged, the canvas is `LayoutCanvasFixture` — which owns the real React
+ * unchanged, the canvas is `DiagramCanvasFixture` — which owns the real React
  * Flow instance, the production `CardNode` and `RoutedEdge` and the projection
  * every stable canvas story draws through — and every Space in the session is a
  * tracked fixture from `./spaces`. What this module supplies is the one thing
@@ -11,8 +11,8 @@
  *
  * Every command that changes something writes the stored snapshot and reloads it
  * through `loadSpaceSnapshot`, production's own intake — so a story cannot reach
- * a Space the application would refuse, and switching a Layout, adding and
- * renaming a Layout or a Graph and placing a Card are all real Edits rather than
+ * a Space the application would refuse, and switching a Diagram, adding and
+ * renaming a Diagram or a Graph and placing a Card are all real Edits rather than
  * list surgery beside a fixed canvas.
  *
  * **The session is seeded already crossed.** How a Space joins the open set is
@@ -27,8 +27,8 @@ import {
   type CardId,
   type CardPlacement,
   type GraphId,
-  type Layout,
-  type LayoutId,
+  type Diagram,
+  type DiagramId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -44,10 +44,10 @@ import {
 import { CARDS_TRIGGER } from '#components/command-dock-triggers';
 import { CardsDrawer, CARD_DRAG_TYPE } from '#components/CardsDrawer';
 import { graphColorMap } from '#src/colors';
-import { nextGraphTitle, nextLayoutTitle } from '#src/titles';
+import { nextGraphTitle, nextDiagramTitle } from '#src/titles';
 import {
   editDocument,
-  editSelectedLayout,
+  editSelectedDiagram,
   exitSpace,
   opened,
   openTree,
@@ -56,7 +56,7 @@ import {
   type SessionState,
   type SpaceStep,
 } from '#src/dock-model';
-import { LayoutCanvasFixture, type DrawnLayout } from './ReactFlowCanvas';
+import { DiagramCanvasFixture, type DrawnDiagram } from './ReactFlowCanvas';
 import {
   commandDockSnapshot,
   designSystemSnapshot,
@@ -66,15 +66,15 @@ import {
 } from './spaces';
 
 /**
- * The Dock's own seam plus the Layout the canvas beside it draws.
+ * The Dock's own seam plus the Diagram the canvas beside it draws.
  *
  * `drawn` is deliberately not a member of {@link DockChrome}: what the canvas
  * draws is `SpaceCanvas`'s in the application and the Dock never reads it. It is
  * carried here because one fixture supplies both halves from one Space.
  */
 interface DrawnChrome extends DockChrome {
-  readonly drawn: DrawnLayout;
-  /** The canvas half of Add to Layout, which the drawer's rows are dragged onto. */
+  readonly drawn: DrawnDiagram;
+  /** The canvas half of Add to Diagram, which the drawer's rows are dragged onto. */
   readonly onDropCard: (cardId: string) => void;
 }
 
@@ -87,7 +87,7 @@ interface DrawnChrome extends DockChrome {
  * The claim the list surfaces are compared on is that a drag *out of* a surface
  * survives that surface's own dismissal and leaves the list — where exactly it
  * lands is the Edit's business, and converting a client point into canvas
- * coordinates would mean reaching past `LayoutCanvasFixture` into the React
+ * coordinates would mean reaching past `DiagramCanvasFixture` into the React
  * Flow instance it owns.
  */
 const dropPlacement = (placed: number): CardPlacement => ({
@@ -137,7 +137,7 @@ const META_ENTRY = opened(metaSnapshot, null);
  *
  * Every entry is a crossing a reader could make: each Space above holds a Space
  * Card naming the next, and Meta holds one naming `Traversal`. The Space it
- * arrives in is still `Rendering`, the fixture with two Layouts, three Graphs
+ * arrives in is still `Rendering`, the fixture with two Diagrams, three Graphs
  * and thirty-four Cards, so nothing else the Dock is judged on is traded for
  * the depth.
  */
@@ -223,7 +223,7 @@ const parentOf = (state: SessionState): SpaceStep | null => {
  * to close the entry outright, so leaving a Space took its selections with it
  * and a Space open but not above you had nowhere to be. Making the open set a
  * tree you move around is what gives it somewhere — and it is why every entry
- * keeps its Layout and Graph, so coming back to one arrives where you left it.
+ * keeps its Diagram and Graph, so coming back to one arrives where you left it.
  *
  * What it costs is that the set only grows unless something takes from it, which
  * is why Exit is a command of its own, in the Space menu. Exit used to be both
@@ -234,11 +234,11 @@ const switchTo = (state: SessionState, spaceId: UUID): SessionState =>
   state.open.has(spaceId) ? { ...state, currentId: spaceId } : state;
 
 /**
- * Layouts, Graphs and placement are edits on a stored snapshot rather than
+ * Diagrams, Graphs and placement are edits on a stored snapshot rather than
  * three lists of local state.
  *
  * A prototype whose rename control refuses an empty name and then changes
- * nothing is lying about the part under review — and one whose Add Layout
+ * nothing is lying about the part under review — and one whose Add Diagram
  * appended to an array the canvas never read would be lying about a larger
  * part. Each operation writes the snapshot; `loadSpaceSnapshot` re-derives the
  * Space, and the canvas, the lists and the menus all follow from that one
@@ -261,7 +261,7 @@ export function useCommandDockChrome(
   const [exitReport, setExitReport] = useState<SpaceExitReport | null>(null);
 
   const entry = currentEntry(session);
-  const { snapshot, layoutId, graphId } = entry;
+  const { snapshot, diagramId, graphId } = entry;
 
   /**
    * One Edit on the current entry, leaving every other entry as it was left.
@@ -281,7 +281,8 @@ export function useCommandDockChrome(
 
   const setSnapshot = (edit: (current: SpaceSnapshot) => SpaceSnapshot): void =>
     write((live) => ({ ...live, snapshot: edit(live.snapshot) }));
-  const setLayoutId = (id: LayoutId | null): void => write((live) => ({ ...live, layoutId: id }));
+  const setDiagramId = (id: DiagramId | null): void =>
+    write((live) => ({ ...live, diagramId: id }));
   const setGraphId = (id: GraphId | null): void => write((live) => ({ ...live, graphId: id }));
 
   const parent = parentOf(session);
@@ -330,27 +331,28 @@ export function useCommandDockChrome(
 
   const colors = useMemo(() => graphColorMap(space), [space]);
 
-  const layout = space.layouts.find((candidate) => candidate.id === layoutId) ?? space.layouts[0];
-  // ADR 0079 keeps the last Layout undeletable and gives a new one an empty
+  const diagram =
+    space.diagrams.find((candidate) => candidate.id === diagramId) ?? space.diagrams[0];
+  // ADR 0079 keeps the last Diagram undeletable and gives a new one an empty
   // Active Graph, so both of these hold for every Edit this file makes.
-  if (layout === undefined) throw new Error('The Command Dock fixture has no Layout to draw.');
-  const graph = layout.graphs.find((candidate) => candidate.id === graphId) ?? layout.graphs[0];
-  if (graph === undefined) throw new Error(`${layout.title} owns no Graph.`);
+  if (diagram === undefined) throw new Error('The Command Dock fixture has no Diagram to draw.');
+  const graph = diagram.graphs.find((candidate) => candidate.id === graphId) ?? diagram.graphs[0];
+  if (graph === undefined) throw new Error(`${diagram.title} owns no Graph.`);
 
   /**
-   * One Edit on the Layout the **live** entry selects.
+   * One Edit on the Diagram the **live** entry selects.
    *
-   * It used to close over `layout.id` read during this render and spend it
+   * It used to close over `diagram.id` read during this render and spend it
    * inside a functional updater that had already gone and fetched the live
    * entry, so the write and the thing saying where to write it came from two
-   * different moments. `editSelectedLayout` takes the entry instead, which is
+   * different moments. `editSelectedDiagram` takes the entry instead, which is
    * what makes a captured id unrepresentable rather than merely wrong.
    */
-  const withinSelected = (edit: (layout: Layout) => Layout): void =>
-    write((live) => editSelectedLayout(live, edit));
+  const withinSelected = (edit: (diagram: Diagram) => Diagram): void =>
+    write((live) => editSelectedDiagram(live, edit));
 
   /**
-   * Add a Card to the drawing Layout — one Edit, whichever route asked for it.
+   * Add a Card to the drawing Diagram — one Edit, whichever route asked for it.
    *
    * The drawer's own Add and a drag onto the canvas spend this same completion,
    * so nothing downstream knows which of the two got here and there is no second
@@ -365,8 +367,8 @@ export function useCommandDockChrome(
       },
     }));
 
-  /** What the drawer lists: the Cards this Layout does not place. */
-  const unplaced = space.cards.filter((card) => layout.positions[card.id] === undefined);
+  /** What the drawer lists: the Cards this Diagram does not place. */
+  const unplaced = space.cards.filter((card) => diagram.positions[card.id] === undefined);
 
   return {
     // Nothing in a story withdraws on it, but the seam is the application's and
@@ -377,7 +379,7 @@ export function useCommandDockChrome(
     // to conflict with. Stated rather than defaulted for the reason above — the
     // field is the application's and a fixture one short of it is not parity.
     replacementEpoch: 0,
-    drawn: { space, layoutId: layout.id },
+    drawn: { space, diagramId: diagram.id },
     onDropCard: (cardId) => {
       const dropped = space.cards.find((card) => card.id === cardId);
       if (dropped !== undefined) place(dropped.id);
@@ -399,7 +401,7 @@ export function useCommandDockChrome(
       onNewSpace: () => {
         document.body.dataset['createCard'] = 'space';
       },
-      // Moving, not exiting: the entry left behind stays open with its Layout and
+      // Moving, not exiting: the entry left behind stays open with its Diagram and
       // its Graph, so this is a move between Spaces and never a close.
       onSwitchTo: (spaceId) => setSession((current) => switchTo(current, spaceId)),
       // And this is what the Open Spaces menu made necessary. Once nothing closes on its
@@ -409,7 +411,7 @@ export function useCommandDockChrome(
       // **Computed whole, then installed.** `exitSpace` answers the next session
       // and the outcome together, so both come from one reading of the session
       // rather than from a captured id spent inside an updater that had gone and
-      // fetched a later one — the stale-closure shape `editSelectedLayout` and
+      // fetched a later one — the stale-closure shape `editSelectedDiagram` and
       // the drag gesture were both fixed for. React flushes discrete events, so
       // the `session` this closes over is the one the press was made against.
       onExit: (spaceId, confirmation) => {
@@ -431,13 +433,13 @@ export function useCommandDockChrome(
     },
 
     canvas: {
-      layouts: space.layouts,
-      selected: layout,
-      onSelect: setLayoutId,
+      diagrams: space.diagrams,
+      selected: diagram,
+      onSelect: setDiagramId,
       onRename: (renamed, title) => {
         setSnapshot((current) =>
-          editDocument(current, (layouts) =>
-            layouts.map((candidate) =>
+          editDocument(current, (diagrams) =>
+            diagrams.map((candidate) =>
               candidate.id === renamed ? { ...candidate, title } : candidate,
             ),
           ),
@@ -448,23 +450,23 @@ export function useCommandDockChrome(
       },
       createDisabled: false,
       deleteDisabled: false,
-      // One Edit that creates and selects an empty Layout owning one empty
-      // Active Graph, which is what ADR 0079 makes Add Layout mean.
+      // One Edit that creates and selects an empty Diagram owning one empty
+      // Active Graph, which is what ADR 0079 makes Add Diagram mean.
       onCreate: () => {
         const added = newUuid();
         setSnapshot((current) =>
-          editDocument(current, (layouts) => [
-            ...layouts,
+          editDocument(current, (diagrams) => [
+            ...diagrams,
             {
               id: added,
-              title: nextLayoutTitle(current),
+              title: nextDiagramTitle(current),
               kind: 'positioned',
               positions: {},
               graphs: [{ id: newUuid(), title: 'Graph 1', edges: [] }],
             },
           ]),
         );
-        setLayoutId(added);
+        setDiagramId(added);
         setGraphId(null);
       },
       // What the command *built*, not a word this fixture invented: the story's
@@ -472,43 +474,43 @@ export function useCommandDockChrome(
       // address it produced, so a label of the harness's own choosing would only
       // prove the harness.
       onCopyLink: () => {
-        document.body.dataset['copyCommand'] = 'layout';
+        document.body.dataset['copyCommand'] = 'diagram';
       },
       onDelete: (deleted) => {
         setSnapshot((current) => {
-          const next = editDocument(current, (layouts) =>
-            layouts.filter((candidate) => candidate.id !== deleted),
+          const next = editDocument(current, (diagrams) =>
+            diagrams.filter((candidate) => candidate.id !== deleted),
           );
           // **The opening selection moves with the deletion, or the document
-          // stops loading.** `editDocument` rewrites the Layouts and nothing
-          // else, so deleting the one `defaultLayout` names leaves that field
-          // pointing at a Layout the document no longer declares —
+          // stops loading.** `editDocument` rewrites the Diagrams and nothing
+          // else, so deleting the one `defaultDiagram` names leaves that field
+          // pointing at a Diagram the document no longer declares —
           // `loadSpaceSnapshot` refuses it, and the refusal arrives as this
           // file's own throw rather than as anything a story can draw. The row
-          // is not what stops this: `layouts.length <= 1` withholds Delete on
-          // the *last* Layout, and the default is rarely the last one.
+          // is not what stops this: `diagrams.length <= 1` withholds Delete on
+          // the *last* Diagram, and the default is rarely the last one.
           // ADR 0079's real Edit moves the opening selection for this reason,
           // and the first survivor is the same answer the render's own fallback
           // gives.
-          // Optional because `layouts` is optional on the stored shape.
-          // `dock-model.ts` keeps its own `storedLayouts` private, and widening
+          // Optional because `diagrams` is optional on the stored shape.
+          // `dock-model.ts` keeps its own `storedDiagrams` private, and widening
           // that module's surface for a fixture is not worth the one read.
-          const surviving = next.document.layouts?.[0];
-          if (next.document.defaultLayout !== deleted || surviving === undefined) return next;
-          return { ...next, document: { ...next.document, defaultLayout: surviving.id } };
+          const surviving = next.document.diagrams?.[0];
+          if (next.document.defaultDiagram !== deleted || surviving === undefined) return next;
+          return { ...next, document: { ...next.document, defaultDiagram: surviving.id } };
         });
-        // **`null` and not `''`.** Deleting the Layout the entry selects leaves
+        // **`null` and not `''`.** Deleting the Diagram the entry selects leaves
         // it selecting nothing until the render's fallback picks the first, and
         // an empty string was a stand-in for that with no type to say so — the
-        // same laundering `defaultLayout` was doing one field over.
-        // `LayoutId | null` spells it, so the sentinel is gone.
-        setLayoutId(layoutId === deleted ? null : layoutId);
+        // same laundering `defaultDiagram` was doing one field over.
+        // `DiagramId | null` spells it, so the sentinel is gone.
+        setDiagramId(diagramId === deleted ? null : diagramId);
         setGraphId(null);
       },
     },
 
     graph: {
-      graphs: layout.graphs,
+      graphs: diagram.graphs,
       active: graph,
       colorByGraphId: colors,
       activeColor: colors[graph.id] ?? FALLBACK_GRAPH_COLOR,
@@ -550,7 +552,7 @@ export function useCommandDockChrome(
       },
       editsDisabled: false,
       onCopyLink: () => {
-        document.body.dataset['copyCommand'] = 'layout-graph';
+        document.body.dataset['copyCommand'] = 'diagram-graph';
       },
       onCopyPermanentLink: () => {
         document.body.dataset['copyCommand'] = 'graph';
@@ -612,9 +614,9 @@ export function useCommandDockChrome(
 /**
  * The canvas the Dock floats over, and the box it docks to.
  *
- * `LayoutCanvasFixture` owns the real React Flow instance, the production
+ * `DiagramCanvasFixture` owns the real React Flow instance, the production
  * `CardNode` and `RoutedEdge`, the projection every stable canvas story draws
- * through and the production `ZoomSlider` — so this module states which Layout
+ * through and the production `ZoomSlider` — so this module states which Diagram
  * to draw and which Graph to emphasise, and nothing about how a canvas is built.
  * The Edge stacking is production's own rather than fixed handle lanes standing
  * in for it.
@@ -643,8 +645,8 @@ export function CommandDockFixture({
     <div
       ref={container}
       className="relative h-screen w-full overflow-hidden bg-background"
-      // A drop is Add to Layout, which is a real Edit on the stored snapshot:
-      // the Card joins the selected Layout and so leaves the list that served
+      // A drop is Add to Diagram, which is a real Edit on the stored snapshot:
+      // the Card joins the selected Diagram and so leaves the list that served
       // the drag. That surface is deliberately left open — adding Cards is
       // repetitive, and whether a surface survives the drag it just served is
       // the comparison.
@@ -657,7 +659,7 @@ export function CommandDockFixture({
         chrome.onDropCard(event.dataTransfer.getData(CARD_DRAG_TYPE));
       }}
     >
-      <LayoutCanvasFixture
+      <DiagramCanvasFixture
         drawn={chrome.drawn}
         activeGraphId={chrome.graph.active.id}
         viewport={{ fit: true }}

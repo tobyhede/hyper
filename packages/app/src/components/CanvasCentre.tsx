@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useStoreApi } from '@xyflow/react';
-import type { LayoutPosition } from '@project/core';
+import type { DiagramPosition } from '@project/core';
 import { CARD_SIZE } from '../card';
 
 /** Where a Card created from a menu or a keystroke lands, in flow coordinates. */
-export type VisibleCentre = () => LayoutPosition;
+export type VisibleCentre = () => DiagramPosition;
 
 /**
  * Reports where the middle of the visible canvas currently is.

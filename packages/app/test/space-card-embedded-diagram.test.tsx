@@ -13,7 +13,7 @@ import {
   MemorySpaceBackendTestControl,
   type SpaceSession,
 } from '@project/persistence';
-import { embeddedNodeId } from '../src/embedded-layout';
+import { embeddedNodeId } from '../src/embedded-diagram';
 import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
@@ -25,32 +25,32 @@ import { anyPresentControl, openSpaceRow, openSpacesMenu, unavailable } from './
  *
  * `space-card-selection.test.tsx` holds the two selections the Card authors;
  * this file holds what those selections then draw. The two claims that matter
- * are that the Layout drawn is the **Card's** and never the target Space's own
- * — the target's `defaultLayout` here is deliberately not the one the Card
+ * are that the Diagram drawn is the **Card's** and never the target Space's own
+ * — the target's `defaultDiagram` here is deliberately not the one the Card
  * selects — and that target editing, draft ownership and retained reads remain
  * coherent inside the containing canvas as a sub flow.
  *
  * The application half of the evidence ADR 0052 requires; the Ladle half is
- * `stories/surfaces/space-card-embedded-layout.stories.tsx`.
+ * `stories/surfaces/space-card-embedded-diagram.stories.tsx`.
  */
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const META_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const META_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const META_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const META_TO_HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const META_TO_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const HOME_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
-const HOME_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
+const HOME_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const HOME_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
 const SPACE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000014');
 
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
-const SELECTED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const SELECTED_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const SELECTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
-const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
 const DRAWN_A = uuidSchema.parse('00000000-0000-4000-8000-000000000025');
 const DRAWN_B = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
@@ -61,13 +61,13 @@ const GONE_A_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
 const GONE_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
 const GONE_A_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000052');
 const GONE_B_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000053');
-const GONE_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000054');
+const GONE_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000054');
 
 /**
- * The target: two Layouts over three Cards, and the one the Card selects is
- * **not** the Space's own `defaultLayout`.
+ * The target: two Diagrams over three Cards, and the one the Card selects is
+ * **not** the Space's own `defaultDiagram`.
  *
- * That asymmetry is the fixture's whole job. With one Layout, or with the
+ * That asymmetry is the fixture's whole job. With one Diagram, or with the
  * selected one also being the default, a Card reading the target's own
  * selection would draw exactly what a Card reading its own does.
  */
@@ -76,9 +76,9 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Architecture',
-    layouts: [
+    diagrams: [
       {
-        id: SELECTED_LAYOUT_ID,
+        id: SELECTED_DIAGRAM_ID,
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
@@ -90,14 +90,14 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         ],
       },
       {
-        id: OTHER_LAYOUT_ID,
+        id: OTHER_DIAGRAM_ID,
         title: 'Collection 2',
         kind: 'positioned',
         positions: { [UNPLACED]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Second pass', edges: [] }],
       },
     ],
-    defaultLayout: OTHER_LAYOUT_ID,
+    defaultDiagram: OTHER_DIAGRAM_ID,
   },
   cards: [
     { id: DRAWN_A, document: { title: 'Intake', kind: 'markdown', body: '' } },
@@ -106,17 +106,17 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-/** Home, holding one Space Card the Layout has already Opened (ADR 0064). */
+/** Home, holding one Space Card the Diagram has already Opened (ADR 0064). */
 const home = (spaceCard: Extract<CardDocument, { kind: 'space' }>): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: HOME_ID,
     document: {
       version: 1,
       title: 'Home',
-      layouts: [
+      diagrams: [
         {
-          id: HOME_LAYOUT_ID,
-          title: 'Layout 1',
+          id: HOME_DIAGRAM_ID,
+          title: 'Diagram 1',
           kind: 'positioned',
           positions: {
             [HOME_CARD_ID]: { x: 10, y: 20, open: false },
@@ -130,7 +130,7 @@ const home = (spaceCard: Extract<CardDocument, { kind: 'space' }>): SpaceSnapsho
           graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
       ],
-      defaultLayout: HOME_LAYOUT_ID,
+      defaultDiagram: HOME_DIAGRAM_ID,
     },
     cards: [
       { id: HOME_CARD_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
@@ -143,10 +143,10 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Meta',
-    layouts: [
+    diagrams: [
       {
-        id: META_LAYOUT_ID,
-        title: 'Layout 1',
+        id: META_DIAGRAM_ID,
+        title: 'Diagram 1',
         kind: 'positioned',
         positions: {
           [META_CARD_ID]: { x: 0, y: 0, open: false },
@@ -156,7 +156,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
     ],
-    defaultLayout: META_LAYOUT_ID,
+    defaultDiagram: META_DIAGRAM_ID,
   },
   cards: [
     { id: META_CARD_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
@@ -198,7 +198,7 @@ const embeddedNode = (cardId: CardId): HTMLElement => {
   return node;
 };
 
-/** A Card of the *containing* Layout, by the node the canvas draws it as. */
+/** A Card of the *containing* Diagram, by the node the canvas draws it as. */
 const containingNode = (cardId: CardId): HTMLElement => {
   const node = document.querySelector(`.react-flow__node[data-id="${cardId}"]`);
   if (!(node instanceof HTMLElement)) throw new Error(`no node is drawn for ${cardId}`);
@@ -238,7 +238,7 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
-describe('the Layout an Open Space Card draws', () => {
+describe('the Diagram an Open Space Card draws', () => {
   it.each(['failed', 'conflicted'] as const)(
     'reports embedded %s persistence on its target entry and exposes recovery only there',
     async (kind) => {
@@ -246,7 +246,7 @@ describe('the Layout an Open Space Card draws', () => {
         title: 'Elsewhere',
         kind: 'space',
         spaceId: TARGET_ID,
-        layout: SELECTED_LAYOUT_ID,
+        diagram: SELECTED_DIAGRAM_ID,
         graph: SELECTED_GRAPH_ID,
       });
       const control = new MemorySpaceBackendTestControl();
@@ -320,16 +320,16 @@ describe('the Layout an Open Space Card draws', () => {
       title: 'Elsewhere',
       kind: 'space',
       spaceId: TARGET_ID,
-      layout: SELECTED_LAYOUT_ID,
+      diagram: SELECTED_DIAGRAM_ID,
       graph: SELECTED_GRAPH_ID,
     });
     await mount({
       ...value,
       document: {
         ...value.document,
-        layouts: value.document.layouts?.map((layout) => ({
-          ...layout,
-          graphs: layout.graphs.map((graph) => ({
+        diagrams: value.document.diagrams?.map((diagram) => ({
+          ...diagram,
+          graphs: diagram.graphs.map((graph) => ({
             ...graph,
             edges: [{ from: HOME_CARD_ID, to: SPACE_CARD_ID }],
           })),
@@ -345,7 +345,7 @@ describe('the Layout an Open Space Card draws', () => {
     const parent = document.querySelector(`.react-flow__node[data-id="${SPACE_CARD_ID}"]`);
     if (!(parent instanceof HTMLElement)) throw new Error('Space Card missing');
     expect(within(parent).queryByRole('button', { name: /Close Card/ })).toBeNull();
-    expect(within(parent).getByTestId('space-card-layout').hasAttribute('disabled')).toBe(true);
+    expect(within(parent).getByTestId('space-card-diagram').hasAttribute('disabled')).toBe(true);
     const sibling = document.querySelector(`.react-flow__node[data-id="${HOME_CARD_ID}"]`);
     if (!(sibling instanceof HTMLElement)) throw new Error('Containing Markdown Card missing');
     expect(within(sibling).queryByRole('button', { name: /Edit Card/ })).toBeNull();
@@ -362,7 +362,7 @@ describe('the Layout an Open Space Card draws', () => {
       title: 'Elsewhere',
       kind: 'space',
       spaceId: TARGET_ID,
-      layout: SELECTED_LAYOUT_ID,
+      diagram: SELECTED_DIAGRAM_ID,
       graph: SELECTED_GRAPH_ID,
     };
     const value = home(document);
@@ -371,10 +371,10 @@ describe('the Layout an Open Space Card draws', () => {
       cards: value.cards.map((card) => (card.id === HOME_CARD_ID ? { ...card, document } : card)),
       document: {
         ...value.document,
-        layouts: value.document.layouts?.map((layout) => ({
-          ...layout,
+        diagrams: value.document.diagrams?.map((diagram) => ({
+          ...diagram,
           positions: {
-            ...layout.positions,
+            ...diagram.positions,
             [HOME_CARD_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
           },
         })),
@@ -413,14 +413,14 @@ describe('the Layout an Open Space Card draws', () => {
    *
    * A single-embedding mount cannot tell the two halves apart either, so this
    * fixture draws the same target twice, from two Open Space Cards of the
-   * containing Layout.
+   * containing Diagram.
    */
   it('withdraws the containing canvas for a live embedded edit and leaves that embedding its own', async () => {
     const spaceCard: CardDocument = {
       title: 'Elsewhere',
       kind: 'space',
       spaceId: TARGET_ID,
-      layout: SELECTED_LAYOUT_ID,
+      diagram: SELECTED_DIAGRAM_ID,
       graph: SELECTED_GRAPH_ID,
     };
     const value = home(spaceCard);
@@ -431,10 +431,10 @@ describe('the Layout an Open Space Card draws', () => {
       ),
       document: {
         ...value.document,
-        layouts: value.document.layouts?.map((layout) => ({
-          ...layout,
+        diagrams: value.document.diagrams?.map((diagram) => ({
+          ...diagram,
           positions: {
-            ...layout.positions,
+            ...diagram.positions,
             [HOME_CARD_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
           },
         })),
@@ -462,9 +462,9 @@ describe('the Layout an Open Space Card draws', () => {
     // Every containing Card control goes, on the Space Card holding the edit
     // and on its sibling alike, and so does the other embedding's own.
     expect(within(editing).queryByRole('button', { name: /Close Card/ })).toBeNull();
-    expect(within(editing).getByTestId('space-card-layout').hasAttribute('disabled')).toBe(true);
+    expect(within(editing).getByTestId('space-card-diagram').hasAttribute('disabled')).toBe(true);
     expect(within(other).queryByRole('button', { name: /Close Card/ })).toBeNull();
-    expect(within(other).getByTestId('space-card-layout').hasAttribute('disabled')).toBe(true);
+    expect(within(other).getByTestId('space-card-diagram').hasAttribute('disabled')).toBe(true);
     expect(within(otherEmbedded).queryByRole('button', { name: 'Edit Title Intake' })).toBeNull();
 
     fireEvent.keyDown(within(embeddedNode(DRAWN_A)).getByRole('textbox', { name: 'Card title' }), {
@@ -482,7 +482,7 @@ describe('the Layout an Open Space Card draws', () => {
       title: 'Elsewhere',
       kind: 'space',
       spaceId: TARGET_ID,
-      layout: SELECTED_LAYOUT_ID,
+      diagram: SELECTED_DIAGRAM_ID,
       graph: SELECTED_GRAPH_ID,
     });
     const backend = new MemorySpaceBackend(
@@ -518,7 +518,7 @@ describe('the Layout an Open Space Card draws', () => {
    * Delete answers a retained read the way Enter and F2 do.
    *
    * The canvas tells assistive technology that backspace or delete removes the
-   * focused Card from its Layout, and the read-only drawing left behind by Exit
+   * focused Card from its Diagram, and the read-only drawing left behind by Exit
    * is still focusable. The other two Card commands aimed at that drawing —
    * `onEditCard` and `onBeginTitleEditing` — reopen the target's session so the
    * next press acts; the deletion command consumed the key and answered
@@ -530,7 +530,7 @@ describe('the Layout an Open Space Card draws', () => {
       title: 'Elsewhere',
       kind: 'space',
       spaceId: TARGET_ID,
-      layout: SELECTED_LAYOUT_ID,
+      diagram: SELECTED_DIAGRAM_ID,
       graph: SELECTED_GRAPH_ID,
     });
     const backend = new MemorySpaceBackend(
@@ -553,12 +553,13 @@ describe('the Layout an Open Space Card draws', () => {
     fireEvent.keyDown(embeddedNode(DRAWN_B), { key: 'Delete', bubbles: true });
     await waitFor(() => expect(spaces.entry(TARGET_ID)).not.toBeUndefined());
     // The press reopens the target and removes nothing — neither the read-only
-    // Card from the target Layout nor the containing Space Card it is drawn in.
+    // Card from the target Diagram nor the containing Space Card it is drawn in.
     expect(
       spaces
         .entry(TARGET_ID)
         ?.session.getState()
-        .working.document.layouts?.find((layout) => layout.id === SELECTED_LAYOUT_ID)?.positions,
+        .working.document.diagrams?.find((diagram) => diagram.id === SELECTED_DIAGRAM_ID)
+        ?.positions,
     ).toHaveProperty(DRAWN_B);
     expect(initial.session.getState().working.cards.some((card) => card.id === SPACE_CARD_ID)).toBe(
       true,
@@ -567,7 +568,7 @@ describe('the Layout an Open Space Card draws', () => {
 
   it('protects every containing Space Card while a nested target owns the editor', async () => {
     const thirdId = uuidSchema.parse('00000000-0000-4000-8000-000000000030');
-    const thirdLayout = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
+    const thirdDiagram = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
     const thirdGraph = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
     const thirdCard = uuidSchema.parse('00000000-0000-4000-8000-000000000033');
     const third = spaceSnapshotSchema.parse({
@@ -575,11 +576,11 @@ describe('the Layout an Open Space Card draws', () => {
       document: {
         version: 1,
         title: 'Nested target',
-        defaultLayout: thirdLayout,
-        layouts: [
+        defaultDiagram: thirdDiagram,
+        diagrams: [
           {
-            id: thirdLayout,
-            title: 'Nested Layout',
+            id: thirdDiagram,
+            title: 'Nested Diagram',
             kind: 'positioned',
             positions: { [thirdCard]: { x: 0, y: 0, open: false } },
             graphs: [{ id: thirdGraph, title: 'Nested Graph', edges: [] }],
@@ -598,7 +599,7 @@ describe('the Layout an Open Space Card draws', () => {
                 title: 'Deeper',
                 kind: 'space',
                 spaceId: thirdId,
-                layout: thirdLayout,
+                diagram: thirdDiagram,
                 graph: thirdGraph,
               },
             }
@@ -606,13 +607,13 @@ describe('the Layout an Open Space Card draws', () => {
       ),
       document: {
         ...target.document,
-        layouts: target.document.layouts?.map((layout) =>
-          layout.id !== SELECTED_LAYOUT_ID
-            ? layout
+        diagrams: target.document.diagrams?.map((diagram) =>
+          diagram.id !== SELECTED_DIAGRAM_ID
+            ? diagram
             : {
-                ...layout,
+                ...diagram,
                 positions: {
-                  ...layout.positions,
+                  ...diagram.positions,
                   [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
                 },
               },
@@ -623,7 +624,7 @@ describe('the Layout an Open Space Card draws', () => {
       title: 'Elsewhere',
       kind: 'space',
       spaceId: TARGET_ID,
-      layout: SELECTED_LAYOUT_ID,
+      diagram: SELECTED_DIAGRAM_ID,
       graph: SELECTED_GRAPH_ID,
     });
     const backend = new MemorySpaceBackend(
@@ -658,7 +659,7 @@ describe('the Layout an Open Space Card draws', () => {
     );
     expect(within(embeddedNode(DRAWN_B)).queryByRole('button', { name: /Close Card/ })).toBeNull();
     expect(
-      within(embeddedNode(DRAWN_B)).getByTestId('space-card-layout').hasAttribute('disabled'),
+      within(embeddedNode(DRAWN_B)).getByTestId('space-card-diagram').hasAttribute('disabled'),
     ).toBe(true);
     const outer = document.querySelector(`.react-flow__node[data-id="${SPACE_CARD_ID}"]`);
     if (!(outer instanceof HTMLElement)) throw new Error('Outer Card missing');
@@ -678,13 +679,13 @@ describe('the Layout an Open Space Card draws', () => {
    * is gone and a read-only picture of it is better than a hole. A Close is the
    * other case: the embedding unmounts with its target still open, so the next
    * Open composes a fresh one, and anything the previous composition published
-   * describes a Layout nobody is reading any more. Held here through the one
+   * describes a Diagram nobody is reading any more. Held here through the one
    * consequence that outlives the frame: the retained drawing says a nested
    * Space Card is Open, so reopening embeds a Space the target has since closed.
    */
   it('forgets what a Closed Space Card read, so reopening embeds nothing it held', async () => {
     const thirdId = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
-    const thirdLayout = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
+    const thirdDiagram = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
     const thirdGraph = uuidSchema.parse('00000000-0000-4000-8000-000000000042');
     const thirdCard = uuidSchema.parse('00000000-0000-4000-8000-000000000043');
     const third = spaceSnapshotSchema.parse({
@@ -692,11 +693,11 @@ describe('the Layout an Open Space Card draws', () => {
       document: {
         version: 1,
         title: 'Nested target',
-        defaultLayout: thirdLayout,
-        layouts: [
+        defaultDiagram: thirdDiagram,
+        diagrams: [
           {
-            id: thirdLayout,
-            title: 'Nested Layout',
+            id: thirdDiagram,
+            title: 'Nested Diagram',
             kind: 'positioned',
             positions: { [thirdCard]: { x: 0, y: 0, open: false } },
             graphs: [{ id: thirdGraph, title: 'Nested Graph', edges: [] }],
@@ -715,7 +716,7 @@ describe('the Layout an Open Space Card draws', () => {
                 title: 'Deeper',
                 kind: 'space',
                 spaceId: thirdId,
-                layout: thirdLayout,
+                diagram: thirdDiagram,
                 graph: thirdGraph,
               },
             }
@@ -723,13 +724,13 @@ describe('the Layout an Open Space Card draws', () => {
       ),
       document: {
         ...target.document,
-        layouts: target.document.layouts?.map((layout) =>
-          layout.id !== SELECTED_LAYOUT_ID
-            ? layout
+        diagrams: target.document.diagrams?.map((diagram) =>
+          diagram.id !== SELECTED_DIAGRAM_ID
+            ? diagram
             : {
-                ...layout,
+                ...diagram,
                 positions: {
-                  ...layout.positions,
+                  ...diagram.positions,
                   [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
                 },
               },
@@ -740,7 +741,7 @@ describe('the Layout an Open Space Card draws', () => {
       title: 'Elsewhere',
       kind: 'space',
       spaceId: TARGET_ID,
-      layout: SELECTED_LAYOUT_ID,
+      diagram: SELECTED_DIAGRAM_ID,
       graph: SELECTED_GRAPH_ID,
     });
     const backend = new MemorySpaceBackend(
@@ -762,7 +763,7 @@ describe('the Layout an Open Space Card draws', () => {
     await waitFor(() => expect(spaces.entry(thirdId)).not.toBeUndefined());
 
     // Close the containing Space Card while the nested one is still Open, so
-    // the read it leaves behind describes a Layout that is about to change.
+    // the read it leaves behind describes a Diagram that is about to change.
     act(() => {
       initial.app.authoring.complete({ kind: 'closed-card', cardId: SPACE_CARD_ID });
     });
@@ -770,7 +771,7 @@ describe('the Layout an Open Space Card draws', () => {
     const targetEntry = spaces.entry(TARGET_ID);
     if (targetEntry === undefined) throw new Error('the target is not open');
     act(() => {
-      targetEntry.app.authoring.completeInLayout(SELECTED_LAYOUT_ID, {
+      targetEntry.app.authoring.completeInDiagram(SELECTED_DIAGRAM_ID, {
         kind: 'closed-card',
         cardId: DRAWN_B,
       });
@@ -792,7 +793,7 @@ describe('the Layout an Open Space Card draws', () => {
     expect(spaces.entry(thirdId)).toBeUndefined();
   }, 20000);
 
-  it('stops embedding a Space Card whose Layout is already on the containing path', async () => {
+  it('stops embedding a Space Card whose Diagram is already on the containing path', async () => {
     // Home embeds the target, and the target embeds Home back. Neither Card is
     // a self-reference, so single-Space intake accepts both (`validate.ts` only
     // refuses `card.spaceId === space.id`); nothing but this guard stops the
@@ -807,7 +808,7 @@ describe('the Layout an Open Space Card draws', () => {
                 title: 'Back to Home',
                 kind: 'space',
                 spaceId: HOME_ID,
-                layout: HOME_LAYOUT_ID,
+                diagram: HOME_DIAGRAM_ID,
                 graph: HOME_GRAPH_ID,
               },
             }
@@ -815,13 +816,13 @@ describe('the Layout an Open Space Card draws', () => {
       ),
       document: {
         ...target.document,
-        layouts: target.document.layouts?.map((layout) =>
-          layout.id !== SELECTED_LAYOUT_ID
-            ? layout
+        diagrams: target.document.diagrams?.map((diagram) =>
+          diagram.id !== SELECTED_DIAGRAM_ID
+            ? diagram
             : {
-                ...layout,
+                ...diagram,
                 positions: {
-                  ...layout.positions,
+                  ...diagram.positions,
                   [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
                 },
               },
@@ -832,7 +833,7 @@ describe('the Layout an Open Space Card draws', () => {
       title: 'Elsewhere',
       kind: 'space',
       spaceId: TARGET_ID,
-      layout: SELECTED_LAYOUT_ID,
+      diagram: SELECTED_DIAGRAM_ID,
       graph: SELECTED_GRAPH_ID,
     });
     const backend = new MemorySpaceBackend(
@@ -855,7 +856,7 @@ describe('the Layout an Open Space Card draws', () => {
       document.querySelector(`.react-flow__node[data-id="${id}"]`);
     // Home drawn inside the target, one hop back — that much is ordinary nesting.
     const returned = embeddedNodeId(embeddedNodeId(SPACE_CARD_ID, DRAWN_B), SPACE_CARD_ID);
-    // The second crossing of `TARGET:SELECTED_LAYOUT` is the cycle. Without the
+    // The second crossing of `TARGET:SELECTED_DIAGRAM` is the cycle. Without the
     // guard each settle adds another level, so this loop never stops growing.
     const repeated = embeddedNodeId(returned, DRAWN_A);
     for (let settle = 0; settle < 12; settle += 1) {
@@ -872,7 +873,7 @@ describe('the Layout an Open Space Card draws', () => {
       title: 'Elsewhere',
       kind: 'space',
       spaceId: TARGET_ID,
-      layout: SELECTED_LAYOUT_ID,
+      diagram: SELECTED_DIAGRAM_ID,
       graph: SELECTED_GRAPH_ID,
     });
     const backend = new MemorySpaceBackend(
@@ -896,9 +897,8 @@ describe('the Layout an Open Space Card draws', () => {
         spaces
           .entry(TARGET_ID)
           ?.session.getState()
-          .working.document.layouts?.find((layout) => layout.id === SELECTED_LAYOUT_ID)?.positions[
-          DRAWN_A
-        ]?.open,
+          .working.document.diagrams?.find((diagram) => diagram.id === SELECTED_DIAGRAM_ID)
+          ?.positions[DRAWN_A]?.open,
       ).toBe(true),
     );
     expect(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Save/ })).toBeTruthy();
@@ -909,18 +909,18 @@ describe('the Layout an Open Space Card draws', () => {
   /**
    * The Card's selection, and not the target's own.
    *
-   * `Collection 2` is the target Space's `defaultLayout` and holds
+   * `Collection 2` is the target Space's `defaultDiagram` and holds
    * `Elsewhere entirely`; the Card selects `Collection 1`. Asserting the
    * absence beside the presence is what makes this a statement about *whose*
    * selection was read rather than about whether anything was drawn.
    */
-  it('draws the Layout the Card selects, not the target own default', async () => {
+  it('draws the Diagram the Card selects, not the target own default', async () => {
     await mount(
       home({
         title: 'Elsewhere',
         kind: 'space',
         spaceId: TARGET_ID,
-        layout: SELECTED_LAYOUT_ID,
+        diagram: SELECTED_DIAGRAM_ID,
         graph: SELECTED_GRAPH_ID,
       }),
     );
@@ -933,7 +933,7 @@ describe('the Layout an Open Space Card draws', () => {
   });
 
   /**
-   * The containing Layout owns the Space Card's rect and the target Space owns
+   * The containing Diagram owns the Space Card's rect and the target Space owns
    * everything inside it, so a child is parented to the Card and confined to
    * it — which is React Flow's own nesting contract and what makes moving the
    * Space Card move the view with it.
@@ -944,7 +944,7 @@ describe('the Layout an Open Space Card draws', () => {
         title: 'Elsewhere',
         kind: 'space',
         spaceId: TARGET_ID,
-        layout: SELECTED_LAYOUT_ID,
+        diagram: SELECTED_DIAGRAM_ID,
         graph: SELECTED_GRAPH_ID,
       }),
     );
@@ -964,10 +964,10 @@ describe('the Layout an Open Space Card draws', () => {
    * in until `layout-only-v1/04` stores one. It draws its selectors and no
    * view — which is a Card waiting, not a Card that failed.
    */
-  it('draws no view for a Card that has selected no Layout', async () => {
+  it('draws no view for a Card that has selected no Diagram', async () => {
     await mount(home({ title: 'Elsewhere', kind: 'space', spaceId: TARGET_ID }));
 
-    await screen.findByTestId('space-card-layout');
+    await screen.findByTestId('space-card-diagram');
     expect(queryEmbeddedNode(DRAWN_A)).toBeNull();
     expect(queryEmbeddedNode(UNPLACED)).toBeNull();
   });
@@ -985,10 +985,10 @@ describe('the Layout an Open Space Card draws', () => {
       document: {
         version: 1,
         title: 'Home',
-        layouts: [
+        diagrams: [
           {
-            id: HOME_LAYOUT_ID,
-            title: 'Layout 1',
+            id: HOME_DIAGRAM_ID,
+            title: 'Diagram 1',
             kind: 'positioned',
             positions: {
               [HOME_CARD_ID]: { x: 10, y: 20, open: false },
@@ -1009,7 +1009,7 @@ describe('the Layout an Open Space Card draws', () => {
             graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
           },
         ],
-        defaultLayout: HOME_LAYOUT_ID,
+        defaultDiagram: HOME_DIAGRAM_ID,
       },
       cards: [
         { id: HOME_CARD_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
@@ -1021,7 +1021,7 @@ describe('the Layout an Open Space Card draws', () => {
             title: 'First gone\nA Space that left',
             kind: 'space',
             spaceId: GONE_A_ID,
-            layout: GONE_LAYOUT_ID,
+            diagram: GONE_DIAGRAM_ID,
           },
         },
         {
@@ -1030,7 +1030,7 @@ describe('the Layout an Open Space Card draws', () => {
             title: 'Second gone',
             kind: 'space',
             spaceId: GONE_B_ID,
-            layout: GONE_LAYOUT_ID,
+            diagram: GONE_DIAGRAM_ID,
           },
         },
         {
@@ -1039,7 +1039,7 @@ describe('the Layout an Open Space Card draws', () => {
             title: 'Elsewhere',
             kind: 'space',
             spaceId: TARGET_ID,
-            layout: SELECTED_LAYOUT_ID,
+            diagram: SELECTED_DIAGRAM_ID,
             graph: SELECTED_GRAPH_ID,
           },
         },

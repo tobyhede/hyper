@@ -3,7 +3,7 @@ import {
   uuidSchema,
   type CardId,
   type GraphId,
-  type LayoutId,
+  type DiagramId,
   type SpaceSnapshot,
 } from '@project/core';
 import { productDestinationPath } from '@project/http';
@@ -30,23 +30,23 @@ import { recordingHistory } from './browser-history';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-/** Named by no Layout in the Space: the dead address a Back can land on. */
-const MISSING_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+/** Named by no Diagram in the Space: the dead address a Back can land on. */
+const MISSING_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: {
           [CARD_A]: { x: 10, y: 20, open: false },
@@ -58,14 +58,14 @@ const snapshot: SpaceSnapshot = {
         ],
       },
       {
-        id: OTHER_LAYOUT_ID,
-        title: 'Other Layout',
+        id: OTHER_DIAGRAM_ID,
+        title: 'Other Diagram',
         kind: 'positioned',
         positions: { [CARD_A]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -79,16 +79,16 @@ const selfEdge: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Space',
-    layouts: [
+    diagrams: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
+        id: DIAGRAM_ID,
+        title: 'Diagram',
         kind: 'positioned',
         positions: { [CARD_A]: { x: 10, y: 20, open: false } },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_A, to: CARD_A }] }],
       },
     ],
-    defaultLayout: LAYOUT_ID,
+    defaultDiagram: DIAGRAM_ID,
   },
   cards: [{ id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
 };
@@ -98,24 +98,24 @@ const compose = (opened: SpaceSnapshot = snapshot) => {
   return composeApp({ spaceSession: openSpaceSession(new MemorySpaceBackend([loaded]), loaded) });
 };
 
-const layoutPath = (layoutId: LayoutId): string =>
-  productDestinationPath({ kind: 'layout', spaceId: SPACE_ID, layoutId });
+const diagramPath = (diagramId: DiagramId): string =>
+  productDestinationPath({ kind: 'diagram', spaceId: SPACE_ID, diagramId });
 
-const layoutGraphPath = (layoutId: LayoutId, graphId: GraphId): string =>
-  productDestinationPath({ kind: 'layout-graph', spaceId: SPACE_ID, layoutId, graphId });
+const diagramGraphPath = (diagramId: DiagramId, graphId: GraphId): string =>
+  productDestinationPath({ kind: 'diagram-graph', spaceId: SPACE_ID, diagramId, graphId });
 
 const presentationPath = productDestinationPath({
   kind: 'presentation',
   spaceId: SPACE_ID,
-  layoutId: LAYOUT_ID,
+  diagramId: DIAGRAM_ID,
   graphId: GRAPH_ID,
   cardId: CARD_A,
 });
 
-const cardPath = (layoutId: LayoutId, cardId: CardId): string =>
-  productDestinationPath({ kind: 'layout-card', spaceId: SPACE_ID, layoutId, cardId });
+const cardPath = (diagramId: DiagramId, cardId: CardId): string =>
+  productDestinationPath({ kind: 'diagram-card', spaceId: SPACE_ID, diagramId, cardId });
 
-const deadPath = layoutPath(MISSING_LAYOUT_ID);
+const deadPath = diagramPath(MISSING_DIAGRAM_ID);
 
 describe('the browser location', () => {
   /**
@@ -126,13 +126,13 @@ describe('the browser location', () => {
    */
   it('writes nothing when it begins following, whatever the location says', () => {
     const app = compose();
-    const history = recordingHistory(layoutPath(OTHER_LAYOUT_ID));
+    const history = recordingHistory(diagramPath(OTHER_DIAGRAM_ID));
     const location = createBrowserLocation(history);
 
     location.follow(app);
 
     expect(history.writes).toEqual([]);
-    expect(history.pathname()).toBe(layoutPath(OTHER_LAYOUT_ID));
+    expect(history.pathname()).toBe(diagramPath(OTHER_DIAGRAM_ID));
     location.dispose();
   });
 
@@ -145,14 +145,14 @@ describe('the browser location', () => {
    */
   it('writes nothing when the same position is decided a second time', () => {
     const app = compose();
-    const history = recordingHistory(layoutPath(OTHER_LAYOUT_ID));
+    const history = recordingHistory(diagramPath(OTHER_DIAGRAM_ID));
     const location = createBrowserLocation(history);
 
     location.follow(app);
     location.follow(app);
     // Navigation republishing the selection it already holds: the notification
     // arrives, the position has not moved, and nothing is written.
-    app.navigation.selectLayout(LAYOUT_ID);
+    app.navigation.selectDiagram(DIAGRAM_ID);
 
     expect(history.writes).toEqual([]);
     location.dispose();
@@ -164,7 +164,7 @@ describe('the browser location', () => {
    */
   it('reports a Back onto a dead address rather than correcting it', () => {
     const app = compose();
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
 
@@ -188,7 +188,7 @@ describe('the browser location', () => {
    */
   it('leaves a Back onto a location outside product addressing alone', async () => {
     const app = compose();
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const refusal = Promise.reject(new Error('The URL is outside product addressing.'));
     const settled = refusal.catch(() => undefined);
     const location = createBrowserLocation(history, undefined, () => refusal);
@@ -205,7 +205,7 @@ describe('the browser location', () => {
   /** The half that must survive the one above: a dead product address reports. */
   it('reports a Back onto a dead address the Space could not be opened for', async () => {
     const app = compose();
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const refusal = Promise.reject(new Error('The product URL does not resolve.'));
     const settled = refusal.catch(() => undefined);
     const location = createBrowserLocation(history, undefined, () => refusal);
@@ -222,22 +222,22 @@ describe('the browser location', () => {
   /**
    * A cleared report and a corrected location are one thing, not two.
    *
-   * The choice is the Layout already selected, so the position does not move
+   * The choice is the Diagram already selected, so the position does not move
    * and no entry is earned — while the location the reader is still on is the
    * one that could not be resolved, which reloads into a host 404. Reporting it
    * as answered and leaving it in the address bar is the half-fix.
    */
-  it('corrects an unresolved location when a repeated Layout choice answers the report', () => {
+  it('corrects an unresolved location when a repeated Diagram choice answers the report', () => {
     const app = compose();
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
     history.popTo(deadPath);
 
-    location.chooseLayout(LAYOUT_ID);
+    location.chooseDiagram(DIAGRAM_ID);
 
     expect(location.getState().destinationNotFound).toBe(false);
-    expect(history.writes).toEqual([{ method: 'replace', path: layoutPath(LAYOUT_ID) }]);
+    expect(history.writes).toEqual([{ method: 'replace', path: diagramPath(DIAGRAM_ID) }]);
     location.dispose();
   });
 
@@ -250,7 +250,7 @@ describe('the browser location', () => {
    */
   it('clears the report and takes one entry when presenting moves off an unresolved location', () => {
     const app = compose();
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
     history.popTo(deadPath);
@@ -270,7 +270,7 @@ describe('the browser location', () => {
    */
   it('takes one entry for a presentation a self-Edge never moves', () => {
     const app = compose(selfEdge);
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
 
@@ -283,18 +283,18 @@ describe('the browser location', () => {
   });
 
   /**
-   * Activating a Graph makes the same deliberate move a Layout choice does — it
+   * Activating a Graph makes the same deliberate move a Diagram choice does — it
    * clears the addressed Card and answers the report — and differs in exactly
    * one thing, which is the reason it may not simply call the same operation:
-   * it does not change the Layout, so the published projection stays.
+   * it does not change the Diagram, so the published projection stays.
    */
   it('answers the report from an activated Graph without disturbing the render adapter', () => {
     const app = compose();
     const history = recordingHistory(
       productDestinationPath({
-        kind: 'layout-card',
+        kind: 'diagram-card',
         spaceId: SPACE_ID,
-        layoutId: LAYOUT_ID,
+        diagramId: DIAGRAM_ID,
         cardId: CARD_A,
       }),
     );
@@ -309,34 +309,34 @@ describe('the browser location', () => {
 
     expect(location.getState()).toEqual({ addressedCardId: null, destinationNotFound: false });
     expect(history.writes).toEqual([
-      { method: 'push', path: layoutGraphPath(LAYOUT_ID, SECOND_GRAPH_ID) },
+      { method: 'push', path: diagramGraphPath(DIAGRAM_ID, SECOND_GRAPH_ID) },
     ]);
     expect(app.adapter.getState().projection).not.toBeNull();
     location.dispose();
   });
 
-  /** The contrast the test above rests on: a Layout choice *does* clear it. */
-  it('clears the published projection when a choice changes the Layout', () => {
+  /** The contrast the test above rests on: a Diagram choice *does* clear it. */
+  it('clears the published projection when a choice changes the Diagram', () => {
     const app = compose();
-    const location = createBrowserLocation(recordingHistory(layoutPath(LAYOUT_ID)));
+    const location = createBrowserLocation(recordingHistory(diagramPath(DIAGRAM_ID)));
     location.follow(app);
     app.adapter.getState().syncProjection([], []);
 
-    location.chooseLayout(OTHER_LAYOUT_ID);
+    location.chooseDiagram(OTHER_DIAGRAM_ID);
 
     expect(app.adapter.getState().projection).toBeNull();
-    expect(app.navigation.getState().selectedLayoutId).toBe(OTHER_LAYOUT_ID);
+    expect(app.navigation.getState().selectedDiagramId).toBe(OTHER_DIAGRAM_ID);
     location.dispose();
   });
 
   it('resolves a destination against the current location for the clipboard', () => {
     const app = compose();
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
 
-    expect(location.href({ kind: 'layout', spaceId: SPACE_ID, layoutId: OTHER_LAYOUT_ID })).toBe(
-      new URL(layoutPath(OTHER_LAYOUT_ID), history.href()).href,
+    expect(location.href({ kind: 'diagram', spaceId: SPACE_ID, diagramId: OTHER_DIAGRAM_ID })).toBe(
+      new URL(diagramPath(OTHER_DIAGRAM_ID), history.href()).href,
     );
     location.dispose();
   });
@@ -354,18 +354,18 @@ describe('the browser location', () => {
    */
   it('restores a Back onto a resolvable Card location without earning an entry', () => {
     const app = compose();
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
-    location.chooseLayout(OTHER_LAYOUT_ID);
-    expect(history.writes).toEqual([{ method: 'push', path: layoutPath(OTHER_LAYOUT_ID) }]);
+    location.chooseDiagram(OTHER_DIAGRAM_ID);
+    expect(history.writes).toEqual([{ method: 'push', path: diagramPath(OTHER_DIAGRAM_ID) }]);
 
-    history.popTo(cardPath(LAYOUT_ID, CARD_B));
+    history.popTo(cardPath(DIAGRAM_ID, CARD_B));
 
-    expect(app.navigation.getState().selectedLayoutId).toBe(LAYOUT_ID);
+    expect(app.navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
     expect(location.getState().addressedCardId).toBe(CARD_B);
     expect(location.getState().destinationNotFound).toBe(false);
-    expect(history.writes).toEqual([{ method: 'push', path: layoutPath(OTHER_LAYOUT_ID) }]);
+    expect(history.writes).toEqual([{ method: 'push', path: diagramPath(OTHER_DIAGRAM_ID) }]);
     location.dispose();
   });
 
@@ -380,21 +380,21 @@ describe('the browser location', () => {
   it('sends a later operation to the composition it followed last', () => {
     const first = compose();
     const second = compose();
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const location = createBrowserLocation(history);
 
     location.follow(first);
     location.follow(second);
-    location.chooseLayout(OTHER_LAYOUT_ID);
+    location.chooseDiagram(OTHER_DIAGRAM_ID);
 
-    expect(second.navigation.getState().selectedLayoutId).toBe(OTHER_LAYOUT_ID);
-    expect(first.navigation.getState().selectedLayoutId).toBe(LAYOUT_ID);
-    expect(history.writes).toEqual([{ method: 'push', path: layoutPath(OTHER_LAYOUT_ID) }]);
+    expect(second.navigation.getState().selectedDiagramId).toBe(OTHER_DIAGRAM_ID);
+    expect(first.navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
+    expect(history.writes).toEqual([{ method: 'push', path: diagramPath(OTHER_DIAGRAM_ID) }]);
     location.dispose();
   });
 
   it('releases the Back listener it registered when disposed', () => {
-    const history = recordingHistory(layoutPath(LAYOUT_ID));
+    const history = recordingHistory(diagramPath(DIAGRAM_ID));
     const location = createBrowserLocation(history);
     location.follow(compose());
     expect(history.listenerCount()).toBe(1);
@@ -413,9 +413,9 @@ describe('the browser location', () => {
     const location = createBrowserLocation(
       recordingHistory(
         productDestinationPath({
-          kind: 'layout-card',
+          kind: 'diagram-card',
           spaceId: SPACE_ID,
-          layoutId: LAYOUT_ID,
+          diagramId: DIAGRAM_ID,
           cardId: CARD_B,
         }),
       ),

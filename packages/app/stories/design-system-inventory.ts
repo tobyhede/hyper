@@ -38,7 +38,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/app/src/SpaceApp.tsx',
     reason:
-      'Isolated single-Space mounting adapter. The shared error boundary and managed application are catalogued through the embedded Layout story.',
+      'Isolated single-Space mounting adapter. The shared error boundary and managed application are catalogued through the embedded Diagram story.',
   },
   {
     module: 'packages/app/src/main.tsx',
@@ -123,7 +123,7 @@ export const handRolledStyles = [
   {
     block: 'rf-card-node',
     reason:
-      "The adapter's node wrapper: card sizing from `--card-width`/`--card-height` and the Expanded Card's fill of the box the Layout authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Card's palette, and the one rule naming the actively presented Card. React Flow measures against this box, so it cannot move into the component it wraps.",
+      "The adapter's node wrapper: card sizing from `--card-width`/`--card-height` and the Expanded Card's fill of the box the Diagram authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Card's palette, and the one rule naming the actively presented Card. React Flow measures against this box, so it cannot move into the component it wraps.",
   },
   {
     block: 'card',

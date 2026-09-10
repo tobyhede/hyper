@@ -216,16 +216,16 @@ const parseImport = (input: unknown): ImportSpace => {
  * cards. Both are rows, so both must stay unique across the database.
  *
  * Per kind, and no wider. An earlier version pooled space, card, graph and
- * layout ids into one set spanning the whole batch, which rejected two things
+ * diagram ids into one set spanning the whole batch, which rejected two things
  * the model allows (ADR 0030): a graph id reused in a second Space, and one UUID
  * naming entities of different kinds. It also made acceptance depend on how a
  * batch was split — importing two such Spaces separately succeeded while
  * importing them together failed, for identical stored results.
  *
- * Graph and layout ids are absent here deliberately. They resolve only inside
+ * Graph and diagram ids are absent here deliberately. They resolve only inside
  * the space document that carries them, and normal domain intake already rejects
  * duplicates of each kind within a Space (`duplicate-graph-id`,
- * `duplicate-layout-id`). Checking them here would either duplicate that or
+ * `duplicate-diagram-id`). Checking them here would either duplicate that or
  * exceed it.
  */
 const duplicateIdentity = (
@@ -269,25 +269,25 @@ const validateImportIdentities = (spaces: readonly ImportSpace[]): void => {
  * Ids are minted in process by `newUuid`. Only the space id comes from
  * PostgreSQL, and by the ordinary path: the `spaces.id` column default fires
  * when `Space.create` omits it, and the created row hands the value back as
- * `reservedSpaceId`. Graphs and layouts are not rows at all — they live inside
+ * `reservedSpaceId`. Graphs and diagrams are not rows at all — they live inside
  * the space document (ADR 0030) — so no column default can reach them, and
  * cards are minted here too, so the whole snapshot can be validated before the
  * first card is written.
  *
- * A layout's id and the ids of the graphs it owns are minted in the **same
+ * A diagram's id and the ids of the graphs it owns are minted in the **same
  * pass**, because under version 1 a graph is reached only through its owner
- * (ADR 0040): there is no space-level collection to walk beside the layouts.
+ * (ADR 0040): there is no space-level collection to walk beside the diagrams.
  * That the pass runs before `parseSnapshotSchema` and before the first card write
  * is what keeps a rejection rolling the complete batch back.
  */
 const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot => {
-  const layouts = input.document.layouts?.map((layout) => ({
-    ...layout,
-    id: layout.id ?? newUuid(),
-    graphs: layout.graphs.map((graph) => ({ ...graph, id: graph.id ?? newUuid() })),
+  const diagrams = input.document.diagrams?.map((diagram) => ({
+    ...diagram,
+    id: diagram.id ?? newUuid(),
+    graphs: diagram.graphs.map((graph) => ({ ...graph, id: graph.id ?? newUuid() })),
   }));
 
-  const document = layouts === undefined ? { ...input.document } : { ...input.document, layouts };
+  const document = diagrams === undefined ? { ...input.document } : { ...input.document, diagrams };
 
   return parseSnapshotSchema({
     id: input.id ?? reservedSpaceId,
@@ -464,9 +464,9 @@ const replaceStoredSpace = async (
 };
 
 const preservesAggregateBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
-  if (current.document.defaultLayout !== next.document.defaultLayout) return false;
+  if (current.document.defaultDiagram !== next.document.defaultDiagram) return false;
   if (
-    JSON.stringify(current.document.layouts ?? []) !== JSON.stringify(next.document.layouts ?? [])
+    JSON.stringify(current.document.diagrams ?? []) !== JSON.stringify(next.document.diagrams ?? [])
   ) {
     return false;
   }
@@ -478,7 +478,7 @@ const preservesAggregateBoundary = (current: SpaceSnapshot, next: SpaceSnapshot)
     if (card.document.kind !== 'space' || previous.document.kind !== 'space') return true;
     return (
       previous.document.spaceId === card.document.spaceId &&
-      previous.document.layout === card.document.layout &&
+      previous.document.diagram === card.document.diagram &&
       previous.document.graph === card.document.graph
     );
   });
@@ -992,7 +992,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
           try {
             // A placeholder document, replaced below once the space id it is
             // being inserted to reserve is known. It carries no graph
-            // collection, because a space has none until a layout exists to own
+            // collection, because a space has none until a diagram exists to own
             // one (ADR 0040) — under version 2 this was an empty space-level
             // array, and there is no longer a key for it to be empty in.
             const spaceCreateInput: SpaceCreateInput = {

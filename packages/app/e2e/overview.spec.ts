@@ -7,7 +7,7 @@ import {
   boxOf,
   graphChoices,
   graphLegendSwatchColor,
-  layoutChoices,
+  diagramChoices,
   openCard,
   selectCanvas,
   selectedCanvas,
@@ -17,12 +17,12 @@ import {
 // The app loads the abstract layout fixture (packages/app/fixture) — two
 // disconnected collections sharing no Cards:
 //   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — graphs over one spine,
-//      plus T, a member of that Layout no Edge reaches, whose Title is three
+//      plus T, a member of that Diagram no Edge reaches, whose Title is three
 //      lines (ADR 0083)
 //   2. Echo (E→F→G→H→E′) — a plain linear collection
-// Each collection is a Layout, because a Graph is a nested owned value of one
+// Each collection is a Diagram, because a Graph is a nested owned value of one
 // (ADR 0040) and these two share no Cards. The fixture opens in Collection 1,
-// and each Layout draws only the Cards and Graphs it owns.
+// and each Diagram draws only the Cards and Graphs it owns.
 // Each returns to its start via an alias, so this particular fixture is acyclic
 // and lays out as clean forward paths even though Graphs may contain cycles
 // (ADR 0032). These tests assert *behaviour* against that shape; none read card prose. See
@@ -44,11 +44,11 @@ function nodeByTitle(page: Page, title: string): Locator {
 
 test('offers more than one named graph', async ({ page }) => {
   await page.goto('/');
-  // The Graph cluster's own list holds every Graph the selected Layout owns.
+  // The Graph cluster's own list holds every Graph the selected Diagram owns.
   await expect(await graphChoices(page)).toHaveCount(3);
 });
 
-test('draws every Graph in the selected Layout, each in its own color', async ({ page }) => {
+test('draws every Graph in the selected Diagram, each in its own color', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
 
@@ -120,17 +120,17 @@ test(
 );
 
 /**
- * A Layout draws the Graphs it owns. Selecting is navigation and writes
+ * A Diagram draws the Graphs it owns. Selecting is navigation and writes
  * nothing (ADR 0031), so the revision is unmoved throughout.
  */
-test('selecting a Layout draws the Graphs it owns and only those', async ({ page }) => {
+test('selecting a Diagram draws the Graphs it owns and only those', async ({ page }) => {
   await page.goto('/');
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '0');
   const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
 
   await expect(selectedCanvas(page)).toContainText('Collection 1');
-  await expect(await layoutChoices(page)).toHaveCount(2);
+  await expect(await diagramChoices(page)).toHaveCount(2);
   await page.keyboard.press('Escape');
 
   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
@@ -154,7 +154,7 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
 /**
  * The two surfaces that name a Graph, held to the same answer.
  *
- * The Command Dock's Graph cluster discloses every Graph the selected Layout
+ * The Command Dock's Graph cluster discloses every Graph the selected Diagram
  * owns, with its title, its colour and which one is active — which is what the
  * canvas HUD's key already said. Issue 06 keeps the key: it is the on-canvas
  * colour reference beside the Edges being read, and it is the one of the two
@@ -170,7 +170,7 @@ test(
     const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
     await expect(legendItems).toHaveCount(3);
 
-    // Titles, in the same order from the selected Layout.
+    // Titles, in the same order from the selected Diagram.
     const choices = await graphChoices(page);
     expect(await legendItems.allInnerTexts()).toEqual(await choices.allInnerTexts());
 
@@ -255,7 +255,7 @@ test(
     await expect(card.locator('.canvas-card__content')).toHaveCount(0);
 
     // A Title never resizes a Card (ADR 0014, ADR 0083): three rungs draw in
-    // the same box every other Card on this Layout has.
+    // the same box every other Card on this Diagram has.
     const laddered = await boxOf(card, 'the multiline-Title Card');
     const plain = await boxOf(nodeByTitle(page, 'B'), 'Card B');
     expect(laddered.height).toBeCloseTo(plain.height, 0);
@@ -263,7 +263,7 @@ test(
   },
 );
 
-test('handles stay measurable, so edges attach where the layout put them', async ({ page }) => {
+test('handles stay measurable, so edges attach where the diagram put them', async ({ page }) => {
   await page.goto('/');
 
   // React Flow measures every handle's box to work out where an edge attaches,
@@ -404,14 +404,14 @@ test('the Close action closes an opened card', async ({ page }) => {
   await expect(card.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });
 
-test('cards are drawn at exactly the size the layout placed them at', async ({ page }) => {
+test('cards are drawn at exactly the size the strategy placed them at', async ({ page }) => {
   await page.goto('/');
   const inner = page.locator('.rf-card-node__inner').first();
   await expect(inner).toBeVisible();
 
-  // The layout arranges cards at `card.ts`'s size and the stylesheet draws them
+  // The layout strategy arranges cards at `card.ts`'s size and the stylesheet draws them
   // from the same numbers. If these drift, handles land where the card isn't —
-  // silently, and looking like a layout bug.
+  // silently, and looking like a diagram bug.
   const declared = await page.evaluate(() => {
     const el = document.querySelector('.graph-area')!;
     const s = getComputedStyle(el);
