@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type Card } from '@project/core';
+import { normalizeTitle, uuidSchema, type Card } from '@project/core';
 import { parseCardFile, serializeCardFile } from '../src/index';
 
 /**
@@ -11,9 +11,16 @@ import { parseCardFile, serializeCardFile } from '../src/index';
  * carrying its own `---`.
  */
 
+/**
+ * A Title as a stored Card carries it: non-empty, and already normalized, so a
+ * generated trailing space is not read as a writer/reader drift when intake
+ * trims it (ADR 0083). A multi-line Title is the block-scalar question the
+ * round trip of `.scratch/card-titles/issues/07` owns.
+ */
 const line = fc
   .string({ minLength: 1, maxLength: 30 })
-  .filter((s) => s.trim().length > 0 && !s.includes('\n'));
+  .map(normalizeTitle)
+  .filter((s) => s.length > 0 && !s.includes('\n'));
 
 /** Bodies built from the lines that make a fence parser wrong. */
 const bodyArb = fc

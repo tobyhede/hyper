@@ -65,9 +65,10 @@ describe('a stored markdown document is the card less its id', () => {
    * What sharing those instances buys, said in values rather than references.
    *
    * The table is the edges of the rules the pane depends on and nothing else:
-   * `min(1)` counts characters, so a title of spaces is valid at rest and a
-   * title of none is not; a body is required and may be empty. Every
-   * combination is asserted both ways,
+   * a Card's Title normalizes and must keep one non-empty line, which is what
+   * `min(1)` means since ADR 0083, so a title of spaces is refused where a
+   * title with one is kept and trimmed; a body is required and may be empty.
+   * Every combination is asserted both ways,
    * because a divergence in either direction is a document that round-trips
    * through storage and then cannot be completed.
    */

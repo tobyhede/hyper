@@ -1,6 +1,7 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 import { COLLAPSED_CARD_SIZE } from './card-geometry';
+import { CARD_TITLE_REQUIRED, normalizeTitle } from './title';
 
 /**
  * Zod schemas for the space file (`space.json`).
@@ -34,19 +35,44 @@ const idSchema = uuidSchema;
 export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
 
 /**
+ * A Card's Title: one or more Title Lines, normalized here (ADR 0083).
+ *
+ * This is the boundary the rule sits at, so a stored Title, an imported one and
+ * one an author just typed all get the same answer, and no surface normalizes
+ * again on the way to a screen. `min(1)` used to count characters; what it
+ * means now is **at least one non-empty line**, which is why a Title of nothing
+ * but whitespace no longer passes: it carries no name, and the name is what
+ * every list, search and accessible label shows.
+ *
+ * Cards only. Space, Layout and Graph titles keep their plain single-line
+ * field: they are labels in lists with no front to draw a ladder on, and giving
+ * all four the capability because they share a field type would be the model
+ * following the implementation (ADR 0083).
+ *
+ * One instance, shared by the three kinds — `omit` and `extend` copy a field
+ * schema by reference, so the stored document and the import variants inherit
+ * this rule rather than restating it, which is what
+ * `card-document-equality.test.ts` holds them to.
+ */
+const cardTitleSchema = z
+  .string()
+  .transform(normalizeTitle)
+  .refine((title) => title.length > 0, { params: { code: CARD_TITLE_REQUIRED } });
+
+/**
  * The frontmatter of a markdown card file (ADR 0020). No `content` key: the
  * body of the file *is* the content, so the card and its text are one artifact.
  */
 export const markdownCardFrontmatterSchema = z.object({
   id: idSchema,
-  title: z.string().min(1),
+  title: cardTitleSchema,
   kind: z.literal('markdown'),
 });
 
 /** The frontmatter of an alias card file — a pointer to the card whose content it shows. */
 export const aliasCardFrontmatterSchema = z.object({
   id: idSchema,
-  title: z.string().min(1),
+  title: cardTitleSchema,
   kind: z.literal('alias'),
   /** The id of the card this alias shows. Referential checks live in `@project/graph`. */
   target: idSchema,
@@ -55,7 +81,7 @@ export const aliasCardFrontmatterSchema = z.object({
 /** A Card that shows one selected view of another independently stored Space (ADR 0068). */
 export const spaceCardFrontmatterSchema = z.object({
   id: idSchema,
-  title: z.string().min(1),
+  title: cardTitleSchema,
   kind: z.literal('space'),
   spaceId: idSchema,
   layout: uuidSchema.optional(),
