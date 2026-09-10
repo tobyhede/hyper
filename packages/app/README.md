@@ -24,20 +24,21 @@ Layout that holds it (ADR 0040), **two Layouts**:
 Collection 1   Long   A → B → C → D → A′
                Mid    A → B → C → D
                Short  A → B → C
+               T      a member no Edge reaches
 Collection 2   Echo   E → F → G → H → E′
 ```
 
 Each Layout's position keys are its Card membership, and every Edge it owns is
 closed over that membership — which is why the split follows the collections
-rather than being drawn anywhere else. Between them the two hold every Card
-once, so nothing is left over and nothing is in both.
+rather than being drawn anywhere else. Membership is the wider of the two: `T`
+is a member of Collection 1 that no Edge reaches, which is what Add Card leaves
+behind and what `packages/app/test/space-files.test.ts` counts rather than
+forbids. Between them the two hold every Card once, so nothing is left over and
+nothing is in both.
 
-Their positions are **seeded from one ELK run over the whole fixture**, so
-selecting a Layout draws its Cards where that run put them and first paint
-did not move when they were declared. That is checked rather than claimed:
-`packages/app/test/fixture-placement.test.ts` re-runs `elkStrategy` over the
-fixture and compares every seeded position, so a change to the ELK options that
-would silently rearrange the fixture fails there.
+Their positions are **authored**, as placement always is (ADR 0014): a plain
+hand-set grid, two rows of a Layout apiece, so selecting a Layout draws its Cards
+where the space file put them and first paint moves nothing.
 
 `defaultLayout` names **Collection 1**, so that is the Layout the fixture opens
 on (ADR 0079). A selected Layout draws only the Graphs it owns, so Collection 2
@@ -81,9 +82,17 @@ Between them the shape exercises every behaviour the e2e suite covers:
   selection.
 - **Scroll inside the frame (issue 05).** `D` is long enough to overflow the 16:9
   panel at a small viewport.
-- **Overlay counts.** 10 cards, 13 edges (4 + 3 + 2 + 4), 26 handles, 4 graphs
+- **A Title on more than one line (ADR 0083).** `T`'s Title is three lines — one
+  of each role — so the Card front's Title ladder is drawn by the space the app
+  and Playwright actually load, and a regression in projection or clamping shows
+  up on screen rather than only in a unit test.
+- **A Layout member no Edge reaches.** `T` again: it is placed on Collection 1
+  and joins none of its Graphs, so it draws no graph handles and carries no
+  Edges. That is the state Add Card and the Cards drawer both author.
+- **Overlay counts.** 11 cards, 13 edges (4 + 3 + 2 + 4), 26 handles, 4 graphs
   across both Layouts. A *selected* Layout draws only the Graphs it owns: 9
-  edges for Collection 1, 4 for Collection 2.
+  edges for Collection 1, 4 for Collection 2 — and 6 Cards on Collection 1,
+  which is its 5 Edge endpoints plus `T`.
 
 The counts above are shape-dependent: change a Graph and the e2e counts change
 with it, deliberately.

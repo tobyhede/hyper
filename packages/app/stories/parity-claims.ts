@@ -134,6 +134,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'React Flow selection/dragging and their translation into state are covered by CardNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-card-exposes-kind-and-keyboard-actions. This story renders the shipped CanvasCard through CanvasCardSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
   },
   {
+    id: 'canvas-card-front-draws-only-its-title-lines',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'Front',
+    claim:
+      'Every Card front draws its kind glyph, its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
+  },
+  {
     id: 'canvas-card-shows-kind-treatment',
     storyFile: 'components/card.stories.tsx',
     storyExport: 'Kinds',
