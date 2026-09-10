@@ -80,6 +80,7 @@ import { NewSpaceCard } from './components/NewSpaceCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
+import { ShellNotice } from './components/ShellNotice';
 import { useOpenSpaces } from './open-spaces-context';
 import { openTree } from './dock-model';
 
@@ -728,9 +729,9 @@ export const createApp = (
      * An effect runs after the render it reacts to, so each of these drew one
      * frame of a rename that had already stopped being available — an editor
      * over a Layout the reader has left, or over a Space that was replaced under
-     * them. `IdentityName` reads its own subject change the same way and for the
-     * same reason (`components/CommandDock.tsx`), so the surface and the
-     * composition agree about when a draft ends.
+     * them. The Dock's rename slot reads the same two facts the same way and
+     * for the same reason (`useDockRenaming` in `components/CommandDock.tsx`),
+     * so the surface and the composition agree about when a draft ends.
      *
      * They stay two conditions rather than one, and that separation is older
      * than this shape: the availability guard reads only whether a chrome title
@@ -742,8 +743,8 @@ export const createApp = (
      *
      * **This clears the report and not the editor** — the two are different
      * things and reading them as one is what left the defect. The editor is the
-     * Dock name control's own state, so the epoch is *also* handed to the Dock
-     * (`replacementEpoch` below) and `IdentityName` ends the rename on it. What
+     * bar's own rename slot, so the epoch is *also* handed to the Dock
+     * (`replacementEpoch` below) and the slot ends the rename on it. What
      * this branch still owes is that the withdrawal it drives — Create Card,
      * Present, Delete Card, the canvas's own title editing — comes back in the
      * same render as the replacement rather than on the commit after, when the
@@ -1449,46 +1450,53 @@ export const createApp = (
         notice={
           <>
             {clipboardFailure === null ? null : (
-              <Alert variant="destructive">
-                <AlertIcon />
-                <AlertTitle>Link not copied</AlertTitle>
-                <AlertDescription>{clipboardFailure}</AlertDescription>
-              </Alert>
+              <ShellNotice title="Link not copied" onDismiss={() => setClipboardFailure(null)}>
+                {clipboardFailure}
+              </ShellNotice>
             )}
             {cardDeletionRefusal === null ? null : (
-              <Alert variant="destructive">
-                <AlertIcon />
-                <AlertTitle>Card not deleted</AlertTitle>
-                <AlertDescription>{cardDeletionRefusal}</AlertDescription>
-              </Alert>
+              <ShellNotice title="Card not deleted" onDismiss={() => setCardDeletionRefusal(null)}>
+                {cardDeletionRefusal}
+              </ShellNotice>
             )}
             {layoutRefusal === null ? null : (
-              <Alert variant="destructive">
-                <AlertIcon />
-                {/* Named for the command that was refused rather than for the
-                    Layout, because a refused *creation* left no Layout to be
-                    unchanged — "Layout unchanged" told the author an existing
-                    Layout had been left alone when none had been made. */}
-                <AlertTitle>
-                  {createLayoutRefusal === null ? 'Layout unchanged' : 'Layout not created'}
-                </AlertTitle>
-                <AlertDescription>{describeAuthoringRefusal(layoutRefusal)}</AlertDescription>
-              </Alert>
+              <ShellNotice
+                /* Named for the command that was refused rather than for the
+                   Layout, because a refused *creation* left no Layout to be
+                   unchanged — "Layout unchanged" told the author an existing
+                   Layout had been left alone when none had been made. */
+                title={createLayoutRefusal === null ? 'Layout unchanged' : 'Layout not created'}
+                // Both, because the one that is standing is whichever was
+                // written last and the reader is dismissing what they can see.
+                onDismiss={() => {
+                  setCreateLayoutRefusal(null);
+                  setLayoutManagementRefusal(null);
+                }}
+              >
+                {describeAuthoringRefusal(layoutRefusal)}
+              </ShellNotice>
             )}
             {spaceCommandBreak === null ? null : (
-              <Alert variant="destructive">
-                <AlertIcon />
-                <AlertTitle>Space command failed</AlertTitle>
-                <AlertDescription>{spaceCommandBreak}</AlertDescription>
-              </Alert>
+              <ShellNotice
+                title="Space command failed"
+                onDismiss={() => setSpaceCommandBreak(null)}
+              >
+                {spaceCommandBreak}
+              </ShellNotice>
             )}
             {graphRefusal === null ? null : (
-              <Alert variant="destructive">
-                <AlertIcon />
-                <AlertTitle>Graph unchanged</AlertTitle>
-                <AlertDescription>{describeAuthoringRefusal(graphRefusal)}</AlertDescription>
-              </Alert>
+              <ShellNotice title="Graph unchanged" onDismiss={() => setGraphRefusal(null)}>
+                {describeAuthoringRefusal(graphRefusal)}
+              </ShellNotice>
             )}
+            {/* **The one report here with no dismissal, and it is not an
+                oversight.** The others are about a press that is over, so
+                putting one away changes nothing it is about. This one is about
+                the address the reader is *on*: clearing it is what asks for the
+                stale location to be corrected (`browser-location.ts`), so a
+                dismissal would be a move dressed as an acknowledgement. It is
+                answered by the first move the reader makes — including opening
+                a Card on the canvas, which the notice never covers. */}
             {destinationNotFound ? (
               <Alert variant="destructive">
                 <AlertIcon />

@@ -236,11 +236,28 @@ function DropdownMenuCheckboxItem({
  * absorb, not each caller's: without this every consumer took an untyped
  * `next` back out of a group it had just handed typed values to, and laundered
  * it — `String(next)` five times over in one surface — which is a cast written
- * as a conversion. Naming the type here means the value a caller gets back is
- * the type it put in, and nothing downstream needs an assertion to say so.
+ * as a conversion.
  *
  * `Value` is inferred from `value` or `defaultValue` where a caller passes one,
  * and can be named explicitly where the group is uncontrolled.
+ *
+ * **What the group alone does not buy.** It types the three props it declares
+ * and nothing else — in particular not its items, whose own `value` is a second
+ * `any` bound by `DropdownMenuRadioItem`'s generic and by nothing this type can
+ * reach. A group named `Value` alongside an item that infers its own therefore
+ * compiles, and hands `onValueChange` a value the group could not have
+ * produced, wearing `Value`. So the type has to be named on **both**, once per
+ * composition, and the item's comment below carries the idiom for doing that.
+ *
+ * That is a TypeScript limitation and not a shape we have yet to find. A parent
+ * cannot constrain generic children through JSX: every JSX expression has the
+ * type `React.JSX.Element`, which is `ReactElement<any, any>`, so even a
+ * `children` slot declared as `ReactElement<DropdownMenuRadioItemProps<Value>>`
+ * accepts any element at all — `any` on the element's own props parameter is
+ * what defeats it, and no variance trick recovers the check. Threading a
+ * context or asking the caller to name the type twice are the two ways out, and
+ * this is the second. `.scratch/command-dock/findings/` records both the
+ * original weighing and the call sites that still owe the second name.
  */
 type DropdownMenuRadioGroupProps<Value> = Omit<
   MenuPrimitive.RadioGroup.Props,
@@ -285,6 +302,15 @@ function DropdownMenuRadioGroup<Value>({
  *
  * The type does not travel from the group through JSX children — TypeScript
  * has no way to carry it there — so the caller names it, once, on both.
+ *
+ * **Left unnamed the item infers its own `Value` and binds to nothing**, which
+ * is the group's promise back open again rather than a narrower version of it:
+ * `<DropdownMenuRadioItem value="none">` inside a group of branded ids infers
+ * `'none'`, renders, and returns `'none'` typed as the brand. Nothing here can
+ * detect the omission — the argument is optional because inference has a
+ * legitimate answer for it — so it is a composition rule, and
+ * `tools/typing-fixtures/must-fail/mismatched-menu-item.tsx` is the executable
+ * evidence that the rule pays once a surface follows it.
  */
 type DropdownMenuRadioItemProps<Value> = Omit<MenuPrimitive.RadioItem.Props, 'value'> & {
   readonly value: Value;

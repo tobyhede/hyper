@@ -23,6 +23,7 @@ import {
   createCard,
   createCardControl,
   newLayout,
+  openGraphMenu,
   openLayoutMenu,
   presentControl,
   unavailable,
@@ -617,6 +618,58 @@ describe('Space app failure reporting', () => {
   );
 
   /**
+   * **A standing report is put away by the reader, not by the next command.**
+   *
+   * The notice slot is pinned over the canvas *above* the Command Dock — a
+   * report drawn behind the furniture it reports for is not a report — and the
+   * Dock moves between twelve slots, so at every top slot the two share a
+   * corner and the report wins hit testing (`e2e/dock-interactions.spec.ts`).
+   * Four of these clear on the next corresponding command and the Space command
+   * break clears only when the next switch or exit is attempted, from the Space
+   * menu on the bar underneath it. So without a dismissal the reader can be left
+   * pressing a control the last failure is sitting on.
+   *
+   * `AlertAction` is the shared `Alert`'s own slot for exactly this, already
+   * spent on Retry by the persistence notice. What is pinned here is that
+   * dismissing is *acknowledgement*: the report goes and the Space is untouched.
+   */
+  it('puts a standing clipboard failure away when the reader dismisses it', async () => {
+    const valid = snapshot('Space', 'Card', 10, 20);
+    const { spaceSession: session, spaceCards } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
+      snapshot: valid,
+      revision: 0n,
+      exportedRevision: null,
+    });
+    const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard permission denied')) },
+    });
+
+    try {
+      mountSpace(
+        { id: runtime(valid).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+        (app) => render(app),
+      );
+
+      openGraphMenu('Graph');
+      fireEvent.click(await screen.findByRole('menuitem', { name: /^Copy link/ }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Link not copied');
+      // The menu the command was pressed in, dismissed the way a reader
+      // dismisses it — the report is what stands, not the surface behind it.
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Link not copied' }));
+
+      await waitFor(() => expect(screen.queryByText('Link not copied')).toBeNull());
+      expect(session.getState().working).toEqual(valid);
+    } finally {
+      if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
+      else Object.defineProperty(navigator, 'clipboard', previousClipboard);
+    }
+  });
+
+  /**
    * Composition happens in Open Spaces now, so `createApp` no longer performs
    * domain intake. What it still does before there is a tree is read the
    * session's working Space to open an addressed Graph, and that throws on a
@@ -943,6 +996,88 @@ describe('Space app Cards drawer', () => {
     expect(name).toHaveTextContent('Workshop');
     expect(document.activeElement).toBe(elsewhere);
     elsewhere.remove();
+  });
+
+  /**
+   * **One name in the bar is being renamed, or none is.**
+   *
+   * A blank name is refused and `InlineTitleEditor` holds a refused draft open
+   * and editable, so a Layout rename can still be running while the reader
+   * presses the Graph name beside it — the availability rule that stops a
+   * *second* Rename beginning reads `editingChromeTitle`, and the name control
+   * deliberately does not, because withdrawing it would draw the live editor's
+   * own name as a static label.
+   *
+   * So the second press is reachable, and what it must not do is leave two
+   * editors standing over one bar. The exclusivity is the disclosure's, one
+   * step along: at most one open id under the whole row, and whichever control
+   * opens next clears whatever was open.
+   */
+  it('leaves one Dock name editor standing when a second rename is begun over a live one', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      (app) => render(app),
+    );
+
+    await beginRename('selected-canvas');
+    const layoutEditor = await screen.findByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(layoutEditor, { target: { value: '' } });
+    fireEvent.keyDown(layoutEditor, { key: 'Enter' });
+    expect(screen.getByRole('textbox', { name: 'Layout name' })).toBeInTheDocument();
+
+    await beginRename('active-graph');
+
+    expect(screen.getAllByRole('textbox', { name: /^(Layout|Graph) name$/ })).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: 'Graph name' })).toBeInTheDocument();
+  });
+
+  /**
+   * **What the bar reports and what the bar draws are one answer.**
+   *
+   * A live chrome rename withdraws Create Card, Present, Delete Card and the
+   * canvas's own title editing, because each of those re-derives the canvas or
+   * takes the caret from under the editor. Three identities drawing three
+   * editors over one boolean is what let that come apart: with a blank Layout
+   * draft still refusing, a Graph rename begun and then abandoned with Escape
+   * reported the *bar* as idle and handed the commands back underneath an
+   * editor that was still on screen.
+   *
+   * The claim is the coupling rather than either half of it, because the fix is
+   * free to end the first rename or to keep it — what it may not do is disagree
+   * with itself. Create Card is the one asserted: it reads `addCard`, which
+   * carries `editingChromeTitle` and nothing else about this Space, while
+   * Present here is withheld anyway for a Graph with no Edges to traverse.
+   */
+  it('withdraws Create Card for as long as a Dock name editor is standing', async () => {
+    const base = snapshot('Space', 'Card', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceCards } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      (app) => render(app),
+    );
+
+    await beginRename('selected-canvas');
+    const layoutEditor = await screen.findByRole('textbox', { name: 'Layout name' });
+    fireEvent.change(layoutEditor, { target: { value: '' } });
+    fireEvent.keyDown(layoutEditor, { key: 'Enter' });
+    expect(unavailable(createCardControl())).toBe(true);
+
+    await beginRename('active-graph');
+    const graphEditor = await screen.findByRole('textbox', { name: 'Graph name' });
+    fireEvent.keyDown(graphEditor, { key: 'Escape' });
+
+    const standing = screen.queryAllByRole('textbox', { name: /^(Layout|Graph) name$/ }).length > 0;
+    expect(unavailable(createCardControl())).toBe(standing);
   });
 
   /**

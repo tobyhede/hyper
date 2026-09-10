@@ -243,6 +243,7 @@ test(
 
     await page.mouse.move(0, 0);
     await expect(openControl).toHaveCSS('opacity', '0');
+    await page.keyboard.press('Tab');
     await openRegion.locator('.react-flow__node').focus();
     await expect(openControl).toHaveCSS('opacity', '1');
 
@@ -629,3 +630,34 @@ test('rendered and source modes keep one content column', async ({ page }) => {
   expect(sourceBox?.x).toBeCloseTo(renderedBox?.x ?? 0, 0);
   expect(sourceBox?.y).toBeCloseTo(renderedBox?.y ?? 0, 0);
 });
+
+test(
+  'Open and Close release pointer-revealed controls while preserving keyboard access',
+  { tag: '@parity:card-rail-reveal-distinguishes-pointer-and-keyboard' },
+  async ({ page }) => {
+    await open(page, openCloseStory);
+    const card = page
+      .getByRole('region', { name: 'Interactive Card' })
+      .locator('.react-flow__node');
+    const actions = card.getByRole('toolbar', { name: 'Card Strategies', exact: true });
+    for (const operation of ['Open', 'Close']) {
+      await card.hover();
+      await card.getByRole('button', { name: `${operation} Card Strategies`, exact: true }).click();
+      await page.mouse.move(1, 1);
+      await expect(actions).toHaveCSS('opacity', '0');
+      await expect(actions).toHaveCSS('pointer-events', 'none');
+    }
+    // Switch to keyboard modality, then reach and operate the same toolbar.
+    await page.keyboard.press('Tab');
+    const openControl = card.getByRole('button', { name: 'Open Card Strategies', exact: true });
+    await openControl.focus();
+    await expect(actions).toHaveCSS('opacity', '1');
+    await openControl.press('Enter');
+    const close = card.getByRole('button', { name: 'Close Card Strategies', exact: true });
+    await expect(close).toBeFocused();
+    await expect(actions).toHaveCSS('opacity', '1');
+    await close.press('Enter');
+    await expect(openControl).toBeFocused();
+    await expect(actions).toHaveCSS('opacity', '1');
+  },
+);

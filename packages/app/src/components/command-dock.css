@@ -112,13 +112,32 @@
 
    Capped against the **container** and not the viewport, because the container
    is what the twelve slots are slots of — a media query would be this sheet
-   guessing at a box the caller already states. */
+   guessing at a box the caller already states.
+
+   **The cap is the frame's and the scrolling is the strip's, so the frame has
+   to hand the strip its size.** The cap belongs to the frame because the frame
+   is the element the twelve slots place; but a cap on the box *around* a
+   scroller constrains nothing, and a scroll property on a box that is still its
+   own content's size has no viewport to scroll inside. The horizontal strip
+   worked by accident — a block child fills its parent's content width without
+   being asked, so it was inside the cap already — and the vertical one did not,
+   because height does not work that way: a short viewport left the column at
+   its full content height, hanging out of the bottom of a shell that is
+   `overflow: hidden` and so cannot be scrolled to. One flex line is what closes
+   that: the strip is stretched to the frame's own capped box, and only then is
+   `overflow` a scroller rather than a declaration. */
 .command-dock {
+  display: flex;
   max-width: calc(100% - 2 * 16px);
   max-height: calc(100% - 16px - 44px);
 }
 
 .command-dock__surface {
+  /* A flex item refuses to shrink below its content by default, and a strip
+     that will not shrink is the cap above not applying. Both axes, because
+     either one of them can be the short one. */
+  min-width: 0;
+  min-height: 0;
   /* Along the dock's own axis only. The cross axis is set by the tallest
      control in the strip, and a scrollbar there would be scrolling a row
      against its own height. */
@@ -376,35 +395,6 @@
   flex: 1 1 auto;
 }
 
-/* A name with no rename behind it, drawn as the label it is.
-
-   It keeps the name slot and takes the button's box by hand, because it is not
-   a button: the Space is the one identity the product has no rename Edit for
-   (see `DockSpace.onRename`), and a greyed-out control would advertise a
-   command nobody can run rather than simply naming the Space. Everything the
-   vertical grid places it by is the shared `command-dock__name` above; what is
-   here is only the padding and the height the three button-drawn names get for
-   free. */
-.command-dock__name--static {
-  display: inline-flex;
-  align-items: center;
-  height: 28px;
-  padding-inline: 6px;
-}
-
-/* ------------------------------------------------------------ disclosure */
-
-/* One open treatment for every disclosure in the Dock — the two list Popovers
-   and the three Menus alike. Keyed off `aria-expanded`, which Base UI sets on
-   any trigger that discloses something, so a control added later is covered
-   without being told. It is a step above the hover fill and no more: an open
-   disclosure is already announced by the surface hanging off it, and a trigger
-   that also inverts reads as a selected mode. */
-.command-dock__surface [aria-expanded='true'] {
-  background: var(--secondary);
-  color: var(--foreground);
-}
-
 /* ---------------------------------------------------------------- crossing */
 
 /* The Space region: the trail of Spaces crossed, then the Space you are in.
@@ -439,30 +429,30 @@
 /* The parent step and the Open Spaces menu are the trail's two list items, and the
    grid places **those** — a class on the button inside an `li` is a class on
    something the grid never sees. So `command-dock__crumb` and
-   `command-dock__disclose` sit on the `BreadcrumbItem`, and the button inherits
-   the colour below through it. */
+   `command-dock__disclose` sit on the `BreadcrumbItem`, and the placement below
+   is all either of them is for.
+
+   **The parent's ink is not here**, and neither is the open treatment every
+   disclosure in the Dock takes. Both were declarations over controls the shared
+   `Button` recipe draws, so this sheet was a second owner of that recipe's
+   appearance — and each won only by being loaded after Tailwind's output rather
+   than by saying anything stronger. They are the `receded` variant and
+   `quietFeedback`'s `aria-expanded` state in `@project/ui` now.
+
+   What the ink says is unchanged and worth keeping: the parent is the Space you
+   are in drawn as the thing it sits inside, and **three things separate it from
+   the Space you are in**, no one of which was enough. The mark is a cube rather
+   than the Space glyph — not the Space glyph decorated, but the same object at a
+   different depth, so the two rows differ in silhouette, which is what a reader
+   matches on (`ParentIcon`, chosen in `.scratch/command-dock/issues/06-...`). It
+   recedes a step below the bar's own tone, which is also why the cube carries a
+   quarter-unit more stroke than the bar's other glyphs — the tone step is weight
+   it has to be given back. And a `Divider` stands between them, as at every
+   cluster boundary in the Dock, so this is the rule rather than a patch on this
+   pair. */
 .command-dock__crumb {
   display: inline-flex;
   min-width: 0;
-}
-
-/* The parent: the Space you are in, drawn as the thing it sits inside, and a
-   name you press to go back one.
-
-   **Three things separate it from the Space you are in**, and no one of them
-   was enough. The mark is a cube rather than the Space glyph — not the Space
-   glyph decorated, but the same object at a different depth: a frame is the
-   surface you are placing Cards on, and a cube is the volume that surface is
-   inside, so the two rows differ in silhouette, which is what a reader matches
-   on (`ParentIcon`, chosen in `.scratch/command-dock/issues/06-...`). It recedes a
-   step below the bar's own tone, because every control in the Dock is a ghost
-   button at `--muted-foreground` and the two rows measured identically until
-   this — which is also why the cube carries a quarter-unit more stroke than the
-   bar's other glyphs, since the tone step it recedes by is weight it has to be
-   given back. And a `Divider` stands between them — every cluster boundary in
-   the Dock has one now, so this is the rule rather than a patch on this pair. */
-.command-dock__crumb {
-  color: color-mix(in oklab, var(--muted-foreground) 72%, transparent);
 }
 
 /* The open-Spaces tree, one hairline per level.

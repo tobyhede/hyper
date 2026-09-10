@@ -70,6 +70,11 @@ body {
  * separate them and the higher value simply won. A report drawn behind the
  * furniture it reports for is not a report, so this sits above the Dock's whole
  * frame, its own notice at `21` included. Under every modal surface still.
+ *
+ * What being above the bar owes is a way out from under it: every report drawn
+ * here carries its own dismissal (`components/ShellNotice.tsx`), because one that
+ * stands until the next corresponding command can be sitting on the control
+ * that command is run from.
  */
 .shell__notice {
   position: absolute;
@@ -212,21 +217,23 @@ body {
 }
 
 /* Hover discovers the control, Selection keeps it stable for touch (no hover
-   state to reveal it), and Card focus offers the keyboard the same authoring
+   state to reveal it), and keyboard-visible Card focus offers the same authoring
    affordance — three independent ways an Open Card is "in play" (ADR 0066).
+   Pointer focus alone must not keep the control up after Open/Close and departure.
    Hover and focus are read off `.react-flow__node`, the element React Flow
    itself makes hoverable and focusable; Selected is read off `data-selected`,
    which only `.rf-card-node__inner` carries. */
 .react-flow__node:hover .react-flow__resize-control.rf-card-node__resize-control,
 .rf-card-node__inner[data-selected='true'] .react-flow__resize-control.rf-card-node__resize-control,
-.react-flow__node:focus-within .react-flow__resize-control.rf-card-node__resize-control {
+.react-flow__node:is(:focus-visible, :has(:focus-visible))
+  .react-flow__resize-control.rf-card-node__resize-control {
   opacity: 1;
   pointer-events: auto;
 }
 
 .react-flow__node:hover .rf-card-node__resize-mark,
 .rf-card-node__inner[data-selected='true'] .rf-card-node__resize-mark,
-.react-flow__node:focus-within .rf-card-node__resize-mark {
+.react-flow__node:is(:focus-visible, :has(:focus-visible)) .rf-card-node__resize-mark {
   opacity: 1;
 }
 

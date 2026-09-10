@@ -52,6 +52,33 @@ beforeAll(() => {
   };
 });
 
+/**
+ * The other half of the same gap: jsdom ships no `PointerEvent` **class**, so
+ * Testing Library falls back to a `MouseEvent` and every field that only a
+ * pointer event carries — `pointerId`, `isPrimary` — is dropped by the
+ * constructor without a word. The grip reads both to decide whether a press is
+ * its own, so an environment that cannot carry them is an environment in which
+ * every gesture here reads as the same anonymous press.
+ *
+ * A subclass of the environment's own `MouseEvent` rather than an event written
+ * from scratch: the mouse half is jsdom's and correct, and the three fields
+ * below are the whole of what is missing.
+ */
+class PointerEventPolyfill extends MouseEvent {
+  readonly pointerId: number;
+  readonly isPrimary: boolean;
+  readonly pointerType: string;
+
+  constructor(type: string, init: PointerEventInit = {}) {
+    super(type, init);
+    this.pointerId = init.pointerId ?? 0;
+    this.isPrimary = init.isPrimary ?? false;
+    this.pointerType = init.pointerType ?? 'mouse';
+  }
+}
+
+beforeAll(() => vi.stubGlobal('PointerEvent', PointerEventPolyfill));
+
 afterAll(() => vi.unstubAllGlobals());
 
 /** The bar, named as its own toolbar — everything below is scoped to it. */
@@ -191,6 +218,18 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
   });
 });
 
+/**
+ * The press the grip answers: the primary button of the primary pointer.
+ *
+ * Written out rather than left to the event's own defaults because the grip
+ * now reads all three fields, and a gesture that does not say which pointer
+ * pressed it is a gesture no reader of this file can check against the guard.
+ */
+const PRIMARY = { pointerId: 1, button: 0, isPrimary: true } as const;
+
+/** The frame the slot decides and the drag moves, which is what a gesture shows on. */
+const frame = (): HTMLElement => screen.getByTestId('command-dock');
+
 describe('the grip discloses the twelve slots (ADR 0082)', () => {
   /**
    * The grip is no longer a `Menu.Trigger`: Base UI opens one on `mousedown`,
@@ -259,11 +298,11 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
     render(<Default />);
     const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
 
-    fireEvent.pointerDown(grip, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.pointerDown(grip, { ...PRIMARY, clientX: 100, clientY: 100 });
     // Past `DRAG_THRESHOLD` on both axes, which is what makes this a drag
     // rather than a press that wobbled.
-    fireEvent.pointerMove(grip, { pointerId: 1, clientX: 220, clientY: 140 });
-    fireEvent.pointerUp(grip, { pointerId: 1, clientX: 220, clientY: 140 });
+    fireEvent.pointerMove(grip, { ...PRIMARY, clientX: 220, clientY: 140 });
+    fireEvent.pointerUp(grip, { ...PRIMARY, clientX: 220, clientY: 140 });
     fireEvent.click(grip);
 
     expect(screen.queryByRole('menu')).toBeNull();
@@ -282,11 +321,56 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
 
     // The press that dismisses, and the `click` it carries. No movement, so
     // this is a press rather than a drag.
-    fireEvent.pointerDown(grip, { pointerId: 1, clientX: 100, clientY: 100 });
-    fireEvent.pointerUp(grip, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.pointerDown(grip, { ...PRIMARY, clientX: 100, clientY: 100 });
+    fireEvent.pointerUp(grip, { ...PRIMARY, clientX: 100, clientY: 100 });
     fireEvent.click(grip);
 
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  /**
+   * **A secondary button asks for a context menu, not for the bar to move.**
+   *
+   * There is no `Menu.Trigger` here, so every semantic a trigger would have
+   * arrived with is this control's to state, and which button it answers is one
+   * of them: `pointerdown` fires for all of them, so the right button took hold
+   * of the dock and its release docked the whole command surface wherever the
+   * pointer had wandered.
+   */
+  it('refuses a press from a secondary button', () => {
+    render(<Default />);
+    const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
+
+    fireEvent.pointerDown(grip, { ...PRIMARY, button: 2, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(grip, { ...PRIMARY, button: 2, clientX: 220, clientY: 140 });
+
+    expect(frame()).toHaveAttribute('data-dragging', 'false');
+  });
+
+  /**
+   * **One pointer owns the gesture it began.**
+   *
+   * A drag held by a captured pointer still sees every other pointer's moves —
+   * a second finger, a pen beside a touch — and each of them was read as the
+   * held gesture's own, so the dock jumped to whichever pointer moved last and
+   * a stray release docked it there. The initiating pointer is retained and
+   * every other one is ignored for the life of the press.
+   */
+  it('ignores a second pointer while a gesture is in flight', () => {
+    render(<Default />);
+    const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
+
+    fireEvent.pointerDown(grip, { ...PRIMARY, clientX: 100, clientY: 100 });
+    // Past the threshold, and from a pointer that never took hold of anything.
+    fireEvent.pointerMove(grip, {
+      pointerId: 2,
+      button: 0,
+      isPrimary: false,
+      clientX: 220,
+      clientY: 140,
+    });
+
+    expect(frame()).toHaveAttribute('data-dragging', 'false');
   });
 });
 

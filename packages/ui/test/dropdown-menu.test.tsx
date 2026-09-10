@@ -160,6 +160,53 @@ describe('DropdownMenu', () => {
   });
 
   /**
+   * The composition rule's other half, held where it can be seen: an item left
+   * unbound is held to nothing, and the value it returns wears the group's type
+   * anyway.
+   *
+   * This is the failure the bound form above prevents, written out rather than
+   * described — `'middle'` is not one of the two things this group deals in, it
+   * renders, it is chosen, and `next` arrives typed `'left' | 'right'` while
+   * holding `'middle'`. A consumer that trusted the declaration and dropped its
+   * runtime lookup is then reading a value off a list that cannot contain it.
+   *
+   * **It compiles on purpose and must not be relaxed into an endorsement.** The
+   * group cannot detect the omission (`packages/ui/src/components/dropdown-menu.tsx`
+   * says why: JSX gives every child the type `ReactElement<any, any>`), so this
+   * stands as the tripwire for the day TypeScript can — on which the item below
+   * stops compiling, this test fails, and the composition rule, the two doc
+   * comments carrying it and `.scratch/command-dock/findings/`'s open call-site
+   * entry are all owed a rewrite.
+   */
+  it('does not hold an unbound item to the group, which is why callers bind', () => {
+    const chosen: ('left' | 'right')[] = [];
+
+    render(
+      <DropdownMenu>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuRadioGroup<'left' | 'right'>
+            defaultValue="left"
+            onValueChange={(next) => {
+              expectTypeOf(next).toEqualTypeOf<'left' | 'right'>();
+              chosen.push(next);
+            }}
+          >
+            <DropdownMenuRadioItem value="left">Left</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="middle">Middle</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Middle' }));
+
+    // The declaration says `'left' | 'right'`. The array holds neither.
+    expect(chosen).toEqual(['middle']);
+  });
+
+  /**
    * A union survives the round trip, which is what `String()` destroyed: the
    * value came back as a bare `string` and had to be parsed again into one of
    * the things the menu had itself just rendered.

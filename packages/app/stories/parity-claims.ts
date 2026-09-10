@@ -16,6 +16,20 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
+    id: 'card-rail-reveal-distinguishes-pointer-and-keyboard',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'OpenAndClose',
+    claim:
+      'Pointer Open and Close allow the rail to hide on departure; keyboard activation keeps the focused command visible across both transitions.',
+  },
+  {
+    id: 'command-dock-identity-presentation',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'Space, Layout and Graph names share typography; Space remains a non-interactive label, while Layout opens its rename editor and returns focus on Escape.',
+  },
+  {
     id: 'cards-drawer-adds-existing-layout-members',
     storyFile: 'surfaces/cards-drawer.stories.tsx',
     storyExport: 'AvailableCards',

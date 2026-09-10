@@ -4,6 +4,7 @@ import {
   activateGraph,
   boxOf,
   createCard,
+  createCardControl,
   dock,
   layoutMenu,
   newLayout,
@@ -275,4 +276,71 @@ test('a persistence failure stays inside the viewport beside a side-edge Dock', 
   await page.unroute('**/api/spaces', failCommit);
   await retry.click();
   await expect(failure).toBeHidden();
+});
+
+/**
+ * **The other narrow direction: a short viewport with the Dock on a side edge.**
+ *
+ * The phone above is narrow and tall, which the horizontal strip answers by
+ * scrolling along the axis it already runs on — and a block-level child fills
+ * its parent's content *width* without being asked, so capping the frame was
+ * enough for it. Height does not work that way. A vertical column whose clusters
+ * are taller than the room the frame is capped to keeps its content height, and
+ * a scroll property on a box with no viewport to scroll inside does nothing at
+ * all: the column simply hung out of the bottom of the screen, with the last
+ * cluster past the edge of a shell that is `overflow: hidden` and so cannot be
+ * scrolled to.
+ *
+ * 844x220 is a phone turned on its side with the browser chrome in place — the
+ * shortest box the app is asked to draw a column in. What ADR 0082 owes here is
+ * the same thing it owes at 390px: every cluster keeps its name and its place,
+ * and *"everything it offers is reachable and operable from the keyboard
+ * alone."*
+ *
+ * Asserted as the obligation rather than as a CSS value: the strip is inside the
+ * viewport, its content scrolls inside it, and the cluster furthest from the
+ * grip can be reached and pressed.
+ */
+test.describe('a short viewport', () => {
+  test.use({ viewport: { width: 844, height: 220 } });
+
+  test('a side-edge Dock scrolls its clusters rather than overflowing the screen', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+
+    // Left edge, middle — the same slot the notice test below uses, and the one
+    // that gives the column the least room above and below it.
+    await dock(page)
+      .getByRole('button', { name: /^Move Command Dock/ })
+      .click();
+    await page.getByRole('menuitemradio', { name: 'Middle', exact: true }).nth(1).click();
+    await expect(dock(page)).toHaveAttribute('data-orientation', 'vertical');
+    // The slot transition is 160ms of `top`, and every measurement below is of
+    // where the column came to rest rather than where it was passing through.
+    await page.waitForTimeout(400);
+
+    const surface = dock(page);
+    const box = await boxOf(surface, 'the Dock');
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(220);
+
+    // The strip is the scroll viewport for its own content, which is the half
+    // that was missing: the cap was on the frame around it, so the column below
+    // measured the same height scrolled as unscrolled.
+    const scroll = await surface.evaluate((element) => ({
+      client: element.clientHeight,
+      content: element.scrollHeight,
+    }));
+    expect(scroll.content).toBeGreaterThan(scroll.client);
+
+    // And the far cluster is reachable, which is what the scrolling is for.
+    const create = createCardControl(page);
+    await create.scrollIntoViewIfNeeded();
+    await expect(create).toBeInViewport({ ratio: 1 });
+    await create.click();
+    await expect(page.getByRole('menu')).toBeVisible();
+  });
 });

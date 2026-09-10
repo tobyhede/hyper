@@ -1,5 +1,6 @@
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { dock, nodeByTitle, settled } from './graph';
+import { boxOf, dock, nodeByTitle, settled } from './graph';
 
 for (const delay of [0, 120]) {
   test(`Dock disclosures switch on one press (${delay}ms)`, async ({ page }) => {
@@ -84,6 +85,43 @@ test(
   },
 );
 
+/**
+ * **The grip answers the primary button and nothing else.**
+ *
+ * The grip is not a `Menu.Trigger`, so every semantic a trigger would have come
+ * with is this control's to state — and button filtering is the one it never
+ * stated. A `pointerdown` is a `pointerdown` whatever pressed it, so a
+ * right-button press took hold of the dock, a right-button drag moved it, and
+ * the release docked it in whatever slot the pointer had reached. There is no
+ * command in the Dock that a secondary button performs, and moving the whole
+ * command surface is not a reasonable answer to a request for a context menu.
+ *
+ * Read off the grip's own accessible name, which is where the dock says which
+ * of the twelve slots it is in — the same sentence a screen reader is given.
+ */
+test('a secondary-button drag on the grip leaves the Dock in its slot', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A')).toBeVisible();
+  await settled(page);
+
+  const grip = dock(page).getByRole('button', { name: /^Move Command Dock/ });
+  await expect(grip).toHaveAccessibleName('Move Command Dock. Top edge, centre.');
+  const box = await boxOf(grip, 'the grip');
+  const viewport = page.viewportSize();
+  if (viewport === null) throw new Error('The page has no viewport size.');
+
+  // Far enough to clear `DRAG_THRESHOLD` several times over and to land in a
+  // different edge's half of the container, so a gesture that is taken at all
+  // redocks visibly rather than settling back where it started.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(viewport.width - 20, viewport.height / 2, { steps: 10 });
+  await page.mouse.up({ button: 'right' });
+
+  await expect(grip).toHaveAccessibleName('Move Command Dock. Top edge, centre.');
+  await expect(dock(page)).toHaveAttribute('data-orientation', 'horizontal');
+});
+
 test('hovering a Card handle keeps its rail revealed with entity actions', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A');
@@ -102,7 +140,15 @@ test('hovering a Card handle keeps its rail revealed with entity actions', async
   await expect(card.getByTestId('canvas-card-actions')).toHaveCSS('opacity', '1');
 });
 
-test('a failed clipboard command reports above an overlapping Dock', async ({ page }) => {
+/**
+ * A refused Copy link, reported over a Dock moved into the same corner.
+ *
+ * The two tests below are the two halves of one rule and neither is worth
+ * asserting alone: the report is drawn above the bar, and the reader can put it
+ * away again. Sharing the setup is what stops the second one being written
+ * against a Dock that never overlapped, which would pass while proving nothing.
+ */
+async function reportOverAnOverlappingDock(page: Page): Promise<Locator> {
   await page.addInitScript(() => {
     Object.defineProperty(navigator.clipboard, 'writeText', {
       value: () => Promise.reject(new Error('Clipboard unavailable')),
@@ -122,6 +168,14 @@ test('a failed clipboard command reports above an overlapping Dock', async ({ pa
   await expect(notice).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu')).toHaveCount(0);
+  return notice;
+}
+
+/** The box the report and the bar share, which both tests aim their hit test at. */
+async function sharedCorner(
+  page: Page,
+  notice: Locator,
+): Promise<{ readonly x: number; readonly y: number }> {
   const frame = await dock(page).boundingBox();
   const report = await notice.boundingBox();
   if (frame === null || report === null) throw new Error('Dock or notice has no visible box');
@@ -133,9 +187,42 @@ test('a failed clipboard command reports above an overlapping Dock', async ({ pa
   };
   expect(overlap.right).toBeGreaterThan(overlap.left);
   expect(overlap.bottom).toBeGreaterThan(overlap.top);
-  const onTop = await page.evaluate((box) => {
-    const hit = document.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2);
+  return { x: (overlap.left + overlap.right) / 2, y: (overlap.top + overlap.bottom) / 2 };
+}
+
+test('a failed clipboard command reports above an overlapping Dock', async ({ page }) => {
+  const notice = await reportOverAnOverlappingDock(page);
+  const corner = await sharedCorner(page, notice);
+  const onTop = await page.evaluate((at) => {
+    const hit = document.elementFromPoint(at.x, at.y);
     return hit !== null && hit.closest('.shell__notice') !== null;
-  }, overlap);
+  }, corner);
   expect(onTop).toBe(true);
+});
+
+/**
+ * **The other half of drawing a report above the bar: a way out from under it.**
+ *
+ * A clipboard failure clears itself on the next copy, and a Space command break
+ * clears only when the next switch or exit is attempted — from the Space menu,
+ * on the bar the report is sitting on. So the report owes the reader a
+ * dismissal, and what it owes after that is the corner back.
+ */
+test('a reported failure is dismissed off the Dock it covers', async ({ page }) => {
+  const notice = await reportOverAnOverlappingDock(page);
+  const corner = await sharedCorner(page, notice);
+
+  await notice.getByRole('button', { name: 'Dismiss: Link not copied' }).click();
+
+  await expect(notice).toHaveCount(0);
+  const covered = await page.evaluate((at) => {
+    const hit = document.elementFromPoint(at.x, at.y);
+    return hit !== null && hit.closest('.shell__notice') !== null;
+  }, corner);
+  expect(covered).toBe(false);
+  // And the bar takes the next press where the report was standing.
+  await dock(page)
+    .getByRole('button', { name: /^Layout: / })
+    .click({ delay: 120 });
+  await expect(page.getByRole('menuitem', { name: 'New Layout', exact: true })).toBeVisible();
 });

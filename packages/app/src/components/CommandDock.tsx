@@ -71,10 +71,12 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
+  buttonVariants,
   CardKindIcon,
   cardKindName,
   ChevronDownIcon,
   CloseIcon,
+  cn,
   CopyIcon,
   DropdownMenu,
   DropdownMenuContent,
@@ -184,6 +186,38 @@ const DISCLOSURE_ALIGN = 'center' as const;
 const DISCLOSURE_SIDE_OFFSET = 6;
 const DISCLOSURE_WIDTH = 'w-72';
 
+/**
+ * **The Dock's three sets of branded ids, bound to the id they are sets of.**
+ *
+ * `DropdownMenuRadioGroup` is generic over its value and `DropdownMenuRadioItem`
+ * is generic over its own, and the type does not travel from the group to its
+ * children: every JSX expression is `React.JSX.Element`, which is
+ * `ReactElement<any, any>`, so even a `children` slot declared as
+ * `ReactElement<DropdownMenuRadioItemProps<Value>>` accepts an item of any type
+ * at all. TypeScript has no way to carry a parent's type argument into generic
+ * JSX children, so the composition names it — once per set, here.
+ *
+ * **What is unbound is not a narrower check but no check.** An item left to
+ * infer its own `Value` binds to nothing: `<DropdownMenuRadioItem value="none">`
+ * inside a group of `LayoutId`s infers `'none'`, compiles, and comes back out of
+ * `onValueChange` wearing the brand — so `onSelect(layoutId: LayoutId)` is
+ * handed a string that is not one, and its declared type is a lie the compiler
+ * helped tell. Bound, that literal is a `TS2322` where it is written.
+ * `CardsDrawer`'s `KindFilterItem` binds the same way, and
+ * `tools/typing-fixtures/must-fail/mismatched-menu-item.tsx` is the standing
+ * evidence that the rule bites.
+ *
+ * **Two of the Dock's five radio groups are deliberately absent from this list**
+ * and neither wants adding: a Graph's colour is a plain `string` on both sides
+ * (`onRecolor(graphId, color: string)`), so there is no narrower type to name;
+ * and the dock-slot group re-parses through `dockSlot(next)` before it acts, so
+ * the value it trusts is one the parser produced rather than one the JSX
+ * claimed.
+ */
+const LayoutItem = DropdownMenuRadioItem<LayoutId>;
+const GraphItem = DropdownMenuRadioItem<GraphId>;
+const SpaceItem = DropdownMenuRadioItem<UUID>;
+
 /* ------------------------------------------------------------------ state */
 
 /**
@@ -213,17 +247,17 @@ export interface DockChrome {
    * That a name in the bar is being renamed right now.
    *
    * **One fact under the whole bar, reported rather than owned.** The editor is
-   * `InlineTitleEditor` and the open/closed state is the name control's own —
-   * which is the whole reason the shared draft the Sidebar needed is gone. But
-   * the *application* still has to know one is running: a live chrome rename
-   * withdraws Create Card, Present, Delete Card and the canvas's own title
-   * editing, because each of those would re-derive the canvas or take the
-   * caret from under it (`authoring-availability.ts`).
+   * `InlineTitleEditor` and which name is open is the bar's own slot
+   * ({@link useDockRenaming}) — which is the whole reason the shared draft the
+   * Sidebar needed is gone. But the *application* still has to know one is
+   * running: a live chrome rename withdraws Create Card, Present, Delete Card
+   * and the canvas's own title editing, because each of those would re-derive
+   * the canvas or take the caret from under it (`authoring-availability.ts`).
    *
    * So the text, the refusal and the focus return stay in the component and only
    * the fact crosses the seam. It is `DockChrome`'s rather than `canvas`'s or
-   * `graph`'s because there is one answer for the bar: two fields would let a
-   * Layout rename and a Graph rename disagree about whether a rename is running.
+   * `graph`'s because there is one answer for the bar — and because there is one
+   * answer, there is one writer: the slot, not each name in turn.
    */
   readonly onRenamingChange: (renaming: boolean) => void;
   /**
@@ -234,8 +268,8 @@ export interface DockChrome {
    * coming.** Every other ending is visible from here: the author presses Enter
    * or Escape, moves to another Layout, or the rename stops being available. A
    * replacement is none of those — accepting the stored Space installs a
-   * different Space's document under the same ids, so `Layout` names the same
-   * `subject`, `chromeTitleEdit` is unchanged once placement resolves, and an
+   * different Space's document under the same ids, so the slot names the same
+   * Layout, `chromeTitleEdit` is unchanged once placement resolves, and an
    * editor left open goes on standing over a Space that is gone, reseeded from
    * the accepted title. Completing it then writes a name the author typed
    * against a Layout they never saw.
@@ -245,9 +279,9 @@ export interface DockChrome {
    * boolean that has to be lowered again is a second message this seam would
    * have to carry. A number the component compares against its own is total.
    *
-   * `DockChrome`'s rather than a group's, and read through a context rather than
-   * threaded, for the same reason {@link onRenamingChange} is: it is one answer
-   * under the whole bar, and every name control owes it the same obedience.
+   * `DockChrome`'s rather than a group's, for the same reason
+   * {@link onRenamingChange} is: it is one answer under the whole bar, and the
+   * slot that holds the rename is where it is spent.
    */
   readonly replacementEpoch: number;
   readonly space: DockSpace;
@@ -580,11 +614,10 @@ function IdentityName({
   kind,
   title,
   testId,
-  subject,
   onRename,
 }: {
   readonly icon: ReactNode;
-  readonly kind: 'Space' | 'Layout' | 'Graph';
+  readonly kind: DockIdentity;
   readonly title: string;
   /**
    * What a behaviour test addresses this identity by.
@@ -596,89 +629,29 @@ function IdentityName({
    * slot; the text in it is what is under test.
    */
   readonly testId: string;
-  /**
-   * Which thing this name is naming, so a rename cannot outlive its subject.
-   *
-   * The editor is seeded from `title` and its open state is this component's, so
-   * a Layout or Graph changing underneath a live rename would leave the caret in
-   * a field editing something the reader has already left — a Back onto another
-   * Layout is exactly that, and it moves the whole cluster without unmounting
-   * it. Read as a render-time transition rather than an effect, because an
-   * effect would let one render draw the stale editor first.
-   *
-   * **It cannot see a replacement**, which is the other way a subject stops
-   * being the one the rename began against: the accepted Space carries the same
-   * Layout and Graph ids, so this value is unchanged across the very transition
-   * ADR 0042 says discards the draft. {@link DockReplacementContext} is what
-   * answers that, and the two stay separate conditions below because they are
-   * two rules — one about the reader moving, one about the Space moving.
-   */
-  readonly subject: string;
   /** Absent for an entity the product cannot rename — see {@link DockSpace.onRename}. */
   readonly onRename: ((title: string) => string | null) | null;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [renaming, setRenamingSubject] = useState(subject);
-  const reportRenaming = useContext(DockRenamingContext);
-  if (renaming !== subject) {
-    setRenamingSubject(subject);
-    if (editing) setEditing(false);
-  }
-
   /**
-   * **A replacement ends the rename, and only this can (ADR 0042).**
+   * **Whether this name is the one being renamed is the bar's answer, not this
+   * component's.**
    *
-   * The application clears its own `editingChromeTitle` on the same epoch, but
-   * that flag is what *withdraws other commands* while a rename runs — it is not
-   * the editor, and lowering it neither closes this one nor stops it being
-   * completed. The editor is this component's, so the invalidation has to reach
-   * this component; anything else invalidates the report and leaves the draft.
+   * It was `useState(false)` here, once per identity, and the three of them
+   * reported into one boolean the App reads as "a chrome rename is running".
+   * Two editors could stand at once — a blank draft is refused and
+   * `InlineTitleEditor` holds a refused draft open, so pressing a second name
+   * left the first one live — and the first cleanup to run then told the App no
+   * rename was live at all, handing Create Card, Present and the canvas's own
+   * title editing back underneath an editor still on screen.
    *
-   * The transition above cannot stand in for it: the accepted Space keeps the
-   * ids, so `subject` is unchanged. Neither can the availability guard, and the
-   * way it fails is worth writing down — placement is asynchronous, so a
-   * replacement passes through a render where `onRename` is `null` and this
-   * draws the static label with `editing` still true. That looks like the draft
-   * going. It comes back the moment placement resolves, remounting
-   * `InlineTitleEditor` reseeded from the *accepted* Layout's title: an editor
-   * the author never opened, over a Space they never saw, one Enter away from
-   * renaming it.
-   *
-   * Read during render for the reason the subject transition is, and the caret
-   * is deliberately not returned — the author did not end this, and pulling
-   * focus onto a name in a Space that has just been replaced under them is
-   * taking focus rather than giving it back.
+   * One slot under the whole bar makes that unrepresentable rather than
+   * guarded: at most one name can be the renaming one, so the flag has one
+   * writer, and the two endings no gesture can see coming — the reader moving
+   * to another Layout, and ADR 0042's replacement — are the slot's own and are
+   * answered once in {@link CommandDock} instead of three times here.
    */
-  const replacementEpoch = useContext(DockReplacementContext);
-  const [renamedUnder, setRenamedUnder] = useState(replacementEpoch);
-  if (renamedUnder !== replacementEpoch) {
-    setRenamedUnder(replacementEpoch);
-    if (editing) setEditing(false);
-  }
-
-  /**
-   * **The App is told from an effect, never from this render.**
-   *
-   * `reportRenaming` is the App's own `setEditingChromeTitle`, and the subject
-   * transition above runs in the render body — so calling it there wrote a
-   * *parent's* state while a child rendered, which React reports out loud and
-   * which under concurrent rendering can fire for a render that is thrown away.
-   * The transition keeps its own state and the notification follows the commit.
-   *
-   * `live` rather than `editing`, and silent while it is false, for two reasons
-   * that are one rule: three identities share this one flag, so an instance
-   * that is *not* renaming must never write it, and an editor whose rename
-   * stops being available renders as a static label with `editing` still true —
-   * a state in which no rename is live and the App must not think one is. The
-   * cleanup covers the third case, an unmount mid-rename, which otherwise left
-   * the flag stuck true with nothing able to clear it.
-   */
-  const live = editing && onRename !== null;
-  useEffect(() => {
-    if (!live) return undefined;
-    reportRenaming(true);
-    return () => reportRenaming(false);
-  }, [live, reportRenaming]);
+  const { renaming, onRenaming } = useContext(DockRenamingContext);
+  const editing = renaming === kind;
 
   /**
    * **Where the caret goes when the editor closes.**
@@ -690,10 +663,10 @@ function IdentityName({
    * two surfaces and had to return to whichever began it; here there is one
    * name and it is right there, so a ref is the whole of it.
    *
-   * Only the editor's own three exits spend this. The subject transition above
-   * ends a rename too, and it must not — the reader moved to another Layout
-   * from the menu beside this name, and pulling the caret onto the name they
-   * just moved away from is taking focus, not returning it.
+   * Only the editor's own three exits spend this. The endings the slot answers
+   * for the bar end a rename too, and they must not — the reader moved to
+   * another Layout from the menu beside this name, and pulling the caret onto
+   * the name they just moved away from is taking focus, not returning it.
    */
   const nameRef = useRef<HTMLButtonElement>(null);
   /**
@@ -702,8 +675,11 @@ function IdentityName({
    * state would set state from inside the effect that reads it.
    */
   const returningFocus = useRef(false);
+  // Only the identity holding the slot draws an editor, so only it can reach
+  // these — clearing the slot is releasing this component's own rename rather
+  // than ending someone else's.
   const endRename = (): void => {
-    setEditing(false);
+    onRenaming(null);
   };
   /**
    * The two endings that owe the caret a home, and only those.
@@ -736,7 +712,10 @@ function IdentityName({
    */
   if (onRename === null) {
     return (
-      <span className="command-dock__name command-dock__name--static" data-testid={testId}>
+      <span
+        className={cn(buttonVariants({ variant: 'label', size: 'compact' }), 'command-dock__name')}
+        data-testid={testId}
+      >
         {icon}
         <IdentityLabel>{title}</IdentityLabel>
       </span>
@@ -779,7 +758,7 @@ function IdentityName({
       data-testid={testId}
       aria-label={`Rename ${kind}: ${title}`}
       title={`Rename ${kind}`}
-      onClick={() => setEditing(true)}
+      onClick={() => onRenaming(kind)}
     >
       {icon}
       <IdentityLabel>{title}</IdentityLabel>
@@ -818,7 +797,6 @@ function LayoutControls({
         icon={<LayoutIcon />}
         kind="Layout"
         testId="selected-canvas"
-        subject={canvas.selected.id}
         title={canvas.selected.title}
         onRename={
           canvas.onRename === null
@@ -848,9 +826,9 @@ function LayoutControls({
           >
             <DropdownMenuLabel>Layouts</DropdownMenuLabel>
             {canvas.layouts.map((layout) => (
-              <DropdownMenuRadioItem key={layout.id} value={layout.id} closeOnClick>
+              <LayoutItem key={layout.id} value={layout.id} closeOnClick>
                 {layout.title}
-              </DropdownMenuRadioItem>
+              </LayoutItem>
             ))}
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
@@ -967,7 +945,6 @@ function GraphControls({
         icon={<GraphIcon color={graph.activeColor} size={14} />}
         kind="Graph"
         testId="active-graph"
-        subject={graph.active.id}
         title={graph.active.title}
         onRename={
           graph.onRename === null
@@ -999,10 +976,10 @@ function GraphControls({
             {graph.graphs.map((each) => {
               const color = graph.colorByGraphId[each.id] ?? FALLBACK_GRAPH_COLOR;
               return (
-                <DropdownMenuRadioItem key={each.id} value={each.id} closeOnClick className="gap-2">
+                <GraphItem key={each.id} value={each.id} closeOnClick className="gap-2">
                   <GraphIcon color={color} size={14} />
                   {each.title}
-                </DropdownMenuRadioItem>
+                </GraphItem>
               );
             })}
           </DropdownMenuRadioGroup>
@@ -1235,29 +1212,118 @@ const DockDisclosureContext = createContext<DockDisclosure>({
   setOpenId: () => undefined,
 });
 
-/**
- * How a name control tells the application it is being renamed.
- *
- * A context for the same reason the disclosure above is one: the fact belongs to
- * the bar rather than to any cluster, and threading a reporter through two
- * components to reach a leaf is the shape that makes the next person keep it
- * locally instead.
- */
-const DockRenamingContext = createContext<(renaming: boolean) => void>(() => undefined);
+/** Which of the bar's three names a rename can be running on. */
+type DockIdentity = 'Space' | 'Layout' | 'Graph';
 
 /**
- * How a name control learns the Space beneath it was replaced (ADR 0042).
+ * Which name in the bar is being renamed, if any.
  *
- * A context beside {@link DockRenamingContext} and for its reason: the fact is
- * the bar's, the three identities each owe it the same answer, and threading a
- * counter through `SpacesControl`, `LayoutControls` and `GraphControls` to reach
- * a leaf is what makes the next person decide the leaf can live without it.
+ * **One slot, exactly as the disclosure above is one open id.** Renaming and
+ * disclosing are the same rule twice: at most one at a time, and whichever
+ * control begins next clears whatever was open. Each identity used to keep its
+ * own `editing` boolean and report into the application's single
+ * `editingChromeTitle`, which meant two editors could stand at once and the
+ * first of them to close told the application that neither was — handing back
+ * the commands the other was still withdrawing. A slot cannot say that: the
+ * fact is the bar's, so it is held once and read by every name.
  *
- * `0` as the default is the count a bar that has replaced nothing is at, so a
- * component mounted outside a provider — a unit test over one identity — never
- * sees a transition it was not given.
+ * A context for the same reason the disclosure is one: threading it through
+ * `SpacesControl`, `LayoutControls` and `GraphControls` to reach a leaf is the
+ * shape that makes the next person keep it locally instead. The default is an
+ * inert slot, so an identity mounted outside a provider draws its name and
+ * never opens an editor, rather than opening one nothing can end.
  */
-const DockReplacementContext = createContext(0);
+interface DockRenaming {
+  readonly renaming: DockIdentity | null;
+  /** Take the slot for one identity, or release it. */
+  readonly onRenaming: (identity: DockIdentity | null) => void;
+}
+
+const DockRenamingContext = createContext<DockRenaming>({
+  renaming: null,
+  onRenaming: () => undefined,
+});
+
+/**
+ * The bar's one rename: which name has the slot, and what the application is
+ * told about it.
+ *
+ * **Three rules that were three copies of themselves, answered once.**
+ *
+ * *A rename cannot outlive its subject.* The slot remembers the Layout or Graph
+ * the rename was begun against, so a reader who moves to another Layout from
+ * the menu beside the name releases it — the editor is seeded from a title, and
+ * leaving it open would put the caret in a field editing something the reader
+ * has already left. Read as a render-time transition rather than an effect,
+ * because an effect lets one render draw the stale editor first, and it is this
+ * component's own state so nothing is written to a parent from a child's
+ * render.
+ *
+ * *A replacement ends it too, and nothing else can (ADR 0042).* The accepted
+ * Space carries the same Layout and Graph ids, so the subject is unchanged
+ * across the very transition that discards the draft, and the application's own
+ * `editingChromeTitle` is the *report* rather than the editor — lowering it
+ * neither closes the editor nor stops it being completed. Nor can the
+ * availability guard stand in: placement is asynchronous, so a replacement
+ * passes through a render where `onRename` is `null` and the name draws as a
+ * static label with the slot still taken. That looks like the draft going. It
+ * comes back the moment placement resolves, reseeded from the *accepted*
+ * Layout's title — an editor the author never opened, over a Space they never
+ * saw, one Enter away from renaming it. The caret is deliberately not returned
+ * on either ending: the author did not end this, and pulling focus onto a name
+ * in a Space that has just been replaced under them is taking focus rather than
+ * giving it back.
+ *
+ * *The application is told from an effect, never from a render.*
+ * `onRenamingChange` is the App's own `setEditingChromeTitle`, and the
+ * transitions above run in this render body. `live` rather than "the slot is
+ * taken", because a name whose rename has stopped being available draws as a
+ * label — a state in which no rename is live and the application must not think
+ * one is. The cleanup covers the ending no transition sees, an unmount
+ * mid-rename, which otherwise left the flag stuck true with nothing able to
+ * clear it.
+ */
+function useDockRenaming(chrome: DockChrome): DockRenaming {
+  /**
+   * What each name in the bar is naming, and whether the product can rename it
+   * at all — the one spelling of both, which is why the identities take neither
+   * as a prop. A second copy beside the call sites is what falls behind.
+   */
+  const identities = {
+    Space: { subject: chrome.space.currentSpaceId, renameable: chrome.space.onRename !== null },
+    Layout: { subject: chrome.canvas.selected.id, renameable: chrome.canvas.onRename !== null },
+    Graph: { subject: chrome.graph.active.id, renameable: chrome.graph.onRename !== null },
+  } satisfies Record<DockIdentity, { readonly subject: string; readonly renameable: boolean }>;
+
+  const [renaming, setRenaming] = useState<{
+    readonly name: DockIdentity;
+    readonly subject: string;
+  } | null>(null);
+  const [renamedUnder, setRenamedUnder] = useState(chrome.replacementEpoch);
+  if (renamedUnder !== chrome.replacementEpoch) {
+    setRenamedUnder(chrome.replacementEpoch);
+    if (renaming !== null) setRenaming(null);
+  } else if (renaming !== null && identities[renaming.name].subject !== renaming.subject) {
+    setRenaming(null);
+  }
+
+  const live = renaming !== null && identities[renaming.name].renameable;
+  const { onRenamingChange } = chrome;
+  useEffect(() => {
+    if (!live) return undefined;
+    onRenamingChange(true);
+    return () => onRenamingChange(false);
+  }, [live, onRenamingChange]);
+
+  return {
+    renaming: renaming?.name ?? null,
+    onRenaming: (identity) => {
+      setRenaming(
+        identity === null ? null : { name: identity, subject: identities[identity].subject },
+      );
+    },
+  };
+}
 
 /**
  * One disclosure's share of the Dock's single open slot.
@@ -1601,7 +1667,13 @@ function ParentSpace({
               // identically, `ToolbarButton` being this same `Button`.
               render={
                 <ToolbarButton
-                  variant="ghost"
+                  // **The step back is a shared variant and not a rule here.**
+                  // The parent recedes below the bar's own tone so the two rows
+                  // read as a place and the volume it sits inside, and that is
+                  // a Button's ink: declared over this class, it made an
+                  // application stylesheet a second owner of the shared
+                  // recipe's appearance, and won only by being loaded later.
+                  variant="receded"
                   size="compact"
                   className="command-dock__crumb nokey"
                   aria-label={`Go to ${parent.title}`}
@@ -1693,7 +1765,7 @@ function ParentSpace({
                   {space.openSpaces.map((row) => {
                     const report = unwellReport(row.persistence);
                     return (
-                      <DropdownMenuRadioItem key={row.spaceId} value={row.spaceId} closeOnClick>
+                      <SpaceItem key={row.spaceId} value={row.spaceId} closeOnClick>
                         {/* The indent is **drawn**, and there is no glyph.
                           Six Space glyphs down the left edge of a six-row menu
                           said "a Space" once and nothing the other five times,
@@ -1738,7 +1810,7 @@ function ParentSpace({
                             <span className="sr-only">{report}</span>
                           </span>
                         )}
-                      </DropdownMenuRadioItem>
+                      </SpaceItem>
                     );
                   })}
                 </DropdownMenuRadioGroup>
@@ -1821,7 +1893,6 @@ function SpacesControl({
           icon={<CardKindIcon kind="space" />}
           kind="Space"
           testId="space-title"
-          subject={space.currentSpaceId}
           title={space.title}
           onRename={space.onRename}
         />
@@ -1964,6 +2035,17 @@ const dockStyle = ({ edge, along }: DockPosition): CSSProperties => {
 const DRAG_THRESHOLD = 4;
 
 interface DragState {
+  /**
+   * The pointer that took hold, and the only one this gesture answers.
+   *
+   * A captured pointer does not make the others go away: `pointermove` and
+   * `pointerup` arrive for every pointer over the element, and a handler that
+   * reads whichever one fired last is a drag any second finger can take over
+   * mid-press. Retained here rather than in a ref beside the gesture because it
+   * *is* part of the gesture — there is no moment when one exists without the
+   * other.
+   */
+  readonly pointerId: number;
   /** Surface position in container coordinates while the pointer holds it. */
   readonly x: number;
   readonly y: number;
@@ -2128,6 +2210,17 @@ function Dock({
   };
 
   /**
+   * Whether this event belongs to the gesture in flight.
+   *
+   * The three handlers below all ask the same question and none of them may
+   * skip it: pointer capture routes the *captured* pointer's events here, and
+   * routes nothing away — a second pointer over the grip still reaches every
+   * one of them.
+   */
+  const holds = (event: ReactPointerEvent<HTMLElement>): boolean =>
+    gesture.current?.pointerId === event.pointerId;
+
+  /**
    * A cancel ends the gesture with no `click` behind it — pointer capture lost,
    * or the browser claiming the gesture for itself — so nothing is coming to
    * spend what the press recorded. Left set, it is the *next* genuine press
@@ -2140,12 +2233,31 @@ function Dock({
    * did, so a completed drag opened the menu over the slot it had just landed
    * in, and a press on an open list closed it and reopened it in one gesture.
    */
-  const cancel = () => {
+  const cancel = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!holds(event)) return;
     track(null);
     pressSpent.current = false;
   };
 
+  /**
+   * **The grip owns the semantics a `Menu.Trigger` would have brought, and
+   * which press it answers is one of them.**
+   *
+   * A `pointerdown` fires for every button of every pointer, so with nothing
+   * asked the right button took hold of the dock, a right-button drag moved it,
+   * and the release docked the whole command surface in whatever slot the
+   * pointer had reached — a context-menu request answered by rearranging the
+   * chrome. Nothing in the Dock is performed by a secondary button, and a
+   * non-primary pointer is a second finger while another one is already doing
+   * something else.
+   *
+   * The third guard is the gesture already in flight. A press cannot begin one
+   * over another: with the initiating pointer retained, a second `pointerdown`
+   * that overwrote it would hand the drag to a pointer that never took hold and
+   * strand the capture of the one that did.
+   */
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !event.isPrimary || gesture.current !== null) return;
     const measured = bounds();
     if (measured === null) return;
     // Read before the dismissal runs: an open list makes this press the one
@@ -2153,6 +2265,7 @@ function Dock({
     pressSpent.current = slotsOpen;
     event.currentTarget.setPointerCapture(event.pointerId);
     track({
+      pointerId: event.pointerId,
       x: measured.docked.left - measured.container.left,
       y: measured.docked.top - measured.container.top,
       offsetX: event.clientX - measured.docked.left,
@@ -2166,7 +2279,7 @@ function Dock({
 
   const onPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
     const held = gesture.current;
-    if (held === null) return;
+    if (held === null || !holds(event)) return;
     const measured = bounds();
     if (measured === null) return;
     // Below the threshold the press is still a click: the dock does not leave
@@ -2199,7 +2312,7 @@ function Dock({
 
   const onPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
     const held = gesture.current;
-    if (held === null) return;
+    if (held === null || !holds(event)) return;
     event.currentTarget.releasePointerCapture(event.pointerId);
     // **The release spends the hint, and does not measure again.** The preview
     // is `nearestSlot` of the box the pointer put the dock in; re-measuring the
@@ -2439,6 +2552,7 @@ export function CommandDock({
 }) {
   const [dock, setDock] = useState<DockPosition>({ edge: initialEdge, along: 'center' });
   const [openId, setOpenId] = useState<string | null>(null);
+  const renaming = useDockRenaming(chrome);
   const vertical = orientationOf(dock.edge) === 'vertical';
   // A rule divides across the dock's own axis, so it runs the other way.
   const divider = vertical ? 'horizontal' : 'vertical';
@@ -2446,17 +2560,16 @@ export function CommandDock({
 
   return (
     <DockDisclosureContext.Provider value={{ openId, setOpenId }}>
-      <DockReplacementContext.Provider value={chrome.replacementEpoch}>
-        <DockRenamingContext.Provider value={chrome.onRenamingChange}>
-          <Dock
-            dock={dock}
-            onDock={setDock}
-            container={container}
-            presenting={chrome.graph.presenting}
-            label="Command Dock"
-            report={<PersistenceReport persistence={chrome.persistence} edge={dock.edge} />}
-          >
-            {/* Space | Layout Graph | Cards.
+      <DockRenamingContext.Provider value={renaming}>
+        <Dock
+          dock={dock}
+          onDock={setDock}
+          container={container}
+          presenting={chrome.graph.presenting}
+          label="Command Dock"
+          report={<PersistenceReport persistence={chrome.persistence} edge={dock.edge} />}
+        >
+          {/* Space | Layout Graph | Cards.
             The three selections first, then the inventory. Which Space, which
             Layout and which Graph are one question asked three times — each names
             the current one, discloses the set, and promotes at most one verb — and
@@ -2471,25 +2584,24 @@ export function CommandDock({
             it names a set rather than a selection, so it has no name to edit and
             nothing to promote but Create. Between Layout and Space it looked like
             a fourth selection that had lost its name. */}
-            {/* One open-id under the whole row, spent by every disclosure through
+          {/* One open-id under the whole row, spent by every disclosure through
             `useDockDisclosure` — that, and not a convention each control keeps,
             is what makes at most one open. The hook says why the `Menubar` this
             obviously wants cannot be used inside Toolbars. */}
-            <SpacesControl space={chrome.space} side={side} vertical={vertical} />
-            <Divider orientation={divider} />
-            <LayoutControls canvas={chrome.canvas} side={side} />
-            <Divider orientation={divider} />
-            <GraphControls
-              graph={chrome.graph}
-              layoutTitle={chrome.canvas.selected.title}
-              side={side}
-              vertical={vertical}
-            />
-            <Divider orientation={divider} />
-            <CardsControl cards={chrome.cards} side={side} />
-          </Dock>
-        </DockRenamingContext.Provider>
-      </DockReplacementContext.Provider>
+          <SpacesControl space={chrome.space} side={side} vertical={vertical} />
+          <Divider orientation={divider} />
+          <LayoutControls canvas={chrome.canvas} side={side} />
+          <Divider orientation={divider} />
+          <GraphControls
+            graph={chrome.graph}
+            layoutTitle={chrome.canvas.selected.title}
+            side={side}
+            vertical={vertical}
+          />
+          <Divider orientation={divider} />
+          <CardsControl cards={chrome.cards} side={side} />
+        </Dock>
+      </DockRenamingContext.Provider>
     </DockDisclosureContext.Provider>
   );
 }
