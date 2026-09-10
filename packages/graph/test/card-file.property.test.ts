@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { stringify as stringifyYaml } from 'yaml';
-import { uuidSchema, type CardFrontmatter } from '@project/core';
+import { normalizeTitle, uuidSchema, type CardFrontmatter } from '@project/core';
 import { parseCardFile } from '../src/index';
 
 /**
@@ -13,11 +13,14 @@ function writeCardFile(frontmatter: CardFrontmatter, body: string): string {
   return `---\n${stringifyYaml(frontmatter)}---\n\n${body}`;
 }
 
-// Single-line and non-empty, matching what the schema accepts. Newlines are
-// excluded because a multi-line title is a YAML question, not a fence question.
+// A Title as a stored Card carries it: non-empty, and already normalized, so a
+// generated trailing space is not read as a fence fault when intake trims it
+// (ADR 0083). Newlines are excluded because a multi-line Title is a YAML
+// question, not a fence question.
 const lineArb = fc
   .string({ minLength: 1, maxLength: 40 })
-  .filter((s) => s.trim().length > 0 && !s.includes('\n'));
+  .map(normalizeTitle)
+  .filter((s) => s.length > 0 && !s.includes('\n'));
 
 const markdownFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record(
   {
