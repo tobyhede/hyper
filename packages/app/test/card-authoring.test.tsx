@@ -242,6 +242,16 @@ describe('authoring a Card title on the graph', () => {
     await screen.findByTestId('selected-canvas');
     await waitFor(() => expect(unavailable(newLayoutItem('Layout'))).toBe(false));
 
+    // **The disclosure `newLayoutItem` opened is dismissed before the canvas is
+    // pressed.** One open id under the whole row means a press landing while a
+    // menu is open is an *outside* press, which Base UI spends on dismissing —
+    // so the press below would reach the Card only by whatever jsdom happens to
+    // do with the event, and the same shape has already produced one flake in
+    // the browser suite. Every helper in `command-dock.ts` opens with this line
+    // for the same reason.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+
     fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
     const input = screen.getByRole('textbox', { name: 'Card title' });
     fireEvent.change(input, { target: { value: '   ' } });

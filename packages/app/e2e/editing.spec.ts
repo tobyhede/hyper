@@ -1601,12 +1601,22 @@ test(
     await presentControl(page).click();
     await expect(page.getByTestId('exit-presenting')).toBeVisible();
 
-    // **Withdrawn by the surface going, not by the toggle greying out.**
-    // Presenting removes the whole Command Dock (ADR 0082), so the trigger is
-    // gone with it — and the drawer it controls is closed rather than left
-    // hidden behind a still-true `open`, which is the half of the claim that
-    // outlived the Sidebar.
-    await expect(dock(page)).toBeHidden();
+    // **Withdrawn by the surface being hidden, not by the toggle greying out.**
+    // Presenting hides the Dock's commands (ADR 0082) — it does not remove the
+    // Dock, which stays mounted at `data-presenting='true'` so the persistence
+    // report keeps its slot (`command-dock.css:86-91`). `visibility: hidden`
+    // takes the toolbar out of the accessibility tree, so `toggle` is scoped
+    // inside a locator matching nothing and its `toHaveCount(0)` would be
+    // satisfied by a Dock that had never rendered at all. The trigger is
+    // therefore addressed through the frame, which is still there, and the
+    // drawer it controls is closed rather than left hidden behind a still-true
+    // `open` — the half of the claim that outlived the Sidebar.
+    const surface = page.locator('.command-dock__surface');
+    await expect(surface).toBeAttached();
+    await expect(surface).toBeHidden();
+    await expect(
+      page.getByTestId('command-dock').locator('.command-dock__cards-trigger'),
+    ).toHaveCount(1);
     await expect(toggle).toHaveCount(0);
     await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
   },

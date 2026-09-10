@@ -3,6 +3,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUuid } from '@project/core';
 import { Default, SaveFailedElsewhere } from '../stories/space/command-dock.stories';
 import { CommandDockFixture, useCommandDockChrome } from '../stories/support/CommandDockFixture';
+// The shared reading of "unavailable": ADR 0073 keeps a toolbar item focusable
+// while it is withdrawn, so `aria-disabled` is the attribute and `toBeDisabled`
+// would call every one of them available.
+import { unavailable } from './command-dock';
 
 /**
  * What the Command Dock owes an author, held over the prototype that draws it.
@@ -482,3 +486,64 @@ function TwoSpacesWithAnUnwellParent() {
     />
   );
 }
+
+/**
+ * **The last Layout and the last Graph cannot be deleted from a story either.**
+ *
+ * The fixture passes `deleteDisabled: false` and `editsDisabled: false`, which
+ * reads at a glance like a story being allowed to empty a Space the application
+ * would refuse — and emptying it would reach `loadSpaceSnapshot`'s refusal or
+ * the fixture's own `has no Layout to draw` throw.
+ *
+ * It cannot, and the reason is that neither flag is the floor. Both rows read
+ * `<flag> || <collection>.length <= 1`, and each flag's doc says so in as many
+ * words: `deleteDisabled` is "beyond the rule the row already knows", and
+ * `editsDisabled` notes that "Delete carries the ADR 0079 rule on top of this
+ * one, read off `graphs` here". The fixture is saying *no additional reason to
+ * withhold*, not *no floor* — so pushing the floor into the fixture as well
+ * would be the same rule in two places, which is the arrangement that lets two
+ * copies disagree later.
+ *
+ * Written as a test rather than as a comment on the fixture, because the next
+ * reader will have the same doubt and a comment there would only assert the
+ * answer.
+ */
+describe('the last Layout and Graph', () => {
+  /** Whichever the cluster is showing now, which each deletion changes. */
+  const showing = (kind: 'Layout' | 'Active Graph'): string => {
+    const name = within(dock())
+      .getByRole('button', { name: new RegExp(`^${kind}: `) })
+      .getAttribute('aria-label');
+    if (name === null) throw new Error(`The ${kind} cluster has no accessible name`);
+    return name.slice(`${kind}: `.length);
+  };
+
+  const deleteItem = (kind: 'Layout' | 'Active Graph'): HTMLElement => {
+    if (screen.queryByRole('menu') !== null) fireEvent.keyDown(document.body, { key: 'Escape' });
+    const title = showing(kind);
+    fireEvent.click(within(dock()).getByRole('button', { name: `${kind}: ${title}` }));
+    return screen.getByRole('menuitem', { name: `Delete ${title}` });
+  };
+
+  it('withhold Delete from a story, which cannot empty the Space', () => {
+    render(<Default />);
+
+    for (const kind of ['Layout', 'Active Graph'] as const) {
+      // Down to one, however many the fixture starts with. The loop is bounded
+      // by the collection rather than by a count this test would have to keep
+      // in step with the fixture.
+      for (let guard = 0; guard < 10; guard += 1) {
+        const item = deleteItem(kind);
+        if (unavailable(item)) break;
+        fireEvent.click(item);
+      }
+      expect(unavailable(deleteItem(kind))).toBe(true);
+    }
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    // Still drawing: neither `loadSpaceSnapshot`'s refusal nor the fixture's own
+    // guard was reached, which is what an emptied Space would have done.
+    expect(within(dock()).getByRole('button', { name: /^Layout: / })).toBeInTheDocument();
+    expect(within(dock()).getByRole('button', { name: /^Active Graph: / })).toBeInTheDocument();
+  });
+});

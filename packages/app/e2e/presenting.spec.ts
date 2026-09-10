@@ -157,8 +157,16 @@ test(
     // anything from. What the audience is left with is the canvas and
     // `PresentingChrome`, which carries the way out.
     await expect(page.getByTestId('command-dock')).toHaveAttribute('data-presenting', 'true');
-    await expect(dock(page)).toBeHidden();
-    await expect(page.getByRole('toolbar', { name: 'Command Dock' })).toBeHidden();
+    // **Hidden and still there**, which a role query cannot tell apart from
+    // gone: `visibility: hidden` takes the toolbar out of the accessibility
+    // tree, so `dock(page)` matches nothing and `toBeHidden()` is satisfied by
+    // the absence rather than by the state. The frame is deliberately retained
+    // to anchor the persistence report to the same slot
+    // (`command-dock.css:86-91`), so the obligation is that the surface is
+    // *attached* and not visible — and a CSS locator is what can still see it.
+    const surface = page.locator('.command-dock__surface');
+    await expect(surface).toBeAttached();
+    await expect(surface).toBeHidden();
     await expect(page.getByTestId('selected-canvas')).toBeHidden();
     await expect(page.getByTestId('exit-presenting')).toBeVisible();
 

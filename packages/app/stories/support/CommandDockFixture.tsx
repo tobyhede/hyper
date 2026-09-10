@@ -475,11 +475,28 @@ export function useCommandDockChrome(
         document.body.dataset['copyCommand'] = 'layout';
       },
       onDelete: (deleted) => {
-        setSnapshot((current) =>
-          editDocument(current, (layouts) =>
+        setSnapshot((current) => {
+          const next = editDocument(current, (layouts) =>
             layouts.filter((candidate) => candidate.id !== deleted),
-          ),
-        );
+          );
+          // **The opening selection moves with the deletion, or the document
+          // stops loading.** `editDocument` rewrites the Layouts and nothing
+          // else, so deleting the one `defaultLayout` names leaves that field
+          // pointing at a Layout the document no longer declares —
+          // `loadSpaceSnapshot` refuses it, and the refusal arrives as this
+          // file's own throw rather than as anything a story can draw. The row
+          // is not what stops this: `layouts.length <= 1` withholds Delete on
+          // the *last* Layout, and the default is rarely the last one.
+          // ADR 0079's real Edit moves the opening selection for this reason,
+          // and the first survivor is the same answer the render's own fallback
+          // gives.
+          // Optional because `layouts` is optional on the stored shape.
+          // `dock-model.ts` keeps its own `storedLayouts` private, and widening
+          // that module's surface for a fixture is not worth the one read.
+          const surviving = next.document.layouts?.[0];
+          if (next.document.defaultLayout !== deleted || surviving === undefined) return next;
+          return { ...next, document: { ...next.document, defaultLayout: surviving.id } };
+        });
         // **`null` and not `''`.** Deleting the Layout the entry selects leaves
         // it selecting nothing until the render's fallback picks the first, and
         // an empty string was a stand-in for that with no type to say so — the
