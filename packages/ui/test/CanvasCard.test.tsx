@@ -625,6 +625,11 @@ describe('CanvasCard Title ladder', () => {
    * first line: the editor it opens edits the whole string, and a control over
    * the name alone would say otherwise. One control, and the ladder inside it,
    * which is also what puts the hover and focus treatment across the ladder.
+   *
+   * Its **accessible name** is the Card's name all the same (ADR 0083): what
+   * the control covers and what it is called are different questions, and a
+   * screen reader announcing three lines as one control's name is worse than
+   * announcing the name and leaving the rest to be read.
    */
   it('puts the whole ladder inside the one Title control', () => {
     render(
@@ -637,14 +642,73 @@ describe('CanvasCard Title ladder', () => {
       />,
     );
 
-    const control = screen.getByRole('button', {
-      name: 'Edit Title Strategies\nNo strategy is privileged\nADR 0014',
-    });
+    const control = screen.getByRole('button', { name: 'Edit Title Strategies' });
     const lines = control.querySelectorAll('.canvas-card__title-line');
     expect(lines).toHaveLength(3);
     expect(screen.getByRole('heading').querySelectorAll('.canvas-card__title-line')).toHaveLength(
       3,
     );
+  });
+
+  /**
+   * Every **control** on the Card is named by the Card's name (ADR 0083), and
+   * the heading is named by the Title Lines it draws.
+   *
+   * Read as one render rather than a case apiece, because the claim is about
+   * the set: the Card, its rail, each command on it and the heading are the
+   * whole of what a Title names here, and a label added later that reached for
+   * the whole Title would leave every other one saying something different
+   * about the same Card. A screen reader hearing three lines as one control's
+   * name is worse than hearing the name and reading the rest.
+   */
+  it('names the Card and its every control by the Card’s name', () => {
+    const title = 'Strategies\nNo strategy is privileged\nADR 0014';
+    const card = (open: boolean) => (
+      <CanvasCard
+        front={{
+          kind: 'markdown',
+          source: 'Markdown',
+          open,
+          onOpenChange: () => 'completed' as const,
+          onBeginEdit: () => undefined,
+        }}
+        state="rest"
+        title={title}
+        graphColor="#ffc53d"
+        onBeginTitleEdit={() => undefined}
+        entityActions={[[{ id: 'copy-link', label: 'Copy link', onSelect: () => 'done' as const }]]}
+      />
+    );
+
+    const { unmount } = render(card(false));
+    for (const name of [
+      'Card Strategies',
+      'Edit Card Strategies',
+      'Open Card Strategies',
+      'Actions for Card Strategies',
+      'Edit Title Strategies',
+    ]) {
+      expect(screen.getAllByLabelText(name), name).not.toHaveLength(0);
+    }
+
+    // The heading carries no label of its own, so it is named by the Title
+    // Lines it draws and a reader reaches every one of them. The name a browser
+    // computes from them is asserted in `ladle-e2e/card.spec.ts`: jsdom and
+    // Chromium join the rungs differently, and only one of them is the truth.
+    expect(screen.getByRole('heading')).not.toHaveAttribute('aria-label');
+    expect(screen.getByRole('heading').textContent).toBe(
+      'StrategiesNo strategy is privilegedADR 0014',
+    );
+    // And no control took the whole Title on the way to that.
+    expect(screen.queryByLabelText(/No strategy is privileged/u)).toBeNull();
+    unmount();
+
+    // Opening reveals two more names and changes a third; none of them grows a
+    // Title Line either.
+    render(card(true));
+    for (const name of ['Close Card Strategies', 'Edit Markdown source of Strategies']) {
+      expect(screen.getAllByLabelText(name), name).not.toHaveLength(0);
+    }
   });
 });
 

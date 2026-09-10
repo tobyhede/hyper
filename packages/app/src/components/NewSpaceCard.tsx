@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { uuidSchema, type UUID } from '@project/core';
+import { normalizeTitle, uuidSchema, type UUID } from '@project/core';
 import {
   Button,
   Field,
@@ -120,7 +120,27 @@ export function NewSpaceCard({
   const titleError = refusal?.fields.title ?? null;
   const targetError = refusal?.fields.target ?? null;
   const formError = refusal?.form ?? null;
-  const named = title.trim().length > 0;
+  /**
+   * The Title as it will be stored, which is also what says whether the Card
+   * has been named.
+   *
+   * `normalizeTitle` and not `trim()`, because the two disagree and the Card's
+   * rename path already follows the schema: a whole-string trim strips the
+   * leading whitespace ADR 0083 says is the first line's own, so the same typed
+   * bytes gave one Title through this pane and another through a rename — and
+   * that rename reported itself as an Edit rather than as changing nothing.
+   * There is no schema between this and the stored Card: the coordinated
+   * lifecycle writes the string it is handed, so the rule has to be the same
+   * one here.
+   *
+   * One value seeds two entities, as the whole pane does, and the second — the
+   * new Space's own single-line title — takes the Card's answer rather than a
+   * rule of its own. It is the same string an author typed into one field, and
+   * a pane that normalized it twice would be asserting the two were separate
+   * decisions, which the field's existence says they are not.
+   */
+  const stored = normalizeTitle(title);
+  const named = stored.length > 0;
   const spaces = targets.kind === 'read' ? targets.spaces : [];
   // A read list and nothing else. An empty one is an answer — this is the only
   // Space stored — and the two states that are not answers withhold the
@@ -133,14 +153,14 @@ export function NewSpaceCard({
     // the rule and the button is only how it is shown.
     if (!named || busy || !choosable) return;
     if (target === NEW_SPACE) {
-      onCreate(null, title.trim());
+      onCreate(null, stored);
       return;
     }
     // Parsed rather than asserted: the value came back out of a `Select`, whose
     // vocabulary is strings, and this is the boundary that turns one back into
     // an identity (ADR 0062).
     const parsed = uuidSchema.safeParse(target);
-    if (parsed.success) onCreate(parsed.data, title.trim());
+    if (parsed.success) onCreate(parsed.data, stored);
   };
 
   return (

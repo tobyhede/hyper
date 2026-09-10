@@ -183,6 +183,26 @@ describe('spaceEntityActions', () => {
   });
 
   /**
+   * A menu row refers to a Card, so its sentence names the Card's **name**
+   * (ADR 0083). The description is one line of prose beneath a label, and a
+   * Title's later lines reaching it would break the sentence in half.
+   */
+  it('describes a Card’s addresses by the Card’s name', () => {
+    const entity: SpaceEntity = {
+      kind: 'card',
+      card: card(PLACED_CARD_ID, 'Auth\nHow a session begins'),
+      layout: LAYOUT,
+    };
+
+    const written = commands(build()(entity))
+      .map((action) => action.description ?? '')
+      .join(' ');
+
+    expect(written).toContain('Opens Auth inside');
+    expect(written).not.toContain('How a session begins');
+  });
+
+  /**
    * A Card the Cards drawer reveals but this Layout does not place has one
    * address, so there is nothing for a second to differ from. Offering it
    * anyway would copy a `layout-card` path the host answers 404 for.

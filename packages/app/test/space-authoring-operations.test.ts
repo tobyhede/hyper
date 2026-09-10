@@ -277,23 +277,28 @@ describe('Edit Card', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('stores a trimmed title, and reads one that only gained padding as unchanged', () => {
+  it('normalizes a Title as the schema does, and reads one that only gained padding as unchanged', () => {
     const { authoring, session } = openPositioned();
 
+    // The interior line's trailing whitespace is the case that tells the two
+    // rules apart: a whole-string trim leaves it, and the schema does not, so
+    // the write path taking the trim would store a Title intake would not mint.
     expect(
       authoring.complete({
         kind: 'edited-card',
         cardId: CARD_A,
-        document: { title: '  Renamed  ', kind: 'markdown', body: 'A' },
+        document: { title: 'Renamed  \nA subtitle   ', kind: 'markdown', body: 'A' },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(session.getState().working.cards[0]?.document.title).toBe('Renamed');
+    expect(session.getState().working.cards[0]?.document.title).toBe('Renamed\nA subtitle');
 
+    // "Renaming a Title to the same Title plus a trailing newline is therefore
+    // unchanged rather than an Edit" (ADR 0083).
     expect(
       authoring.complete({
         kind: 'edited-card',
         cardId: CARD_A,
-        document: { title: 'Renamed ', kind: 'markdown', body: 'A' },
+        document: { title: 'Renamed\nA subtitle\n', kind: 'markdown', body: 'A' },
       }),
     ).toEqual({ kind: 'unchanged' });
   });
@@ -396,18 +401,27 @@ describe('Add Alias', () => {
     expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[MINTED]).toEqual(CENTRE);
   });
 
-  it('keeps a title the author already entered', () => {
+  /**
+   * Normalized as the schema normalizes it, not trimmed as a whole string.
+   *
+   * A Title is Title Lines, so a first line's leading whitespace is that line's
+   * own and an interior line's trailing whitespace is out of a whole-string
+   * trim's reach (ADR 0083). Creation and renaming write the same field, so the
+   * same author bytes have to reach the same stored document whichever path
+   * wrote them — the rename path already asks `normalizeTitle`.
+   */
+  it('keeps a title the author already entered, normalized the way a rename is', () => {
     const { authoring, session } = openPositioned();
 
     authoring.complete({
       kind: 'created-alias',
       target: CARD_A,
-      title: '  Recap  ',
+      title: '  Recap  \n  the week  ',
       anchor: CENTRE,
     });
 
     expect(session.getState().working.cards[2]?.document).toEqual({
-      title: 'Recap',
+      title: '  Recap\n  the week',
       kind: 'alias',
       target: CARD_A,
     });

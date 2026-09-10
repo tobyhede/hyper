@@ -1,4 +1,4 @@
-import type { Graph, SpaceSnapshot } from '@project/core';
+import { titleName, type Graph, type SpaceSnapshot } from '@project/core';
 
 /**
  * The neutral titles the app mints for structure the author did not name.
@@ -35,11 +35,18 @@ function nextNumberedTitle(prefix: string, titles: Iterable<string>): string {
   return `${prefix} ${highest + 1n}`;
 }
 
-/** What an Edit calls the Card it creates. */
+/**
+ * What an Edit calls the Card it creates.
+ *
+ * The scan reads **first lines** (ADR 0083). A Card whose Title opens `Card 3`
+ * and continues onto further Title Lines is still the Card called `Card 3`, so
+ * it occupies 3 and the next Edit mints 4 — otherwise adding a subtitle to a
+ * minted Card would silently free its number for a duplicate.
+ */
 export const nextCardTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
     'Card',
-    snapshot.cards.map((card) => card.document.title),
+    snapshot.cards.map((card) => titleName(card.document.title)),
   );
 
 /** What an Edit calls the next Layout it creates. */

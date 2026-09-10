@@ -1,4 +1,4 @@
-import type { CardId, GraphId, LayoutId } from '@project/core';
+import { titleName, type CardId, type GraphId, type LayoutId } from '@project/core';
 import {
   graphCardIds,
   outgoingEdges,
@@ -501,7 +501,11 @@ export function createNavigation(
       return outgoingEdgesFrom(space, state.activeGraphId, currentCard(state.traversalHistory)).map(
         (edge, index) => ({
           cardId: edge.to,
-          title: space.lookup.card(edge.to)?.title ?? edge.to,
+          // The Card's name and never its whole Title: a move is a row in
+          // the presenting chrome and a control's accessible name, and a
+          // newline reaching either draws as a broken-looking label rather
+          // than as an error (ADR 0083).
+          title: titleName(space.lookup.card(edge.to)?.title ?? edge.to),
           selected: index === state.branchIndex,
         }),
       );

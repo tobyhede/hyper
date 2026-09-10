@@ -1,4 +1,12 @@
-import type { Card, Graph, GraphId, Layout, LayoutId, UUID } from '@project/core';
+import {
+  titleName,
+  type Card,
+  type Graph,
+  type GraphId,
+  type Layout,
+  type LayoutId,
+  type UUID,
+} from '@project/core';
 import type { ProductDestination } from '@project/http';
 import {
   CopyIcon,
@@ -276,6 +284,8 @@ export function spaceEntityActions({
     }
 
     const { card, layout } = entity;
+    // A menu row names the Card, so it says the Card's name (ADR 0083).
+    const cardName = titleName(card.title);
     const permanent: ProductDestination = { kind: 'card', spaceId, cardId: card.id };
     // A Layout's members *are* its position keys (ADR 0040). A Card the Cards
     // drawer reveals but this Layout does not place has no within-Layout
@@ -292,14 +302,14 @@ export function spaceEntityActions({
             copy(
               COPY_LINK_ACTION_ID,
               COPY_LINK,
-              `Opens ${card.title} inside ${layout.title}, selected the way it is now`,
+              `Opens ${cardName} inside ${layout.title}, selected the way it is now`,
               { kind: 'layout-card', spaceId, layoutId: layout.id, cardId: card.id },
               onCopy,
             ),
             copy(
               COPY_PERMANENT_LINK_ACTION_ID,
               COPY_PERMANENT_LINK,
-              `Always opens ${card.title} on its own, wherever it is placed`,
+              `Always opens ${cardName} on its own, wherever it is placed`,
               permanent,
               onCopy,
             ),
@@ -308,7 +318,7 @@ export function spaceEntityActions({
             copy(
               COPY_LINK_ACTION_ID,
               COPY_LINK,
-              `Opens ${card.title} on its own — ${layout.title} does not place it`,
+              `Opens ${cardName} on its own — ${layout.title} does not place it`,
               permanent,
               onCopy,
             ),

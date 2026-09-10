@@ -258,6 +258,19 @@ function useComboboxAnchor() {
   return React.useRef<HTMLDivElement | null>(null);
 }
 
+/**
+ * The primitive's own matcher, for a list whose rows are searched by something
+ * other than the string they display.
+ *
+ * `Combobox.Root` filters with this by default, reading each item through
+ * `itemToStringLabel` — so a caller that wants the two to differ has to hand it
+ * a `filter`, and the point of re-exporting the hook is that the replacement is
+ * still the primitive's matching and not a hand-rolled `includes`. Its
+ * `Intl.Collator` comparison is case- and accent-insensitive and ignores
+ * punctuation, which is the behaviour every other list here already has.
+ */
+const useComboboxFilter = ComboboxPrimitive.useFilter;
+
 export {
   Combobox,
   ComboboxInput,
@@ -275,4 +288,5 @@ export {
   ComboboxTrigger,
   ComboboxValue,
   useComboboxAnchor,
+  useComboboxFilter,
 };
