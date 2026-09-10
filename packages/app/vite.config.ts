@@ -17,7 +17,14 @@ export default defineConfig(({ mode }) => {
               catalog: 'directory' as const,
               directory: repositoryFile('../../.scratch/v1-release/roadmap-space'),
             }
-          : undefined;
+          : mode === 'spaces'
+            ? {
+                // A batch, not one directory: the overview's Space Cards only
+                // resolve if their targets are in the same catalog.
+                catalog: 'batch' as const,
+                directory: repositoryFile('../../.scratch/spaces'),
+              }
+            : undefined;
   const developmentModule =
     memoryCatalog === undefined
       ? repositoryFile('../../src/http/postgres-http-runtime.ts')
