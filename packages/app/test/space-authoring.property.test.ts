@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { expect, it } from 'vitest';
 
 import {
+  normalizeTitle,
   uuidSchema,
   type Card,
   type Graph,
@@ -165,9 +166,12 @@ it('keeps an existing Alias Target immutable while accepting Title edits', () =>
       fc.constantFrom(CARD_A, CARD_B),
       fc.oneof(
         fc.constant('Alias'),
+        // Normalized, not trimmed: the write path stores what the schema would
+        // mint, and the two disagree about a line's leading whitespace and
+        // about trailing whitespace on any line but the last (ADR 0083).
         fc
           .string({ minLength: 1, maxLength: 8 })
-          .filter((title) => title.trim().length > 0 && title.trim() !== 'Alias'),
+          .filter((title) => normalizeTitle(title).length > 0 && normalizeTitle(title) !== 'Alias'),
       ),
       (target, proposedTitle) => {
         const alternativeTarget = target === CARD_A ? CARD_B : CARD_A;
@@ -199,10 +203,12 @@ it('keeps an existing Alias Target immutable while accepting Title edits', () =>
             cardId: CARD_C,
             document: { title: proposedTitle, kind: 'alias', target },
           }),
-        ).toEqual(proposedTitle === 'Alias' ? { kind: 'unchanged' } : { kind: 'completed' });
+        ).toEqual(
+          normalizeTitle(proposedTitle) === 'Alias' ? { kind: 'unchanged' } : { kind: 'completed' },
+        );
         expect(session.getState().working.cards).toContainEqual({
           id: CARD_C,
-          document: { title: proposedTitle.trim(), kind: 'alias', target },
+          document: { title: normalizeTitle(proposedTitle), kind: 'alias', target },
         });
 
         const beforeRetarget = session.getState().working;

@@ -277,23 +277,28 @@ describe('Edit Card', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('stores a trimmed title, and reads one that only gained padding as unchanged', () => {
+  it('normalizes a Title as the schema does, and reads one that only gained padding as unchanged', () => {
     const { authoring, session } = openPositioned();
 
+    // The interior line's trailing whitespace is the case that tells the two
+    // rules apart: a whole-string trim leaves it, and the schema does not, so
+    // the write path taking the trim would store a Title intake would not mint.
     expect(
       authoring.complete({
         kind: 'edited-card',
         cardId: CARD_A,
-        document: { title: '  Renamed  ', kind: 'markdown', body: 'A' },
+        document: { title: 'Renamed  \nA subtitle   ', kind: 'markdown', body: 'A' },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(session.getState().working.cards[0]?.document.title).toBe('Renamed');
+    expect(session.getState().working.cards[0]?.document.title).toBe('Renamed\nA subtitle');
 
+    // "Renaming a Title to the same Title plus a trailing newline is therefore
+    // unchanged rather than an Edit" (ADR 0083).
     expect(
       authoring.complete({
         kind: 'edited-card',
         cardId: CARD_A,
-        document: { title: 'Renamed ', kind: 'markdown', body: 'A' },
+        document: { title: 'Renamed\nA subtitle\n', kind: 'markdown', body: 'A' },
       }),
     ).toEqual({ kind: 'unchanged' });
   });

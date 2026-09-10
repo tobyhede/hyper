@@ -9,6 +9,8 @@ import {
   type GraphId,
   type LayoutId,
   type LayoutPosition,
+  CARD_TITLE_REQUIRED,
+  normalizeTitle,
   type SpaceSnapshot,
   titleName,
   type UUID,
@@ -236,7 +238,9 @@ export type AuthoringRefusal =
   | { readonly code: 'alias-target-immutable' }
   | { readonly code: 'space-card-target-immutable' }
   | { readonly code: 'space-card-deletion-unsupported' }
-  | { readonly code: 'card-title-required' }
+  // The one code here the domain owns rather than this module: `@project/core`
+  // raises it from the Card schema, so both ends spell it from one constant.
+  | { readonly code: typeof CARD_TITLE_REQUIRED }
   | { readonly code: 'layout-title-required' }
   | { readonly code: 'space-must-keep-layout' }
   | { readonly code: 'alias-target-not-found'; readonly targetId: CardId }
@@ -596,10 +600,33 @@ interface CreatedCard {
 const incomingAliases = (cards: SnapshotCards, cardId: CardId): SnapshotCards =>
   cards.filter((card) => card.document.kind === 'alias' && card.document.target === cardId);
 
-/** A title normalized for authorship, or `null` when it contains no name. */
+/**
+ * A single-line title normalized for authorship, or `null` when it has no name.
+ *
+ * Layouts and Graphs only. Their titles are single-line by ADR 0083, so the
+ * whole string is one line and trimming it is the whole rule. A Card's Title is
+ * Title Lines and normalizes by a rule of its own — {@link namedCardTitle}.
+ */
 const trimmedNonBlankTitle = (title: string): string | null => {
   const trimmed = title.trim();
   return trimmed.length === 0 ? null : trimmed;
+};
+
+/**
+ * A Card Title normalized as the schema normalizes it, or `null` when it
+ * carries no name.
+ *
+ * `normalizeTitle` and not `trim()`, because on a Title of more than one line
+ * the two give different answers: a whole-string trim cannot reach the trailing
+ * whitespace on an interior line, and it strips a first line's leading
+ * whitespace, which ADR 0083 says is that line's own. A write path that
+ * disagreed with the parse boundary would store a Card whose Title differs from
+ * the one intake mints from the same bytes — derived state disagreeing with the
+ * code that derives it, which this repo fixes at the source.
+ */
+const namedCardTitle = (title: string): string | null => {
+  const normalized = normalizeTitle(title);
+  return normalized.length === 0 ? null : normalized;
 };
 
 /**
@@ -1069,13 +1096,14 @@ export function createSpaceAuthoring({
       ) {
         return refuse({ code: 'space-card-target-immutable' });
       }
-      // Trimmed and refused *here* rather than only at the surface that typed
-      // it. A blank title is the empty case wearing different bytes, and intake
-      // answers an empty one by failing — which this derivation reports by
-      // throwing, and an author's mistake may not throw. Every caller of this
-      // operation is covered by one rule instead of each remembering it.
-      const title = trimmedNonBlankTitle(completion.document.title);
-      if (title === null) return refuse({ code: 'card-title-required' });
+      // Normalized and refused *here* rather than only at the surface that
+      // typed it. A blank title is the empty case wearing different bytes, and
+      // intake answers an empty one by failing — which this derivation reports
+      // by throwing, and an author's mistake may not throw. Every caller of
+      // this operation is covered by one rule instead of each remembering it,
+      // and that one rule is the schema's own (ADR 0083).
+      const title = namedCardTitle(completion.document.title);
+      if (title === null) return refuse({ code: CARD_TITLE_REQUIRED });
       const document: CardDocument = { ...completion.document, title };
       if (sameValue(card.document, document)) return UNCHANGED;
       const refusal = aliasTargetRefusal(space, document);

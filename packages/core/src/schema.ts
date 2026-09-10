@@ -57,7 +57,14 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
 const cardTitleSchema = z
   .string()
   .transform(normalizeTitle)
-  .refine((title) => title.length > 0, { params: { code: CARD_TITLE_REQUIRED } });
+  .refine((title) => title.length > 0, {
+    // Both, and for two audiences. `params.code` is the stable identity an
+    // authoring surface words for itself (ADR 0057); `message` is what a file
+    // that fails intake prints, and a `refine` with no message prints Zod's
+    // "Invalid input" — which names neither the field's rule nor the fix.
+    message: 'A title must have at least one line with something in it',
+    params: { code: CARD_TITLE_REQUIRED },
+  });
 
 /**
  * The frontmatter of a markdown card file (ADR 0020). No `content` key: the
