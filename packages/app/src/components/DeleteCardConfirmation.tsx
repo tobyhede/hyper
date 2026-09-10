@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Card } from '@project/core';
+import { titleName, type Card } from '@project/core';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,7 +63,10 @@ export function DeleteCardConfirmation({
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Card {card.title}?</AlertDialogTitle>
+          {/* The Card's **name**, which is how a control names a Card: the
+              ladder below the name is drawn on the Card front and nowhere else
+              (ADR 0083). */}
+          <AlertDialogTitle>Delete Card {titleName(card.title)}?</AlertDialogTitle>
           <AlertDialogDescription>{DELETION_DESCRIPTIONS[card.kind]}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

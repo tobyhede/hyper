@@ -305,6 +305,26 @@ describe('Add Space Card', () => {
   });
 
   /**
+   * Creating a Card and renaming one are the same rule about what a Title is,
+   * and a `trim()` on this pane made them two rules. A whole-string trim strips
+   * the leading whitespace ADR 0083 says is the first line's own, so the same
+   * typed bytes produced one Title through the pane and another through the
+   * rename — with the rename reported as an Edit rather than as changing
+   * nothing.
+   */
+  it('stores the Title the schema stores, so a rename to the same bytes is no Edit', async () => {
+    const { session } = mount();
+    await openSpaceCardCreation();
+
+    chooseTarget('A new Space');
+    createNamed('  Recap');
+
+    await waitFor(() => expect(spaceCardsOf(session)).toHaveLength(1));
+    expect(spaceCardsOf(session)[0]?.document.title).toBe('  Recap');
+    await settled(session);
+  });
+
+  /**
    * The seeding is a convenience at creation and never a link afterwards: the
    * Card and the Space it references are separate entities from the moment they
    * exist, and the Card's Title is the containing Space's to author.

@@ -9,7 +9,10 @@ import {
   type GraphId,
   type LayoutId,
   type LayoutPosition,
+  CARD_TITLE_REQUIRED,
+  normalizeTitle,
   type SpaceSnapshot,
+  titleName,
   type UUID,
 } from '@project/core';
 import {
@@ -235,7 +238,9 @@ export type AuthoringRefusal =
   | { readonly code: 'alias-target-immutable' }
   | { readonly code: 'space-card-target-immutable' }
   | { readonly code: 'space-card-deletion-unsupported' }
-  | { readonly code: 'card-title-required' }
+  // The one code here the domain owns rather than this module: `@project/core`
+  // raises it from the Card schema, so both ends spell it from one constant.
+  | { readonly code: typeof CARD_TITLE_REQUIRED }
   | { readonly code: 'layout-title-required' }
   | { readonly code: 'space-must-keep-layout' }
   | { readonly code: 'alias-target-not-found'; readonly targetId: CardId }
@@ -245,6 +250,7 @@ export type AuthoringRefusal =
   | { readonly code: 'card-not-expanded' }
   | {
       readonly code: 'card-has-aliases';
+      /** The Aliases by **name**, which is what a sentence listing Cards says (ADR 0083). */
       readonly aliasTitles: readonly string[];
     }
   | { readonly code: 'graph-title-required' }
@@ -594,10 +600,33 @@ interface CreatedCard {
 const incomingAliases = (cards: SnapshotCards, cardId: CardId): SnapshotCards =>
   cards.filter((card) => card.document.kind === 'alias' && card.document.target === cardId);
 
-/** A title normalized for authorship, or `null` when it contains no name. */
+/**
+ * A single-line title normalized for authorship, or `null` when it has no name.
+ *
+ * Layouts and Graphs only. Their titles are single-line by ADR 0083, so the
+ * whole string is one line and trimming it is the whole rule. A Card's Title is
+ * Title Lines and normalizes by a rule of its own — {@link namedCardTitle}.
+ */
 const trimmedNonBlankTitle = (title: string): string | null => {
   const trimmed = title.trim();
   return trimmed.length === 0 ? null : trimmed;
+};
+
+/**
+ * A Card Title normalized as the schema normalizes it, or `null` when it
+ * carries no name.
+ *
+ * `normalizeTitle` and not `trim()`, because on a Title of more than one line
+ * the two give different answers: a whole-string trim cannot reach the trailing
+ * whitespace on an interior line, and it strips a first line's leading
+ * whitespace, which ADR 0083 says is that line's own. A write path that
+ * disagreed with the parse boundary would store a Card whose Title differs from
+ * the one intake mints from the same bytes — derived state disagreeing with the
+ * code that derives it, which this repo fixes at the source.
+ */
+const namedCardTitle = (title: string): string | null => {
+  const normalized = normalizeTitle(title);
+  return normalized.length === 0 ? null : normalized;
 };
 
 /**
@@ -1074,13 +1103,14 @@ export function createSpaceAuthoring({
       ) {
         return refuse({ code: 'space-card-target-immutable' });
       }
-      // Trimmed and refused *here* rather than only at the surface that typed
-      // it. A blank title is the empty case wearing different bytes, and intake
-      // answers an empty one by failing — which this derivation reports by
-      // throwing, and an author's mistake may not throw. Every caller of this
-      // operation is covered by one rule instead of each remembering it.
-      const title = trimmedNonBlankTitle(completion.document.title);
-      if (title === null) return refuse({ code: 'card-title-required' });
+      // Normalized and refused *here* rather than only at the surface that
+      // typed it. A blank title is the empty case wearing different bytes, and
+      // intake answers an empty one by failing — which this derivation reports
+      // by throwing, and an author's mistake may not throw. Every caller of
+      // this operation is covered by one rule instead of each remembering it,
+      // and that one rule is the schema's own (ADR 0083).
+      const title = namedCardTitle(completion.document.title);
+      if (title === null) return refuse({ code: CARD_TITLE_REQUIRED });
       const document: CardDocument = { ...completion.document, title };
       if (sameValue(card.document, document)) return UNCHANGED;
       const refusal = aliasTargetRefusal(space, document);
@@ -1145,9 +1175,12 @@ export function createSpaceAuthoring({
       // Title is what this replaced: it produced two Cards with one name by
       // default, and the creation flow asks for a name at this moment anyway
       // (ADR 0070).
-      const entered = completion.title?.trim() ?? '';
+      // Normalized the way a rename is, and for the same reason: creation and
+      // renaming write one field, so the same typed bytes have to reach the
+      // same stored document whichever path wrote them (ADR 0083).
+      const entered = namedCardTitle(completion.title ?? '');
       const document: CardDocument = {
-        title: entered.length > 0 ? entered : nextCardTitle(snapshot),
+        title: entered ?? nextCardTitle(snapshot),
         kind: 'alias',
         target: completion.target,
       };
@@ -1196,7 +1229,9 @@ export function createSpaceAuthoring({
       if (incoming.length > 0) {
         return refuse({
           code: 'card-has-aliases',
-          aliasTitles: incoming.map((alias) => alias.document.title),
+          // Named, not Titled: the wording joins these into one sentence, and
+          // a Title's later lines would break the list across it (ADR 0083).
+          aliasTitles: incoming.map((alias) => titleName(alias.document.title)),
         });
       }
       // Deferred like a creation so the complete Layout changes atomically.

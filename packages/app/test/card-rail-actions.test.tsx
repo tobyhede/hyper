@@ -221,6 +221,32 @@ describe('a Card’s commands on the canvas rail', () => {
     await settled(session);
   });
 
+  /**
+   * The question names the Card by its **name** (ADR 0083).
+   *
+   * A Card's Title is one or more Title Lines and the front draws the ladder;
+   * a dialog title is a sentence, and a line break arriving in one draws as a
+   * broken-looking label rather than as an error. This is the claim the
+   * retired Sidebar's own footer used to hold.
+   */
+  it('names the Card in the question by its name and not by its whole Title', async () => {
+    const session = mount();
+    const laddered = 'A\nAnd read this next';
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+    fireEvent.change(input, { target: { value: laddered } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Card A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Card' }));
+
+    const question = await screen.findByRole('alertdialog', { name: 'Delete Card A?' });
+    expect(question).not.toHaveTextContent('And read this next');
+    fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    await settled(session);
+  });
+
   /** The other answer, which is the one that makes the question a question. */
   it('leaves the Card alone when the question is cancelled', async () => {
     const session = mount();

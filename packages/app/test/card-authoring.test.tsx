@@ -334,15 +334,18 @@ describe('authoring a Card title on the graph', () => {
     await settled(session);
   });
 
-  it('stores a title without the whitespace surrounding it', async () => {
+  it('stores a Title normalized the way the schema normalizes it', async () => {
     const session = mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
     const input = screen.getByRole('textbox', { name: 'Card title' });
 
-    fireEvent.change(input, { target: { value: '  Renamed A  ' } });
+    // Every line loses its trailing whitespace and the trailing blank line
+    // goes, which is the rule a whole-string trim cannot express: it never
+    // reaches the spaces after `A subtitle` (ADR 0083).
+    fireEvent.change(input, { target: { value: 'Renamed A  \nA subtitle   \n' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    expect(cardTitleOf(session, CARD_ID)).toBe('Renamed A');
+    expect(cardTitleOf(session, CARD_ID)).toBe('Renamed A\nA subtitle');
     await settled(session);
   });
 
