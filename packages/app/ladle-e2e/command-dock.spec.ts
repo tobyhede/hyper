@@ -465,8 +465,9 @@ test(
  * away — and it says it in words rather than colour alone, through
  * `openSpaceStatusLabel`. The strip is deleted
  * (`.scratch/command-dock/issues/08`) and those words outlived it in
- * `packages/ui/src/open-space-status.ts`, so this menu is now their one
- * caller.
+ * `packages/ui/src/open-space-status.ts`, which `unwellReport`
+ * (`packages/app/src/dock-model.ts`) is what calls — this menu draws what that
+ * answers.
  */
 test(
   'the Open Spaces menu names which other open Space failed to commit',

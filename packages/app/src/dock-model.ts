@@ -29,7 +29,8 @@ import type { ExitSpaceResult, RejectedExitConfirmation } from './open-spaces';
  * shared with `OpenSpaces`, the vertical tab strip that reported the same three
  * states over the same open set; this menu replaced it and
  * `.scratch/command-dock/issues/08` deleted it, so the words now live in
- * `packages/ui/src/open-space-status.ts` with one caller. They stay in
+ * `packages/ui/src/open-space-status.ts` and {@link unwellReport} below is what
+ * spends them — the Open Spaces menu draws what that answers. They stay in
  * `@project/ui` rather than moving here because a second vocabulary for one
  * state is how a reader learns that "Save failed" and "Changes not saved" are
  * two different things, and that risk returns with the next surface that

@@ -25,7 +25,7 @@ is the same defect this ticket existed to fix.
 | `packages/ui/src/components/skeleton.tsx` | Imported only by `sidebar.tsx`, through `SidebarMenuSkeleton`. |
 | `packages/ui/src/OpenSpaces.tsx` | The vertical tab strip of open Spaces. The Dock's Open Spaces menu is the set's surface. |
 | `packages/ui/src/components/tabs.tsx` | Imported only by `OpenSpaces.tsx`. |
-| `packages/ui/src/hooks/use-mobile.ts` | **The seventh, and this ticket did not name it.** Imported only by `sidebar.tsx`. `ui:catalog:check` scans `.tsx` and this is a `.ts` hook, so nothing in the tree could report it — a reader had to. `vitest.setup.ts`'s `matchMedia` shim existed solely for it and went with it. |
+| `packages/ui/src/hooks/use-mobile.ts` | **The seventh, and this ticket did not name it.** Imported only by `sidebar.tsx`. `ui:catalog:check` scans `.tsx` and this is a `.ts` hook, so nothing in the tree could report it — a reader had to. `vitest.setup.ts`'s `matchMedia` shim looked like it went with it and did not: see the `test/key-bindings.ts` entry below for what actually reads it. |
 
 ## Why deletion rather than keeping
 
