@@ -552,6 +552,36 @@ const closedCard = (
     roomBetween(at.openSize, COLLAPSED_CARD_SIZE),
   );
 
+/**
+ * The placement after a Card leaves the Layout, with the room it held given
+ * back.
+ *
+ * Leaving is a Close the Card does not come back from, so it reclaims exactly
+ * as {@link closedCard} does — and it has to, because the room is no longer
+ * derived from the Card's own entry. Under the derivation ADR 0084 removed,
+ * dropping the entry dropped the displacement with it; now the room is written
+ * into the neighbours' own coordinates, and a removal that only drops the entry
+ * leaves a hole with nothing on the canvas left to explain it and no Edit that
+ * can give it back.
+ *
+ * The reclaim runs **before** the removal, because `Placement.displace` answers
+ * the placement unchanged for a subject the map does not hold — after
+ * `Placement.remove` there is no subject left to compare the neighbours
+ * against.
+ *
+ * Both ways a Card leaves end here, the way both ways it closes end at
+ * `closedCard`: `removed-card-from-layout`, and the deletion applied with the
+ * other membership changes below.
+ */
+const removedCard = (placement: Placement, cardId: CardId): Placement => {
+  const at = placement.get(cardId);
+  const reclaimed =
+    at?.open === true
+      ? Placement.displace(placement, cardId, roomBetween(at.openSize, COLLAPSED_CARD_SIZE))
+      : placement;
+  return Placement.remove(reclaimed, cardId);
+};
+
 /** Two Edges are the same Edge when they join the same Cards the same way (ADR 0032). */
 const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>
   left.from === right.from && left.to === right.to;
@@ -1251,7 +1281,7 @@ export function createSpaceAuthoring({
         return refuse({ code: 'card-not-in-layout' });
       }
       unplacedCardId = completion.cardId;
-      completedPlacement = Placement.remove(completedPlacement, completion.cardId);
+      completedPlacement = removedCard(completedPlacement, completion.cardId);
     } else if (completion.kind === 'deleted-card') {
       const deleted = space.lookup.card(completion.cardId);
       if (deleted === undefined) {
@@ -1351,7 +1381,7 @@ export function createSpaceAuthoring({
       );
     }
     if (deletedCardId !== undefined) {
-      completedPlacement = Placement.remove(completedPlacement, deletedCardId);
+      completedPlacement = removedCard(completedPlacement, deletedCardId);
     }
     if (connection !== null) {
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === activeGraphId);

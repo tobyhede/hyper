@@ -582,9 +582,10 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // gates, and the Card answers `false` to every frame while still handing
       // the proposed rect on (`CardNode`), so that change is never produced and
       // this store never has a split frame to refuse. The draft is what makes
-      // the resized Card, its displaced neighbours, handles and Edges one
-      // publication; `SpaceCanvas.test.tsx` drives the real control and holds
-      // the whole gesture to proposing nothing here.
+      // the resized Card, its handles and its Edges one publication — and only
+      // those: its neighbours are drawn from the authored placement and do not
+      // move until the Edit lands (ADR 0084). `SpaceCanvas.test.tsx` drives the
+      // real control and holds the whole gesture to proposing nothing here.
       const relevant = changes.filter((change) => !('id' in change) || owned.has(change.id));
       if (relevant.length === 0) return;
 

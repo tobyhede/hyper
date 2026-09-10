@@ -344,6 +344,13 @@ export async function boxOf(
 }
 
 /**
+ * The screen pixels spent crossing React Flow's `nodeDragThreshold` before the
+ * travel below is measured. Two rather than one, because the threshold is
+ * exclusive and a single pixel does not clear it.
+ */
+const NUDGE = 2;
+
+/**
  * Drag by a flow-space delta, scaled through the current zoom.
  *
  * Anything a caller wants to assert *while* the Card is being dragged goes in
@@ -377,18 +384,26 @@ export async function dragBy(
   // `nodeDragThreshold` (1px at the pinned 12.11.2) and measures the Card's
   // travel from *that* position, so everything covered before it is lost — and a
   // `steps: 5` move to the halfway point spends a tenth of the whole delta on
-  // its first event. Spending two pixels here instead leaves an error the
-  // flow-coordinate assertions can ignore rather than one that scales with the
-  // drag.
-  await page.mouse.move(box.x + box.width / 2 + Math.sign(dx) * 2, box.y + 12 + Math.sign(dy) * 2);
+  // its first event.
+  //
+  // Spending the nudge on its own move makes that loss a known constant instead
+  // of a proportion, and **every coordinate below is then measured from the
+  // nudge rather than from the press**, so the Card travels exactly `dx`/`dy`
+  // flow units. Leaving the nudge uncompensated would have left an error of
+  // `NUDGE / zoom` — small at the fixture's zoom, and growing as a Layout gets
+  // wider or a viewport narrower, which is precisely the shape of assertion
+  // that passes until the day it does not.
+  const from = {
+    x: box.x + box.width / 2 + Math.sign(dx) * NUDGE,
+    y: box.y + 12 + Math.sign(dy) * NUDGE,
+  };
+  await page.mouse.move(from.x, from.y);
   // A single jump can still be swallowed, so the travel itself moves twice.
-  await page.mouse.move(box.x + box.width / 2 + (dx * zoom) / 2, box.y + 12 + (dy * zoom) / 2, {
-    steps: 5,
-  });
+  await page.mouse.move(from.x + (dx * zoom) / 2, from.y + (dy * zoom) / 2, { steps: 5 });
 
   await whileDragging?.();
 
-  await page.mouse.move(box.x + box.width / 2 + dx * zoom, box.y + 12 + dy * zoom, { steps: 5 });
+  await page.mouse.move(from.x + dx * zoom, from.y + dy * zoom, { steps: 5 });
   await page.mouse.up();
 }
 
