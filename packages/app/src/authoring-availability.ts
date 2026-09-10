@@ -86,7 +86,7 @@ export interface AuthoringInProgress {
    * what is in progress — so the identity stays with the canvas that draws the
    * embeddings and only this aggregate reaches here.
    *
-   * The canvas reports it through the render adapter, beside `resizeDraft`:
+   * The canvas reports it through the render adapter, beside `interactionDraft`:
    * that store is what re-renders the Space's command surface and the canvas
    * together, where a report through a callback prop would land an effect late.
    */

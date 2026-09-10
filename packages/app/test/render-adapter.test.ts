@@ -709,7 +709,7 @@ describe('render adapter', () => {
     // Still the live capability and not a snapshot of one: the canvas holds it
     // from before the gesture and the store has to answer that same value.
     capability.beginResize(CARD_A);
-    expect(store.getState().resizeDraft?.cardId).toBe(CARD_A);
+    expect(store.getState().interactionDraft?.cardId).toBe(CARD_A);
   });
 
   it('previews one resize through a derived Placement and completes only its final size', () => {
@@ -724,7 +724,7 @@ describe('render adapter', () => {
     store.getState().cardResize.beginResize(CARD_A);
     store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
 
-    expect(store.getState().resizeDraft).toEqual({
+    expect(store.getState().interactionDraft).toEqual({
       cardId: CARD_A,
       size: { width: 620, height: 440 },
       placement: Placement.fromEntries([
@@ -739,7 +739,7 @@ describe('render adapter', () => {
     expect(spy.completions).toEqual([
       { kind: 'resized-card', cardId: CARD_A, size: { width: 620, height: 440 } },
     ]);
-    expect(store.getState().resizeDraft).toBeNull();
+    expect(store.getState().interactionDraft).toBeNull();
   });
 
   it('snaps both dimensions inside the Close range to the exact Closed rect', () => {
@@ -752,11 +752,11 @@ describe('render adapter', () => {
     store.getState().cardResize.beginResize(CARD_A);
     store.getState().cardResize.previewResize(CARD_A, { width: 280, height: 166 });
 
-    expect(store.getState().resizeDraft).toMatchObject({
+    expect(store.getState().interactionDraft).toMatchObject({
       cardId: CARD_A,
       size: { width: 260, height: 146 },
     });
-    expect(store.getState().resizeDraft?.placement.get(CARD_A)).toEqual({
+    expect(store.getState().interactionDraft?.placement.get(CARD_A)).toEqual({
       x: 10,
       y: 20,
       open: true,
@@ -779,7 +779,7 @@ describe('render adapter', () => {
     store.getState().cardResize.beginResize(CARD_A);
     store.getState().cardResize.previewResize(CARD_A, { width: 280, height: 240 });
 
-    expect(store.getState().resizeDraft).toMatchObject({
+    expect(store.getState().interactionDraft).toMatchObject({
       cardId: CARD_A,
       size: { width: 280, height: 240 },
     });
@@ -825,7 +825,7 @@ describe('render adapter', () => {
     store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
     store.getState().cardResize.cancelResize(CARD_A);
 
-    expect(store.getState().resizeDraft).toBeNull();
+    expect(store.getState().interactionDraft).toBeNull();
     expect(spy.completions).toEqual([]);
   });
 
@@ -991,7 +991,7 @@ describe('render adapter', () => {
 
   /*
    * An embedded Layout's live edit is an Interaction of the canvas, so it is
-   * held beside `resizeDraft` rather than reported up through a callback prop:
+   * held beside `interactionDraft` rather than reported up through a callback prop:
    * this store is what re-renders the Space's command surface and the canvas
    * together, and every availability answer is derived once, above both of them
    * (`authoring-availability.ts`).
@@ -1044,13 +1044,13 @@ describe('render adapter', () => {
     store.getState().cardResize.beginResize(CARD_A);
     store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
     expect(store.getState().projection).not.toBeNull();
-    expect(store.getState().resizeDraft).not.toBeNull();
+    expect(store.getState().interactionDraft).not.toBeNull();
 
     expect(authoring.acceptStoredSpace()).toBeNull();
 
     expect(store.getState().projection).toBeNull();
     expect(store.getState().selection).toEqual({ kind: 'none' });
     expect(store.getState().moved).toBe(false);
-    expect(store.getState().resizeDraft).toBeNull();
+    expect(store.getState().interactionDraft).toBeNull();
   });
 });

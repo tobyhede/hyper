@@ -34,7 +34,16 @@ export interface Projection {
   readonly edges: Edge[];
 }
 
-export interface ResizeDraft {
+/**
+ * The Placement one live gesture is proposing, layered over the authored one.
+ *
+ * Named for the gesture rather than for resize because there is one of these at
+ * a time and it is the canvas's answer to "where is everything right now". A
+ * second nullable field beside it would put the precedence rule at every
+ * consumer, and the consumers are the two that ask exactly this: the Space's
+ * canvas and an embedded Layout's.
+ */
+export interface InteractionDraft {
   readonly cardId: CardId;
   readonly size: { readonly width: number; readonly height: number };
   readonly placement: Placement;
@@ -199,8 +208,8 @@ export interface RenderAdapterState {
   moved: boolean;
   /** The ordinary React Flow selection used for continued authoring. */
   selection: CanvasSelection;
-  /** One transient resize layered over the authored Placement. */
-  resizeDraft: ResizeDraft | null;
+  /** The one live gesture's proposed Placement, layered over the authored one. */
+  interactionDraft: InteractionDraft | null;
   /**
    * Whether some embedded Layout on this canvas is running a Card edit.
    *
@@ -209,7 +218,7 @@ export interface RenderAdapterState {
    * begun in there withdraws authoring from the canvas around it
    * (`authoring-availability.ts`'s `editingEmbeddedLayout`). It begins and ends
    * inside the canvas subtree, so it has to be published to be read above it —
-   * and it is published *here*, beside `resizeDraft`, because both are drafts
+   * and it is published *here*, beside `interactionDraft`, because both are drafts
    * of one canvas gesture and because this store re-renders the Space's command
    * surface and the canvas together. A callback prop into the composition root
    * would report it an effect late instead.
@@ -435,7 +444,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     dragOrigins: new Map(),
     moved: false,
     selection: NO_SELECTION,
-    resizeDraft: null,
+    interactionDraft: null,
     editingEmbeddedLayout: false,
 
     // Written once, here, and by nothing after: every `set` below merges a
@@ -446,7 +455,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         const at = authored?.get(cardId);
         if (authored === null || at?.open !== true) return;
         set({
-          resizeDraft: {
+          interactionDraft: {
             cardId,
             size: at.openSize,
             placement: authored,
@@ -455,13 +464,13 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       },
 
       previewResize: (cardId, size) => {
-        const draft = get().resizeDraft;
+        const draft = get().interactionDraft;
         if (draft?.cardId !== cardId) return;
         const at = draft.placement.get(cardId);
         if (at?.open !== true) return;
         const proposedSize = snapCardSizeToClose(size);
         set({
-          resizeDraft: {
+          interactionDraft: {
             cardId,
             size: proposedSize,
             placement: Placement.place(draft.placement, cardId, {
@@ -473,14 +482,14 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       },
 
       finishResize: (cardId) => {
-        const draft = get().resizeDraft;
+        const draft = get().interactionDraft;
         if (draft?.cardId !== cardId) return;
         authoring.complete({ kind: 'resized-card', cardId, size: draft.size });
-        set({ resizeDraft: null });
+        set({ interactionDraft: null });
       },
 
       cancelResize: (cardId) => {
-        if (get().resizeDraft?.cardId === cardId) set({ resizeDraft: null });
+        if (get().interactionDraft?.cardId === cardId) set({ interactionDraft: null });
       },
     },
 
@@ -525,7 +534,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         dragOrigins: new Map(),
         moved: false,
         selection: NO_SELECTION,
-        resizeDraft: null,
+        interactionDraft: null,
       });
       authoring.replacePlacement(placement);
     },
@@ -687,7 +696,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       dragOrigins: new Map(),
       moved: false,
       selection: NO_SELECTION,
-      resizeDraft: null,
+      interactionDraft: null,
     });
   });
   return adapter;

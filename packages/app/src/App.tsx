@@ -478,7 +478,7 @@ export const createApp = (
     // uses it. `replacePlacement` keeps the map's identity when the value is
     // unchanged, so this does not defeat the memo below.
     const authoredPositions = authoring.authoredPlacement();
-    const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
+    const interactionDraft = useRenderAdapter((s) => s.interactionDraft);
     const selection = useRenderAdapter((s) => s.selection);
     const selectedCardId = selectedCardOf(selection);
     const selectedCard =
@@ -575,7 +575,7 @@ export const createApp = (
     const placement = usePlacementRendering(
       projection.strategyGraph,
       strategy,
-      resizeDraft?.placement ?? authoredPositions,
+      interactionDraft?.placement ?? authoredPositions,
     );
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
 

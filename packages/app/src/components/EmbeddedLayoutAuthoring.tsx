@@ -66,7 +66,7 @@ export function EmbeddedLayoutAuthoring({
   const placement = usePlacementRendering(
     pending?.strategyGraph ?? emptyGraph,
     strategy,
-    state.resizeDraft?.placement ?? authored,
+    state.interactionDraft?.placement ?? authored,
   );
   const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
   const projected = useMemo(
