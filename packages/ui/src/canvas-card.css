@@ -235,24 +235,9 @@
   outline-offset: 2px;
 }
 
-/* The two marker lines: the Alias's Target and the Space Card's referenced
-   Space. One rule for both, because they are the same line — a Card naming
-   something outside itself, drawn quietly under its own Title — and letting
-   them drift apart would teach an author that the two mean different things. */
-.canvas-card__alias-of,
-.canvas-card__space-of {
-  margin: 4px 0 0;
-  overflow: hidden;
-  color: var(--canvas-card-muted);
-  font-size: 12px;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* The stand-in while the referenced Space has not been read. Sized and coloured
-   as the marker above it so the Card does not change shape when the selectors
-   arrive in its place. */
+   as the selectors that replace it so the Card does not change shape when they
+   arrive. */
 .canvas-card__space-note {
   margin: 8px 0 0;
   color: var(--canvas-card-muted);

@@ -27,23 +27,13 @@ export const States: Story = () => (
           <CanvasCardSpecimen title="Strategies" state="dragging" />
         </Specimen>
         <Specimen label="alias · rest">
-          <CanvasCardSpecimen title="Opening, again" kind="alias" aliasOf="Opening" />
+          <CanvasCardSpecimen title="Opening, again" kind="alias" />
         </Specimen>
         <Specimen label="alias · selected">
-          <CanvasCardSpecimen
-            title="Opening, again"
-            kind="alias"
-            aliasOf="Opening"
-            state="selected"
-          />
+          <CanvasCardSpecimen title="Opening, again" kind="alias" state="selected" />
         </Specimen>
         <Specimen label="alias · dragging">
-          <CanvasCardSpecimen
-            title="Opening, again"
-            kind="alias"
-            aliasOf="Opening"
-            state="dragging"
-          />
+          <CanvasCardSpecimen title="Opening, again" kind="alias" state="dragging" />
         </Specimen>
       </div>
     </CatalogueSection>
@@ -64,7 +54,7 @@ export const Kinds: Story = () => (
           <CanvasCardSpecimen title="Why authored placement beats a layout engine that reshuffles on every edit" />
         </Specimen>
         <Specimen label="alias">
-          <CanvasCardSpecimen title="Opening, again" kind="alias" aliasOf="Opening" />
+          <CanvasCardSpecimen title="Opening, again" kind="alias" />
         </Specimen>
       </div>
     </CatalogueSection>
@@ -170,10 +160,10 @@ ResizeControl.meta = { iframed: true };
  */
 function Instance({
   initialTitle,
-  aliasOf,
+  kind = 'markdown',
 }: {
   readonly initialTitle: string;
-  readonly aliasOf?: string;
+  readonly kind?: 'markdown' | 'alias';
 }) {
   const [title] = useState(initialTitle);
   const [selected, setSelected] = useState(false);
@@ -184,11 +174,11 @@ function Instance({
     return 'completed' as const;
   };
   const front: CanvasCardFront =
-    aliasOf === undefined
-      ? open
+    kind === 'alias'
+      ? { kind: 'alias', source: '', open: false }
+      : open
         ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: changeOpen }
-        : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen }
-      : { kind: 'alias', aliasOf, source: '', open: false };
+        : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen };
   const state: Exclude<CanvasCardState, 'editing'> = dragging
     ? 'dragging'
     : selected
@@ -230,7 +220,7 @@ function Instance({
 export const Actions: Story = () => (
   <div className="flex flex-wrap gap-8 p-8" style={cardSizeVars}>
     <Instance initialTitle="Strategies" />
-    <Instance initialTitle="Opening, again" aliasOf="Opening" />
+    <Instance initialTitle="Opening, again" kind="alias" />
   </div>
 );
 

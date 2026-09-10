@@ -81,7 +81,6 @@ test(
 
     const alias = nodeByTitle(page, 'A′').first();
     await expect(alias.getByRole('img', { name: 'Alias' })).toBeVisible();
-    await expect(alias.getByTestId('alias-marker')).toHaveText('A');
 
     const markdown = nodeByTitle(page, 'A').first();
     await markdown.click();
@@ -391,7 +390,6 @@ test(
 
     const recap = nodeByTitle(page, 'A′');
     await expect(recap).toBeVisible();
-    await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
     await openCard(recap, 'A′');
     await expect(recap.getByText('entry point')).toBeVisible();

@@ -57,7 +57,6 @@ export type CanvasCardFront =
     })
   | {
       readonly kind: 'alias';
-      readonly aliasOf: string;
       /** The resolved Target Markdown this Alias displays read-only. */
       readonly source: string;
       /** Authored Layout state; an Alias Opens through the shared Card operation. */
@@ -66,8 +65,6 @@ export type CanvasCardFront =
     }
   | {
       readonly kind: 'space';
-      /** The Title of the Space this Card references. Immutable, and not this Card's own Title. */
-      readonly spaceTitle: string;
       /** Authored Layout state; a Space Card Opens through the shared Card operation. */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -446,31 +443,9 @@ export function CanvasCard(props: CanvasCardProps) {
             )}
           </CardTitle>
         )}
-        {/* The marker *is* the Target's name, so there is nothing to draw
-            without one. An empty line still takes its own top margin and still
-            answers a query for the marker, which reads as an Alias naming a
-            Card called "". */}
-        {front.kind === 'alias' && front.aliasOf !== '' && (
-          <p className="canvas-card__alias-of" data-testid="alias-marker">
-            {front.aliasOf}
-          </p>
-        )}
-        {/* The same line for the same reason, and drawn whether the Card is
-            Open or Closed: which Space this Card reaches is a fact about it, not
-            something an author should have to open it to find out. The empty
-            guard is the Alias marker's — a Space whose Title is empty is named
-            by nothing, and a blank line claiming to name it is worse than no
-            line. */}
-        {front.kind === 'space' && front.spaceTitle !== '' && (
-          <p className="canvas-card__space-of" data-testid="space-marker">
-            {front.spaceTitle}
-          </p>
-        )}
-        {/* Below the marker rather than above it: the Space is what these two
-            choices are *about*, so it is read first. Withheld while the Card is
-            read-only for the same reason every other authoring affordance is —
-            a read-only surface draws what the Card shows, not what could be
-            changed about it. */}
+        {/* Withheld while the Card is read-only for the same reason every other
+            authoring affordance is — a read-only surface draws what the Card
+            shows, not what could be changed about it. */}
         {front.kind === 'space' && front.open && !readOnly && (
           <SpaceCardSelectors selection={front.selection} />
         )}

@@ -73,8 +73,12 @@ export const NewAliasPane: Story = () => {
         <NewAlias
           targets={[markdown]}
           refusal={null}
+          // An empty title reaches Authoring as the empty string, which is what
+          // tells it to mint `Card N` — the Target's own Title is never copied
+          // (ADR 0083 refines ADR 0046). So the unnamed completion this stands
+          // in for reports the minted name.
           onCreate={(target, title) =>
-            setCreated(`Created ${title === '' ? '(the Target’s title)' : title} on ${target}.`)
+            setCreated(`Created ${title === '' ? 'the minted Card N' : title} on ${target}.`)
           }
           onCancel={() => setCreated('Cancelled, creating nothing.')}
           onRefusalStale={() => undefined}

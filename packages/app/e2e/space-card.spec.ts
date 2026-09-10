@@ -86,11 +86,6 @@ test(
     await settled(page);
     await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
     await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
-    // The target Space's name, drawn on the Card beside the Card's own title —
-    // they begin equal and are renamed independently from here.
-    await expect(nodeByTitle(page, 'Architecture').getByTestId('space-marker')).toHaveText(
-      'Architecture',
-    );
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   },
 );
@@ -123,17 +118,16 @@ test('a second Space Card may reference the Space the first one created', async 
 
   await expect(page.getByTestId('new-space-card')).toHaveCount(0);
   await settled(page);
-  // Both Cards name the same Space, and only one Space was ever created — the
-  // second Card is a second way to reach it rather than a second copy of it.
-  await expect(nodeByTitle(page, 'Architecture again').getByTestId('space-marker')).toHaveText(
-    'Architecture',
-  );
+  // The second Card was authored against the Space the first one created — the
+  // pane offered it as a choice — so this is a second way to reach that Space
+  // rather than a second copy of it.
+  await expect(nodeByTitle(page, 'Architecture again')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
 /**
- * Opening a Space Card exposes the target's context and the selections the Card
- * authors — and nothing that would change the Space it points at.
+ * Opening a Space Card exposes the selections the Card authors over its
+ * target's context — and nothing that would change the Space it points at.
  *
  * A created target Space is complete (ADR 0080): the one Space initializer gives
  * it an authored default Layout and one empty Active Graph, so its selectors
@@ -141,7 +135,9 @@ test('a second Space Card may reference the Space the first one created', async 
  * chosen neither yet — storing the target's default Layout and Graph on the Card
  * at creation is `layout-only-v1/04`.
  */
-test('an Open Space Card shows its target and offers no way to change it', async ({ page }) => {
+test('an Open Space Card offers its target’s selections and no way to change it', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -162,7 +158,6 @@ test('an Open Space Card shows its target and offers no way to change it', async
   await card.focus();
   await card.press('Enter');
 
-  await expect(card.getByTestId('space-marker')).toHaveText('Architecture');
   // Enabled rather than merely present: a selector over a target with nothing
   // to choose is disabled, so this is what says the created Space arrived
   // complete rather than blank.
@@ -377,9 +372,6 @@ test('closing a Space Card removes the embedded Layout it was drawing', async ({
   // The Space Card itself is untouched — Closing is a Layout Edit about this
   // Card's Open state and says nothing about the Space it references.
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
-  await expect(nodeByTitle(page, 'Architecture').getByTestId('space-marker')).toHaveText(
-    'Architecture',
-  );
 });
 
 test('an embedded Card can move, open with the keyboard and resize in its target Layout', async ({

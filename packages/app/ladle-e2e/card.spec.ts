@@ -49,7 +49,6 @@ test(
 
     const alias = specimen(page, 'alias').getByRole('article');
     await expect(alias).toHaveCSS('border-style', 'dotted');
-    await expect(alias.getByTestId('alias-marker')).toHaveText('Opening');
 
     const longTitle = specimen(page, 'markdown · long title').getByRole('heading');
     await expect(longTitle).toBeVisible();
@@ -133,7 +132,6 @@ test(
 
     const alias = page.getByRole('article', { name: 'Opening, again' });
     await expect(alias.getByRole('img', { name: 'Alias' })).toBeVisible();
-    await expect(alias.getByTestId('alias-marker')).toHaveText('Opening');
 
     const markdown = page.getByRole('article', { name: 'Strategies' });
     const actions = markdown.getByTestId('canvas-card-actions');

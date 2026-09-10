@@ -62,13 +62,12 @@ describe('CanvasCard kind and interaction state', () => {
     // silent-nothing case, and the rail is not the centred, icon-optional
     // layout the pre-design-system Card used.
     expect(screen.getByRole('img', { name: 'Markdown Card' })).toBeVisible();
-    expect(screen.queryByTestId('alias-marker')).not.toBeInTheDocument();
   });
 
-  it('presents an Alias front with the Target title it must receive', () => {
+  it('presents an Alias front by its kind alone', () => {
     render(
       <CanvasCard
-        front={{ kind: 'alias', aliasOf: 'Opening', source: '', open: false }}
+        front={{ kind: 'alias', source: '', open: false }}
         state="selected"
         title="Opening, again"
         graphColor="#35d6c3"
@@ -79,14 +78,13 @@ describe('CanvasCard kind and interaction state', () => {
     expect(card).toHaveAttribute('data-kind', 'alias');
     expect(card).toHaveAttribute('data-state', 'selected');
     expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
-    expect(screen.getByTestId('alias-marker')).toHaveTextContent('Opening');
   });
 
   it('offers an Alias the shared Open operation', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasCard
-        front={{ kind: 'alias', aliasOf: 'Opening', source: 'Markdown', open: false, onOpenChange }}
+        front={{ kind: 'alias', source: 'Markdown', open: false, onOpenChange }}
         state="selected"
         title="Return"
         graphColor="#ffc53d"
@@ -729,18 +727,20 @@ describe('CanvasCard open Markdown front', () => {
     expect(screen.getByText('the Card’s own source')).toBeVisible();
   });
 
-  it('keeps the Alias front limited to the Target it owns', () => {
+  it('draws no body on a closed Alias', () => {
     render(
       <CanvasCard
-        front={{ kind: 'alias', aliasOf: 'Strategies', source: '', open: false }}
+        front={{ kind: 'alias', source: '', open: false }}
         state="rest"
         title="Strategy overview"
         graphColor="#35d6c3"
       />,
     );
 
-    expect(screen.getByTestId('alias-marker')).toHaveTextContent('Strategies');
-    expect(screen.queryByText('a body')).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Strategy overview' })).toHaveAttribute(
+      'data-expanded',
+      'false',
+    );
   });
 
   it('holds the Markdown body open while the Title is being renamed', () => {
@@ -778,15 +778,13 @@ describe('CanvasCard Space front', () => {
   });
 
   /**
-   * Which Space this Card reaches is a fact about the Card, so it is drawn
-   * while the Card is Closed — the same line, in the same place, that an Alias
-   * draws its Target on. What a Closed Space Card does not draw is either
-   * selector: those are what Opening it is for.
+   * A Closed Space Card draws neither selector even when the selections are
+   * available to it: those are what Opening it is for.
    */
-  it('names the Space it references while closed', () => {
+  it('withholds both selectors while closed', () => {
     render(
       <CanvasCard
-        front={{ kind: 'space', spaceTitle: 'Strategy', open: false, selection: selection() }}
+        front={{ kind: 'space', open: false, selection: selection() }}
         state="rest"
         title="Strategy elsewhere"
         graphColor="#35d6c3"
@@ -795,7 +793,6 @@ describe('CanvasCard Space front', () => {
 
     const card = screen.getByRole('article', { name: 'Strategy elsewhere' });
     expect(card).toHaveAttribute('data-kind', 'space');
-    expect(screen.getByTestId('space-marker')).toHaveTextContent('Strategy');
     expect(screen.queryByTestId('space-card-layout')).not.toBeInTheDocument();
     expect(screen.queryByTestId('space-card-graph')).not.toBeInTheDocument();
   });
@@ -810,7 +807,7 @@ describe('CanvasCard Space front', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     const { rerender } = render(
       <CanvasCard
-        front={{ kind: 'space', spaceTitle: 'Strategy', open: false, onOpenChange }}
+        front={{ kind: 'space', open: false, onOpenChange }}
         state="selected"
         title="Elsewhere"
         graphColor="#35d6c3"
@@ -823,7 +820,7 @@ describe('CanvasCard Space front', () => {
 
     rerender(
       <CanvasCard
-        front={{ kind: 'space', spaceTitle: 'Strategy', open: true, onOpenChange }}
+        front={{ kind: 'space', open: true, onOpenChange }}
         state="selected"
         title="Elsewhere"
         graphColor="#35d6c3"
@@ -837,14 +834,13 @@ describe('CanvasCard Space front', () => {
   it('offers both selectors seeded with the Card’s own selections when open', () => {
     render(
       <CanvasCard
-        front={{ kind: 'space', spaceTitle: 'Strategy', open: true, selection: selection() }}
+        front={{ kind: 'space', open: true, selection: selection() }}
         state="rest"
         title="Elsewhere"
         graphColor="#35d6c3"
       />,
     );
 
-    expect(screen.getByTestId('space-marker')).toHaveTextContent('Strategy');
     // Named by their labels, not only reachable by test id: the two controls
     // are one word apart and an author has to be able to tell which is which.
     expect(screen.getByRole('combobox', { name: 'Layout' })).toHaveTextContent('Collection 1');
@@ -864,7 +860,6 @@ describe('CanvasCard Space front', () => {
       <CanvasCard
         front={{
           kind: 'space',
-          spaceTitle: 'Strategy',
           open: true,
           selection: selection({ onLayoutChange }),
         }}
@@ -891,7 +886,6 @@ describe('CanvasCard Space front', () => {
       <CanvasCard
         front={{
           kind: 'space',
-          spaceTitle: 'Strategy',
           open: true,
           selection: selection({ graphs: [], graphId: null }),
         }}
@@ -909,7 +903,7 @@ describe('CanvasCard Space front', () => {
   it('stands a plain note in for the selectors while the Space is unread', () => {
     render(
       <CanvasCard
-        front={{ kind: 'space', spaceTitle: 'Strategy', open: true }}
+        front={{ kind: 'space', open: true }}
         state="rest"
         title="Elsewhere"
         graphColor="#35d6c3"
@@ -928,16 +922,13 @@ describe('CanvasCard Space front', () => {
     render(
       <CanvasCard
         readOnly
-        front={{ kind: 'space', spaceTitle: 'Strategy', open: true, selection: selection() }}
+        front={{ kind: 'space', open: true, selection: selection() }}
         state="rest"
         title="Elsewhere"
         graphColor="#35d6c3"
       />,
     );
 
-    // The marker stays: it is what the Card shows, not something an author can
-    // change about it.
-    expect(screen.getByTestId('space-marker')).toHaveTextContent('Strategy');
     expect(screen.queryByTestId('space-card-layout')).not.toBeInTheDocument();
     expect(screen.queryByTestId('space-card-graph')).not.toBeInTheDocument();
   });

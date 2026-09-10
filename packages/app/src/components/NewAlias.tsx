@@ -33,8 +33,10 @@ export interface NewAliasProps {
   readonly refusal: CardCreationRefusalErrors | null;
   /**
    * Create the Alias on the chosen Target, with the title exactly as typed —
-   * the empty string included, because an empty title is what tells Authoring
-   * to take the Target's own and `??` cannot express that.
+   * the empty string included. What an empty one becomes is Authoring's to
+   * decide, and it mints the same neutral `Card N` any other created Card gets
+   * (ADR 0083); this pane neither supplies a name of its own nor normalizes the
+   * one it holds, so both rules stay in the one place that owns them.
    */
   readonly onCreate: (target: CardId, title: string) => void;
   readonly onCancel: () => void;
@@ -138,7 +140,8 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
               field-local corrective message to describe the next action. */}
           {refusal === null && (
             <FieldDescription className="card-pane__hint">
-              Choosing a Target creates the Alias. Leave the title empty to take the Target’s.
+              Choosing a Target creates the Alias. Leave the title empty and it is named for you;
+              renaming continues on the Card.
             </FieldDescription>
           )}
         </FieldGroup>

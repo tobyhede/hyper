@@ -216,9 +216,10 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/card-and-alias-panes.stories.tsx',
     storyExport: 'NewAliasPane',
     // Deliberately says nothing about the title the pane carries. The Ladle test
-    // types one and reads it back, but the application test exercises the empty
-    // title that takes the Target's own (ADR 0049), so a clause about a typed
-    // title would have one proof rather than the two ADR 0052 requires.
+    // types one and reads it back, while the application test leaves it empty
+    // and reads back the `Card N` Authoring mints for an unnamed Alias (ADR 0083
+    // refines ADR 0046) — so a clause about a typed title would have one proof
+    // rather than the two ADR 0052 requires.
     claim:
       'Adding an Alias offers Title and Target with no create action, and completes on the Target chosen rather than on a second confirmation.',
   },

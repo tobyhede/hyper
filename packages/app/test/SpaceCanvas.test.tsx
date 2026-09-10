@@ -378,7 +378,6 @@ describe.each([
 it.each(['Enter', ' '])('opens a focused Alias with %s', (key) => {
   const alias = cardNode('A again', ALIAS_ID);
   alias.data.kind = 'alias';
-  alias.data.aliasOf = 'A';
   const { openCard } = mountGraph([alias]);
 
   const focusedAlias = nodeOf(ALIAS_ID);
@@ -394,7 +393,7 @@ describe.each([
     'Alias',
     {
       ...cardNode('A again', ALIAS_ID),
-      data: { ...cardNode('A again', ALIAS_ID).data, kind: 'alias' as const, aliasOf: 'A' },
+      data: { ...cardNode('A again', ALIAS_ID).data, kind: 'alias' as const },
     },
     ALIAS_ID,
   ],
@@ -555,7 +554,6 @@ describe('resize belongs to Card rather than to a Card kind', () => {
   it('offers a resize operation to an Open Card whatever its kind', () => {
     const alias = cardNode('Alias', CARD_ID, false);
     alias.data.kind = 'alias';
-    alias.data.aliasOf = 'A';
     alias.data.expanded = true;
     const { view } = mountGraph([alias]);
 

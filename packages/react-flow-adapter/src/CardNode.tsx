@@ -88,12 +88,6 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    */
   const inner = useRef<HTMLDivElement>(null);
 
-  // An absent `aliasOf` means the Target title did not resolve — unreachable for
-  // a Space that survives intake (`validate.ts` refuses `unresolved-alias-target`
-  // and `alias-targets-alias`), but `projection.ts` types it optional and the
-  // Alias front carries the Target title as required. The empty string is how
-  // that reaches `CanvasCard` as "no Target to name", and `CanvasCard` draws no
-  // Target line for it rather than an empty one.
   const markdownOperations: MarkdownOperations = {};
   if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
     markdownOperations.onOpenChange = data.onEditCard;
@@ -120,7 +114,6 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           };
   const aliasFront: AliasFront = {
     kind: 'alias',
-    aliasOf: data.aliasOf ?? '',
     source: data.body ?? '',
     open: data.expanded === true,
   };
@@ -132,10 +125,6 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   // change are the two selections the composition hands down.
   const spaceFront: SpaceFront = {
     kind: 'space',
-    // The same convention `aliasOf` uses above: absent means the target did not
-    // resolve, which intake makes unreachable for a stored Card and reachable
-    // for the render between a Card arriving and its target being read.
-    spaceTitle: data.spaceTitle ?? '',
     open: data.expanded === true,
   };
   if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
