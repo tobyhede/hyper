@@ -1,6 +1,6 @@
 # 03 — Rename the Card model to Thing
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 
 **What to build:** One authored forward migration taking the PostgreSQL model
@@ -64,3 +64,62 @@ change two that change one had no analogue for — Layout was never a table.
   migration's own `start-contract` will name `Card` and its `end-contract` will
   name `Thing` — that is correct and is what makes the pair a record of the
   rename.
+
+## Answer
+
+Resolved. One migration, `migrations/app/20260910T1429_rename_card_to_thing`,
+four operations: `dropTable` on the retired table, then `createTable`,
+`createIndex` and `addForeignKey` for the new one. `contract:check` passes and
+`test/unit/prisma-foundation.test.ts` is green, so the emitted contract is
+reachable from the migration head again.
+
+### The hazard this issue recorded was right; its reason was not
+
+The generated migration **is** a drop and create — `prisma-next` 0.16.0 exposes
+no `renameTable`, its operation factory's only rename is `renameRlsPolicy`, and
+the `hints` the CLI's own error message mentions for "rename inference" turn out
+to be diagnostic prose rather than a mechanism a plan can be given. So the shape
+stands, and it is acceptable for the reason AGENTS.md records rather than for a
+reason anyone should assume: development and CI are the only environments, every
+database is derived from tracked seeds, fixtures and migrations, and there is no
+byte in that table this repository cannot mint again.
+
+**What this issue got wrong was that it needed a database at all.**
+`prisma-next migrate` refuses without a connection because it *applies*
+migrations; `prisma-next migration plan` **generates** one and says so in its own
+help — "No database connection is needed — this is a fully offline operation."
+That was found by reading CI's failure, which named the two-step fix in its
+`fix` field. The wrong conclusion had already reached this issue's Hazards
+section and a PR description; both are corrected.
+
+### One real trap in the offline path
+
+`migration plan` with no `--from` planned **eight** operations from `<empty>` —
+a `CREATE SCHEMA` and every table in the database — rather than the four that
+carry the head forward. Passing `--from 20260904T1313_retire_entry_space`
+explicitly is what produces the edge the graph is missing. A plan rooted at empty
+looks plausible in isolation and would have added a second root to the migration
+graph, so **read the operation count and the `from` hash before keeping a
+planned migration**: the correct one reports
+`from sha256:d00492db…` (the head's `to`) and `to sha256:edd3e82b…` (the emitted
+contract), and the plan output prints both.
+
+The 40 pre-existing files under `migrations/app/` are untouched. The new
+directory's own `start-contract` names the retired model and its `end-contract`
+names the new one, which is what makes the pair a record of the rename rather
+than a rewrite of history.
+
+### Verification
+
+`pnpm verify:static` green. `pnpm test` **202 files, 2498 passed**, no failures —
+the sweep's one outstanding red is closed.
+
+`pnpm test:integration:postgres` and `pnpm e2e:postgres` were **not run locally**:
+they need PostgreSQL up and a `.env` this worktree does not have, and the user
+chose to prove them in CI instead, where the `postgres` job runs both against a
+database it migrates from empty. That is the stronger test of this change — a
+fresh database is exactly what a swept snapshot would have passed locally and
+failed there — and it is the run to read for this issue, not a local one.
+
+`pnpm e2e` and `pnpm e2e:ladle` judged **inapplicable**: nothing rendered
+changed, and both were green on the sweep that renamed everything they can see.

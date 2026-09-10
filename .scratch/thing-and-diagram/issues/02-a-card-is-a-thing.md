@@ -221,5 +221,9 @@ is a CI step in the static job.
 any other, and it rewrites `src/persistence/postgres-space-repository.ts`, which
 typechecks against the emitted contract. Reverting either half would break the
 other, so the model rename lands with the sweep and the forward migration that
-makes the head reach it is 03 — which needs a live database to generate, since
-`prisma-next migrate` refuses without a connection.
+makes the head reach it is 03.
+
+The sentence that stood here said 03 needed a live database to generate. It does
+not: `prisma-next migrate` refuses without a connection because it *applies*
+migrations, while `prisma-next migration plan` generates one entirely offline.
+03 records what that cost to find out.
