@@ -1,9 +1,15 @@
 /**
  * THROWAWAY UX PROTOTYPE — what Create Thing costs in the Things cluster.
  *
- * **The complaint, stated as a count.** The Dock draws `[▢ Things ⌄][+]` and the
- * `+` is a disclosure: it opens a menu of the three kinds, so *every* creation
- * costs two presses. The kind an author reaches for constantly is the Markdown
+ * **Settled: Option B, packed onto one row, is what the Dock draws.** The sheet
+ * is kept as the record of the comparison that produced that answer — a later
+ * reader asking "why not a menu, a split, or a badge" is asking a question the
+ * production code does not answer. It reads in the past tense throughout;
+ * nothing here is a live proposal, and nothing here is developed further.
+ *
+ * **The complaint, stated as a count.** The Dock drew `[▢ Things ⌄][+]` and the
+ * `+` was a disclosure: it opened a menu of the three kinds, so *every* creation
+ * cost two presses. The kind an author reaches for constantly is the Markdown
  * Thing, and it is the one kind that needs no second decision — so the most
  * common command in the product pays for a choice it never makes.
  *
@@ -14,22 +20,23 @@
  *   alias     `thingCreation.open()`    — opens a modal pane (a Target is required)
  *   space     `thingCreation.open()`    — opens a modal pane (a Space is required)
  *
- * So the menu is not one command disclosed three ways. It is one command that
+ * So the menu was not one command disclosed three ways. It was one command that
  * completes, sitting behind the same trigger as two commands that were always
- * going to open something. The menu adds a press to the one that needed none and
- * a *third* step to the two that already had two.
+ * going to open something. The menu added a press to the one that needed none
+ * and a *third* step to the two that already had two.
  *
- * **What the component's own doc says, so the options argue with it rather than
- * around it.** `CreateMenu` states: *"The kind is chosen at creation, so the menu
+ * **What the component's own doc said, so the options argued with it rather than
+ * around it.** `CreateMenu` stated: *"The kind is chosen at creation, so the menu
  * offers three peers rather than a split button with a hidden default."* That
- * sentence is what Option E contradicts, and contradicting it is the point of
+ * sentence is what Option E contradicted, and contradicting it was the point of
  * drawing it — a default is only *hidden* if the glyph does not already name it,
- * and `icons.tsx` documents `PlusIcon` as **"Create a Markdown Thing"** today.
- * The history is real too: `AddThingControl` was a split button, deleted by
+ * and `icons.tsx` documents `PlusIcon` as **"Create a Markdown Thing"** then as
+ * now. The history is real too: `AddThingControl` was a split button, deleted by
  * `.scratch/command-dock/issues/08` when the Dock replaced the Sidebar, and
  * `CLAUDE.md` says not to restore it because its recorded design contradicts
- * `CreateMenu`'s. This sheet is where that contradiction is settled by looking,
- * not by restoring anything.
+ * `CreateMenu`'s. This sheet is where that contradiction was settled by
+ * looking, not by restoring anything: B keeps the peers and drops the
+ * disclosure, so nothing was restored.
  *
  * **Nothing here creates a Thing.** Every press is recorded in the log instead,
  * with the press count each option has spent, so the 2× is measured rather than
@@ -262,10 +269,11 @@ function Option({
 /* -------------------------------------------------------------- permutations */
 
 /**
- * **A — the menu, as shipped.** One trigger, three peers behind it.
+ * **A — the menu, as it then stood.** One trigger, three peers behind it.
  *
  * Drawn first and unchanged so every count below is read against it rather than
- * against a memory of it.
+ * against a memory of it. This is the arrangement the sheet replaced, not the
+ * one it chose.
  */
 function MenuCreate({ record }: { readonly record: (line: string) => void }) {
   return (
@@ -578,7 +586,7 @@ export const Permutations: Story = () => {
       </PrototypeBanner>
       <div className="grid flex-1 gap-4 p-6">
         <Option
-          name="A · Menu (shipped today)"
+          name="A · Menu (the arrangement replaced)"
           presses={presses['A'] ?? 0}
           claim="one trailing target, and three kinds that read as peers with no default between them."
           cost="two presses for every creation, including the one kind that needs no second decision."
@@ -589,7 +597,7 @@ export const Permutations: Story = () => {
         </Option>
 
         <Option
-          name="B · Three peers, bare"
+          name="B · Three peers, bare (chosen)"
           presses={presses['B'] ?? 0}
           claim="one press for all three kinds, and no hidden default to argue about."
           cost="three targets in the cluster, a kind glyph asked to mean a verb for the first time in the product, and — in the vertical dock — a row the arrow keys walk downward. See VerticalDock."
@@ -625,7 +633,7 @@ export const Permutations: Story = () => {
           name="E · Split: + completes, chevron discloses the rest"
           presses={presses['E'] ?? 0}
           claim="one press for the kind that completes an Edit, and the menu kept for the two that open a pane."
-          cost="a second chevron beside the Things trigger's own, and a default the shipped design argues against."
+          cost="a second chevron beside the Things trigger's own, and a default `CreateMenu`'s own doc argued against."
         >
           <DockStrip>
             <SplitCreate record={press('E')} />

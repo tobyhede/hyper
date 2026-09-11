@@ -9,10 +9,11 @@
    badge" is asking a question this sheet answers and the production code does
    not. Do not develop these rules further; change the production sheet.
 
-   **One rule, and it is the whole of the proposed production change.** Written
-   here rather than in `command-dock.css` because the arrangement is still a
-   review question; if it is accepted, this block moves into that sheet beside
-   the three placement rules it belongs with and this file goes.
+   **One rule, and it was the whole of the production change B asked for.** It
+   stayed here rather than moving into `command-dock.css` because this file is
+   the staged comparison and the production sheet is where the accepted
+   arrangement went: `.command-dock__things` and `.command-dock__create` carry
+   it there. These rules exist only to draw the five options side by side.
 
    The peers are a nested `ToolbarGroup` — `role="group"`, a plain div in Base
    UI with no positional logic of its own, so it nests inside the Things cluster

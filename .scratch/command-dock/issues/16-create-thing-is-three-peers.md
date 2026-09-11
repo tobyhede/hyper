@@ -107,6 +107,21 @@ rather than by a document (ADR 0052)." The evidence is therefore
 `command-dock-packs-things-onto-one-row` in `stories/parity-claims.ts`, each with
 its Ladle and application halves.
 
+## Verified
+
+All three commands the change can be observed by, on the finished branch:
+
+| command | result |
+| --- | --- |
+| `pnpm verify` | green — 200 files, 2476 passed, 2 skipped |
+| `pnpm e2e` | green — 192 passed, database-free over HTTP |
+| `pnpm e2e:ladle` | green — 89 passed |
+
+`pnpm e2e` stays database-free: it drives `E2eMemorySpaceRepository` over a
+per-test Vite host, and PostgreSQL is `pnpm e2e:postgres`'s alone. That project
+is not run here — this change reaches no repository, migration or Space chrome
+that the one PostgreSQL test addresses.
+
 ## What is left
 
 Nothing blocking. The prototype sheet stays under `stories/review` as the record
