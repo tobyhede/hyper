@@ -122,6 +122,39 @@ describe('canvasProjection', () => {
     expect(opacityOf(OTHER_GRAPH)).toBeLessThan(1);
   });
 
+  /*
+   * Two Space Things on one target, selecting one Diagram at different Graphs
+   * (ADR 0026, `layout-only-v1/04` criterion 5).
+   *
+   * Which Edges an embedding draws is the Diagram's business, and which one it
+   * emphasises is the Thing's, so a pair that differs only by stored Graph has
+   * to come out identical in membership and opposite in emphasis. Asserted as a
+   * pair rather than as two separate projections: one projection emphasising
+   * correctly says nothing about whether the other one drew the same Space, and
+   * a regression that let `activeGraphId` filter rather than emphasise would
+   * satisfy every single-projection claim above.
+   */
+  it('draws one Diagram at two Graphs with the same Edges and opposite emphasis', async () => {
+    const space = spaceWith({ diagrams: [diagramOwning(DRAWN, OTHER)] });
+
+    const onDrawn = await projectThrough(space, { ...AT_REST, activeGraphId: DRAWN_GRAPH });
+    const onOther = await projectThrough(space, { ...AT_REST, activeGraphId: OTHER_GRAPH });
+
+    const drawnGraphIds = (edges: typeof onDrawn.edges) =>
+      edges.map((edge) => edge.data?.['graphId']).sort();
+    expect(drawnGraphIds(onOther.edges)).toEqual(drawnGraphIds(onDrawn.edges));
+    expect(onOther.edges.map((edge) => edge.id).sort()).toEqual(
+      onDrawn.edges.map((edge) => edge.id).sort(),
+    );
+
+    const opacityOf = (edges: typeof onDrawn.edges, graphId: string) =>
+      Number(edges.find((edge) => edge.data?.['graphId'] === graphId)?.style?.opacity);
+    expect(opacityOf(onDrawn.edges, DRAWN_GRAPH)).toBe(1);
+    expect(opacityOf(onDrawn.edges, OTHER_GRAPH)).toBeLessThan(1);
+    expect(opacityOf(onOther.edges, OTHER_GRAPH)).toBe(1);
+    expect(opacityOf(onOther.edges, DRAWN_GRAPH)).toBeLessThan(1);
+  });
+
   it('names the traversal position, the authoring selection and what Presenting draws', async () => {
     const space = spaceWith({ diagrams: [diagramOwning(DRAWN)] });
 

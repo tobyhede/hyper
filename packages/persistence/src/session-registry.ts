@@ -737,10 +737,22 @@ export function createSpaceSessionRegistry(
       try {
         stored = await loadWorkingSpace(targetSpaceId);
       } catch {
-        // The loader throws when the initializing commit did not land, which is
-        // the one transient arm: the next attempt may well succeed. Its own
-        // diagnostics belong to the opening path, which is where a reader would
-        // go looking for them.
+        // Every throw out of the loader lands here, not only the one the arm is
+        // named for. `working-space.ts` throws when the initializing commit did
+        // not land, when a conflict names the Space without returning its
+        // current state, when a committed initialization reports no revision,
+        // and when a non-empty Diagram list loses its first value; a rejected
+        // `loadSpace` reaches here too. They are one refusal because the author
+        // has one move for all of them — the target has no selection to give
+        // and the next attempt may find one — and `not-initialized` is what
+        // says so. The distinction they would otherwise draw is between kinds
+        // of repository fault, which no row in a target list answers.
+        //
+        // The error itself is dropped rather than reported: this registry takes
+        // no reporter, and threading one in for this arm alone would put a
+        // diagnostic seam on the lifecycle that the opening path — where these
+        // same throws are raised and where a reader looks for them — already
+        // owns.
         return unavailableTarget('not-initialized');
       }
       if (stored === undefined) return unavailableTarget('missing');

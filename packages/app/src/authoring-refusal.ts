@@ -471,11 +471,23 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
   }
 };
 
-/** The refusals the Target field answers — see {@link presentNewSpaceThingRefusal}. */
-const TARGET_FIELD_REFUSALS: ReadonlySet<SpaceThingRefusal['code']> = new Set([
-  'aggregate-refused',
-  'space-thing-target-unavailable',
-]);
+/**
+ * Where each refusal is drawn — see {@link presentNewSpaceThingRefusal}.
+ *
+ * A table over every code rather than a set of the two that reach the Target
+ * field, for the reason `TARGET_UNAVAILABLE_REASONS` above is one: a membership
+ * test answers `false` for a code nobody placed, so a refusal added later would
+ * quietly land under the pane instead of on the field that fixes it. `satisfies
+ * Record<…>` makes the omission a compile error here, where the decision is.
+ */
+const REFUSAL_PLACEMENT = {
+  'aggregate-refused': 'target',
+  'space-thing-target-unavailable': 'target',
+  'diagram-not-found': 'form',
+  'space-thing-not-found': 'form',
+  'persistence-recovery-required': 'form',
+  'persistence-read-failed': 'form',
+} satisfies Record<SpaceThingRefusal['code'], 'target' | 'form'>;
 
 /**
  * Error placement for Space Thing creation, which owns Title and Target.
@@ -489,7 +501,7 @@ const TARGET_FIELD_REFUSALS: ReadonlySet<SpaceThingRefusal['code']> = new Set([
 export const presentNewSpaceThingRefusal = (
   refusal: SpaceThingRefusal,
 ): ThingCreationRefusalErrors =>
-  TARGET_FIELD_REFUSALS.has(refusal.code)
+  REFUSAL_PLACEMENT[refusal.code] === 'target'
     ? { fields: { target: describeSpaceThingRefusal(refusal) } }
     : { fields: {}, form: describeSpaceThingRefusal(refusal) };
 

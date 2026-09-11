@@ -15,9 +15,14 @@ context rather than the target Space's own navigation selection.
       initialization and stores the resulting default Layout and Active Graph.
 - [x] Initialization or target-load failure produces no Card, dangling reference
       or partially persisted aggregate Edit.
-- [x] The Layout and Graph the Card stores are the context any Open or Enter
+- [~] The Layout and Graph the Card stores are the context any Open or Enter
       resolves, and navigating inside the target writes neither selection back
       until an authored Edit records one under the established ownership rules.
+      *Open resolves the stored pair and neither selection is written back.
+      Enter does not: `OpenSpaces.enter` still takes a Diagram and no Graph and
+      has no production caller, so it cannot carry a Card's stored Graph. That
+      half is `entity-url-addressability/08`'s and is not built here — see the
+      build note below.*
 - [x] Several Space Cards may reference one target while selecting different
       Layouts and Graphs, and each selection survives aggregate round-trip. The
       selected Graph is that embed's Active Graph and emphasises only: which
@@ -123,12 +128,19 @@ Three findings worth keeping:
   pair.
 
 Enter is **not** built and was never this ticket's: `entity-url-addressability/08`
-owns that surface and `OpenSpaces.enter` still has no production caller. The
-fourth criterion is ticked on the half this ticket owns — the stored context is
-what Open resolves, and navigating inside a target writes neither selection back.
+owns that surface, `OpenSpaces.enter` still has no production caller, and its
+`(spaceId, selection?: DiagramId)` signature carries no Graph to resolve one
+with. The fourth criterion is therefore marked `[~]` rather than `[x]`: the half
+this ticket owns is done — the stored context is what Open resolves, and
+navigating inside a target writes neither selection back — and the Enter half
+is left open against the ticket that owns it.
 
 Verified on the finished state: `pnpm verify` (196 files, 2448 passed, 2
 skipped), `pnpm e2e` (180 passed), `pnpm e2e:ladle` (83 passed).
-`pnpm test:integration:postgres` was not run — it needs a database — so the
-PostgreSQL fixtures rolled forward with it are correct by inspection and by the
-shared `spaceRepositoryContract` the memory adapter runs.
+
+`pnpm test:integration:postgres` was run afterwards against a container started
+for it (80 passed, 4 files), because it is the only command that can observe
+the three files this ticket rolled forward under it —
+`test/support/repository-contract.ts` and the two suites it drives. The
+renamed contract case and the memory/PostgreSQL differential both pass against
+the real adapter, so the fixtures are evidenced rather than inspected.
