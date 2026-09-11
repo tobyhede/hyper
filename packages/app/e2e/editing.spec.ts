@@ -1587,8 +1587,8 @@ test('New Diagram creates an empty Diagram and leaves existing Things in the Thi
 });
 
 test(
-  'adding an existing Thing from the Things drawer authors Diagram membership',
-  { tag: '@parity:things-drawer-adds-existing-diagram-members' },
+  'adding an existing Thing from the Things list authors Diagram membership',
+  { tag: '@parity:things-popover-adds-existing-diagram-members' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
@@ -1606,8 +1606,8 @@ test(
 );
 
 test(
-  'the Things drawer names an empty Diagram after every absent Thing is added',
-  { tag: '@parity:things-drawer-distinguishes-an-empty-diagram' },
+  'the Things list names an empty Diagram after every absent Thing is added',
+  { tag: '@parity:things-popover-distinguishes-an-empty-diagram' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
@@ -1626,8 +1626,51 @@ test(
 );
 
 test(
+  'the Things filter counts what each switch contributes under the current search',
+  { tag: '@parity:things-popover-counts-what-each-filter-contributes' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await page.getByRole('button', { name: 'Things' }).click();
+    const markdown = page.getByRole('button', { name: /^Markdown Things, \d+$/ });
+    await expect(markdown).toBeVisible();
+
+    // Narrowed to the one kind the count is read against, because the claim is
+    // that the number agrees with the rows *under it* — and the rows are four
+    // sources interleaved, this Space leaving an Alias unplaced beside its
+    // Markdown Things. Turning the other three off is also the gesture that
+    // proves a switch narrows the list at all.
+    for (const other of ['Aliases', 'Space Things in this Space', 'Spaces in this Meta Space']) {
+      await page.getByRole('button', { name: new RegExp(`^${other}, \\d+$`) }).click();
+    }
+
+    const rows = page.getByRole('button', { name: /^Add .* to Diagram$/ });
+    const before = await rows.count();
+    expect(before, 'this Diagram leaves Markdown Things unplaced').toBeGreaterThan(0);
+    await expect(markdown).toHaveAccessibleName(`Markdown Things, ${String(before)}`);
+
+    // The count answers the search rather than the Space, which is the whole of
+    // why it is worth drawing — a number that disagreed with the rows under it
+    // would be a second claim about the same set
+    // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
+    await page.getByRole('textbox', { name: 'Search things' }).fill('zzzz');
+    await expect(rows).toHaveCount(0);
+    await expect(markdown).toHaveAccessibleName('Markdown Things, 0');
+
+    // And a switch the reader turns off goes on counting, because the number is
+    // what says whether turning it back on is worth the press.
+    await page.getByRole('textbox', { name: 'Search things' }).fill('');
+    await markdown.click();
+    await expect(markdown).toHaveAttribute('aria-pressed', 'false');
+    await expect(markdown).toHaveAccessibleName(`Markdown Things, ${String(before)}`);
+  },
+);
+
+test(
   'a long Things list scrolls independently on a narrow screen',
-  { tag: '@parity:things-drawer-scrolls-a-long-list-on-a-narrow-screen' },
+  { tag: '@parity:things-popover-scrolls-a-long-list-on-a-narrow-screen' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
@@ -1636,113 +1679,148 @@ test(
 
     await page.getByRole('button', { name: 'Things' }).click();
     await expect(page.getByRole('textbox', { name: 'Search things' })).toBeVisible();
-    const list = page.locator('[data-base-ui-swipe-ignore]');
-    expect(await list.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
-      true,
+    // **The application half proves containment; the Ladle half proves the
+    // scrolling.** This Space's selected Diagram leaves five Things unplaced, and
+    // five rows do not overflow any sane bound — the drawer this replaced
+    // scrolled here only because its rows were whole 146px Thing fronts. What is
+    // provable against the real Space is the invariant that actually bites on a
+    // short screen: an anchored popover is bounded by the room it has and stays
+    // inside the viewport, where a fixed height would put the last rows under
+    // the edge with no way to reach them. `things-popover.spec.ts` mounts
+    // eighteen rows against the same bound and asserts it scrolls.
+    const list = page.locator('.things-popover__list');
+    const box = await boxOf(list, 'the Things list');
+    const viewport = page.viewportSize();
+    expect(viewport, 'the viewport was sized above').not.toBeNull();
+    expect(box.y + box.height, 'the list ends inside the viewport').toBeLessThanOrEqual(
+      viewport?.height ?? 0,
     );
+    expect(
+      await list.evaluate((element) => getComputedStyle(element).overflowY),
+      'the list scrolls rather than clipping what the bound cuts off',
+    ).toBe('auto');
   },
 );
 
 test(
-  'the Things drawer dismisses on Escape and survives working on the canvas behind it',
-  { tag: '@parity:things-drawer-opens-and-dismisses-without-locking-the-canvas' },
+  'the Things list dismisses on Escape and survives working on the canvas behind it',
+  { tag: '@parity:things-popover-opens-and-dismisses-without-locking-the-canvas' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
     const trigger = page.getByRole('button', { name: 'Things' });
-    const drawer = page.getByRole('dialog', { name: 'Things' });
+    const list = page.getByRole('dialog', { name: 'Things' });
 
-    await expect(drawer).toHaveCount(0);
+    await expect(list).toHaveCount(0);
     await trigger.click();
-    await expect(drawer).toBeVisible();
+    await expect(list).toBeVisible();
 
-    // Selecting a Thing on the canvas is the ordinary press this drawer has to
-    // live through: it is how a Thing is dropped, and a drawer that closed on it
-    // could only ever add one Thing per opening.
+    // Selecting a Thing on the canvas is the ordinary press this list has to
+    // live through: it is how a Thing is dropped, and a surface that closed on
+    // it could only ever add one Thing per opening. That is the comparison's own
+    // reason for anchoring the list rather than drawing it from the screen edge
+    // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
     await nodeByTitle(page, 'A').click();
     await expect(nodeByTitle(page, 'A')).toHaveClass(/selected/);
-    await expect(drawer).toBeVisible();
+    await expect(list).toBeVisible();
 
     await page.keyboard.press('Escape');
-    await expect(drawer).toHaveCount(0);
+    await expect(list).toHaveCount(0);
     await expect(trigger).toBeFocused();
   },
 );
 
-test('the open Things drawer leaves the Graph key and overview visible beside it', async ({
-  page,
-}) => {
+test('the open Things list takes no width from the canvas it feeds', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
   const legend = page.getByTestId('graph-legend');
   const overview = page.getByRole('img', { name: 'Graph overview' });
+  const canvas = page.getByTestId('selected-canvas');
   await expect(legend).toBeVisible();
+  const before = await boxOf(canvas, 'the canvas');
 
   await page.getByRole('button', { name: 'Things' }).click();
-  const drawer = page.getByRole('dialog', { name: 'Things' });
-  await expect(drawer).toBeVisible();
+  const list = page.getByRole('dialog', { name: 'Things' });
+  await expect(list).toBeVisible();
 
-  // The drawer overlays the end edge and the HUD is pinned to the same one, so
-  // the shell yields the panel's width instead of letting it cover the Graph
-  // key and the pannable overview. Geometry, because "visible" is true of an
-  // element sitting underneath an opaque panel.
-  const panel = await boxOf(drawer, 'the Things drawer');
-  for (const [what, locator] of [
-    ['the Graph key', legend],
-    ['the Graph overview', overview],
-  ] as const) {
-    const box = await boxOf(locator, what);
-    expect(box.x + box.width, `${what} ends before the drawer begins`).toBeLessThanOrEqual(panel.x);
-  }
+  // **The obligation ADR 0082 binds, and the one the drawer this replaced could
+  // not keep.** A drawer from the screen edge occludes the edge you are
+  // dropping onto, so the shell had to yield its width and the canvas got
+  // narrower every time the reader opened it. An anchored popover floats: the
+  // canvas is the same box open or closed, and the Graph key and the pannable
+  // overview stay where they were.
+  const after = await boxOf(canvas, 'the canvas');
+  expect(after.width, 'the canvas keeps its width while the list is open').toBe(before.width);
+  expect(after.x, 'the canvas keeps its position while the list is open').toBe(before.x);
 
-  // And it is still the reader's to operate, not just to look at.
+  // And they are still the reader's to operate, not just to look at.
   await expect(legend).toContainText('Graph');
   await overview.click({ position: { x: 4, y: 4 } });
-  await expect(drawer).toBeVisible();
+  await expect(list).toBeVisible();
 });
 
-test('leaving a presentation closes the Things drawer rather than reopening it over the canvas', async ({
+test('leaving a presentation closes the Things list rather than reopening it over the canvas', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  const drawer = page.getByRole('dialog', { name: 'Things' });
+  const list = page.getByRole('dialog', { name: 'Things' });
   await page.getByRole('button', { name: 'Things' }).click();
-  await expect(drawer).toBeVisible();
+  await expect(list).toBeVisible();
 
   await presentControl(page).click();
   await expect(page.getByTestId('exit-presenting')).toBeVisible();
-  await expect(drawer).toHaveCount(0);
+  await expect(list).toHaveCount(0);
 
-  // A drawer that sprang back would also take focus with it — `Drawer.Popup`
-  // moves focus in on every open, however that open was caused — landing the
-  // reader in the Things list instead of on the canvas they returned to.
+  // A list that sprang back would also take focus with it — a popover moves
+  // focus in on every open, however that open was caused — landing the reader
+  // in the Things instead of on the canvas they returned to. What the Dock drops
+  // on the way into presenting is the *request* that opened it, so there is
+  // nothing left to reopen from.
   await page.getByTestId('exit-presenting').click();
   await expect(presentControl(page)).toBeVisible();
-  await expect(drawer).toHaveCount(0);
-  await expect(page.locator('[data-slot="drawer-popup"]')).toHaveCount(0);
+  await expect(list).toHaveCount(0);
 });
 
-test('keyboard placement moves focus from the Things drawer to the added canvas Thing', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
+test(
+  'a keyboard Add keeps the reader in the Things list, on the filter',
+  { tag: '@parity:things-popover-keeps-the-reader-in-the-list-after-a-keyboard-add' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
 
-  await page.getByRole('button', { name: 'Things' }).click();
-  const source = page.getByRole('button', { name: 'Add E to Diagram' });
-  await source.focus();
-  await source.press('Enter');
+    await page.getByRole('button', { name: 'Things' }).click();
+    const source = page.getByRole('button', { name: 'Add E to Diagram' });
+    await source.focus();
+    await source.press('Enter');
 
-  await expect(nodeByTitle(page, 'E')).toBeFocused();
-});
+    // The Thing is placed, and the reader has not been taken anywhere: an anchored
+    // list is a surface you spend repeatedly, which is what the surface
+    // comparison bought and what a screen-edge drawer, taken away by the Thing it
+    // placed, could not offer
+    // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
+    await expect(nodeByTitle(page, 'E')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add E to Diagram' })).toHaveCount(0);
+
+    // On the filter rather than on the popup Base UI would otherwise park it on:
+    // the reader's next move is to name the next Thing.
+    await expect(page.getByRole('textbox', { name: 'Search things' })).toBeFocused();
+
+    // And Escape is the way out to the canvas, returning focus to the control the
+    // list hangs off rather than dropping it on the document.
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Things' })).toBeFocused();
+  },
+);
 
 /**
  * Deleting a Thing is the Thing rail's now (ADR 0073), so its withdrawal is read
@@ -1828,7 +1906,7 @@ test('Delete Thing is withdrawn while the selected Thing is Open', async ({ page
   ).toHaveCount(0);
 });
 
-test('dragging from the Things drawer uses transformed canvas coordinates then ordinary Thing dragging', async ({
+test('dragging from the Things list uses transformed canvas coordinates then ordinary Thing dragging', async ({
   page,
 }) => {
   await page.goto('/');
@@ -1864,9 +1942,9 @@ test('dragging from the Things drawer uses transformed canvas coordinates then o
 });
 
 test(
-  'the Things toggle is withdrawn while presenting, matching the drawer it controls',
+  'the Things toggle is withdrawn while presenting, matching the list it controls',
   {
-    tag: '@parity:things-drawer-withdraws-while-authoring-is-unavailable',
+    tag: '@parity:things-popover-withdraws-while-authoring-is-unavailable',
   },
   async ({ page }) => {
     await page.goto('/');
@@ -1887,7 +1965,7 @@ test(
     // inside a locator matching nothing and its `toHaveCount(0)` would be
     // satisfied by a Dock that had never rendered at all. The trigger is
     // therefore addressed through the frame, which is still there, and the
-    // drawer it controls is closed rather than left hidden behind a still-true
+    // list it controls is closed rather than left hidden behind a still-true
     // `open` — the half of the claim that outlived the Sidebar.
     const surface = page.locator('.command-dock__surface');
     await expect(surface).toBeAttached();

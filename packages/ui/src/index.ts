@@ -102,6 +102,8 @@ export {
   MarkdownIcon,
   OpenThingIcon,
   ParentIcon,
+  SpaceThingIcon,
+  SpaceIcon,
   SearchIcon,
   PlusIcon,
   ZoomInIcon,
@@ -227,6 +229,7 @@ export { Separator } from './components/separator';
 export { Slider } from './components/slider';
 export { Spinner } from './components/spinner';
 export { Textarea } from './components/textarea';
+export { ToggleGroup, ToggleGroupItem } from './components/toggle-group';
 export { Toolbar, ToolbarButton, ToolbarGroup } from './components/toolbar';
 export type { ToolbarButtonProps } from './components/toolbar';
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/tooltip';

@@ -751,7 +751,15 @@ describe('Space app failure reporting', () => {
   });
 });
 
-describe('Space app Things drawer', () => {
+/**
+ * The Things list is a Popover, so these assert that it is *mounted* rather than
+ * that it is visible: Base UI's Positioner holds a popup at `opacity: 0` until
+ * it has measured its anchor, and jsdom answers every measurement with zeroes,
+ * so `toBeVisible` can never pass here for any popover in the tree
+ * (`SelectedEdgeControls`' own tests read the same way). The visibility half of
+ * this evidence is the Ladle behaviour test, which runs in a real browser.
+ */
+describe('Space app Things list', () => {
   it('opens once for the client whose working load created the empty Diagram', () => {
     const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 1n, exportedRevision: null };
@@ -771,7 +779,7 @@ describe('Space app Things drawer', () => {
       (app) => render(app),
     );
 
-    expect(screen.getByRole('dialog', { name: 'Things' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Things' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Things' }));
     expect(screen.queryByRole('dialog', { name: 'Things' })).not.toBeInTheDocument();
   });
@@ -830,7 +838,7 @@ describe('Space app Things drawer', () => {
     expect(session.getState().working.document.diagrams?.[1]?.positions).toEqual({});
     expect(session.getState().working.document.diagrams?.[1]?.graphs).toHaveLength(1);
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Diagram 1');
-    expect(screen.getByRole('dialog', { name: 'Things' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Things' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Things' }));
     expect(screen.queryByRole('dialog', { name: 'Things' })).not.toBeInTheDocument();
@@ -1145,7 +1153,7 @@ describe('Space app Things drawer', () => {
    * run would have to catch.
    */
 
-  it('keeps the Things drawer closed after the reader closes it, even once the Space gains another Thing', async () => {
+  it('keeps the Things list closed after the reader closes it, even once the Space gains another Thing', async () => {
     const base = snapshot('Space', 'Thing', 10, 20);
     const local: SpaceSnapshot = {
       ...base,
@@ -1181,7 +1189,9 @@ describe('Space app Things drawer', () => {
       ),
     );
 
-    expect(screen.getByRole('button', { name: 'Add Outside thing to Diagram' })).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Add Outside thing to Diagram' }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Things' }));
     expect(

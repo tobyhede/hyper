@@ -91,6 +91,46 @@ test(
 );
 
 /**
+ * The Things list offers the Meta Space's Spaces beside this Space's Things.
+ *
+ * The distinction the filter's two Space glyphs exist to draw (ADR 0074): the
+ * frame is a Space **Thing**, one authored view placed in a Diagram, and the cube
+ * is the Space itself, offered whether or not this Space has ever pointed at
+ * it. Creating a Space Thing brings its Space into the Meta Space, so the same
+ * Edit that puts a frame on the canvas is what puts a cube in the list.
+ */
+test(
+  'the Things list offers a newly created Space as a Space of the Meta Space',
+  { tag: '@parity:things-popover-offers-the-meta-spaces-beside-the-things' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await createThing(page, 'Space Thing');
+    await page.getByTestId('new-space-thing-title').fill('Architecture');
+    await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
+    await expect(page.getByTestId('new-space-thing')).toHaveCount(0);
+    await expect(nodeByTitle(page, 'Architecture')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Things' }).click();
+    const list = page.getByRole('dialog', { name: 'Things' });
+    await expect(list).toBeVisible();
+
+    // The Space is offered although the Thing that references it is already on
+    // this Diagram — they are two different things to place, which is why the
+    // filter draws them as two toggles rather than one.
+    const row = list.getByRole('button', { name: 'Add Architecture to Diagram' });
+    await expect(row).toHaveCount(1);
+    await expect(row).toHaveAttribute('data-space-id', /.+/);
+
+    // And pressing its toggle off takes it away, leaving this Space's Things.
+    await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
+    await expect(list.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(0);
+  },
+);
+
+/**
  * The second Space Thing is offered the first's Space, and referencing it is not
  * a copy.
  *

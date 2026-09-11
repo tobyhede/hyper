@@ -104,7 +104,7 @@ import {
   ToolbarButton,
   ToolbarGroup,
 } from '@project/ui';
-import type { Graph, GraphId, Diagram, DiagramId, UUID } from '@project/core';
+import type { Thing, ThingId, Graph, GraphId, Diagram, DiagramId, UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
@@ -133,7 +133,8 @@ import {
   openSpacesName,
   SPACES_LABEL,
 } from '../dock-model';
-import { SET_TRIGGER } from './command-dock-triggers';
+import { THINGS_TRIGGER, SET_TRIGGER } from './command-dock-triggers';
+import { ThingsPopover, type ThingsPopoverSpace } from './ThingsPopover';
 import './command-dock.css';
 
 /**
@@ -503,30 +504,86 @@ export interface DockGraph {
   readonly presentDisabled: boolean;
 }
 
+/**
+ * What the Things list draws and what activating a row does.
+ *
+ * **Two one-way writes rather than an `open` flag**, and that is what lets the
+ * Dock own the slot without a second copy of the answer beside it. The
+ * application has exactly two things to say about whether this list is open —
+ * `disclose` asks for it and `disabled` withdraws it — and nothing it reads
+ * back, so neither is state it keeps. A controlled `open` pair here is the
+ * shape that lets the Dock's slot and the application's flag disagree, which is
+ * how two disclosures come to be open at once.
+ */
+export interface DockThingsList {
+  /** The Things this Diagram does not place — what the list offers. */
+  readonly things: readonly Thing[];
+  /** Every Thing in the Space, for resolving an Alias row's Target Title. */
+  readonly allThings: readonly Thing[];
+  /** The Title of every Space a Space Thing in the list references. */
+  readonly spaceTitleById?: ReadonlyMap<UUID, string> | undefined;
+  /**
+   * Every Space this Meta Space holds bar the one being authored.
+   *
+   * The list's second source. A Space is not a Thing and is in no Diagram, so it
+   * is not filtered against one; placing it authors the Space Thing that frames
+   * it, which under ADR 0074 is the only way a Space is referenced at all.
+   */
+  readonly spaces?: readonly ThingsPopoverSpace[] | undefined;
+  /** Place a Space by authoring the Space Thing that frames it, or answer with a refusal. */
+  readonly onAddSpace?: ((space: ThingsPopoverSpace) => Promise<string | null>) | undefined;
+  /** Returns a refusal that stays on the list, or null after a completed Add. */
+  readonly onAdd: (thing: Thing, activation: 'keyboard' | 'pointer') => string | null;
+  readonly onDragStart: (thingId: ThingId) => void;
+  readonly onDragEnd?: (() => void) | undefined;
+  /** The row an addressed Thing marks as current, drawn whether or not it opened the list. */
+  readonly revealedThingId?: ThingId | null | undefined;
+  /**
+   * A request to disclose the list, or `null` for none outstanding.
+   *
+   * **A request rather than an `open` flag**, which is what lets the Dock own
+   * the slot without a second copy of the answer beside it. The application has
+   * two moments at which it asks for this list and none at which it reads back
+   * whether the list is open: a Diagram just created — by Add Diagram, or by
+   * having opened a Space into one — and a Thing addressed that the selected
+   * Diagram does not place.
+   *
+   * The Dock opens on the value **changing identity**, so the application raises
+   * a fresh object per request and an unrelated edit recomputing an equal one
+   * reopens nothing the reader has just closed. A request outstanding when the
+   * Dock first mounts opens it without waiting a frame.
+   */
+  readonly disclose?: DockThingsDisclosure | null | undefined;
+  /** Whether the Diagram can accept membership edits at all. */
+  readonly disabled: boolean;
+}
+
+/** One request to disclose the Things list, and the Thing it is about if any. */
+export interface DockThingsDisclosure {
+  /** The Thing the request is about, for a caller that wants it marked too. */
+  readonly thingId: ThingId | null;
+}
+
 export interface DockThings {
   /**
-   * The Things surface itself — its trigger and its panel, supplied whole.
+   * The Things, as a list this Dock draws.
    *
-   * **A slot rather than a list, because there is one Things surface and it is
-   * not this one's.** The prototype drew its own filtered popover here and it
-   * was compared against a Drawer and a second dock at the scale that separates
-   * them; the Popover won that comparison. What settled it the other way is that
-   * the application already had `ThingsDrawer` — a production surface with its
-   * own stable story, its own behaviour tests and seven parity claims — and two
-   * surfaces offering "add an existing Thing to this Diagram" is the second place
-   * commands live that ADR 0082 rules out. So the Dock offers the *way* to the
-   * Things and the drawer is what it opens; re-deciding which of the two the
-   * product wants is a promotion of its own rather than a side effect of this
-   * one.
+   * **The Dock draws it rather than being handed it, and that is the whole of
+   * why the open state lives here.** The prototype's Things cluster disclosed a
+   * filtered Popover it drew itself, chosen over a Drawer from the screen edge
+   * and a second docked panel in a comparison over twenty-nine unplaced Things;
+   * the Popover won, and the reasons are written above {@link ThingsPopover} and
+   * in `.scratch/command-dock/issues/10-decide-the-cards-surface.md`. The Dock's
+   * promotion shipped the application's `ThingsDrawer` against that decision
+   * because the drawer already had parity claims and the prototype's evidence
+   * sat in a file marked throwaway; this slot was a `ReactNode` for as long as
+   * the surface was a foreign component.
    *
-   * The caller supplies trigger and panel together because they are one
-   * component: a toggle whose `disabled` and whose surface are decided in two
-   * places is a toggle that comes to disagree with what it names. It draws in
-   * the Dock's own name slot through {@link THINGS_TRIGGER} and
-   * {@link ThingsTrigger}, so it lands in the column the other three names land
-   * in, whichever edge the dock is on.
+   * It is not one any more. A list the Dock draws takes the Dock's own single
+   * open slot, so opening it closes whichever menu was open and opening a menu
+   * closes it — which a handed-in surface holding its own `open` could not do.
    */
-  readonly surface: ReactNode;
+  readonly list: DockThingsList;
   /**
    * Create a Thing of one kind — the one command about the *set*.
    *
@@ -1389,6 +1446,78 @@ function useDockDisclosure() {
   } satisfies DisclosureBinding;
 }
 
+/**
+ * The Things disclosure's id, and the one in the Dock that is not a `useId`.
+ *
+ * Every other disclosure takes an opaque generated id, so two cannot collide by
+ * both calling themselves "things" (see {@link useDockDisclosure}). This one is
+ * named because it is the one disclosure the Dock itself opens on the
+ * application's behalf — a Diagram just created, a Thing addressed that the
+ * Diagram does not place — and {@link DockChrome} has to be able to seed the
+ * Dock's slot with it before any control has mounted to mint an id.
+ */
+const THINGS_DISCLOSURE_ID = 'command-dock-things';
+
+/**
+ * The Things list in its cluster, holding the Dock's one open slot.
+ *
+ * The three things the application says about whether this is open are applied
+ * here rather than mirrored into a second flag: `initiallyOpen` seeds the slot
+ * in {@link CommandDock}, `disabled` closes it, and `reveal` opens it on the
+ * change rather than on the value. Each is a one-way write into the slot, so
+ * there is no state here that can come to disagree with the application's.
+ */
+function ThingsList({ list, side }: { readonly list: DockThingsList; readonly side: MenuSide }) {
+  const { openId, setOpenId } = useContext(DockDisclosureContext);
+  const open = openId === THINGS_DISCLOSURE_ID;
+  const disclosed = useRef(list.disclose ?? null);
+  // The slot key is stable and the trigger's DOM id is not, because they answer
+  // different questions: the Dock has to be able to name this slot before a
+  // control exists, and every open Space keeps its Dock mounted, so a literal
+  // `id` would be in the document more than once the moment a second Space is
+  // open.
+  const triggerId = useId();
+
+  // Withdrawing the list *closes* it rather than leaving it open behind a
+  // disabled trigger. Presenting and creating an Alias both pass through here,
+  // and a list that reopened itself on the way back would take focus with it,
+  // landing the reader in the Things rather than on the canvas they returned to.
+  useEffect(() => {
+    if (list.disabled && open) setOpenId(null);
+  }, [list.disabled, open, setOpenId]);
+
+  // On the identity changing rather than on the value: an unrelated edit
+  // elsewhere in the Space recomputes an equal request, and reopening on that
+  // alone would reopen a list the reader has just closed.
+  useEffect(() => {
+    const next = list.disclose ?? null;
+    if (next === disclosed.current) return;
+    disclosed.current = next;
+    if (next !== null) setOpenId(THINGS_DISCLOSURE_ID);
+  }, [list.disclose, setOpenId]);
+
+  return (
+    <ThingsPopover
+      open={open && !list.disabled}
+      onOpenChange={(next) => setOpenId(next ? THINGS_DISCLOSURE_ID : null)}
+      triggerId={triggerId}
+      side={side}
+      disabled={list.disabled}
+      triggerRender={<ToolbarButton variant="ghost" {...THINGS_TRIGGER} />}
+      triggerLabel={<ThingsTrigger />}
+      things={list.things}
+      allThings={list.allThings}
+      spaceTitleById={list.spaceTitleById}
+      spaces={list.spaces}
+      onAddSpace={list.onAddSpace}
+      onAdd={list.onAdd}
+      onDragStart={list.onDragStart}
+      onDragEnd={list.onDragEnd}
+      revealedThingId={list.revealedThingId}
+    />
+  );
+}
+
 function ThingsControl({
   things,
   side = 'bottom',
@@ -1407,7 +1536,7 @@ function ThingsControl({
    */
   return (
     <ToolbarGroup aria-label="Things" className="command-dock__cluster">
-      {/* **The surface carries no commands, and that is the shape rather than a
+      {/* **The list carries no commands, and that is the shape rather than a
           gap in it.** Things names no one entity — a Thing's own commands are the
           Thing rail's (ADR 0073) and this Dock deliberately carries none — and
           its one set command, Create, is the `+` beside this trigger.
@@ -1417,7 +1546,7 @@ function ThingsControl({
           It offers Space Things like any other Thing and does nothing special
           with them: entering one is the canvas Thing's gesture (ADR 0068), not a
           list's. */}
-      {things.surface}
+      <ThingsList list={things.list} side={side} />
       {/* **Trailing, where Present leads**, and the asymmetry is the point.
           Present acts on the named entity the cluster is showing — present *this
           Graph* — so it sits at the edge the eye enters from, ahead of the name
@@ -2576,7 +2705,13 @@ export function CommandDock({
   readonly initialEdge: DockEdge;
 }) {
   const [dock, setDock] = useState<DockPosition>({ edge: initialEdge, along: 'center' });
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(
+    // The one disclosure the Dock opens for the application rather than for the
+    // reader: Add Diagram makes an empty Diagram, and the Things are what fills it.
+    // Seeded here so a Space opened into a new Diagram draws the list on its
+    // first frame rather than one after it.
+    (chrome.things.list.disclose ?? null) === null ? null : THINGS_DISCLOSURE_ID,
+  );
   const renaming = useDockRenaming(chrome);
   const vertical = orientationOf(dock.edge) === 'vertical';
   // A rule divides across the dock's own axis, so it runs the other way.

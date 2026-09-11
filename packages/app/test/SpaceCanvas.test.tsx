@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
-import { THING_DRAG_TYPE } from '../src/components/ThingsDrawer';
+import { THING_DRAG_TYPE } from '../src/components/ThingsPopover';
 import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';

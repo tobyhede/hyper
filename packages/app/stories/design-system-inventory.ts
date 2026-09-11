@@ -55,6 +55,11 @@ export const uncataloguedComponents = [
       'Deliberately without a consumer. It wraps cmdk, which ADR 0050 kept rather than migrating; `ThingSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
   },
   {
+    module: 'packages/ui/src/components/drawer.tsx',
+    reason:
+      'Without a consumer since `.scratch/command-dock/issues/10-decide-the-cards-surface.md` restored the Things surface decision: `ThingsDrawer` was its only one, and the Things list is a `Popover` anchored to the Dock’s own trigger — which is what the prototype’s three-surface comparison chose, on the ground that a screen-edge drawer occludes the canvas edge you are dropping onto. The registry `Drawer` and `DRAWER_WIDTH` are what is left, and `AppShell`’s `insetEnd` is left standing with them. `08-retire-the-sidebar-era-primitives.md` took the Sidebar-era primitives while this one still had a consumer, so it did not take this; retiring a registry primitive is a foundation decision rather than a surface one, and taking these three is a decision of its own.',
+  },
+  {
     module: 'packages/ui/src/components/empty.tsx',
     reason:
       'Deliberately without a consumer, for the same reason as `Command.tsx` above. A shadcn registry primitive for an empty result set — the combobox empty message comes from Base UI’s own `ComboboxEmpty`, not from here.',

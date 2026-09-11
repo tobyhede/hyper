@@ -81,7 +81,7 @@ investigation. PostgreSQL E2E was reported fixed but not executed locally.
 
 ## Decisions and follow-up findings — do not mislabel as confirmed regressions
 
-- **New Layout:** opening the Cards drawer after creation, and on first Layout
+- **New Layout:** opening the Cards list after creation, and on first Layout
   initialization, already happens at `a2082964`. Removing that side effect is a
   requested behaviour change, not an addition introduced by this branch. Record
   whether New Layout should create/select its empty Layout and initial Graph
