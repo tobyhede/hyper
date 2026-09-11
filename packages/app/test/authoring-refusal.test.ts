@@ -28,6 +28,7 @@ const EVERY_REFUSAL = {
   'space-thing-target-immutable': { code: 'space-thing-target-immutable' },
   'thing-title-required': { code: 'thing-title-required' },
   'diagram-title-required': { code: 'diagram-title-required' },
+  'space-title-required': { code: 'space-title-required' },
   'alias-target-not-found': { code: 'alias-target-not-found', targetId: TARGET_ID },
   'alias-target-must-own-content': { code: 'alias-target-must-own-content', targetId: TARGET_ID },
   'thing-already-in-diagram': { code: 'thing-already-in-diagram' },

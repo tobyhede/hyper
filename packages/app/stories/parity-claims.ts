@@ -27,7 +27,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Space, Diagram and Graph names share typography; Space remains a non-interactive label, while Diagram opens its rename editor and returns focus on Escape.',
+      'Space, Diagram and Graph names share typography and are each a rename control rather than a label, and a name that opens its editor takes the caret back on Escape.',
   },
   {
     id: 'things-drawer-adds-existing-diagram-members',
@@ -308,7 +308,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'The Diagram and Graph names are each their own rename control, editing in place as one refusable draft that keeps a refusal on the field, completes on Enter and cancels on Escape.',
+      'The Space, Diagram and Graph names are each their own rename control, editing in place as one refusable draft that keeps a refusal on the field, completes on Enter and cancels on Escape.',
   },
   {
     id: 'command-dock-marks-the-space-one-crossing-up',

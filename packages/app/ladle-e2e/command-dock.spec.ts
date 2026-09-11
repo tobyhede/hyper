@@ -164,10 +164,44 @@ test(
  * focus back to itself.
  */
 test(
-  'the Diagram and Graph names each edit in place and keep a refusal on the field',
+  'the Space, Diagram and Graph names each edit in place and keep a refusal on the field',
   { tag: '@parity:command-dock-edits-identity-names' },
   async ({ page }) => {
     await page.goto(story('default'));
+
+    // **The Space first, because it is the identity that was a label.** It is one
+    // Edit on this Space's own session, writing `document.title` and nothing
+    // else: the four other Spaces this story has open are untouched, and the
+    // Space Thing in the parent that points here keeps its own Title (ADR 0083).
+    // Visible-filtered for the reason every `getByTestId` here is — an inactive
+    // open Space stays mounted and draws a Dock of its own.
+    const spaceTitle = () => page.getByTestId('space-title').filter({ visible: true });
+    await spaceTitle().click();
+    const spaceName = page.getByRole('textbox', { name: 'Space name' });
+    await expect(spaceName).toBeFocused();
+    // Whitespace, not nothing: `spaceFileSchema` spells the title
+    // `z.string().min(1)`, which counts characters, so this is the blank the
+    // schema cannot see and the surface refuses on the trim.
+    await spaceName.fill('   ');
+    await spaceName.press('Enter');
+    await expect(page.getByText('A Space needs a name.')).toBeVisible();
+    await expect(spaceName).toBeVisible();
+    await spaceName.fill('Atlas');
+    await spaceName.press('Enter');
+    await expect(spaceTitle()).toContainText('Atlas');
+    // And the menu beside it names the Space the Edit wrote, from the same value.
+    await expect(
+      surface(page).getByRole('button', { name: 'Space: Atlas', exact: true }),
+    ).toBeVisible();
+
+    // Escape cancels the Space draft and hands the caret back to the name it was
+    // begun from, which is the whole of the "no second surface" claim above.
+    await spaceTitle().click();
+    const cancelledSpace = page.getByRole('textbox', { name: 'Space name' });
+    await cancelledSpace.fill('Ledger');
+    await cancelledSpace.press('Escape');
+    await expect(spaceTitle()).toContainText('Atlas');
+    await expect(spaceTitle()).toBeFocused();
 
     await page.getByTestId('selected-canvas').filter({ visible: true }).click();
     const diagramName = page.getByRole('textbox', { name: 'Diagram name' });
@@ -570,8 +604,18 @@ test('Command Dock stories are isolated from the Ladle catalogue', async ({ page
   await expect(page.getByLabel('Search stories')).toBeVisible();
 });
 
+/**
+ * One treatment across the three names, and all three are controls.
+ *
+ * The Space used to be the exception here — a `<span>` wearing the Button box,
+ * because there was no `renamed-space` Edit and a greyed name would have
+ * advertised a command nobody could run. There is one now, so the three are one
+ * component in one state: the typography is shared *and* so is the affordance,
+ * which is what makes the Space name's own `Rename Space:` control the assertion
+ * below rather than its absence.
+ */
 test(
-  'Dock identities share typography while the Space name remains a label',
+  'Dock identities share typography and each name is its own rename control',
   { tag: '@parity:command-dock-identity-presentation' },
   async ({ page }) => {
     await page.goto(story('default'));
@@ -579,29 +623,62 @@ test(
     const diagram = page.getByTestId('selected-canvas').filter({ visible: true });
     await expect(space).toBeVisible();
     await expect(diagram).toBeVisible();
-    const typography = await diagram.evaluate((element) => {
-      const style = getComputedStyle(element);
-      return [style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight, style.color];
-    });
-    for (const identity of [space, page.getByTestId('active-graph').filter({ visible: true })]) {
-      await expect(identity).toBeVisible();
-      expect(
-        await identity.evaluate((element) => {
-          const style = getComputedStyle(element);
-          return [
-            style.fontFamily,
-            style.fontSize,
-            style.fontWeight,
-            style.lineHeight,
-            style.color,
-          ];
-        }),
-      ).toEqual(typography);
-    }
-    await expect(page.getByRole('button', { name: /^Rename Space:/ })).toHaveCount(0);
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toBeVisible();
+    /**
+     * **The three read in one frame, and that is the assertion rather than a
+     * precaution.**
+     *
+     * The names share the Button's `transition-[color,…] duration-200`, so a colour
+     * read while that transition is in flight is a point on it rather than a settled
+     * value. Sampled one locator after another, the three land at different points
+     * of the same animation and the run fails on two intermediate values neither
+     * name ever rests at — a difference in *time* reported as a difference in
+     * treatment. Under `failOnFlakyTests` a retry that passes still fails the run,
+     * so waiting it out is not an option; reading them together removes the race
+     * instead. They mount together with one duration from one value, so a shared
+     * transition is shared at every frame of it, and a genuinely different colour
+     * still differs.
+     */
+    // The visibility filter is inside the page rather than on a locator for the
+    // same reason it is on the ones above: an inactive open Space stays mounted
+    // and draws a hidden Dock carrying these same ids.
+    const [reference, ...others] = await page
+      .locator(
+        '[data-testid="space-title"], [data-testid="selected-canvas"], [data-testid="active-graph"]',
+      )
+      .evaluateAll((elements) =>
+        elements
+          .filter((element) => element.checkVisibility())
+          .map((element) => {
+            const style = getComputedStyle(element);
+            return [
+              style.fontFamily,
+              style.fontSize,
+              style.fontWeight,
+              style.lineHeight,
+              style.color,
+            ];
+          }),
+      );
+    expect(others).toHaveLength(2);
+    for (const identity of others) expect(identity).toEqual(reference);
+    // One control, named the way the other two are. A count rather than a
+    // visibility check because the story keeps four other Spaces mounted, and
+    // `getByRole` is what excludes theirs: an inactive Space's Dock is hidden
+    // and so out of the accessibility tree, while `getByTestId` above still
+    // finds it and needs the visible filter.
+    await expect(page.getByRole('button', { name: /^Rename Space:/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^Rename Diagram:/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^Rename Graph:/ })).toHaveCount(1);
     await diagram.click();
     await expect(page.getByRole('textbox', { name: 'Diagram name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(diagram).toBeFocused();
+    // And the Space's, because the caret coming back is the half of this claim
+    // that the identity which used to be a label had no way to owe.
+    await space.click();
+    await expect(page.getByRole('textbox', { name: 'Space name', exact: true })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(space).toBeFocused();
   },
 );

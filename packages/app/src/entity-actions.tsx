@@ -84,8 +84,21 @@ export type SpaceEntity =
   | { readonly kind: 'graph'; readonly graph: Graph; readonly diagram: Diagram }
   | { readonly kind: 'thing'; readonly thing: Thing; readonly diagram: Diagram };
 
-/** What an inline rename names, for the two entities that have one. */
+/**
+ * What an inline rename names — the three entities the Command Dock names, all
+ * of which now have one.
+ *
+ * **The Space arm carries no id, and that asymmetry is the domain's.** A
+ * Diagram and a Graph are named *inside* a Space, so an Edit on one has to say
+ * which, and the surface may be naming a Diagram the canvas has since left. A
+ * Space rename writes `document.title` of the session the Edit is completed on,
+ * which is the Space the Dock is drawing — there is no second candidate for it
+ * to disambiguate, and `renamed-space` accordingly carries only the title
+ * (`space-authoring.ts`). An id here would be a value nothing reads, asserted by
+ * a surface that cannot be wrong about it.
+ */
 export type SpaceChromeTitleSubject =
+  | { readonly kind: 'space' }
   | { readonly kind: 'diagram'; readonly id: UUID }
   | { readonly kind: 'graph'; readonly id: GraphId };
 export interface SpaceEntityActionsOptions {
@@ -196,8 +209,13 @@ export function spaceEntityActions({
 
   return (entity) => {
     if (entity.kind === 'space') {
-      // No Rename: the application has no Space rename affordance, and a menu
-      // is not the place to invent one.
+      // No Rename, and no longer because there is no such Edit — `renamed-space`
+      // exists now. The Dock renames a Space the way it renames a Diagram and a
+      // Graph: by a click on the name it already draws, right beside this menu.
+      // A row here would open that same editor from a second place, which is the
+      // duplication the whole arrangement keeps removing — and the same reason
+      // the Diagram and Graph branches below get their Rename row only from a
+      // caller that has one, while the application passes `onRename: null`.
       //
       // One address, and it is the Space's **own** — the one place this module
       // departs from the rule above, so it is written down rather than left to

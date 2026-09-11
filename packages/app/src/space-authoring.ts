@@ -160,6 +160,33 @@ export type AuthoringCompletion =
   | { readonly kind: 'deleted-thing'; readonly thingId: ThingId }
   | { readonly kind: 'renamed-diagram'; readonly diagramId: UUID; readonly title: string }
   | { readonly kind: 'deleted-diagram'; readonly diagramId: UUID }
+  /**
+   * Rename Space: the one Edit on the Space document *above* any Diagram.
+   *
+   * It writes `document.title` and nothing else. No Space Thing pointing at this
+   * Space changes with it — a Space's name and the Title of a Thing that
+   * references it are two stored values that agree only at creation, and ADR
+   * 0083 keeps the target's name off the Thing's front, so nothing in another
+   * Space draws what this writes.
+   *
+   * Derived in the region above the `placement-pending` gate, beside
+   * `created-diagram` and `deleted-diagram`, because that is already the region
+   * for Edits on the document rather than inside a Diagram: all three write keys
+   * of `document`, read `session.getState().working` direct, and answer their own
+   * placement. This one reuses `Placement.fromDiagram` over the Diagram it does
+   * not change, which loses nothing — under ADR 0084 the Diagram *is* the
+   * authority for what the canvas draws, so re-deriving the placement from it is
+   * an identity on the one already installed.
+   *
+   * Two shapes were rejected for it. Below the gate, parallel to
+   * `renamed-diagram`, is the smaller change and gives the Edit a
+   * `placement-pending` refusal plus an answer to whether it is a
+   * `DiagramRequiredOperation` — two sentences that are simply wrong about an
+   * Edit holding no Diagram. Making `placement` and `nextDiagramId` optional on
+   * `CompletedEdit` names the class honestly and weakens, for one member, a type
+   * whose whole promise is that nothing is left to decide.
+   */
+  | { readonly kind: 'renamed-space'; readonly title: string }
   | { readonly kind: 'added-graph' }
   | { readonly kind: 'renamed-graph'; readonly graphId: GraphId; readonly title: string }
   | { readonly kind: 'recolored-graph'; readonly graphId: GraphId; readonly color: string }
@@ -243,6 +270,12 @@ export type AuthoringRefusal =
   // raises it from the Thing schema, so both ends spell it from one constant.
   | { readonly code: typeof THING_TITLE_REQUIRED }
   | { readonly code: 'diagram-title-required' }
+  /**
+   * Rename Space with nothing left after the trim. `spaceFileSchema` declares
+   * the title as `z.string().min(1)`, which counts characters, so blank is the
+   * empty case wearing different bytes and only this Edit can refuse it.
+   */
+  | { readonly code: 'space-title-required' }
   | { readonly code: 'space-must-keep-diagram' }
   | { readonly code: 'alias-target-not-found'; readonly targetId: ThingId }
   | { readonly code: 'alias-target-must-own-content'; readonly targetId: ThingId }
@@ -711,7 +744,7 @@ const incomingAliases = (things: SnapshotThings, thingId: ThingId): SnapshotThin
 /**
  * A single-line title normalized for authorship, or `null` when it has no name.
  *
- * Diagrams and Graphs only. Their titles are single-line by ADR 0083, so the
+ * Spaces, Diagrams and Graphs. Their titles are single-line by ADR 0083, so the
  * whole string is one line and trimming it is the whole rule. A Thing's Title is
  * Title Lines and normalizes by a rule of its own — {@link namedThingTitle}.
  */
@@ -1137,6 +1170,82 @@ export function createSpaceAuthoring({
           placement: Placement.fromDiagram(nextDiagram),
           nextActiveGraphId: nextDiagram.activeGraph ?? nextDiagram.graphs[0]?.id ?? null,
           nextDiagramId: nextDiagram.id,
+        },
+      };
+    }
+    if (completion.kind === 'renamed-space') {
+      const snapshot = session.getState().working;
+      // Trimmed for the reason a Diagram's and a Graph's titles are: the schema
+      // counts characters, so a title of spaces satisfies it and would store a
+      // Space with no readable name.
+      const title = trimmedNonBlankTitle(completion.title);
+      if (title === null) return refuse({ code: 'space-title-required' });
+      if (title === snapshot.document.title) return UNCHANGED;
+      // The Diagram is resolved for the placement, not for permission: a Space
+      // rename is legal whatever is drawing, and this Edit changes neither the
+      // selection nor the Diagram it names. So the resolution happens *after*
+      // the title checks rather than as the universal gate the Edits below run
+      // first — a blank name is a blank name whether or not the canvas has
+      // moved on, and answering with the Diagram instead would report the wrong
+      // fact about the author's own keystrokes.
+      //
+      // `diagram-not-found` rather than a code of its own, and no
+      // `placement-pending` or `diagram-required` arm: the refusal is the one
+      // the chosen shape already raises, and inventing a second would make an
+      // Edit that holds no Diagram say it needed one.
+      const diagram = (snapshot.document.diagrams ?? []).find(
+        (candidate) => candidate.id === selection,
+      );
+      if (diagram === undefined) return refuse({ code: 'diagram-not-found' });
+      const next = { ...snapshot, document: { ...snapshot.document, title } };
+      assertValidAuthoredSnapshot(next);
+      return {
+        kind: 'completed',
+        edit: {
+          snapshot: next,
+          // **The placement already installed, carried forward.** This is what
+          // every other Edit does — the general path below spends
+          // `reportedPlacement` as its `completedPlacement` — and an Edit that
+          // re-derived through `Placement.fromDiagram` instead would be a second
+          // answer to a question the union answers once. The two agree in the
+          // steady state and do not agree while the canvas holds geometry no
+          // Edit has authored, and there a re-derivation snaps every Thing back
+          // to its stored position for a change that wrote `document.title`.
+          //
+          // `Placement.fromDiagram` is the fallback and not the rule, for the
+          // case that keeps this Edit above the `placement-pending` gate: the
+          // canvas may have reported nothing at all, and a Space's name is not
+          // written into a Diagram, so there is no geometry to wait on.
+          placement: reportedPlacement ?? Placement.fromDiagram(diagram),
+          // **Navigation's Active Graph, not the Diagram's stored one.**
+          //
+          // Activating a Graph is not an Edit (ADR 0028), so the emphasised
+          // Graph routinely differs from the `activeGraph` the Diagram stores
+          // until some other Edit writes it. `created-diagram` and
+          // `deleted-diagram` re-resolve legitimately, each landing the reader
+          // in a *different* Diagram; this Edit changes no Diagram and no
+          // selection, so re-resolving would answer a question nobody asked and
+          // snap the emphasis, the Dock's Graph cluster and the product URL back
+          // to the stored Graph — a rename of the Space silently activating a
+          // different Graph. So this carries the current one forward, exactly as
+          // the general path below does for the same reason (`navigation.ts`
+          // writes out the harm at length).
+          //
+          // The embedded arm mirrors the one below, and it is written for that
+          // reason alone. `selection` is then the embedded Diagram rather than
+          // Navigation's, so Navigation's Graph may be one this Diagram does not
+          // show — but nothing here reads the answer: `performCompletion`'s
+          // embedded path submits and installs and never calls
+          // `continueInDiagram`, so `nextActiveGraphId` is discarded whenever
+          // `embeddedDiagramId` is given. The arm is consistency with the
+          // general path, not a guard against anything, and no gesture reaches a
+          // Space rename from an embedded Diagram in any case — the Dock's Space
+          // name is not drawn inside one.
+          nextActiveGraphId:
+            embeddedDiagramId === undefined
+              ? navigation.getState().activeGraphId
+              : (diagram.activeGraph ?? diagram.graphs[0]?.id ?? null),
+          nextDiagramId: diagram.id,
         },
       };
     }

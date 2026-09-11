@@ -174,6 +174,17 @@ export function spaceMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Space: /);
 }
 
+/**
+ * The Space the Dock is in, named on the cluster beside its menu.
+ *
+ * The third identity, and a control like the other two: `renamed-space` made the
+ * name a rename control rather than a label, so a test presses this the way it
+ * presses {@link selectedCanvas}.
+ */
+export function spaceName(page: Page): Locator {
+  return page.getByTestId('space-title');
+}
+
 /** What the Dock says is drawing. */
 export function selectedCanvas(page: Page): Locator {
   return page.getByTestId('selected-canvas');

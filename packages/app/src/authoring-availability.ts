@@ -53,7 +53,7 @@ export interface AuthoringInProgress {
   readonly editingThingTitle: boolean;
   /** Some Thing of the selected Diagram is Open (ADR 0064). */
   readonly thingIsOpen: boolean;
-  /** A Diagram or Graph rename is running in the Space chrome. */
+  /** A Space, Diagram or Graph rename is running in the Space chrome. */
   readonly editingChromeTitle: boolean;
   /**
    * This Space's canvas is the one the session is authoring right now.
@@ -97,7 +97,7 @@ export interface AuthoringInProgress {
 export interface AuthoringAvailability {
   /** The Things View may be opened, and may stay open. */
   readonly thingsView: boolean;
-  /** A Diagram or Graph rename may run in the chrome. */
+  /** A Space, Diagram or Graph rename may run in the chrome. */
   readonly chromeTitleEdit: boolean;
   /** An entity menu may offer its Rename and its Delete. */
   readonly entityEdits: boolean;
@@ -186,7 +186,8 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
   const thingsView = !presenting && !creatingThing;
 
   /**
-   * Whether a Diagram or Graph rename may run in the chrome at all.
+   * Whether a chrome rename may run at all — the one answer for all three of
+   * the Dock's names, the Space's included since `renamed-space`.
    *
    * `editable` is a term because while placement is pending there is no
    * projected canvas: a rename begun there is an editor with nothing behind it,

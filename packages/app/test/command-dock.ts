@@ -34,15 +34,24 @@ export const unavailable = (control: HTMLElement): boolean =>
 /**
  * Begin the inline rename of a Dock identity, once it may begin.
  *
- * The name is a **button** while a chrome rename is available and a plain label
- * while it is not — the Space is never renameable, and a Diagram or a Graph stops
- * being while a Thing title editor or a live content edit owns the caret, or
- * before the canvas has a placement to edit at all. So a test that presses the
- * name has to wait for it to be a control, and the wait is the assertion: it is
- * how "the rename is withdrawn" and "the rename is back" are both read.
+ * All three names are renameable now — `renamed-space` joined `renamed-diagram`
+ * and `renamed-graph` — and all three are withdrawn together, by the one
+ * `chromeTitleEdit` guard: a Thing title editor or a live content edit owns the
+ * caret, or the canvas has no placement to edit against. So a test that presses
+ * a name has to wait for it to be *available* rather than for it to be a
+ * control, and the wait is the assertion: it is how "the rename is withdrawn"
+ * and "the rename is back" are both read.
+ *
+ * **`aria-disabled` rather than `tagName`.** The slot is a `ToolbarButton` in
+ * both states now, so the element it was reading — a `<span>` while the rename
+ * was withheld — no longer exists, and a `tagName` wait would be satisfied
+ * immediately by a name nothing can open. `unavailable` above is the same
+ * reading every other withdrawn Dock control is read by.
  */
-export const beginRename = async (testId: 'selected-canvas' | 'active-graph'): Promise<void> => {
-  await waitFor(() => expect(screen.getByTestId(testId).tagName).toBe('BUTTON'));
+export const beginRename = async (
+  testId: 'space-title' | 'selected-canvas' | 'active-graph',
+): Promise<void> => {
+  await waitFor(() => expect(unavailable(screen.getByTestId(testId))).toBe(false));
   fireEvent.click(screen.getByTestId(testId));
 };
 

@@ -15,14 +15,14 @@ import { expect, test } from '@playwright/test';
  * a Sidebar row". The Command Dock has clusters rather than rows and no
  * `onContextMenu` anywhere, so that behaviour did not move: it belongs to the
  * Thing rail (ADR 0073), which is what the last two tests in this file press.
- * What is left of the Sidebar's half is the one thing the Dock does keep — a
- * Space name that offers its address and no rename — restated below in the
- * Dock's own words and untagged, the claim it stood for having been retired
- * rather than renamed.
+ * What is left of the Sidebar's half is the one thing the Dock still decides
+ * about the Space's own menu — which address it offers, and that Rename is not a
+ * row in it — restated below in the Dock's own words and untagged, the claim it
+ * stood for having been retired rather than renamed.
  */
 
 /**
- * The Space's own name carries an address and no rename, and that is two
+ * The Space's own menu carries one address and no Rename row, and that is two
  * decisions rather than one.
  *
  * The address is the Space's **own**, and that is a departure rather than the
@@ -33,27 +33,35 @@ import { expect, test } from '@playwright/test';
  * `.scratch/link-ux` has not taken, so this holds the behaviour that stands
  * rather than a claim that no second address is possible.
  *
- * And no rename either. `space-authoring.ts` has `renamed-diagram` and
- * `renamed-graph` and nothing for a Space, so the Dock draws the name as a
- * label — not a disabled control, which would advertise a command nobody can
- * run. The Diagram beside it is a rename control, which is what makes the
- * difference visible in one story.
+ * And no Rename row — which is no longer because there is no such Edit.
+ * `space-authoring.ts` has `renamed-space` beside `renamed-diagram` and
+ * `renamed-graph`, and the Dock draws the name itself as the control that runs
+ * it. A row in this menu would open that same editor from a second place, which
+ * is the duplication the Dock keeps removing, and it is the reason
+ * `spaceEntityActions` is handed `onRename: null` by the application
+ * (`entity-actions.tsx`). So the name beside this menu is a `button`, and the
+ * menu it discloses is still Rename-free.
  */
-test('the Space name is a label with one address, beside a Diagram that renames', async ({
+test('the Space name renames while its menu carries one address and no Rename row', async ({
   page,
 }) => {
   await page.goto('/?story=space--command-dock--default&mode=preview');
 
   const title = page.getByTestId('space-title').filter({ visible: true });
   await expect(title).toContainText('Rendering');
-  await expect(title).not.toHaveJSProperty('tagName', 'BUTTON');
-  await expect(page.getByRole('button', { name: /^Rename Space/ })).toHaveCount(0);
+  await expect(title).toHaveJSProperty('tagName', 'BUTTON');
+  await expect(page.getByRole('button', { name: 'Rename Space: Rendering' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Rename Diagram: Collection 1' })).toBeVisible();
 
   // `delay` is the whole reason this test is in a browser: a default Playwright
   // click puts mousedown and mouseup in the same tick, and the dismissal that
   // this regressed on never gets a turn between them.
-  await page.getByRole('button', { name: 'Space: Rendering' }).click({ delay: 120 });
+  //
+  // `exact`, because an accessible name matches as a substring by default and
+  // the name beside this trigger is now `Rename Space: Rendering`, which
+  // contains this one. It was unambiguous only while a withheld Space name drew
+  // as a `<span>` and no button in the bar carried the longer string.
+  await page.getByRole('button', { name: 'Space: Rendering', exact: true }).click({ delay: 120 });
 
   const menu = page.getByRole('menu');
   await expect(menu.getByRole('menuitem', { name: 'Copy link' })).toBeVisible();
