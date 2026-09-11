@@ -9,9 +9,11 @@ import {
   initializeSpace,
   loadSpace,
   loadSpaceAggregate,
+  loadSpaceSnapshot,
   type Space,
   type SpaceAggregateError,
 } from '@project/graph';
+import { createWorkingSpaceLoader } from './working-space';
 import type {
   CommitResult,
   LoadedAggregate,
@@ -79,16 +81,32 @@ export interface SpaceSessionRegistry {
   readonly spaceThings: (newId: () => UUID) => SpaceThingLifecycle;
 }
 
+/** What a Space Thing selects in the Space it shows: one Diagram and one of its Graphs. */
+interface SpaceThingSelection {
+  readonly diagram: UUID;
+  readonly graph: UUID;
+}
+
 export interface CreateSpaceThingInput {
   readonly containingSpaceId: UUID;
   readonly diagramId: UUID;
   readonly title: string;
   readonly position: DiagramPosition;
 }
+/**
+ * Reference an existing Space. The selection is **not** a parameter (ADR 0079).
+ *
+ * A Space Thing stores a Diagram and a Graph of its target from the moment it
+ * exists, and where those come from is this module's rule rather than a
+ * caller's: the target is made working — which durably initializes a stored
+ * diagramless Space — and the Diagram it opens on, with that Diagram's Active
+ * Graph, is what the Thing records. A caller holding a `SpaceSummary` has
+ * neither id to offer, and the pane that chooses a target shows no selector,
+ * so an optional override here would be a seam nothing could fill honestly.
+ * Choosing differently is an Edit on the Thing afterwards (ADR 0068).
+ */
 export interface LinkSpaceThingInput extends CreateSpaceThingInput {
   readonly targetSpaceId: UUID;
-  readonly diagram?: UUID;
-  readonly graph?: UUID;
 }
 export interface DeleteSpaceThingInput {
   readonly containingSpaceId: UUID;
@@ -108,7 +126,18 @@ export type SpaceThingLifecycleResult =
             readonly recovery: 'retry' | 'resolve-conflict';
           }
         | { readonly code: 'aggregate-refused'; readonly errors: readonly SpaceAggregateError[] }
-        | { readonly code: 'persistence-read-failed' };
+        | { readonly code: 'persistence-read-failed' }
+        /**
+         * The target could not be made working, so it supplies no Diagram and
+         * Graph for the Thing to select (ADR 0079).
+         *
+         * One code for reading it, initializing it and finding it gone between
+         * the listing and this Edit, because the author's answer is the same in
+         * all three and the Edit did not begin in any of them. It is separate
+         * from `persistence-read-failed`, which is about the Spaces this Edit
+         * validates against rather than the one it was pointed at.
+         */
+        | { readonly code: 'space-thing-target-unavailable'; readonly spaceId: UUID };
     };
 export interface SpaceThingLifecycle {
   readonly create: (input: CreateSpaceThingInput) => Promise<SpaceThingLifecycleResult>;
@@ -578,6 +607,75 @@ export function createSpaceSessionRegistry(
   };
 
   const spaceThings = (newId: () => UUID): SpaceThingLifecycle => {
+    const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
+    /**
+     * The one rule for what a Space Thing selects in a Space it is shown
+     * (ADR 0079, ADR 0026).
+     *
+     * The Diagram the Space itself opens on, and that Diagram's own Active
+     * Graph — the head of its list only where it has authored none, which is
+     * what an absent `activeGraph` means. Written here rather than at the two
+     * callers because `create` and `link` reach a Space by different routes and
+     * must still seed the same selection, and because the on-canvas selector
+     * seeds a *changed* Diagram by the same rule
+     * (`packages/app/src/canvas-thing-authoring.ts`).
+     *
+     * `undefined` says the Space supplies no selection. After initialization
+     * that is unreachable through a valid Space — `defaultDiagram` is recorded
+     * and every Diagram owns at least one Graph — so this is the type-level
+     * boundary between a snapshot that passed intake and the ids read out of
+     * it, not a state the author can produce.
+     */
+    const selectionOf = (space: Space): SpaceThingSelection | undefined => {
+      if (space.defaultDiagram === undefined) return undefined;
+      const resolved = space.lookup.diagram(space.defaultDiagram);
+      if (resolved === undefined) return undefined;
+      const { diagram } = resolved;
+      const graph =
+        diagram.graphs.find(({ id }) => id === diagram.activeGraph) ?? diagram.graphs[0];
+      if (graph === undefined) return undefined;
+      return { diagram: diagram.id, graph: graph.id };
+    };
+    /**
+     * Make the target working, then read what it opens on.
+     *
+     * **Before the coordination, never inside it.** Initialization is its own
+     * durable single-Space commit, and `derive` runs with the persistence
+     * barrier raised against revisions the coordination is about to spend — a
+     * commit from in there would conflict with the Edit that called it. Running
+     * first is also what the ticket asks for in order: the target is durably
+     * initialized, and only then is a Thing authored against what it minted. So
+     * a failure here produces no Thing at all rather than a half-written pair.
+     *
+     * An open target is read from its live session instead, because that is the
+     * Space the author can see; it is already initialized, opening being the
+     * working load that does it.
+     *
+     * Nothing holds the target still between this and the Edit. It does not
+     * need to: the selection is validated against the whole aggregate inside
+     * the coordination, so a Diagram deleted in the gap is refused as
+     * `space-thing-diagram-missing` rather than stored.
+     */
+    const targetSelection = async (targetSpaceId: UUID): Promise<SpaceThingSelection | undefined> => {
+      const live = sessions.get(targetSpaceId)?.session.getState().working;
+      if (live !== undefined) {
+        const loaded = loadSpaceSnapshot(live);
+        return loaded.ok ? selectionOf(loaded.space) : undefined;
+      }
+      let stored: LoadedSpace | undefined;
+      try {
+        stored = await loadWorkingSpace(targetSpaceId);
+      } catch {
+        // The loader throws when initialization could not commit. That is the
+        // same answer to the author as a Space that has gone: this Edit was not
+        // attempted. Its own diagnostics belong to the opening path, which is
+        // where a reader would go looking for them.
+        return undefined;
+      }
+      if (stored === undefined) return undefined;
+      const loaded = loadSpaceSnapshot(stored.snapshot);
+      return loaded.ok ? selectionOf(loaded.space) : undefined;
+    };
     const working = (id: UUID): SpaceSnapshot => {
       const session = sessions.get(id)?.session;
       if (session === undefined) throw new Error(`Space ${id} has no live session`);
@@ -605,7 +703,7 @@ export function createSpaceSessionRegistry(
     };
     const link = async (input: LinkSpaceThingInput): Promise<SpaceThingLifecycleResult> => {
       let refusal: SpaceThingLifecycleResult | undefined;
-      const result = await coordinateSpaceThingLifecycle(() => {
+      const result = await coordinateSpaceThingLifecycle(async () => {
         refusal = recoveryRefusal(input.containingSpaceId);
         if (refusal !== undefined) return undefined;
         const source = working(input.containingSpaceId);
@@ -616,13 +714,27 @@ export function createSpaceSessionRegistry(
           };
           return undefined;
         }
-        let document: ThingDocument = {
+        // Last, and deliberately: an Edit the containing Space has already
+        // refused must not initialize the Space it was pointed at, and must not
+        // mint the two identities doing so would spend.
+        const selection = await targetSelection(input.targetSpaceId);
+        if (selection === undefined) {
+          refusal = {
+            kind: 'refused',
+            refusal: {
+              code: 'space-thing-target-unavailable',
+              spaceId: input.targetSpaceId,
+            },
+          };
+          return undefined;
+        }
+        const document: ThingDocument = {
           title: input.title,
           kind: 'space',
           spaceId: input.targetSpaceId,
+          diagram: selection.diagram,
+          graph: selection.graph,
         };
-        if (input.diagram !== undefined) document = { ...document, diagram: input.diagram };
-        if (input.graph !== undefined) document = { ...document, graph: input.graph };
         const thingId = newId();
         return [
           {
@@ -659,6 +771,14 @@ export function createSpaceSessionRegistry(
           const loaded = loadSpace(initialized.file, initialized.thingFiles);
           if (!loaded.ok) throw new Error(loaded.errors.map(({ message }) => message).join('\n'));
           const target = snapshotFromSpace(loaded.space);
+          // The Diagram and Graph the initializer just minted, read back through
+          // the same rule a stored target answers rather than off the file it
+          // wrote (ADR 0079). A new Space is complete, so the boundary below is
+          // type-level: `initializeSpace` authors a `defaultDiagram` owning one
+          // Graph, and the intake above has already accepted it.
+          const selection = selectionOf(loaded.space);
+          if (selection === undefined)
+            throw new Error('An initialized Space supplied no Diagram to select');
           const thingId = newId();
           return [
             {
@@ -669,7 +789,13 @@ export function createSpaceSessionRegistry(
                   current,
                   input.diagramId,
                   thingId,
-                  { title: input.title, kind: 'space', spaceId: target.id },
+                  {
+                    title: input.title,
+                    kind: 'space',
+                    spaceId: target.id,
+                    diagram: selection.diagram,
+                    graph: selection.graph,
+                  },
                   input.position,
                 ),
             },

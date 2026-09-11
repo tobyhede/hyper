@@ -444,22 +444,32 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
       return describeAggregateRefusal(refusal.errors);
     case 'persistence-read-failed':
       return 'The stored Spaces could not be read, so this edit was not attempted.';
+    case 'space-thing-target-unavailable':
+      return 'That Space could not be prepared to be shown here, so nothing was created.';
   }
 };
 
 /**
  * Error placement for Space Thing creation, which owns Title and Target.
  *
- * Only `aggregate-refused` reaches the Target field, and it is the one that
- * has to: a cycle, a target that has gone and a Diagram the target no
- * longer holds are all answered by choosing a different Space. The rest
- * describe the containing Space or the repository, which no row in that list
- * would fix.
+ * Two codes reach the Target field, and they are the two that have to: a cycle,
+ * a target that has gone and a Diagram the target no longer holds are all
+ * answered by choosing a different Space, and so is a target that could not be
+ * prepared to be shown. The rest describe the containing Space or the
+ * repository, which no row in that list would fix.
+ *
+ * A set rather than a comparison, because the question is now which codes the
+ * list answers rather than which single one does.
  */
+const TARGET_FIELD_REFUSALS: ReadonlySet<SpaceThingRefusal['code']> = new Set([
+  'aggregate-refused',
+  'space-thing-target-unavailable',
+]);
+
 export const presentNewSpaceThingRefusal = (
   refusal: SpaceThingRefusal,
 ): ThingCreationRefusalErrors =>
-  refusal.code === 'aggregate-refused'
+  TARGET_FIELD_REFUSALS.has(refusal.code)
     ? { fields: { target: describeSpaceThingRefusal(refusal) } }
     : { fields: {}, form: describeSpaceThingRefusal(refusal) };
 

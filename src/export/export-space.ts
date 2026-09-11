@@ -118,16 +118,14 @@ const canonicalThing = (
     title: document.title,
   };
   if (document.kind === 'alias') return { ...common, kind: 'alias', target: document.target };
-  if (document.kind === 'space') {
-    const thing: Extract<Thing, { kind: 'space' }> = {
+  if (document.kind === 'space')
+    return {
       ...common,
       kind: 'space',
       spaceId: document.spaceId,
+      diagram: document.diagram,
+      graph: document.graph,
     };
-    if (document.diagram !== undefined) thing.diagram = document.diagram;
-    if (document.graph !== undefined) thing.graph = document.graph;
-    return thing;
-  }
   return { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
 };
 

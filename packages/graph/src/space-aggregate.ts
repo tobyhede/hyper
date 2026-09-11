@@ -138,19 +138,13 @@ export function loadSpaceAggregate({
       if (thing.kind !== 'space') continue;
       const target = byId.get(thing.spaceId);
       if (target === undefined) continue;
-      const diagramId = thing.diagram ?? target.defaultDiagram;
-      if (diagramId === undefined) {
-        if (thing.graph !== undefined && target.lookup.graph(thing.graph) === undefined) {
-          errors.push({
-            kind: 'space-thing-graph-missing',
-            spaceId: space.id,
-            thingId: thing.id,
-            targetSpaceId: target.id,
-            graphId: thing.graph,
-          });
-        }
-        continue;
-      }
+      // The Thing's own stored id, with no fallback to the target's
+      // `defaultDiagram` (ADR 0079). A Space Thing selects a Diagram from the
+      // moment it exists, so a `diagram` that resolves to nothing is a dangling
+      // reference to a deleted Diagram rather than an unmade choice — which is
+      // what makes reporting it right where reading through the target's own
+      // opening selection used to be.
+      const diagramId = thing.diagram;
       const resolvedDiagram = target.lookup.diagram(diagramId);
       if (resolvedDiagram === undefined) {
         errors.push({
@@ -162,7 +156,6 @@ export function loadSpaceAggregate({
         });
         continue;
       }
-      if (thing.graph === undefined) continue;
       if (target.lookup.graph(thing.graph) === undefined) {
         errors.push({
           kind: 'space-thing-graph-missing',

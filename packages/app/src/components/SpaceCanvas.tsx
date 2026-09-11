@@ -327,7 +327,7 @@ export function SpaceCanvas({
       parent: ThingFlowNode;
       spaceId: ThingId;
       diagramId: DiagramId;
-      graphId: GraphId | null;
+      graphId: GraphId;
       entry: OpenSpace | undefined;
       absolute: DiagramPosition;
       bounds: EmbeddedBounds;
@@ -352,7 +352,7 @@ export function SpaceCanvas({
       const document = session
         .getState()
         .working.things.find((thing) => thing.id === parent.data.thingId)?.document;
-      if (document?.kind !== 'space' || document.diagram === undefined) continue;
+      if (document?.kind !== 'space') continue;
       // A Diagram already on this path would embed itself. Single-Space intake
       // refuses only a Thing targeting its own Space, so a mutual pair reaches
       // here validated and would otherwise nest one level deeper per commit.
@@ -376,7 +376,7 @@ export function SpaceCanvas({
         parent,
         spaceId: document.spaceId,
         diagramId: document.diagram,
-        graphId: document.graph ?? null,
+        graphId: document.graph,
         entry: entries.find((entry) => entry.id === document.spaceId),
         absolute,
         bounds: {
@@ -516,7 +516,7 @@ export function SpaceCanvas({
   useEffect(() => {
     const visible = new Map(
       embeddedRequests.map((request) => [
-        `${request.parent.id}:${request.diagramId}:${request.graphId ?? ''}`,
+        `${request.parent.id}:${request.diagramId}:${request.graphId}`,
         request,
       ]),
     );

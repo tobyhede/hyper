@@ -85,14 +85,31 @@ export const aliasThingFrontmatterSchema = z.object({
   target: idSchema,
 });
 
-/** A Thing that shows one selected view of another independently stored Space (ADR 0068). */
+/**
+ * A Thing that shows one selected view of another independently stored Space
+ * (ADR 0068).
+ *
+ * **The selection is part of the Thing, not an option on it (ADR 0079).** A
+ * Space Thing names a Diagram of its target and a Graph that Diagram owns, and
+ * it names them from the moment it exists: the lifecycle that creates one
+ * initializes a diagramless target before completing and stores what
+ * initialization minted, so there is no valid Space Thing with nothing selected
+ * and no surface that has to draw one. Both ids are resolved against the target
+ * by aggregate intake rather than here — this file knows the shape and
+ * `@project/graph` knows the Spaces.
+ *
+ * What used to fill the gap was a fallback to the target's `defaultDiagram`,
+ * which made one Thing's selection follow another Space's opening choice.
+ * Requiring the field is what stops that: two Space Things on one target differ
+ * by what they store and by nothing else.
+ */
 export const spaceThingFrontmatterSchema = z.object({
   id: idSchema,
   title: thingTitleSchema,
   kind: z.literal('space'),
   spaceId: idSchema,
-  diagram: uuidSchema.optional(),
-  graph: idSchema.optional(),
+  diagram: uuidSchema,
+  graph: idSchema,
 });
 
 const defaultMarkdownKind = (value: unknown): unknown =>
