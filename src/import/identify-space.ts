@@ -89,12 +89,27 @@ export const describeSchemaFailure = (issues: readonly SchemaIssue[], label: str
  * **same pass**, because under version 1 a graph is reached only through its
  * owner (ADR 0040): there is no space-level collection to walk beside the
  * diagrams.
+ *
+ * `spaceId` **supplies** the identity the document omits; it never overrides one
+ * the document declares. A caller has it because the identity was written
+ * somewhere else too — a directory name — and where both exist they must agree,
+ * exactly as `read-aggregate` requires of those two. Nothing here chooses
+ * between them, because either answer would be a guess about which the author
+ * meant. The rule lives in this function rather than only in its caller: an
+ * override that passed silently would store a Space under an id its own
+ * `space.json` does not spell, and no later intake would notice.
  */
 export const identifySpace = (
   input: ImportSpace,
   newId: () => UUID,
   spaceId: UUID = input.id ?? newId(),
 ): SpaceSnapshot => {
+  if (input.id !== undefined && input.id !== spaceId) {
+    throw new SpaceIdentityError(
+      `the space file declares Space ${input.id} but it is identified as ${spaceId}`,
+    );
+  }
+
   const diagrams = input.document.diagrams?.map((diagram) => ({
     ...diagram,
     id: diagram.id ?? newId(),

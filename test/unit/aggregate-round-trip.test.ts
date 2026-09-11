@@ -2,7 +2,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { newUuid, spaceFileSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import type { LoadedSpace } from '@project/persistence';
+import { createWorkingSpaceLoader, type LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { importAggregate } from '../../src/import/import-aggregate';
@@ -195,7 +195,7 @@ describe('exporting and importing one complete aggregate', () => {
     expect(loaded.kind === 'loaded' && loaded.aggregate.metaSpaceId).toBe(META_SPACE_ID);
   });
 
-  it('writes a versioned manifest naming the Meta Space, and one directory per Space', async () => {
+  it('writes a versioned aggregate file naming the Meta Space, and one directory per Space', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
 
     await exportTo(repositoryHolding(completeAggregate()), destination);
@@ -262,15 +262,24 @@ describe('exporting and importing one complete aggregate', () => {
 
     await exportTo(source, destination);
     const first = await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8');
-    const manifest = await readFile(join(destination, AGGREGATE_FILE_NAME), 'utf8');
+    const aggregateFile = await readFile(join(destination, AGGREGATE_FILE_NAME), 'utf8');
     await exportTo(source, destination);
 
     expect(await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8')).toBe(first);
-    expect(await readFile(join(destination, AGGREGATE_FILE_NAME), 'utf8')).toBe(manifest);
+    expect(await readFile(join(destination, AGGREGATE_FILE_NAME), 'utf8')).toBe(aggregateFile);
   });
 });
 
-describe('a layoutless Space', () => {
+describe('a diagramless Space', () => {
+  /** A Space before its first working load: titled, holding a Thing, no Diagram. */
+  const diagramless: SpaceSnapshot = {
+    id: META_SPACE_ID,
+    document: { version: 1, title: 'Not yet opened' },
+    things: [
+      { id: MARKDOWN_THING_ID, document: { title: 'Opening', kind: 'markdown', body: 'Hello.\n' } },
+    ],
+  };
+
   /*
    * A Space with no Diagram is initialized on its first complete working-state
    * read, and by nothing else — not by listing, import completion or export
@@ -279,44 +288,49 @@ describe('a layoutless Space', () => {
    */
   it('round-trips unchanged, initialized by neither export nor import', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
-    const layoutless: SpaceSnapshot = {
-      id: META_SPACE_ID,
-      document: { version: 1, title: 'Not yet opened' },
-      things: [
-        {
-          id: MARKDOWN_THING_ID,
-          document: { title: 'Opening', kind: 'markdown', body: 'Hello.\n' },
-        },
-      ],
-    };
 
-    await exportTo(repositoryHolding([layoutless]), destination);
+    await exportTo(repositoryHolding([diagramless]), destination);
     const exported = spaceFileSchema.parse(
       JSON.parse(await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8')),
     );
     const reimported = await importFrom(destination);
 
     expect(exported).toEqual({ version: 1, id: META_SPACE_ID, title: 'Not yet opened' });
-    expect(await storedSnapshots(reimported)).toEqual([layoutless]);
+    expect(await storedSnapshots(reimported)).toEqual([diagramless]);
   });
 
+  /*
+   * The initialization is performed rather than assumed. Handing this a Space
+   * built already holding a Diagram proved only that export writes one — the
+   * assertion passed without `loadWorkingSpace` being involved at all, so a
+   * first working load that stopped durably initializing would not have shown
+   * up here.
+   *
+   * So the Space goes in diagramless, `createWorkingSpaceLoader` is what gives it
+   * a Diagram and Graph, and the ids asserted are the ones that load minted.
+   */
   it('exports the Diagram and Graph a later initialization gave it', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
-    const initialized = targetSpace(
-      META_SPACE_ID,
-      'Opened since',
-      META_DIAGRAM_ID,
-      META_GRAPH_ID,
-      MARKDOWN_THING_ID,
-    );
+    const repository = repositoryHolding([diagramless]);
 
-    await exportTo(repositoryHolding([initialized]), destination);
+    const initialized = await createWorkingSpaceLoader(repository, newUuid)(META_SPACE_ID);
+    const diagram = initialized?.snapshot.document.diagrams?.[0];
+    if (diagram === undefined) throw new Error('The working load initialized no Diagram');
+    await exportTo(repository, destination);
 
     const exported = spaceFileSchema.parse(
       JSON.parse(await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8')),
     );
-    expect(exported.defaultDiagram).toBe(META_DIAGRAM_ID);
-    expect(exported.diagrams?.[0]?.graphs[0]?.id).toBe(META_GRAPH_ID);
+    expect(exported.defaultDiagram).toBe(diagram.id);
+    expect(exported.diagrams?.[0]?.id).toBe(diagram.id);
+    expect(exported.diagrams?.[0]?.graphs[0]?.id).toBe(diagram.graphs[0]?.id);
+    // The Diagram initialization authors is *empty* (ADR 0079) — it does not
+    // adopt the Things the Space already held — and export writes that as it is
+    // rather than placing them for it.
+    expect(exported.diagrams?.[0]?.positions).toEqual({});
+    expect(await storedSnapshots(repository).then((spaces) => spaces[0]?.things)).toEqual(
+      diagramless.things,
+    );
   });
 });
 
@@ -362,10 +376,17 @@ describe('re-exporting over an earlier export', () => {
   });
 
   /*
-   * The format reads a root manifest and `<space-uuid>/` children, and inside a
-   * Space directory it reads `space.json`, `*.md` and `things/*.md`. Everything
-   * else is the author's — notes, assets, a README — and re-export has to carry
+   * The format reads a root aggregate file and `<space-uuid>/` children, and
+   * inside a Space directory it reads `space.json`, `*.md` and `things/*.md`.
+   * Everything else is the author's — notes, assets — and re-export has to carry
    * it across rather than tidy it away.
+   *
+   * A `README.md` inside a Space directory is **not** one of those, and the
+   * comments here and on `writeSpaceDirectory` used to offer it as the example of
+   * what survives. It does not and must not: root `*.md` is what the reader scans
+   * for Thing files, so a README left there imports as a Thing or refuses the
+   * import for carrying no frontmatter. Asserted alongside, so the boundary is
+   * the tested one rather than the plausible one.
    */
   it('preserves root files it ignores and undiscovered contents of a Space it keeps', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
@@ -374,12 +395,14 @@ describe('re-exporting over an earlier export', () => {
     await exportTo(source, destination);
     await writeFile(join(destination, 'notes.txt'), 'root note\n');
     await writeFile(join(destination, META_SPACE_ID, 'assets.json'), '{"kept":true}\n');
+    await writeFile(join(destination, META_SPACE_ID, 'README.md'), '# Notes\n');
     await exportTo(source, destination);
 
     expect(await readFile(join(destination, 'notes.txt'), 'utf8')).toBe('root note\n');
     expect(await readFile(join(destination, META_SPACE_ID, 'assets.json'), 'utf8')).toBe(
       '{"kept":true}\n',
     );
+    expect(await readdir(join(destination, META_SPACE_ID))).not.toContain('README.md');
   });
 
   it('removes the file of a Thing the Space no longer holds', async () => {

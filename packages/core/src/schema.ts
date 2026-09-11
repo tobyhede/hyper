@@ -376,13 +376,13 @@ export const spaceSnapshotSchema = z.object({
 });
 
 /**
- * The **first-public** aggregate manifest version.
+ * The **first-public** aggregate file version.
  *
  * Its own constant rather than a second use of `SPACE_FILE_VERSION`, because
  * the two version different documents: that one says what a space file holds,
  * this one says what the directory around it holds. Both are `1` today and
  * nothing holds them in step — a change to the space file's shape does not
- * move the manifest's, and reusing one constant would make the next such
+ * move the aggregate file's, and reusing one constant would make the next such
  * change look like it did.
  */
 export const AGGREGATE_FILE_VERSION = 1;
@@ -394,7 +394,7 @@ export const AGGREGATE_FILE_VERSION = 1;
  * Spaces is Meta. No adapter may infer that from ordering, cardinality or
  * topology (ADR 0078), and a directory is exactly where such an inference would
  * be tempting — the first child, the alphabetically-least name — so the
- * manifest states it outright, and a directory without one is not an aggregate.
+ * aggregate file states it outright, and a directory without one is not an aggregate.
  *
  * There is deliberately **no Space inventory** beside it. A Space is in the
  * aggregate because its directory is there, exactly as a thing exists because

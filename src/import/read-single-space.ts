@@ -7,6 +7,7 @@ import {
   type ImportSpaceFile,
 } from '@project/core';
 import { documentRefusal, parseImportThingFile } from '@project/graph';
+import { compareOrdinal } from '../ordinal';
 
 type SpaceImportFileErrorKind = 'discovery' | 'parsing';
 
@@ -28,17 +29,6 @@ const resolveSpaceFile = async (inputPath: string): Promise<string> => {
     ? join(absoluteInput, 'space.json')
     : absoluteInput;
 };
-
-/**
- * Order two relative paths by code unit, not by locale.
- *
- * `localeCompare` reads the host's collation, so the same space directory could
- * import its things in a different order on a different machine. Import order is
- * observable — it is the order things are inserted and the order a canonical
- * export will emit — so it has to come from the bytes alone.
- */
-const compareOrdinal = (left: string, right: string): number =>
-  left < right ? -1 : left > right ? 1 : 0;
 
 const markdownFilesIn = async (directory: string): Promise<string[]> =>
   (await readdir(directory, { withFileTypes: true }))

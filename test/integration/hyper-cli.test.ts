@@ -172,7 +172,7 @@ describe('hyper CLI', () => {
    * one `<space-uuid>/` child per Space.
    *
    * A bare Space directory is no longer what the public command takes, so every
-   * fixture here is built through this — a directory with no manifest is a
+   * fixture here is built through this — a directory with no aggregate file is a
    * different failure, not a shorter fixture.
    */
   const makeAggregateDirectory = async (
@@ -256,7 +256,7 @@ describe('hyper CLI', () => {
       body: 'Durable CLI body.\n',
     });
 
-    // The manifest named Meta and the repository stored what it named. Nothing
+    // The aggregate file named Meta and the repository stored what it named. Nothing
     // else selects it: there is no mutable flag to point somewhere else, and no
     // position in the input for it to be read off (ADR 0078).
     await expect(repository.loadAggregate()).resolves.toMatchObject({
@@ -363,10 +363,13 @@ describe('hyper CLI', () => {
         `Exported space ${IMPORTED_SPACE_ID} at revision 0\n`,
       stderr: '',
     });
-    const manifest: unknown = JSON.parse(
+    const aggregateFile: unknown = JSON.parse(
       await readFile(join(destination, AGGREGATE_FILE_NAME), 'utf8'),
     );
-    expect(manifest).toEqual({ version: AGGREGATE_FILE_VERSION, metaSpaceId: IMPORTED_SPACE_ID });
+    expect(aggregateFile).toEqual({
+      version: AGGREGATE_FILE_VERSION,
+      metaSpaceId: IMPORTED_SPACE_ID,
+    });
     // Read back through the ordinary single-Space reader, from the child named
     // for the Space. The directory name is where a Space Id is written down, so
     // addressing it by that name is also the assertion that it was.

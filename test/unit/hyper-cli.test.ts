@@ -8,6 +8,7 @@ import { runCliMain } from '../../src/cli/main';
 import { runHyper, type CliIo } from '../../src/cli/run';
 import { AGGREGATE_FILE_NAME } from '../../src/import/read-aggregate';
 import { readSingleSpace } from '../../src/import/read-single-space';
+import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -42,14 +43,6 @@ const makeTemporaryDirectory = async (): Promise<string> => {
   return directory;
 };
 
-interface SpaceDirectory {
-  /** The directory name, which is where a Space's own identity is written. */
-  readonly name: string;
-  /** Raw text, so a test can write a space file that does not parse. */
-  readonly spaceFile: string;
-  readonly things?: Readonly<Record<string, string>>;
-}
-
 /**
  * Build a canonical aggregate directory: a versioned `hyper.json` naming the
  * Meta Space, and one `<space-uuid>/` child per Space. Public import takes
@@ -59,19 +52,7 @@ interface SpaceDirectory {
 const writeAggregate = async (
   metaSpaceId: UUID,
   spaces: readonly SpaceDirectory[],
-): Promise<string> => {
-  const root = await makeTemporaryDirectory();
-  await writeFile(join(root, AGGREGATE_FILE_NAME), JSON.stringify({ version: 1, metaSpaceId }));
-  for (const space of spaces) {
-    const directory = join(root, space.name);
-    await mkdir(join(directory, 'things'), { recursive: true });
-    await writeFile(join(directory, 'space.json'), space.spaceFile);
-    for (const [name, text] of Object.entries(space.things ?? {})) {
-      await writeFile(join(directory, 'things', name), text);
-    }
-  }
-  return root;
-};
+): Promise<string> => writeAggregateInto(await makeTemporaryDirectory(), metaSpaceId, spaces);
 
 /** One Meta Space alone, which is the smallest complete aggregate there is. */
 const writeSingleSpaceAggregate = (id: UUID = SPACE_ID, title = 'Imported talk'): Promise<string> =>
@@ -375,6 +356,48 @@ describe('runHyper', () => {
     );
   });
 
+  /*
+   * The bytes landed, so the export happened, and nothing may say otherwise.
+   * `markExported` runs after replacement precisely so a failure here cannot
+   * corrupt the destination, and an unrecorded revision reads as changed since
+   * its last export — the conservative direction, which invites an export that
+   * was already done rather than hiding one that never happened.
+   *
+   * Reporting it as `Export failed` with exit 1 inverted that: the one state
+   * this design chose to be safe became the one the operator is told to treat
+   * as a failure, and would plausibly answer by re-running or discarding the
+   * destination. The reasons were lost too — `describeError` reads only
+   * `message`, so an `AggregateError`'s `errors` never reached the terminal and
+   * the operator learned neither which Space nor why.
+   */
+  it('reports a completed export whose projected revision could not be recorded', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    repository.markExported = () => Promise.reject(new Error('connection lost'));
+    const output = captureIo();
+
+    await expect(
+      runHyper(['export', destination], { repository, io: output.io, newId: newUuid }),
+    ).resolves.toBe(0);
+
+    expect(output.stdout).toEqual([
+      `Exported the aggregate rooted at ${SPACE_ID} to ${destination}\n`,
+      `Exported space ${SPACE_ID} at revision 0\n`,
+    ]);
+    const reported = output.stderr.join('');
+    expect(reported).toContain('was exported');
+    expect(reported).toContain(SPACE_ID);
+    expect(reported).toContain('connection lost');
+    // The whole point of the ordering: the files are complete and valid even
+    // though the revision behind them was never written down.
+    await expect(readFile(join(destination, SPACE_ID, 'space.json'), 'utf8')).resolves.toContain(
+      '"title": "Stored talk"',
+    );
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      exportedRevision: null,
+    });
+  });
+
   it('writes deterministic fully identified files that re-enter through version 1 intake', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const snapshot: SpaceSnapshot = {
@@ -539,6 +562,15 @@ describe('runHyper', () => {
     { args: ['first', 'second'] },
     { args: ['--dangerous-truncate'] },
     { args: ['space', '--unknown'] },
+    /*
+     * An option is never a destination. `export` reached `exportAggregate` on
+     * arity alone, so an operator mixing the two commands wrote a complete
+     * aggregate into a directory named `--dangerous-truncate` and was told
+     * nothing — the unknown-flag guard below only ever sees the import path.
+     */
+    { args: ['export', '--dangerous-truncate'] },
+    { args: ['export', '--unknown'] },
+    { args: ['export', ''] },
   ])('rejects invalid arguments $args', async ({ args }) => {
     const output = captureIo();
 
@@ -700,21 +732,12 @@ describe('runHyper', () => {
    * repository. That error is new to version 1 — a graph id is unique across the
    * space although one diagram owns it (ADR 0045).
    *
-   * It used to assert that both colliding diagram ids reached stderr, because
-   * the only part an author can act on is *which two* collided. They no longer
-   * do: `aggregate-refused` carries structured `SpaceAggregateError`s and the
-   * CLI prints their `kind` alone, so a whole-Space fault arrives as the single
-   * word `invalid-space-snapshot` with every identity inside it dropped. The
-   * assertion below is what the command actually says; restoring the detail is a
-   * change to `reportImportResult`, not to this test.
-   */
-  /*
-   * The original of this test is where the CLI's refusal reporting was found to
-   * be throwing identities away: a duplicate graph id is a whole-Space fault, so
-   * it arrives as one `invalid-space-snapshot`, and printing the kind alone left
-   * an author holding a directory and the word "invalid". `describeAggregateRefusal`
-   * renders the structured error instead, which is why both colliding Diagram
-   * ids are nameable here.
+   * This test is where the CLI's refusal reporting was found to be throwing
+   * identities away: a duplicate graph id is a whole-Space fault, so it arrives
+   * as one `invalid-space-snapshot`, and printing the kind alone left an author
+   * holding a directory and the word "invalid" — when the only part they can act
+   * on is *which two* collided. `describeAggregateRefusal` renders the structured
+   * error instead, which is why both colliding Diagram ids are nameable below.
    */
   it('refuses a graph id two diagrams own, naming both of them', async () => {
     const root = await writeAggregate(SPACE_ID, [

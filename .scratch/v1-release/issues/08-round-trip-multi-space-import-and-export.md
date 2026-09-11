@@ -76,8 +76,17 @@ canonical initial aggregate without an import source.
       names no retired key at all, which is ADR 0056's rule. `defaultRenderer` is
       absent from `packages/**` and `src/**` (`git grep defaultRenderer --
       packages src` returns nothing).
-- [ ] PostgreSQL integration proves the initialized aggregate survives a fresh
-      application host and exports at the committed revision.
+- [x] PostgreSQL integration proves the initialized aggregate survives a fresh
+      application host and exports at the committed revision. Written, in
+      `test/e2e/postgres-persistence.spec.ts`: the fixture is established through
+      `initializeAggregate` (`:107`), and after the edit survives a second Vite
+      host the same test exports (`:181`) and asserts the aggregate file equals
+      `{ version: 1, metaSpaceId }`, that `<spaceId>/space.json` carries the id
+      and title, and that the Space reads back at `revision: 1n` with
+      `exportedRevision: 1n` (`:183-196`). **Written, not observed here** — the
+      one command that can run it, `pnpm e2e:postgres`, needs a migrated
+      database, and no run of it is recorded against this branch. CI runs it as
+      the last step of the `postgres` job, which is where the evidence will be.
 
 This ticket absorbs the aggregate criteria formerly proposed as
 `layout-only-v1/05`, so it remains the one canonical aggregate-format and
@@ -183,3 +192,78 @@ To close it:
 ```sh
 pnpm postgres:up && pnpm test:integration:postgres && pnpm e2e:postgres; pnpm postgres:down
 ```
+
+### Second review pass, 11 September 2026
+
+`/code-review-loop` ran three reviewers over `f3ec6cdd` in parallel — the
+Standards/Spec pair, the built-in review at low effort, and CodeRabbit — and
+collated 17 verified findings. Five had already been closed by `9d198232`; the
+rest are closed here. Three of the reviewers converged independently on the
+re-export abort, which is what raised confidence in it before any code moved.
+
+What changed in production code:
+
+- `hyper export` rejects an option-like or empty destination. It validated arity
+  alone, so `hyper export --dangerous-truncate` wrote a complete aggregate into a
+  directory of that name, and `hyper export ''` resolved to the working directory
+  and began staging a copy of the repository — that case *hung* the test that
+  first reached it.
+- A completed export is no longer reported as a failure. `markExported` runs
+  after replacement precisely so its failure cannot corrupt the destination, yet
+  a rejection there printed `Export failed` with exit 1 and discarded the
+  `AggregateError`'s reasons, because `describeError` reads only `message`.
+  `exportAggregate` now answers `unrecorded` per Space and the CLI names each one
+  with its reason, exit 0.
+- Staged verification renders its refusal through `describeAggregateRefusal`
+  rather than `error.kind` alone — the same loss of identities that renderer was
+  added in `f3ec6cdd` to prevent, reintroduced one directory away from it.
+- Minting is deterministic. `readAggregate` read its Space directories
+  concurrently *and* minted inside that concurrency, so ids were drawn in
+  I/O-completion order: which Space got which id depended on how fast its files
+  came back. Reads stay concurrent; minting now runs afterwards in discovery's
+  ordinal order. The regression test needs the first-sorting Space to be the
+  slower read — with equal-sized reads the two orders coincide and the race never
+  shows.
+- `identifySpace` refuses a `spaceId` that disagrees with the document's own
+  `id` instead of silently overriding it. The invariant lived only in its one
+  caller, so a second caller could have stored a Space under an id its own
+  `space.json` does not spell, with no refusal anywhere.
+
+Vocabulary, both against words this repo formally retires:
+
+- **`manifest`** — reintroduced ~16 times for `hyper.json`, in prose and in local
+  variable names, including in the `README.md` paragraph that retires it
+  (`:86`) and in `schema.ts` eight lines from its own retirement notice. Now
+  `aggregate file`, matching `AGGREGATE_FILE_NAME`. `CONTEXT.md:9` retires the
+  word outright and `current-domain-vocabulary.test.ts` does not guard it, so
+  nothing in `verify` would have said so.
+- **`layoutless`** — new on this branch against ADR 0085, in `AGENTS.md` and in a
+  `describe` name and identifier, while the same paragraph wrote `diagramless`
+  for the identical state. Now `diagramless` throughout.
+
+Tests and documentation:
+
+- The export-after-initialization criterion was asserted against a Space
+  *constructed already holding* a Diagram, so it proved export writes a Diagram
+  and nothing about initialization. It now goes in diagramless and
+  `createWorkingSpaceLoader` is what gives it a Diagram — and pins that the
+  Diagram initialization authors is empty (ADR 0079) rather than adopting the
+  Things the Space already held.
+- Two docblocks claimed a `README.md` survives a round trip inside a Space
+  directory. It does not and must not: root `*.md` is what the reader scans for
+  Thing files, so one left there imports as a Thing or refuses the import. The
+  removal is now asserted rather than the preservation implied.
+- A stale docblock in `hyper-cli.test.ts` said the CLI prints `kind` alone with
+  "every identity dropped", stacked directly above a second docblock saying the
+  opposite and above assertions proving the second. Merged into one.
+- `compareOrdinal` had three copies and `exists` two. The comparator decides
+  order on both sides of the round trip and the no-diff-on-re-export invariant
+  depends on them agreeing, so it is now one module, `src/ordinal.ts`.
+- The aggregate fixture builder was byte-identical in two unit suites; it is now
+  `test/support/aggregate-directory.ts`, with each suite keeping its own
+  temporary-directory lifecycle.
+
+Deliberately not changed: the duplicated `Promise.allSettled` fold the reviewers
+flagged. The export side now returns `{ spaceId, reason }` per Space and the
+import side bare reasons, so the two no longer share a body — only the `as
+unknown` narrowing, which is not worth a module.

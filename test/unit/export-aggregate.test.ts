@@ -27,7 +27,7 @@ const UPPER_CASE_NAME = 'B0000000-0000-4000-8000-0000000000FF';
 /**
  * What one Space's bytes look like is this file's whole subject, so every
  * aggregate below holds exactly one Space and that Space is Meta. The aggregate
- * shapes — the manifest, several Space directories, converging Space Things —
+ * shapes — the aggregate file, several Space directories, converging Space Things —
  * belong to `aggregate-round-trip.test.ts`, which owns the round trip; a second
  * Space here would only make the canonical form harder to read off the page.
  *
@@ -378,6 +378,46 @@ describe('canonical export', () => {
    * exporter that started work and then noticed would leave a sibling behind
    * where a check on the destination alone would still pass.
    */
+  /*
+   * Staged verification is the last thing standing between a serialization
+   * defect and a destination that cannot be imported, and the only way it can
+   * fail is one: `loadAggregate` has already validated, so a refusal here means
+   * the canonical bytes say something the stored aggregate did not.
+   *
+   * Which makes the identities inside the refusal the whole of its value — the
+   * operator has to find the Space or Thing the serializer mangled. Rendering
+   * `error.kind` alone reduced that to one word, which is exactly the loss
+   * `src/cli/aggregate-refusal.ts` was added in the same change to prevent.
+   *
+   * `loadAggregate` is stubbed because a valid repository cannot reach here; the
+   * refusal has to come from the staged bytes disagreeing with Meta rooting.
+   */
+  it('names the Space in a refusal raised by verifying the staged aggregate', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    const orphan = uuidSchema.parse('c0000000-0000-4000-8000-0000000000aa');
+    repository.loadAggregate = () =>
+      Promise.resolve({
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: SPACE_ID,
+          spaces: [
+            storedSpace,
+            {
+              snapshot: { id: orphan, document: { version: 1, title: 'Orphan' }, things: [] },
+              revision: 0n,
+              exportedRevision: null,
+            },
+          ],
+        },
+      });
+
+    const thrown = await captureError(() => exportAggregate(repository, destination));
+
+    expect(thrown?.message).toContain(orphan);
+    expect(thrown?.message).toContain('no Space Thing points at it');
+  });
+
   it('writes nothing and answers uninitialized when the repository holds no aggregate', async () => {
     const root = await makeTemporaryDirectory();
 

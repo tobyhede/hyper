@@ -1,10 +1,17 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
-import { aggregateFileSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  aggregateFileSchema,
+  uuidSchema,
+  type ImportSpace,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
+import { compareOrdinal } from '../ordinal';
 import { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
 import { isMissingFile, readSingleSpace, SpaceImportFileError } from './read-single-space';
 
-/** The name of the manifest at the root of a canonical aggregate directory. */
+/** The name of the aggregate file at the root of a canonical aggregate directory. */
 export const AGGREGATE_FILE_NAME = 'hyper.json';
 
 /** One complete Meta-rooted aggregate, read from a canonical directory. */
@@ -12,9 +19,6 @@ export interface AggregateSource {
   readonly metaSpaceId: UUID;
   readonly spaces: readonly SpaceSnapshot[];
 }
-
-const compareOrdinal = (left: string, right: string): number =>
-  left < right ? -1 : left > right ? 1 : 0;
 
 const isRegularFile = async (path: string): Promise<boolean> => {
   try {
@@ -123,6 +127,13 @@ export const spaceDirectoryId = (name: string): UUID | undefined => {
   return parsed.success ? parsed.data : undefined;
 };
 
+/** One Space directory's bytes, read and identified but not yet minted into. */
+interface SpaceDirectoryRead {
+  readonly directory: string;
+  readonly id: UUID;
+  readonly input: ImportSpace;
+}
+
 /**
  * Read one Space directory, taking its identity from the directory's own name.
  *
@@ -135,8 +146,14 @@ export const spaceDirectoryId = (name: string): UUID | undefined => {
  * Where `space.json` also carries an `id` the two must agree. Nothing chooses
  * between them — a disagreement is refused, because either answer would be a
  * guess about which of the two the author meant.
+ *
+ * **Reads, and does not mint.** Minting is `identifyReadSpaces` below, run in
+ * ordinal order once every read has settled, because these reads run
+ * concurrently and a generator consumed inside them draws in I/O-completion
+ * order — so which Space received which minted id depended on how fast its
+ * files came back rather than on the sort that discovery applied.
  */
-const readSpaceDirectory = async (directory: string, newId: () => UUID): Promise<SpaceSnapshot> => {
+const readSpaceDirectory = async (directory: string): Promise<SpaceDirectoryRead> => {
   const id = spaceDirectoryId(basename(directory));
   if (id === undefined) {
     throw new SpaceImportFileError('parsing', [
@@ -151,14 +168,47 @@ const readSpaceDirectory = async (directory: string, newId: () => UUID): Promise
     ]);
   }
 
-  try {
-    return identifySpace(input, newId, id);
-  } catch (error) {
-    if (error instanceof SpaceIdentityError) {
-      throw new SpaceImportFileError('parsing', [`${directory}: ${error.message}`]);
+  return { directory, id, input };
+};
+
+/** The Spaces minting completed, beside the failures it gathered on the way. */
+interface IdentifiedSpaces {
+  readonly spaces: readonly SpaceSnapshot[];
+  readonly failures: readonly unknown[];
+}
+
+/**
+ * Fill in the ids the documents left out, in the order discovery put the Spaces
+ * in, collecting each Space's own failure rather than stopping at the first.
+ *
+ * Synchronous on purpose: the whole point is that nothing between one Space's
+ * first minted id and the next one's can reorder them, and an `await` in here
+ * would put that back.
+ *
+ * Failures are gathered rather than thrown so they join the read failures in one
+ * list, and are answered by the one policy below. A fault the reader does not
+ * model reaches this phase as readily as the read phase — the identity generator
+ * throwing is how canonical export verifies a staged aggregate — so it has to be
+ * sorted by what it is, not by which phase raised it.
+ */
+const identifyReadSpaces = (
+  reads: readonly SpaceDirectoryRead[],
+  newId: () => UUID,
+): IdentifiedSpaces => {
+  const spaces: SpaceSnapshot[] = [];
+  const failures: unknown[] = [];
+  for (const { directory, id, input } of reads) {
+    try {
+      spaces.push(identifySpace(input, newId, id));
+    } catch (error) {
+      failures.push(
+        error instanceof SpaceIdentityError
+          ? new SpaceImportFileError('parsing', [`${directory}: ${error.message}`])
+          : error,
+      );
     }
-    throw error;
   }
+  return { spaces, failures };
 };
 
 /**
@@ -173,7 +223,10 @@ const readSpaceDirectory = async (directory: string, newId: () => UUID): Promise
  * twice in two vocabularies.
  *
  * Every Space directory is read before any failure is raised, so one unreadable
- * Space does not hide the next one's problem.
+ * Space does not hide the next one's problem. Those reads are concurrent and
+ * their minting is not: ids are drawn afterwards, in discovery's ordinal order,
+ * so the same directory yields the same assignment every time rather than one
+ * decided by which `space.json` came back first.
  */
 export const readAggregate = async (
   inputPath: string,
@@ -183,14 +236,19 @@ export const readAggregate = async (
   const metaSpaceId = await readAggregateFile(directory);
   const spaceDirectories = await discoverSpaceDirectories(directory);
 
-  const results = await Promise.allSettled(
-    spaceDirectories.map((child) => readSpaceDirectory(child, newId)),
-  );
+  const results = await Promise.allSettled(spaceDirectories.map(readSpaceDirectory));
   // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
   // `unknown` stops that `any` from propagating into `failures`.
-  const failures: unknown[] = results.flatMap((result) =>
+  const readFailures: unknown[] = results.flatMap((result) =>
     result.status === 'rejected' ? [result.reason as unknown] : [],
   );
+  const reads = results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+  // Minting runs over whatever read cleanly even when a neighbour did not, so a
+  // fault it raises is weighed against the read failures rather than hidden
+  // behind them.
+  const identified = identifyReadSpaces(reads, newId);
+  const failures = [...readFailures, ...identified.failures];
+
   if (failures.length > 0) {
     // A failure this reader does not model — a programming fault, a non-ENOENT
     // `fs` error, the identity generator itself throwing — is raised as it is
@@ -209,8 +267,5 @@ export const readAggregate = async (
     );
   }
 
-  return {
-    metaSpaceId,
-    spaces: results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
-  };
+  return { metaSpaceId, spaces: identified.spaces };
 };

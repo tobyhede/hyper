@@ -1,4 +1,4 @@
-import { uuidSchema, type ImportSpace, type UUID } from '@project/core';
+import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { describeSchemaFailure, identifySpace } from '../../src/import/identify-space';
 
@@ -81,6 +81,29 @@ describe('identifySpace', () => {
     );
 
     expect(snapshot.id).toBe(SPACE_ID);
+  });
+
+  /*
+   * The two ids a Space can be named by must agree, and nothing here chooses
+   * between them — which is exactly the rule `read-aggregate` states for a
+   * directory name against its `space.json`.
+   *
+   * It was enforced only in that one caller, so the invariant sat outside the
+   * function that depends on it: the third argument overrode `input.id` without
+   * a word, and a second caller that passed one and skipped the check would
+   * store a Space under an id its own document does not spell — with no refusal
+   * anywhere to say so.
+   */
+  it('refuses a Space id that disagrees with the one the document declares', () => {
+    const identify = (): SpaceSnapshot =>
+      identifySpace(
+        { id: THING_ID, document: { version: 1, title: 'Disagreeing' }, things: [] },
+        countingIds(),
+        SPACE_ID,
+      );
+
+    expect(identify).toThrow(THING_ID);
+    expect(identify).toThrow(SPACE_ID);
   });
 
   it('mints a fresh Space id per call for input that omits one', () => {

@@ -3,6 +3,7 @@ import { basename, join, resolve } from 'node:path';
 import { AGGREGATE_FILE_VERSION, type AggregateFile, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import type { LoadedAggregate } from '@project/persistence';
+import { describeAggregateRefusal } from '../cli/aggregate-refusal';
 import {
   AGGREGATE_FILE_NAME,
   discoverSpaceDirectories,
@@ -10,7 +11,8 @@ import {
   spaceDirectoryId,
 } from '../import/read-aggregate';
 import type { SpaceRepository } from '../persistence/space-repository';
-import { compareOrdinal, writeSpaceDirectory } from './canonical-space';
+import { compareOrdinal } from '../ordinal';
+import { writeSpaceDirectory } from './canonical-space';
 import {
   createStagingRoot,
   exists,
@@ -18,8 +20,20 @@ import {
   replaceDestination,
 } from './replace-destination';
 
+/** One Space whose bytes landed but whose projected revision was not recorded. */
+export interface UnrecordedExport {
+  readonly spaceId: UUID;
+  readonly reason: unknown;
+}
+
 export type AggregateExportResult =
-  { kind: 'exported'; aggregate: LoadedAggregate } | { kind: 'uninitialized' };
+  /**
+   * `unrecorded` is empty on the ordinary export. It is not a failure arm: the
+   * bytes are complete and valid on disk either way, and a Space listed here
+   * simply still reads as changed since its last export.
+   */
+  | { kind: 'exported'; aggregate: LoadedAggregate; unrecorded: readonly UnrecordedExport[] }
+  | { kind: 'uninitialized' };
 
 /**
  * Nothing in a canonical export is minted, because the aggregate being written
@@ -78,6 +92,13 @@ const removeObsoleteSpaceDirectories = async (
  * normalizes Markdown line endings, among other things — so a stored Space and
  * its exported form may legitimately differ. What must hold is that the result
  * is a valid, Meta-rooted aggregate naming the same Meta Space.
+ *
+ * A refusal is rendered through `describeAggregateRefusal`, the same renderer
+ * the CLI's import path uses. `loadAggregate` has already validated, so the
+ * only thing that can fail here is the canonical bytes disagreeing with the
+ * aggregate they were written from — a serialization defect, where the Space and
+ * Thing ids are precisely what the operator needs and `error.kind` alone is one
+ * word for a fault that could be anywhere in a Space.
  */
 const verifyStagedAggregate = async (directory: string, metaSpaceId: UUID): Promise<void> => {
   const reread = await readAggregate(directory, mintsNothing);
@@ -91,7 +112,12 @@ const verifyStagedAggregate = async (directory: string, metaSpaceId: UUID): Prom
     snapshots: reread.spaces,
   });
   if (!intake.ok) {
-    throw new Error(intake.errors.map(({ kind }) => kind).join('\n'));
+    throw new Error(
+      [
+        'Exported aggregate does not read back as a valid aggregate:',
+        ...describeAggregateRefusal(intake.errors, reread.spaces),
+      ].join('\n'),
+    );
   }
 };
 
@@ -174,27 +200,32 @@ const rejectSymbolicLinks = async (
  * where the opposite would hide one that never happened. So this runs after
  * replacement and never before it: a revision recorded against bytes that did
  * not land is the one failure mode there is no recovering from.
+ *
+ * **Answered, not thrown.** This runs after the destination has been replaced,
+ * so by the time it can fail the export has already happened and no sentence
+ * may say otherwise. Throwing made the CLI print `Export failed` with exit 1
+ * for the one outcome this ordering was chosen to make safe, which invites the
+ * operator to re-run or discard a destination that is complete and valid. Each
+ * failure is returned against the Space it belongs to, because "which Space,
+ * and why" is the whole of what the operator can act on — an `AggregateError`
+ * carried neither through `describeError`, which reads only `message`.
  */
 const markAggregateExported = async (
   repository: SpaceRepository,
   aggregate: LoadedAggregate,
-): Promise<void> => {
+): Promise<readonly UnrecordedExport[]> => {
   const results = await Promise.allSettled(
     aggregate.spaces.map(({ snapshot, revision }) =>
       repository.markExported(snapshot.id, revision),
     ),
   );
-  // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
-  // `unknown` stops that `any` from propagating into `failures`.
-  const failures: unknown[] = results.flatMap((result) =>
-    result.status === 'rejected' ? [result.reason as unknown] : [],
-  );
-  if (failures.length > 0) {
-    throw new AggregateError(
-      failures,
-      'The aggregate was exported but its projected revisions were not all recorded',
-    );
-  }
+  return results.flatMap((result, index) => {
+    const space = aggregate.spaces[index];
+    if (result.status !== 'rejected' || space === undefined) return [];
+    // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
+    // `unknown` stops that `any` from propagating into the result.
+    return [{ spaceId: space.snapshot.id, reason: result.reason as unknown }];
+  });
 };
 
 /**
@@ -224,6 +255,7 @@ export const exportAggregate = async (
 
   const stagingRoot = await createStagingRoot(destination);
   const replacement = join(stagingRoot, 'replacement');
+  let unrecorded: readonly UnrecordedExport[];
   try {
     if (await exists(destination)) {
       await cp(destination, replacement, { recursive: true });
@@ -232,10 +264,10 @@ export const exportAggregate = async (
     }
     await stageAggregate(aggregate, replacement);
     await replaceDestination(replacement, destination);
-    await markAggregateExported(repository, aggregate);
+    unrecorded = await markAggregateExported(repository, aggregate);
   } finally {
     await rm(stagingRoot, { recursive: true, force: true }).catch(() => undefined);
   }
 
-  return { kind: 'exported', aggregate };
+  return { kind: 'exported', aggregate, unrecorded };
 };

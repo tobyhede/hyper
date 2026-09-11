@@ -246,6 +246,76 @@ describe('readAggregate', () => {
     expect(uuidSchema.safeParse(space.things[0]?.id).success).toBe(true);
   });
 
+  /*
+   * Which Space draws which minted id is decided by the ordinal sort, not by
+   * which `space.json` the filesystem returned first.
+   *
+   * Reading the Spaces concurrently is deliberate — one unreadable Space must
+   * not hide the next one's problem — but minting inside that concurrency made
+   * the draw order an artifact of I/O completion: every call runs only as far as
+   * its first `await`, and `newId` is consumed after it. So the same directory
+   * handed the same generator twice could put `…0001` on either Space's Diagram.
+   *
+   * `readAggregate` is asked twice over the same bytes with a fresh counter each
+   * time: the two answers have to agree, which is what "from the bytes alone"
+   * means. A single run cannot catch this — it passes whichever way the race
+   * lands.
+   */
+  it('mints in ordinal directory order however the reads complete', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    // Diagrams with no `id`, so each Space draws from the generator. Identical
+    // documents but for their ids, so nothing but order can distinguish them.
+    for (const id of [OTHER_SPACE_ID, META_SPACE_ID]) {
+      const directory = await writeSpace(
+        root,
+        id,
+        JSON.stringify({
+          version: 1,
+          id,
+          title: `Space ${id}`,
+          diagrams: [
+            {
+              title: 'Only',
+              kind: 'positioned',
+              positions: {},
+              graphs: [{ title: 'Only', edges: [] }],
+            },
+          ],
+        }),
+      );
+      // The Space that sorts *first* is given the slower read, so completion
+      // order and ordinal order disagree. Without that the two coincide and the
+      // race never shows: equal-sized reads settle in submission order.
+      if (id !== META_SPACE_ID) continue;
+      await mkdir(join(directory, 'things'));
+      for (let index = 0; index < 40; index += 1) {
+        const suffix = index.toString().padStart(12, '0');
+        // Each Thing carries its own id, so the files buy read latency without
+        // drawing from the generator — which leaves the Diagram and its Graph as
+        // the only draws and the expectation below readable.
+        await writeFile(
+          join(directory, 'things', `thing-${suffix}.md`),
+          `---\nid: 44444444-4444-4444-8444-${suffix}\ntitle: Thing ${index}\n---\nBody.\n`,
+        );
+      }
+    }
+
+    const first = await readAggregate(root, countingIds());
+    const second = await readAggregate(root, countingIds());
+
+    const mintedBySpace = (aggregate: Awaited<ReturnType<typeof readAggregate>>) =>
+      aggregate.spaces.map(({ id, document }) => [id, document.diagrams?.[0]?.id]);
+    expect(mintedBySpace(first)).toEqual(mintedBySpace(second));
+    // And the ordinal order is the one it follows: META sorts before OTHER, so
+    // it draws first whichever order the directories were written in. Each Space
+    // draws twice — its Diagram, then the Graph that Diagram owns.
+    expect(mintedBySpace(first)).toEqual([
+      [META_SPACE_ID, '00000000-0000-4000-8000-000000000001'],
+      [OTHER_SPACE_ID, '00000000-0000-4000-8000-000000000003'],
+    ]);
+  });
+
   it('reports every unreadable Space together rather than stopping at the first', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);

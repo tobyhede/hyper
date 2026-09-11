@@ -101,7 +101,17 @@ const runExport = async (
   { repository, io }: RunHyperDependencies,
 ): Promise<number> => {
   const destination = args[1];
-  if (args.length !== 2 || destination === undefined) {
+  // An option is never a destination, and neither is nothing. Arity alone let
+  // `hyper export --dangerous-truncate` write a complete aggregate into a
+  // directory of that name, and `hyper export ''` resolve to the working
+  // directory and stage a copy of it. The import path's unknown-flag guard
+  // never sees either, because `export` is routed before it.
+  if (
+    args.length !== 2 ||
+    destination === undefined ||
+    destination === '' ||
+    destination.startsWith('-')
+  ) {
     io.stderr(USAGE);
     return 2;
   }
@@ -116,6 +126,18 @@ const runExport = async (
     );
     for (const space of result.aggregate.spaces) {
       io.stdout(`Exported space ${space.snapshot.id} at revision ${space.revision.toString()}\n`);
+    }
+    // Not a failure, and not silent either. The files are complete; what did
+    // not happen is the bookkeeping behind them, so each Space is named with
+    // its reason and the command still succeeds. Left unsaid, the operator
+    // would find these Spaces reading as changed since their last export with
+    // nothing to explain why.
+    if (result.unrecorded.length > 0) {
+      io.stderr(
+        `The aggregate was exported, but these projected revisions were not recorded, so each Space still reads as changed since its last export:\n${result.unrecorded
+          .map(({ spaceId, reason }) => `  ${spaceId}: ${describeError(reason)}`)
+          .join('\n')}\n`,
+      );
     }
     return 0;
   } catch (error) {

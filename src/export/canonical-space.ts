@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   SPACE_FILE_VERSION,
@@ -9,9 +9,8 @@ import {
 } from '@project/core';
 import { serializeThingFile } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
-
-export const compareOrdinal = (left: string, right: string): number =>
-  left < right ? -1 : left > right ? 1 : 0;
+import { compareOrdinal } from '../ordinal';
+import { exists } from './replace-destination';
 
 /**
  * One placement, rebuilt key by key — the remembered Open Size included, on both
@@ -126,16 +125,6 @@ export const canonicalThing = (
   return { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
 };
 
-const exists = async (path: string): Promise<boolean> => {
-  try {
-    await stat(path);
-    return true;
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return false;
-    throw error;
-  }
-};
-
 const removeMarkdownFiles = async (directory: string): Promise<void> => {
   if (!(await exists(directory))) return;
   const entries = await readdir(directory, { withFileTypes: true });
@@ -154,7 +143,14 @@ const removeMarkdownFiles = async (directory: string): Promise<void> => {
  * space file, `things/*.md`, and `space.json` — so a Thing deleted since the
  * last export leaves no file behind to be read back as a Thing that still
  * exists. Anything the reader would not have looked at survives, which is what
- * lets a Space directory carry notes, assets or a README across a round trip.
+ * lets a Space directory carry notes or assets across a round trip.
+ *
+ * **Markdown is not among what survives, and a `README.md` here is no
+ * exception.** The reader scans root `*.md` as Thing files, so a README beside
+ * `space.json` is not an ignored file at all — left in place it would import as
+ * a Thing, or refuse the import for having no frontmatter. Removing it is the
+ * correct behaviour rather than a gap; prose that belongs with a Space directory
+ * has to sit under a name the reader does not scan.
  */
 export const writeSpaceDirectory = async (
   stored: LoadedSpace,

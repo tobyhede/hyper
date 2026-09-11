@@ -180,10 +180,10 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     exportDirectory = await mkdtemp(join(tmpdir(), 'hyper-postgres-e2e-export-'));
     const exported = await exportAggregate(repository, exportDirectory);
     expect(exported.kind).toBe('exported');
-    const manifest: unknown = JSON.parse(
+    const aggregateFile: unknown = JSON.parse(
       await readFile(join(exportDirectory, AGGREGATE_FILE_NAME), 'utf8'),
     );
-    expect(manifest).toEqual({ version: 1, metaSpaceId: spaceId });
+    expect(aggregateFile).toEqual({ version: 1, metaSpaceId: spaceId });
     // The Space directory is named for the Space, which is where an aggregate
     // writes every Space Id down (ADR 0078) — so its presence under this name
     // is the check, not a search for a file called `space.json` somewhere.

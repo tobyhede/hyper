@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type UUID } from '@project/core';
@@ -12,13 +12,13 @@ import type {
 import { afterEach, describe, expect, it } from 'vitest';
 import { importAggregate } from '../../src/import/import-aggregate';
 import { SpaceImportFileError } from '../../src/import/read-single-space';
-import { AGGREGATE_FILE_NAME } from '../../src/import/read-aggregate';
 import type {
   AggregateInput,
   InitializeAggregateResult,
   ReplaceAggregateResult,
   SpaceRepository,
 } from '../../src/persistence/space-repository';
+import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 import { captureError } from '../support/capture-error';
 
@@ -97,14 +97,6 @@ const countingIds = (): (() => UUID) => {
   };
 };
 
-interface SpaceDirectory {
-  /** The directory name, which is where a Space's own identity is written. */
-  readonly name: string;
-  /** Raw text, so a test can write a space file that does not parse. */
-  readonly spaceFile: string;
-  readonly things?: Readonly<Record<string, string>>;
-}
-
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = async (): Promise<string> => {
@@ -116,19 +108,7 @@ const makeTemporaryDirectory = async (): Promise<string> => {
 const writeAggregate = async (
   metaSpaceId: UUID,
   spaces: readonly SpaceDirectory[],
-): Promise<string> => {
-  const root = await makeTemporaryDirectory();
-  await writeFile(join(root, AGGREGATE_FILE_NAME), JSON.stringify({ version: 1, metaSpaceId }));
-  for (const space of spaces) {
-    const directory = join(root, space.name);
-    await mkdir(join(directory, 'things'), { recursive: true });
-    await writeFile(join(directory, 'space.json'), space.spaceFile);
-    for (const [name, text] of Object.entries(space.things ?? {})) {
-      await writeFile(join(directory, 'things', name), text);
-    }
-  }
-  return root;
-};
+): Promise<string> => writeAggregateInto(await makeTemporaryDirectory(), metaSpaceId, spaces);
 
 /** One Meta Space alone, which is the smallest complete aggregate there is. */
 const writeMetaOnlyAggregate = (
