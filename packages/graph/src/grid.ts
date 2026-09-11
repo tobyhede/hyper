@@ -7,7 +7,7 @@ import type { LayoutStrategyGraph, LayoutStrategy } from './layout';
  * the things — never the edges, never the graphs — and it places no ports,
  * leaving their offsets undefined for the render layer to spread evenly. That —
  * placing no ports, ignoring the edges — is what keeps the seam honest, not any
- * ELK specifics. The arithmetic is synchronous but the function is `async`, so
+ * one engine's specifics. The arithmetic is synchronous but the function is `async`, so
  * it satisfies the uniformly-async `LayoutStrategy` contract (layout-seam/06).
  *
  * Automatic: it computes placement from the things alone, so no Diagram stands

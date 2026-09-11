@@ -124,7 +124,7 @@ describe('projectThingNodes', () => {
         color: '#222222',
       },
     ]);
-    // A vertical offset is always assigned (even spread before ELK runs).
+    // A vertical offset is always assigned (the even spread, which is the only rule).
     expect(typeof a.data.sourceHandles[0]!.offsetY).toBe('number');
   });
 
@@ -402,7 +402,7 @@ describe('projectGraphEdges', () => {
     expect(mainEdge.style?.stroke).toBe('#111111');
   });
 
-  it("carries ELK's routed points when a strategy has placed them", () => {
+  it('carries routed points when a strategy has placed them', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors, {
       strategyGraph: {
         things: [],

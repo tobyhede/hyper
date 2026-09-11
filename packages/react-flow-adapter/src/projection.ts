@@ -40,7 +40,7 @@ export const OTHER_GRAPH_OPACITY = {
 } satisfies Record<GraphEmphasis, number>;
 
 /** A graph handle resolved for rendering: a color and a vertical offset (px from
- *  the node's top) matching where ELK placed the port. */
+ *  the node's top), spread evenly down the node's side. */
 export type ThingHandle = {
   id: string;
   graphId: GraphId;
@@ -58,7 +58,7 @@ export type ThingTitleEditor = {
 
 /** Data carried by each custom thing node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint, and it includes the
- *  handle arrays the ELK layout needs. */
+ *  handle arrays the node declares its handles from. */
 export type ThingNodeData = {
   thingId: ThingId;
   title: string;
@@ -258,8 +258,9 @@ function resolveHandles(
   const count = refs.length;
   return refs.map((ref, index) => {
     const port = portsById.get(ref.id);
-    // Not every strategy places ports — a grid has no opinion about them, and ELK
-    // has not run yet on first paint. Fall back to an even spread.
+    // **The even spread is the only branch that runs.** No strategy in the tree
+    // places ports (ADR 0086), so `port` is always undefined; the lookup and this
+    // fallback leave together with ticket 02. Don't go looking for a producer.
     const offsetY = port?.y ?? ((index + 1) / (count + 1)) * nodeHeight;
     return {
       id: ref.id,
@@ -350,8 +351,8 @@ function declaredHandles(
 }
 
 /**
- * Map things → React Flow thing nodes, attaching per-graph handles positioned at
- * their ELK port offsets. The thing id is the React Flow node id.
+ * Map things → React Flow thing nodes, attaching per-graph handles spread evenly
+ * down the node's sides. The thing id is the React Flow node id.
  *
  * A node carries its thing's *title*, not its content (ADR 0006) — the content is
  * loaded when a thing is opened or presented, not embedded in every node.
@@ -418,8 +419,8 @@ export function projectThingNodes(
       },
       className: active ? 'rf-thing-node rf-thing-node--active' : 'rf-thing-node',
     };
-    // Carry the diagram's dimensions through when it has placed the thing. ELK
-    // (and the grid) work at a fixed `THING_SIZE`, so declaring width/height
+    // Carry the diagram's dimensions through when it has placed the thing. Every
+    // strategy works at a fixed `THING_SIZE`, so declaring width/height
     // here means React Flow renders the node at exactly the size the diagram
     // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
     // view chooses one) resolves correctly on first paint. Absent before the
@@ -457,7 +458,7 @@ export interface ProjectGraphEdgesOptions {
   activeGraphId?: GraphId | null;
   /** How strongly the other graphs recede. */
   emphasis?: GraphEmphasis;
-  /** The laid-out graph; ELK's routed edge geometry comes from here when present. */
+  /** The laid-out graph. Routed edge geometry would come from here — nothing emits any. */
   strategyGraph?: LayoutStrategyGraph;
 }
 
@@ -471,7 +472,8 @@ function routedPoints(edge: LayoutStrategyEdge | undefined): Point[] | undefined
   return points;
 }
 
-/** Map graph-derived edges → colored React Flow edges drawn along ELK's routing. */
+/** Map graph-derived edges → colored React Flow edges. Every one draws a bezier:
+ *  no strategy routes, so `routedPoints` always answers undefined (ADR 0086). */
 export function projectGraphEdges(
   graphRenderEdges: readonly GraphRenderEdge[],
   colors: ColorByGraphId,
@@ -492,8 +494,8 @@ export function projectGraphEdges(
 
     return {
       id: edge.id,
-      // A custom edge that draws ELK's routed polyline (issue 03); it falls back
-      // to a bezier between the handles when no routing has been placed yet.
+      // A custom edge whose polyline branch is unreachable here; it draws the
+      // bezier between the handles, which is the only geometry the product has.
       type: 'routed',
       source: edge.source,
       target: edge.target,

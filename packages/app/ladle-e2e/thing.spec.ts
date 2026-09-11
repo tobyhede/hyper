@@ -52,7 +52,7 @@ const FRONTS = [
 ] as const;
 
 const ONE_LINE = ['Strategies'];
-const THREE_LINES = ['Strategies', 'no strategy is privileged', 'elkjs is one member of a set'];
+const THREE_LINES = ['Strategies', 'no strategy is privileged', 'grid is one member of a set'];
 
 /** The roles of a Thing's drawn Title Lines, in the order they are drawn. */
 const rolesOf = (lines: Locator): Promise<readonly (string | null)[]> =>

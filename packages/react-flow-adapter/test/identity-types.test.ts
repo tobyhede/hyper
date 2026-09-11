@@ -2,7 +2,6 @@ import { describe, expectTypeOf, it } from 'vitest';
 import type { ThingId, GraphId } from '@project/core';
 import type { ThingHandleSet } from '@project/graph';
 import type {
-  elkPortId,
   projectThingNodes,
   ThingHandle,
   ThingNodeData,
@@ -29,7 +28,6 @@ describe('React Flow adapter identity types', () => {
       GraphId | null | undefined
     >();
     expectTypeOf<RoutedEdgeData['graphId']>().toEqualTypeOf<GraphId>();
-    expectTypeOf<Parameters<typeof elkPortId>[0]>().toEqualTypeOf<ThingId>();
     expectTypeOf<Parameters<typeof projectThingNodes>[1]>().toEqualTypeOf<
       ReadonlyMap<ThingId, ThingHandleSet>
     >();
@@ -41,10 +39,7 @@ describe('React Flow adapter identity types', () => {
     >();
     // @ts-expect-error A plain string has not crossed the UUID validation seam.
     const activeGraphId: ThingNodeData['activeGraphId'] = 'graph';
-    // @ts-expect-error A synthetic port id may be a string; its thing namespace may not.
-    const portThingId: Parameters<typeof elkPortId>[0] = 'thing';
     void handlesByThing;
     void activeGraphId;
-    void portThingId;
   });
 });

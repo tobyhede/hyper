@@ -10,23 +10,20 @@ import {
   type LayoutStrategyGraph,
   type LayoutStrategy,
 } from '@project/graph';
-import { elkStrategy } from '../src/index';
 import { uuid } from './uuid';
 
 /**
  * The `LayoutStrategy` contract, asserted against every implementation.
  *
- * `gridStrategy`, `positionedStrategy` and `elkStrategy` each had thorough
- * tests, in three files, sharing no assertions. So each was verified to do what
- * *it* does, and nothing checked they agree on the thing they have in common —
- * which is the whole reason the seam exists. docs/agents/rendering.md says `gridStrategy` is
+ * `gridStrategy` and `positionedStrategy` each had thorough tests, in separate
+ * files, sharing no assertions. So each was verified to do what *it* does, and
+ * nothing checked they agree on the thing they have in common — which is the
+ * whole reason the seam exists. docs/agents/rendering.md says `gridStrategy` is
  * kept "partly to keep the seam honest"; this is what makes that true.
  *
  * A strategy is free to put things anywhere. What it may not do is lose one,
  * invent one, drop an edge, rewrite an identity, or return something other than
- * a promise. `elkStrategy` runs the real elkjs here — it is the implementation
- * most able to violate this, being the one that does not simply arrange in a
- * loop, so faking the engine would test the wrong half.
+ * a promise.
  */
 
 const SIZE = { width: 320, height: 180 };
@@ -98,7 +95,6 @@ const authored = (): Placement =>
 const STRATEGIES: [name: string, make: () => LayoutStrategy][] = [
   ['gridStrategy', () => gridStrategy()],
   ['positionedStrategy', () => positionedStrategy(authored())],
-  ['elkStrategy', () => elkStrategy()],
 ];
 
 describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
