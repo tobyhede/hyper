@@ -136,21 +136,31 @@ test('a secondary-button drag on the grip leaves the Dock in its slot', async ({
   await expect(dock(page)).toHaveAttribute('data-orientation', 'horizontal');
 });
 
+/**
+ * The handles sit half outside the Thing's own box, so a pointer moving from the
+ * Thing onto one leaves `.canvas-thing` without leaving the Thing — and the rail
+ * must not drop away under a pointer that is still on the Thing's furniture.
+ *
+ * Read off the commands and the kind glyph rather than a coloured band: the band
+ * is gone and the rail is neutral (`.scratch/command-dock/issues/12`). The
+ * handle's own colour is asserted here too, because it is the half of the
+ * treatment change that says where the Graph's colour went.
+ */
 test('hovering a Thing handle keeps its rail revealed with entity actions', async ({ page }) => {
   await page.goto('/');
   const thing = nodeByTitle(page, 'A');
   await expect(thing).toBeVisible();
   await settled(page);
   await thing.hover();
-  const rail = thing.locator('.canvas-thing__rail');
   const handle = thing.locator('[data-handleid="authoring-source-right"]');
   const color = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(color).not.toBe('rgba(0, 0, 0, 0)');
   const box = await handle.boundingBox();
   if (box === null) throw new Error('Thing handle has no box');
   // The outside half is beyond the Thing face but inside the handle hit target.
   await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2);
   await expect(handle).toBeVisible();
-  await expect(rail).toHaveCSS('background-color', color);
+  await expect(thing.locator('.thing-rail__kind')).toHaveCSS('opacity', '1');
   await expect(thing.getByTestId('canvas-thing-actions')).toHaveCSS('opacity', '1');
 });
 

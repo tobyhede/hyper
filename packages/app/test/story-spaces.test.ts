@@ -43,7 +43,7 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * The Things drawer's Refused story needs a Diagram that is *missing* Things, and
+   * The Things list's Refused story needs a Diagram that is *missing* Things, and
    * it must not find one by indexing into `diagrams` — that follows array order,
    * so inserting a Diagram would silently move the story to a different one.
    */

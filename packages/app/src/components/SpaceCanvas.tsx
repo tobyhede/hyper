@@ -49,7 +49,7 @@ import type { CanvasSelection, ThingResize, EdgeSubject } from '../render-adapte
 import type { SpaceAuthoring } from '../space-authoring';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { THING_SIZE } from '../thing';
-import { THING_DRAG_TYPE } from './ThingsDrawer';
+import { THING_DRAG_TYPE } from './ThingsPopover';
 import { OverviewCamera, PresentingCamera } from './cameras';
 import type { OpenSpace } from '../open-spaces';
 import { clipEmbeddedNode, embeddedClipId, type EmbeddedBounds } from '../embedded-diagram';

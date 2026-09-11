@@ -37,6 +37,20 @@ export type {
   ThingRailKindActionsProps,
   ThingRailSharedActionsProps,
 } from './ThingRailActions';
+export { CommandName, CommandSurface, CommandToolbar } from './CommandSurface';
+export type {
+  CommandNameProps,
+  CommandSurfaceOrientation,
+  CommandSurfaceProps,
+  CommandToolbarProps,
+} from './CommandSurface';
+export { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
+export type {
+  ChoiceMenuChoice,
+  ChoiceMenuProps,
+  ChoiceMenuSide,
+  ChoiceMenuTriggerProps,
+} from './ChoiceMenu';
 export { ThingKindIcon, thingKindName } from './ThingKindIcon';
 export type { ThingKindIconProps } from './ThingKindIcon';
 export { ThingSearchCombobox } from './ThingSearchCombobox';
@@ -88,6 +102,8 @@ export {
   MarkdownIcon,
   OpenThingIcon,
   ParentIcon,
+  SpaceThingIcon,
+  SpaceIcon,
   SearchIcon,
   PlusIcon,
   ZoomInIcon,
@@ -213,6 +229,7 @@ export { Separator } from './components/separator';
 export { Slider } from './components/slider';
 export { Spinner } from './components/spinner';
 export { Textarea } from './components/textarea';
+export { ToggleGroup, ToggleGroupItem } from './components/toggle-group';
 export { Toolbar, ToolbarButton, ToolbarGroup } from './components/toolbar';
 export type { ToolbarButtonProps } from './components/toolbar';
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/tooltip';

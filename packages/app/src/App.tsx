@@ -7,9 +7,7 @@ import {
   AlertTitle,
   AppShell,
   DeleteIcon,
-  DRAWER_WIDTH,
   FALLBACK_GRAPH_COLOR,
-  ToolbarButton,
   type EntityActionGroup,
   type EntityActionOutcome,
 } from '@project/ui';
@@ -21,7 +19,7 @@ import {
   type UUID,
 } from '@project/core';
 import type { ProductDestination } from '@project/http';
-import { createNonThrowingReporter } from '@project/persistence';
+import { createNonThrowingReporter, type SpaceSummary } from '@project/persistence';
 import { graphThingIds, Placement, positionedStrategy } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpacesState, RejectedExitConfirmation } from './open-spaces';
@@ -32,6 +30,7 @@ import { canvasProjection } from './canvas-projection';
 import { canvasContent } from './canvas-content';
 import {
   describeAuthoringRefusal,
+  describeSpaceThingBreak,
   describeSpaceThingRefusal,
   presentNewAliasRefusal,
   presentNewSpaceThingRefusal,
@@ -66,15 +65,8 @@ import { SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CanvasContinuation } from './components/CanvasContinuation';
 import { ChromeContinuation } from './components/ChromeContinuation';
-import { ThingsDrawer } from './components/ThingsDrawer';
-import { THINGS_TRIGGER } from './components/command-dock-triggers';
 import { DeleteThingConfirmation } from './components/DeleteThingConfirmation';
-import {
-  ThingsTrigger,
-  CommandDock,
-  type DockChrome,
-  type SpaceExitReport,
-} from './components/CommandDock';
+import { CommandDock, type DockChrome, type SpaceExitReport } from './components/CommandDock';
 import { NewAlias } from './components/NewAlias';
 import { NewSpaceThing } from './components/NewSpaceThing';
 import { PlacementFailure } from './components/PlacementFailure';
@@ -306,7 +298,17 @@ export const createApp = (
       },
       [],
     );
-    const [thingsDrawerOpen, setThingsDrawerOpen] = useState(initialization === 'created-diagram');
+    /**
+     * The outstanding request that the Dock disclose its Things list, if any.
+     *
+     * **A request, not the open state** — the Dock owns whether the list is
+     * open, because it owns the one slot that keeps its disclosures exclusive
+     * (`DockThingsList`). A fresh object per request is the signal; an equal one
+     * recomputed by an unrelated edit reopens nothing the reader has closed.
+     */
+    const [discloseThings, setDiscloseThings] = useState<{
+      readonly thingId: ThingId | null;
+    } | null>(initialization === 'created-diagram' ? { thingId: null } : null);
     const thingsDrag = useRef<{
       readonly thingId: ThingId;
       readonly diagramId: DiagramId;
@@ -416,6 +418,118 @@ export const createApp = (
      * added: the Edit is atomic and installs every participant at once, so
      * exactly one Thing can have appeared in this Space.
      */
+    /**
+     * The Spaces the Things list offers, and when they are re-read.
+     *
+     * **A repository read rather than a derivation of this Space**, because the
+     * Meta Space's Spaces are not this Space's Things — ADR 0074 makes a Space
+     * reachable through the Space Things that reference it, and the list offers
+     * the Spaces themselves so a reader can frame one that nothing here points
+     * at yet. `referenceableSpaces` withholds the containing Space, which is
+     * the one target that cannot work whatever else is stored.
+     *
+     * Re-read on an epoch rather than on every working snapshot: the set only
+     * changes when a Space is created or destroyed, which happens through the
+     * coordinated lifecycle, so one bump per such Edit costs one read where
+     * keying on the snapshot would cost one per keystroke.
+     *
+     * **The epoch is the lifecycle's and not this component's**, because the
+     * Edit that moves it is the *session's*: it is coordinated across Spaces,
+     * and every open Space stays mounted with its own list (ADR 0074, ADR 0076,
+     * `OpenSpacesApplication`). Local state here was re-read only where the Edit
+     * was made, so a Space framed or destroyed in one open Space left every
+     * other one offering the set as it was.
+     *
+     * **And the epoch invalidates rather than fetches.** One shared epoch with
+     * every mounted `App` reading on it is the same defect the other way round:
+     * one Edit becomes N repository reads and N state updates, for N−1 lists
+     * that cannot be opened — a hidden Space's Things trigger is not merely
+     * unread, it is unreachable. So only the drawn Space subscribes, `read`
+     * compares the epoch it last answered before spending anything, and a
+     * Space that was hidden across an Edit reads once, when it is shown. The
+     * guarantee is unchanged and the cost is back to one read per Edit.
+     */
+    const [metaSpaces, setMetaSpaces] = useState<readonly SpaceSummary[]>([]);
+    // Last read wins, by token rather than by a cancelled flag: two reads can
+    // be in flight across a quick pair of Edits, and the one that started first
+    // may answer last.
+    const latestSpacesRead = useRef(0);
+    /**
+     * The epoch `metaSpaces` answers, or `null` for a list never read.
+     *
+     * A ref rather than state, because it decides whether to read and never
+     * what to draw — as state it would be a second render per read, and the
+     * render that matters is `setMetaSpaces`'s.
+     */
+    const readSpacesEpoch = useRef<number | null>(null);
+    useEffect(() => {
+      // Not subscribed at all while hidden, rather than subscribed and
+      // returning early: a subscriber that decides to do nothing has still
+      // woken every hidden Space on every Edit.
+      if (!active) return;
+      const read = (): void => {
+        const epoch = spaceThings.spaceSet.getState();
+        if (readSpacesEpoch.current === epoch) return;
+        readSpacesEpoch.current = epoch;
+        const token = latestSpacesRead.current + 1;
+        latestSpacesRead.current = token;
+        void (async () => {
+          try {
+            const spaces = await spaceThings.referenceableSpaces(currentSpace().id);
+            if (latestSpacesRead.current === token) setMetaSpaces(spaces);
+          } catch (failure) {
+            // Reported rather than drawn: the list's own empty state says what
+            // it has, and a Spaces read that failed is not a refusal of
+            // anything the reader asked for.
+            reportBreak(failure);
+            // The epoch goes back, so the next showing retries rather than
+            // standing on an empty list until another Space is framed.
+            readSpacesEpoch.current = null;
+            if (latestSpacesRead.current === token) setMetaSpaces([]);
+          }
+        })();
+      };
+      read();
+      return spaceThings.spaceSet.subscribe(read);
+    }, [active]);
+
+    /**
+     * Placing a Space: the Space Thing that frames it, authored in this Diagram.
+     *
+     * The same `link` the creation pane spends, from the surface that offers
+     * the Space — so a reader who found it in the list never meets a second
+     * picker asking which Space they meant. The Title defaults to the Space's
+     * own, which is the name they just read on the row; renaming it afterwards
+     * is the ordinary inline Title edit every Thing has (ADR 0083).
+     */
+    const addSpaceThingFor = useCallback(
+      async (space: { readonly id: UUID; readonly title: string }): Promise<string | null> => {
+        // Answers rather than rejects, for `readReferenceableSpaces`'s reason
+        // and one more: the list spends this on a press, so a rejection left to
+        // travel is a row that visibly does nothing. `resolveDiagram` is inside
+        // the `try` because it is the likeliest break on this path — the list
+        // has been open across renders and the Diagram it resolves is the one
+        // drawing now.
+        try {
+          const resolved = resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
+          const result = await spaceThings.link({
+            containingSpaceId: currentSpace().id,
+            diagramId: resolved.diagram.id,
+            title: space.title,
+            position: centreAnchor(),
+            targetSpaceId: space.id,
+          });
+          return result.kind === 'refused' ? describeSpaceThingRefusal(result.refusal) : null;
+        } catch (failure) {
+          // Both: the reader gets the sentence on the list that asked, and the
+          // diagnostic still reaches the operational channel.
+          reportBreak(failure);
+          return describeSpaceThingBreak(failure);
+        }
+      },
+      [centreAnchor],
+    );
+
     const createSpaceThing = useCallback(
       async ({
         targetSpaceId,
@@ -445,6 +559,9 @@ export const createApp = (
         if (result.kind === 'unchanged') return { kind: 'none' };
         const created = spaceSession.getState().working.things.find(({ id }) => !before.has(id));
         if (created !== undefined) useRenderAdapter.getState().selectThing(created.id);
+        // Nothing bumps the Spaces epoch here: a created Space joins the Meta
+        // Space for *every* open Space, so the lifecycle that made it is what
+        // announces it (`space-thing-lifecycle.ts`).
         // `null` rather than the Thing just selected: there is nothing to
         // continue *at*, because the title was typed on the pane before the
         // Edit ran, so the author goes back to Add Thing.
@@ -625,22 +742,23 @@ export const createApp = (
       spaceOnCanvas: active,
       editingEmbeddedDiagram,
     });
-    // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
-    // `thingsDrawerOpen`. Presenting and creating an Alias both pass through here,
-    // and a drawer that reopened itself on the way back would take
-    // focus with it — `Drawer.Popup` moves focus in on every open, so Stop would
-    // land the reader in the Things list instead of on the canvas they returned to.
+    // A withdrawn list takes its outstanding request with it. Closing is the
+    // Dock's, from the same `disabled` answer that withdraws the trigger; what
+    // has to be dropped here is a request that would otherwise reopen the list
+    // the moment authoring came back — presenting and creating an Alias both
+    // pass through here, and a list that reopened itself on the way back would
+    // take focus with it, landing the reader in the Things rather than on the
+    // canvas they returned to.
     //
     // Read during render rather than in an effect, like the rename guards below:
-    // an effect closes it one frame after the presentation has already started
+    // an effect drops it one frame after the presentation has already started
     // drawing over it. `thingsView` is `!presenting && !creatingThing` and carries
-    // nothing derived from this flag, so setting it false here settles in one
-    // pass.
-    if (thingsDrawerOpen && !availability.thingsView) setThingsDrawerOpen(false);
-    // Reveals the drawer once per (Diagram, address) rather than on every
+    // nothing derived from this value, so clearing it here settles in one pass.
+    if (discloseThings !== null && !availability.thingsView) setDiscloseThings(null);
+    // Reveals the list once per (Diagram, address) rather than on every
     // dependency change: an unrelated edit elsewhere in the Space still
     // recomputes `thingsOutsideSelectedDiagram` with a fresh array identity, and
-    // re-running on that alone would reopen a drawer the reader just closed.
+    // re-running on that alone would reopen a list the reader just closed.
     // The Diagram is part of the key, not just the Thing id — a canonical Thing
     // link addresses no Diagram of its own, so the same Thing can be
     // revealed once in one Diagram and then adopt a different default Diagram
@@ -662,7 +780,7 @@ export const createApp = (
     ) {
       setRevealedAddress({ diagramId: selectedDiagramId, thingId: addressedThingId });
       if (thingsOutsideSelectedDiagram.some(({ id }) => id === addressedThingId)) {
-        setThingsDrawerOpen(true);
+        setDiscloseThings({ thingId: addressedThingId });
       }
     }
     const placement = usePlacementRendering(
@@ -798,7 +916,7 @@ export const createApp = (
      * node-decoration memo in `canvas-thing-authoring.ts`, so a fresh builder
      * rebuilds every node object, re-renders every `ThingNode` and runs
      * `spaceEntityActions` once per Thing — on renders that touch nothing on the
-     * canvas, the Things drawer opening among them. `SpaceCanvas`'s own note
+     * canvas, the Things list opening among them. `SpaceCanvas`'s own note
      * measures that and calls the widening harmless.
      *
      * Wrapping both builders in `useMemo` was tried and reverted: with the
@@ -859,7 +977,14 @@ export const createApp = (
               containingSpaceId: renderedSpace.id,
               thingId: thing.id,
             });
-            return result.kind === 'refused' ? describeSpaceThingRefusal(result.refusal) : null;
+            if (result.kind === 'refused') return describeSpaceThingRefusal(result.refusal);
+            // The other Edit that changes the Meta Space's set: this deletion
+            // can destroy the target Space and every Space below it that
+            // nothing else references, so a list that was not told goes on
+            // offering a Space that is gone. Announced by the lifecycle for the
+            // same reason creation is — the Space it destroys was offered in
+            // every open Space, not only in this one.
+            return null;
           }
         : () => {
             const result = authoring.complete({ kind: 'deleted-thing', thingId: thing.id });
@@ -1354,7 +1479,7 @@ export const createApp = (
                 const result = authoring.complete({ kind: 'created-diagram' });
                 setCreateDiagramRefusal(result.kind === 'refused' ? result.refusal : null);
                 setDiagramManagementRefusal(null);
-                if (result.kind === 'completed') setThingsDrawerOpen(true);
+                if (result.kind === 'completed') setDiscloseThings({ thingId: null });
               },
               // The Dock's Delete names the Diagram its cluster is showing, which is
               // the drawing one — resolved from the id it hands back rather than
@@ -1417,34 +1542,34 @@ export const createApp = (
                 !presenting && (!availability.present || activeGraph.edges.length === 0),
             },
             things: {
-              /* Trigger and panel are one component: only the trigger draws in the
-           cluster, the drawer portalling its popup over the canvas. That is what
-           stops the toggle's `disabled` and the surface it names from drifting
-           apart — they are the same availability answer read in one place. The
-           trigger takes the Dock's own name treatment so the word lands in the
-           column the other three names land in. */
-              surface: (
-                <ThingsDrawer
-                  open={thingsDrawerOpen}
-                  onOpenChange={setThingsDrawerOpen}
-                  disabled={!availability.thingsView}
-                  triggerRender={<ToolbarButton variant="ghost" {...THINGS_TRIGGER} />}
-                  triggerLabel={<ThingsTrigger />}
-                  things={thingsOutsideSelectedDiagram}
-                  allThings={renderedSpace.things}
-                  spaceTitleById={spaceTitleById}
-                  onAdd={(thing, activation) =>
-                    addExistingThing(thing.id, centreAnchor(), activation === 'keyboard')
-                  }
-                  onDragStart={(thingId) => {
-                    thingsDrag.current = { thingId, diagramId: selectedDiagramId };
-                  }}
-                  onDragEnd={() => {
-                    thingsDrag.current = null;
-                  }}
-                  revealedThingId={addressedThingId}
-                />
-              ),
+              /* The Dock draws this list and owns whether it is open, so what
+                 crosses here is what the list shows and what a row does —
+                 never an `open` flag the two could come to disagree about
+                 (`DockThingsList`). */
+              list: {
+                things: thingsOutsideSelectedDiagram,
+                allThings: renderedSpace.things,
+                spaceTitleById,
+                spaces: metaSpaces,
+                onAddSpace: addSpaceThingFor,
+                disabled: !availability.thingsView,
+                disclose: discloseThings,
+                revealedThingId: addressedThingId,
+                /* **No focus continuation, and that is the surface's own
+                   change.** The drawer this replaced took a keyboard Add to
+                   the placed Thing on the canvas; an anchored list keeps the
+                   reader in it, so adding several Things costs one disclosure
+                   rather than one each, and the caret lands back in the filter
+                   (`ThingsPopover`). Escape is the way out to the canvas, and
+                   it returns focus to the trigger the list hangs off. */
+                onAdd: (thing) => addExistingThing(thing.id, centreAnchor(), false),
+                onDragStart: (thingId) => {
+                  thingsDrag.current = { thingId, diagramId: selectedDiagramId };
+                },
+                onDragEnd: () => {
+                  thingsDrag.current = null;
+                },
+              },
               onCreate: (kind) => {
                 if (kind === 'markdown') addThing();
                 else thingCreation.open(kind);
@@ -1462,11 +1587,10 @@ export const createApp = (
 
     return (
       <AppShell
-        // The drawer overlays the end edge of the main area, and the canvas, the
-        // Graph key and a standing notice are all pinned to that same edge. The
-        // shell yields exactly the panel's own width so the three stay beside it
-        // rather than behind it — `DRAWER_WIDTH` is the one place that number is.
-        insetEnd={thingsDrawerOpen ? DRAWER_WIDTH : undefined}
+        // No inset. The Things list is a Popover anchored to its trigger and
+        // floats over the canvas, so it yields no width — which is the
+        // occlusion the surface comparison held against the drawer it replaced
+        // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
         notice={
           <>
             {clipboardFailure === null ? null : (
@@ -1559,7 +1683,7 @@ export const createApp = (
             onRefused={setThingDeletionRefusal}
           />
         )}
-        {/* One child, not a row: the Things drawer portals over this rather than
+        {/* One child, not a row: the Things list portals over this rather than
             sitting beside it, so a toggle that says nothing about the Diagram no
             longer re-flows the canvas and re-measures every Thing on it. */}
         <div ref={graphArea} className="graph-area size-full min-w-0" style={thingSizeVars}>

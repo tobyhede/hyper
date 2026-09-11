@@ -143,7 +143,7 @@ export const authoredSnapshot: SpaceSnapshot = {
 /**
  * The same Space opened on Collection 2, which holds two of the five Things.
  *
- * The Things drawer's stories need a Diagram some Things are *absent* from, and
+ * The Things list's stories need a Diagram some Things are *absent* from, and
  * this **declares where it opens** like every other fixture here rather than
  * leaving a story to index into `diagrams` — array order is not a declaration,
  * and a Diagram inserted before it would move the story somewhere else in

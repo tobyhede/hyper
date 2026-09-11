@@ -9,7 +9,7 @@ where the author continues after creation and what cancelling does. Ticket 11
 identified these as product decisions, not proven branch regressions.
 
 New Layout currently creates and selects an empty Layout with its initial empty
-Graph, then opens the Cards drawer. First Layout initialization also opens that
+Graph, then opens the Cards list. First Layout initialization also opens that
 drawer. Both behaviors already exist at the promotion's merge base `a2082964`.
 The reviewed handoff requests that New Layout create/select the Layout without
 opening another surface. Decide the first-initialization case explicitly too;

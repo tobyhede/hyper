@@ -155,7 +155,12 @@ export function createOpenSpaces({
   // Opening a Space is a working load, so it initializes a stored diagramless
   // Space before anything composes against it (ADR 0079).
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
-  const spaceThings = createSpaceThingLifecycle({ backend, registry, newId });
+  const spaceThings = createSpaceThingLifecycle({
+    backend,
+    registry,
+    newId,
+    reportObserverError: report,
+  });
   const observable = createObservableState<OpenSpacesState>(
     { activeSpaceId: null, entries: [], openedFrom: new Map() },
     report,

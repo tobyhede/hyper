@@ -11,5 +11,5 @@ the Title ladder is drawn wherever the fixture is loaded rather than only in a
 unit test.
 
 It is a member of Collection 1 that no Edge reaches, which is the other thing it
-is here for: Add Thing and the Things drawer both author exactly that, and until
+is here for: Add Thing and the Things list both author exactly that, and until
 now no tracked space had one.

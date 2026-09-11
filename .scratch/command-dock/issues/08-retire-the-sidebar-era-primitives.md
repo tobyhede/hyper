@@ -56,6 +56,31 @@ reports the Sidebar's `Mod-B` entry once the source it scanned is gone — so a
 forgotten thread fails `pnpm verify`. A rewritten inventory reason is prose that
 only a reader can check.
 
+## Two this ticket did not take, because they still had a consumer when it ran
+
+`10` retired `CardsDrawer` in favour of a Popover anchored to the Dock trigger,
+which took the last consumer of the registry `Drawer` and of the strip the shell
+yielded to a screen-edge surface. Both were live when the six above were deleted,
+so they are not omissions from this ticket — they fell out of a later surface
+decision and are named here so the handoff is written down rather than asserted
+in an inventory entry.
+
+| Module or prop | Why it has no consumer |
+| --- | --- |
+| `packages/ui/src/components/drawer.tsx` | The registry `Drawer` and `DRAWER_WIDTH`. `CardsDrawer` was the only mount; `10` decided the Cards list is a Popover anchored to its trigger, on the ground that a screen-edge drawer occludes the canvas edge you are dropping onto. |
+| `AppShell`'s `insetEnd` | The strip `.shell` yielded to a surface overlaying the end edge. A Popover overlays the canvas rather than displacing it, so nothing sets it. |
+
+The drawer carries an inventory entry rather than a deletion, on the grounds this
+ticket states for itself: retiring a registry primitive is a foundation decision,
+and taking these two is a decision of its own. Deleting `insetEnd` would take the
+`padding-inline-end` rule in `styles.css` with it.
+
+**That decision of its own is `16-retire-the-registry-drawer-and-the-yielded-strip.md`,
+and not this ticket.** This section is the handoff — what fell out and why — and
+a resolved ticket cannot be scanned for as work. `10` originally wrote that this
+ticket "owns taking it"; it does not, and `10` now points at `16` too. Every
+site of prose about the pair cites `16`.
+
 ## The three stale premises, corrected
 
 - **`InlineTitleEditorVariant`'s `sidebar` arm was already deleted.** `f7b5470f`

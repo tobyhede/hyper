@@ -174,14 +174,16 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
   const soleAuthoringSurface = spaceOnCanvas && !creatingThing && !editingChromeTitle;
 
   /**
-   * One condition for the Things View toggle's `disabled` and for the drawer's
-   * own open state, so neither can drift from the other into an enabled control
-   * over a drawer that will not open.
+   * One condition for the Things list's `disabled` and for the Dock slot that
+   * holds it open, so neither can drift from the other into an enabled control
+   * over a list that will not open.
    *
-   * Withdrawing the drawer *closes* it rather than hiding it behind a still-true
-   * open state, because `Drawer.Popup` moves focus in on every open: a drawer
-   * that reopened itself on the way back from presenting or from a creation
-   * pane would take focus with it.
+   * Withdrawing the list *closes* it rather than hiding it behind a still-true
+   * open state. The open state is the Dock's — `ThingsList` clears its
+   * disclosure slot when this goes false — and a list that reopened itself on
+   * the way back from presenting or from a creation pane would take focus with
+   * it, landing the reader in the Things rather than on the canvas they
+   * returned to.
    */
   const thingsView = !presenting && !creatingThing;
 

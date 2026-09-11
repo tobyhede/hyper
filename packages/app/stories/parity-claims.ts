@@ -30,53 +30,74 @@ export const parityClaims: readonly ParityClaim[] = [
       'Space, Diagram and Graph names share typography and are each a rename control rather than a label, and a name that opens its editor takes the caret back on Escape.',
   },
   {
-    id: 'things-drawer-adds-existing-diagram-members',
-    storyFile: 'surfaces/things-drawer.stories.tsx',
+    id: 'things-popover-adds-existing-diagram-members',
+    storyFile: 'surfaces/things-popover.stories.tsx',
     storyExport: 'AvailableThings',
     claim:
-      'The right Things drawer shows full production Thing fronts without canvas handles, filters the Things absent from a Diagram, and activates an existing Thing through the application Add to Diagram path.',
+      'The Things list, anchored to its own trigger, draws each Thing absent from the Diagram as a titled row carrying its kind glyph and a drag grip, and activates an existing Thing through the application Add to Diagram path.',
   },
   {
-    id: 'things-drawer-opens-and-dismisses-without-locking-the-canvas',
-    storyFile: 'surfaces/things-drawer.stories.tsx',
+    id: 'things-popover-opens-and-dismisses-without-locking-the-canvas',
+    storyFile: 'surfaces/things-popover.stories.tsx',
     storyExport: 'AvailableThings',
     claim:
-      'The Things drawer opens from its own trigger as a dialog named Things, dismisses on Escape with focus returning to that trigger, and leaves the surface behind it both live and undismissing — which is what dropping a Thing onto the canvas is.',
+      'The Things list opens anchored to its own trigger, dismisses on Escape with focus returning to that trigger, and leaves the surface behind it both live and undismissing — which is what dropping a Thing onto the canvas is.',
   },
   {
-    id: 'things-drawer-distinguishes-an-empty-diagram',
-    storyFile: 'surfaces/things-drawer.stories.tsx',
+    id: 'things-popover-keeps-the-reader-in-the-list-after-a-keyboard-add',
+    storyFile: 'surfaces/things-popover.stories.tsx',
+    storyExport: 'AvailableThings',
+    claim:
+      'A keyboard Add leaves the Things list open and puts the caret back in its filter, rather than following the placed Thing onto the canvas — so adding several Things costs one disclosure.',
+  },
+  {
+    id: 'things-popover-offers-the-meta-spaces-beside-the-things',
+    storyFile: 'surfaces/things-popover.stories.tsx',
+    storyExport: 'MetaSpaces',
+    claim:
+      'The Things list offers the Meta Space’s Spaces interleaved with this Space’s Things, each row carrying the glyph that says which it is, and the Spaces toggle takes them away without touching the Things.',
+  },
+  {
+    id: 'things-popover-counts-what-each-filter-contributes',
+    storyFile: 'surfaces/things-popover.stories.tsx',
+    storyExport: 'AvailableThings',
+    claim:
+      'Each filter switch draws its glyph beside the number of rows it is contributing under the current search — including zero, and including a switch the reader has turned off — and the count moves with the search rather than reporting what the Space holds.',
+  },
+  {
+    id: 'things-popover-distinguishes-an-empty-diagram',
+    storyFile: 'surfaces/things-popover.stories.tsx',
     storyExport: 'Empty',
     claim: 'A Diagram containing every Space Thing names that empty Things View explicitly.',
   },
   {
-    id: 'things-drawer-scrolls-a-long-list-on-a-narrow-screen',
-    storyFile: 'surfaces/things-drawer.stories.tsx',
+    id: 'things-popover-scrolls-a-long-list-on-a-narrow-screen',
+    storyFile: 'surfaces/things-popover.stories.tsx',
     storyExport: 'LongList',
     claim:
       'A long Things list remains searchable and independently scrollable inside the viewport on a narrow screen.',
   },
   {
-    id: 'things-drawer-withdraws-while-authoring-is-unavailable',
-    storyFile: 'surfaces/things-drawer.stories.tsx',
+    id: 'things-popover-withdraws-while-authoring-is-unavailable',
+    storyFile: 'surfaces/things-popover.stories.tsx',
     storyExport: 'Disabled',
     claim:
       'The Things trigger is disabled while the Diagram cannot accept membership edits — presenting, an open Thing, or Alias creation.',
   },
   {
-    id: 'things-drawer-keeps-an-add-refusal-on-its-surface',
-    storyFile: 'surfaces/things-drawer.stories.tsx',
+    id: 'things-popover-keeps-an-add-refusal-on-its-surface',
+    storyFile: 'surfaces/things-popover.stories.tsx',
     storyExport: 'Refused',
-    claim: 'A refused Add remains visible in the open Things drawer that asked for it.',
+    claim: 'A refused Add remains visible in the open Things list that asked for it.',
     applicationEvidence:
       'No browser gesture reaches a repeated Add. Completing the first one removes the Thing from `thingsOutsideSelectedDiagram`, so the row unmounts before a second click can land on it, and only two events dispatched inside one task reach the refusal at all. The story is driven to the state instead, through the production Authoring composition, so the sentence it draws is the one `describeAuthoringRefusal` gives the application.',
   },
   {
-    id: 'things-drawer-coexists-with-persistence-failure',
-    storyFile: 'surfaces/things-drawer.stories.tsx',
+    id: 'things-popover-coexists-with-persistence-failure',
+    storyFile: 'surfaces/things-popover.stories.tsx',
     storyExport: 'PersistenceFailure',
     claim:
-      'A failed membership save leaves the Things drawer available beside the standing retryable persistence notice.',
+      'A failed membership save leaves the Things list available beside the standing retryable persistence notice.',
   },
   {
     id: 'canvas-thing-fills-authored-node-rect',
@@ -162,10 +183,18 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Alias front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
   },
   {
-    id: 'canvas-thing-shows-active-graph-colour',
+    // **The former coloured-rail claim, changed rather than dropped.**
+    // It read "a selected Thing's rail carries the Active Graph's own colour",
+    // which was true and is now deliberately false: the rail is neutral and the
+    // commands on it are the Command Dock's own surface
+    // (`.scratch/command-dock/issues/12`). The claim keeps the palette sweep,
+    // because what has to hold at every colour is the *opposite* of what it used
+    // to be — and adds the half that says where the colour went.
+    id: 'canvas-thing-toolbar-is-neutral-and-graph-colour-stays-on-connections',
     storyFile: 'components/thing.stories.tsx',
     storyExport: 'Colours',
-    claim: "A selected Thing's rail carries the Active Graph's own colour.",
+    claim:
+      "A Thing's revealed commands are drawn on the same neutral command surface as the Command Dock at every Active Graph colour, while the Thing's authoring handles and its Edges keep that colour.",
   },
   {
     id: 'canvas-thing-hover-reveals-actions-and-handles-together',
@@ -520,6 +549,13 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'SelectedDiagram',
     claim:
       "An Open Space Thing draws the Diagram it selects — the target Space's own Things and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Thing's own rect.",
+  },
+  {
+    id: 'open-space-thing-chooses-its-context-on-the-shared-controls',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      "An Open Space Thing's Diagram and Graph choices are drawn on the Command Dock's own command surface and through the same shared control and list, and choosing one writes the Thing's stored context without moving the containing Space.",
   },
   {
     id: 'embedded-diagram-things-author-target',

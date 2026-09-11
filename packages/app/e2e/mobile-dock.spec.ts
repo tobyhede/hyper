@@ -128,9 +128,9 @@ test('New Diagram selects an empty authored Diagram, and Delete returns to the o
   await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
-  // An empty Diagram reveals the Things drawer, which at this width overlays the
+  // An empty Diagram reveals the Things list, which at this width overlays the
   // end of the strip — so it is dismissed before the next command rather than
-  // reached around. That is the drawer's own contract and not the Dock's: a
+  // reached around. That is the list's own contract and not the Dock's: a
   // surface the author opens is dismissed by the author.
   await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
   await page.keyboard.press('Escape');

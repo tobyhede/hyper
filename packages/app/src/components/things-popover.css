@@ -1,0 +1,159 @@
+/* The Things Popover's own stylesheet, beside the component that draws it.
+ *
+ * **Not in `command-dock.css`, and the Ladle suite is why.** These rules first
+ * landed there, because the Dock is what mounts the list — but `ThingsPopover`
+ * itself imported no stylesheet, so a story that mounts the component on its
+ * own drew it unstyled, and the `things-popover-*` claims about the row grip,
+ * the filter box and the scrolling bound were all being proved against a bare
+ * `<ul>`. A stylesheet beside its component is the repository's own convention
+ * (`canvas-thing.css`, `thing-search-combobox.css`, `markdown-source-editor.css`)
+ * and it is the only arrangement under which mounting the component is enough.
+ */
+
+/* The Things Popover's list, restored with the surface it belongs to
+   (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`). */
+.things-popover__list {
+  display: flex;
+  /* Bounded by the room the popover actually has rather than by a constant.
+     Base UI publishes `--available-height` on the positioner, and a fixed
+     300px on a short viewport puts the last rows under the edge of the screen
+     with no way to reach them — which is the failure mode a screen-edge drawer
+     does not have and an anchored surface does. The floor keeps a usably tall
+     list on the shortest screen; the cap keeps a tall screen from drawing a
+     column of Things taller than the canvas beside it.
+
+     **Three bounds, because the floor is not allowed to become a clip.** 8rem is
+     the *comfortable* reserve — the filter row, the popup's padding, and room
+     for the alert above the rows — so below about 268px of room the floor is
+     what decides, and a 140px list is then taller than the room it sits in:
+     `overflow-y` scrolls the rows the list owns and nothing scrolls the popup
+     back off the screen edge. The last line is the *hard* reserve: 6rem is what
+     the chrome above the rows actually measures (a 92px popup top and filter
+     row at this width), so the list never claims room the popup has to spend on
+     the controls that reach it. Measured rather than guessed — with the floor
+     alone the popup's bottom stands at 232px whatever the viewport, so it
+     clipped below about 232px tall, and 4rem was still short of clearing it.
+
+     Not `clamp(0px, …)`: that is this rule with the floor deleted, and a list
+     that collapses to no rows is the worse of the two failures. The 2.5rem
+     keeps one row drawn where even the hard reserve runs out. */
+  max-height: min(
+    300px,
+    max(140px, calc(var(--available-height, 100vh) - 8rem)),
+    max(2.5rem, calc(var(--available-height, 100vh) - 6rem))
+  );
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+
+  /* The overlay scrollbar is painted inside this box, over whatever sits under
+     it — which is the right border of every row, thickened into a rail running
+     the height of the list. The gutter moves the rows out from under it; the
+     negative margin spends the popover's own padding on the scrollbar, so the
+     rows stay flush with the filter field above them rather than shuffling
+     left to make room. */
+  padding: 8px;
+  padding-inline-end: 0;
+  margin-inline-end: 8px;
+}
+
+.things-popover__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* Bound to the attribute that decides it rather than to the row, so the cursor
+   and the gesture cannot come apart: a Space row is placed by a press, and a
+   grab cursor over one advertises a drop it will never answer. */
+.things-popover__row[draggable='true'] {
+  cursor: grab;
+}
+
+.things-popover__row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The affordance is drawn and never moves. The grip is the dock's own dotted
+   field at row scale, so the thing you drag a Thing by and the thing you drag
+   the dock by are one mark. */
+.things-popover__row-grip {
+  width: 10px;
+  height: 14px;
+  flex: none;
+  background-image: radial-gradient(currentcolor 1px, transparent 1px);
+  background-position: 0 0;
+  background-size: 5px 5px;
+  opacity: 0.4;
+}
+
+/* The hover is a *pointer report*, not a selection. It used to swap in
+   `--secondary` when that was beige, which painted a warm block the eye read
+   as a chosen row rather than the one the pointer happens to be over. */
+.things-popover__row:hover,
+.things-popover__row:focus-visible {
+  border-color: var(--border);
+  background: var(--accent);
+}
+
+/* --------------------------------------------- the Things list's filter */
+
+/* **The box is what makes it read as a control.** The row first shipped as four
+   bare glyph toggles and read as decoration: no border, no ground, four marks
+   on the popover's paper. A control that can be pressed says so before it is
+   pressed, which leaves the fill free to mean only "on" rather than carrying
+   the affordance as well as the state. The comparison that settled this, and
+   the nine other arrangements it was drawn against, are in
+   `.scratch/command-dock/issues/10-decide-the-cards-surface.md`. */
+.things-popover__filter {
+  display: flex;
+  gap: 4px;
+}
+
+.things-popover__toggle {
+  gap: 5px;
+  padding: 5px 8px;
+  border-color: var(--border);
+  background: var(--card);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 4%);
+}
+
+.things-popover__toggle:hover {
+  background: var(--secondary);
+}
+
+.things-popover__toggle[data-pressed] {
+  border-color: color-mix(in oklab, var(--foreground) 25%, transparent);
+  background: var(--accent);
+}
+
+/* Unpressed is drawn *down* rather than merely un-filled, so a row with two off
+   reads as two switches turned off and not as two controls that failed to
+   render. */
+.things-popover__toggle:not([data-pressed]) {
+  color: var(--muted-foreground);
+  opacity: 0.72;
+}
+
+/* How many rows this switch is contributing under the current search. Tabular
+   figures so the row does not shuffle as the reader types. */
+.things-popover__count {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-align: center;
+}
+
+.things-popover__toggle[data-pressed] .things-popover__count {
+  background: var(--card);
+}

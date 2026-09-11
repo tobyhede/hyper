@@ -149,16 +149,28 @@ export const Kinds: Story = () => (
   </div>
 );
 
+/**
+ * **The rail no longer carries the Graph's colour, and this is where that is
+ * shown** (`.scratch/command-dock/issues/12`).
+ *
+ * Each specimen is the real `ThingNode` at one palette colour, drawn selected so
+ * both halves of the answer are on screen at rest: the Thing's commands sit on
+ * the shared neutral command surface — the same one the Command Dock wears, and
+ * the same at every colour — while the authoring handles around the Thing are
+ * painted the Active Graph's own. The colour still says *which Graph*; it says
+ * it where a Graph is, on the connections and the points they leave from,
+ * rather than as a wash behind a toolbar.
+ */
 export const Colours: Story = () => (
   <div className="inv inv-sheet" style={thingSizeVars}>
     <CatalogueSection
       title="Thing colours"
-      note="The selected presentation state carries the Active Graph colour across its rail. These are the complete catalogue palette examples."
+      note="A Thing's revealed commands are the shared neutral command surface at every Active Graph colour. The colour identifies the Graph on the Thing's authoring handles and on its Edges instead. These are the complete catalogue palette examples."
     >
       <div className="inv-row">
         {GRAPH_PALETTE.map((color) => (
           <Specimen key={color} label={color}>
-            <CanvasThingSpecimen title="Strategies" state="selected" graphColor={color} />
+            <CanvasThingNodeSpecimen selected graphColor={color} />
           </Specimen>
         ))}
       </div>
@@ -166,6 +178,7 @@ export const Colours: Story = () => (
   </div>
 );
 Colours.storyName = 'Colours';
+Colours.meta = { iframed: true };
 
 export const Hover: Story = () => (
   <div className="inv inv-sheet" style={thingSizeVars}>

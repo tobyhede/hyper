@@ -1,4 +1,11 @@
-import { useCallback, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { titleLines, titleName } from '@project/core';
 import { Button } from './Button';
 import {
@@ -8,12 +15,20 @@ import {
   ThingRailSharedActions,
 } from './ThingRailActions';
 import { ThingContentEditProvider, type ThingContentEdit } from './thing-content-edit';
+import { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
+import { CommandSurface } from './CommandSurface';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ThingRail } from './ThingRail';
 import { Card, CardContent, CardTitle } from './components/card';
-import { Label } from './components/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './Select';
-import { AbandonEditIcon, CloseThingIcon, CommitEditIcon, EditIcon, OpenThingIcon } from './icons';
+import {
+  AbandonEditIcon,
+  CloseThingIcon,
+  CommitEditIcon,
+  EditIcon,
+  GraphIcon,
+  DiagramIcon,
+  OpenThingIcon,
+} from './icons';
 import {
   MarkdownThingBody,
   type MarkdownThingBodyEditor,
@@ -336,7 +351,12 @@ export function CanvasThing(props: CanvasThingProps) {
       data-content-editing={visibleContentEdit !== null}
       style={style}
     >
-      <ThingRail kind={visualKind} graphColor={graphColor} className="canvas-thing__rail">
+      {/* Neutral: the band carries no colour and the commands on it sit on the
+          shared command surface (`.scratch/command-dock/issues/12`). The Graph's
+          colour is still on this Thing — `--canvas-thing-graph` below draws the
+          Title's own hover and caret treatment — and still on the handles and
+          Edges the adapter draws around it. */}
+      <ThingRail kind={visualKind} className="canvas-thing__rail">
         {showActions && (
           // ADR 0073. One tab stop for the whole rail, arrows between its
           // controls: a canvas carries many Things and a Thing's rail carries
@@ -566,6 +586,18 @@ interface SpaceThingSelectorsProps {
  * What an Open Space Thing offers to author: which Diagram of the referenced
  * Space it shows, and which Graph of that Diagram.
  *
+ * **Drawn as the Command Dock draws the same two choices**, on the shared
+ * command surface and through the shared `ChoiceMenu`
+ * (`.scratch/command-dock/issues/12`). A Diagram and a Graph are named and
+ * chosen identically wherever the product asks for them, which is the whole
+ * point of the pair being components rather than a treatment each surface
+ * arrives at.
+ *
+ * **`CommandSurface` and not `CommandToolbar`.** The Thing already has one
+ * toolbar — the strip of commands on its rail — and a second roving container
+ * on the same Thing would answer the Tab key twice for one Thing (ADR 0073). A
+ * bound choice is an ordinary tab stop anyway.
+ *
  * The absent case is a line of prose and nothing else. A `Spinner` would be a
  * second thing to look at on a Thing whose whole content is two short controls,
  * and `StatusBusy` brings a `role="status"` with it — a live region announcing
@@ -577,9 +609,10 @@ function SpaceThingSelectors({ selection }: SpaceThingSelectorsProps) {
     return <p className="canvas-thing__space-note">Reading the referenced Space…</p>;
   }
   return (
-    <div className="canvas-thing__space-selectors">
+    <CommandSurface orientation="vertical" className="canvas-thing__space-choices">
       <SpaceThingSelector
         label="Diagram"
+        icon={<DiagramIcon />}
         testId="space-thing-diagram"
         choices={selection.diagrams}
         chosen={selection.diagramId}
@@ -588,18 +621,20 @@ function SpaceThingSelectors({ selection }: SpaceThingSelectorsProps) {
       />
       <SpaceThingSelector
         label="Graph"
+        icon={<GraphIcon />}
         testId="space-thing-graph"
         choices={selection.graphs}
         chosen={selection.graphId}
         disabled={selection.disabled === true}
         onChoose={selection.onGraphChange}
       />
-    </div>
+    </CommandSurface>
   );
 }
 
 interface SpaceThingSelectorProps {
   readonly label: string;
+  readonly icon: ReactNode;
   readonly testId: string;
   readonly choices: readonly CanvasSpaceThingChoice[];
   readonly chosen: string | null;
@@ -612,75 +647,71 @@ interface SpaceThingSelectorProps {
  * One of the two, so the Diagram and the Graph cannot drift apart in treatment,
  * labelling or keyboard behaviour.
  *
- * The shared `Select` (ADR 0050), which until now had no consumer: opening,
- * arrow navigation, type-ahead, the `combobox`/`listbox` pairing and dismissal
- * are all the primitive's, and none of them is restated here. Three things are
- * this Thing's and are supplied from here rather than pushed into the primitive.
+ * The shared `ChoiceMenu` (ADR 0050): the labelled list, the mark on the member
+ * this Thing selects, arrow navigation, type-ahead, the menu's own
+ * `menu`/`menuitemradio` pairing and dismissal are all the primitive's, and none
+ * of them is restated here. **The operation is not shared and must not be** —
+ * this list writes which Diagram *this Thing* shows into the Thing, where the
+ * Dock's identical-looking list moves the canvas the author is standing on.
+ * Both arrive from the caller for exactly that reason.
  *
- * `nokey` on both halves. React Flow subscribes its live Space-key pan
- * activation on the document and excludes a target through a `.nokey` ancestor;
- * a `button` is not one of its own native exclusions, so a trigger sitting on a
- * canvas Thing would pan the canvas instead of opening its list, and the popup —
- * portalled out of the Thing entirely — is outside the canvas's own guard.
- * `nodrag nopan` are the same pair every other in-Thing control carries, so a
- * press on the trigger does not drag the Thing out from under it.
+ * Three things are this Thing's and are supplied from here.
  *
- * An empty list disables the trigger rather than opening onto nothing. A Space
- * with no Graphs is an ordinary entity to reference, and a control that opens
- * onto an empty list says "look again" where an unavailable one says "there are
- * none". A canvas that has withdrawn authoring disables it the same way, and
- * for the reason it still draws the selection at all: which Diagram this Thing
- * shows is known, and only changing it is unavailable.
+ * `nokey` on the trigger and on the popup. React Flow subscribes its live
+ * Space-key pan activation on the document and excludes a target through a
+ * `.nokey` ancestor; a `button` is not one of its own native exclusions, so a
+ * trigger sitting on a canvas Thing would pan the canvas instead of opening its
+ * list, and the popup — portalled out of the Thing entirely — is outside the
+ * canvas's own guard. `nodrag nopan` are the same pair every other in-Thing
+ * control carries, so a press on the trigger does not drag the Thing out from
+ * under it.
  *
- * `SelectValue`'s function child resolves the selected id against this list
- * rather than leaving Base UI to find the label off a rendered item: the popup
- * is unmounted while closed, so nothing has registered a label at the moment
- * the trigger first has to display one. The absent case is text on the trigger
- * and never an item — Base UI spells an empty controlled selection `null`, and
- * a Space Thing has no clear-selection action, which is why the `null` an
- * `onValueChange` can carry is ignored here (docs/agents/ui.md).
+ * An empty list disables the trigger rather than opening onto nothing, and the
+ * trigger says which set is empty. A Space with no Graphs is an ordinary entity
+ * to reference, and a control that opens onto an empty list says "look again"
+ * where an unavailable one says "there are none". A canvas that has withdrawn
+ * authoring disables it the same way, and for the reason it still draws the
+ * selection at all: which Diagram this Thing shows is known, and only changing it
+ * is unavailable.
+ *
+ * The trigger resolves the selected id against this list itself: the popup is
+ * unmounted while closed, so nothing has registered a title at the moment the
+ * trigger first has to display one.
  */
 function SpaceThingSelector({
   label,
+  icon,
   testId,
   choices,
   chosen,
   disabled,
   onChoose,
 }: SpaceThingSelectorProps) {
-  const triggerId = useId();
+  const selected = choices.find((choice) => choice.id === chosen);
   return (
-    <div className="canvas-thing__space-selector">
-      <Label className="canvas-thing__space-selector-label" htmlFor={triggerId}>
-        {label}
-      </Label>
-      <Select
-        value={chosen}
-        onValueChange={(next: string | null) => {
-          if (next !== null) onChoose(next);
-        }}
-      >
-        <SelectTrigger
-          id={triggerId}
+    <ChoiceMenu<string>
+      label={`${label}s`}
+      choices={choices}
+      chosen={chosen}
+      onChoose={onChoose}
+      className="nokey w-64"
+      trigger={
+        <ChoiceMenuTrigger
           data-testid={testId}
+          className="canvas-thing__space-choice nokey nodrag nopan"
+          // The name is drawn, so the accessible name says which of the two this
+          // is as well as what it holds: the controls are one word apart and an
+          // author has to be able to tell them apart by ear. An unchosen one
+          // says `none` rather than repeating the `No Diagram` it draws, which as
+          // an accessible name read as a Diagram called "No Diagram".
+          aria-label={selected === undefined ? `${label}: none` : `${label}: ${selected.title}`}
+          title={`Choose the ${label} this Space Thing shows`}
           disabled={disabled || choices.length === 0}
-          className="canvas-thing__space-selector-trigger nokey nodrag nopan"
-        >
-          <SelectValue>
-            {(value: string | null) =>
-              choices.find((choice) => choice.id === value)?.title ?? `No ${label}`
-            }
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent className="nokey">
-          {choices.map((choice) => (
-            <SelectItem key={choice.id} value={choice.id}>
-              {choice.title}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+          icon={icon}
+          name={selected?.title ?? `No ${label}`}
+        />
+      }
+    />
   );
 }
 

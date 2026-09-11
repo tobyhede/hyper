@@ -487,6 +487,29 @@ export const presentThingCreationBreak: ThingCreationBreak = (failure) => ({
 });
 
 /**
+ * What a rejected Space Thing placement says, where a refusal would have been.
+ *
+ * The Things list places a Space by spending a coordinated Edit across Spaces,
+ * and neither the Diagram it resolves first nor the transport under it is a
+ * refusal channel: both *reject*. A rejection is not a refusal for the reason
+ * `presentThingCreationBreak` gives — the lifecycle refuses for everything it
+ * can name, so reaching here means an invariant broke — but the reader pressed
+ * a row and is owed a sentence either way, and the list draws one string rather
+ * than the pane's fielded errors.
+ *
+ * Here rather than on the surface, because a Space Thing's prose is written in
+ * this module or nowhere. The rejection is `unknown` for `ThingCreationBreak`'s
+ * reason and named the same way — at the type rather than at a parameter, which
+ * is what lets a rejection arm take it without writing the annotation the
+ * parsing rules reserve for an I/O boundary.
+ */
+export type SpaceThingBreak = (failure: unknown) => string;
+
+/** @see SpaceThingBreak */
+export const describeSpaceThingBreak: SpaceThingBreak = (failure) =>
+  `This Space Thing was not added: ${failureMessage(failure)}`;
+
+/**
  * What a choices read that threw says, rather than what a creation says.
  *
  * A read that failed attempted no Edit, so `presentThingCreationBreak`'s

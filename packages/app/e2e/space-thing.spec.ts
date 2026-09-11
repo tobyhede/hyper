@@ -91,6 +91,95 @@ test(
 );
 
 /**
+ * The Things list offers the Meta Space's Spaces beside this Space's Things.
+ *
+ * The distinction the filter's two Space glyphs exist to draw (ADR 0074): the
+ * frame is a Space **Thing**, one authored view placed in a Diagram, and the cube
+ * is the Space itself, offered whether or not this Space has ever pointed at
+ * it. Creating a Space Thing brings its Space into the Meta Space, so the same
+ * Edit that puts a frame on the canvas is what puts a cube in the list.
+ */
+test(
+  'the Things list offers a newly created Space as a Space of the Meta Space',
+  { tag: '@parity:things-popover-offers-the-meta-spaces-beside-the-things' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await createThing(page, 'Space Thing');
+    await page.getByTestId('new-space-thing-title').fill('Architecture');
+    await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
+    await expect(page.getByTestId('new-space-thing')).toHaveCount(0);
+    await expect(nodeByTitle(page, 'Architecture')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Things' }).click();
+    const list = page.getByRole('dialog', { name: 'Things' });
+    await expect(list).toBeVisible();
+
+    // The Space is offered although the Thing that references it is already on
+    // this Diagram — they are two different things to place, which is why the
+    // filter draws them as two toggles rather than one.
+    const row = list.getByRole('button', { name: 'Add Architecture to Diagram' });
+    await expect(row).toHaveCount(1);
+    await expect(row).toHaveAttribute('data-space-id', /.+/);
+
+    // And pressing its toggle off takes it away, leaving this Space's Things.
+    await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
+    await expect(list.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(0);
+  },
+);
+
+/**
+ * Destroying a Space takes it out of the list that offers it.
+ *
+ * The Spaces source is read once and re-read on an epoch, and creating a Space
+ * Thing is not the only Edit that changes the set: deleting the last Space Thing
+ * that references a Space destroys that Space and every Space below it that
+ * nothing else references (ADR 0074, ADR 0076). A list still offering it would
+ * spend `link` against a Space that is gone, on a row the reader had no way to
+ * know was stale.
+ */
+test('stops offering a Space the moment the last Space Thing referencing it is deleted', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  await createThing(page, 'Space Thing');
+  await page.getByTestId('new-space-thing-title').fill('Architecture');
+  await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
+  await expect(nodeByTitle(page, 'Architecture')).toBeVisible();
+
+  const openList = async () => {
+    await page.getByRole('button', { name: 'Things' }).click();
+    const list = page.getByRole('dialog', { name: 'Things' });
+    await expect(list).toBeVisible();
+    return list;
+  };
+
+  const offered = await openList();
+  await expect(offered.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+
+  const thing = nodeByTitle(page, 'Architecture').first();
+  await thing.click();
+  await thing.hover();
+  await thing.getByRole('button', { name: 'Actions for Thing Architecture' }).click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Delete Thing' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete Thing' }).click();
+  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
+
+  // The Space went with its last reference, so the cube goes with it — and the
+  // count on the toggle agrees, which is the claim the count exists to make.
+  const after = await openList();
+  await expect(after.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Spaces in this Meta Space, 0' })).toBeVisible();
+});
+
+/**
  * The second Space Thing is offered the first's Space, and referencing it is not
  * a copy.
  *
@@ -135,46 +224,79 @@ test('a second Space Thing may reference the Space the first one created', async
  * chosen neither yet — storing the target's default Diagram and Graph on the Thing
  * at creation is `layout-only-v1/04`.
  */
-test('an Open Space Thing offers its target’s selections and no way to change it', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await settled(page);
+test(
+  'an Open Space Thing offers its target’s selections and no way to change it',
+  {
+    tag: '@parity:open-space-thing-chooses-its-context-on-the-shared-controls',
+  },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
 
-  await createThing(page, 'Space Thing');
-  await page.getByTestId('new-space-thing-title').fill('Architecture');
-  await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
-  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
-  await settled(page);
+    await createThing(page, 'Space Thing');
+    await page.getByTestId('new-space-thing-title').fill('Architecture');
+    await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
+    await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
+    await settled(page);
 
-  // Opened from the keyboard rather than from the Thing's own control, because
-  // the created Thing is placed at the visible centre and the fixture already
-  // has a Thing there — a deliberate partial overlap (`freeAnchor` steps only on
-  // an exact collision), which leaves the rail under another node's box. Enter
-  // on the focused node is the same `opened-thing` completion the control runs.
-  const thing = nodeByTitle(page, 'Architecture');
-  await thing.focus();
-  await thing.press('Enter');
+    // Opened from the keyboard rather than from the Thing's own control, because
+    // the created Thing is placed at the visible centre and the fixture already
+    // has a Thing there — a deliberate partial overlap (`freeAnchor` steps only on
+    // an exact collision), which leaves the rail under another node's box. Enter
+    // on the focused node is the same `opened-thing` completion the control runs.
+    const thing = nodeByTitle(page, 'Architecture');
+    await thing.focus();
+    await thing.press('Enter');
 
-  // Enabled rather than merely present: a selector over a target with nothing
-  // to choose is disabled, so this is what says the created Space arrived
-  // complete rather than blank.
-  const diagramSelector = thing.getByTestId('space-thing-diagram');
-  await expect(diagramSelector).toBeEnabled();
-  await expect(diagramSelector).toHaveText('No Diagram');
-  await diagramSelector.click();
-  await expect(page.getByRole('option', { name: 'Diagram 1' })).toBeVisible();
-  await page.getByRole('option', { name: 'Diagram 1' }).click();
-  await settled(page);
-  await expect(diagramSelector).toHaveText('Diagram 1');
-  await expect(thing.getByTestId('space-thing-graph')).toHaveText('Graph 1');
-  // The containing Thing offers Close and its own title editing. The embedded
-  // target Things carry their own content-editing controls.
-  await expect(thing.getByRole('button', { name: 'Close Thing Architecture' })).toBeVisible();
-  await expect(thing.getByRole('button', { name: 'Edit Thing Architecture' })).toHaveCount(0);
-});
+    // Enabled rather than merely present: a selector over a target with nothing
+    // to choose is disabled, so this is what says the created Space arrived
+    // complete rather than blank.
+    const diagramSelector = thing.getByTestId('space-thing-diagram');
+    await expect(diagramSelector).toBeEnabled();
+    await expect(diagramSelector).toHaveText('No Diagram');
+    // The shared `ChoiceMenu` the Command Dock's own Diagram list is: a menu of
+    // radio rows behind the control that names what is chosen.
+    await diagramSelector.click();
+    await expect(page.getByRole('menuitemradio', { name: 'Diagram 1' })).toBeVisible();
+    await page.getByRole('menuitemradio', { name: 'Diagram 1' }).click();
+    await settled(page);
+    await expect(diagramSelector).toHaveText('Diagram 1');
+    await expect(thing.getByTestId('space-thing-graph')).toHaveText('Graph 1');
+
+    // **The Dock's surface and controls, and not the Dock's operations**
+    // (`.scratch/command-dock/issues/12`). The panel the two choices sit on is
+    // compared against the Dock that is on screen beside it, property by property,
+    // so a change to one that the other did not follow fails here; and the list
+    // that was just used wrote the Thing's own context without moving the canvas
+    // the Thing is standing on.
+    const treatment = (locator: Locator) =>
+      locator.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          borderRadius: style.borderTopLeftRadius,
+          borderColor: style.borderTopColor,
+          borderWidth: style.borderTopWidth,
+          padding: style.paddingTop,
+        };
+      });
+    expect(await treatment(thing.locator('[data-slot="command-surface"]'))).toEqual(
+      await treatment(page.locator('.command-dock__surface:visible')),
+    );
+    // `:visible`, because creating the target Space opened it too and every open
+    // Space stays mounted with one shown (`OpenSpacesApplication`).
+    await expect(page.locator('[data-testid="selected-canvas"]:visible')).toContainText(
+      'Collection 1',
+    );
+
+    // The containing Thing offers Close and its own title editing. The embedded
+    // target Things carry their own content-editing controls.
+    await expect(thing.getByRole('button', { name: 'Close Thing Architecture' })).toBeVisible();
+    await expect(thing.getByRole('button', { name: 'Edit Thing Architecture' })).toHaveCount(0);
+  },
+);
 
 /**
  * Deleting a Space Thing says what it destroys before it is confirmed.
@@ -268,7 +390,7 @@ async function openSpaceThingOnItsDiagram(page: Page): Promise<Locator> {
   const diagramSelector = thing.getByTestId('space-thing-diagram');
   await expect(diagramSelector).toBeEnabled();
   await diagramSelector.click();
-  await page.getByRole('option', { name: 'Diagram 1' }).click();
+  await page.getByRole('menuitemradio', { name: 'Diagram 1' }).click();
   await expect(diagramSelector).toHaveText('Diagram 1');
   await settled(page);
   return thing;

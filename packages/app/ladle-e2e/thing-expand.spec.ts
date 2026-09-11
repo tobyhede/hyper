@@ -168,9 +168,15 @@ test(
     const sourceHandle = specimen.locator('.rf-thing-node__authoring-handle--source').first();
     await expect(sourceHandle).toHaveCSS('opacity', '0');
     expect(await sourceHandle.evaluate(transitionDuration, 'opacity')).toBe(120);
+    // The rail carries no colour to fade now, so the quieting is the two things
+    // that do: the commands and the kind glyph
+    // (`.scratch/command-dock/issues/12`).
     expect(
-      await thing.locator('.thing-rail').evaluate(transitionDuration, 'background-color'),
+      await thing.getByTestId('canvas-thing-actions').evaluate(transitionDuration, 'opacity'),
     ).toBe(120);
+    expect(await thing.locator('.thing-rail__kind').evaluate(transitionDuration, 'opacity')).toBe(
+      120,
+    );
 
     const leavingContent = thing.locator('.canvas-thing__content');
     await expect(leavingContent).toHaveCount(0);
@@ -491,6 +497,22 @@ test('an unavailable rail command keeps its place under the arrows', async ({ pa
   // native property drew the control and took it off the keyboard, which made
   // ADR 0064's "keeps its slot" a promise to the eye only.
   await expect(close).toHaveAttribute('aria-disabled', 'true');
+
+  // **And it says so, which is the half an attribute assertion cannot make.**
+  // `disabled:` utilities never match a toolbar item, so an unavailable command
+  // was drawn at full ink and still took the hover fill — operable to the eye and
+  // inert to the press. Both are read here: quieter than the command beside it,
+  // and unmoved by a pointer that cannot use it (`Button.tsx`).
+  const ink = (locator: typeof close) =>
+    locator.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { opacity: style.opacity, background: style.backgroundColor, cursor: style.cursor };
+    });
+  const unavailable = await ink(close);
+  expect(Number(unavailable.opacity)).toBeLessThan(Number((await ink(cancel)).opacity));
+  expect(unavailable.cursor).toBe('not-allowed');
+  await close.hover();
+  expect((await ink(close)).background).toBe(unavailable.background);
   await save.focus();
   await save.press('ArrowRight');
   await expect(cancel).toBeFocused();
@@ -503,27 +525,35 @@ test('an unavailable rail command keeps its place under the arrows', async ({ pa
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeVisible();
 });
 
+/**
+ * The rail used to say "this Thing is awake" with the Active Graph's band behind
+ * its commands, and the band is gone (`.scratch/command-dock/issues/12`). What
+ * is left saying it is the kind glyph, which a resting Thing draws quietly, and
+ * the commands themselves — so those are what this reads.
+ */
 test('a Thing running an edit is not drawn at rest, however it is left', async ({ page }) => {
   await open(page, markdownStory);
   const thing = page.getByRole('article', { name: 'Strategies' });
-  const rail = thing.locator('.thing-rail');
-  const quiet = 'rgba(0, 0, 0, 0)';
+  const kind = thing.locator('.thing-rail__kind');
+  const commands = thing.getByTestId('canvas-thing-actions');
 
   await page.mouse.move(0, 0);
-  await expect(rail).toHaveCSS('background-color', quiet);
+  await expect(kind).toHaveCSS('opacity', '0.28');
+  await expect(commands).toHaveCSS('opacity', '0');
 
   await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
   // Nothing is hovering the Thing, the caret is in its body rather than on its
-  // rail, and a blur ends nothing — so without this the band and the kind glyph
-  // would quiet down and leave Save, Cancel and Close lit on top of nothing.
+  // rail, and a blur ends nothing — so without this the kind glyph would quiet
+  // down and leave Save, Cancel and Close lit on a Thing that looks asleep.
   await page.mouse.move(0, 0);
-  await expect(rail).not.toHaveCSS('background-color', quiet);
-  await expect(thing.getByTestId('canvas-thing-actions')).toHaveCSS('opacity', '1');
+  await expect(kind).toHaveCSS('opacity', '1');
+  await expect(commands).toHaveCSS('opacity', '1');
 
   await thing.getByRole('button', { name: 'Cancel editing Thing Strategies' }).click();
   await page.mouse.move(0, 0);
-  await expect(rail).toHaveCSS('background-color', quiet);
+  await expect(kind).toHaveCSS('opacity', '0.28');
+  await expect(commands).toHaveCSS('opacity', '0');
 });
 
 test(

@@ -58,6 +58,78 @@ test(
   },
 );
 
+/**
+ * The two choices an Open Space Thing publishes, drawn as the Dock draws the same
+ * two (`.scratch/command-dock/issues/12`).
+ *
+ * Both halves matter and only one is about appearance. The treatment is compared
+ * against the Dock **on screen in the same page**, property by property, so a
+ * change to either that the other did not follow fails here rather than drawing
+ * two panels that merely looked alike when this was written. The other half is
+ * that the controls are not the Dock's *operations*: pressing this Thing's Diagram
+ * list must not move the canvas the Thing is standing on.
+ */
+test(
+  "an Open Space Thing's choices are the Dock's surface and controls, acting on the Thing",
+  { tag: '@parity:open-space-thing-chooses-its-context-on-the-shared-controls' },
+  async ({ page }) => {
+    await open(page);
+    const thing = spaceThing(page);
+
+    // What the Thing holds: the target Space's own Diagram and Graph, named.
+    await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Collection 1');
+    await expect(thing.getByTestId('space-thing-graph')).toHaveText('Overview');
+
+    const treatment = (locator: Locator) =>
+      locator.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          borderRadius: style.borderTopLeftRadius,
+          borderColor: style.borderTopColor,
+          borderWidth: style.borderTopWidth,
+          padding: style.paddingTop,
+        };
+      });
+    expect(await treatment(thing.locator('[data-slot="command-surface"]'))).toEqual(
+      await treatment(page.locator('.command-dock__surface:visible')),
+    );
+
+    // The same list the Dock's own Diagram cluster discloses: radio rows, one
+    // marked, reached from the control that names what is chosen.
+    // `:visible`, because every open Space stays mounted with one shown
+    // (`OpenSpacesApplication`), and the target Space is open here too.
+    //
+    // The row chosen is deliberately **not** the one already marked: pressing
+    // the selected row and finding the Thing unchanged proves the list renders,
+    // not that a choice is honoured. The target Space offers a second Diagram
+    // whose content no other Diagram of it draws, so what is on screen
+    // afterwards could only have come from the choice.
+    const selectedDiagram = page.locator('[data-testid="selected-canvas"]:visible');
+    const before = await selectedDiagram.innerText();
+    await thing.getByTestId('space-thing-diagram').click();
+    const row = page.getByRole('menuitemradio', { name: 'Collection 2' });
+    await expect(row).toBeVisible();
+    await row.click();
+
+    // The Thing's stored context is the chosen one, Graph included: choosing a
+    // Diagram seeds the Graph from that Diagram's own Active Graph
+    // (`canvas-thing-authoring.ts`), so both names move together.
+    await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Collection 2');
+    await expect(thing.getByTestId('space-thing-graph')).toHaveText('Detail');
+
+    // And the embedding redrew to the chosen Diagram: its own Thing, and none of
+    // the Diagram that was selected a moment ago.
+    await expect(embeddedNodes(page)).toHaveCount(1);
+    await expect(embeddedNodes(page).getByRole('heading', { name: 'Review' })).toBeVisible();
+    await expect(embeddedNodes(page).getByRole('heading', { name: 'Intake' })).toHaveCount(0);
+
+    // And it acted on the Thing rather than on the Space the Thing sits in: the
+    // containing Diagram is the one it was.
+    await expect(selectedDiagram).toHaveText(before);
+  },
+);
+
 test(
   'editing the embedded Thing updates its target Space',
   { tag: '@parity:embedded-diagram-things-author-target' },

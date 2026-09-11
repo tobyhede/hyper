@@ -4,6 +4,7 @@ import {
   createSpaceSessionRegistry,
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
+  type ObserverErrorReporter,
 } from '@project/persistence';
 import { createSpaceThingLifecycle } from '../src/space-thing-lifecycle';
 
@@ -13,6 +14,17 @@ import { createSpaceThingLifecycle } from '../src/space-thing-lifecycle';
  * coordination that performs them. What is held here is the pair of reads
  * `app` adds over them, which is where they live (ADR 0076).
  */
+
+/**
+ * The observer sink, which nothing here is meant to reach.
+ *
+ * The epoch's only observers are the surfaces that re-read the Spaces, and none
+ * is mounted in this file — so a failure arriving here is a broken test rather
+ * than a claim, and rethrowing is how it says so.
+ */
+const failOnObserverError: ObserverErrorReporter = (error) => {
+  throw error;
+};
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -91,7 +103,12 @@ describe('what a Space Thing may reference', () => {
       { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
     ]);
     const registry = createSpaceSessionRegistry(backend);
-    const lifecycle = createSpaceThingLifecycle({ backend, registry, newId: idSource([]) });
+    const lifecycle = createSpaceThingLifecycle({
+      backend,
+      registry,
+      newId: idSource([]),
+      reportObserverError: failOnObserverError,
+    });
 
     // The containing Space is the one target that cannot work whatever else is
     // stored, so it is withheld outright. Every deeper cycle is left to intake,
@@ -134,7 +151,12 @@ describe('what a Space Thing may reference', () => {
       { snapshot: twoDiagrams, revision: 7n, exportedRevision: null },
     ]);
     const registry = createSpaceSessionRegistry(backend);
-    const lifecycle = createSpaceThingLifecycle({ backend, registry, newId: idSource([]) });
+    const lifecycle = createSpaceThingLifecycle({
+      backend,
+      registry,
+      newId: idSource([]),
+      reportObserverError: failOnObserverError,
+    });
 
     await expect(lifecycle.target(TARGET_ID)).resolves.toEqual({
       id: TARGET_ID,
@@ -171,7 +193,12 @@ describe('what a Space Thing may reference', () => {
       { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
     ]);
     const registry = createSpaceSessionRegistry(backend);
-    const lifecycle = createSpaceThingLifecycle({ backend, registry, newId: idSource([]) });
+    const lifecycle = createSpaceThingLifecycle({
+      backend,
+      registry,
+      newId: idSource([]),
+      reportObserverError: failOnObserverError,
+    });
 
     await expect(lifecycle.target(TARGET_ID)).resolves.toBeUndefined();
   });
@@ -201,7 +228,12 @@ describe('what a Space Thing may reference', () => {
       revision: 7n,
       exportedRevision: null,
     });
-    const lifecycle = createSpaceThingLifecycle({ backend, registry, newId: idSource([]) });
+    const lifecycle = createSpaceThingLifecycle({
+      backend,
+      registry,
+      newId: idSource([]),
+      reportObserverError: failOnObserverError,
+    });
     const stored = targetSnapshot.document.diagrams?.[0];
     if (stored === undefined) throw new Error('the target fixture has no Diagram to rename');
 

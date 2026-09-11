@@ -203,7 +203,7 @@ describe('spaceEntityActions', () => {
   });
 
   /**
-   * A Thing the Things drawer reveals but this Diagram does not place has one
+   * A Thing the Things list reveals but this Diagram does not place has one
    * address, so there is nothing for a second to differ from. Offering it
    * anyway would copy a `diagram-thing` path the host answers 404 for.
    */

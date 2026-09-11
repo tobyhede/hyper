@@ -97,11 +97,14 @@ import {
   PlusIcon,
   PresentIcon,
   Separator,
-  Toolbar,
+  ChoiceMenu,
+  ChoiceMenuTrigger,
+  CommandName,
+  CommandToolbar,
   ToolbarButton,
   ToolbarGroup,
 } from '@project/ui';
-import type { Graph, GraphId, Diagram, DiagramId, UUID } from '@project/core';
+import type { Thing, ThingId, Graph, GraphId, Diagram, DiagramId, UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
@@ -130,7 +133,8 @@ import {
   openSpacesName,
   SPACES_LABEL,
 } from '../dock-model';
-import { SET_TRIGGER } from './command-dock-triggers';
+import { THINGS_TRIGGER, SET_TRIGGER } from './command-dock-triggers';
+import { ThingsPopover, type ThingsPopoverSpace } from './ThingsPopover';
 import './command-dock.css';
 
 /**
@@ -185,7 +189,7 @@ const DISCLOSURE_SIDE_OFFSET = 6;
 const DISCLOSURE_WIDTH = 'w-72';
 
 /**
- * **The Dock's three sets of branded ids, bound to the id they are sets of.**
+ * **The one set of branded ids this module still binds by hand.**
  *
  * `DropdownMenuRadioGroup` is generic over its value and `DropdownMenuRadioItem`
  * is generic over its own, and the type does not travel from the group to its
@@ -193,7 +197,7 @@ const DISCLOSURE_WIDTH = 'w-72';
  * `ReactElement<any, any>`, so even a `children` slot declared as
  * `ReactElement<DropdownMenuRadioItemProps<Value>>` accepts an item of any type
  * at all. TypeScript has no way to carry a parent's type argument into generic
- * JSX children, so the composition names it — once per set, here.
+ * JSX children, so a surface that writes both names it — once per set.
  *
  * **What is unbound is not a narrower check but no check.** An item left to
  * infer its own `Value` binds to nothing: `<DropdownMenuRadioItem value="none">`
@@ -201,19 +205,24 @@ const DISCLOSURE_WIDTH = 'w-72';
  * `onValueChange` wearing the brand — so `onSelect(diagramId: DiagramId)` is
  * handed a string that is not one, and its declared type is a lie the compiler
  * helped tell. Bound, that literal is a `TS2322` where it is written.
- * `ThingsDrawer`'s `KindFilterItem` binds the same way, and
+ * `ThingsPopover`'s `FilterToggle` binds the same way, and
  * `tools/typing-fixtures/must-fail/mismatched-menu-item.tsx` is the standing
  * evidence that the rule bites.
  *
- * **Two of the Dock's five radio groups are deliberately absent from this list**
- * and neither wants adding: a Graph's colour is a plain `string` on both sides
+ * **The Diagram and Graph sets no longer need a name here, and that is the
+ * better answer rather than a looser one.** Both are `ChoiceMenu` now, which
+ * renders the group *and* its items from one type parameter — so the two halves
+ * cannot be named differently because no call site writes the second one.
+ * Naming a type twice and trusting the author is what a shared composition
+ * removes; `ChoiceMenu<DiagramId>` is the whole of it.
+ *
+ * **Two of the Dock's remaining radio groups are deliberately absent** and
+ * neither wants adding: a Graph's colour is a plain `string` on both sides
  * (`onRecolor(graphId, color: string)`), so there is no narrower type to name;
  * and the dock-slot group re-parses through `dockSlot(next)` before it acts, so
  * the value it trusts is one the parser produced rather than one the JSX
  * claimed.
  */
-const DiagramItem = DropdownMenuRadioItem<DiagramId>;
-const GraphItem = DropdownMenuRadioItem<GraphId>;
 const SpaceItem = DropdownMenuRadioItem<UUID>;
 
 /* ------------------------------------------------------------------ state */
@@ -495,30 +504,86 @@ export interface DockGraph {
   readonly presentDisabled: boolean;
 }
 
+/**
+ * What the Things list draws and what activating a row does.
+ *
+ * **Two one-way writes rather than an `open` flag**, and that is what lets the
+ * Dock own the slot without a second copy of the answer beside it. The
+ * application has exactly two things to say about whether this list is open —
+ * `disclose` asks for it and `disabled` withdraws it — and nothing it reads
+ * back, so neither is state it keeps. A controlled `open` pair here is the
+ * shape that lets the Dock's slot and the application's flag disagree, which is
+ * how two disclosures come to be open at once.
+ */
+export interface DockThingsList {
+  /** The Things this Diagram does not place — what the list offers. */
+  readonly things: readonly Thing[];
+  /** Every Thing in the Space, for resolving an Alias row's Target Title. */
+  readonly allThings: readonly Thing[];
+  /** The Title of every Space a Space Thing in the list references. */
+  readonly spaceTitleById?: ReadonlyMap<UUID, string> | undefined;
+  /**
+   * Every Space this Meta Space holds bar the one being authored.
+   *
+   * The list's second source. A Space is not a Thing and is in no Diagram, so it
+   * is not filtered against one; placing it authors the Space Thing that frames
+   * it, which under ADR 0074 is the only way a Space is referenced at all.
+   */
+  readonly spaces?: readonly ThingsPopoverSpace[] | undefined;
+  /** Place a Space by authoring the Space Thing that frames it, or answer with a refusal. */
+  readonly onAddSpace?: ((space: ThingsPopoverSpace) => Promise<string | null>) | undefined;
+  /** Returns a refusal that stays on the list, or null after a completed Add. */
+  readonly onAdd: (thing: Thing, activation: 'keyboard' | 'pointer') => string | null;
+  readonly onDragStart: (thingId: ThingId) => void;
+  readonly onDragEnd?: (() => void) | undefined;
+  /** The row an addressed Thing marks as current, drawn whether or not it opened the list. */
+  readonly revealedThingId?: ThingId | null | undefined;
+  /**
+   * A request to disclose the list, or `null` for none outstanding.
+   *
+   * **A request rather than an `open` flag**, which is what lets the Dock own
+   * the slot without a second copy of the answer beside it. The application has
+   * two moments at which it asks for this list and none at which it reads back
+   * whether the list is open: a Diagram just created — by Add Diagram, or by
+   * having opened a Space into one — and a Thing addressed that the selected
+   * Diagram does not place.
+   *
+   * The Dock opens on the value **changing identity**, so the application raises
+   * a fresh object per request and an unrelated edit recomputing an equal one
+   * reopens nothing the reader has just closed. A request outstanding when the
+   * Dock first mounts opens it without waiting a frame.
+   */
+  readonly disclose?: DockThingsDisclosure | null | undefined;
+  /** Whether the Diagram can accept membership edits at all. */
+  readonly disabled: boolean;
+}
+
+/** One request to disclose the Things list, and the Thing it is about if any. */
+export interface DockThingsDisclosure {
+  /** The Thing the request is about, for a caller that wants it marked too. */
+  readonly thingId: ThingId | null;
+}
+
 export interface DockThings {
   /**
-   * The Things surface itself — its trigger and its panel, supplied whole.
+   * The Things, as a list this Dock draws.
    *
-   * **A slot rather than a list, because there is one Things surface and it is
-   * not this one's.** The prototype drew its own filtered popover here and it
-   * was compared against a Drawer and a second dock at the scale that separates
-   * them; the Popover won that comparison. What settled it the other way is that
-   * the application already had `ThingsDrawer` — a production surface with its
-   * own stable story, its own behaviour tests and seven parity claims — and two
-   * surfaces offering "add an existing Thing to this Diagram" is the second place
-   * commands live that ADR 0082 rules out. So the Dock offers the *way* to the
-   * Things and the drawer is what it opens; re-deciding which of the two the
-   * product wants is a promotion of its own rather than a side effect of this
-   * one.
+   * **The Dock draws it rather than being handed it, and that is the whole of
+   * why the open state lives here.** The prototype's Things cluster disclosed a
+   * filtered Popover it drew itself, chosen over a Drawer from the screen edge
+   * and a second docked panel in a comparison over twenty-nine unplaced Things;
+   * the Popover won, and the reasons are written above {@link ThingsPopover} and
+   * in `.scratch/command-dock/issues/10-decide-the-cards-surface.md`. The Dock's
+   * promotion shipped the application's `ThingsDrawer` against that decision
+   * because the drawer already had parity claims and the prototype's evidence
+   * sat in a file marked throwaway; this slot was a `ReactNode` for as long as
+   * the surface was a foreign component.
    *
-   * The caller supplies trigger and panel together because they are one
-   * component: a toggle whose `disabled` and whose surface are decided in two
-   * places is a toggle that comes to disagree with what it names. It draws in
-   * the Dock's own name slot through {@link THINGS_TRIGGER} and
-   * {@link ThingsTrigger}, so it lands in the column the other three names land
-   * in, whichever edge the dock is on.
+   * It is not one any more. A list the Dock draws takes the Dock's own single
+   * open slot, so opening it closes whichever menu was open and opening a menu
+   * closes it — which a handed-in surface holding its own `open` could not do.
    */
-  readonly surface: ReactNode;
+  readonly list: DockThingsList;
   /**
    * Create a Thing of one kind — the one command about the *set*.
    *
@@ -592,11 +657,7 @@ function Divider({ orientation }: { readonly orientation: 'horizontal' | 'vertic
  * survive.
  */
 function IdentityLabel({ children }: { readonly children: ReactNode }) {
-  return (
-    <span className="command-dock__ident">
-      <span className="command-dock__ident-text">{children}</span>
-    </span>
-  );
+  return <CommandName>{children}</CommandName>;
 }
 
 /**
@@ -832,71 +893,67 @@ function DiagramControls({
             : (title) => canvas.onRename?.(canvas.selected.id, title) ?? null
         }
       />
-      <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
-        <DropdownMenuTrigger
-          id={triggerId}
-          className="nokey command-dock__disclose"
-          aria-label={`Diagram: ${canvas.selected.title}`}
-          title="Switch Diagram"
-          render={<ToolbarButton variant="ghost" size="icon" />}
+      {/* The list, the mark on the Diagram you are in and every key that moves
+          between them are `ChoiceMenu`'s — the same component an Open Space Thing
+          chooses its Diagram through. What stays here is what the list *is* and
+          what choosing one does, which on this surface is the canvas moving.
+          The commands below it are this cluster's own. */}
+      <ChoiceMenu<DiagramId>
+        label="Diagrams"
+        choices={canvas.diagrams}
+        chosen={canvas.selected.id}
+        onChoose={canvas.onSelect}
+        open={open}
+        onOpenChange={onOpenChange}
+        triggerId={triggerId}
+        side={side}
+        align={DISCLOSURE_ALIGN}
+        sideOffset={DISCLOSURE_SIDE_OFFSET}
+        className={`nokey ${DISCLOSURE_WIDTH}`}
+        trigger={
+          <ChoiceMenuTrigger
+            id={triggerId}
+            className="nokey command-dock__disclose"
+            aria-label={`Diagram: ${canvas.selected.title}`}
+            title="Switch Diagram"
+            render={<ToolbarButton variant="ghost" size="icon" />}
+          />
+        }
+      >
+        {/* The same order the Spaces popover pins below its scroll: the set
+            first, then the commands on the one it is naming. A Diagram list is
+            short enough that nothing scrolls, so the end of the list and the
+            pinned position are the same place — which is why one rule covers
+            both and neither has to know which case it is. */}
+        <DropdownMenuItem
+          className="gap-2"
+          disabled={canvas.createDisabled}
+          onClick={canvas.onCreate}
         >
-          <ChevronDownIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align={DISCLOSURE_ALIGN}
-          side={side}
-          sideOffset={DISCLOSURE_SIDE_OFFSET}
-          className={`nokey ${DISCLOSURE_WIDTH}`}
+          <PlusIcon />
+          New Diagram
+        </DropdownMenuItem>
+        <DropdownMenuItem className="gap-2" onClick={canvas.onCopyLink}>
+          <CopyIcon />
+          Copy link
+        </DropdownMenuItem>
+        {/* The last Diagram cannot be deleted (ADR 0079), so the command is
+            present and unavailable rather than absent — a control that
+            disappears teaches nothing about why. */}
+        {/* Delete is destructive and sits behind its own rule, away from
+            the commands above it — the same separation the menu already
+            makes between the list and the commands. */}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          className="gap-2"
+          disabled={canvas.deleteDisabled || canvas.diagrams.length <= 1}
+          onClick={() => canvas.onDelete(canvas.selected.id)}
         >
-          <DropdownMenuRadioGroup
-            value={canvas.selected.id}
-            onValueChange={(next) => canvas.onSelect(next)}
-          >
-            <DropdownMenuLabel>Diagrams</DropdownMenuLabel>
-            {canvas.diagrams.map((diagram) => (
-              <DiagramItem key={diagram.id} value={diagram.id} closeOnClick>
-                {diagram.title}
-              </DiagramItem>
-            ))}
-          </DropdownMenuRadioGroup>
-          <DropdownMenuSeparator />
-          {/* The same order the Spaces popover pins below its scroll: the set
-              first, then the commands on the one it is naming. A Diagram list is
-              short enough that nothing scrolls, so the end of the list and the
-              pinned position are the same place — which is why one rule covers
-              both and neither has to know which case it is. */}
-          <DropdownMenuGroup>
-            <DropdownMenuItem
-              className="gap-2"
-              disabled={canvas.createDisabled}
-              onClick={canvas.onCreate}
-            >
-              <PlusIcon />
-              New Diagram
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={canvas.onCopyLink}>
-              <CopyIcon />
-              Copy link
-            </DropdownMenuItem>
-            {/* The last Diagram cannot be deleted (ADR 0079), so the command is
-                present and unavailable rather than absent — a control that
-                disappears teaches nothing about why. */}
-            {/* Delete is destructive and sits behind its own rule, away from
-                the commands above it — the same separation the menu already
-                makes between the list and the commands. */}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              className="gap-2"
-              disabled={canvas.deleteDisabled || canvas.diagrams.length <= 1}
-              onClick={() => canvas.onDelete(canvas.selected.id)}
-            >
-              <DeleteIcon />
-              Delete {canvas.selected.title}
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <DeleteIcon />
+          Delete {canvas.selected.title}
+        </DropdownMenuItem>
+      </ChoiceMenu>
     </ToolbarGroup>
   );
 }
@@ -980,40 +1037,39 @@ function GraphControls({
             : (title) => graph.onRename?.(graph.active.id, title) ?? null
         }
       />
-      <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
-        <DropdownMenuTrigger
-          id={triggerId}
-          className="nokey command-dock__disclose"
-          aria-label={`Active Graph: ${graph.active.title}`}
-          title="Switch Graph"
-          render={<ToolbarButton variant="ghost" size="icon" />}
-        >
-          <ChevronDownIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align={DISCLOSURE_ALIGN}
-          side={side}
-          sideOffset={DISCLOSURE_SIDE_OFFSET}
-          className={`nokey ${DISCLOSURE_WIDTH}`}
-        >
-          <DropdownMenuRadioGroup
-            value={graph.active.id}
-            onValueChange={(next) => graph.onActivate(next)}
-          >
-            <DropdownMenuLabel>Graphs in {diagramTitle}</DropdownMenuLabel>
-            {graph.graphs.map((each) => {
-              const color = graph.colorByGraphId[each.id] ?? FALLBACK_GRAPH_COLOR;
-              return (
-                <GraphItem key={each.id} value={each.id} closeOnClick className="gap-2">
-                  <GraphIcon color={color} size={14} />
-                  {each.title}
-                </GraphItem>
-              );
-            })}
-          </DropdownMenuRadioGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            {/* **A submenu, not a control beside Present.** The rule this
+      {/* The same `ChoiceMenu` the Diagram cluster and an Open Space Thing draw,
+          with each row carrying the colour its Graph is drawn in — a choice's
+          own glyph is the choice's, which is why it rides on the choice rather
+          than being rendered here. */}
+      <ChoiceMenu<GraphId>
+        label={`Graphs in ${diagramTitle}`}
+        choices={graph.graphs.map((each) => ({
+          id: each.id,
+          title: each.title,
+          icon: (
+            <GraphIcon color={graph.colorByGraphId[each.id] ?? FALLBACK_GRAPH_COLOR} size={14} />
+          ),
+        }))}
+        chosen={graph.active.id}
+        onChoose={graph.onActivate}
+        open={open}
+        onOpenChange={onOpenChange}
+        triggerId={triggerId}
+        side={side}
+        align={DISCLOSURE_ALIGN}
+        sideOffset={DISCLOSURE_SIDE_OFFSET}
+        className={`nokey ${DISCLOSURE_WIDTH}`}
+        trigger={
+          <ChoiceMenuTrigger
+            id={triggerId}
+            className="nokey command-dock__disclose"
+            aria-label={`Active Graph: ${graph.active.title}`}
+            title="Switch Graph"
+            render={<ToolbarButton variant="ghost" size="icon" />}
+          />
+        }
+      >
+        {/* **A submenu, not a control beside Present.** The rule this
                 cluster already keeps is frequency: Present earns a permanent
                 control because traversing is what a Graph is *for*, and New
                 Graph sits in the menu because Graphs are made rarely. Colour is
@@ -1030,34 +1086,30 @@ function GraphControls({
                 one colour, the palette is a closed set, and a menu's own roving
                 focus and keyboard selection come free — where a row of buttons
                 inside a menu would be a focus manager fighting the menu's. */}
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="gap-2" disabled={graph.editsDisabled}>
-                <GraphIcon color={graph.activeColor} size={14} />
-                Colour
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="nokey">
-                <DropdownMenuRadioGroup
-                  value={graph.active.color ?? ''}
-                  onValueChange={(next) => graph.onRecolor(graph.active.id, next)}
-                >
-                  {GRAPH_COLORS.map(([name, color]) => (
-                    <DropdownMenuRadioItem key={color} value={color} closeOnClick className="gap-2">
-                      <GraphIcon color={color} size={14} />
-                      {name}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <DropdownMenuItem
-              className="gap-2"
-              disabled={graph.editsDisabled}
-              onClick={graph.onCreate}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="gap-2" disabled={graph.editsDisabled}>
+            <GraphIcon color={graph.activeColor} size={14} />
+            Colour
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="nokey">
+            <DropdownMenuRadioGroup
+              value={graph.active.color ?? ''}
+              onValueChange={(next) => graph.onRecolor(graph.active.id, next)}
             >
-              <PlusIcon />
-              New Graph
-            </DropdownMenuItem>
-            {/* **A copy reports through the application's standing notice**, not
+              {GRAPH_COLORS.map(([name, color]) => (
+                <DropdownMenuRadioItem key={color} value={color} closeOnClick className="gap-2">
+                  <GraphIcon color={color} size={14} />
+                  {name}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuItem className="gap-2" disabled={graph.editsDisabled} onClick={graph.onCreate}>
+          <PlusIcon />
+          New Graph
+        </DropdownMenuItem>
+        {/* **A copy reports through the application's standing notice**, not
                 in the item's own label. `EntityActionsMenu` swaps a pressed
                 item's words to "Copied" or "Not copied", and it does that
                 because the Sidebar's menus were inside a Sheet drawn over the
@@ -1066,7 +1118,7 @@ function GraphControls({
                 covers nothing: "Link not copied" is pinned in the shell at every
                 width, so the in-place swap has lost the reason it existed for.
                 The Thing rail keeps it, being a menu on the canvas itself. */}
-            {/* Both forms, always: a Diagram owns its Graphs (ADR 0040), so a
+        {/* Both forms, always: a Diagram owns its Graphs (ADR 0040), so a
                 Graph always has a within-Diagram address as well as its own —
                 which is exactly what `spaceEntityActions` offers on a Graph.
 
@@ -1078,27 +1130,25 @@ function GraphControls({
                 The second form is offered only where it differs from the first,
                 which on a Graph is always — a Diagram row shows one link for the
                 same reason, having only its own. */}
-            <DropdownMenuItem className="gap-2" onClick={graph.onCopyLink}>
-              <CopyIcon />
-              Copy link
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={graph.onCopyPermanentLink}>
-              <CopyIcon />
-              Copy permanent link
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              className="gap-2"
-              disabled={graph.editsDisabled || graph.graphs.length <= 1}
-              onClick={() => graph.onDelete(graph.active.id)}
-            >
-              <DeleteIcon />
-              Delete {graph.active.title}
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        <DropdownMenuItem className="gap-2" onClick={graph.onCopyLink}>
+          <CopyIcon />
+          Copy link
+        </DropdownMenuItem>
+        <DropdownMenuItem className="gap-2" onClick={graph.onCopyPermanentLink}>
+          <CopyIcon />
+          Copy permanent link
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          className="gap-2"
+          disabled={graph.editsDisabled || graph.graphs.length <= 1}
+          onClick={() => graph.onDelete(graph.active.id)}
+        >
+          <DeleteIcon />
+          Delete {graph.active.title}
+        </DropdownMenuItem>
+      </ChoiceMenu>
       {vertical ? present : null}
     </ToolbarGroup>
   );
@@ -1396,6 +1446,78 @@ function useDockDisclosure() {
   } satisfies DisclosureBinding;
 }
 
+/**
+ * The Things disclosure's id, and the one in the Dock that is not a `useId`.
+ *
+ * Every other disclosure takes an opaque generated id, so two cannot collide by
+ * both calling themselves "things" (see {@link useDockDisclosure}). This one is
+ * named because it is the one disclosure the Dock itself opens on the
+ * application's behalf — a Diagram just created, a Thing addressed that the
+ * Diagram does not place — and {@link DockChrome} has to be able to seed the
+ * Dock's slot with it before any control has mounted to mint an id.
+ */
+const THINGS_DISCLOSURE_ID = 'command-dock-things';
+
+/**
+ * The Things list in its cluster, holding the Dock's one open slot.
+ *
+ * The three things the application says about whether this is open are applied
+ * here rather than mirrored into a second flag: `initiallyOpen` seeds the slot
+ * in {@link CommandDock}, `disabled` closes it, and `reveal` opens it on the
+ * change rather than on the value. Each is a one-way write into the slot, so
+ * there is no state here that can come to disagree with the application's.
+ */
+function ThingsList({ list, side }: { readonly list: DockThingsList; readonly side: MenuSide }) {
+  const { openId, setOpenId } = useContext(DockDisclosureContext);
+  const open = openId === THINGS_DISCLOSURE_ID;
+  const disclosed = useRef(list.disclose ?? null);
+  // The slot key is stable and the trigger's DOM id is not, because they answer
+  // different questions: the Dock has to be able to name this slot before a
+  // control exists, and every open Space keeps its Dock mounted, so a literal
+  // `id` would be in the document more than once the moment a second Space is
+  // open.
+  const triggerId = useId();
+
+  // Withdrawing the list *closes* it rather than leaving it open behind a
+  // disabled trigger. Presenting and creating an Alias both pass through here,
+  // and a list that reopened itself on the way back would take focus with it,
+  // landing the reader in the Things rather than on the canvas they returned to.
+  useEffect(() => {
+    if (list.disabled && open) setOpenId(null);
+  }, [list.disabled, open, setOpenId]);
+
+  // On the identity changing rather than on the value: an unrelated edit
+  // elsewhere in the Space recomputes an equal request, and reopening on that
+  // alone would reopen a list the reader has just closed.
+  useEffect(() => {
+    const next = list.disclose ?? null;
+    if (next === disclosed.current) return;
+    disclosed.current = next;
+    if (next !== null) setOpenId(THINGS_DISCLOSURE_ID);
+  }, [list.disclose, setOpenId]);
+
+  return (
+    <ThingsPopover
+      open={open && !list.disabled}
+      onOpenChange={(next) => setOpenId(next ? THINGS_DISCLOSURE_ID : null)}
+      triggerId={triggerId}
+      side={side}
+      disabled={list.disabled}
+      triggerRender={<ToolbarButton variant="ghost" {...THINGS_TRIGGER} />}
+      triggerLabel={<ThingsTrigger />}
+      things={list.things}
+      allThings={list.allThings}
+      spaceTitleById={list.spaceTitleById}
+      spaces={list.spaces}
+      onAddSpace={list.onAddSpace}
+      onAdd={list.onAdd}
+      onDragStart={list.onDragStart}
+      onDragEnd={list.onDragEnd}
+      revealedThingId={list.revealedThingId}
+    />
+  );
+}
+
 function ThingsControl({
   things,
   side = 'bottom',
@@ -1414,7 +1536,7 @@ function ThingsControl({
    */
   return (
     <ToolbarGroup aria-label="Things" className="command-dock__cluster">
-      {/* **The surface carries no commands, and that is the shape rather than a
+      {/* **The list carries no commands, and that is the shape rather than a
           gap in it.** Things names no one entity — a Thing's own commands are the
           Thing rail's (ADR 0073) and this Dock deliberately carries none — and
           its one set command, Create, is the `+` beside this trigger.
@@ -1424,7 +1546,7 @@ function ThingsControl({
           It offers Space Things like any other Thing and does nothing special
           with them: entering one is the canvas Thing's gesture (ADR 0068), not a
           list's. */}
-      {things.surface}
+      <ThingsList list={things.list} side={side} />
       {/* **Trailing, where Present leads**, and the asymmetry is the point.
           Present acts on the named entity the cluster is showing — present *this
           Graph* — so it sits at the edge the eye enters from, ahead of the name
@@ -1714,7 +1836,7 @@ function ParentSpace({
                   this one is somewhere you are not, so the one thing it offers
                   is going there. */}
               <ParentIcon />
-              <span className="command-dock__ident-text">{parent.title}</span>
+              <CommandName>{parent.title}</CommandName>
             </BreadcrumbLink>
           </BreadcrumbItem>
         )}
@@ -2400,13 +2522,15 @@ function Dock({
             wrapper *inside* the surface would have been the other way to do it and
             is the wrong one: the vertical column's grid places this element's
             direct children, so a layer between them moves every slot. */}
-        <Toolbar
+        <CommandToolbar
           aria-label={label}
           // The arrows follow the edge the dock is on: a column whose arrow keys
           // ran left and right would be a toolbar disagreeing with its own shape.
+          // `CommandToolbar` spends the one value twice — Base UI takes it for
+          // the arrows and `command-surface.css` reads it back for the axis —
+          // so the paint and the keyboard cannot drift apart here.
           orientation={vertical ? 'vertical' : 'horizontal'}
           className={`command-dock__surface nokey nodrag nopan ${className ?? ''}`}
-          data-orientation={vertical ? 'vertical' : 'horizontal'}
         >
           {/* The grip is both the drag handle and the disclosure, which is what a
               grip on a movable panel already reads as. It draws its dots from CSS
@@ -2484,7 +2608,7 @@ function Dock({
             </DropdownMenuContent>
           </DropdownMenu>
           {children}
-        </Toolbar>
+        </CommandToolbar>
         {report}
       </div>
     </>
@@ -2581,7 +2705,13 @@ export function CommandDock({
   readonly initialEdge: DockEdge;
 }) {
   const [dock, setDock] = useState<DockPosition>({ edge: initialEdge, along: 'center' });
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(
+    // The one disclosure the Dock opens for the application rather than for the
+    // reader: Add Diagram makes an empty Diagram, and the Things are what fills it.
+    // Seeded here so a Space opened into a new Diagram draws the list on its
+    // first frame rather than one after it.
+    (chrome.things.list.disclose ?? null) === null ? null : THINGS_DISCLOSURE_ID,
+  );
   const renaming = useDockRenaming(chrome);
   const vertical = orientationOf(dock.edge) === 'vertical';
   // A rule divides across the dock's own axis, so it runs the other way.

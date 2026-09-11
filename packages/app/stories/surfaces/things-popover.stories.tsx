@@ -1,14 +1,14 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
-import { uuidSchema, type Thing } from '@project/core';
+import { uuidSchema, type Thing, type UUID } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import { ThingsDrawer } from '#components/ThingsDrawer';
+import { ThingsPopover } from '#components/ThingsPopover';
 import { PersistenceNotice } from '#components/PersistenceControl';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { composeApp } from '#src/compose-app';
 import { sparseAuthoredSnapshot } from '../support/spaces';
 
-export default { title: 'Surfaces/Things Drawer' };
+export default { title: 'Surfaces/Things Popover' };
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
@@ -32,34 +32,56 @@ const LONG_THINGS: readonly Thing[] = Array.from({ length: 18 }, (_, index) => (
   body: '',
 }));
 
-function ThingsDrawerFixture({
+/** Spaces of the Meta Space, which are not Things and are in no Diagram. */
+const SPACES = [
+  { id: id('000000000020'), title: 'Blueprint' },
+  { id: id('000000000021'), title: 'Yardstick' },
+];
+
+function ThingsPopoverFixture({
   things = THINGS,
   allThings = things,
   disabled = false,
   notice,
+  spaces,
 }: {
   readonly things?: readonly Thing[];
   readonly allThings?: readonly Thing[];
   readonly disabled?: boolean;
   readonly notice?: ReactNode;
+  readonly spaces?: readonly { readonly id: UUID; readonly title: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState<readonly string[]>([]);
+  // A completed Add takes the Thing out of the list, which is what the
+  // application does: the Thing has joined the Diagram, so it is no longer
+  // outside it. Without that the activated row never unmounts, and every
+  // claim this catalogue makes about what follows an Add — the row going,
+  // the caret coming back to the filter — would hold over a row still on
+  // screen and still able to keep focus itself.
+  const [placed, setPlaced] = useState<readonly string[]>([]);
+  const outside = things.filter((thing) => !placed.includes(thing.id));
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex shrink-0 items-center gap-2 border-b p-2">
         <span className="text-sm font-medium">Diagram 1</span>
-        <ThingsDrawer
-          things={things}
+        <ThingsPopover
+          things={outside}
           allThings={allThings}
           open={open}
           onOpenChange={setOpen}
           disabled={disabled}
           onAdd={(thing) => {
             setAdded((titles) => [...titles, thing.title]);
+            setPlaced((ids) => [...ids, thing.id]);
             return null;
           }}
           onDragStart={() => undefined}
+          spaces={spaces}
+          onAddSpace={(space) => {
+            setAdded((titles) => [...titles, space.title]);
+            return Promise.resolve(null);
+          }}
         />
       </header>
       {notice}
@@ -93,7 +115,7 @@ function RefusedAdd() {
 
   return (
     <div className="flex h-screen items-start bg-background p-2 text-foreground">
-      <ThingsDrawer
+      <ThingsPopover
         things={things}
         allThings={space.things}
         open={open}
@@ -116,28 +138,44 @@ function RefusedAdd() {
  * The production Things View with every Thing kind available.
  *
  * Mounted closed, behind its own trigger and over a stand-in for the canvas it
- * feeds — the smallest boundary that owns the drawer's opening, its dismissal
- * and the fact that its overlay does not take the surface behind it away.
+ * feeds — the smallest boundary that owns the list's opening, its dismissal and
+ * the fact that the surface behind it stays live. That last one is the
+ * comparison's own claim restored: the list is anchored to its trigger and does
+ * not close on an outside press, so dropping a Thing onto the canvas neither
+ * dismisses it nor is dismissed by it
+ * (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
  */
 export const AvailableThings: Story = () => {
-  return <ThingsDrawerFixture />;
+  return <ThingsPopoverFixture />;
 };
 AvailableThings.meta = { iframed: true };
 
-export const Empty: Story = () => <ThingsDrawerFixture things={[]} allThings={THINGS} />;
+/**
+ * The list's second source beside its first.
+ *
+ * A Space Thing is one authored view placed in a Diagram; a Space is the volume
+ * such a view is a view of, offered whether or not this Space has ever pointed
+ * at it (ADR 0074). The rows interleave by name because the reader is looking
+ * for a name, and each carries the glyph that says which it is — the same pair
+ * the filter draws.
+ */
+export const MetaSpaces: Story = () => <ThingsPopoverFixture spaces={SPACES} />;
+MetaSpaces.meta = { iframed: true };
+
+export const Empty: Story = () => <ThingsPopoverFixture things={[]} allThings={THINGS} />;
 Empty.meta = { iframed: true };
 
-export const LongList: Story = () => <ThingsDrawerFixture things={LONG_THINGS} />;
+export const LongList: Story = () => <ThingsPopoverFixture things={LONG_THINGS} />;
 LongList.meta = { iframed: true };
 
-export const Disabled: Story = () => <ThingsDrawerFixture disabled />;
+export const Disabled: Story = () => <ThingsPopoverFixture disabled />;
 Disabled.meta = { iframed: true };
 
 export const Refused: Story = () => <RefusedAdd />;
 Refused.meta = { iframed: true };
 
 export const PersistenceFailure: Story = () => (
-  <ThingsDrawerFixture
+  <ThingsPopoverFixture
     notice={
       <PersistenceNotice
         persistence={{

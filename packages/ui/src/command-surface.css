@@ -1,0 +1,77 @@
+/* The one command surface, beside the components that draw it.
+
+   **Chrome is about the thing it commands, so it reads as a layer over it.**
+   Translucent, blurred, hairline-bordered, softly shadowed — never the paper a
+   Thing is. That treatment was written for the Command Dock floating over the
+   canvas, and it is written here because it is not the Dock's: a Thing's own
+   commands are a strip of the same kind floating over the Thing
+   (`.scratch/command-dock/issues/12`), and the two reading as one language is
+   the point rather than a coincidence two stylesheets keep by hand.
+
+   Every colour is a token the application sets in one place, so a surface
+   mounted on cream paper and a surface mounted on the canvas take the same
+   neutral panel rather than each mixing one from what is behind it.
+
+   **Treatment only.** Where a surface sits, how big it may be, whether it
+   scrolls and what it does when it is dragged are the mounting surface's — the
+   Dock's own sheet still owns its twelve slots and its cap, and the Thing's owns
+   when its strip is revealed. Nothing here positions anything. */
+.command-surface {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  /* The ink, washed twice: a contact shadow and the cast one that lifts the
+     strip off whatever it is over. */
+  box-shadow:
+    0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
+    0 6px 18px color-mix(in oklab, var(--foreground) 10%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+/* A surface runs along its own axis and its arrows follow it. The attribute is
+   the primitive's own — `CommandToolbar` states it from the same `orientation`
+   it hands Base UI, so the paint and the keyboard cannot disagree. */
+.command-surface[data-orientation='vertical'] {
+  flex-direction: column;
+}
+
+/* A name drawn on a command surface: as much of it as fits, ellipsed rather
+   than wrapped, and never widening the surface it is on.
+
+   Shared because the Dock and an Open Space Thing both name a Diagram and a
+   Graph, and a name that ellipsed on one and wrapped on the other would be two
+   answers to one question. The gap is the *name's* — between a glyph and the
+   word beside it — and is not the surface's gap between controls. */
+.command-name {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.command-name__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Every control on a command surface cross-fades its colours over 200ms, and
+     that duration is the shared `Button` recipe's rather than this surface's —
+     so a reader who has asked for no motion is given the same answer without
+     it, here, once.
+
+     Written on the surface rather than at each place one is mounted because the
+     two places disagreed: `canvas-thing.css` withdrew it for a Thing's rail
+     controls and `command-dock.css` never did, which is one control recipe with
+     two answers to the same preference. The element selector is what outranks
+     the utility class the recipe carries. */
+  .command-surface button {
+    transition: none;
+  }
+}

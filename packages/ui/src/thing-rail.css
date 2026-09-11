@@ -1,21 +1,37 @@
 /* The band across the top of a Thing, beside the component that draws it.
 
-   Geometry and colour only. A Thing that hides its own rail at rest — the canvas
-   Thing does, revealing it with the Thing itself — overrides these from its own
-   stylesheet, because when the rail shows is the Thing's state and not the rail's.
+   Geometry only, and deliberately no colour at all.
 
-   `--thing-rail-graph` is published by `ThingRail` from its `graphColor` prop, so
-   the rail does not depend on which Thing mounted it. */
+   **The band used to carry the Active Graph's colour and no longer does**
+   (`.scratch/command-dock/issues/12`). What a Thing reveals on hover is a command
+   strip, and a strip of commands is chrome — so it is drawn as the product draws
+   chrome everywhere else: the neutral `.command-surface` the Command Dock
+   wears, mounted here by `ThingRailActions`. A coloured band behind it would have
+   been a second surface treatment on one Thing and a second answer to what the
+   Graph's colour means. The colour has not left the canvas: the Thing's handles
+   and the Edges of each Graph still carry it, which is where a colour that says
+   *which Graph* belongs.
+
+   So the rail is a row, a height and nothing else. The height is what reserves
+   the strip's room inside a Thing whose size is authored — it is read by
+   `packages/ui/test/canvas-thing-title-ladder.test.ts` and
+   `canvas-thing-embedded-diagram.test.ts`, each of which holds the room left over
+   to something the domain states. A Thing that hides its own strip at rest — the
+   canvas Thing does, revealing it with the Thing itself — says so from its own
+   stylesheet, because when the strip shows is the Thing's state and not the
+   rail's. */
 .thing-rail {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 34px;
-  min-height: 34px;
-  padding: 0 8px;
+  /* Exactly the command strip's own height: a 28px control in the shared
+     surface's 4px padding inside its 1px border. The strip is seated in the
+     band rather than floating over the Thing's content, which is what keeps an
+     Open Thing's Markdown clear of it. */
+  height: 38px;
+  min-height: 38px;
+  padding: 0 6px;
   border-radius: 0;
-  background: var(--thing-rail-graph);
-  transition: background-color var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
 }
 
 .thing-rail__kind {
@@ -30,7 +46,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .thing-rail,
   .thing-rail__kind {
     transition: none;
   }

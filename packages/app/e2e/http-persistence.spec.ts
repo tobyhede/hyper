@@ -115,7 +115,7 @@ test(
   {
     tag: [
       '@parity:command-dock-recovers-retryable-failure',
-      '@parity:things-drawer-coexists-with-persistence-failure',
+      '@parity:things-popover-coexists-with-persistence-failure',
     ],
   },
   async ({ page }) => {
