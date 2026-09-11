@@ -13,7 +13,7 @@ const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
 const strategyGraph: LayoutStrategyGraph = {
-  things: [{ id: THING_A, width: 240, height: 140, ports: [] }],
+  things: [{ id: THING_A, width: 240, height: 140 }],
   edges: [],
 };
 
@@ -73,8 +73,8 @@ describe('usePlacementRendering', () => {
     const automatic = gridStrategy();
     const gainedThing: LayoutStrategyGraph = {
       things: [
-        { id: THING_A, width: 240, height: 140, ports: [] },
-        { id: THING_B, width: 240, height: 140, ports: [] },
+        { id: THING_A, width: 240, height: 140 },
+        { id: THING_B, width: 240, height: 140 },
       ],
       edges: [],
     };
@@ -120,8 +120,8 @@ describe('usePlacementRendering', () => {
     const strategy = gridStrategy();
     const nextGraph: LayoutStrategyGraph = {
       things: [
-        { id: THING_A, width: 240, height: 140, ports: [] },
-        { id: THING_B, width: 240, height: 140, ports: [] },
+        { id: THING_A, width: 240, height: 140 },
+        { id: THING_B, width: 240, height: 140 },
       ],
       edges: [],
     };

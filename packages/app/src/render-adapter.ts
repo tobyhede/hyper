@@ -194,10 +194,14 @@ export interface RenderAdapterState {
   /** Gesture starts retained until each node receives a settled callback. */
   dragOrigins: ReadonlyMap<string, DiagramPosition>;
   /**
-   * Set once a thing has actually moved. A diagram's routed edge geometry
-   * describes the placement it computed, so it stops being true the moment a
-   * thing leaves the place that routing assumed; from then on edges are drawn as
-   * plain curves between wherever the things now are.
+   * Set once a thing has actually moved.
+   *
+   * Its one reader was the Edge geometry: a routed edge described the placement
+   * a strategy computed, so it stopped being true the moment a thing left it,
+   * and from then on the edges were drawn as plain curves. Nothing routes an
+   * edge since ADR 0086, so nothing reads this — where an Edge attaches, and
+   * whether that answer needs to know a drag has happened, is the open question
+   * `.scratch/edge-attachment/` carries next.
    */
   moved: boolean;
   /** The ordinary React Flow selection used for continued authoring. */

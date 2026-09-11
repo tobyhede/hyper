@@ -7,7 +7,7 @@ const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 describe('canvasContent', () => {
   const placed: LayoutStrategyGraph = {
-    things: [{ id: THING_ID, width: 260, height: 146, ports: [], x: 0, y: 0 }],
+    things: [{ id: THING_ID, width: 260, height: 146, x: 0, y: 0 }],
     edges: [],
   };
 

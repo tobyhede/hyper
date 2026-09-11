@@ -1,25 +1,22 @@
 import type { ComponentProps } from 'react';
 import { BaseEdge, getBezierPath, type Edge, type EdgeProps } from '@xyflow/react';
 import type { GraphId } from '@project/core';
-import type { Point } from '@project/graph';
 
 /**
- * React Flow custom edge. **It draws a bezier, and only ever has.**
+ * React Flow custom edge that draws a bezier between the two handles.
  *
- * The polyline branch below is unreachable in the application: it needs `points`,
- * which come from a strategy's routed `sections`, and no strategy in the tree
- * emits any (ADR 0086). A back-edge — target left of source, e.g. two graphs
- * disagreeing on the order of things they share — therefore leaves rightward and
- * hooks back on itself, reading as a broken stub. That is the product's actual
- * behaviour, not a fallback waiting for a router to resolve.
- *
- * The component keeps its name and the branch leaves with ticket 02 of ADR 0086.
- * Don't debug why routing "isn't resolving"; there is nothing to resolve.
+ * It kept a second branch until ADR 0086: a polyline along the waypoints a
+ * routing strategy had placed, for a back-edge (target left of source, e.g. two
+ * graphs disagreeing on the order of things they share) whose bezier leaves
+ * rightward and hooks back on itself. That branch never executed in the
+ * application — no strategy in the tree ever emitted a routed section, and a
+ * Diagram has nowhere to store one — so the bezier is, and always was, the only
+ * edge geometry the product draws. The name stays because the edge is still the
+ * one drawn along a Graph; where it attaches is `.scratch/edge-attachment/`'s
+ * open question.
  */
 export type RoutedEdgeData = {
   graphId: GraphId;
-  /** A routed path, start → bends → end. **Always absent** — nothing populates it. */
-  points?: Point[];
 };
 
 /**
@@ -27,47 +24,6 @@ export type RoutedEdgeData = {
  * what lets `EdgeProps` hand back a typed `data` instead of an `unknown` to cast.
  */
 export type RoutedFlowEdge = Edge<RoutedEdgeData, 'routed'>;
-
-/** Rounded to one decimal place — a router's coordinates carry long float tails
- *  that add nothing visible to an edge's path but bloat the SVG string. */
-function roundCoordinate(value: number): number {
-  return Math.round(value * 10) / 10;
-}
-
-function polyline(points: Point[]): string {
-  return points
-    .map(
-      (point, index) =>
-        `${index === 0 ? 'M' : 'L'} ${roundCoordinate(point.x)} ${roundCoordinate(point.y)}`,
-    )
-    .join(' ');
-}
-
-/** Where a routed polyline reads as its middle: the point half its length along,
- *  interpolated within whichever segment spans it rather than snapped to a bend. */
-function polylineMidpoint(points: Point[]): Point {
-  const lengths = points.map((point, index) => {
-    const previous = points[index - 1];
-    if (previous === undefined) return 0;
-    return Math.hypot(point.x - previous.x, point.y - previous.y);
-  });
-  const total = lengths.reduce((sum, length) => sum + length, 0);
-  let travelled = 0;
-  for (const [index, length] of lengths.entries()) {
-    const previous = points[index - 1];
-    const point = points[index];
-    if (previous === undefined || point === undefined) continue;
-    if (travelled + length >= total / 2) {
-      const along = length === 0 ? 0 : (total / 2 - travelled) / length;
-      return {
-        x: previous.x + (point.x - previous.x) * along,
-        y: previous.y + (point.y - previous.y) * along,
-      };
-    }
-    travelled += length;
-  }
-  return points[0] ?? { x: 0, y: 0 };
-}
 
 /** An Edge's drawn path and the point a label or toolbar sits at. */
 export interface RoutedEdgeGeometry {
@@ -82,11 +38,9 @@ export interface RoutedEdgeGeometry {
  * Exported because an application may compose a richer Edge over this one —
  * selection controls, a toolbar — and such an Edge needs the same midpoint the
  * path implies. Recomputing it beside the composition would be a second answer
- * to "is this Edge routed", and the two would disagree the first time a diagram
- * stopped placing sections.
+ * to the same question, and the two would disagree the day the curve changed.
  */
 export function routedEdgeGeometry({
-  data,
   sourceX,
   sourceY,
   sourcePosition,
@@ -94,11 +48,6 @@ export function routedEdgeGeometry({
   targetY,
   targetPosition,
 }: EdgeProps<RoutedFlowEdge>): RoutedEdgeGeometry {
-  const points = data?.points;
-  if (points && points.length >= 2) {
-    const middle = polylineMidpoint(points);
-    return { path: polyline(points), labelX: middle.x, labelY: middle.y };
-  }
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,

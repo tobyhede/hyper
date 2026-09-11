@@ -18,15 +18,15 @@ import type { Space } from './space';
  */
 
 export interface GraphRenderHandleRef {
-  /** Handle id, also used as the port id a strategy reads. */
+  /** Handle id, also the id an Edge names its two ends by. */
   id: string;
   graphId: GraphId;
 }
 
 export interface ThingHandleSet {
-  /** Outbound ports (right / EAST). */
+  /** Outbound ports, drawn on the right. */
   sourceHandles: GraphRenderHandleRef[];
-  /** Inbound ports (left / WEST). */
+  /** Inbound ports, drawn on the left. */
   targetHandles: GraphRenderHandleRef[];
 }
 
@@ -34,8 +34,9 @@ export interface ThingHandleSet {
  * A Graph's Edge as the render graph draws it: the authored `{ from, to }`
  * (`@project/core`'s `GraphEdge`) resolved onto the ports it attaches to, and tagged with the Graph
  * it belongs to so the render layer can colour it. `buildLayoutStrategyGraph` narrows
- * this to a `LayoutStrategyEdge`, which is the same thing again once geometry lands on
- * it.
+ * this to a `LayoutStrategyEdge`, which is the same Edge without the Graph it is
+ * tagged with — a strategy arranges the Things and answers no geometry for an
+ * Edge at all (ADR 0086).
  */
 export interface GraphRenderEdge {
   id: string;

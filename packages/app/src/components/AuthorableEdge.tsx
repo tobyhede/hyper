@@ -43,9 +43,9 @@ function EdgeControlLayer({
 /**
  * The application's authorable Edge: `RoutedEdge`'s path, plus Hyper's controls.
  *
- * It composes the reusable Edge rather than redrawing it — the routed polyline,
- * the bezier fallback and the point the controls sit at all come from
- * `routedEdgeGeometry`, so this cannot disagree with what is on screen.
+ * It composes the reusable Edge rather than redrawing it — both the curve and
+ * the point the controls sit at come from `routedEdgeGeometry`, so this cannot
+ * disagree with what is on screen.
  *
  * The controls' visibility rule is `selected`, React Flow's own default for edge
  * toolbars, and Enter and Space keep their native selection meaning on the Edge

@@ -40,7 +40,15 @@ export interface CanvasInteraction {
   readonly selectedThingId: ThingId | null;
   /** Presenting draws the active Thing's content rather than its title. */
   readonly presenting: boolean;
-  /** Whether a Thing has been dragged out of the placement the strategy computed. */
+  /**
+   * Whether a Thing has been dragged out of the placement the strategy computed.
+   *
+   * Its one reader was the Edge geometry: a routed Edge described the placement
+   * a strategy computed, so it stopped being true the moment a Thing left it.
+   * Nothing routes an Edge since ADR 0086, so nothing reads this — where an Edge
+   * attaches, and whether that answer needs to know a drag has happened, is
+   * `.scratch/edge-attachment/`'s open question.
+   */
   readonly moved: boolean;
 }
 
@@ -51,7 +59,7 @@ export interface CanvasNodesAndEdges {
 }
 
 export interface PendingCanvasProjection {
-  /** What a layout strategy arranges: the visible things, handles and edges. */
+  /** What a layout strategy arranges: the visible things and edges. */
   readonly strategyGraph: LayoutStrategyGraph;
   /** Every visible Graph's resolved colour. */
   readonly colors: Readonly<Record<string, string>>;
@@ -87,7 +95,7 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
   const openThingIds = new Set(
     [...authored].filter(([, at]) => at.open).map(([thingId]) => thingId),
   );
-  const strategyGraph = buildLayoutStrategyGraph(thingIds, handles, edges, (thingId) => {
+  const strategyGraph = buildLayoutStrategyGraph(thingIds, edges, (thingId) => {
     const at = authored.get(thingId);
     return at?.open === true ? at.openSize : THING_SIZE;
   });
@@ -100,14 +108,6 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
       const { activeGraphId } = interaction;
       // Activating a Graph emphasises it; it never hides the rest of the Space.
       const emphasis: GraphEmphasis = activeGraphId === null ? 'equal' : 'subtle';
-
-      // A diagram's routed Edge geometry describes the placement it computed,
-      // so it stops being true once a Thing is dragged out of it. From then on
-      // the Edges fall back to plain curves between wherever the Things now are
-      // — which is what a positioned view draws anyway, since it routes nothing.
-      const edgeOptions = interaction.moved
-        ? { activeGraphId, emphasis }
-        : { activeGraphId, emphasis, strategyGraph: laidOut };
 
       return {
         nodes: projectThingNodes(space, handles, colors, {
@@ -123,7 +123,7 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
           thingIds,
           openThingIds,
         }),
-        edges: projectGraphEdges(edges, colors, edgeOptions),
+        edges: projectGraphEdges(edges, colors, { activeGraphId, emphasis }),
       };
     },
   };

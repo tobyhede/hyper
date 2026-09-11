@@ -48,8 +48,7 @@ const upper = ENTITY.toUpperCase();
  * pattern safe to run over prose as well as code.
  *
  * The bare English words are unavoidable and legitimate: Hono routes requests,
- * a graph-layout engine routes an edge around a thing, TanStack Router owns a URL
- * route, and the
+ * ELK routes an edge around a thing, TanStack Router owns a URL route, and the
  * ADRs and CONTEXT.md have to name what was retired in order to retire it. A
  * word-level ban on those would be enforced by an ever-growing list of
  * exceptions. A compound is different — nothing writes one of these by
@@ -58,9 +57,9 @@ const upper = ENTITY.toUpperCase();
  *
  * The `Routed*` geometry AGENTS.md carves out falls out of the shape rather
  * than needing an exception: the retired name followed by a *lowercase* letter
- * is a different word, so that component and a router's routed sections never
- * match. The carve-out is the *shape*, not the dependency — it outlived elkjs
- * (ADR 0086) and survives whatever routes next.
+ * is a different word, so that component and the bare English one never match.
+ * The carve-out is the *shape*, not the dependency — it outlived elkjs (ADR
+ * 0086) and survives whatever routes next.
  */
 const RETIRED_COMPOUND = new RegExp(
   [
@@ -403,7 +402,7 @@ describe('the vocabulary that guard reads', () => {
 
   it('stays silent on the qualified senses the ADR keeps', () => {
     const kept = [
-      // Qualified graph-layout geometry and its component (AGENTS.md).
+      // ELK's routed geometry and its component (AGENTS.md).
       `import { ${ENTITY}dEdge } from './${ENTITY}dEdge';`,
       `// a single layout pass ${lower}s them around the things`,
       // Hono and the HTTP application.
@@ -1008,9 +1007,8 @@ describe('the retired name for the surface over the open set is gone', () => {
  * this file already uses:
  *
  *  - `LayoutStrategy` and everything built on it keeps its name, which ADR 0085
- *    records as a negative in as many words. The word there is the verb: one of
- *    its two surviving implementations reads no Diagram at all (it was two of
- *    three before ADR 0086 took elkjs), so naming the contract
+ *    records as a negative in as many words. The word there is the verb: two of
+ *    its three implementations read no Diagram at all, so naming the contract
  *    after the entity would assert a relationship they do not have and would
  *    reintroduce the conflation ADR 0014 exists to correct.
  *  - React's `useLayoutEffect` is a hook, not a domain type, and it is spelled

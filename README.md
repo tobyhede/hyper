@@ -177,13 +177,13 @@ Validation happens in two layers:
 
 ### Diagrams
 
-A **Diagram** is authored data: a named thing-to-position map stored with the space. A **LayoutStrategy** is behaviour: it takes the layout-strategy graph to arrange and asynchronously returns that same value with geometry on its things and handles ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)):
+A **Diagram** is authored data: a named thing-to-position map stored with the space. A **LayoutStrategy** is behaviour: it takes the layout-strategy graph to arrange and asynchronously returns that same value with positions on its things ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)):
 
 ```ts
 type LayoutStrategy = (graph: LayoutStrategyGraph) => Promise<LayoutStrategyGraph>;
 ```
 
-Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy that places things on a grid, and nothing selects it today. `positionedStrategy` reads an authored Diagram, and it is what the canvas draws. An automatic arrangement returns as a destructive Edit over a Diagram rather than as a render path, which is what took elkjs out of the tree ([ADR 0086](docs/adr/0086-automatic-arrangement-is-an-edit-not-a-render-path.md)). Which things a strategy arranges is the view's choice, not the strategy's.
+Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy that places things on a grid, and nothing selects it today. `positionedStrategy` reads an authored Diagram, and it is what the canvas draws. An automatic arrangement returns as a destructive Edit over a Diagram rather than as a render path, which is what took elkjs out of the tree ([ADR 0086](docs/adr/0086-automatic-arrangement-is-an-edit-not-a-render-path.md)) — and with it the routed Edge geometry and per-Thing port offsets the contract used to carry, which a Diagram has nowhere to store and no strategy in the tree ever placed. Where an Edge attaches is the render layer's own question. Which things a strategy arranges is the view's choice, not the strategy's.
 
 ## Architecture
 

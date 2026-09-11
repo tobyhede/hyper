@@ -4,11 +4,11 @@ import type { LayoutStrategyGraph, LayoutStrategy } from './layout';
  * A grid: things in reading order, left to right and wrapping down.
  *
  * The second strategy, and the one that makes the seam real. It consumes only
- * the things — never the edges, never the graphs — and it places no ports,
- * leaving their offsets undefined for the render layer to spread evenly. That —
- * placing no ports, ignoring the edges — is what keeps the seam honest, not any
- * one engine's specifics. The arithmetic is synchronous but the function is `async`, so
- * it satisfies the uniformly-async `LayoutStrategy` contract (layout-seam/06).
+ * the things — never the edges, never the graphs — and it answers positions,
+ * which is the whole of what the contract carries (ADR 0086). Ignoring the edges
+ * is what keeps the seam honest, not any one engine's specifics. The arithmetic
+ * is synchronous but the function is `async`, so it satisfies the
+ * uniformly-async `LayoutStrategy` contract (layout-seam/06).
  *
  * Automatic: it computes placement from the things alone, so no Diagram stands
  * behind it. That does not make a view of it read-only — editing one is legal

@@ -5,7 +5,7 @@
  * when something outside the package calls into it, and then every type that
  * module exports comes with it — those types are the vocabulary of the calls
  * being made, nameable the moment a consumer wants a variable for one, which is
- * why `GridStrategyOptions`, `LayoutStrategyPort` and `ThingFileErrorKind` are
+ * why `GridStrategyOptions` and `ThingFileErrorKind` are
  * here with nothing importing them. Functions are named one at a time, and a
  * helper no consumer needs to write stays in its module. Usually it sits behind
  * an offered form that calls it — `graphThingIds` calls `thingIdsForGraphs`,
@@ -47,11 +47,8 @@ export { buildLayoutStrategyGraph } from './layout';
 export type {
   LayoutStrategyThing,
   LayoutStrategyEdge,
-  LayoutStrategyEdgeSection,
   LayoutStrategyGraph,
-  LayoutStrategyPort,
   LayoutStrategy,
-  Point,
 } from './layout';
 
 // `resolveContentThing` is the only function here: identity lookup is reached
