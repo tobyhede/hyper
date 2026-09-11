@@ -158,6 +158,16 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
     />
   );
 
+  /**
+   * Whether this Thing's anchors are also affordances.
+   *
+   * Read-only draws a Thing without Thing-owned controls, and an embedded Space
+   * boundary offers no connection authoring — but both still draw Edges, and an
+   * Edge attaches to an anchor (ADR 0087). So the four sides render either way
+   * and this decides only whether an author may take hold of one.
+   */
+  const connectionAuthoring = !data.readOnly && data.connectionAuthoringEnabled !== false;
+
   const renderAuthoringHandle = (
     side: (typeof AUTHORING_SIDES)[number],
     role: 'source' | 'target',
@@ -168,7 +178,9 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
       type={role}
       position={side}
       className={`rf-thing-node__authoring-handle rf-thing-node__authoring-handle--${role}`}
-      aria-label={`${role === 'source' ? 'Connect from' : 'Connect to'} ${side}`}
+      {...(connectionAuthoring
+        ? { 'aria-label': `${role === 'source' ? 'Connect from' : 'Connect to'} ${side}` }
+        : { 'aria-hidden': true })}
       // `isConnectable` is React Flow's own switch and it only works if a custom
       // node forwards it: `NodeWrapper` resolves `nodesConnectable` and the
       // node's own `connectable` into this one prop and hands it over, and
@@ -179,9 +191,11 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
       // ports below are `isConnectable={false}` outright — so dropping it left
       // the flow-level flag governing nothing but whether the connection line
       // rendered, with CSS and a pane's backdrop standing in for the withdrawal.
-      isConnectable={isConnectable}
-      isConnectableStart={isConnectable && role === 'source' && !connectionInProgress}
-      isConnectableEnd={isConnectable && role === seeking}
+      isConnectable={connectionAuthoring && isConnectable}
+      isConnectableStart={
+        connectionAuthoring && isConnectable && role === 'source' && !connectionInProgress
+      }
+      isConnectableEnd={connectionAuthoring && isConnectable && role === seeking}
       // A handle is a drag affordance, and a click is not a drag. A press and
       // release inside React Flow's drag threshold starts no connection, so the
       // click reached the Thing underneath and opened it to read — from the one
@@ -347,6 +361,11 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
       data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={seeking ?? 'none'}
+      // Whether the four anchors are also affordances. They render either way —
+      // an Edge attaches to an anchor and React Flow draws no Edge for a Thing
+      // whose handles it cannot resolve — so this is what the reveal in
+      // `styles.css` reads before showing one to a pointer (ADR 0087).
+      data-connection-authoring={connectionAuthoring}
       data-resizing={resizeActive}
       // The wrapper React Flow sizes from `node.width`/`node.height` is this
       // element's parent, so an Expanded Thing only reaches its own rect if this
@@ -430,12 +449,8 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
         `position` on the handle itself, so the four sides are unaffected by the
         order they are declared in. `ThingNode.test.tsx` pins the ordering.
       */}
-      {!data.readOnly &&
-        data.connectionAuthoringEnabled !== false &&
-        AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
-      {!data.readOnly &&
-        data.connectionAuthoringEnabled !== false &&
-        AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
+      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
+      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
       {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>
   );

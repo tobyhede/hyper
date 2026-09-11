@@ -271,14 +271,23 @@ body {
    end the drag is looking for — a target for an ordinary connection, and a
    source for a reconnection that has taken hold of an Edge's `from` end. The
    role is read off the drag rather than assumed, so the second gesture has
-   somewhere to land. */
+   somewhere to land.
+
+   Every rule below is conditioned on `data-connection-authoring`, because the
+   four sides are **anchors** before they are affordances and they render on
+   every Thing: an Edge attaches to one, and React Flow draws no Edge at all for
+   a Thing whose handles it cannot resolve (ADR 0087). A Thing inside a Space
+   Thing's embedded Diagram draws its Edges and offers no gesture, so the reveal
+   is what withholds the affordance the anchors would otherwise expose. */
 .react-flow__node:hover
-  .rf-thing-node__inner[data-connection-in-progress='false']
+  .rf-thing-node__inner[data-connection-authoring='true'][data-connection-in-progress='false']
   .rf-thing-node__authoring-handle--source,
-.rf-thing-node__inner[data-selected='true'][data-connection-in-progress='false']
+.rf-thing-node__inner[data-connection-authoring='true'][data-selected='true'][data-connection-in-progress='false']
   .rf-thing-node__authoring-handle--source,
-.rf-thing-node__inner[data-connection-seeking='target'] .rf-thing-node__authoring-handle--target,
-.rf-thing-node__inner[data-connection-seeking='source'] .rf-thing-node__authoring-handle--source {
+.rf-thing-node__inner[data-connection-authoring='true'][data-connection-seeking='target']
+  .rf-thing-node__authoring-handle--target,
+.rf-thing-node__inner[data-connection-authoring='true'][data-connection-seeking='source']
+  .rf-thing-node__authoring-handle--source {
   opacity: 1;
   pointer-events: auto;
 }

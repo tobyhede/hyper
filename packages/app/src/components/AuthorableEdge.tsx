@@ -1,6 +1,10 @@
-import { useContext, type ReactNode } from 'react';
+import { useContext, type ComponentProps, type ReactNode } from 'react';
 import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
-import { RoutedEdge, routedEdgeGeometry, type RoutedFlowEdge } from '@project/react-flow-adapter';
+import {
+  RoutedEdgePath,
+  useRoutedEdgeGeometry,
+  type RoutedFlowEdge,
+} from '@project/react-flow-adapter';
 import { edgeSelectionOf, sameEdgeSubject } from '../render-adapter';
 import { EdgeAuthoringContext } from './edge-authoring-context';
 import { selectedEdgeRefusalOf } from '../edge-authoring';
@@ -41,11 +45,12 @@ function EdgeControlLayer({
 }
 
 /**
- * The application's authorable Edge: `RoutedEdge`'s path, plus Hyper's controls.
+ * The application's authorable Edge: the reusable path, plus Hyper's controls.
  *
  * It composes the reusable Edge rather than redrawing it — both the curve and
- * the point the controls sit at come from `routedEdgeGeometry`, so this cannot
- * disagree with what is on screen.
+ * the point the controls sit at come from one `useRoutedEdgeGeometry`, so this
+ * cannot disagree with what is on screen, and the Edge's two Things are read
+ * from React Flow's store once rather than once per layer.
  *
  * The controls' visibility rule is `selected`, React Flow's own default for edge
  * toolbars, and Enter and Space keep their native selection meaning on the Edge
@@ -59,7 +64,10 @@ function EdgeControlLayer({
  */
 export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
   const commands = useContext(EdgeAuthoringContext);
-  const { labelX, labelY } = routedEdgeGeometry(props);
+  const { path, labelX, labelY } = useRoutedEdgeGeometry(props);
+  const pathProps: ComponentProps<typeof RoutedEdgePath> = { id: props.id, path };
+  if (props.markerEnd !== undefined) pathProps.markerEnd = props.markerEnd;
+  if (props.style !== undefined) pathProps.style = props.style;
   // The same translation the selection mirror and the callbacks use, so this
   // Edge cannot disagree with them about which Edge it is.
   const subject = edgeSelectionOf({ ...props, id: props.id });
@@ -67,13 +75,13 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
   // `selected` is the whole gate. The decoration conjoins it with the Active
   // Graph, so an Edge outside that Graph never reaches these controls.
   if (!props.selected || commands === null || subject === null) {
-    return <RoutedEdge {...props} />;
+    return <RoutedEdgePath {...pathProps} />;
   }
   const open = commands.editing !== null && sameEdgeSubject(subject, commands.editing);
 
   return (
     <>
-      <RoutedEdge {...props} />
+      <RoutedEdgePath {...pathProps} />
       <EdgeControlLayer labelX={labelX} labelY={labelY}>
         <SelectedEdgeControls
           from={subject.edge.from}

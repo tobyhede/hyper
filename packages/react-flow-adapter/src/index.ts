@@ -6,11 +6,23 @@ export * from './projection';
 export { ThingNode } from './ThingNode';
 export {
   RoutedEdge,
-  routedEdgeGeometry,
+  RoutedEdgePath,
+  useEdgeAttachment,
+  useRoutedEdgeGeometry,
   type RoutedEdgeData,
   type RoutedEdgeGeometry,
   type RoutedFlowEdge,
 } from './RoutedEdge';
+export {
+  anchorPoint,
+  edgeAttachment,
+  facingSides,
+  selfEdgeAttachment,
+  type AnchorPoint,
+  type AnchorRect,
+  type EdgeAttachment,
+  type FacingSides,
+} from './edge-attachment';
 export { GraphHud } from './GraphHud';
 export { GraphConnectionLine } from './GraphConnectionLine';
 export { ZoomSlider } from './ZoomSlider';

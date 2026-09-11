@@ -167,6 +167,7 @@ interface Overrides {
   sourceHandles?: ThingHandle[];
   targetHandles?: ThingHandle[];
   readOnly?: boolean;
+  connectionAuthoringEnabled?: boolean;
 }
 
 function props({
@@ -188,6 +189,7 @@ function props({
   sourceHandles = [outHandle(graphId, 50)],
   targetHandles = [],
   readOnly = false,
+  connectionAuthoringEnabled,
 }: Overrides = {}): NodeProps<ThingFlowNode> {
   const data: ThingFlowNode['data'] = {
     thingId,
@@ -217,6 +219,8 @@ function props({
   if (onBeginBodyEditing !== undefined) data.onBeginBodyEditing = onBeginBodyEditing;
   if (bodyEditor !== undefined) data.bodyEditor = bodyEditor;
   if (resize !== undefined) data.resize = resize;
+  if (connectionAuthoringEnabled !== undefined)
+    data.connectionAuthoringEnabled = connectionAuthoringEnabled;
 
   return {
     id: thingId,
@@ -509,11 +513,58 @@ const connectable = (label: 'Connect from' | 'Connect to', end: 'start' | 'end')
     .map((handle) => handle.getAttribute(`data-connectable-${end}`) === 'true');
 
 describe('ThingNode graph authoring', () => {
-  it('renders no authoring handles when the Thing is read-only', () => {
+  /*
+   * A handle does two jobs and ADR 0087 separates them. As an **anchor** it is
+   * where an Edge meets a Thing, and that is not optional: a Thing inside a
+   * Space Thing's embedded Diagram draws Edges while it withholds every
+   * authoring control, and React Flow renders no Edge at all for a Thing whose
+   * handles it cannot resolve. As an **affordance** it is where an author
+   * begins or ends drawing, and that is what read-only withholds.
+   */
+  it('keeps the four anchors of each role on a read-only Thing', () => {
+    render(<ThingNode {...props({ selected: true, readOnly: true })} />);
+
+    expect(document.querySelectorAll('.rf-thing-node__authoring-handle--source')).toHaveLength(4);
+    expect(document.querySelectorAll('.rf-thing-node__authoring-handle--target')).toHaveLength(4);
+  });
+
+  /*
+   * The anchors are always in the DOM, so what withdraws the *affordance* from
+   * an embedded or read-only Thing is the stylesheet, and this is what it reads.
+   * The handles are `opacity: 0` at rest and revealed by hover, Selection or a
+   * drag in flight; without this the reveal would fire on a Thing that cannot
+   * be authored.
+   */
+  it('publishes whether its anchors are affordances, which is what the reveal reads', () => {
+    const { rerender } = render(<ThingNode {...props({ readOnly: true })} />);
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-authoring',
+      'false',
+    );
+
+    rerender(<ThingNode {...props({ connectionAuthoringEnabled: false })} />);
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-authoring',
+      'false',
+    );
+
+    rerender(<ThingNode {...props({})} />);
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-authoring',
+      'true',
+    );
+  });
+
+  it('offers no drag affordance on a read-only Thing', () => {
     render(<ThingNode {...props({ selected: true, readOnly: true })} />);
 
     expect(screen.queryByRole('button', { name: /^Connect from / })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Connect to / })).not.toBeInTheDocument();
+    const anchors = [...document.querySelectorAll('.rf-thing-node__authoring-handle')];
+    expect(anchors.every((anchor) => anchor.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(anchors.every((anchor) => anchor.getAttribute('data-connectable') === 'false')).toBe(
+      true,
+    );
   });
 
   it('shows four active-Graph-coloured spatial source handles on a selected Thing', () => {
