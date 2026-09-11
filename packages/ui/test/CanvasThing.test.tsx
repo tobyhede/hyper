@@ -1111,14 +1111,24 @@ describe('CanvasThing Space front', () => {
     expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
   });
 
-  /** A Space with no Graphs is an ordinary entity to reference. */
-  it('draws an empty list as unavailable rather than opening onto nothing', () => {
+  /**
+   * The one state that leaves a selector with nothing to say: the Diagram this
+   * Thing names is no longer in the target.
+   *
+   * A Space Thing selects a Diagram and a Graph from the moment it exists
+   * (ADR 0079), so a `null` here is a dangling reference to something deleted
+   * and never a choice that was not made. The Graphs on offer are the selected
+   * Diagram's alone, so a Diagram resolving to nothing leaves none — while the
+   * Diagram list stays the target's, because choosing another is exactly what
+   * answers this.
+   */
+  it('draws a selection the target no longer holds as unavailable', () => {
     render(
       <CanvasThing
         front={{
           kind: 'space',
           open: true,
-          selection: selection({ graphs: [], graphId: null }),
+          selection: selection({ diagramId: null, graphs: [], graphId: null }),
         }}
         state="rest"
         title="Elsewhere"
@@ -1126,6 +1136,9 @@ describe('CanvasThing Space front', () => {
       />,
     );
 
+    const diagram = screen.getByTestId('space-thing-diagram');
+    expect(diagram).toBeEnabled();
+    expect(diagram).toHaveTextContent('No Diagram');
     const graph = screen.getByTestId('space-thing-graph');
     expect(graph).toBeDisabled();
     expect(graph).toHaveTextContent('No Graph');

@@ -58,7 +58,8 @@ const spaceThingSelection = (
       // the seed has to be a Graph this Diagram owns or the aggregate refuses
       // the Thing that names it.
       if (diagram === undefined) return;
-      const seed = diagram.graphs.find((graph) => graph.id === diagram.activeGraph) ?? diagram.graphs[0];
+      const seed =
+        diagram.graphs.find((graph) => graph.id === diagram.activeGraph) ?? diagram.graphs[0];
       // A Diagram owns at least one Graph, so this is the type-level boundary
       // between a validated Space and the ids read out of it, not a Diagram an
       // author can choose and leave half-selected.

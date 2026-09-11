@@ -21,14 +21,23 @@ const markdown = (id: UUID, title = id): StoredThing => ({
   document: { title, kind: 'markdown', body: '' },
 });
 
+/**
+ * A Space Thing always carries a selection, so this helper always takes one
+ * (ADR 0079). What the aggregate then decides is whether the pair *resolves* in
+ * the target — an id naming nothing there is a dangling reference to something
+ * deleted, which is what every refusal below is now about.
+ */
 const spaceThing = (
   id: UUID,
   target: UUID,
-  selection: { readonly diagram?: UUID; readonly graph?: UUID } = {},
+  selection: { readonly diagram: UUID; readonly graph: UUID },
 ): StoredThing => ({
   id,
   document: { title: id, kind: 'space', spaceId: target, ...selection },
 });
+
+/** The selection every Space Thing whose target was built with `diagram: true` names. */
+const SELECTS_FIRST = { diagram: DIAGRAM, graph: GRAPH } as const;
 
 const snapshot = (
   id: UUID,
@@ -36,7 +45,6 @@ const snapshot = (
   options: {
     readonly diagram?: boolean;
     readonly secondDiagram?: boolean;
-    readonly defaultDiagram?: UUID;
   } = {},
 ): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
@@ -44,7 +52,6 @@ const snapshot = (
     document: {
       version: 1,
       title: id,
-      defaultDiagram: options.defaultDiagram,
       diagrams: [
         ...(options.diagram === true
           ? [
@@ -110,8 +117,8 @@ describe('loadSpaceAggregate', () => {
         snapshot(
           META,
           [
-            spaceThing(META_THING, CHILD, { diagram: DIAGRAM, graph: GRAPH }),
-            spaceThing(SECOND_META_THING, CHILD),
+            spaceThing(META_THING, CHILD, SELECTS_FIRST),
+            spaceThing(SECOND_META_THING, CHILD, SELECTS_FIRST),
           ],
           { diagram: true },
         ),
@@ -144,7 +151,9 @@ describe('loadSpaceAggregate', () => {
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceThing(META_THING, CHILD), markdown(CHILD_THING)], { diagram: true }),
+          snapshot(META, [spaceThing(META_THING, CHILD, SELECTS_FIRST), markdown(CHILD_THING)], {
+            diagram: true,
+          }),
           snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true }),
         ],
       }),
@@ -167,7 +176,7 @@ describe('loadSpaceAggregate', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
-        snapshots: [snapshot(META, [spaceThing(META_THING, CHILD)])],
+        snapshots: [snapshot(META, [spaceThing(META_THING, CHILD, SELECTS_FIRST)])],
       }),
     );
 
@@ -182,12 +191,16 @@ describe('loadSpaceAggregate', () => {
   });
 
   it('refuses a multi-Space reference cycle at the closing Thing', () => {
+    // Both Spaces supply the Diagram and Graph their inbound Space Thing names,
+    // because a dangling selection is reported before the walk that finds a
+    // cycle ever runs. A cycle between two Spaces neither of which could be
+    // opened would be refused for the selection and never reach this rule.
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceThing(META_THING, CHILD)]),
-          snapshot(CHILD, [spaceThing(CHILD_THING, META)]),
+          snapshot(META, [spaceThing(META_THING, CHILD, SELECTS_FIRST)], { diagram: true }),
+          snapshot(CHILD, [spaceThing(CHILD_THING, META, SELECTS_FIRST)], { diagram: true }),
         ],
       }),
     );
@@ -218,7 +231,7 @@ describe('loadSpaceAggregate', () => {
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceThing(META_THING, CHILD, { diagram: OTHER })]),
+          snapshot(META, [spaceThing(META_THING, CHILD, { diagram: OTHER, graph: GRAPH })]),
           snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true }),
         ],
       }),
@@ -240,8 +253,10 @@ describe('loadSpaceAggregate', () => {
       SpaceAggregateError,
       { readonly kind: 'space-thing-diagram-missing' }
     >;
-    // The only producer resolves `thing.diagram ?? target.defaultDiagram` and
-    // continues when that is absent, so the refusal always names a Diagram.
+    // The only producer reads the Thing's own `diagram`, which every Space
+    // Thing carries (ADR 0079), so the refusal always names the Diagram it
+    // looked for. There is no longer a fallback to the target's own opening
+    // selection, and so no arm in which the refusal has nothing to name.
     expectTypeOf<DiagramMissing['diagramId']>().toEqualTypeOf<UUID>();
   });
 
@@ -250,7 +265,7 @@ describe('loadSpaceAggregate', () => {
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceThing(META_THING, CHILD, { graph: OTHER })]),
+          snapshot(META, [spaceThing(META_THING, CHILD, { diagram: DIAGRAM, graph: OTHER })]),
           snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true }),
         ],
       }),
@@ -267,28 +282,12 @@ describe('loadSpaceAggregate', () => {
     ]);
   });
 
-  it.each([
-    {
-      name: 'an explicit authored Diagram',
-      selection: { diagram: DIAGRAM },
-      target: { diagram: true },
-    },
-    {
-      name: 'a Graph with the target Diagram fallback',
-      selection: { graph: GRAPH },
-      target: { diagram: true },
-    },
-    {
-      name: 'no selections when the target has no Graph',
-      selection: {},
-      target: {},
-    },
-  ])('accepts $name', ({ selection, target }) => {
+  it('accepts a Space Thing naming a Diagram of its target and a Graph that Diagram owns', () => {
     const result = loadSpaceAggregate({
       metaSpaceId: META,
       snapshots: [
-        snapshot(META, [spaceThing(META_THING, CHILD, selection)]),
-        snapshot(CHILD, [markdown(CHILD_THING)], target),
+        snapshot(META, [spaceThing(META_THING, CHILD, SELECTS_FIRST)]),
+        snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true }),
       ],
     });
 
@@ -320,30 +319,34 @@ describe('loadSpaceAggregate', () => {
     ]);
   });
 
-  it('uses the target default Diagram when only the Graph is explicit', () => {
-    const errors = errorsOf(
-      loadSpaceAggregate({
-        metaSpaceId: META,
-        snapshots: [
-          snapshot(META, [spaceThing(META_THING, CHILD, { graph: GRAPH })]),
-          snapshot(CHILD, [markdown(CHILD_THING)], {
-            diagram: true,
-            secondDiagram: true,
-            defaultDiagram: SECOND_DIAGRAM,
-          }),
-        ],
-      }),
-    );
+  it('lets two Space Things converge on one target while each selects its own Diagram', () => {
+    const result = loadSpaceAggregate({
+      metaSpaceId: META,
+      snapshots: [
+        snapshot(
+          META,
+          [
+            spaceThing(META_THING, CHILD, SELECTS_FIRST),
+            spaceThing(SECOND_META_THING, CHILD, { diagram: SECOND_DIAGRAM, graph: SECOND_GRAPH }),
+          ],
+          { diagram: true },
+        ),
+        snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true, secondDiagram: true }),
+      ],
+    });
 
-    expect(errors).toEqual([
-      {
-        kind: 'space-thing-graph-outside-diagram',
-        spaceId: META,
-        thingId: META_THING,
-        targetSpaceId: CHILD,
-        diagramId: SECOND_DIAGRAM,
-        graphId: GRAPH,
-      },
-    ]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const meta = result.aggregate.lookup.space(META);
+    expect(meta?.lookup.thing(META_THING)).toMatchObject({
+      kind: 'space',
+      diagram: DIAGRAM,
+      graph: GRAPH,
+    });
+    expect(meta?.lookup.thing(SECOND_META_THING)).toMatchObject({
+      kind: 'space',
+      diagram: SECOND_DIAGRAM,
+      graph: SECOND_GRAPH,
+    });
   });
 });

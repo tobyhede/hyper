@@ -21,6 +21,13 @@ const MISSING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005'
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+/**
+ * What the Space Thing selects of its target (ADR 0079). The target Space is not
+ * in this fixture — these tests mount one canvas and never read a second Space —
+ * so the pair is required by the shape and resolved by nothing here.
+ */
+const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 
 const snapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
@@ -47,7 +54,13 @@ const snapshot = spaceSnapshotSchema.parse({
     { id: ALIAS_ID, document: { title: 'Return', kind: 'alias', target: THING_ID } },
     {
       id: SPACE_THING_ID,
-      document: { title: 'Architecture', kind: 'space', spaceId: TARGET_SPACE_ID },
+      document: {
+        title: 'Architecture',
+        kind: 'space',
+        spaceId: TARGET_SPACE_ID,
+        diagram: TARGET_DIAGRAM_ID,
+        graph: TARGET_GRAPH_ID,
+      },
     },
   ],
 });

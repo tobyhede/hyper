@@ -8,7 +8,14 @@ const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffi
 
 const THINGS: readonly Thing[] = [
   { id: id('000000000001'), title: 'Zulu', kind: 'markdown', body: '' },
-  { id: id('000000000002'), title: 'Alpha', kind: 'space', spaceId: id('000000000012') },
+  {
+    id: id('000000000002'),
+    title: 'Alpha',
+    kind: 'space',
+    spaceId: id('000000000012'),
+    diagram: id('000000000013'),
+    graph: id('000000000014'),
+  },
   { id: id('000000000003'), title: 'Alpha', kind: 'markdown', body: '' },
   {
     id: id('000000000004'),

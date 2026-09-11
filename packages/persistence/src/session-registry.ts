@@ -656,7 +656,9 @@ export function createSpaceSessionRegistry(
      * the coordination, so a Diagram deleted in the gap is refused as
      * `space-thing-diagram-missing` rather than stored.
      */
-    const targetSelection = async (targetSpaceId: UUID): Promise<SpaceThingSelection | undefined> => {
+    const targetSelection = async (
+      targetSpaceId: UUID,
+    ): Promise<SpaceThingSelection | undefined> => {
       const live = sessions.get(targetSpaceId)?.session.getState().working;
       if (live !== undefined) {
         const loaded = loadSpaceSnapshot(live);

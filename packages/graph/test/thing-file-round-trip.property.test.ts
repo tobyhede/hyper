@@ -51,25 +51,18 @@ const thingArb: fc.Arbitrary<Thing> = fc.oneof(
     kind: fc.constant('alias' as const),
     target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
   }),
-  fc.record(
-    {
-      id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-      title: line,
-      kind: fc.constant('space' as const),
-      spaceId: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-      diagram: fc.option(
-        fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-        { nil: undefined },
-      ),
-      graph: fc.option(
-        fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-        {
-          nil: undefined,
-        },
-      ),
-    },
-    { requiredKeys: ['id', 'title', 'kind', 'spaceId'] },
-  ),
+  // Every field of a Space Thing is always written, its selection included: a
+  // Space Thing names a Diagram of its target and a Graph that Diagram owns
+  // from the moment it exists (ADR 0079), so there is no absent-selection case
+  // for the round trip to carry.
+  fc.record({
+    id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+    title: line,
+    kind: fc.constant('space' as const),
+    spaceId: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+    diagram: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+    graph: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+  }),
 );
 
 describe('thing file round-trip', () => {

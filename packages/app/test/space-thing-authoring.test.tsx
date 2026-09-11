@@ -1,14 +1,22 @@
 import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  newUuid,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import {
   MemorySpaceBackend,
+  MemorySpaceBackendTestControl,
   type ObserverErrorReporter,
   type SpaceSession,
 } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
+import { mintingIds } from './minting';
 import { openTestSpace } from './opened-space';
 import type { SpaceThingAuthoring } from '../src/space-thing-lifecycle';
 import { createThing, unavailable } from './command-dock';
@@ -45,41 +53,96 @@ const HOME_NEXT_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
 const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const OTHER_TO_HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
+/**
+ * `Collection 1` owns two Graphs and has authored the second as its Active one.
+ *
+ * The asymmetry is the fixture's job: a selection seeded from the head of the
+ * list and one seeded from the Diagram's own Active Graph agree everywhere a
+ * Diagram owns one Graph, so only a Diagram like this can say which rule ran
+ * (ADR 0026).
+ */
+const OTHER_DRAFT_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
+const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000025');
+const OTHER_SECOND_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
+const OTHER_SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000027');
 
 /**
- * The Meta Space, which references both ordinary Spaces below.
+ * The three identities a reference to a diagramless Space mints, in order.
+ *
+ * The Diagram and the Graph go first because initialization runs before the
+ * Thing is authored at all (ADR 0079) — a target that could not be prepared
+ * produces no Thing — and the Thing's own id is drawn last.
+ */
+const MINTED_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000030');
+const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
+const MINTED_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
+
+/**
+ * The Meta Space over the ordinary Spaces below it.
  *
  * It is here because the aggregate demands it rather than because these tests
  * are about it: Meta is the sole root and every ordinary Space must be
- * referenced (ADR 0074), so a candidate that left `Home` or `Other` unreachable
- * would be refused for a reason none of these tests is making.
+ * referenced (ADR 0074), so a candidate that left `Home` unreachable would be
+ * refused for a reason none of these tests is making.
+ *
+ * What Meta cannot do is reference a Space with no Diagram. A Space Thing names
+ * a Diagram of its target (ADR 0079) and a diagramless target offers none to
+ * name, so `Other` goes unreferenced for exactly as long as it stays that way —
+ * and the Edit under test is the one that initializes it *and* references it,
+ * which is the only moment the whole aggregate is read.
  */
-const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
-  id: META_ID,
-  document: {
-    version: 1,
-    title: 'Meta',
-    diagrams: [
-      {
-        id: META_DIAGRAM_ID,
-        title: 'Diagram 1',
-        kind: 'positioned',
-        positions: {
-          [META_THING_ID]: { x: 0, y: 0, open: false },
-          [META_TO_HOME_ID]: { x: 300, y: 0, open: false },
-          [META_TO_OTHER_ID]: { x: 600, y: 0, open: false },
-        },
-        graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
-      },
-    ],
-    defaultDiagram: META_DIAGRAM_ID,
-  },
-  things: [
+const meta = (target: SpaceSnapshot): SpaceSnapshot => {
+  const toOther =
+    target.document.defaultDiagram === undefined
+      ? []
+      : [
+          {
+            id: META_TO_OTHER_ID,
+            document: {
+              title: 'Other',
+              kind: 'space',
+              spaceId: OTHER_ID,
+              diagram: OTHER_DIAGRAM_ID,
+              graph: OTHER_GRAPH_ID,
+            },
+          },
+        ];
+  const things = [
     { id: META_THING_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
-    { id: META_TO_HOME_ID, document: { title: 'Home', kind: 'space', spaceId: HOME_ID } },
-    { id: META_TO_OTHER_ID, document: { title: 'Other', kind: 'space', spaceId: OTHER_ID } },
-  ],
-});
+    {
+      id: META_TO_HOME_ID,
+      document: {
+        title: 'Home',
+        kind: 'space',
+        spaceId: HOME_ID,
+        diagram: HOME_DIAGRAM_ID,
+        graph: HOME_GRAPH_ID,
+      },
+    },
+    ...toOther,
+  ];
+  return spaceSnapshotSchema.parse({
+    id: META_ID,
+    document: {
+      version: 1,
+      title: 'Meta',
+      diagrams: [
+        {
+          id: META_DIAGRAM_ID,
+          title: 'Diagram 1',
+          kind: 'positioned',
+          positions: Object.fromEntries(
+            things.map((thing, index) => [thing.id, { x: index * 300, y: 0, open: false }]),
+          ),
+          graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        },
+      ],
+      defaultDiagram: META_DIAGRAM_ID,
+    },
+    things,
+  });
+};
 
 /** The Space the app opens, and the one every Space Thing below is created in. */
 const home: SpaceSnapshot = spaceSnapshotSchema.parse({
@@ -116,7 +179,45 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
+/**
+ * The Space an author references instead of creating one: already initialized,
+ * with two Diagrams to tell one Space Thing's selection from another's.
+ */
 const other: SpaceSnapshot = spaceSnapshotSchema.parse({
+  id: OTHER_ID,
+  document: {
+    version: 1,
+    title: 'Other Space',
+    diagrams: [
+      {
+        id: OTHER_DIAGRAM_ID,
+        title: 'Collection 1',
+        kind: 'positioned',
+        positions: { [OTHER_THING_ID]: { x: 0, y: 0, open: false } },
+        graphs: [
+          { id: OTHER_DRAFT_GRAPH_ID, title: 'Draft', edges: [] },
+          { id: OTHER_GRAPH_ID, title: 'Current', edges: [] },
+        ],
+        activeGraph: OTHER_GRAPH_ID,
+      },
+      {
+        id: OTHER_SECOND_DIAGRAM_ID,
+        title: 'Collection 2',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: OTHER_SECOND_GRAPH_ID, title: 'Second pass', edges: [] }],
+      },
+    ],
+    defaultDiagram: OTHER_DIAGRAM_ID,
+  },
+  things: [{ id: OTHER_THING_ID, document: { title: 'Thing 1', kind: 'markdown', body: '' } }],
+});
+
+/**
+ * The same Space as it is stored before anything has opened it: no Diagram at
+ * all, which is the state ADR 0079's first working load exists to end.
+ */
+const diagramlessOther: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: OTHER_ID,
   document: { version: 1, title: 'Other Space' },
   things: [{ id: OTHER_THING_ID, document: { title: 'Thing 1', kind: 'markdown', body: '' } }],
@@ -133,7 +234,16 @@ const otherReferencingHome: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...other,
   things: [
     ...other.things,
-    { id: OTHER_TO_HOME_ID, document: { title: 'Home', kind: 'space', spaceId: HOME_ID } },
+    {
+      id: OTHER_TO_HOME_ID,
+      document: {
+        title: 'Home',
+        kind: 'space',
+        spaceId: HOME_ID,
+        diagram: HOME_DIAGRAM_ID,
+        graph: HOME_GRAPH_ID,
+      },
+    },
   ],
 });
 
@@ -142,6 +252,11 @@ const runtime = (value: SpaceSnapshot) => {
   if (!loaded.ok) throw new Error(loaded.errors.map((error) => error.message).join('\n'));
   return loaded.space;
 };
+
+interface MountInjections {
+  readonly newId?: () => UUID;
+  readonly control?: MemorySpaceBackendTestControl;
+}
 
 interface Mounted {
   readonly backend: MemorySpaceBackend;
@@ -162,14 +277,24 @@ function mount(
   otherSnapshot: SpaceSnapshot = other,
   broken: Partial<SpaceThingAuthoring> = {},
   reportObserverError?: ObserverErrorReporter,
+  /**
+   * The two injections only some tests name: the minter a coordinated Edit
+   * draws its identities from (ADR 0016), and the control that decides what a
+   * commit answers.
+   */
+  { newId = newUuid, control }: MountInjections = {},
 ): Mounted {
-  const backend = new MemorySpaceBackend(META_ID, [
-    { snapshot: meta, revision: 0n, exportedRevision: null },
-    { snapshot: home, revision: 0n, exportedRevision: null },
-    { snapshot: otherSnapshot, revision: 0n, exportedRevision: null },
-  ]);
+  const backend = new MemorySpaceBackend(
+    META_ID,
+    [
+      { snapshot: meta(otherSnapshot), revision: 0n, exportedRevision: null },
+      { snapshot: home, revision: 0n, exportedRevision: null },
+      { snapshot: otherSnapshot, revision: 0n, exportedRevision: null },
+    ],
+    control,
+  );
   const stored = { snapshot: home, revision: 0n, exportedRevision: null };
-  const { spaceSession: session, spaceThings: authoring } = openTestSpace(backend, stored);
+  const { spaceSession: session, spaceThings: authoring } = openTestSpace(backend, stored, newId);
   const spaceThings: SpaceThingAuthoring = { ...authoring, ...broken };
   const app = composeApp({ spaceSession: session, reportObserverError });
   let view: RenderResult | undefined;
@@ -227,6 +352,34 @@ async function openSpaceThingCreation(): Promise<void> {
  */
 function chooseTarget(name: string): void {
   fireEvent.keyDown(screen.getByTestId('new-space-thing-target'), { key: 'ArrowDown' });
+  const option = screen.getByRole('option', { name });
+  fireEvent.pointerDown(option, { button: 0 });
+  fireEvent.pointerUp(option, { button: 0 });
+  fireEvent.click(option);
+}
+
+/**
+ * Open a Space Thing on the canvas and wait for its selectors.
+ *
+ * Both waits are real: the Thing reaches the canvas with the asynchronous
+ * placement, and its target is a *second* Space read after the Thing is already
+ * drawn — until that read lands the Open Thing draws its waiting note in place
+ * of the two controls.
+ */
+async function openSpaceThing(title: string): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: `Open Thing ${title}` }));
+  await screen.findByTestId('space-thing-diagram');
+}
+
+/**
+ * Choose one row of an Open Space Thing's selector.
+ *
+ * Base UI's own list, driven the way the primitive expects: a keyboard press on
+ * the trigger to open, then the full pointer sequence on the row, because a bare
+ * `click` reaches the item before the pointer handlers that select it.
+ */
+function chooseSelection(testId: string, name: string): void {
+  fireEvent.keyDown(screen.getByTestId(testId), { key: 'ArrowDown' });
   const option = screen.getByRole('option', { name });
   fireEvent.pointerDown(option, { button: 0 });
   fireEvent.pointerUp(option, { button: 0 });
@@ -363,9 +516,127 @@ describe('Add Space Thing', () => {
 
     await waitFor(() => expect(screen.queryByTestId('new-space-thing')).not.toBeInTheDocument());
     expect(spaceThingsOf(session).map((thing) => thing.document)).toEqual([
-      { title: 'The other one', kind: 'space', spaceId: OTHER_ID },
+      {
+        title: 'The other one',
+        kind: 'space',
+        spaceId: OTHER_ID,
+        diagram: OTHER_DIAGRAM_ID,
+        graph: OTHER_GRAPH_ID,
+      },
     ]);
     expect(await backend.listSpaces()).toHaveLength(3);
+    await settled(session);
+  });
+
+  /**
+   * An already-initialized target is read, not re-made.
+   *
+   * What the Thing records is the Diagram that Space itself opens on and that
+   * Diagram's own Active Graph (ADR 0079, ADR 0026) — `Current` and not `Draft`,
+   * which is the only thing `Collection 1`'s two Graphs are here to tell apart.
+   * The target's stored document is asserted whole, because initialization is a
+   * commit and a commit that ran against a Space needing nothing would show up
+   * nowhere else.
+   */
+  it('takes an initialized target’s opening selection and initializes nothing', async () => {
+    const { backend, session } = mount();
+    await openSpaceThingCreation();
+
+    chooseTarget('Other Space');
+    createNamed('The other one');
+
+    await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
+    expect(spaceThingsOf(session)[0]?.document).toMatchObject({
+      diagram: OTHER_DIAGRAM_ID,
+      graph: OTHER_GRAPH_ID,
+    });
+    const stored = await backend.loadSpace(OTHER_ID);
+    expect(stored?.snapshot.document).toEqual(other.document);
+    await settled(session);
+  });
+
+  /**
+   * A diagramless target is initialized before the Thing that shows it exists.
+   *
+   * A Space Thing names a Diagram of its target and a Graph that Diagram owns
+   * (ADR 0079), so a Space with neither offers nothing to name. The lifecycle
+   * makes the target working first — the durable initialization ADR 0079 gives
+   * first working load — and stores exactly what that minted. Both halves are
+   * asserted because either alone would pass against a Thing carrying two ids
+   * the stored Space had never heard of.
+   */
+  it('initializes a diagramless target and stores what initialization minted', async () => {
+    const { backend, session } = mount(diagramlessOther, {}, undefined, {
+      newId: mintingIds(MINTED_DIAGRAM_ID, MINTED_GRAPH_ID, MINTED_THING_ID),
+    });
+    await openSpaceThingCreation();
+
+    chooseTarget('Other Space');
+    createNamed('The other one');
+
+    await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
+    expect(spaceThingsOf(session)[0]).toEqual({
+      id: MINTED_THING_ID,
+      document: {
+        title: 'The other one',
+        kind: 'space',
+        spaceId: OTHER_ID,
+        diagram: MINTED_DIAGRAM_ID,
+        graph: MINTED_GRAPH_ID,
+      },
+    });
+    const stored = await backend.loadSpace(OTHER_ID);
+    expect(stored?.snapshot.document.defaultDiagram).toBe(MINTED_DIAGRAM_ID);
+    expect(stored?.snapshot.document.diagrams).toEqual([
+      {
+        id: MINTED_DIAGRAM_ID,
+        title: 'Diagram 1',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        activeGraph: MINTED_GRAPH_ID,
+      },
+    ]);
+    // Initialized, not replaced: the Thing the Space already held is untouched.
+    expect(stored?.snapshot.things).toEqual(diagramlessOther.things);
+    expect(await backend.listSpaces()).toHaveLength(3);
+    await settled(session);
+  });
+
+  /**
+   * A target that could not be prepared makes nothing at all.
+   *
+   * Initialization is its own durable commit and it runs before the Edit
+   * (ADR 0079), so a commit that fails leaves no Thing, no half-written
+   * selection and a containing Space nobody touched. The author is told on the
+   * **Target** field, because what answers it is choosing another Space —
+   * exactly as for the aggregate refusals beside it.
+   */
+  it('creates nothing and names the Target when its target could not be prepared', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const { backend, session } = mount(diagramlessOther, {}, undefined, { control });
+    await openSpaceThingCreation();
+    chooseTarget('Other Space');
+    const before = thingsOf(session);
+
+    // Queued here rather than at mount so it is spent by the initialization
+    // commit and not by whatever the opening of `Home` might have written.
+    control.queueResult({
+      kind: 'permanent-failure',
+      code: 'invalid-commit',
+      message: 'the target could not be written',
+    });
+    createNamed('The other one');
+
+    const target = await screen.findByTestId('new-space-thing-target');
+    await waitFor(() => expect(target).toHaveAttribute('aria-invalid', 'true'));
+    expect(target).toHaveAccessibleDescription(
+      'That Space could not be prepared to be shown here, so nothing was created.',
+    );
+    expect(screen.getByTestId('new-space-thing')).toBeVisible();
+    expect(spaceThingsOf(session)).toEqual([]);
+    expect(thingsOf(session)).toEqual(before);
+    expect((await backend.loadSpace(OTHER_ID))?.snapshot.document.diagrams).toBeUndefined();
     await settled(session);
   });
 
@@ -396,8 +667,72 @@ describe('Add Space Thing', () => {
       OTHER_ID,
       OTHER_ID,
     ]);
+    // Both begin at what the Space itself opens on, because the selection is
+    // read off the target rather than proposed by the author (ADR 0079).
+    expect(
+      spaceThingsOf(session).map(({ document }) => [document.diagram, document.graph]),
+    ).toEqual([
+      [OTHER_DIAGRAM_ID, OTHER_GRAPH_ID],
+      [OTHER_DIAGRAM_ID, OTHER_GRAPH_ID],
+    ]);
     expect(await backend.listSpaces()).toHaveLength(3);
     await settled(session);
+  });
+
+  /**
+   * Two references to one Space are two selections, and neither is the other's.
+   *
+   * This is the behaviour that requiring the pair buys over deriving it. While
+   * a Space Thing with nothing stored read its Diagram through the target's own
+   * `defaultDiagram`, two Things on one Space could only ever show the same
+   * Diagram — so one Thing showing `Collection 1` beside another showing
+   * `Collection 2` was not expressible at all.
+   *
+   * The selection is changed through the on-canvas selector, which is the only
+   * surface that changes one: the creation pane offers no choice, because a
+   * caller holding a listing row has no Diagram of the target to offer
+   * (ADR 0068). And it is read back off the *stored* Space as well as the
+   * session, since a selection that lived only in working state would be a view
+   * preference rather than authored content.
+   */
+  it('keeps a selection per Space Thing, and stores both', async () => {
+    const { backend, session } = mount();
+
+    await openSpaceThingCreation();
+    chooseTarget('Other Space');
+    createNamed('One way in');
+    await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
+    await settled(session);
+
+    await openSpaceThingCreation();
+    chooseTarget('Other Space');
+    createNamed('Another way in');
+    await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(2));
+    await settled(session);
+
+    await openSpaceThing('One way in');
+    chooseSelection('space-thing-diagram', 'Collection 2');
+
+    await waitFor(() =>
+      expect(
+        spaceThingsOf(session).map(({ document }) => [
+          document.title,
+          document.diagram,
+          document.graph,
+        ]),
+      ).toEqual([
+        ['One way in', OTHER_SECOND_DIAGRAM_ID, OTHER_SECOND_GRAPH_ID],
+        ['Another way in', OTHER_DIAGRAM_ID, OTHER_GRAPH_ID],
+      ]),
+    );
+    await settled(session);
+
+    const stored = await backend.loadSpace(HOME_ID);
+    expect(
+      stored?.snapshot.things.flatMap((thing) =>
+        thing.document.kind === 'space' ? [thing.document] : [],
+      ),
+    ).toEqual(spaceThingsOf(session).map((thing) => thing.document));
   });
 
   /**

@@ -16,6 +16,9 @@ const SECOND_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000
 const CHILD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000016');
 const CHILD_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000017');
 const CHILD_LINK_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000018');
+const CHILD_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000019');
+const CHILD_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001a');
+const SECOND_TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001b');
 
 class ThrowingAggregateBackend extends MemorySpaceBackend {
   throwNextLoad = true;
@@ -100,7 +103,13 @@ describe('Space Thing lifecycle', () => {
                 ...metaSnapshot.things,
                 {
                   id: SECOND_SPACE_THING_ID,
-                  document: { title: 'Existing target', kind: 'space', spaceId: TARGET_ID },
+                  document: {
+                    title: 'Existing target',
+                    kind: 'space',
+                    spaceId: TARGET_ID,
+                    diagram: TARGET_DIAGRAM_ID,
+                    graph: TARGET_GRAPH_ID,
+                  },
                 },
               ],
             }
@@ -177,7 +186,16 @@ describe('Space Thing lifecycle', () => {
       ...metaSnapshot,
       things: [
         ...metaSnapshot.things,
-        { id: SPACE_THING_ID, document: { title: 'Target', kind: 'space', spaceId: TARGET_ID } },
+        {
+          id: SPACE_THING_ID,
+          document: {
+            title: 'Target',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
+        },
       ],
       document: {
         ...metaSnapshot.document,
@@ -285,7 +303,13 @@ describe('Space Thing lifecycle', () => {
         ...target.getState().working.things,
         {
           id: CHILD_LINK_ID,
-          document: { title: 'Unsaved child', kind: 'space', spaceId: CHILD_ID },
+          document: {
+            title: 'Unsaved child',
+            kind: 'space',
+            spaceId: CHILD_ID,
+            diagram: CHILD_DIAGRAM_ID,
+            graph: CHILD_GRAPH_ID,
+          },
         },
       ],
     });
@@ -411,7 +435,16 @@ describe('Space Thing lifecycle', () => {
       ...metaSnapshot,
       things: [
         ...metaSnapshot.things,
-        { id: SPACE_THING_ID, document: { title: 'Target', kind: 'space', spaceId: TARGET_ID } },
+        {
+          id: SPACE_THING_ID,
+          document: {
+            title: 'Target',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
+        },
       ],
       document: {
         ...metaSnapshot.document,
@@ -475,7 +508,16 @@ describe('Space Thing lifecycle', () => {
       ...metaSnapshot,
       things: [
         ...metaSnapshot.things,
-        { id: SPACE_THING_ID, document: { title: 'Target', kind: 'space', spaceId: TARGET_ID } },
+        {
+          id: SPACE_THING_ID,
+          document: {
+            title: 'Target',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
+        },
       ],
       document: {
         ...metaSnapshot.document,
@@ -910,7 +952,17 @@ describe('Space Thing lifecycle', () => {
     expect(storedMeta?.revision).toBe(4n);
     expect(storedMeta?.snapshot.things).toContainEqual({
       id: SPACE_THING_ID,
-      document: { title: 'Architecture', kind: 'space', spaceId: TARGET_ID },
+      document: {
+        title: 'Architecture',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        // The Diagram and Graph initialization minted for the target it just
+        // made, kept rather than discarded (ADR 0079). A created Space Thing
+        // stores a selection from the moment it exists, and the only Diagram in
+        // existence for a Space one Edit old is the one that Edit authored.
+        diagram: TARGET_DIAGRAM_ID,
+        graph: TARGET_GRAPH_ID,
+      },
     });
     expect(storedMeta?.snapshot.document.diagrams?.[0]?.positions[SPACE_THING_ID]).toEqual({
       x: 240,
@@ -957,7 +1009,13 @@ describe('Space Thing lifecycle', () => {
         ...metaSnapshot.things,
         {
           id: SPACE_THING_ID,
-          document: { title: 'First link', kind: 'space', spaceId: TARGET_ID },
+          document: {
+            title: 'First link',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
         },
       ],
       document: {
@@ -977,13 +1035,33 @@ describe('Space Thing lifecycle', () => {
         ...targetSnapshot.things,
         {
           id: CHILD_LINK_ID,
-          document: { title: 'Child', kind: 'space', spaceId: CHILD_ID },
+          document: {
+            title: 'Child',
+            kind: 'space',
+            spaceId: CHILD_ID,
+            diagram: CHILD_DIAGRAM_ID,
+            graph: CHILD_GRAPH_ID,
+          },
         },
       ],
     };
     const child: SpaceSnapshot = {
       id: CHILD_ID,
-      document: { version: 1, title: 'Child' },
+      document: {
+        version: 1,
+        title: 'Child',
+        defaultDiagram: CHILD_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: CHILD_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: { [CHILD_THING_ID]: { x: 0, y: 0, open: false } },
+            graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
+            activeGraph: CHILD_GRAPH_ID,
+          },
+        ],
+      },
       things: [
         {
           id: CHILD_THING_ID,
@@ -1022,6 +1100,274 @@ describe('Space Thing lifecycle', () => {
     expect(await backend.loadSpace(CHILD_ID)).toBeUndefined();
   });
 
+  it('links an initialized Space by storing the selection that Space already opens on', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    // One identity, and it is the Thing's. A target that already opens on a
+    // Diagram has nothing left for this Edit to mint (ADR 0079), and an
+    // exhausted source throws rather than quietly handing out a real id — so
+    // the count is asserted by the source rather than by a spy.
+    const lifecycle = registry.spaceThings(idSource([SPACE_THING_ID]));
+
+    await expect(
+      lifecycle.link({
+        containingSpaceId: META_ID,
+        diagramId: META_DIAGRAM_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    ).resolves.toEqual({ kind: 'completed' });
+
+    const storedMeta = await backend.loadSpace(META_ID);
+    expect(storedMeta?.snapshot.things).toContainEqual({
+      id: SPACE_THING_ID,
+      document: {
+        title: 'Architecture',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        diagram: TARGET_DIAGRAM_ID,
+        graph: TARGET_GRAPH_ID,
+      },
+    });
+    // Read, never written. Linking is an Edit on the Space doing the pointing,
+    // and the one commit this made is that Space's.
+    expect(await backend.loadSpace(TARGET_ID)).toEqual({
+      snapshot: targetSnapshot,
+      revision: 7n,
+      exportedRevision: null,
+    });
+    expect(control.requests).toHaveLength(1);
+  });
+
+  it('durably initializes a stored diagramless target before the Thing that selects it exists', async () => {
+    const diagramlessTarget: SpaceSnapshot = {
+      id: TARGET_ID,
+      document: { version: 1, title: 'Architecture' },
+      things: [
+        {
+          id: TARGET_THING_ID,
+          document: { title: 'Architecture', kind: 'markdown', body: '' },
+        },
+      ],
+    };
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: diagramlessTarget, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    // The Diagram and the Graph initialization mints, in that order, and only
+    // then the Thing's own id. Initialization runs before the Edit rather than
+    // inside it, so an id source written in any other order is exhausted at the
+    // draw that proves it (ADR 0016, ADR 0079).
+    const lifecycle = registry.spaceThings(
+      idSource([TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_THING_ID]),
+    );
+
+    await expect(
+      lifecycle.link({
+        containingSpaceId: META_ID,
+        diagramId: META_DIAGRAM_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    ).resolves.toEqual({ kind: 'completed' });
+
+    // Durable by the time the lifecycle answers, in its own commit: the target
+    // carries the complete Diagram rather than a selection only the Thing
+    // remembers.
+    expect(await backend.loadSpace(TARGET_ID)).toEqual({
+      revision: 8n,
+      exportedRevision: null,
+      snapshot: {
+        ...diagramlessTarget,
+        document: {
+          version: 1,
+          title: 'Architecture',
+          defaultDiagram: TARGET_DIAGRAM_ID,
+          diagrams: [
+            {
+              id: TARGET_DIAGRAM_ID,
+              title: 'Diagram 1',
+              kind: 'positioned',
+              positions: {},
+              graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
+              activeGraph: TARGET_GRAPH_ID,
+            },
+          ],
+        },
+      },
+    });
+    const storedMeta = await backend.loadSpace(META_ID);
+    expect(storedMeta?.snapshot.things).toContainEqual({
+      id: SPACE_THING_ID,
+      document: {
+        title: 'Architecture',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        diagram: TARGET_DIAGRAM_ID,
+        graph: TARGET_GRAPH_ID,
+      },
+    });
+  });
+
+  it("selects the Diagram's authored Active Graph rather than the head of its list", async () => {
+    const targetWithLaterActiveGraph: SpaceSnapshot = {
+      ...targetSnapshot,
+      document: {
+        ...targetSnapshot.document,
+        diagrams: [
+          {
+            id: TARGET_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: { [TARGET_THING_ID]: { x: 0, y: 0, open: false } },
+            graphs: [
+              { id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] },
+              { id: SECOND_TARGET_GRAPH_ID, title: 'Graph 2', edges: [] },
+            ],
+            activeGraph: SECOND_TARGET_GRAPH_ID,
+          },
+        ],
+      },
+    };
+    const backend = new MemorySpaceBackend(META_ID, [
+      { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+      { snapshot: targetWithLaterActiveGraph, revision: 7n, exportedRevision: null },
+    ]);
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceThings(idSource([SPACE_THING_ID]));
+
+    await expect(
+      lifecycle.link({
+        containingSpaceId: META_ID,
+        diagramId: META_DIAGRAM_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    ).resolves.toEqual({ kind: 'completed' });
+
+    // The head of `graphs` is what an *unauthored* `activeGraph` falls back to,
+    // so a target that has authored one is the case that tells the rule from
+    // the fallback (ADR 0026).
+    const storedMeta = await backend.loadSpace(META_ID);
+    expect(storedMeta?.snapshot.things).toContainEqual({
+      id: SPACE_THING_ID,
+      document: {
+        title: 'Architecture',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        diagram: TARGET_DIAGRAM_ID,
+        graph: SECOND_TARGET_GRAPH_ID,
+      },
+    });
+  });
+
+  it('refuses a link whose target could not be initialized and authors nothing', async () => {
+    const diagramlessTarget: SpaceSnapshot = {
+      id: TARGET_ID,
+      document: { version: 1, title: 'Architecture' },
+      things: [
+        {
+          id: TARGET_THING_ID,
+          document: { title: 'Architecture', kind: 'markdown', body: '' },
+        },
+      ],
+    };
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'denied' });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: diagramlessTarget, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const before = structuredClone(meta.getState());
+    const lifecycle = registry.spaceThings(idSource([TARGET_DIAGRAM_ID, TARGET_GRAPH_ID]));
+
+    await expect(
+      lifecycle.link({
+        containingSpaceId: META_ID,
+        diagramId: META_DIAGRAM_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    ).resolves.toEqual({
+      kind: 'refused',
+      refusal: { code: 'space-thing-target-unavailable', spaceId: TARGET_ID },
+    });
+
+    // The two identities the attempt drew are spent and the target is untouched,
+    // but no Thing names either: initialization running before the Edit is what
+    // makes a failure here produce nothing rather than half of something.
+    expect(meta.getState()).toEqual(before);
+    expect(await backend.loadSpace(META_ID)).toEqual({
+      snapshot: metaSnapshot,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    expect(await backend.loadSpace(TARGET_ID)).toEqual({
+      snapshot: diagramlessTarget,
+      revision: 7n,
+      exportedRevision: null,
+    });
+    expect(control.requests).toHaveLength(1);
+  });
+
+  it('refuses a link to a target that has gone since it was listed', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceThings(idSource([]));
+
+    // The same refusal a failed initialization answers, and for the same reason:
+    // the author's move is to choose another Space, and this Edit did not begin.
+    // A target that has gone is an ordinary answer rather than a throw, because
+    // nothing holds the listing and the Edit together.
+    await expect(
+      lifecycle.link({
+        containingSpaceId: META_ID,
+        diagramId: META_DIAGRAM_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    ).resolves.toEqual({
+      kind: 'refused',
+      refusal: { code: 'space-thing-target-unavailable', spaceId: TARGET_ID },
+    });
+    expect(meta.getState().working).toEqual(metaSnapshot);
+    expect(control.requests).toHaveLength(0);
+  });
+
   it('keeps a target referenced by an uncommitted sibling session', async () => {
     const linkedMeta: SpaceSnapshot = {
       ...metaSnapshot,
@@ -1029,17 +1375,43 @@ describe('Space Thing lifecycle', () => {
         ...metaSnapshot.things,
         {
           id: SPACE_THING_ID,
-          document: { title: 'Target', kind: 'space', spaceId: TARGET_ID },
+          document: {
+            title: 'Target',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
         },
         {
           id: SECOND_SPACE_THING_ID,
-          document: { title: 'Sibling', kind: 'space', spaceId: CHILD_ID },
+          document: {
+            title: 'Sibling',
+            kind: 'space',
+            spaceId: CHILD_ID,
+            diagram: CHILD_DIAGRAM_ID,
+            graph: CHILD_GRAPH_ID,
+          },
         },
       ],
     };
     const sibling: SpaceSnapshot = {
       id: CHILD_ID,
-      document: { version: 1, title: 'Sibling' },
+      document: {
+        version: 1,
+        title: 'Sibling',
+        defaultDiagram: CHILD_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: CHILD_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: { [CHILD_THING_ID]: { x: 0, y: 0, open: false } },
+            graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
+            activeGraph: CHILD_GRAPH_ID,
+          },
+        ],
+      },
       things: [
         {
           id: CHILD_THING_ID,
@@ -1071,7 +1443,13 @@ describe('Space Thing lifecycle', () => {
         ...sibling.things,
         {
           id: CHILD_LINK_ID,
-          document: { title: 'Target', kind: 'space', spaceId: TARGET_ID },
+          document: {
+            title: 'Target',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
         },
       ],
     });
