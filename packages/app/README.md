@@ -16,8 +16,8 @@ thing, either beside it or under `things/`. The fixture uses both locations
 (`a.md` at the top, the rest in `things/`) so the two-location scan is exercised
 by the space the app actually loads.
 
-Two **disconnected collections** in one space, sharing no things, which ELK lays
-out as separate bands — and, because a Graph is a nested owned value of the
+Two **disconnected collections** in one space, sharing no things, authored as two
+separate bands — and, because a Graph is a nested owned value of the
 Diagram that holds it (ADR 0040), **two Diagrams**:
 
 ```
@@ -46,7 +46,7 @@ is off the canvas until it is selected.
 
 `example/` is one connected collection of seven Things, so its three Graphs are
 owned by a **single** Diagram. Nothing renders it, so its positions are a plain
-deterministic grid rather than an ELK run.
+deterministic grid.
 
 Each collection returns to its start via an **alias** (`A′` of `A`, `E′` of `E`).
 That deliberately exercises alias rendering while keeping this fixture acyclic

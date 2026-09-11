@@ -244,7 +244,8 @@ body {
   pointer-events: none;
 }
 
-/* Per-graph ports, positioned by ELK's computed offset (inline `top`). React
+/* Per-graph ports, positioned by the offset the projection resolves (inline
+   `top`). React
    Flow handles the left/right edge placement and vertical centering, and the
    size is declared alongside the handle bounds in `authoring-handle.ts` so the
    two cannot drift.

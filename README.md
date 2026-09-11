@@ -4,7 +4,7 @@ A local prototype that proves one idea:
 
 > A technical deck can be authored as Markdown things on a spatial graph, then presented as a curated Graph through that graph.
 
-Content can be authored in version-controlled files and imported into the live persistence model. A space directory holds a space file naming the diagrams and the graphs each one owns, plus one Markdown file per thing. [React Flow](https://reactflow.dev) draws **every** Graph at once, each in its own colour, and [elkjs](https://github.com/kieler/elkjs) lays them out automatically (layered, left→right). A Thing exposes an outbound handle for each Graph with an outgoing Edge and an inbound handle for each Graph with an incoming Edge (the "multiple handles" approach). Choosing a Graph in the toolbar emphasises it without hiding the others.
+Content can be authored in version-controlled files and imported into the live persistence model. A space directory holds a space file naming the diagrams and the graphs each one owns, plus one Markdown file per thing. [React Flow](https://reactflow.dev) draws **every** Graph at once, each in its own colour, at the positions the diagram authored. A Thing exposes an outbound handle for each Graph with an outgoing Edge and an inbound handle for each Graph with an incoming Edge (the "multiple handles" approach). Choosing a Graph in the toolbar emphasises it without hiding the others.
 
 **Presenting is the same canvas, closer in.** There is no deck and no second surface ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): pressing Present moves React Flow's camera to the Graph's first thing and draws that thing's content rendered. Arrow keys traverse the Graph's edges — Right follows the selected one, Left goes back along the path taken, Up and Down choose among a fork's branches without moving the camera ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
 
@@ -29,7 +29,7 @@ Then:
 5. Press **Present** to traverse the Graph: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
 6. Watch the address bar. The Space, a Diagram, a Thing, a Graph and each Active Thing reached while Presenting have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)); the Sidebar and the presenting chrome offer **Copy link** for the current one, browser Back and Forward follow the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
 
-The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored Graph edges stay legible.
+The graph uses React Flow's multiple-handles approach: a thing declares one handle pair per Graph, spread evenly down its sides, so the coloured Graph edges stay legible where several Graphs run through one thing.
 
 ### Verify
 
@@ -156,7 +156,7 @@ Things, Diagrams and Graphs are parts of the Space aggregate, so they have produ
 
 ### Graphs as color-coded flows
 
-Each authored edge becomes a colored drawn edge, and each thing a Graph leaves gains a `<graphId>::out` handle (right) while each thing it arrives at gains a `<graphId>::in` handle (left) — one per Graph per side, so a fork's several outgoing edges share one handle. Those become namespaced ELK port ids. ELK keeps each port on its assigned side and returns its exact offset so the handles line up and the edge runs cleanly. `@project/graph` derives the handles (`buildThingHandles`) and edges (`buildGraphRenderEdges`), then assembles the graph to arrange (`buildLayoutStrategyGraph`); `@project/react-flow-adapter` applies a `LayoutStrategy` and colors the projection. Switching graphs changes emphasis, not visibility or placement.
+Each authored edge becomes a colored drawn edge, and each thing a Graph leaves gains a `<graphId>::out` handle (right) while each thing it arrives at gains a `<graphId>::in` handle (left) — one per Graph per side, so a fork's several outgoing edges share one handle. `@project/graph` derives the handles (`buildThingHandles`) and edges (`buildGraphRenderEdges`), then assembles the graph to arrange (`buildLayoutStrategyGraph`); `@project/react-flow-adapter` applies a `LayoutStrategy` and colors the projection. Switching graphs changes emphasis, not visibility or placement.
 
 ### Markdown things
 
@@ -183,7 +183,7 @@ A **Diagram** is authored data: a named thing-to-position map stored with the sp
 type LayoutStrategy = (graph: LayoutStrategyGraph) => Promise<LayoutStrategyGraph>;
 ```
 
-Three ship. `elkStrategy` (in `@project/react-flow-adapter`, the only package that may touch elkjs) is one automatic strategy and runs ELK layered left→right. `gridStrategy` (in `@project/graph`) is a pure automatic strategy that places things on a grid. `positionedStrategy` reads an authored Diagram. Which things a strategy arranges is the view's choice, not the strategy's.
+Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy that places things on a grid, and nothing selects it today. `positionedStrategy` reads an authored Diagram, and it is what the canvas draws. An automatic arrangement returns as a destructive Edit over a Diagram rather than as a render path, which is what took elkjs out of the tree ([ADR 0086](docs/adr/0086-automatic-arrangement-is-an-edit-not-a-render-path.md)). Which things a strategy arranges is the view's choice, not the strategy's.
 
 ## Architecture
 
@@ -194,7 +194,7 @@ A pnpm workspace with strict TypeScript and enforced package boundaries:
 | `@project/core` | Domain types + Zod schema. No framework code. |
 | `@project/graph` | Pure graph/Graph logic: intake and indexing, lookups, Graph navigation, referential validation, Graph→handles/edges derivation, and the `LayoutStrategy` contract. Property-tested. |
 | `@project/persistence` | Browser-safe backend and session contracts, optimistic revisions, commit coalescing, failure/conflict handling, and the memory adapter. |
-| `@project/react-flow-adapter` | Owns React Flow projection and all elkjs specifics. Runs the ELK strategy and projects the domain model into coloured React Flow Thing nodes and Edges. |
+| `@project/react-flow-adapter` | Owns React Flow projection and every React Flow specific. Applies a `LayoutStrategy` and projects the domain model into coloured React Flow Thing nodes and Edges. |
 | `@project/ui` | Reusable, framework-agnostic React: thing renderer, Graph selector, Graph legend, presentation controls, app shell. |
 | `@project/app` | Wiring: Navigation, Space Authoring and Edge Authoring, product-URL navigation over the browser History API (no router library), the Zustand-backed render adapter, the canvas and its cameras, the example presentation, and Vite. |
 
@@ -213,12 +213,12 @@ Design rules kept throughout: domain logic stays out of React components, React 
 
 - **Thing authoring is intentionally narrow.** Markdown source, Titles and Alias Targets are editable, while visual editing, freehand drawing and whiteboard shapes are not built. Thing, placement and Edge edits commit through the HTTP persistence session: under `pnpm dev` they land in PostgreSQL and outlive the page, and under `pnpm dev:new` they survive a browser reload but not a server restart.
 - **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic version 1 space directory from the database and records the revision it projected.
-- **Overlay legibility.** The graph draws every Graph at once. Only **compatible** graphs — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two graphs disagreeing about the order of things they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
-- **Things are a fixed shape.** A thing draws its title, so every thing is the same size — declared once in `packages/app/src/thing.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the thing, not the reverse, which is why measured DOM sizes are not fed into ELK.
+- **Overlay legibility.** The graph draws every Graph at once. Only **compatible** graphs — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two graphs disagreeing about the order of things they share force a backward edge, and nothing routes an edge around a thing — every edge is the bezier React Flow draws, so a backward one curls back on itself. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
+- **Things are a fixed shape.** A thing draws its title, so every thing is the same size — declared once in `packages/app/src/thing.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the thing, not the reverse, which is why a measured DOM size never decides placement.
 - **Structural authoring is partial.** Dragging between spatial handles draws an Edge, and the first one mints and activates `Graph 1` ([ADR 0033](docs/adr/0033-route-authoring-uses-spatial-route-coloured-handles.md)). Option/Alt plus an empty drop atomically creates and connects a blank `Thing N`. There is no detached Thing creation, and deleting Things, Edges or Graphs is deliberately disabled until those operations can complete through the same persisted-Edit lifecycle. Broader Graph management is also unbuilt.
 - **No speaker view, timer, transitions or deck export.** They went with the deck framework and return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
 - **The presented thing is scaled by the camera**, so its text is rasterised rather than laid out at its final size — a property of wanting a spatial camera at all.
-- The production bundle ships React Flow and elkjs in a single chunk (~2.1 MB) — fine for a prototype, not tuned for size.
+- The production bundle ships React Flow in a single chunk — fine for a prototype, not tuned for size. The ~2.1 MB figure recorded here was measured with elkjs in the bundle and has not been remeasured since it left.
 
 ## Next likely improvements
 

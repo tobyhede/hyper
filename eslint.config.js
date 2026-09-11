@@ -39,7 +39,7 @@ const ESCAPE_PATTERN = {
 /** `paths` and `patterns` must each be homogeneous — all strings or all objects
  *  — so the render-layer bans are restated as groups to sit beside the escape
  *  pattern. Both spellings are needed: a `paths` entry for `elkjs` does not
- *  match `elkjs/lib/elk.bundled.js`, which is how it is actually imported. */
+ *  match `elkjs/lib/elk.bundled.js`, which is how it would be imported. */
 const RENDER_ONLY_PATTERN = {
   group: ['elkjs/*', '@xyflow/*'],
   message: 'React Flow and elkjs live in @project/react-flow-adapter only.',
@@ -284,8 +284,8 @@ export default tseslint.config(
   // the reusable UI stay clear of it.
   //
   // `patterns` is load-bearing next to `paths`: a `paths` entry for `elkjs`
-  // does not match `elkjs/lib/elk.bundled.js`, which is how it is really
-  // imported. The type layer (`rootDir` + narrowed `paths` in each package's
+  // does not match `elkjs/lib/elk.bundled.js`, which is how it would really
+  // be imported. The type layer (`rootDir` + narrowed `paths` in each package's
   // tsconfig) catches what this cannot — relative escapes like `../../app/src`.
   //
   // Every package gets the escape pattern; the domain packages get the library

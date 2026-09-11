@@ -81,7 +81,7 @@ reviews:
         `test/unit/current-domain-vocabulary.test.ts` scans every tracked file
         for them, so reintroducing one fails the build rather than the review.
         Qualified senses are kept and are not findings: Hono handles a request
-        route, ELK produces routed geometry, a URL has one, and `path`
+        route, a graph-layout engine produces routed geometry, a URL has one, and `path`
         identifiers are filesystem paths, router URLs or React Flow's
         `edge-path` class. Other retired vocabulary: `manifest`, `Arrangement`,
         a shared `Draft`, a `cards` array in the space file, an `edges` array
@@ -98,7 +98,7 @@ reviews:
     - path: 'packages/core/**'
       instructions: >-
         Zod schemas plus schema-derived types only. No React, no @xyflow/react,
-        no elkjs, no framework dependency — ESLint enforces this, so a finding
+        no graph-layout engine, no framework dependency — ESLint enforces this, so a finding
         here means the rule was bypassed. Geometry rides as optional fields on
         elements (ADR 0005); there is no `Arrangement` type and none should be
         proposed. A Diagram is authored data; a LayoutStrategy is behaviour
@@ -126,12 +126,11 @@ reviews:
         not-yet-incident handle declaration and breaking the NEXT connection.
         Never suggest `display: none` to hide a handle — React Flow measures
         handles and reports 0x0, so edges attach to the wrong point; use
-        `opacity` or `visibility`. ELK port constraints are `FIXED_SIDE`, not
-        `FIXED_ORDER` (clockwise ordering crosses every edge at a shared thing).
-        ELK port ids are namespaced `<thingId>##<handleId>`; a bare handle id
-        mislays even a single-Graph graph. Handle ids stay `<graphId>::out` /
+        `opacity` or `visibility`. Handle ids stay `<graphId>::out` /
         `::in` — a per-side counter breaks React Flow's own resolution (#008).
-        Do not tune global ELK options against the fixture screenshot.
+        elkjs left the repository with ADR 0086, which makes an automatic
+        arrangement an Edit over an authored Diagram rather than a render path:
+        do not propose reinstating a render-time engine.
 
     - path: 'packages/http/**'
       instructions: >-

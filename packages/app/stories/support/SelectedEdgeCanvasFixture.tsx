@@ -49,7 +49,7 @@ const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
 /**
  * The Diagram the story opens on: the Space's declared default, which is its
  * first positioned Diagram — so the placement comes from authored positions
- * rather than from running elkjs inside a story.
+ * rather than from computing any inside a story.
  */
 const DIAGRAM = resolveDiagram(SPACE, requireDefaultDiagram(SPACE));
 

@@ -1014,12 +1014,11 @@ describe('the retired name for the surface over the open set is gone', () => {
  *
  * What is left needing a **file** exemption is what needs one for the same
  * reason `packages/ui/src/icons.tsx` already has one above: a foreign name,
- * with no shape to read. Lucide exports the grid glyph under the retired word,
- * and elkjs names both its options bag and its per-element field after it —
- * three identifiers spelled exactly as the entity was, in someone else's
- * catalogue. Each file is asserted to still be earning itself, so a dependency
- * that stops exporting one deletes the exemption rather than leaving a hole.
- * They are not written out here for the reason nothing retired is written out
+ * with no shape to read. Lucide exports the grid glyph under the retired word —
+ * an identifier spelled exactly as the entity was, in someone else's catalogue.
+ * The file is asserted to still be earning itself, so a dependency that stops
+ * exporting it deletes the exemption rather than leaving a hole.
+ * It is not written out here for the reason nothing retired is written out
  * in this file: it is read by its own scan.
  */
 const RETIRED_DIAGRAM = ['L', 'ayout'].join('');
@@ -1091,24 +1090,15 @@ const RETIRED_DIAGRAM_NAME = new RegExp(
 const RETIRED_DIAGRAM_BARE = new RegExp(`\\b${RETIRED_DIAGRAM}\\b`);
 
 /**
- * The four foreign spellings the exemption below forgives: Lucide's grid glyph,
- * elkjs's options bag on the type and on the element field, and the screaming
- * case our own default for that bag is declared in.
+ * The one foreign spelling the exemption below forgives: Lucide's grid glyph.
+ * elkjs's three — its options bag on the type and on the element field, and the
+ * screaming case our own default for that bag was declared in — went with the
+ * dependency (ADR 0086).
  */
-const FOREIGN_DIAGRAM_SPELLINGS = new RegExp(
-  [
-    `${RETIRED_DIAGRAM}Grid`,
-    `${RETIRED_DIAGRAM}Options`,
-    `${retiredDiagramLower}Options`,
-    `${RETIRED_DIAGRAM_UPPER}_OPTIONS`,
-    // elkjs's own engine method, which is spelled exactly like the retired
-    // singular field the arm above reads.
-    `${retiredDiagramLower}: \\(`,
-  ].join('|'),
-);
+const FOREIGN_DIAGRAM_SPELLINGS = new RegExp(`${RETIRED_DIAGRAM}Grid`);
 
 /**
- * An exempted file read with those three spellings masked out. Masking rather
+ * An exempted file read with that spelling masked out. Masking rather
  * than skipping is the point: a retired domain compound added to one of these
  * modules is our vocabulary wearing a forgiven file's name, and it stays
  * visible to the scan.
@@ -1208,21 +1198,17 @@ const withoutQualifiedSpellings = (source: string): string =>
   );
 
 /**
- * The files where the retired spelling is a **foreign** identifier rather than
- * a domain one — Lucide's glyph and elkjs's options bag. A file exemption
- * rather than a shape one precisely because there is no shape to read: these
- * are spelled exactly as the entity was.
+ * The file where the retired spelling is a **foreign** identifier rather than a
+ * domain one — Lucide's glyph. A file exemption rather than a shape one
+ * precisely because there is no shape to read: it is spelled exactly as the
+ * entity was.
  *
- * Both are scoped to the module that owns the dependency — `icons.tsx` is the
- * only module allowed to import Lucide at all, and the elk directory is where
- * ADR 0014 confines elkjs — so a foreign name cannot spread behind them.
+ * It is scoped to the module that owns the dependency — `icons.tsx` is the only
+ * module allowed to import Lucide at all — so a foreign name cannot spread
+ * behind it. The three elkjs modules that used to sit beside it left with the
+ * dependency (ADR 0086).
  */
-const FOREIGN_DIAGRAM_FILES: readonly string[] = [
-  'packages/ui/src/icons.tsx',
-  'packages/react-flow-adapter/src/elk/layout.ts',
-  'packages/react-flow-adapter/src/elk/elk-strategy.ts',
-  'packages/react-flow-adapter/test/elk-strategy.test.ts',
-];
+const FOREIGN_DIAGRAM_FILES: readonly string[] = ['packages/ui/src/icons.tsx'];
 
 describe('a Diagram is named once (ADR 0085)', () => {
   const scanned = scannableFiles();
@@ -1275,8 +1261,8 @@ describe('a Diagram is named once (ADR 0085)', () => {
 
   it('still reports a domain compound inside a foreign-name exemption', () => {
     const source = [
-      `import type { ${RETIRED_DIAGRAM}Options } from 'elkjs';`,
-      `const options: ${RETIRED_DIAGRAM}Options = { ...node.${retiredDiagramLower}Options };`,
+      `import { ${RETIRED_DIAGRAM}Grid } from 'lucide-react';`,
+      `export const DiagramIcon = ${RETIRED_DIAGRAM}Grid;`,
       `const chosen = space.default${RETIRED_DIAGRAM};`,
     ].join('\n');
 
@@ -1357,7 +1343,7 @@ describe('a Diagram is named once (ADR 0085)', () => {
       // The contract ADR 0085 records as keeping its name, in every shape.
       `import type { ${RETIRED_DIAGRAM}Strategy, ${RETIRED_DIAGRAM}StrategyGraph } from './${retiredDiagramLower}';`,
       `export const gridStrategy: ${RETIRED_DIAGRAM}Strategy = async (graph) => graph;`,
-      `const ${retiredDiagramLower}Strategy = elkStrategy();`,
+      `const ${retiredDiagramLower}Strategy = gridStrategy();`,
       // React's hook, which is spelled the one way a lookbehind separates.
       `const measured = use${RETIRED_DIAGRAM}Effect(() => measure(), []);`,
       // The verb, in the prose ADR 0085 leaves alone.
@@ -1623,9 +1609,9 @@ const FOREIGN_BARE_THING_FILES: readonly string[] = [
  *
  * The collection has to be the **receiver**, with nothing between them, which is
  * what keeps a `count`, a `cell` or a `colour` bound by something this guard
- * does not govern out of it. Two live bindings are deliberately outside its
- * reach and should stay there: `elk-strategy.test.ts` binds `(c)` over elkjs's
- * own `children`, and a foreign collection has no domain initial to take.
+ * does not govern out of it. A binding over a foreign collection is deliberately
+ * outside its reach and should stay there — someone else's `children` has no
+ * domain initial to take.
  */
 const RETIRED_THING_INITIAL_BINDING = new RegExp(
   [

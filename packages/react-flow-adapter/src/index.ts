@@ -3,7 +3,6 @@ import { ThingNode } from './ThingNode';
 import { RoutedEdge } from './RoutedEdge';
 
 export * from './projection';
-export * from './elk';
 export { ThingNode } from './ThingNode';
 export {
   RoutedEdge,

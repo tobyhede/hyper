@@ -12,13 +12,13 @@ import type { Space } from './space';
  * outbound port twice.
  *
  * This is what lets each Graph render as its own colored line across the
- * canvas and drives the ELK multiple-handles diagram. It belongs to the
+ * canvas and drives the multiple-handles rendering. It belongs to the
  * **overview** — the view that draws every Graph at once and needs distinct
  * attachment points to stay legible (ADR 0021) — not to the domain.
  */
 
 export interface GraphRenderHandleRef {
-  /** Handle id, also used as the ELK port id. */
+  /** Handle id, also used as the port id a strategy reads. */
   id: string;
   graphId: GraphId;
 }

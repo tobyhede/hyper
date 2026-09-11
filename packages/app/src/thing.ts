@@ -5,12 +5,12 @@
  * A thing draws its title (ADR 0006), so its content is bounded and every thing is
  * the same shape. That makes the size a design constant rather than something
  * measured: content adapts to the thing, not the thing to the content. It is why
- * feeding measured DOM sizes into ELK — which React Flow's elkjs example must do,
- * because its nodes are content-sized — is unnecessary here.
+ * a measured DOM size never decides placement here, the way it must in a layout
+ * whose nodes are content-sized.
  *
  * Expressed as a ratio because that is the part that is deliberate. The base
- * width is arbitrary: ELK lays out in its own coordinate space, and React Flow's
- * zoom maps it to the viewport, so only the proportion is a design decision.
+ * width is arbitrary: placement is authored in its own coordinate space, and React
+ * Flow's zoom maps it to the viewport, so only the proportion is a design decision.
  *
  * **16:9, matching the presentation surface.** A thing in the graph and the same
  * thing being presented are one object, so they share a silhouette — click a thing,
