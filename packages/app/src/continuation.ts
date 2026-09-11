@@ -46,6 +46,15 @@ export type ContinuationTarget =
  * unmounts and re-registers leaves the module holding a stale element. The
  * adapter resolves each of these against `data-continuation-control`.
  *
+ * **One address per creating kind, because there is one control per kind.**
+ * This was a single `add-thing`, which was right while the three kinds sat
+ * behind one `+` and a cancelled pane could only be returned to that trigger.
+ * The Dock now draws the kinds as peers, so a cancelled Alias has a control of
+ * its own to go back to and returning it to a neighbour would be the caret
+ * landing on a command the author did not use. The union is the two kinds that
+ * *open* a pane (`ThingCreationKind`): a Markdown Thing completes its Edit on
+ * activation and so is never somewhere to come back from.
+ *
  * **There was a third kind here, `sidebar-row`, and it is gone with the surface
  * it named.** It existed because a Diagram or Graph rename was one draft shared
  * between a Sidebar row and the canvas header, begun from either and returning
@@ -56,7 +65,7 @@ export type ContinuationTarget =
  * to address (`components/CommandDock.tsx`). Renaming it would have been a name
  * for a thing that no longer exists.
  */
-export type ContinuationControl = 'add-thing';
+export type ContinuationControl = 'create-alias' | 'create-space-thing';
 
 export interface PendingContinuation {
   readonly target: ContinuationTarget;

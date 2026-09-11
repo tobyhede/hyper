@@ -50,6 +50,20 @@ export interface ThingKindIconProps {
    */
   readonly aliasOf?: ThingBaseKind | undefined;
   readonly size?: number | undefined;
+  /**
+   * Draw the glyph without putting it in the accessibility tree.
+   *
+   * For the one case the default is wrong: a control that **already names the
+   * command it performs**, where the glyph repeats a fact the button has
+   * stated. The Command Dock's three Create controls are that — each is
+   * labelled `Create <kind>`, so an `img` announcing `<kind>` beside it is a
+   * second node saying half of what the button just said.
+   *
+   * It is deliberately not the default. Everywhere else the glyph carries the
+   * kind *on its own* — on a Thing's own Front, in the Target picker's results,
+   * on a list row — and there the name is the whole point of the element.
+   */
+  readonly decorative?: boolean | undefined;
 }
 
 /**
@@ -82,8 +96,22 @@ function KindGlyph({ kind, aliasOf, size }: ThingKindIconProps) {
  * both reach the accessibility tree.
  */
 
-export function ThingKindIcon({ kind, aliasOf, size }: ThingKindIconProps) {
+export function ThingKindIcon({ kind, aliasOf, size, decorative = false }: ThingKindIconProps) {
   const name = kind === 'alias' && aliasOf !== undefined ? ALIAS_NAMES[aliasOf] : KIND_NAMES[kind];
+  if (decorative)
+    return (
+      <span
+        className="inline-flex flex-none items-center text-[var(--muted-foreground)]"
+        aria-hidden="true"
+        // The pointer still gets the word: a decorative glyph is hidden from the
+        // accessibility tree, not from the reader hovering it.
+        title={name}
+        data-thing-kind={kind}
+        data-alias-of={kind === 'alias' ? aliasOf : undefined}
+      >
+        <KindGlyph kind={kind} aliasOf={aliasOf} size={size} />
+      </span>
+    );
   return (
     <span
       className="inline-flex flex-none items-center text-[var(--muted-foreground)]"

@@ -1155,71 +1155,79 @@ function GraphControls({
 }
 
 /**
- * Create Thing, as three commands behind one trigger, in the Things cluster.
+ * Create Thing, as three peer commands in the Things cluster.
  *
- * The kind is chosen at creation, so the menu offers three peers rather than a
- * split button with a hidden default — and this is *Create*, distinct from
- * adding an existing Thing, which is the list's drag.
+ * **The kinds were always peers; they are no longer disclosed.** The design this
+ * replaces put them behind a `+` and recorded why they are peers rather than a
+ * split button with a hidden default — the kind is chosen at creation, so none
+ * of the three is the default. That reasoning is kept whole here. What is
+ * dropped is the disclosure around them, which cost a press on *every*
+ * creation, including the one kind that needs no second decision: `markdown`
+ * completes its Edit on activation, while `alias` and `space` open a pane
+ * because a Target and a target Space are still owed (`App.tsx`, `onCreate`).
+ * So the menu charged the cheapest command for a choice it never makes.
  *
- * **This is the one New that stayed a control**, against the rule that put New
- * Diagram and New Graph inside their menus, and it is an exception on two
- * stated grounds. Frequency: Diagrams and Graphs are made rarely and Things
- * constantly, which is the same thing that earns Present its own control on
- * the Graph cluster rather than a menu row. And shape: the other two disclose
- * a short exclusive list, so a New at the end of it costs nothing, while the
- * Things surface is a long scrolling list you drag out of — a New pinned above
- * or below it is a second region to build and reason about, and a New inside
- * it scrolls away.
+ * The other half of that recorded design is untouched and still load-bearing:
+ * Create stays *outside* the Things surface. That list is a long scrolling one
+ * an author drags out of, so a New pinned above it is a second region and a New
+ * inside it scrolls away.
  *
- * It carries no chevron of its own. In the cluster it sits in the slot Present
- * holds on the Graph cluster — a bare glyph after the disclosure — and a
- * second chevron beside `Things ⌄` would read as a second disclosure of the
- * same list.
+ * **A glyph is asked to mean a verb here, which it is not asked to do anywhere
+ * else in the product.** The same three silhouettes mark rows in the Things
+ * list and Things on the canvas, where they say *what a Thing is*. Each control
+ * carries `Create <kind>` as its accessible name and its tooltip, so the
+ * keyboard and the pointer are unambiguous; what is accepted is that a silent
+ * visual reading could take three kind glyphs in a command slot for filters
+ * over the list the trigger opens.
+ *
+ * They carry no chevron. In the cluster they sit where Present sits on the
+ * Graph cluster — bare glyphs after the disclosure — and a second chevron
+ * beside `Things ⌄` would read as a second disclosure of the same list.
  */
-function CreateMenu({
-  side = 'top',
+function CreatePeers({
   onCreate,
   disabled,
 }: {
-  readonly side?: MenuSide;
   readonly onCreate: (kind: (typeof THING_KINDS)[number]) => void;
   readonly disabled: boolean;
 }) {
-  const { id: triggerId, open, onOpenChange } = useDockDisclosure();
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
-      <DropdownMenuTrigger
-        id={triggerId}
-        className="nokey command-dock__set-verb"
-        aria-label="Create Thing"
-        title="Create Thing"
-        // Where a cancelled creation pane puts the caret back. The pane is modal
-        // and unmounts on cancel, so there is no element to have held on to —
-        // the continuation names this control by address instead, and one
-        // adapter resolves it (`continuation.ts`, `ChromeContinuation`).
-        data-continuation-control="add-thing"
-        disabled={disabled}
-        render={<ToolbarButton variant="ghost" size="icon" />}
-      >
-        <PlusIcon />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align={DISCLOSURE_ALIGN}
-        side={side}
-        sideOffset={DISCLOSURE_SIDE_OFFSET}
-        className={`nokey ${DISCLOSURE_WIDTH}`}
-      >
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Create Thing</DropdownMenuLabel>
-          {THING_KINDS.map((kind) => (
-            <DropdownMenuItem key={kind} className="gap-2" onClick={() => onCreate(kind)}>
-              <ThingKindIcon kind={kind} />
-              {thingKindName(kind)}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    /* **A nested group, and it is what lets the vertical dock pack.** Base UI's
+       toolbar group is a plain `role="group"` div with no positional logic, so
+       it nests inside the cluster without taking the roving tabindex off the
+       one `Toolbar` root — and it gives `command-dock.css` one element to place
+       instead of three. Left as three siblings the vertical column's grid
+       auto-places them onto three rows and the Things cluster stands at 102px
+       beside a 44px Diagram and a 44px Graph. */
+    <ToolbarGroup aria-label="Create a Thing" className="command-dock__create">
+      {THING_KINDS.map((kind) => (
+        <ToolbarButton
+          key={kind}
+          variant="ghost"
+          size="icon"
+          className="nokey"
+          aria-label={`Create ${thingKindName(kind)}`}
+          title={`Create ${thingKindName(kind)}`}
+          // Where a cancelled creation pane puts the caret back, per kind. The
+          // pane is modal and unmounts on cancel, so there is no element to
+          // have held on to — the continuation names this control by address
+          // and one adapter resolves it (`continuation.ts`,
+          // `ChromeContinuation`). `markdown` completes on activation and is
+          // never somewhere to come back from, so it carries no address.
+          data-continuation-control={
+            kind === 'alias' ? 'create-alias' : kind === 'space' ? 'create-space-thing' : undefined
+          }
+          disabled={disabled}
+          onClick={() => onCreate(kind)}
+        >
+          {/* Decorative here and nowhere else in the Dock: this button already
+              says `Create <kind>`, so a glyph announcing `<kind>` beside it is a
+              second node repeating half of it. Three of these are mounted at
+              rest, so the duplication is permanent rather than disclosed. */}
+          <ThingKindIcon kind={kind} decorative />
+        </ToolbarButton>
+      ))}
+    </ToolbarGroup>
   );
 }
 
@@ -1535,11 +1543,11 @@ function ThingsControl({
    * announces once on the way past rather than on every item.
    */
   return (
-    <ToolbarGroup aria-label="Things" className="command-dock__cluster">
+    <ToolbarGroup aria-label="Things" className="command-dock__cluster command-dock__things">
       {/* **The list carries no commands, and that is the shape rather than a
           gap in it.** Things names no one entity — a Thing's own commands are the
           Thing rail's (ADR 0073) and this Dock deliberately carries none — and
-          its one set command, Create, is the `+` beside this trigger.
+          its set commands, the three Creates, are the peers beside this trigger.
           Repeating Create inside the list as well would be the second path to
           one command that the Sidebar's own actions menu was built to remove.
 
@@ -1552,13 +1560,17 @@ function ThingsControl({
           Graph* — so it sits at the edge the eye enters from, ahead of the name
           it acts on. Create acts on the **set**: Things names no one entity, which
           is why it has no name to edit, and a command about the set reads after
-          the disclosure that lists it. `[▢ Things ⌄][+]` is "the Things, and add
-          one"; `[+][▢ Things ⌄]` would be a verb with no subject in front of it.
+          the disclosure that lists it. `[▢ Things ⌄][▢][▣][▢↗]` is "the Things,
+          and make one"; leading would be verbs with no subject in front of them.
 
-          It costs the vertical dock a fourth track — see the grid in
-          `command-dock.css` — because this is the one cluster with a control on
-          both sides of its name. */}
-      <CreateMenu side={side} onCreate={things.onCreate} disabled={things.createDisabled} />
+          **The vertical dock packs this cluster rather than granting it tracks.**
+          Three trailing commands would need three verb tracks, empty on the three
+          rows that have one verb or none — 84px of a 208px column spent on
+          gutters. Instead the Things trigger gives up the `1fr` name track it
+          never needed: Space, Diagram and Graph name entities the author renamed,
+          so their names take the slack and truncate, while "Things" is a fixed
+          word. See `command-dock.css`. */}
+      <CreatePeers onCreate={things.onCreate} disabled={things.createDisabled} />
     </ToolbarGroup>
   );
 }

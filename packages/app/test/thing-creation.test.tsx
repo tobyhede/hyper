@@ -136,7 +136,7 @@ const settled = (session: SpaceSession): Promise<void> =>
 
 /** Wait for the Things to reach the canvas, which is what makes Thing authoring available. */
 async function readyToAuthor(): Promise<HTMLElement> {
-  const create = await screen.findByRole('button', { name: 'Create Thing' });
+  const create = await screen.findByRole('button', { name: 'Create Markdown Thing' });
   await waitFor(() => expect(unavailable(create)).toBe(false));
   return create;
 }
@@ -308,7 +308,7 @@ describe('Add Alias', () => {
     expect(screen.queryByTestId('new-alias')).not.toBeInTheDocument();
     expect(session.getState().working).toBe(before);
     // Cancelled or completed, focus never lands on `<body>`.
-    expect(screen.getByRole('button', { name: 'Create Thing' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Create Alias' })).toHaveFocus();
     await settled(session);
   });
 

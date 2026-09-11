@@ -425,7 +425,7 @@ test(
     for (const testId of ['space-title', 'selected-canvas', 'active-graph'])
       await expect(strip.getByTestId(testId)).toBeAttached();
     await expect(strip.getByRole('button', { name: 'Things' })).toBeVisible();
-    await expect(strip.getByRole('button', { name: 'Create Thing' })).toBeVisible();
+    await expect(strip.getByRole('button', { name: 'Create Markdown Thing' })).toBeVisible();
 
     // And a command runs from the strip with nothing dismissed first: the menu
     // opens over the canvas, the choice lands, and the strip is still there.

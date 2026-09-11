@@ -74,11 +74,19 @@ const neverRead = (): Promise<ThingCreationRead> => new Promise<never>(() => und
 const neverSettles = (): Promise<ThingCreationOutcome> =>
   new Promise<ThingCreationOutcome>(() => undefined);
 
-const RETURN_TO_ADD_THING: PendingContinuation = {
-  target: { kind: 'control', name: 'add-thing' },
+/**
+ * Where a close with no Thing to continue at sends the author: the Create
+ * control for the kind the pane was creating.
+ *
+ * A function rather than a constant, because the address is per kind now — the
+ * Dock draws the three kinds as peers, so a cancelled Alias goes back to Create
+ * Alias rather than to whichever peer used to carry the one shared address.
+ */
+const returnToCreate = (name: 'create-alias' | 'create-space-thing'): PendingContinuation => ({
+  target: { kind: 'control', name },
   select: false,
   then: 'focus',
-};
+});
 
 const NAME_CREATED_THING: PendingContinuation = {
   target: { kind: 'thing', thingId: THING_ID },
@@ -327,13 +335,28 @@ describe('a choices read that answers a pane that has moved on', () => {
 });
 
 describe('where the creation continues', () => {
-  it('returns to Add Thing when the pane is cancelled', () => {
+  it('returns to the cancelled pane’s own Create control', () => {
     const { creation, requested } = openedOn();
 
     creation.cancel();
 
     expect(creation.getState().pane.status).toBe('closed');
-    expect(requested).toEqual([RETURN_TO_ADD_THING]);
+    expect(requested).toEqual([returnToCreate('create-space-thing')]);
+  });
+
+  /**
+   * **The address is the kind's, not the cluster's.** While the three kinds sat
+   * behind one `+` there was one control to come back to and the address could
+   * be a constant. They are peers now, so this pair is what stops a cancelled
+   * Alias handing the caret to Create Space Thing — a near-miss that no
+   * assertion on a shared constant could have caught.
+   */
+  it('returns to a cancelled Alias’s control rather than a neighbour’s', () => {
+    const { creation, requested } = openedOn(aliasChoices);
+
+    creation.cancel();
+
+    expect(requested).toEqual([returnToCreate('create-alias')]);
   });
 
   it('names the created Thing when one was created', () => {
@@ -351,7 +374,7 @@ describe('where the creation continues', () => {
    * minted, and its title was typed on the pane before the Edit ran — so there
    * is nothing left to name and the author goes back to the control.
    */
-  it('returns to Add Thing when the creation left no Thing to continue at', async () => {
+  it('returns to the Create control when the creation left no Thing to continue at', async () => {
     const { creation, requested } = openedOn(spaceChoices, {
       submit: () => Promise.resolve({ kind: 'created', thingId: null }),
     });
@@ -360,7 +383,7 @@ describe('where the creation continues', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(requested).toEqual([RETURN_TO_ADD_THING]);
+    expect(requested).toEqual([returnToCreate('create-space-thing')]);
   });
 
   it('owes nothing when presenting takes the pane away', () => {

@@ -250,21 +250,25 @@ export function presentControl(page: Page): Locator {
   return dock(page).getByRole('button', { name: /^Present / });
 }
 
-/** Whether creating a Thing is available at all, which the `+` reports. */
-export function createThingControl(page: Page): Locator {
-  return dock(page).getByRole('button', { name: 'Create Thing' });
+/** The kinds the Dock offers, named as their controls announce them. */
+export type ThingKindName = 'Markdown Thing' | 'Space Thing' | 'Alias';
+
+/**
+ * One kind's Create control, which is also what reports whether creating is
+ * available at all — every peer is withdrawn by the same fact.
+ */
+export function createThingControl(page: Page, kind: ThingKindName = 'Markdown Thing'): Locator {
+  return dock(page).getByRole('button', { name: `Create ${kind}` });
 }
 
-/** Create a Thing of one kind, from the Things cluster's `+`. */
-export async function createThing(
-  page: Page,
-  kind: 'Markdown Thing' | 'Space Thing' | 'Alias',
-): Promise<void> {
-  const menu = await disclose(page, 'Create Thing');
-  // The row says the kind twice — `ThingKindIcon` announces it and the word
-  // beside it repeats it — so which of the two carries the accessible name is
-  // the glyph's decision and not this module's.
-  await menu.getByRole('menuitem', { name: new RegExp(`^(${kind}\\s*)+$`) }).click();
+/**
+ * Create a Thing of one kind, from its own control in the Things cluster.
+ *
+ * The three kinds are peers with no disclosure in front of them, so this is one
+ * press whichever kind is asked for.
+ */
+export async function createThing(page: Page, kind: ThingKindName): Promise<void> {
+  await createThingControl(page, kind).click();
 }
 
 /** The resolved colour drawn on one Graph's legend swatch, by its title. */

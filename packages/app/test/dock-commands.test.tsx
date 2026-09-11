@@ -227,8 +227,16 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
    * Four `Toolbar` roots is four tab stops, where the ADR draws one root whose
    * arrows move between every command in it. The groups are what assistive
    * technology announces on the way past instead.
+   *
+   * **The fifth group is nested inside Things, and is load-bearing rather than
+   * decorative.** The three Create commands are one `role="group"` so the
+   * vertical column has a single element to place: left as three siblings the
+   * cluster's grid auto-places them onto three rows and Things stands at 102px
+   * beside a 44px Diagram. Base UI's group carries no positional logic and does
+   * not divide the keyboard, so the roving tabindex stays on the one root —
+   * which the arrow-order test below is what actually proves.
    */
-  it('draws one root and four named groups inside it', async () => {
+  it('draws one root and its named groups, with Create nested inside Things', async () => {
     await renderDock(<Default />);
 
     const groups = within(dock()).getAllByRole('group');
@@ -238,6 +246,7 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
       'Diagram',
       'Graph',
       'Things',
+      'Create a Thing',
     ]);
     // No toolbar inside the toolbar: the clusters are groups now.
     expect(within(dock()).queryAllByRole('toolbar')).toHaveLength(0);

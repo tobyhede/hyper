@@ -652,32 +652,29 @@ describe("the app's canvas delete key", () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 
-  it.each(DELETE_KEYS)(
-    'leaves the Edge standing when %s reaches the Add Thing menu trigger',
-    (key) => {
-      // The real treatment, mounted where the real control is: outside the flow
-      // entirely, in chrome that marks itself `.nokey` — which is the marker
-      // the canvas guard reads rather than a list of its own. `THINGS_TRIGGER` is
-      // the Command Dock's own Things trigger, exported for whoever supplies that
-      // surface, so the class under test here is the class the Dock ships.
-      //
-      // It carried two cases beside it once, over `AddThingControl` and a
-      // `SpaceSidebar` mounted the same way. ADR 0082 retired the Sidebar,
-      // `.scratch/command-dock/issues/08` deleted the control, and the Dock that
-      // replaced both marks itself the same way — so one production trigger
-      // proves one guard.
-      const { adapter, session } = mountCanvas(
-        <Toolbar>
-          <ToolbarButton {...THINGS_TRIGGER}>Things</ToolbarButton>
-        </Toolbar>,
-      );
-      act(() => adapter.getState().selectEdge(SUBJECT));
+  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches a Create Thing control', (key) => {
+    // The real treatment, mounted where the real control is: outside the flow
+    // entirely, in chrome that marks itself `.nokey` — which is the marker
+    // the canvas guard reads rather than a list of its own. `THINGS_TRIGGER` is
+    // the Command Dock's own Things trigger, exported for whoever supplies that
+    // surface, so the class under test here is the class the Dock ships.
+    //
+    // It carried two cases beside it once, over `AddThingControl` and a
+    // `SpaceSidebar` mounted the same way. ADR 0082 retired the Sidebar,
+    // `.scratch/command-dock/issues/08` deleted the control, and the Dock that
+    // replaced both marks itself the same way — so one production trigger
+    // proves one guard.
+    const { adapter, session } = mountCanvas(
+      <Toolbar>
+        <ToolbarButton {...THINGS_TRIGGER}>Things</ToolbarButton>
+      </Toolbar>,
+    );
+    act(() => adapter.getState().selectEdge(SUBJECT));
 
-      fireEvent.keyDown(screen.getByRole('button', { name: 'Things' }), { key });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Things' }), { key });
 
-      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
-    },
-  );
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
 
   it.each([
     ['menu', 'menu'],
