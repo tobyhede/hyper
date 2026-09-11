@@ -193,13 +193,6 @@ export interface RenderAdapterState {
   projection: Projection | null;
   /** Gesture starts retained until each node receives a settled callback. */
   dragOrigins: ReadonlyMap<string, DiagramPosition>;
-  /**
-   * Set once a thing has actually moved. A diagram's routed edge geometry
-   * describes the placement it computed, so it stops being true the moment a
-   * thing leaves the place that routing assumed; from then on edges are drawn as
-   * plain curves between wherever the things now are.
-   */
-  moved: boolean;
   /** The ordinary React Flow selection used for continued authoring. */
   selection: CanvasSelection;
   /** One transient resize layered over the authored Placement. */
@@ -436,7 +429,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
   const adapter = create<RenderAdapterState>((set, get) => ({
     projection: null,
     dragOrigins: new Map(),
-    moved: false,
     selection: NO_SELECTION,
     resizeDraft: null,
     editingEmbeddedDiagram: false,
@@ -526,7 +518,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       set({
         projection: null,
         dragOrigins: new Map(),
-        moved: false,
         selection: NO_SELECTION,
         resizeDraft: null,
       });
@@ -635,7 +626,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       set({
         projection: { ...projection, nodes },
         dragOrigins,
-        moved: true,
         selection,
       });
       authoring.complete({
@@ -689,7 +679,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     adapter.setState({
       projection: null,
       dragOrigins: new Map(),
-      moved: false,
       selection: NO_SELECTION,
       resizeDraft: null,
     });

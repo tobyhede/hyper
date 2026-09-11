@@ -37,7 +37,9 @@ export type ThingFrontmatter = z.infer<typeof thingFrontmatterSchema>;
 /**
  * One `{ from, to }` connection a graph is made of (ADR 0032). The authored
  * element — distinct from `@project/graph`'s `GraphRenderEdge`, which is this plus the
- * handles it attaches to, and from `LayoutStrategyEdge`, which is that plus geometry.
+ * handles it attaches to, and from `LayoutStrategyEdge`, which is that without the
+ * Graph it is tagged with. None of the three carries geometry: a strategy arranges
+ * the Things and answers nothing at all for an Edge (ADR 0086).
  */
 export type GraphEdge = z.infer<typeof graphEdgeSchema>;
 export type Graph = z.infer<typeof graphSchema>;

@@ -12,10 +12,10 @@ import type { Placement } from './placement';
  * Thing's neighbours were moved by the Edit that opened it (ADR 0084), so there
  * is no derived layer between those positions and the ones drawn, and this reads
  * an Open Thing's rect off its own entry alone. Like `gridStrategy` it consumes
- * only the things: it never looks at the edges, places no ports, and populates no
- * edge sections, leaving the render layer to spread handles evenly and draw a
- * plain curve. If this file ever needs
- * to know about ports or routing, the seam has leaked.
+ * only the things: it never looks at the edges, and it answers positions and
+ * nothing else, leaving the render layer to spread handles evenly and draw a
+ * plain curve. The contract has had nowhere to put anything else since ADR 0086,
+ * so if this file ever needs to know where an Edge attaches, the seam has leaked.
  *
  * Positions are deliberately **sparse**. A space can hold several positioned
  * diagrams, so a thing created while one was active genuinely has no position in

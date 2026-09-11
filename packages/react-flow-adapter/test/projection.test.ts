@@ -124,11 +124,11 @@ describe('projectThingNodes', () => {
         color: '#222222',
       },
     ]);
-    // A vertical offset is always assigned (the even spread, which is the only rule).
+    // A vertical offset is always assigned (even spread before ELK runs).
     expect(typeof a.data.sourceHandles[0]!.offsetY).toBe('number');
   });
 
-  it('uses the port offsets and positions a diagram put on the things', () => {
+  it('uses the positions a diagram put on the things, and spreads the anchors itself', () => {
     const nodes = projectThingNodes(space, handles, colors, {
       strategyGraph: {
         things: [
@@ -138,9 +138,6 @@ describe('projectThingNodes', () => {
             y: 600,
             width: 260,
             height: 300,
-            ports: [
-              { id: '00000000-0000-4000-8000-000000000004::out', side: 'out', x: 260, y: 42 },
-            ],
           },
         ],
         edges: [],
@@ -148,7 +145,10 @@ describe('projectThingNodes', () => {
     });
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     expect(a.position).toEqual({ x: 500, y: 600 });
-    expect(a.data.sourceHandles[0]!.offsetY).toBe(42);
+    // A position is all a strategy answers (ADR 0086). Thing A has one outbound
+    // anchor, so the even spread puts it at half the box the diagram placed —
+    // there is no placed offset left that could say otherwise.
+    expect(a.data.sourceHandles[0]!.offsetY).toBe(150);
     // thing b is absent from the diagram → falls back to the origin (no authored position).
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.position).toEqual({
       x: 0,
@@ -159,9 +159,8 @@ describe('projectThingNodes', () => {
   it("spreads a placed thing's anchors down the thing's own box, not the collapsed constant", () => {
     // The strategies arrange every collapsed Thing at `THING_SIZE`, so this only
     // ever differs for an Expanded one (ADR 0064) — and it has to differ, or an
-    // Edge attaches partway down a box the Thing no longer occupies. `ports` is
-    // left empty because `positionedStrategy` places none: this is the fallback
-    // spread, which is what an authored Diagram actually draws.
+    // Edge attaches partway down a box the Thing no longer occupies. The even
+    // spread over that box is the only rule there is (ADR 0086).
     const expanded = projectThingNodes(space, handles, colors, {
       nodeHeight: 146,
       strategyGraph: {
@@ -172,7 +171,6 @@ describe('projectThingNodes', () => {
             y: 0,
             width: 560,
             height: 420,
-            ports: [],
           },
         ],
         edges: [],
@@ -232,9 +230,6 @@ describe('projectThingNodes', () => {
             y: 600,
             width: 260,
             height: 300,
-            ports: [
-              { id: '00000000-0000-4000-8000-000000000004::out', side: 'out', x: 260, y: 42 },
-            ],
           },
           {
             id: uuid('00000000-0000-4000-8000-000000000003'),
@@ -242,7 +237,6 @@ describe('projectThingNodes', () => {
             y: 600,
             width: 260,
             height: 300,
-            ports: [{ id: '00000000-0000-4000-8000-000000000004::in', side: 'in', x: 0, y: 88 }],
           },
         ],
         edges: [],
@@ -260,15 +254,29 @@ describe('projectThingNodes', () => {
     expect(declared.get('00000000-0000-4000-8000-000000000031::out')?.type).toBe('source');
     expect(declared.get('00000000-0000-4000-8000-000000000031::in')?.type).toBe('target');
 
-    // The ones the strategy placed sit at its port offsets, less half the 11px the
-    // CSS draws the handle at, because React Flow centres a handle on the border.
-    // Outbound on A, inbound on B — the two sides move independently.
-    expect(declared.get('00000000-0000-4000-8000-000000000004::out')?.y).toBe(36.5);
+    // An incident anchor sits at the even spread down the box the diagram placed,
+    // less half the 11px the CSS draws the handle at, because React Flow centres
+    // a handle on the border. Thing A has one outbound anchor, so it sits at half
+    // of 300. Nothing places a port any more (ADR 0086), so the declaration and
+    // the drawn anchor are one spread read twice — and they have to agree, or an
+    // Edge attaches where no anchor is.
+    expect(declared.get('00000000-0000-4000-8000-000000000004::out')?.y).toBe(144.5);
+    expect(declared.get('00000000-0000-4000-8000-000000000004::out')?.y).toBe(
+      a.data.sourceHandles[0]!.offsetY - 5.5,
+    );
+    // A Graph thing A is not on has no anchor to read, so its declaration falls
+    // back to the Graph's own index — 1 of 2 and 2 of 2 down the same box.
+    expect(declared.get('00000000-0000-4000-8000-000000000004::in')?.y).toBe(94.5);
+    expect(declared.get('00000000-0000-4000-8000-000000000031::in')?.y).toBe(194.5);
+
     const b = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!;
+    const drawnOnB = b.data.targetHandles.find(
+      (handle) => handle.id === '00000000-0000-4000-8000-000000000004::in',
+    )!;
     expect(
       (b.handles ?? []).find((handle) => handle.id === '00000000-0000-4000-8000-000000000004::in')
         ?.y,
-    ).toBe(82.5);
+    ).toBe(drawnOnB.offsetY - 5.5);
   });
 
   it('declares every Graph attachment point when the colour map is incomplete', () => {
@@ -285,7 +293,6 @@ describe('projectThingNodes', () => {
               y: 600,
               width: 260,
               height: 300,
-              ports: [],
             },
           ],
           edges: [],
@@ -315,7 +322,6 @@ describe('projectThingNodes', () => {
             y: 600,
             width: 260,
             height: 300,
-            ports: [],
           },
         ],
         edges: [],
@@ -402,39 +408,20 @@ describe('projectGraphEdges', () => {
     expect(mainEdge.style?.stroke).toBe('#111111');
   });
 
-  it('carries routed points when a strategy has placed them', () => {
-    const edges = projectGraphEdges(graphRenderEdges, colors, {
-      strategyGraph: {
-        things: [],
-        edges: [
-          {
-            id: MAIN_EDGE_ID,
-            source: uuid('00000000-0000-4000-8000-000000000002'),
-            target: uuid('00000000-0000-4000-8000-000000000003'),
-            sourceHandle: '00000000-0000-4000-8000-000000000004::out',
-            targetHandle: '00000000-0000-4000-8000-000000000004::in',
-            sections: [
-              {
-                startPoint: { x: 0, y: 0 },
-                endPoint: { x: 10, y: 4 },
-                bendPoints: [{ x: 5, y: 0 }],
-              },
-            ],
-          },
-        ],
-      },
+  it('carries the Graph it belongs to and no geometry of its own', () => {
+    const edges = projectGraphEdges(graphRenderEdges, colors);
+
+    // The Edge data is the Graph id and nothing else (ADR 0086). It carried an
+    // optional routed polyline until then, for waypoints a routing strategy
+    // might have placed; nothing ever placed one, and a Diagram has nowhere to
+    // store one, so the bezier React Flow draws between the two resolved handles
+    // is the only Edge geometry there has ever been.
+    expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
+      graphId: uuid('00000000-0000-4000-8000-000000000004'),
     });
-    // start → bends → end, flattened for the custom edge to draw.
-    expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toMatchObject({
-      points: [
-        { x: 0, y: 0 },
-        { x: 5, y: 0 },
-        { x: 10, y: 4 },
-      ],
+    expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).toEqual({
+      graphId: uuid('00000000-0000-4000-8000-000000000030'),
     });
-    // An edge the diagram did not route carries no `points` key at all (bezier
-    // fallback). The key is omitted, not set to undefined (exactOptionalPropertyTypes).
-    expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).not.toHaveProperty('points');
   });
 
   it('draws every graph the same when nothing is emphasised', () => {
@@ -505,7 +492,6 @@ describe('non-incident graph anchors versus the authoring handles', () => {
     const thingIds = singleGraphSpace.things.map((thing) => thing.id);
     const strategyGraph = buildLayoutStrategyGraph(
       thingIds,
-      handlesByThing,
       buildGraphRenderEdges(singleGraphSpace),
       () => ({ width: 260, height: 146 }),
     );
@@ -534,7 +520,6 @@ describe('non-incident graph anchors versus the authoring handles', () => {
     const thingIds = singleGraphSpace.things.map((thing) => thing.id);
     const strategyGraph = buildLayoutStrategyGraph(
       thingIds,
-      handlesByThing,
       buildGraphRenderEdges(singleGraphSpace),
       () => ({ width: 260, height: 146 }),
     );

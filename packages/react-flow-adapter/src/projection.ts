@@ -12,9 +12,7 @@ import type {
   GraphRenderEdge,
   GraphRenderHandleRef,
   LayoutStrategyThing,
-  LayoutStrategyEdge,
   LayoutStrategyGraph,
-  Point,
   Space,
 } from '@project/graph';
 import type { RoutedEdgeData } from './RoutedEdge';
@@ -40,7 +38,7 @@ export const OTHER_GRAPH_OPACITY = {
 } satisfies Record<GraphEmphasis, number>;
 
 /** A graph handle resolved for rendering: a color and a vertical offset (px from
- *  the node's top), spread evenly down the node's side. */
+ *  the node's top), spread evenly down the box the Thing occupies. */
 export type ThingHandle = {
   id: string;
   graphId: GraphId;
@@ -58,7 +56,7 @@ export type ThingTitleEditor = {
 
 /** Data carried by each custom thing node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint, and it includes the
- *  handle arrays the node declares its handles from. */
+ *  per-Graph handle arrays the node draws its attachment points from. */
 export type ThingNodeData = {
   thingId: ThingId;
   title: string;
@@ -239,7 +237,7 @@ export interface ProjectThingNodesOptions {
   /** The active Graph's resolved colour for graph authoring controls. */
   activeGraphColor?: string;
   emphasis?: GraphEmphasis;
-  /** The laid-out graph; positions and port offsets come from here when present. */
+  /** The laid-out graph; the things' positions come from here when present. */
   strategyGraph?: LayoutStrategyGraph;
   /** Node height used to evenly distribute handles before the layout resolves. */
   nodeHeight?: number;
@@ -249,19 +247,23 @@ export interface ProjectThingNodesOptions {
   openThingIds?: ReadonlySet<ThingId>;
 }
 
+/**
+ * A Thing's per-Graph anchors, spread evenly down the side of the rect it
+ * occupies.
+ *
+ * The even spread was a fallback until ADR 0086 and is now the rule: a strategy
+ * answers positions only, so there is no placed offset that could override it.
+ * Where an Edge attaches is the render layer's own question, still open
+ * (`.scratch/edge-attachment/`).
+ */
 function resolveHandles(
   refs: GraphRenderHandleRef[],
   colors: ColorByGraphId,
-  portsById: ReadonlyMap<string, LayoutStrategyThing['ports'][number]>,
   nodeHeight: number,
 ): ThingHandle[] {
   const count = refs.length;
   return refs.map((ref, index) => {
-    const port = portsById.get(ref.id);
-    // **The even spread is the only branch that runs.** No strategy in the tree
-    // places ports (ADR 0086), so `port` is always undefined; the lookup and this
-    // fallback leave together with ticket 02. Don't go looking for a producer.
-    const offsetY = port?.y ?? ((index + 1) / (count + 1)) * nodeHeight;
+    const offsetY = ((index + 1) / (count + 1)) * nodeHeight;
     return {
       id: ref.id,
       graphId: ref.graphId,
@@ -352,7 +354,7 @@ function declaredHandles(
 
 /**
  * Map things → React Flow thing nodes, attaching per-graph handles spread evenly
- * down the node's sides. The thing id is the React Flow node id.
+ * down the box each thing occupies. The thing id is the React Flow node id.
  *
  * A node carries its thing's *title*, not its content (ADR 0006) — the content is
  * loaded when a thing is opened or presented, not embedded in every node.
@@ -388,7 +390,6 @@ export function projectThingNodes(
     // An alias shows its target's content under its own title (ADR 0009).
     const body =
       showContent || open ? (resolveContentThing(space, thing.id)?.body ?? '') : undefined;
-    const portsById = new Map((placedThing?.ports ?? []).map((port) => [port.id, port]));
     // The Thing's own height once a strategy has placed it, and the constant only
     // before one has. The two agree for every collapsed Thing — the strategies
     // arrange at `THING_SIZE` — and differ exactly for an Open one, whose
@@ -396,8 +397,8 @@ export function projectThingNodes(
     // Read from the same rect `declaredHandles` reasons about below, so a
     // Graph's drawn anchor and its declared one cannot land in different places.
     const spread = placedThing?.height ?? nodeHeight;
-    const sourceHandles = resolveHandles(handles.sourceHandles, colors, portsById, spread);
-    const targetHandles = resolveHandles(handles.targetHandles, colors, portsById, spread);
+    const sourceHandles = resolveHandles(handles.sourceHandles, colors, spread);
+    const targetHandles = resolveHandles(handles.targetHandles, colors, spread);
 
     const node: ThingFlowNode = {
       id: thing.id,
@@ -458,22 +459,15 @@ export interface ProjectGraphEdgesOptions {
   activeGraphId?: GraphId | null;
   /** How strongly the other graphs recede. */
   emphasis?: GraphEmphasis;
-  /** The laid-out graph. Routed edge geometry would come from here — nothing emits any. */
-  strategyGraph?: LayoutStrategyGraph;
 }
 
-/** Flatten an edge's routed sections into one point list: start → bends → end. */
-function routedPoints(edge: LayoutStrategyEdge | undefined): Point[] | undefined {
-  if (!edge?.sections?.length) return undefined;
-  const points: Point[] = [];
-  for (const section of edge.sections) {
-    points.push(section.startPoint, ...(section.bendPoints ?? []), section.endPoint);
-  }
-  return points;
-}
-
-/** Map graph-derived edges → colored React Flow edges. Every one draws a bezier:
- *  no strategy routes, so `routedPoints` always answers undefined (ADR 0086). */
+/**
+ * Map graph-derived edges → coloured React Flow edges.
+ *
+ * It took the laid-out graph too until ADR 0086, for the waypoints a routing
+ * strategy might have placed on an edge. Nothing ever placed one, so the option
+ * only ever carried a value nobody read.
+ */
 export function projectGraphEdges(
   graphRenderEdges: readonly GraphRenderEdge[],
   colors: ColorByGraphId,
@@ -481,21 +475,17 @@ export function projectGraphEdges(
 ): Edge[] {
   const activeGraphId = options.activeGraphId ?? null;
   const emphasis = options.emphasis ?? 'equal';
-  const laidEdges = new Map((options.strategyGraph?.edges ?? []).map((e) => [e.id, e]));
 
   return graphRenderEdges.map((edge) => {
     const color = colors[edge.graphId] ?? FALLBACK_COLOR;
     const isActiveGraph = edge.graphId === activeGraphId;
     const emphasized = isActiveGraph || emphasis === 'equal';
-    const points = routedPoints(laidEdges.get(edge.id));
 
     const data: RoutedEdgeData = { graphId: edge.graphId };
-    if (points !== undefined) data.points = points;
 
     return {
       id: edge.id,
-      // A custom edge whose polyline branch is unreachable here; it draws the
-      // bezier between the handles, which is the only geometry the product has.
+      // A custom edge, drawing a bezier between the handles React Flow resolved.
       type: 'routed',
       source: edge.source,
       target: edge.target,

@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { ThingId, GraphId } from '@project/core';
+import type { ThingId } from '@project/core';
 import {
   buildLayoutStrategyGraph,
   gridStrategy,
   Placement,
   positionedStrategy,
-  type ThingHandleSet,
   type GraphRenderEdge,
   type LayoutStrategyGraph,
   type LayoutStrategy,
@@ -28,13 +27,6 @@ import { uuid } from './uuid';
 
 const SIZE = { width: 320, height: 180 };
 
-/** A thing with one inbound and one outbound handle, as `buildLayoutStrategyGraph` makes
- *  them from a graph's edges. */
-const handles = (graphId: GraphId): ThingHandleSet => ({
-  targetHandles: [{ id: `${graphId}::in`, graphId }],
-  sourceHandles: [{ id: `${graphId}::out`, graphId }],
-});
-
 /**
  * A fork and a merge over five things — deliberately not a line, since a line is
  * the degenerate case and every fixture graph already is one.
@@ -54,7 +46,6 @@ function sampleGraph(): LayoutStrategyGraph {
     '00000000-0000-4000-8000-000000000008',
   ].map(uuid);
   const graphId = uuid('00000000-0000-4000-8000-000000000004');
-  const handlesByThing = new Map(thingIds.map((id) => [id, handles(graphId)]));
   const connections: readonly [ThingId, ThingId][] = [
     [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
     [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000005')],
@@ -71,7 +62,7 @@ function sampleGraph(): LayoutStrategyGraph {
     targetHandle: `${graphId}::in`,
   }));
 
-  return buildLayoutStrategyGraph(thingIds, handlesByThing, edges, () => SIZE);
+  return buildLayoutStrategyGraph(thingIds, edges, () => SIZE);
 }
 
 /**
@@ -151,18 +142,6 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
     expect(identity(output)).toEqual(identity(input));
   });
 
-  it('keeps every thing’s ports, by id and side', async () => {
-    const input = sampleGraph();
-    const output = await make()(input);
-
-    const ports = (g: LayoutStrategyGraph) =>
-      g.things.flatMap((t) => t.ports.map((p) => `${t.id}/${p.id}/${p.side}`)).sort();
-
-    // A handle a strategy dropped is an edge React Flow cannot resolve — its
-    // warning #008, and an edge drawn to the wrong point.
-    expect(ports(output)).toEqual(ports(input));
-  });
-
   it('does not mutate the graph it was given', async () => {
     const input = sampleGraph();
     const before = JSON.stringify(input);
@@ -184,7 +163,6 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
   it('arranges a single thing with no edges', async () => {
     const only = buildLayoutStrategyGraph(
       [uuid('00000000-0000-4000-8000-000000000099')],
-      new Map(),
       [],
       () => SIZE,
     );

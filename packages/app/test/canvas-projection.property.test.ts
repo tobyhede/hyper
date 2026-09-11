@@ -87,7 +87,6 @@ async function projectThroughDiagram(generated: { file: unknown; thingFiles: Thi
     activeThingId: null,
     selectedThingId: null,
     presenting: false,
-    moved: false,
   });
 }
 

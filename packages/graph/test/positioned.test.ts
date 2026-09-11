@@ -8,14 +8,7 @@ import { uuid } from './thing-files';
 const SIZE = { width: 100, height: 50 };
 
 function thingsOf(...ids: string[]): LayoutStrategyThing[] {
-  return ids.map((id) => ({
-    id: uuid(id),
-    ...SIZE,
-    ports: [
-      { id: '00000000-0000-4000-8000-000000000004::in', side: 'in' as const },
-      { id: '00000000-0000-4000-8000-000000000004::out', side: 'out' as const },
-    ],
-  }));
+  return ids.map((id) => ({ id: uuid(id), ...SIZE }));
 }
 
 const graph: LayoutStrategyGraph = {
@@ -108,23 +101,11 @@ describe('positionedStrategy', () => {
     expect(laid.things).toEqual([]);
   });
 
-  it('never places ports, leaving the render layer to spread them', async () => {
-    const laid = await positionedStrategy(at({ '00000000-0000-4000-8000-000000000002': [0, 0] }))(
-      graph,
-    );
-    for (const thing of laid.things) {
-      for (const port of thing.ports) {
-        expect(port.y).toBeUndefined();
-      }
-    }
-  });
-
   it('ignores the edges and passes them through untouched', async () => {
     const laid = await positionedStrategy(at({ '00000000-0000-4000-8000-000000000002': [0, 0] }))(
       graph,
     );
     expect(laid.edges).toEqual(graph.edges);
-    expect(laid.edges.every((e) => e.sections === undefined)).toBe(true);
 
     const withoutEdges = await positionedStrategy(
       at({ '00000000-0000-4000-8000-000000000002': [0, 0] }),

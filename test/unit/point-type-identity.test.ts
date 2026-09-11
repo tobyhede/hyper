@@ -14,16 +14,17 @@ const typeScriptSourceFiles = (directory: string): readonly string[] =>
 
 /**
  * ADR 0038 made `core`'s schema-derived `DiagramPosition` the one representation
- * of an **authored** point, and ADR 0085 split the computed one back out: the
- * geometry a LayoutStrategy returns is `graph`'s own bare `Point`, because no
- * author wrote one and no schema parses one. Those were never one point — a
- * constraint added to `diagramPositionSchema` for the sake of authored placement
- * would otherwise bind engine output it has nothing to say about.
+ * of an **authored** point. ADR 0085 split a computed one back out — `graph`'s
+ * own bare `Point`, for the routed Edge geometry a strategy could place — and
+ * ADR 0086 removed the routing half of the contract, taking the only members
+ * that point ever typed. A strategy answers positions and nothing else, so
+ * `graph` declares no point at all now and this reads for none: the narrower
+ * thing ADR 0038 was protecting is that `graph` must not re-declare the
+ * **authored** position, and it carries `core`'s.
  *
- * So what is read here is not "no point type in `graph`" but the narrower thing
- * ADR 0038 was protecting: `graph` must not re-declare the **authored**
- * position. It carries `core`'s, and the one point it declares itself is the
- * strategy's, in the module that declares the strategy contract.
+ * The list is deliberately written as one rather than as "zero", because the
+ * computed direction returns with Auto-arrange: a point declared beside the
+ * strategy contract is a decision to take again, not a regression to slip in.
  *
  * This reads the declarations because **no type-level assertion can check it**.
  * TypeScript is structural, so a re-declared `interface DiagramPoint { x: number;
@@ -36,11 +37,9 @@ const typeScriptSourceFiles = (directory: string): readonly string[] =>
  * so the declarations are what has to be read.
  *
  * The check is structural rather than a search for a name: it finds a point
- * re-declared under any name, and it stays silent about the many legitimate uses
- * of `x` and `y` next door (`LayoutStrategyThing`, `LayoutStrategyPort`), whose
- * members are optional and not alone. The one declaration the split allows is
- * named and located, so a second one — or the same one moving to a module that
- * is not the strategy contract — is still reported.
+ * re-declared under any name, and it stays silent about the legitimate uses of
+ * `x` and `y` next door (`LayoutStrategyThing`), whose members are optional and
+ * not alone.
  */
 describe('a point has one type', () => {
   const graphSourceDir = fileURLToPath(new URL('../../packages/graph/src/', import.meta.url));
@@ -75,15 +74,20 @@ describe('a point has one type', () => {
   };
 
   /**
-   * The one point `graph` declares: the geometry a strategy computes, in the
-   * module that declares the strategy contract. Written as a location rather
-   * than a name so that moving it elsewhere is reported too — the argument for
-   * it is that it lives beside `LayoutStrategyEdgeSection`, not that it is
-   * spelled `Point`.
+   * The points `graph` may declare: none.
+   *
+   * `Point in packages/graph/src/layout.ts` stood here until ADR 0086 — the
+   * geometry a routing strategy placed, beside the section type that was its one
+   * consumer. Both went together, which is the shape to keep: an exported type
+   * is exempt from `noUnusedLocals`, so a point can sit declared, exported and
+   * typing nothing while the geometry it was split from `DiagramPosition` for
+   * quietly goes back onto the authored position — the split reverted with every
+   * guard here and both typechecks green. Written as locations rather than names
+   * so that a point moving between modules is reported too.
    */
-  const STRATEGY_POINT = 'Point in packages/graph/src/layout.ts';
+  const DECLARED_POINTS: readonly string[] = [];
 
-  it('declares no point type beyond the strategy geometry ADR 0085 split out', () => {
+  it('declares no point type of its own, the computed one having left with ADR 0086', () => {
     const declared = graphSourceFiles().flatMap((file) =>
       parse(file)
         .statements.map(declaredPoint)
@@ -91,38 +95,7 @@ describe('a point has one type', () => {
         .map((name) => `${name} in packages/graph/src/${relative(graphSourceDir, file)}`),
     );
 
-    expect(declared).toEqual([STRATEGY_POINT]);
-  });
-
-  /**
-   * The declaration inventory above is not the invariant. An exported type is
-   * exempt from `noUnusedLocals`, so `Point` can sit declared, exported and
-   * unused while the routed geometry goes straight back onto `DiagramPosition`
-   * — the split reverted, with every guard here and both typechecks green.
-   * Measured, not assumed. So what ADR 0085 actually decided is read where it
-   * landed: on the members of the section type.
-   */
-  it('types the routed geometry on that point rather than the authored position', () => {
-    const contract = graphSourceFiles().find((file) => file.endsWith('layout.ts'));
-    expect(contract, 'the strategy contract module').toBeDefined();
-
-    const section = parse(contract ?? '').statements.find(
-      (statement): statement is ts.InterfaceDeclaration =>
-        ts.isInterfaceDeclaration(statement) && statement.name.text === 'LayoutStrategyEdgeSection',
-    );
-    expect(section, 'LayoutStrategyEdgeSection').toBeDefined();
-
-    // `Point` for the two ends, `Point[]` for the bends — the element type is
-    // what matters, so an array unwraps to the name it is an array of.
-    const named = (section?.members ?? []).map((member) => {
-      if (!ts.isPropertySignature(member) || member.type === undefined) return null;
-      const type = ts.isArrayTypeNode(member.type) ? member.type.elementType : member.type;
-      return ts.isTypeReferenceNode(type) && ts.isIdentifier(type.typeName)
-        ? type.typeName.text
-        : null;
-    });
-
-    expect(named).toEqual(['Point', 'Point', 'Point']);
+    expect(declared).toEqual(DECLARED_POINTS);
   });
 
   it('takes the authored position from core rather than re-declaring it', () => {

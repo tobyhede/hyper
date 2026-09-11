@@ -10,7 +10,7 @@ import * as graphPackage from '@project/graph';
  * The rule behind the list: the unit of curation is the module, not the name. A
  * module reaches the index when something outside the package calls into it, and
  * every type that module exports is offered with it — which is why
- * `GridStrategyOptions`, `LayoutStrategyPort` and `ThingFileErrorKind` are listed below
+ * `GridStrategyOptions` and `ThingFileErrorKind` are listed below
  * with nothing importing them. Functions are named one at a time: a helper whose
  * only callers are inside the package stays in its module, behind the form
  * consumers do call.
@@ -71,9 +71,7 @@ const OFFERED_TYPES = [
   'InitializeSpaceOptions',
   'LayoutStrategyThing',
   'LayoutStrategyEdge',
-  'LayoutStrategyEdgeSection',
   'LayoutStrategyGraph',
-  'LayoutStrategyPort',
   'LayoutStrategy',
   'LoadSpaceResult',
   'LoadSpaceAggregateInput',
@@ -82,7 +80,6 @@ const OFFERED_TYPES = [
   'NewSpace',
   'ParseThingFileResult',
   'ParseImportThingFileResult',
-  'Point',
   'OwnedGraph',
   'ResolvedContentThing',
   'ResolvedDiagram',

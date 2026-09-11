@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildThingHandles,
   buildLayoutStrategyGraph,
   buildGraphRenderEdges,
   gridStrategy,
@@ -58,32 +57,29 @@ const space = loadFixture();
 const SIZE = { width: 100, height: 50 };
 
 describe('buildLayoutStrategyGraph', () => {
-  it('carries each thing’s size and its ports, inbound first', () => {
+  it('carries each thing’s size and nothing positioned', () => {
     const graph = buildLayoutStrategyGraph(
       [
         uuid('00000000-0000-4000-8000-000000000002'),
         uuid('00000000-0000-4000-8000-000000000003'),
         uuid('00000000-0000-4000-8000-000000000005'),
       ],
-      buildThingHandles(space),
       buildGraphRenderEdges(space),
       () => SIZE,
     );
 
     const b = graph.things.find((t) => t.id === '00000000-0000-4000-8000-000000000003')!;
     expect(b).toMatchObject({ width: 100, height: 50 });
-    expect(b.ports).toEqual([
-      { id: '00000000-0000-4000-8000-000000000004::in', side: 'in' },
-      { id: '00000000-0000-4000-8000-000000000004::out', side: 'out' },
-    ]);
-    // Nothing is positioned yet — that is the diagram's job.
+    // Nothing is positioned yet — that is the diagram's job. And a Thing carries
+    // its rect and nothing else: the contract answers positions only (ADR 0086),
+    // so the per-Graph anchors it used to carry are the render layer's alone.
+    expect(Object.keys(b).sort()).toEqual(['height', 'id', 'width']);
     expect(b.x).toBeUndefined();
   });
 
   it('drops edges whose endpoints the view is not showing', () => {
     const graph = buildLayoutStrategyGraph(
       [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
-      buildThingHandles(space),
       buildGraphRenderEdges(space),
       () => SIZE,
     );
@@ -100,7 +96,6 @@ describe('gridStrategy', () => {
       uuid('00000000-0000-4000-8000-000000000003'),
       uuid('00000000-0000-4000-8000-000000000005'),
     ],
-    buildThingHandles(space),
     buildGraphRenderEdges(space),
     () => SIZE,
   );
@@ -116,15 +111,6 @@ describe('gridStrategy', () => {
       [110, 0],
       [0, 60],
     ]);
-  });
-
-  it('never places ports, leaving the render layer to spread them', async () => {
-    const laid = await gridStrategy()(graph);
-    for (const thing of laid.things) {
-      for (const port of thing.ports) {
-        expect(port.y).toBeUndefined();
-      }
-    }
   });
 
   it('ignores the edges entirely', async () => {
