@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0005, 0014
+Refined by: 0087
 Related: 0021, 0025, 0040, 0045, 0053, 0056, 0079, 0085
 
 elkjs leaves the repository. The `LayoutStrategy` contract keeps the one direction that has a consumer — `positionedStrategy`, which reads a Diagram and answers the graph to draw — and loses the routing output that neither direction can use. `gridStrategy` stays, unused, because it is pure, costs nothing and keeps the contract honest — not because grid is the arrangement that returns. No strategy is privileged (ADR 0014, ADR 0040, ADR 0041).

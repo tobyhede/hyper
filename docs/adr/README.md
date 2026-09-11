@@ -50,6 +50,7 @@ under `superseded/`.
 | [0005](0005-layout-is-a-strategy.md) | A strategy arranges Cards and returns no separate arranged-result type. |
 | [0014](0014-layout-is-the-authored-data-strategy-is-the-behaviour.md) | A Layout is authored data. A LayoutStrategy is behaviour. |
 | [0086](0086-automatic-arrangement-is-an-edit-not-a-render-path.md) | An automatic arrangement is an Edit over a Diagram. No strategy runs at render but the positioned one. |
+| [0087](0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md) | An Edge attaches to one of a Thing's four anchors, on the side facing its neighbour, chosen while drawing. |
 | [0040](0040-layouts-own-card-membership-and-routes.md) | A Layout owns its Card membership and its Graphs. |
 | [0079](0079-v1-exposes-only-layouts-and-first-open-initializes-one.md) | An authored Layout is the only selectable and addressable canvas context, and first working load initializes one. |
 | [0080](0080-new-spaces-start-complete-and-layoutless-stored-spaces-are-repaired.md) | New Spaces persist their first Card in a complete Layout; first working load repairs stored layoutless Spaces without placing their Cards. |
