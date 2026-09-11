@@ -148,8 +148,22 @@ const home = (spaceThing: Extract<ThingDocument, { kind: 'space' }>): SpaceSnaps
     ],
   });
 
-/** The Space Thing as created: a target and nothing selected of it yet. */
-const unselected = home({ title: 'Elsewhere', kind: 'space', spaceId: TARGET_ID });
+/**
+ * The Space Thing as created: the Diagram its target opens on, and that Diagram's
+ * Active Graph (ADR 0079).
+ *
+ * There is no Space Thing here carrying nothing, because the lifecycle that
+ * creates one stores what its target opens on before the Thing exists. So what
+ * these tests exercise is a selection being *changed*, and the baseline they
+ * change from is the one the author would actually have been handed.
+ */
+const created = home({
+  title: 'Elsewhere',
+  kind: 'space',
+  spaceId: TARGET_ID,
+  diagram: FIRST_DIAGRAM_ID,
+  graph: FIRST_GRAPH_ID,
+});
 
 /**
  * Meta, which is here because the aggregate demands a sole root that reaches
@@ -177,10 +191,25 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   },
   things: [
     { id: META_THING_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
-    { id: META_TO_HOME_ID, document: { title: 'Home', kind: 'space', spaceId: HOME_ID } },
+    {
+      id: META_TO_HOME_ID,
+      document: {
+        title: 'Home',
+        kind: 'space',
+        spaceId: HOME_ID,
+        diagram: HOME_DIAGRAM_ID,
+        graph: HOME_GRAPH_ID,
+      },
+    },
     {
       id: META_TO_TARGET_ID,
-      document: { title: 'Architecture', kind: 'space', spaceId: TARGET_ID },
+      document: {
+        title: 'Architecture',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        diagram: FIRST_DIAGRAM_ID,
+        graph: FIRST_GRAPH_ID,
+      },
     },
   ],
 });
@@ -192,7 +221,7 @@ const runtime = (value: SpaceSnapshot) => {
 };
 
 /** Mount the app on one exact `Home` snapshot, with Meta and the target beside it. */
-function mount(value: SpaceSnapshot = unselected): SpaceSession {
+function mount(value: SpaceSnapshot = created): SpaceSession {
   const backend = new MemorySpaceBackend(META_ID, [
     { snapshot: meta, revision: 0n, exportedRevision: null },
     { snapshot: value, revision: 0n, exportedRevision: null },
@@ -307,10 +336,12 @@ describe('an Open Space Thing', () => {
 
     const thing = await openSpaceThing();
 
-    expect(within(thing).getByRole('button', { name: 'Diagram: none' })).toBeEnabled();
-    // Nothing is selected yet, so the Diagram offers the target's two and the
-    // Graph beside it has no Diagram to draw from.
-    expect(within(thing).getByRole('button', { name: 'Graph: none' })).toBeDisabled();
+    // Both are live from the first render, and both name what they hold. A
+    // Space Thing selects a Diagram and a Graph from the moment it exists (ADR
+    // 0079), so the Graph control always has a Diagram to draw its rows from,
+    // and neither control has a `none` to say.
+    expect(within(thing).getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
+    expect(within(thing).getByRole('button', { name: 'Graph: Overview' })).toBeEnabled();
     await settled(session);
   });
 
@@ -350,15 +381,15 @@ describe('an Open Space Thing', () => {
     const session = mount();
     await openSpaceThing();
 
-    choose('space-thing-diagram', 'Collection 1');
+    choose('space-thing-diagram', 'Collection 2');
 
     await waitFor(() =>
       expect(spaceThingDocument(session)).toEqual({
         title: 'Elsewhere',
         kind: 'space',
         spaceId: TARGET_ID,
-        diagram: FIRST_DIAGRAM_ID,
-        graph: FIRST_GRAPH_ID,
+        diagram: SECOND_DIAGRAM_ID,
+        graph: THIRD_GRAPH_ID,
       }),
     );
     await settled(session);
@@ -453,8 +484,10 @@ describe('an Open Space Thing', () => {
     // Exactly two, named: a third would be the retarget control this Thing is
     // not allowed to have, whatever it happened to be labelled.
     expect(choiceControls(thing)).toHaveLength(2);
-    expect(within(thing).getByRole('button', { name: 'Diagram: none' })).toBeInTheDocument();
-    expect(within(thing).getByRole('button', { name: 'Graph: none' })).toBeInTheDocument();
+    expect(
+      within(thing).getByRole('button', { name: 'Diagram: Collection 1' }),
+    ).toBeInTheDocument();
+    expect(within(thing).getByRole('button', { name: 'Graph: Overview' })).toBeInTheDocument();
     await settled(session);
   });
 });

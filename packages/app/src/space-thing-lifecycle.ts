@@ -16,6 +16,7 @@ export type {
   LinkSpaceThingInput,
   SpaceThingLifecycle,
   SpaceThingLifecycleResult,
+  SpaceThingTargetUnavailableReason,
 } from '@project/persistence';
 
 /** The target's choices; rendering uses its live Space's production projection. */

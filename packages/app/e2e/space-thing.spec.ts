@@ -212,20 +212,34 @@ test('a second Space Thing may reference the Space the first one created', async
   // rather than a second copy of it.
   await expect(nodeByTitle(page, 'Architecture again')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+
+  // Referencing an existing Space selects in it too (ADR 0079). The first Thing
+  // stored what its target initializer minted; this one had to read the same
+  // pair back off a Space that already had it, which is the other half of the
+  // rule and the half a created target cannot exercise.
+  const again = nodeByTitle(page, 'Architecture again');
+  await again.focus();
+  await again.press('Enter');
+  await expect(again.getByTestId('space-thing-diagram')).toHaveText('Diagram 1');
+  await expect(again.getByTestId('space-thing-graph')).toHaveText('Graph 1');
 });
 
 /**
- * Opening a Space Thing exposes the selections the Thing authors over its
- * target's context — and nothing that would change the Space it points at.
+ * Opening a Space Thing shows the selections it already carries — and nothing
+ * that would change the Space it points at.
  *
  * A created target Space is complete (ADR 0080): the one Space initializer gives
- * it an authored default Diagram and one empty Active Graph, so its selectors
- * offer that Diagram and its Graph rather than opening onto nothing. The Thing has
- * chosen neither yet — storing the target's default Diagram and Graph on the Thing
- * at creation is `layout-only-v1/04`.
+ * it an authored default Diagram and one empty Active Graph. The Thing stores
+ * that pair from the moment it exists (ADR 0079), so what an author opens onto
+ * is a Diagram and a Graph already named rather than two empty selectors, and
+ * the selectors are there to *change* the choice rather than to make it.
+ *
+ * Read before either is clicked, which is what distinguishes a stored selection
+ * from one this test made: a selector that had to be opened to show `Diagram 1`
+ * would prove only that the target offers it.
  */
 test(
-  'an Open Space Thing offers its target’s selections and no way to change it',
+  'an Open Space Thing shows the selections it was created with',
   {
     tag: '@parity:open-space-thing-chooses-its-context-on-the-shared-controls',
   },
@@ -255,22 +269,18 @@ test(
     // complete rather than blank.
     const diagramSelector = thing.getByTestId('space-thing-diagram');
     await expect(diagramSelector).toBeEnabled();
-    await expect(diagramSelector).toHaveText('No Diagram');
-    // The shared `ChoiceMenu` the Command Dock's own Diagram list is: a menu of
-    // radio rows behind the control that names what is chosen.
-    await diagramSelector.click();
-    await expect(page.getByRole('menuitemradio', { name: 'Diagram 1' })).toBeVisible();
-    await page.getByRole('menuitemradio', { name: 'Diagram 1' }).click();
-    await settled(page);
     await expect(diagramSelector).toHaveText('Diagram 1');
     await expect(thing.getByTestId('space-thing-graph')).toHaveText('Graph 1');
+    // And the Diagram it names is the one it draws, which is what says the
+    // stored pair reached the canvas rather than only the two controls.
+    await expect(page.locator('.react-flow__node[data-id^="embedded:"]')).toHaveCount(1);
 
     // **The Dock's surface and controls, and not the Dock's operations**
     // (`.scratch/command-dock/issues/12`). The panel the two choices sit on is
     // compared against the Dock that is on screen beside it, property by property,
-    // so a change to one that the other did not follow fails here; and the list
-    // that was just used wrote the Thing's own context without moving the canvas
-    // the Thing is standing on.
+    // so a change to one that the other did not follow fails here; and the Thing
+    // drawing its own stored context left the canvas the Thing stands on where
+    // it was.
     const treatment = (locator: Locator) =>
       locator.evaluate((element) => {
         const style = getComputedStyle(element);
@@ -361,7 +371,7 @@ const embeddedNodes = (page: Page): Locator =>
   page.locator('.react-flow__node[data-id^="embedded:"]');
 
 /**
- * Create a Space Thing, Open it, and point it at its target's one Diagram.
+ * Create a Space Thing and Open it on the Diagram it already selects.
  *
  * Spelled out once rather than three times because every claim about what an
  * Open Space Thing *shows* starts from the same place, and none of the steps is
@@ -370,6 +380,11 @@ const embeddedNodes = (page: Page): Locator =>
  * test before this one. The keyboard Open is that test's reasoning too — the
  * created Thing lands at the visible centre, partly under a fixture Thing, so its
  * rail is not reliably clickable until it is Open and drawn over its neighbour.
+ *
+ * Nothing here points the Thing anywhere. It arrives pointed: creating a Space
+ * Thing stores the Diagram its target opens on and that Diagram's Active Graph
+ * (ADR 0079), so the Open gesture is the whole of what these tests need to set
+ * up, and the selector is read rather than clicked.
  */
 async function openSpaceThingOnItsDiagram(page: Page): Promise<Locator> {
   await page.goto('/');
@@ -387,11 +402,7 @@ async function openSpaceThingOnItsDiagram(page: Page): Promise<Locator> {
   await thing.focus();
   await thing.press('Enter');
 
-  const diagramSelector = thing.getByTestId('space-thing-diagram');
-  await expect(diagramSelector).toBeEnabled();
-  await diagramSelector.click();
-  await page.getByRole('menuitemradio', { name: 'Diagram 1' }).click();
-  await expect(diagramSelector).toHaveText('Diagram 1');
+  await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Diagram 1');
   await settled(page);
   return thing;
 }

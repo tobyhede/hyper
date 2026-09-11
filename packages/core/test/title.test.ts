@@ -56,6 +56,8 @@ const spaceFrontmatter = (title: string) => ({
   title,
   kind: 'space',
   spaceId: SPACE_ID,
+  diagram: DIAGRAM_ID,
+  graph: GRAPH_ID,
 });
 
 /** The schemas that read one Thing kind, each beside the frontmatter it reads. */

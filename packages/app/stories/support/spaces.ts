@@ -43,6 +43,45 @@ const loaded = (result: LoadSpaceResult | LoadSpaceSnapshotResult): Space => {
   return result.space;
 };
 
+/** One Diagram of a target Space and one Graph that Diagram owns — what every Space Thing stores. */
+interface SpaceThingSelection {
+  readonly diagram: UUID;
+  readonly graph: GraphId;
+}
+
+/**
+ * What a Space Thing pointed at a fixture selects: the Diagram that Space opens
+ * on, and that Diagram's Active Graph (ADR 0079, ADR 0026).
+ *
+ * Derived from the target snapshot rather than written out beside each Space
+ * Thing, because a transcribed pair is one that goes stale the moment a
+ * fixture's `defaultDiagram` moves — and these load at module scope, so a stale
+ * pair takes the whole catalogue down rather than one story. It is the same rule
+ * the lifecycle applies when it creates a Space Thing
+ * (`packages/persistence/src/session-registry.ts`), which is what keeps a
+ * fixture Space Thing indistinguishable from an authored one.
+ */
+const opensOn = (target: SpaceSnapshot): SpaceThingSelection => {
+  const diagram = (target.document.diagrams ?? []).find(
+    ({ id }) => id === target.document.defaultDiagram,
+  );
+  if (diagram === undefined)
+    throw new Error(`Story Space ${target.document.title} declares no opening Diagram`);
+  const graph = diagram.graphs.find(({ id }) => id === diagram.activeGraph) ?? diagram.graphs[0];
+  if (graph === undefined)
+    throw new Error(`Story Diagram ${diagram.title} owns no Graph to select`);
+  return { diagram: diagram.id, graph: graph.id };
+};
+
+/** A Space Thing titled for the Space it shows, selecting what that Space opens on. */
+export const spaceThingDocument = (
+  title: string,
+  target: SpaceSnapshot,
+): SpaceSnapshot['things'][number]['document'] => {
+  const { diagram, graph } = opensOn(target);
+  return { title, kind: 'space', spaceId: target.id, diagram, graph };
+};
+
 const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -486,15 +525,19 @@ const dockThingId = (title: string): UUID => {
 /**
  * The Spaces a Space Thing here points at: the other tracked fixtures, in turn.
  *
- * Real ids rather than minted ones, because a Space Thing's whole content is the
- * Space it names — a fixture pointing at nothing would draw a Space Thing that
- * could never resolve, and the Dock's Spaces list is exactly the surface that
- * would have to pretend otherwise.
+ * Real Spaces rather than minted ids, because a Space Thing's whole content is
+ * the Space it names — a fixture pointing at nothing would draw a Space Thing
+ * that could never resolve, and the Dock's Spaces list is exactly the surface
+ * that would have to pretend otherwise.
+ *
+ * The snapshots themselves rather than their ids, because a Space Thing stores a
+ * Diagram and a Graph of its target as well (ADR 0079) and {@link opensOn} reads
+ * those off the Space the Thing points at.
  */
-const DOCK_TARGET_SPACES = [authoredSnapshot.id, traversalSpace.id, deepDiveSpace.id] as const;
+const DOCK_TARGET_SPACES = [authoredSnapshot, traversalSnapshot, deepDiveSnapshot] as const;
 
-const dockTargetSpace = (index: number): UUID =>
-  DOCK_TARGET_SPACES[index % DOCK_TARGET_SPACES.length] ?? authoredSnapshot.id;
+const dockTargetSpace = (index: number): SpaceSnapshot =>
+  DOCK_TARGET_SPACES[index % DOCK_TARGET_SPACES.length] ?? authoredSnapshot;
 
 /**
  * Which Thing each Alias shows, named rather than derived from its title.
@@ -524,7 +567,7 @@ const dockThingDocument = (
   kind: DockThingKind,
   index: number,
 ): SpaceSnapshot['things'][number]['document'] => {
-  if (kind === 'space') return { title, kind, spaceId: dockTargetSpace(index) };
+  if (kind === 'space') return spaceThingDocument(title, dockTargetSpace(index));
   if (kind === 'alias') return { title, kind, target: dockAliasTarget(title) };
   return { title, kind, body: '' };
 };
@@ -640,7 +683,7 @@ const chainId = (offset: number): UUID =>
 const crossingSpace = (
   block: number,
   title: string,
-  targets: readonly (readonly [string, UUID])[],
+  targets: readonly (readonly [string, SpaceSnapshot])[],
 ): SpaceSnapshot => ({
   id: chainId(block),
   document: {
@@ -662,23 +705,23 @@ const crossingSpace = (
       },
     ],
   },
-  things: targets.map(([thingTitle, spaceId], index) => ({
+  things: targets.map(([thingTitle, target], index) => ({
     id: chainId(block + 3 + index),
-    document: { title: thingTitle, kind: 'space', spaceId },
+    document: spaceThingDocument(thingTitle, target),
   })),
 });
 
 /** The link above the Dock's own Space, and the one the Dock's trail names. */
 export const designSystemSnapshot: SpaceSnapshot = crossingSpace(0x00, 'Design system', [
-  ['Rendering', commandDockSnapshot.id],
-  ['Space', authoredSnapshot.id],
-  ['Traversal', traversalSnapshot.id],
+  ['Rendering', commandDockSnapshot],
+  ['Space', authoredSnapshot],
+  ['Traversal', traversalSnapshot],
 ]);
 
 /** The link below Meta, which a deep trail collapses. */
 export const platformSnapshot: SpaceSnapshot = crossingSpace(0x10, 'Platform', [
-  ['Design system', designSystemSnapshot.id],
-  ['Deep dive', deepDiveSnapshot.id],
+  ['Design system', designSystemSnapshot],
+  ['Deep dive', deepDiveSnapshot],
 ]);
 
 export const designSystemSpace: Space = loaded(loadSpaceSnapshot(designSystemSnapshot));
@@ -706,12 +749,12 @@ const metaId = (offset: number): UUID =>
  * the Space you arrive in are named by two different authors.
  */
 const META_TARGETS = [
-  ['Platform', platformSnapshot.id],
-  ['Rendering', commandDockSnapshot.id],
-  ['Space', authoredSnapshot.id],
-  ['Traversal', traversalSnapshot.id],
-  ['Deep dive', deepDiveSnapshot.id],
-] as const satisfies readonly (readonly [string, UUID])[];
+  ['Platform', platformSnapshot],
+  ['Rendering', commandDockSnapshot],
+  ['Space', authoredSnapshot],
+  ['Traversal', traversalSnapshot],
+  ['Deep dive', deepDiveSnapshot],
+] as const satisfies readonly (readonly [string, SpaceSnapshot])[];
 
 /**
  * Meta's own identity, and the Diagram and Graph it owns — three values from the
@@ -759,9 +802,9 @@ export const metaSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  things: META_TARGETS.map(([title, spaceId], index) => ({
+  things: META_TARGETS.map(([title, target], index) => ({
     id: metaId(0x8 + index),
-    document: { title, kind: 'space', spaceId },
+    document: spaceThingDocument(title, target),
   })),
 };
 

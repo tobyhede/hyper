@@ -23,6 +23,8 @@ const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
 const snapshot = (id = SPACE_ID, thingId = THING_ID, title = 'Stored space'): SpaceSnapshot => ({
   id,
@@ -38,10 +40,46 @@ const metaReferencingOther = (): SpaceSnapshot => ({
   things: [
     {
       id: THING_ID,
-      document: { title: 'Other space', kind: 'space', spaceId: OTHER_SPACE_ID },
+      document: {
+        title: 'Other space',
+        kind: 'space',
+        spaceId: OTHER_SPACE_ID,
+        diagram: OTHER_DIAGRAM_ID,
+        graph: OTHER_GRAPH_ID,
+      },
     },
   ],
 });
+
+/**
+ * The Space the Meta Space above points at, carrying the Diagram and Graph that
+ * Space Thing selects.
+ *
+ * A Space Thing names a Diagram of its target and a Graph that Diagram owns
+ * (ADR 0079), so the target cannot be the structureless `snapshot` — a Diagram
+ * the target minted for itself on first working load would carry an identity
+ * this fixture could not have written down.
+ */
+const otherSnapshot = (): SpaceSnapshot => {
+  const base = snapshot(OTHER_SPACE_ID, OTHER_THING_ID, 'Other space');
+  return {
+    ...base,
+    document: {
+      ...base.document,
+      defaultDiagram: OTHER_DIAGRAM_ID,
+      diagrams: [
+        {
+          id: OTHER_DIAGRAM_ID,
+          title: 'Diagram 1',
+          kind: 'positioned',
+          positions: { [OTHER_THING_ID]: { x: 0, y: 0, open: false } },
+          graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] }],
+          activeGraph: OTHER_GRAPH_ID,
+        },
+      ],
+    },
+  };
+};
 
 const startupFor = (metaSpaceId: UUID, ...snapshots: SpaceSnapshot[]) => {
   const repository = new E2eMemorySpaceRepository(
@@ -103,11 +141,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('opens the exact named Space when several are stored', async () => {
-    const startup = startupFor(
-      SPACE_ID,
-      metaReferencingOther(),
-      snapshot(OTHER_SPACE_ID, OTHER_THING_ID, 'Other space'),
-    );
+    const startup = startupFor(SPACE_ID, metaReferencingOther(), otherSnapshot());
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: OTHER_SPACE_ID }),

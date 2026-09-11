@@ -43,7 +43,14 @@ export function EmbeddedDiagramAuthoring({
   readonly parent: ThingFlowNode;
   readonly entry: OpenSpace;
   readonly diagramId: DiagramId;
-  readonly graphId: GraphId | null;
+  /**
+   * The Graph the Space Thing selects, emphasised inside the embedding.
+   *
+   * Not nullable, unlike the Space's own Active Graph this feeds: a Space Thing
+   * stores a Graph as well as a Diagram (ADR 0079), so an embedding always has
+   * one to emphasise even where the Space it draws has authored none.
+   */
+  readonly graphId: GraphId;
   readonly enabled: boolean;
   readonly bounds: EmbeddedBounds;
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;

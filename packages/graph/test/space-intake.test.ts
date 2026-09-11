@@ -57,7 +57,7 @@ const viaFiles: Loader = ({ things, ...structure }) =>
         : thing.kind === 'space'
           ? {
               path: `things/${thing.id}.md`,
-              text: `---\nid: ${thing.id}\ntitle: ${thing.title}\nkind: space\nspaceId: ${thing.spaceId}\n${thing.diagram === undefined ? '' : `diagram: ${thing.diagram}\n`}${thing.graph === undefined ? '' : `graph: ${thing.graph}\n`}---\n`,
+              text: `---\nid: ${thing.id}\ntitle: ${thing.title}\nkind: space\nspaceId: ${thing.spaceId}\ndiagram: ${thing.diagram}\ngraph: ${thing.graph}\n---\n`,
             }
           : thingFile(thing.id, thing.title, thing.body),
     ),
@@ -87,11 +87,23 @@ const aliasTo = (id: string, target: string): Thing => ({
   target: uuid(target),
 });
 
+/**
+ * The Diagram and Graph every Space Thing below selects. A Space Thing names
+ * them in its **target** Space (ADR 0079), and single-Space intake never opens
+ * a target — only the aggregate does — so one pair serves every Space Thing
+ * here, and what these ids resolve to is the aggregate's question rather than
+ * this file's.
+ */
+const TARGET_DIAGRAM = uuid('00000000-0000-4000-8000-000000000097');
+const TARGET_GRAPH = uuid('00000000-0000-4000-8000-000000000098');
+
 const spaceThing = (id: string, spaceId: string): Thing => ({
   id: uuid(id),
   title: `Space ${spaceId}`,
   kind: 'space',
   spaceId: uuid(spaceId),
+  diagram: TARGET_DIAGRAM,
+  graph: TARGET_GRAPH,
 });
 
 const graph = (id: string, title: string, edges: { from: string; to: string }[] = []) => ({

@@ -56,12 +56,23 @@ const DRAWN_A = uuidSchema.parse('00000000-0000-4000-8000-000000000025');
 const DRAWN_B = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
 const UNPLACED = uuidSchema.parse('00000000-0000-4000-8000-000000000027');
 
+/**
+ * A Diagram and Graph of the target that the target does not hold: the dangling
+ * selection left behind when the Diagram a Space Thing named is deleted.
+ *
+ * A Space Thing selects from the moment it exists (ADR 0079), so a stored pair
+ * that resolves to nothing is this and never an unmade choice.
+ */
+const DELETED_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000028');
+const DELETED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000029');
+
 /** Two Spaces no backend holds, each reached by a Space Thing of its own. */
 const GONE_A_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
 const GONE_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
 const GONE_A_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000052');
 const GONE_B_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000053');
 const GONE_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000054');
+const GONE_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000055');
 
 /**
  * The target: two Diagrams over three Things, and the one the Thing selects is
@@ -160,10 +171,25 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   },
   things: [
     { id: META_THING_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
-    { id: META_TO_HOME_ID, document: { title: 'Home', kind: 'space', spaceId: HOME_ID } },
+    {
+      id: META_TO_HOME_ID,
+      document: {
+        title: 'Home',
+        kind: 'space',
+        spaceId: HOME_ID,
+        diagram: HOME_DIAGRAM_ID,
+        graph: HOME_GRAPH_ID,
+      },
+    },
     {
       id: META_TO_TARGET_ID,
-      document: { title: 'Architecture', kind: 'space', spaceId: TARGET_ID },
+      document: {
+        title: 'Architecture',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        diagram: OTHER_DIAGRAM_ID,
+        graph: OTHER_GRAPH_ID,
+      },
     },
   ],
 });
@@ -979,12 +1005,25 @@ describe('the Diagram an Open Space Thing draws', () => {
   });
 
   /**
-   * A Space Thing that has selected nothing yet is the state creation leaves it
-   * in until `layout-only-v1/04` stores one. It draws its selectors and no
-   * view — which is a Thing waiting, not a Thing that failed.
+   * The one state that draws no view now that the selection is required.
+   *
+   * A Space Thing selects a Diagram from the moment it exists (ADR 0079), so
+   * the Thing that used to stand here — one that had chosen nothing yet — is
+   * unreachable, and a pair resolving to nothing means the Diagram it names was
+   * deleted out from under it. The Thing has neither failed nor is it waiting:
+   * its target read, so both selectors are drawn over the Diagrams that do
+   * exist, and the only thing missing is the one it points at.
    */
-  it('draws no view for a Thing that has selected no Diagram', async () => {
-    await mount(home({ title: 'Elsewhere', kind: 'space', spaceId: TARGET_ID }));
+  it('draws no view for a Thing whose selected Diagram the target no longer holds', async () => {
+    await mount(
+      home({
+        title: 'Elsewhere',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        diagram: DELETED_DIAGRAM_ID,
+        graph: DELETED_GRAPH_ID,
+      }),
+    );
 
     await screen.findByTestId('space-thing-diagram');
     expect(queryEmbeddedNode(DRAWN_A)).toBeNull();
@@ -1041,6 +1080,7 @@ describe('the Diagram an Open Space Thing draws', () => {
             kind: 'space',
             spaceId: GONE_A_ID,
             diagram: GONE_DIAGRAM_ID,
+            graph: GONE_GRAPH_ID,
           },
         },
         {
@@ -1050,6 +1090,7 @@ describe('the Diagram an Open Space Thing draws', () => {
             kind: 'space',
             spaceId: GONE_B_ID,
             diagram: GONE_DIAGRAM_ID,
+            graph: GONE_GRAPH_ID,
           },
         },
         {

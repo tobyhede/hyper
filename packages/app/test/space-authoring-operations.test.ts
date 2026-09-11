@@ -48,6 +48,17 @@ const MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 /** What a second Diagram creation would mint. */
 const UNKNOWN_THING = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
+/**
+ * What a Space Thing pointed at a Space these tests never load selects (ADR 0079).
+ *
+ * Every Space Thing names a Diagram of its target and a Graph that Diagram owns,
+ * so there is no Space Thing here with nothing chosen. Whether the pair resolves
+ * is the whole aggregate's question and not this seam's: single-Space intake
+ * holds one Space, so a target outside it supplies nothing to check these
+ * against, which is why they can be ids and nothing more.
+ */
+const UNLOADED_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000097');
+const UNLOADED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000096');
 
 const CENTRE = { x: 400, y: 300, open: false };
 
@@ -791,7 +802,13 @@ describe('Add Alias', () => {
         positionedSnapshot.things[0]!,
         {
           id: THING_B,
-          document: { title: 'Nested Space', kind: 'space', spaceId: UNKNOWN_THING },
+          document: {
+            title: 'Nested Space',
+            kind: 'space',
+            spaceId: UNKNOWN_THING,
+            diagram: UNLOADED_DIAGRAM,
+            graph: UNLOADED_GRAPH,
+          },
         },
       ],
     };
@@ -1915,7 +1932,16 @@ describe('Delete Thing from Space', () => {
       ...positionedSnapshot,
       things: [
         positionedSnapshot.things[0]!,
-        { id: THING_B, document: { title: 'Nested Space', kind: 'space', spaceId: UNKNOWN_THING } },
+        {
+          id: THING_B,
+          document: {
+            title: 'Nested Space',
+            kind: 'space',
+            spaceId: UNKNOWN_THING,
+            diagram: UNLOADED_DIAGRAM,
+            graph: UNLOADED_GRAPH,
+          },
+        },
       ],
     };
     const { authoring, session } = open(linked);

@@ -7,6 +7,8 @@ const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const snapshot = (id = META_ID, title = 'Meta'): SpaceSnapshot => ({
   id,
@@ -16,6 +18,39 @@ const snapshot = (id = META_ID, title = 'Meta'): SpaceSnapshot => ({
 
 const loaded = (id = META_ID, revision = 3n): LoadedSpace => ({
   snapshot: snapshot(id),
+  revision,
+  exportedRevision: null,
+});
+
+/**
+ * The Space a Space Thing here points at, complete enough to be pointed at.
+ *
+ * A Space Thing names a Diagram of its target and a Graph that Diagram owns
+ * (ADR 0079), so a target with no Diagram is not a Space any valid Space Thing
+ * can select — which is why the cases below that link to `OTHER_ID` build it
+ * through this rather than through the structureless `snapshot`.
+ */
+const otherSnapshot = (): SpaceSnapshot => ({
+  ...snapshot(OTHER_ID, 'Other'),
+  document: {
+    version: 1,
+    title: 'Other',
+    defaultDiagram: OTHER_DIAGRAM_ID,
+    diagrams: [
+      {
+        id: OTHER_DIAGRAM_ID,
+        title: 'Diagram 1',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        activeGraph: OTHER_GRAPH_ID,
+      },
+    ],
+  },
+});
+
+const otherLoaded = (revision: bigint): LoadedSpace => ({
+  snapshot: otherSnapshot(),
   revision,
   exportedRevision: null,
 });
@@ -125,7 +160,13 @@ describe('MemorySpaceBackend aggregate persistence', () => {
       things: [
         {
           id: SPACE_THING_ID,
-          document: { title: 'Other', kind: 'space', spaceId: OTHER_ID },
+          document: {
+            title: 'Other',
+            kind: 'space',
+            spaceId: OTHER_ID,
+            diagram: OTHER_DIAGRAM_ID,
+            graph: OTHER_GRAPH_ID,
+          },
         },
       ],
     };
@@ -139,7 +180,7 @@ describe('MemorySpaceBackend aggregate persistence', () => {
             snapshot: linkedMeta,
             expectedRevision: 3n,
           },
-          { kind: 'create', spaceId: OTHER_ID, snapshot: snapshot(OTHER_ID, 'Other') },
+          { kind: 'create', spaceId: OTHER_ID, snapshot: otherSnapshot() },
         ],
       }),
     ).resolves.toEqual({
@@ -181,11 +222,17 @@ describe('MemorySpaceBackend aggregate persistence', () => {
       things: [
         {
           id: SPACE_THING_ID,
-          document: { title: 'Other', kind: 'space', spaceId: OTHER_ID },
+          document: {
+            title: 'Other',
+            kind: 'space',
+            spaceId: OTHER_ID,
+            diagram: OTHER_DIAGRAM_ID,
+            graph: OTHER_GRAPH_ID,
+          },
         },
       ],
     };
-    const other = loaded(OTHER_ID, 6n);
+    const other = otherLoaded(6n);
     const backend = new MemorySpaceBackend(META_ID, [{ ...loaded(), snapshot: linkedMeta }, other]);
 
     await expect(

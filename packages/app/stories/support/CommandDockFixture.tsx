@@ -13,6 +13,7 @@ import {
   metaSnapshot,
   newSpaceFixture,
   platformSnapshot,
+  spaceThingDocument,
   traversalSnapshot,
 } from './spaces';
 
@@ -100,11 +101,7 @@ export async function openDockStory(scenario: DockScenario) {
         ...metaSnapshot.things,
         {
           id: newUuid(),
-          document: {
-            kind: 'space' as const,
-            title: snapshot.document.title,
-            spaceId: snapshot.id,
-          },
+          document: spaceThingDocument(snapshot.document.title, snapshot),
         },
       ],
     };

@@ -70,6 +70,10 @@ const ALL_IDLESS_THING_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffff
 const SECOND_IDLESS_THING_ID = uuidSchema.parse('fefefefe-fefe-4fef-8fef-fefefefefefe');
 const DIAGRAM_ID = uuidSchema.parse('0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a');
 const OTHER_DIAGRAM_ID = uuidSchema.parse('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
+const OTHER_SPACE_DIAGRAM_ID = uuidSchema.parse('0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c');
+const OTHER_SPACE_GRAPH_ID = uuidSchema.parse('0d0d0d0d-0d0d-4d0d-8d0d-0d0d0d0d0d0d');
+const CONCURRENT_DIAGRAM_ID = uuidSchema.parse('0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e');
+const CONCURRENT_GRAPH_ID = uuidSchema.parse('0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f');
 const ORDERED_THING_IDS = [
   uuidSchema.parse('eeeeeeee-1111-4eee-8eee-eeeeeeeeeeee'),
   uuidSchema.parse('eeeeeeee-2222-4eee-8eee-eeeeeeeeeeee'),
@@ -102,11 +106,30 @@ const snapshot: SpaceSnapshot = {
   ],
 };
 
+/*
+ * The Space every Space Thing below points at, carrying the Diagram and Graph
+ * those Things select. A Space Thing names a Diagram of its target and a Graph
+ * that Diagram owns from the moment it exists (ADR 0079), so a target with no
+ * Diagram is one nothing valid can reference. The Diagram positions nothing:
+ * several cases here replace this Space's Things, and what a Space Thing
+ * resolves is the Diagram and the Graph rather than what that Diagram places.
+ */
 const otherSnapshot: SpaceSnapshot = {
   id: OTHER_SPACE_ID,
   document: {
     version: 1,
     title: 'Other space',
+    defaultDiagram: OTHER_SPACE_DIAGRAM_ID,
+    diagrams: [
+      {
+        id: OTHER_SPACE_DIAGRAM_ID,
+        title: 'Diagram 1',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: OTHER_SPACE_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        activeGraph: OTHER_SPACE_GRAPH_ID,
+      },
+    ],
   },
   things: [
     {
@@ -641,7 +664,13 @@ describe('PostgresSpaceRepository', () => {
         ...snapshot.things,
         {
           id: MISSING_THING_ID,
-          document: { title: 'Link', kind: 'space', spaceId: OTHER_SPACE_ID },
+          document: {
+            title: 'Link',
+            kind: 'space',
+            spaceId: OTHER_SPACE_ID,
+            diagram: OTHER_SPACE_DIAGRAM_ID,
+            graph: OTHER_SPACE_GRAPH_ID,
+          },
         },
       ],
     };
@@ -949,7 +978,13 @@ describe('PostgresSpaceRepository', () => {
         ...snapshot.things,
         {
           id: MISSING_THING_ID,
-          document: { title: 'Other Space', kind: 'space', spaceId: OTHER_SPACE_ID },
+          document: {
+            title: 'Other Space',
+            kind: 'space',
+            spaceId: OTHER_SPACE_ID,
+            diagram: OTHER_SPACE_DIAGRAM_ID,
+            graph: OTHER_SPACE_GRAPH_ID,
+          },
         },
       ],
     };
@@ -981,12 +1016,40 @@ describe('PostgresSpaceRepository', () => {
     const secondRepository = new PostgresSpaceRepository(db);
     const firstTarget: SpaceSnapshot = {
       id: OTHER_SPACE_ID,
-      document: { version: 1, title: 'First target' },
+      document: {
+        version: 1,
+        title: 'First target',
+        defaultDiagram: OTHER_SPACE_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: OTHER_SPACE_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ id: OTHER_SPACE_GRAPH_ID, title: 'Graph 1', edges: [] }],
+            activeGraph: OTHER_SPACE_GRAPH_ID,
+          },
+        ],
+      },
       things: [],
     };
     const secondTarget: SpaceSnapshot = {
       id: CONCURRENT_SPACE_ID,
-      document: { version: 1, title: 'Second target' },
+      document: {
+        version: 1,
+        title: 'Second target',
+        defaultDiagram: CONCURRENT_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: CONCURRENT_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ id: CONCURRENT_GRAPH_ID, title: 'Graph 1', edges: [] }],
+            activeGraph: CONCURRENT_GRAPH_ID,
+          },
+        ],
+      },
       things: [],
     };
     const firstLinked: SpaceSnapshot = {
@@ -999,6 +1062,8 @@ describe('PostgresSpaceRepository', () => {
             title: 'First link',
             kind: 'space',
             spaceId: OTHER_SPACE_ID,
+            diagram: OTHER_SPACE_DIAGRAM_ID,
+            graph: OTHER_SPACE_GRAPH_ID,
           },
         },
       ],
@@ -1013,6 +1078,8 @@ describe('PostgresSpaceRepository', () => {
             title: 'Second link',
             kind: 'space',
             spaceId: CONCURRENT_SPACE_ID,
+            diagram: CONCURRENT_DIAGRAM_ID,
+            graph: CONCURRENT_GRAPH_ID,
           },
         },
       ],

@@ -22,7 +22,14 @@ const THINGS: readonly Thing[] = [
     kind: 'alias',
     target: id('000000000003'),
   },
-  { id: id('000000000005'), title: 'Demo flow', kind: 'space', spaceId: id('000000000010') },
+  {
+    id: id('000000000005'),
+    title: 'Demo flow',
+    kind: 'space',
+    spaceId: id('000000000010'),
+    diagram: id('000000000011'),
+    graph: id('000000000012'),
+  },
 ];
 
 const LONG_THINGS: readonly Thing[] = Array.from({ length: 18 }, (_, index) => ({

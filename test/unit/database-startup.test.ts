@@ -25,6 +25,8 @@ const OTHER_THING_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const DIAGRAM_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const GRAPH_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
 const LINK_THING_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
+const CHILD_DIAGRAM_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
+const CHILD_GRAPH_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
 
 /**
  * The identities startup is about to mint, named in the order it mints them
@@ -435,14 +437,45 @@ describe('resolveDatabaseStartup', () => {
           { id: OTHER_THING_ID, document: { title: 'Meta thing', kind: 'markdown', body: '' } },
           {
             id: LINK_THING_ID,
-            document: { title: 'Open the child', kind: 'space', spaceId: SPACE_ID },
+            document: {
+              title: 'Open the child',
+              kind: 'space',
+              spaceId: SPACE_ID,
+              diagram: CHILD_DIAGRAM_ID,
+              graph: CHILD_GRAPH_ID,
+            },
           },
         ],
       },
       revision: 7n,
       exportedRevision: null,
     };
-    const repository = new MemorySpaceRepository([storedSpace(4n), meta], OTHER_SPACE_ID);
+    // The child carries the Diagram that Space Thing selects. A Space Thing
+    // names a Diagram of its target and a Graph that Diagram owns from the
+    // moment it exists (ADR 0079), so the ordinary Space inside the closure
+    // cannot be the structureless one `storedSpace` builds.
+    const stored = storedSpace(4n);
+    const child: LoadedSpace = {
+      ...stored,
+      snapshot: {
+        ...stored.snapshot,
+        document: {
+          ...stored.snapshot.document,
+          defaultDiagram: CHILD_DIAGRAM_ID,
+          diagrams: [
+            {
+              id: CHILD_DIAGRAM_ID,
+              title: 'Diagram 1',
+              kind: 'positioned',
+              positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+              graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
+              activeGraph: CHILD_GRAPH_ID,
+            },
+          ],
+        },
+      },
+    };
+    const repository = new MemorySpaceRepository([child, meta], OTHER_SPACE_ID);
 
     const result = await resolveDatabaseStartup(repository, mintingIds(DIAGRAM_ID));
 

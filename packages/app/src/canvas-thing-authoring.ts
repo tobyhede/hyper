@@ -36,11 +36,7 @@ const spaceThingSelection = (
   thingId: ThingId,
   target: SpaceThingTarget,
   document: Extract<ThingDocument, { kind: 'space' }> | undefined,
-  complete: (
-    thingId: ThingId,
-    diagram: SpaceThingTargetDiagram,
-    graphId: GraphId | undefined,
-  ) => void,
+  complete: (thingId: ThingId, diagram: SpaceThingTargetDiagram, graphId: GraphId) => void,
   disabled: boolean,
 ): CanvasSpaceThingSelection => {
   const selectedDiagram = target.diagrams.find((diagram) => diagram.id === document?.diagram);
@@ -62,8 +58,13 @@ const spaceThingSelection = (
       // the seed has to be a Graph this Diagram owns or the aggregate refuses
       // the Thing that names it.
       if (diagram === undefined) return;
-      const active = diagram.graphs.find((graph) => graph.id === diagram.activeGraph);
-      complete(thingId, diagram, (active ?? diagram.graphs[0])?.id);
+      const seed =
+        diagram.graphs.find((graph) => graph.id === diagram.activeGraph) ?? diagram.graphs[0];
+      // A Diagram owns at least one Graph, so this is the type-level boundary
+      // between a validated Space and the ids read out of it, not a Diagram an
+      // author can choose and leave half-selected.
+      if (seed === undefined) return;
+      complete(thingId, diagram, seed.id);
     },
     onGraphChange: (id) => {
       if (selectedDiagram === undefined) return;
@@ -280,21 +281,25 @@ export function useCanvasThingAuthoring({
    * by the Diagram that holds it (ADR 0040), and the aggregate refuses a Thing
    * naming a Graph its Diagram does not own. So choosing a Diagram re-seeds
    * the Graph from that Diagram rather than leaving the previous one to be
-   * refused at intake, and a Diagram with no Graph leaves the selection unwritten
-   * rather than pointing at nothing.
+   * refused at intake.
+   *
+   * There is no arm for a Diagram that owns no Graph. A Diagram owns at least
+   * one — `spaceFileSchema` says so — and a Space Thing stores a Graph as well
+   * as a Diagram (ADR 0079), so writing the pair half-made is not a state this
+   * surface may reach. `graphId` is required here for that reason, and the
+   * schema parse below is what still stands between a resolved pair and a
+   * stored one.
    *
    * The target Space reference is untouched here and cannot be reached from the
    * surface at all: it is chosen once, at creation (ADR 0068), and Space
    * Authoring refuses a changed one on its own account.
    */
   const completeSpaceThingSelection = useCallback(
-    (thingId: ThingId, diagram: SpaceThingTargetDiagram, graphId: GraphId | undefined): void => {
+    (thingId: ThingId, diagram: SpaceThingTargetDiagram, graphId: GraphId): void => {
       const stored = spaceSession.getState().working.things.find((thing) => thing.id === thingId);
       if (stored?.document.kind !== 'space') return;
-      const document: ThingDocument = { ...stored.document, diagram: diagram.id };
-      const parsed = thingDocumentSchema.safeParse(
-        graphId === undefined ? { ...document, graph: undefined } : { ...document, graph: graphId },
-      );
+      const document: ThingDocument = { ...stored.document, diagram: diagram.id, graph: graphId };
+      const parsed = thingDocumentSchema.safeParse(document);
       if (!parsed.success) return;
       authoring.complete({ kind: 'edited-thing', thingId, document: parsed.data });
     },

@@ -97,7 +97,16 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
           { id: thingId, document: { title: 'Thing', kind: 'markdown', body: '' } },
           {
             id: META_SPACE_THING_ID,
-            document: { title: 'Other', kind: 'space', spaceId: OTHER_ID },
+            // The Diagram `Other` opens on and that Diagram's Active Graph —
+            // what the lifecycle would have stored had this Thing been authored
+            // rather than written out (ADR 0079).
+            document: {
+              title: 'Other',
+              kind: 'space',
+              spaceId: OTHER_ID,
+              diagram: DIAGRAM_ID,
+              graph: GRAPH_ONE,
+            },
           },
         ]
       : [{ id: thingId, document: { title: 'Thing', kind: 'markdown', body: '' } }],

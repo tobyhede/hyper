@@ -53,16 +53,27 @@ const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
 const DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
 const SECOND_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000022');
 const SECOND_DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000023');
+const THIRD_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000024');
+const FOURTH_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000025');
 
 const thing = (id: UUID, title: string) => ({
   id,
   document: { title, kind: 'markdown' as const, body: title },
 });
 
+/**
+ * A Space Thing and the selection it carries.
+ *
+ * The selection is a parameter rather than a default because a Space Thing names
+ * a Diagram of its target and a Graph that Diagram owns from the moment it
+ * exists (ADR 0079). Every case below therefore says which Diagram of which
+ * target it is pointing at, and a target built without one cannot be linked to
+ * at all — which is what `targetSpace` is for.
+ */
 const spaceThing = (
   id: UUID,
   target: UUID,
-  selection: { readonly diagram?: UUID; readonly graph?: UUID } = {},
+  selection: { readonly diagram: UUID; readonly graph: UUID },
 ) => ({
   id,
   document: { title: `Open ${target}`, kind: 'space' as const, spaceId: target, ...selection },
@@ -79,6 +90,36 @@ const space = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceSnapsho
   id,
   document: { version: 1, title },
   things: thingIds.map((thingId) => thing(thingId, `${title} thing`)),
+});
+
+/**
+ * A Space complete enough to be pointed at: one positioned Diagram owning one
+ * Graph, which is the least a Space Thing's selection can resolve against.
+ *
+ * `space` above deliberately has no structure, and under ADR 0079 that makes it
+ * a Space no valid Space Thing can name. The cases that link build their target
+ * through this instead, and select `DIAGRAM_ID` and `GRAPH_ID` when they do. The
+ * Diagram positions nothing: what a Space Thing resolves is the Diagram and the
+ * Graph, and which Things that Diagram places is a separate matter this suite
+ * never reads.
+ */
+const targetSpace = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceSnapshot => ({
+  ...space(id, title, thingIds),
+  document: {
+    version: 1,
+    title,
+    defaultDiagram: DIAGRAM_ID,
+    diagrams: [
+      {
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+        activeGraph: GRAPH_ID,
+      },
+    ],
+  },
 });
 
 /**
@@ -193,10 +234,13 @@ export const spaceRepositoryContract = (
 
   it(`${name} classifies canonical initialization and invalid lifecycle proposals`, async () => {
     await withHarness(async (repository) => {
-      const child = space(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+      const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
       const meta = {
         ...space(SPACE_ID, 'Meta', [THING_ID]),
-        things: [thing(THING_ID, 'Meta thing'), spaceThing(LINK_THING_ID, OTHER_SPACE_ID)],
+        things: [
+          thing(THING_ID, 'Meta thing'),
+          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ],
       };
       const input = { metaSpaceId: SPACE_ID, spaces: [meta, child] };
       const [first, second] = await Promise.all([
@@ -375,10 +419,13 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses to create a new unreachable Space by removing its last reference alone`, async () => {
     await withHarness(async (repository) => {
-      const target = space(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]);
+      const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]);
       const linkedMeta: SpaceSnapshot = {
         ...space(SPACE_ID, 'Meta', [THING_ID]),
-        things: [thing(THING_ID, 'Meta thing'), spaceThing(SECOND_THING_ID, OTHER_SPACE_ID)],
+        things: [
+          thing(THING_ID, 'Meta thing'),
+          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ],
       };
       await seed(repository, linkedMeta, target);
 
@@ -396,13 +443,13 @@ export const spaceRepositoryContract = (
     await withHarness(async (repository) => {
       const meta = space(SPACE_ID, 'Meta', [THING_ID]);
       await seed(repository, meta);
-      const child = space(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+      const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
       const linked = {
         ...meta,
         things: [
           ...meta.things,
-          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID),
-          spaceThing(LINK_THING_ID, OTHER_SPACE_ID),
+          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
         ],
       };
 
@@ -452,7 +499,10 @@ export const spaceRepositoryContract = (
        */
       const halfUnlinked = {
         ...meta,
-        things: [...meta.things, spaceThing(LINK_THING_ID, OTHER_SPACE_ID)],
+        things: [
+          ...meta.things,
+          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ],
       };
       await expect(
         repository.commit({
@@ -513,7 +563,7 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} round trips every optional Space Thing selection combination across a later default change`, async () => {
+  it(`${name} keeps each Space Thing's own selection across a later default Diagram change`, async () => {
     await withHarness(async (repository) => {
       const meta = space(SPACE_ID, 'Meta', [THING_ID]);
       await seed(repository, meta);
@@ -526,40 +576,59 @@ export const spaceRepositoryContract = (
           diagrams: [
             {
               id: DIAGRAM_ID,
-              title: 'First view',
+              title: 'First diagram',
               kind: 'positioned',
               positions: { [OTHER_THING_ID]: { x: 0, y: 0, open: false } },
-              graphs: [{ id: GRAPH_ID, title: 'First graph', edges: [] }],
+              graphs: [
+                { id: GRAPH_ID, title: 'First graph', edges: [] },
+                { id: THIRD_GRAPH_ID, title: 'Second graph', edges: [] },
+              ],
+              activeGraph: GRAPH_ID,
             },
             {
               id: SECOND_DIAGRAM_ID,
-              title: 'Second view',
+              title: 'Second diagram',
               kind: 'positioned',
               positions: { [OTHER_THING_ID]: { x: 100, y: 100, open: false } },
-              graphs: [{ id: SECOND_GRAPH_ID, title: 'Second graph', edges: [] }],
+              graphs: [
+                { id: SECOND_GRAPH_ID, title: 'Third graph', edges: [] },
+                { id: FOURTH_GRAPH_ID, title: 'Fourth graph', edges: [] },
+              ],
+              activeGraph: SECOND_GRAPH_ID,
             },
           ],
         },
       };
-      const unselected = spaceThing(SECOND_THING_ID, OTHER_SPACE_ID);
-      const selectedView = spaceThing(LINK_THING_ID, OTHER_SPACE_ID, {
-        diagram: SECOND_DIAGRAM_ID,
-      });
-      const selectedGraphWithDefaultView = spaceThing(THIRD_SPACE_THING_ID, OTHER_SPACE_ID, {
+      /*
+       * Four Space Things on one target, no two selecting the same pair. Two
+       * share a Diagram and differ by Graph, two share the other Diagram and
+       * differ by Graph, so the round trip has to carry both halves of a
+       * selection rather than a Diagram with a Graph implied by it (ADR 0026).
+       */
+      const onDefaultDiagram = spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, {
+        diagram: DIAGRAM_ID,
         graph: GRAPH_ID,
       });
-      const selectedViewAndGraph = spaceThing(FOURTH_SPACE_THING_ID, OTHER_SPACE_ID, {
+      const onDefaultDiagramAtAnotherGraph = spaceThing(LINK_THING_ID, OTHER_SPACE_ID, {
+        diagram: DIAGRAM_ID,
+        graph: THIRD_GRAPH_ID,
+      });
+      const onSecondDiagram = spaceThing(THIRD_SPACE_THING_ID, OTHER_SPACE_ID, {
         diagram: SECOND_DIAGRAM_ID,
         graph: SECOND_GRAPH_ID,
+      });
+      const onSecondDiagramAtAnotherGraph = spaceThing(FOURTH_SPACE_THING_ID, OTHER_SPACE_ID, {
+        diagram: SECOND_DIAGRAM_ID,
+        graph: FOURTH_GRAPH_ID,
       });
       const linked = {
         ...meta,
         things: [
           ...meta.things,
-          unselected,
-          selectedView,
-          selectedGraphWithDefaultView,
-          selectedViewAndGraph,
+          onDefaultDiagram,
+          onDefaultDiagramAtAnotherGraph,
+          onSecondDiagram,
+          onSecondDiagramAtAnotherGraph,
         ],
       };
 
@@ -572,65 +641,44 @@ export const spaceRepositoryContract = (
         }),
       ).resolves.toMatchObject({ kind: 'committed' });
 
+      /*
+       * The target changes the Diagram it opens on, and nothing else changes.
+       * That commit stands alone: no Thing reads its selection through the
+       * target's `defaultDiagram`, so moving the opening choice cannot invalidate
+       * a Thing that chose the Diagram it is leaving (ADR 0079).
+       */
       const retargetedDefault: SpaceSnapshot = {
         ...target,
         document: { ...target.document, defaultDiagram: SECOND_DIAGRAM_ID },
       };
-      await expect(commitUpdate(repository, retargetedDefault, 0n)).resolves.toMatchObject({
-        kind: 'aggregate-refused',
-      });
-      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(target, 0n, null));
-
-      const linkedToLaterDefault: SpaceSnapshot = {
-        ...linked,
-        things: [
-          ...meta.things,
-          unselected,
-          selectedView,
-          spaceThing(THIRD_SPACE_THING_ID, OTHER_SPACE_ID, { graph: SECOND_GRAPH_ID }),
-          selectedViewAndGraph,
-        ],
-      };
-      await expect(
-        repository.commit({
-          changes: [
-            {
-              kind: 'update',
-              spaceId: SPACE_ID,
-              snapshot: linkedToLaterDefault,
-              expectedRevision: 1n,
-            },
-            {
-              kind: 'update',
-              spaceId: OTHER_SPACE_ID,
-              snapshot: retargetedDefault,
-              expectedRevision: 0n,
-            },
-          ],
-        }),
-      ).resolves.toEqual({
+      await expect(commitUpdate(repository, retargetedDefault, 0n)).resolves.toEqual({
         kind: 'committed',
-        revisions: [
-          { spaceId: SPACE_ID, revision: 2n },
-          { spaceId: OTHER_SPACE_ID, revision: 1n },
-        ],
+        revisions: [{ spaceId: OTHER_SPACE_ID, revision: 1n }],
         deletedSpaceIds: [],
       });
+
       const result = await repository.loadAggregate();
       if (result.kind === 'uninitialized') throw new Error('Seeded repository is uninitialized');
       const aggregate = result.aggregate;
       expect(aggregate).toEqual({
         metaSpaceId: SPACE_ID,
-        spaces: [stored(linkedToLaterDefault, 2n, null), stored(retargetedDefault, 1n, null)],
+        spaces: [stored(linked, 1n, null), stored(retargetedDefault, 1n, null)],
       });
-      const storedSpaceThing = aggregate.spaces[0]?.snapshot.things.find(
-        ({ id }) => id === SECOND_THING_ID,
-      );
-      expect(storedSpaceThing?.document).toStrictEqual({
-        title: `Open ${OTHER_SPACE_ID}`,
-        kind: 'space',
-        spaceId: OTHER_SPACE_ID,
-      });
+      // Read back one at a time as well, and strictly: the whole-snapshot
+      // comparison above would accept a `diagram` the adapter had quietly
+      // rewritten to the target's new opening choice if every Thing agreed on
+      // it, and it would accept an extra key alongside.
+      const storedThings = aggregate.spaces[0]?.snapshot.things ?? [];
+      for (const authored of [
+        onDefaultDiagram,
+        onDefaultDiagramAtAnotherGraph,
+        onSecondDiagram,
+        onSecondDiagramAtAnotherGraph,
+      ]) {
+        expect(storedThings.find(({ id }) => id === authored.id)?.document).toStrictEqual(
+          authored.document,
+        );
+      }
     });
   });
 
@@ -761,10 +809,13 @@ export const spaceRepositoryContract = (
   it(`${name} refuses a commit claiming a Thing another Space owns`, async () => {
     await withHarness(async (repository) => {
       const first = space(SPACE_ID, 'One', [THING_ID]);
-      const other = space(OTHER_SPACE_ID, 'Other', [OTHER_THING_ID]);
+      const other = targetSpace(OTHER_SPACE_ID, 'Other', [OTHER_THING_ID]);
       const linked = {
         ...first,
-        things: [...first.things, spaceThing(LINK_THING_ID, OTHER_SPACE_ID)],
+        things: [
+          ...first.things,
+          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ],
       };
       await seed(repository, linked, other);
       const claiming: SpaceSnapshot = {

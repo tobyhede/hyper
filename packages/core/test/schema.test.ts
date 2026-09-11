@@ -303,7 +303,7 @@ describe('thing frontmatter schema', () => {
     expect('body' in alias).toBe(false);
   });
 
-  it('parses a Space Thing with optional Diagram and Graph selections', () => {
+  it('parses a Space Thing that names both the Diagram and the Graph it selects', () => {
     const selected = thingFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000006',
       title: 'Nested space',
@@ -312,20 +312,37 @@ describe('thing frontmatter schema', () => {
       diagram: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
     });
-    const inherited = thingFrontmatterSchema.parse({
-      id: '00000000-0000-4000-8000-000000000010',
-      title: 'Nested space with inherited selections',
-      kind: 'space',
-      spaceId: '00000000-0000-4000-8000-000000000007',
-    });
 
     expect(selected).toMatchObject({
       kind: 'space',
       diagram: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
     });
-    expect(inherited).not.toHaveProperty('diagram');
-    expect(inherited).not.toHaveProperty('graph');
+  });
+
+  /**
+   * The selection is part of what a Space Thing **is**, not an option on it
+   * (ADR 0079). A Space Thing names a Diagram of its target and a Graph that
+   * Diagram owns from the moment it exists: creating one against a diagramless
+   * target initializes that target first and stores what initialization mints,
+   * and `spaceFileSchema` already guarantees every Diagram owns at least one
+   * Graph, so there is always a pair to name. That leaves the schema with no
+   * shape for an unmade choice — an absent `diagram` or `graph` is malformed
+   * frontmatter rather than a Thing inheriting its target's opening selection.
+   */
+  it('rejects a Space Thing that leaves either half of its selection unwritten', () => {
+    const nested = {
+      id: '00000000-0000-4000-8000-000000000010',
+      title: 'Nested space',
+      kind: 'space',
+      spaceId: '00000000-0000-4000-8000-000000000007',
+    };
+    const diagram = '00000000-0000-4000-8000-000000000008';
+    const graph = '00000000-0000-4000-8000-000000000009';
+
+    expect(thingFrontmatterSchema.safeParse(nested).success).toBe(false);
+    expect(thingFrontmatterSchema.safeParse({ ...nested, diagram }).success).toBe(false);
+    expect(thingFrontmatterSchema.safeParse({ ...nested, graph }).success).toBe(false);
   });
 
   it('rejects an alias with no target', () => {

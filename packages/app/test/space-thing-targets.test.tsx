@@ -40,13 +40,27 @@ const otherTarget: SpaceThingTarget = {
 
 /** The Things a completed Edit hands the canvas: one Space Thing, a fresh array. */
 const things = (): readonly Thing[] => [
-  { id: SPACE_THING_ID, title: 'Nested', kind: 'space', spaceId: TARGET_ID },
+  {
+    id: SPACE_THING_ID,
+    title: 'Nested',
+    kind: 'space',
+    spaceId: TARGET_ID,
+    diagram: TARGET_DIAGRAM_ID,
+    graph: TARGET_GRAPH_ID,
+  },
 ];
 
 /** The same canvas with a second Space Thing, pointed at a second target Space. */
 const twoThings = (): readonly Thing[] => [
   ...things(),
-  { id: OTHER_SPACE_THING_ID, title: 'Also nested', kind: 'space', spaceId: OTHER_TARGET_ID },
+  {
+    id: OTHER_SPACE_THING_ID,
+    title: 'Also nested',
+    kind: 'space',
+    spaceId: OTHER_TARGET_ID,
+    diagram: OTHER_TARGET_DIAGRAM_ID,
+    graph: OTHER_TARGET_GRAPH_ID,
+  },
 ];
 
 interface ProbeProps {

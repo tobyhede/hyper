@@ -12,6 +12,8 @@ const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_THING_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const LINK_THING_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const DIAGRAM_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+const GRAPH_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 
 const importSpace = (id: UUID, thingId: UUID, title: string): ImportSpace => ({
   id,
@@ -144,6 +146,10 @@ describe('MemorySpaceRepository', () => {
   it('rejects a commit that claims a Thing owned by another Space', async () => {
     const repository = new MemorySpaceRepository();
     const meta = importSpace(SPACE_ID, THING_ID, 'First');
+    // The second Space carries the Diagram the Space Thing selects, because a
+    // Space Thing names a Diagram of its target and a Graph that Diagram owns
+    // from the moment it exists (ADR 0079).
+    const second = importSpace(OTHER_SPACE_ID, OTHER_THING_ID, 'Second');
     await repository.importSpaces(
       [
         {
@@ -156,11 +162,32 @@ describe('MemorySpaceRepository', () => {
                 title: 'Second',
                 kind: 'space',
                 spaceId: OTHER_SPACE_ID,
+                diagram: DIAGRAM_ID,
+                graph: GRAPH_ID,
               },
             },
           ],
         },
-        importSpace(OTHER_SPACE_ID, OTHER_THING_ID, 'Second'),
+        {
+          ...second,
+          document: {
+            ...second.document,
+            defaultDiagram: DIAGRAM_ID,
+            diagrams: [
+              {
+                id: DIAGRAM_ID,
+                title: 'Diagram 1',
+                kind: 'positioned',
+                // Positions nothing: the claiming commit below replaces this
+                // Space's Things, and what a Space Thing resolves is the Diagram
+                // and the Graph rather than what that Diagram places.
+                positions: {},
+                graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+                activeGraph: GRAPH_ID,
+              },
+            ],
+          },
+        },
       ],
       'insert',
     );

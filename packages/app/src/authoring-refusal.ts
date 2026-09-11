@@ -1,7 +1,10 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import type { AuthoringRefusal, EdgeEndpoint, StoredSpaceRefusal } from './space-authoring';
-import type { SpaceThingLifecycleResult } from './space-thing-lifecycle';
+import type {
+  SpaceThingLifecycleResult,
+  SpaceThingTargetUnavailableReason,
+} from './space-thing-lifecycle';
 import { failureMessage } from './failure-message';
 
 /** Why a coordinated Space Thing lifecycle operation refused (ADR 0076). */
@@ -429,6 +432,25 @@ const PERSISTENCE_FAILURE_REASONS = {
 export const describePersistenceFailure = (failure: PersistenceFailure): string =>
   PERSISTENCE_FAILURE_REASONS[failure.code];
 
+/**
+ * Why the Space a new Space Thing was pointed at could not supply a selection.
+ *
+ * `not-initialized` is the one that ends in advice, because it is the one a
+ * second attempt can answer: the Space is there and readable and the commit
+ * that would have given it a Diagram simply did not land. The other two are
+ * permanent for that target, so their sentences stop at what happened and leave
+ * the Target field beside them to say what to do instead.
+ *
+ * `satisfies` rather than an annotation, as `AGGREGATE_REFUSAL_REASONS` above:
+ * a reason added without a sentence fails here rather than at the call.
+ */
+const TARGET_UNAVAILABLE_REASONS = {
+  missing: 'That Space no longer exists, so nothing was created.',
+  unreadable: 'That Space could not be read, so nothing was created.',
+  'not-initialized':
+    'That Space could not be prepared to be shown here, so nothing was created. Try again.',
+} satisfies Record<SpaceThingTargetUnavailableReason, string>;
+
 /** Why a coordinated Space Thing operation refused, in the author's terms. */
 export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string => {
   switch (refusal.code) {
@@ -444,22 +466,42 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
       return describeAggregateRefusal(refusal.errors);
     case 'persistence-read-failed':
       return 'The stored Spaces could not be read, so this edit was not attempted.';
+    case 'space-thing-target-unavailable':
+      return TARGET_UNAVAILABLE_REASONS[refusal.reason];
   }
 };
 
 /**
+ * Where each refusal is drawn — see {@link presentNewSpaceThingRefusal}.
+ *
+ * A table over every code rather than a set of the two that reach the Target
+ * field, for the reason `TARGET_UNAVAILABLE_REASONS` above is one: a membership
+ * test answers `false` for a code nobody placed, so a refusal added later would
+ * quietly land under the pane instead of on the field that fixes it. `satisfies
+ * Record<…>` makes the omission a compile error here, where the decision is.
+ */
+const REFUSAL_PLACEMENT = {
+  'aggregate-refused': 'target',
+  'space-thing-target-unavailable': 'target',
+  'diagram-not-found': 'form',
+  'space-thing-not-found': 'form',
+  'persistence-recovery-required': 'form',
+  'persistence-read-failed': 'form',
+} satisfies Record<SpaceThingRefusal['code'], 'target' | 'form'>;
+
+/**
  * Error placement for Space Thing creation, which owns Title and Target.
  *
- * Only `aggregate-refused` reaches the Target field, and it is the one that
- * has to: a cycle, a target that has gone and a Diagram the target no
- * longer holds are all answered by choosing a different Space. The rest
- * describe the containing Space or the repository, which no row in that list
- * would fix.
+ * Two codes reach the Target field, and they are the two that have to: a cycle,
+ * a target that has gone and a Diagram the target no longer holds are all
+ * answered by choosing a different Space, and so is a target that could not be
+ * prepared to be shown. The rest describe the containing Space or the
+ * repository, which no row in that list would fix.
  */
 export const presentNewSpaceThingRefusal = (
   refusal: SpaceThingRefusal,
 ): ThingCreationRefusalErrors =>
-  refusal.code === 'aggregate-refused'
+  REFUSAL_PLACEMENT[refusal.code] === 'target'
     ? { fields: { target: describeSpaceThingRefusal(refusal) } }
     : { fields: {}, form: describeSpaceThingRefusal(refusal) };
 

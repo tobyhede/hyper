@@ -54,9 +54,52 @@ const idAt = (seed: number, offset: number): UUID =>
     `00000000-0000-4000-8000-${(seed * 256 + offset).toString(16).padStart(12, '0')}`,
   );
 
-const spaceThing = (id: UUID, title: string, spaceId: UUID) => ({
+/**
+ * The Diagram and the Graph a generated Space owns, keyed off the offset its own
+ * id came from.
+ *
+ * A Space Thing names a Diagram of its target and a Graph that Diagram owns
+ * (ADR 0079), so a generated aggregate has to mint both alongside every Space it
+ * mints. Deriving them from the target's offset is what lets a Space Thing built
+ * anywhere in this fixture select a pair that genuinely resolves, without
+ * threading the target's snapshot to the site that points at it.
+ */
+const diagramIdAt = (seed: number, offset: number): UUID => idAt(seed, 100 + offset);
+const graphIdAt = (seed: number, offset: number): UUID => idAt(seed, 150 + offset);
+
+/**
+ * A generated Space's document: one positioned Diagram owning one Graph.
+ *
+ * The Diagram positions nothing on purpose. Several scenarios below replace a
+ * Space's Things wholesale, and a Diagram that placed the Things it started with
+ * would fail intake for a reason the scenario is not about.
+ */
+const spaceDocument = (seed: number, offset: number, title: string) => ({
+  version: 1 as const,
+  title,
+  defaultDiagram: diagramIdAt(seed, offset),
+  diagrams: [
+    {
+      id: diagramIdAt(seed, offset),
+      title: 'Diagram 1',
+      kind: 'positioned' as const,
+      positions: {},
+      graphs: [{ id: graphIdAt(seed, offset), title: 'Graph 1', edges: [] }],
+      activeGraph: graphIdAt(seed, offset),
+    },
+  ],
+});
+
+/** A Space Thing selecting the one Diagram and Graph the Space at `offset` owns. */
+const spaceThing = (id: UUID, title: string, spaceId: UUID, seed: number, offset: number) => ({
   id,
-  document: { title, kind: 'space' as const, spaceId },
+  document: {
+    title,
+    kind: 'space' as const,
+    spaceId,
+    diagram: diagramIdAt(seed, offset),
+    graph: graphIdAt(seed, offset),
+  },
 });
 
 interface Fixture {
@@ -95,24 +138,26 @@ const fixtureFor = ({
 
   const meta: SpaceSnapshot = {
     id: metaSpaceId,
-    document: { version: 1, title: `Meta ${seed}` },
+    document: spaceDocument(seed, 0, `Meta ${seed}`),
     things: [
       ...parentSpaceIds.map((spaceId, index) =>
-        spaceThing(idAt(seed, 20 + index), `Parent ${index}`, spaceId),
+        spaceThing(idAt(seed, 20 + index), `Parent ${index}`, spaceId, seed, 1 + index),
       ),
       ...extraSpaceIds.map((spaceId, index) =>
-        spaceThing(idAt(seed, 30 + index), `Extra ${index}`, spaceId),
+        spaceThing(idAt(seed, 30 + index), `Extra ${index}`, spaceId, seed, 11 + index),
       ),
     ],
   };
   const parents: SpaceSnapshot[] = parentSpaceIds.map((id, parentIndex) => ({
     id,
-    document: { version: 1, title: `Parent ${parentIndex} seed ${seed}` },
+    document: spaceDocument(seed, 1 + parentIndex, `Parent ${parentIndex} seed ${seed}`),
     things: Array.from({ length: referencesPerParent }, (_, referenceIndex) =>
       spaceThing(
         idAt(seed, 40 + parentIndex * 10 + referenceIndex),
         `Shared ${referenceIndex}`,
         sharedSpaceId,
+        seed,
+        10,
       ),
     ),
   }));
@@ -123,12 +168,12 @@ const fixtureFor = ({
   }
   const shared: SpaceSnapshot = {
     id: sharedSpaceId,
-    document: { version: 1, title: `Shared ${seed}` },
+    document: spaceDocument(seed, 10, `Shared ${seed}`),
     things: [],
   };
   const extras: SpaceSnapshot[] = extraSpaceIds.map((id, index) => ({
     id,
-    document: { version: 1, title: `Extra ${index} seed ${seed}` },
+    document: spaceDocument(seed, 11 + index, `Extra ${index} seed ${seed}`),
     things: [],
   }));
   const snapshots = [meta, ...parents, shared, ...extras];
@@ -157,14 +202,14 @@ const fixtureFor = ({
     case 'create-ordinary-space': {
       const created: SpaceSnapshot = {
         id: newSpaceId,
-        document: { version: 1, title: `Created ${seed}` },
+        document: spaceDocument(seed, 15, `Created ${seed}`),
         things: [],
       };
       commit = {
         changes: orderedChanges(
           update({
             ...meta,
-            things: [...meta.things, spaceThing(newSpaceThingId, 'Created', newSpaceId)],
+            things: [...meta.things, spaceThing(newSpaceThingId, 'Created', newSpaceId, seed, 15)],
           }),
           [{ kind: 'create', spaceId: newSpaceId, snapshot: created }],
           reverseChanges,
