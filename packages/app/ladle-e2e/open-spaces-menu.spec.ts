@@ -42,8 +42,10 @@ test('the Open Spaces menu moves between Spaces without closing or resetting one
   page,
 }) => {
   await page.goto(DEFAULT);
-  await expect(page.getByTestId('space-title').locator('visible=true')).toContainText('Rendering');
-  await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+  await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
+    'Rendering',
+  );
+  await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
     'Collection 1',
   );
 
@@ -52,20 +54,24 @@ test('the Open Spaces menu moves between Spaces without closing or resetting one
     .getByRole('button', { name: 'Diagram: Collection 1', exact: true })
     .click({ delay: 120 });
   await page.getByRole('menuitemradio', { name: 'Collection 2' }).click();
-  await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+  await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
     'Collection 2',
   );
 
   await (await openSpacesMenu(page)).getByRole('menuitemradio', { name: /^Traversal/ }).click();
-  await expect(page.getByTestId('space-title').locator('visible=true')).toContainText('Traversal');
+  await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
+    'Traversal',
+  );
 
   // Still five, so the Space just left is open rather than closed.
   const returning = await openSpacesMenu(page);
   await expect(returning.getByRole('menuitemradio')).toHaveCount(5);
   await returning.getByRole('menuitemradio', { name: /^Rendering/ }).click();
 
-  await expect(page.getByTestId('space-title').locator('visible=true')).toContainText('Rendering');
-  await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+  await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
+    'Rendering',
+  );
+  await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
     'Collection 2',
   );
 });
@@ -106,12 +112,16 @@ test('Exit closes one Space and keeps its children reachable through their new O
 }) => {
   await page.goto(DEFAULT);
   await (await openSpacesMenu(page)).getByRole('menuitemradio', { name: /^Design system/ }).click();
-  await expect(page.locator('[data-testid="space-title"]:visible')).toContainText('Design system');
+  await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
+    'Design system',
+  );
   await page
     .getByRole('button', { name: 'Space: Design system', exact: true })
     .click({ delay: 120 });
   await page.getByRole('menuitem', { name: 'Exit Space', exact: true }).click();
-  await expect(page.locator('[data-testid="space-title"]:visible')).toContainText('Meta Space');
+  await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
+    'Meta Space',
+  );
 
   await page.getByRole('button', { name: 'Spaces. 4 open.' }).click({ delay: 120 });
   const menu = page.getByRole('menu');
@@ -119,7 +129,7 @@ test('Exit closes one Space and keeps its children reachable through their new O
   await expect(menu.getByRole('menuitemradio', { name: /^Design system/ })).toHaveCount(0);
   await menu.getByRole('menuitemradio', { name: /^Rendering/ }).click();
   await expect(page.getByRole('button', { name: 'Go to Platform' })).toBeVisible();
-  await expect(page.locator('[data-testid="selected-canvas"]:visible')).toContainText(
+  await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
     'Collection 1',
   );
 });

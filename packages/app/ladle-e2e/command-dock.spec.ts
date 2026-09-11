@@ -19,7 +19,7 @@ import { commandDockSnapshot } from '../stories/support/spaces';
 const story = (name: string): string => `/?story=space--command-dock--${name}&mode=preview`;
 
 /** The docked frame, which is the element the twelve slots place. */
-const dock = (page: Page) => page.getByTestId('command-dock').locator('visible=true');
+const dock = (page: Page) => page.getByTestId('command-dock').filter({ visible: true });
 
 /** The command surface inside it: one `Toolbar`, one tab stop, one roving order. */
 const surface = (page: Page) => page.getByRole('toolbar', { name: 'Command Dock' });
@@ -59,7 +59,7 @@ test(
   async ({ page }) => {
     await page.goto(story('default'));
 
-    await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Collection 1',
     );
 
@@ -72,12 +72,12 @@ test(
 
     await other.click();
 
-    await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Collection 2',
     );
     // And the Graphs follow the Diagram that owns them (ADR 0040): `Echo` is
     // `Collection 2`'s only Graph, and `Long` belongs to the Diagram just left.
-    await expect(page.getByTestId('active-graph').locator('visible=true')).toContainText('Echo');
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText('Echo');
     await expect(
       surface(page).getByRole('button', { name: 'Diagram: Collection 2', exact: true }),
     ).toBeVisible();
@@ -107,10 +107,12 @@ test(
     // `Diagram 1` is what `nextDiagramTitle` mints over `Collection 1` and
     // `Collection 2` — the application's own numbering, not a word this test
     // chose.
-    await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Diagram 1',
     );
-    await expect(page.getByTestId('active-graph').locator('visible=true')).toContainText('Graph 1');
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText(
+      'Graph 1',
+    );
     await expect(nodes).toHaveCount(0);
 
     const reopened = await disclose(page, 'Diagram: Diagram 1');
@@ -167,7 +169,7 @@ test(
   async ({ page }) => {
     await page.goto(story('default'));
 
-    await page.getByTestId('selected-canvas').locator('visible=true').click();
+    await page.getByTestId('selected-canvas').filter({ visible: true }).click();
     const diagramName = page.getByRole('textbox', { name: 'Diagram name' });
     await expect(diagramName).toBeFocused();
     await diagramName.fill('');
@@ -177,25 +179,27 @@ test(
     await expect(diagramName).toBeVisible();
     await diagramName.fill('Workshop');
     await diagramName.press('Enter');
-    await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Workshop',
     );
     await expect(
       surface(page).getByRole('button', { name: 'Diagram: Workshop', exact: true }),
     ).toBeVisible();
 
-    await page.getByTestId('active-graph').locator('visible=true').click();
+    await page.getByTestId('active-graph').filter({ visible: true }).click();
     const graphName = page.getByRole('textbox', { name: 'Graph name' });
     await graphName.fill('Journey');
     await graphName.press('Escape');
     // Escape cancels the draft rather than committing it.
-    await expect(page.getByTestId('active-graph').locator('visible=true')).toContainText('Long');
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText('Long');
 
-    await page.getByTestId('active-graph').locator('visible=true').click();
+    await page.getByTestId('active-graph').filter({ visible: true }).click();
     const again = page.getByRole('textbox', { name: 'Graph name' });
     await again.fill('Journey');
     await again.press('Enter');
-    await expect(page.getByTestId('active-graph').locator('visible=true')).toContainText('Journey');
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText(
+      'Journey',
+    );
   },
 );
 
@@ -215,7 +219,7 @@ test(
   async ({ page }) => {
     await page.goto(story('default'));
 
-    await expect(page.getByTestId('space-title').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
       'Rendering',
     );
     const parent = surface(page).getByRole('button', { name: 'Go to Design system' });
@@ -237,7 +241,7 @@ test(
       ).toBeVisible();
 
     await menu.getByRole('menuitemradio', { name: /^Traversal/ }).click();
-    await expect(page.getByTestId('space-title').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
       'Traversal',
     );
   },
@@ -262,13 +266,13 @@ test(
     // that cannot tell the two vertical edges apart would pass on either.
     await expect(dock(page)).toHaveAttribute('data-edge', 'left');
     await expect(surface(page)).toHaveAttribute('data-orientation', 'vertical');
-    await expect(page.getByTestId('space-title').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
       'Rendering',
     );
-    await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Collection 1',
     );
-    await expect(page.getByTestId('active-graph').locator('visible=true')).toContainText('Long');
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText('Long');
     await expect(surface(page).getByRole('button', { name: 'Cards' })).toBeVisible();
 
     const menu = await disclose(page, 'Diagram: Collection 1');
@@ -310,13 +314,15 @@ test(
   async ({ page }) => {
     await page.goto(story('new-space'));
 
-    await expect(page.getByTestId('space-title').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
       'New space',
     );
-    await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Diagram 1',
     );
-    await expect(page.getByTestId('active-graph').locator('visible=true')).toContainText('Graph 1');
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText(
+      'Graph 1',
+    );
     // `aria-disabled`, not the attribute: ADR 0073 keeps a toolbar item focusable
     // while it is unavailable so it announces itself rather than being drawn and
     // unreachable, and Base UI's `focusableWhenDisabled` defaults to `true`
@@ -348,8 +354,8 @@ test(
     await expect(page.locator('.react-flow__node:visible').first()).toBeVisible();
     await expect(dock(page)).toHaveAttribute('data-presenting', 'true');
     await expect(surface(page)).toBeHidden();
-    await expect(page.getByTestId('space-title').locator('visible=true')).toBeHidden();
-    await expect(page.getByTestId('selected-canvas').locator('visible=true')).toBeHidden();
+    await expect(page.getByTestId('space-title').filter({ visible: true })).toBeHidden();
+    await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toBeHidden();
   },
 );
 
@@ -391,7 +397,7 @@ test(
     // opens over the canvas, the choice lands, and the strip is still there.
     const menu = await disclose(page, 'Diagram: Collection 1');
     await menu.getByRole('menuitemradio', { name: 'Collection 2' }).click();
-    await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Collection 2',
     );
     await expect(strip).toBeVisible();
@@ -428,7 +434,7 @@ test(
     // The local work is still on the canvas behind it: a retryable failure
     // leaves it intact, so blocking the paper would overstate it.
     await expect(page.locator('.react-flow__node:visible').first()).toBeVisible();
-    await expect(page.getByTestId('selected-canvas').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Collection 1',
     );
 
@@ -511,10 +517,10 @@ test(
     await page.goto(story('save-failed-elsewhere'));
 
     // The Space on the strip is well: the failure is one crossing up.
-    await expect(page.getByTestId('space-title').locator('visible=true')).toContainText(
+    await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
       'Rendering',
     );
-    await expect(page.getByTestId('persistence-failure').locator('visible=true')).toHaveCount(0);
+    await expect(page.getByTestId('persistence-failure').filter({ visible: true })).toHaveCount(0);
 
     // **Before anything is disclosed.** ADR 0082: a report you have to go and
     // find is not a report, so the bar carries the mark and says so in the
@@ -555,7 +561,7 @@ test('Command Dock stories are isolated from the Ladle catalogue', async ({ page
 
   await page.goto('/?story=space--command-dock--default');
   await expect(
-    page.frameLocator('iframe').getByTestId('command-dock').locator('visible=true'),
+    page.frameLocator('iframe').getByTestId('command-dock').filter({ visible: true }),
   ).toBeVisible();
   await expect(page.getByLabel('Search stories')).toBeVisible();
 });
@@ -565,15 +571,15 @@ test(
   { tag: '@parity:command-dock-identity-presentation' },
   async ({ page }) => {
     await page.goto(story('default'));
-    const space = page.getByTestId('space-title').locator('visible=true');
-    const diagram = page.getByTestId('selected-canvas').locator('visible=true');
+    const space = page.getByTestId('space-title').filter({ visible: true });
+    const diagram = page.getByTestId('selected-canvas').filter({ visible: true });
     await expect(space).toBeVisible();
     await expect(diagram).toBeVisible();
     const typography = await diagram.evaluate((element) => {
       const style = getComputedStyle(element);
       return [style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight, style.color];
     });
-    for (const identity of [space, page.getByTestId('active-graph').locator('visible=true')]) {
+    for (const identity of [space, page.getByTestId('active-graph').filter({ visible: true })]) {
       await expect(identity).toBeVisible();
       expect(
         await identity.evaluate((element) => {
