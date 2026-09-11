@@ -51,13 +51,16 @@ export interface ThingKindIconProps {
   readonly aliasOf?: ThingBaseKind | undefined;
   readonly size?: number | undefined;
   /**
-   * Draw the glyph without putting it in the accessibility tree.
+   * Draw the glyph as a mark and nothing else: no accessible name, and no
+   * tooltip either.
    *
    * For the one case the default is wrong: a control that **already names the
    * command it performs**, where the glyph repeats a fact the button has
    * stated. The Command Dock's three Create controls are that — each is
    * labelled `Create <kind>`, so an `img` announcing `<kind>` beside it is a
-   * second node saying half of what the button just said.
+   * second node saying half of what the button just said, and a `title` of
+   * `<kind>` is worse: the glyph fills the button, so that tooltip is the one
+   * the pointer gets and `Create Alias` hovers as `Alias`.
    *
    * It is deliberately not the default. Everywhere else the glyph carries the
    * kind *on its own* — on a Thing's own Front, in the Target picker's results,
@@ -94,24 +97,32 @@ function KindGlyph({ kind, aliasOf, size }: ThingKindIconProps) {
  * is what a screen reader announces, and as a `title`, which is what a pointer
  * hovering it sees. The SVG underneath stays `aria-hidden`, so the two do not
  * both reach the accessibility tree.
+ *
+ * **Decorative carries neither, and the `title` is the reason it cannot.** A
+ * decorative glyph is inside a control that has already named the command it
+ * performs, and the glyph fills that control — so it is the node the pointer is
+ * over, and its own `title` is the tooltip that appears instead of the button's.
+ * Hovering `Create Alias` would read `Alias`: the noun, in a slot that performs
+ * a verb. Withholding it is what lets the button's own name reach the pointer as
+ * well as the screen reader.
  */
 
 export function ThingKindIcon({ kind, aliasOf, size, decorative = false }: ThingKindIconProps) {
-  const name = kind === 'alias' && aliasOf !== undefined ? ALIAS_NAMES[aliasOf] : KIND_NAMES[kind];
+  // Named only where a name is drawn: the decorative arm announces nothing and
+  // shows the pointer nothing, so deriving one for it would be a value that
+  // exists to be discarded.
   if (decorative)
     return (
       <span
         className="inline-flex flex-none items-center text-[var(--muted-foreground)]"
         aria-hidden="true"
-        // The pointer still gets the word: a decorative glyph is hidden from the
-        // accessibility tree, not from the reader hovering it.
-        title={name}
         data-thing-kind={kind}
         data-alias-of={kind === 'alias' ? aliasOf : undefined}
       >
         <KindGlyph kind={kind} aliasOf={aliasOf} size={size} />
       </span>
     );
+  const name = kind === 'alias' && aliasOf !== undefined ? ALIAS_NAMES[aliasOf] : KIND_NAMES[kind];
   return (
     <span
       className="inline-flex flex-none items-center text-[var(--muted-foreground)]"

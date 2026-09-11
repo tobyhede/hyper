@@ -253,6 +253,27 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
   });
 
   /**
+   * One tooltip per Create control, and it names the command.
+   *
+   * The glyph fills the button, so it is what the pointer is over — a `title`
+   * on the glyph is the tooltip the author actually sees, and the button's own
+   * never shows. `Alias` where the button says `Create Alias` names the noun in
+   * a slot that performs a verb, which is the one reading the issue's own
+   * cost list says a silent visual reading could already take for a filter.
+   */
+  it('gives each Create control one tooltip, and it is the command', async () => {
+    await renderDock(<Default />);
+
+    const create = within(dock()).getByRole('group', { name: 'Create a Thing' });
+
+    for (const name of ['Create Markdown Thing', 'Create Alias', 'Create Space Thing']) {
+      const control = within(create).getByRole('button', { name });
+      expect(control).toHaveAttribute('title', name);
+      expect(control.querySelectorAll('[title]')).toHaveLength(0);
+    }
+  });
+
+  /**
    * The breadcrumb's two controls are the ones that could not be toolbar items
    * while each cluster owned its own root, so they were plain Buttons and each
    * took a tab stop. They are items now, which is what makes the bar one.
