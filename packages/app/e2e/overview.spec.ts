@@ -317,10 +317,10 @@ test('anchors stay measurable, so Edges attach where the Thing is', async ({ pag
   // `opacity: 0` until the reveal shows them, which keeps the box; that reads as
   // an ordinary styling choice, and this is what stops a later CSS tidy-up from
   // reaching for `display: none`. See react-flow-guidance/issues/03.
-  const ports = page.locator('.rf-thing-node__authoring-handle');
-  await expect(ports.first()).toBeAttached();
+  const anchors = page.locator('.rf-thing-node__authoring-handle');
+  await expect(anchors.first()).toBeAttached();
 
-  const boxes = await ports.evaluateAll((els) =>
+  const boxes = await anchors.evaluateAll((els) =>
     els.map((el) => {
       const rect = el.getBoundingClientRect();
       return { width: rect.width, height: rect.height };

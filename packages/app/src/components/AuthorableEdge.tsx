@@ -1,7 +1,8 @@
-import { useContext, type ComponentProps, type ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
 import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
 import {
   RoutedEdgePath,
+  routedEdgePathProps,
   useRoutedEdgeGeometry,
   type RoutedFlowEdge,
 } from '@project/react-flow-adapter';
@@ -65,9 +66,7 @@ function EdgeControlLayer({
 export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
   const commands = useContext(EdgeAuthoringContext);
   const { path, labelX, labelY } = useRoutedEdgeGeometry(props);
-  const pathProps: ComponentProps<typeof RoutedEdgePath> = { id: props.id, path };
-  if (props.markerEnd !== undefined) pathProps.markerEnd = props.markerEnd;
-  if (props.style !== undefined) pathProps.style = props.style;
+  const pathProps = routedEdgePathProps(props, path);
   // The same translation the selection mirror and the callbacks use, so this
   // Edge cannot disagree with them about which Edge it is.
   const subject = edgeSelectionOf({ ...props, id: props.id });

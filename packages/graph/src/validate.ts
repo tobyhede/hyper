@@ -113,10 +113,11 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   }
 
   // A graph id is unique across the **space**, although one diagram owns it
-  // (ADR 0045). The flatten a space-subject view draws keys colour, handle ids
-  // (`<graphId>::out`/`::in`) and activation on the id alone, and the lookup
-  // intake builds would drop one of a pair in silence while both stayed in the
-  // collection.
+  // (ADR 0045). The flatten a space-subject view draws keys colour and
+  // activation on the id alone, and the lookup intake builds would drop one of a
+  // pair in silence while both stayed in the collection. ADR 0045's third
+  // ground, the `<graphId>::out`/`::in` handle ids, went with ADR 0087 — an Edge
+  // names no handle now — and the two that remain carry the rule on their own.
   //
   // Every occurrence is collected before anything is reported, because the fault
   // is the *id*, not its second appearance: an id used four times is one thing

@@ -7,22 +7,18 @@ export { ThingNode } from './ThingNode';
 export {
   RoutedEdge,
   RoutedEdgePath,
-  useEdgeAttachment,
+  routedEdgePathProps,
   useRoutedEdgeGeometry,
   type RoutedEdgeData,
   type RoutedEdgeGeometry,
   type RoutedFlowEdge,
 } from './RoutedEdge';
-export {
-  anchorPoint,
-  edgeAttachment,
-  facingSides,
-  selfEdgeAttachment,
-  type AnchorPoint,
-  type AnchorRect,
-  type EdgeAttachment,
-  type FacingSides,
-} from './edge-attachment';
+// `edge-attachment` is absent whole, for the reason `@project/graph`'s index
+// gives for `frontmatter` and `validate`: `facingSides`, `anchorPoint`,
+// `edgeAttachment`, `selfEdgeAttachment` and the rects they are written in are
+// how `RoutedEdge` decides where a curve lands, and no consumer outside this
+// package asks that question — the application composes the Edge, not the rule.
+// A test of the rule imports it from its own module.
 export { GraphHud } from './GraphHud';
 export { GraphConnectionLine } from './GraphConnectionLine';
 export { ZoomSlider } from './ZoomSlider';

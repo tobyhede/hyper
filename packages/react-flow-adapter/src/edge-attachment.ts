@@ -124,9 +124,12 @@ export function edgeAttachment(source: AnchorRect, target: AnchorRect): EdgeAtta
  * The anchors a self-Edge attaches to: a fixed loop over two adjacent sides.
  *
  * Taken before the general rule rather than as a correction after it. The facing
- * rule divides by the vector between two centres, which is zero for one Thing,
- * and the sides it settles on face away from each other with the Thing between
- * them — so the curve would cross the Thing it belongs to.
+ * rule would answer, not fail: one rect against itself overlaps on both axes, so
+ * the shallower overlap picks an axis and the two coincident centres fall to the
+ * `>=` — Bottom leaving, Top entering. Those two sides face away from each other
+ * with the Thing between them, so the curve would be drawn straight through the
+ * Thing it belongs to. A plausible answer rather than a broken one is why this
+ * is taken first rather than caught afterwards.
  */
 export function selfEdgeAttachment(rect: AnchorRect): EdgeAttachment {
   const from = anchorPoint(rect, Position.Right);

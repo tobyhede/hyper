@@ -114,6 +114,10 @@
       // lets a test put them somewhere. The rule the answer feeds is pure and
       // tested without any of this in `edge-attachment.test.ts`; what is left
       // here is the reading, which has no in-repo implementation to inject.
+      // It stands `BaseEdge` in too, for the reason the entries above give: the
+      // assertion is the `d` the Edge asked for, and reading it off React Flow's
+      // own `<path>` would mean mounting the provider tree to observe a string
+      // the component already hands over.
       "files": [
         "packages/ui/test/Button.test.tsx",
         "packages/react-flow-adapter/test/ThingNode.test.tsx",
