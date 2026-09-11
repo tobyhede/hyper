@@ -147,15 +147,15 @@ function retiredSpaceGraphs(document: unknown): SpaceError | null {
  * answered by its version rather than by the shape it happens to carry.
  *
  * **Offered, and composed rather than named one at a time — that composition is
- * the point.** Both checks above exist because the schema's own answer for these
- * documents misleads: a cascade of moved keys in one case, a silently stripped
- * topology in the other. Any door that parses ahead of intake needs *all* of
- * them, and a door that reaches for them individually gets the ones its author
- * knew about. `readSingleSpace` asked the version check alone and imported a
- * Space with its whole `graphs` array dropped, looking complete (ticket `10`);
- * ticket `08` is where it came to ask the version check at all. One function is
- * what makes the next check added here reach the importer without anyone
- * remembering to carry it there.
+ * the point.** Both checks above exist because the schema's own answer for
+ * these documents misleads: a cascade of moved keys in one case, a refusal that
+ * names the key without saying it is retired in the other. Any door that parses
+ * ahead of intake needs *all* of them, and a door that reaches for them
+ * individually gets the ones its author knew about. `readSingleSpace` asked the
+ * version check alone and imported a Space with its whole `graphs` array
+ * dropped, looking complete (ticket `10`); ticket `08` is where it came to ask
+ * the version check at all. One function is what makes the next check added
+ * here reach the importer without anyone remembering to carry it there.
  *
  * **This docblock is where that argument is written out** — the index clause,
  * the importer and both tickets point here rather than restating it.

@@ -303,11 +303,10 @@ describe('readSingleSpace', () => {
   });
 
   it('refuses a retired space-level graphs key rather than stripping it', async () => {
-    // `importSpaceFileSchema` is a plain Zod object, so an undeclared key is
-    // dropped. For the retired `things` and `edges` that is right — they carried
-    // nothing the rest of the document does not say. A space-level `graphs`
-    // carried the whole topology (ADR 0040), so stripping it discards exactly
-    // what the author wrote and imports a Space that looks complete.
+    // `importSpaceFileSchema` is strict, so an undeclared key is already
+    // refused rather than dropped. This check survives that to *name* the one
+    // that matters: a space-level `graphs` carried the whole topology
+    // (ADR 0040), and a generic unrecognized-key refusal does not say so.
     const temporaryDirectory = await makeTemporaryDirectory();
     const talkDirectory = join(temporaryDirectory, 'talk');
     await mkdir(talkDirectory);

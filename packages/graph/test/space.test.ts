@@ -163,13 +163,12 @@ describe('loadSpace', () => {
   });
 
   it('rejects a version 1 space that still carries a Space-level graphs array', () => {
-    // Read before parsing, beside the version check and for the same reason:
-    // `spaceFileSchema` is a plain object, so an undeclared key is *stripped*.
-    // That is right for the retired `things` and `edges` keys, which carried
-    // nothing the rest of the document does not already say. A Space-level
-    // `graphs` carried the whole topology (ADR 0040), so stripping it in silence
-    // discards what its author wrote and yields a Space that loads looking
-    // complete. Declaring the key in the schema instead would put it in the
+    // Read before parsing, beside the version check: `spaceFileSchema` is
+    // strict, so an undeclared key is already refused rather than stripped.
+    // This check survives that to *name* the one that matters — a Space-level
+    // `graphs` carried the whole topology (ADR 0040), and a generic
+    // unrecognized-key refusal leaves a reader to work out why that one
+    // mattered. Declaring the key in the schema instead would put it in the
     // inferred document type, which the HTTP contract is checked against.
     const result = loadSpace({ ...validInput, graphs: [MAIN] }, validThings);
 

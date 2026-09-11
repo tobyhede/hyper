@@ -180,8 +180,8 @@ describe('importSingleSpace', () => {
 
   it('refuses a retired space-level graphs key rather than importing what survives it', async () => {
     // The regression this exists for is not a bad diagnostic — it is a
-    // successful import. `importSpaceFileSchema` is a plain Zod object, so it
-    // dropped the retired key and handed the repository a Space missing its
+    // successful import. `importSpaceFileSchema` was a plain Zod object then, so
+    // it dropped the retired key and handed the repository a Space missing its
     // whole topology, reported as imported (issue `10`). Refusing is what the
     // test above proves; what this adds is that nothing reaches the repository.
     const directory = await makeTemporaryDirectory();
