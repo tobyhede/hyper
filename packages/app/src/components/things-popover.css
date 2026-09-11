@@ -36,11 +36,21 @@
 
      Not `clamp(0px, …)`: that is this rule with the floor deleted, and a list
      that collapses to no rows is the worse of the two failures. The 2.5rem
-     keeps one row drawn where even the hard reserve runs out. */
+     keeps one row drawn where even the hard reserve runs out.
+
+     **The last term is what stops that floor becoming the clip it replaced.**
+     Below 40px of room the 2.5rem is what the third bound answers, and a 40px
+     list in a 30px slot hangs the popup off the screen edge again — the floor
+     reproducing, at one tenth the size, the failure the hard reserve was
+     measured to remove. Bounding the whole rule by the room it has costs
+     nothing above 40px, where one of the three bounds above is always the
+     smaller: it decides only where there is less room than a single row, and
+     there the honest answer is the room. */
   max-height: min(
     300px,
     max(140px, calc(var(--available-height, 100vh) - 8rem)),
-    max(2.5rem, calc(var(--available-height, 100vh) - 6rem))
+    max(2.5rem, calc(var(--available-height, 100vh) - 6rem)),
+    var(--available-height, 100vh)
   );
   flex-direction: column;
   gap: 2px;
