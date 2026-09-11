@@ -19,6 +19,10 @@ const TARGET_GRAPH_ID = id('000000000012');
 const INTAKE_ID = id('000000000013');
 const STORAGE_ID = id('000000000014');
 
+const TARGET_SECOND_DIAGRAM_ID = id('000000000015');
+const TARGET_SECOND_GRAPH_ID = id('000000000016');
+const REVIEW_ID = id('000000000017');
+
 /**
  * The target Space, whose Diagram the Space Thing selects.
  *
@@ -27,6 +31,13 @@ const STORAGE_ID = id('000000000014');
  * Thing's rect and nothing else. Both fit inside the Thing's Open Size with the
  * `SPACE_THING_EMBED_INSET` reserved, so what is on screen is the whole Diagram
  * rather than the part that happened to fit.
+ *
+ * **Two Diagrams, sharing no Thing.** A Space Thing's Diagram choice can only be
+ * shown to be honoured by choosing one that is not already chosen and finding
+ * different content on screen — pressing the marked row proves the list renders
+ * and nothing more. So `Collection 2` draws one Thing of its own, `Review`,
+ * which `Collection 1` does not position; whichever Diagram the Thing selects,
+ * what the embedding draws names it.
  */
 const target: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: TARGET_ID,
@@ -46,12 +57,22 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
           { id: TARGET_GRAPH_ID, title: 'Overview', edges: [{ from: INTAKE_ID, to: STORAGE_ID }] },
         ],
       },
+      {
+        id: TARGET_SECOND_DIAGRAM_ID,
+        title: 'Collection 2',
+        kind: 'positioned',
+        positions: {
+          [REVIEW_ID]: { x: 0, y: 0, open: false },
+        },
+        graphs: [{ id: TARGET_SECOND_GRAPH_ID, title: 'Detail', edges: [] }],
+      },
     ],
     defaultDiagram: TARGET_DIAGRAM_ID,
   },
   things: [
     { id: INTAKE_ID, document: { title: 'Intake', kind: 'markdown', body: '' } },
     { id: STORAGE_ID, document: { title: 'Storage', kind: 'markdown', body: '' } },
+    { id: REVIEW_ID, document: { title: 'Review', kind: 'markdown', body: '' } },
   ],
 });
 

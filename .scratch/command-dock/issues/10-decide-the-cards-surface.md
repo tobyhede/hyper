@@ -108,8 +108,11 @@ won, and in this file. Losing both takes two deliberate deletions.
   comparison held against the drawer.
 - `packages/ui/src/components/drawer.tsx` lost its last consumer. Retiring a
   registry primitive is a foundation decision rather than a surface one, so it
-  is recorded in the inventory and `08-retire-the-sidebar-era-primitives.md`
-  owns taking it.
+  is recorded in the inventory meanwhile and
+  `16-retire-the-registry-drawer-and-the-yielded-strip.md` owns taking it.
+  **This line named `08` and that was wrong**: `08` is resolved and it ran while
+  this drawer was still mounted, so it could not and did not take it. `08`
+  records the handoff; `16` is the decision.
 - The seven `cards-drawer-*` parity claims are ten `cards-popover-*` claims,
   with their Ladle and application halves moved across. The seven cover the
   same behaviours; the three new ones are what this change added and had to

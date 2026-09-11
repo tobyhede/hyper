@@ -85,9 +85,16 @@ function Fixture({
 function ControlledFixture({
   open,
   onAdd = vi.fn(),
+  spaces,
+  onAddSpace,
 }: {
   readonly open: boolean;
   readonly onAdd?: (thing: Thing, activation: 'keyboard' | 'pointer') => string | null;
+  readonly spaces?: readonly { readonly id: UUID; readonly title: string }[];
+  readonly onAddSpace?: (space: {
+    readonly id: UUID;
+    readonly title: string;
+  }) => Promise<string | null>;
 }) {
   return (
     <ThingsPopover
@@ -97,9 +104,13 @@ function ControlledFixture({
       onOpenChange={vi.fn()}
       onAdd={onAdd}
       onDragStart={vi.fn()}
+      spaces={spaces}
+      onAddSpace={onAddSpace}
     />
   );
 }
+
+const BLUEPRINT = { id: id('000000000020'), title: 'Blueprint' };
 
 /**
  * The list as the application drives it: a completed Add **takes the row away**,
@@ -400,6 +411,48 @@ describe('ThingsPopover', () => {
     expect(screen.getByRole('textbox', { name: 'Search things' })).toHaveValue('');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(thingButtons()).toHaveLength(4);
+  });
+
+  /**
+   * The reset cannot clear what has not arrived yet.
+   *
+   * Only the popup unmounts, so this component — and its `refusal` — outlives
+   * every close, and `onAddSpace` is a coordinated cross-Space Edit that settles
+   * arbitrarily later. Press a Space row, close the list, and the refusal lands
+   * behind the reset that was supposed to forget it: the next open draws a red
+   * alert over a gesture the reader made against a list that is gone, which is
+   * the state the reset exists to make unreachable. The Thing arm cannot reach
+   * it, `onAdd` being synchronous.
+   */
+  it('drops a Space placement that settles after the list has closed', async () => {
+    let settle: (refusal: string | null) => void = () => {
+      throw new Error('The placement was never asked for');
+    };
+    const placement = new Promise<string | null>((resolve) => {
+      settle = resolve;
+    });
+    const onAddSpace = vi.fn(() => placement);
+    const view = render(<ControlledFixture open spaces={[BLUEPRINT]} onAddSpace={onAddSpace} />);
+    await screen.findByRole('dialog', { name: 'Things' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Blueprint to Diagram' }), {
+      detail: 1,
+    });
+    expect(onAddSpace).toHaveBeenCalledTimes(1);
+
+    view.rerender(<ControlledFixture open={false} spaces={[BLUEPRINT]} onAddSpace={onAddSpace} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // The Edit answers only now, with the list already closed and reset.
+    await act(async () => {
+      settle('This Space is no longer stored.');
+      await placement;
+    });
+
+    view.rerender(<ControlledFixture open spaces={[BLUEPRINT]} onAddSpace={onAddSpace} />);
+    await screen.findByRole('dialog', { name: 'Things' });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('finds an Alias by its Target title', async () => {

@@ -99,18 +99,34 @@ test(
     // marked, reached from the control that names what is chosen.
     // `:visible`, because every open Space stays mounted with one shown
     // (`OpenSpacesApplication`), and the target Space is open here too.
+    //
+    // The row chosen is deliberately **not** the one already marked: pressing
+    // the selected row and finding the Thing unchanged proves the list renders,
+    // not that a choice is honoured. The target Space offers a second Diagram
+    // whose content no other Diagram of it draws, so what is on screen
+    // afterwards could only have come from the choice.
     const selectedDiagram = page.locator('[data-testid="selected-canvas"]:visible');
     const before = await selectedDiagram.innerText();
     await thing.getByTestId('space-thing-diagram').click();
-    const row = page.getByRole('menuitemradio', { name: 'Collection 1' });
+    const row = page.getByRole('menuitemradio', { name: 'Collection 2' });
     await expect(row).toBeVisible();
     await row.click();
 
+    // The Thing's stored context is the chosen one, Graph included: choosing a
+    // Diagram seeds the Graph from that Diagram's own Active Graph
+    // (`canvas-thing-authoring.ts`), so both names move together.
+    await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Collection 2');
+    await expect(thing.getByTestId('space-thing-graph')).toHaveText('Detail');
+
+    // And the embedding redrew to the chosen Diagram: its own Thing, and none of
+    // the Diagram that was selected a moment ago.
+    await expect(embeddedNodes(page)).toHaveCount(1);
+    await expect(embeddedNodes(page).getByRole('heading', { name: 'Review' })).toBeVisible();
+    await expect(embeddedNodes(page).getByRole('heading', { name: 'Intake' })).toHaveCount(0);
+
     // And it acted on the Thing rather than on the Space the Thing sits in: the
-    // containing Diagram is the one it was, and the embedding is still drawn.
+    // containing Diagram is the one it was.
     await expect(selectedDiagram).toHaveText(before);
-    await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Collection 1');
-    await expect(embeddedNodes(page)).toHaveCount(2);
   },
 );
 

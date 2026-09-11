@@ -20,8 +20,28 @@
      with no way to reach them — which is the failure mode a screen-edge drawer
      does not have and an anchored surface does. The floor keeps a usably tall
      list on the shortest screen; the cap keeps a tall screen from drawing a
-     column of Things taller than the canvas beside it. */
-  max-height: min(300px, max(140px, calc(var(--available-height, 100vh) - 8rem)));
+     column of Things taller than the canvas beside it.
+
+     **Three bounds, because the floor is not allowed to become a clip.** 8rem is
+     the *comfortable* reserve — the filter row, the popup's padding, and room
+     for the alert above the rows — so below about 268px of room the floor is
+     what decides, and a 140px list is then taller than the room it sits in:
+     `overflow-y` scrolls the rows the list owns and nothing scrolls the popup
+     back off the screen edge. The last line is the *hard* reserve: 6rem is what
+     the chrome above the rows actually measures (a 92px popup top and filter
+     row at this width), so the list never claims room the popup has to spend on
+     the controls that reach it. Measured rather than guessed — with the floor
+     alone the popup's bottom stands at 232px whatever the viewport, so it
+     clipped below about 232px tall, and 4rem was still short of clearing it.
+
+     Not `clamp(0px, …)`: that is this rule with the floor deleted, and a list
+     that collapses to no rows is the worse of the two failures. The 2.5rem
+     keeps one row drawn where even the hard reserve runs out. */
+  max-height: min(
+    300px,
+    max(140px, calc(var(--available-height, 100vh) - 8rem)),
+    max(2.5rem, calc(var(--available-height, 100vh) - 6rem))
+  );
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;

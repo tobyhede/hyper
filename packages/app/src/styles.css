@@ -42,7 +42,8 @@ body {
    and the Things list is an anchored Popover — so this is dead with
    `AppShell.insetEnd`. Issue 08 retired the Sidebar-era primitives while
    this one still had a consumer, so it did not take the pair; taking them is a
-   decision of its own, recorded there and in the design-system inventory.
+   decision of its own, and `.scratch/command-dock/issues/16-retire-the-registry-drawer-and-the-yielded-strip.md`
+   owns it. This declaration goes with `insetEnd` when it is taken.
 
    Deliberately not animated, although the panel beside it slides. React Flow
    re-measures this container continuously, so an animated width moves the

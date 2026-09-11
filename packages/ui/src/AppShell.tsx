@@ -23,9 +23,11 @@ export interface AppShellProps {
    *
    * **Nothing sets it.** The strip was the Things drawer's, and that drawer is
    * gone: the Things list is a Popover anchored to its trigger, which overlays
-   * the canvas rather than displacing it. Retiring this prop along with
-   * `Drawer` is
-   * `.scratch/command-dock/issues/08-retire-the-sidebar-era-primitives.md`.
+   * the canvas rather than displacing it. Retiring this prop along with the
+   * registry `Drawer` and its `DRAWER_WIDTH` is one undecided foundation
+   * decision, owned by
+   * `.scratch/command-dock/issues/16-retire-the-registry-drawer-and-the-yielded-strip.md`.
+   * Not `08`, which is resolved and ran while the drawer still had a consumer.
    */
   insetEnd?: string | undefined;
   children: ReactNode;

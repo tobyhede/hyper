@@ -262,6 +262,36 @@ function RowGrip() {
 }
 
 /**
+ * The sentence standing on the list, and which opening of it asked for one.
+ *
+ * **The reset cannot clear a refusal that has not arrived yet.** Only the popup
+ * unmounts, so the component and this state outlive every close, and
+ * `onAddSpace` is a coordinated cross-Space Edit that settles arbitrarily
+ * later: press a Space row, press Escape, and the answer lands *behind* the
+ * reset that was supposed to forget it. The next open would then draw a red
+ * alert with no gesture behind it — precisely the state the reset exists to
+ * make unreachable. So a placement carries the opening it was asked from, and a
+ * settlement is applied only where that opening is still the one on screen.
+ *
+ * **The counter rides on the same state as the sentence** rather than on a ref,
+ * which is what lets a late settlement be dropped in the updater — comparing
+ * against a ref would mean reading and writing one during render, which is what
+ * `react-hooks/refs` is right to reject and what the reset would have to do.
+ *
+ * A counter rather than the open flag, because the list can be reopened while
+ * an Edit is still in flight, and that opening did not ask for it either.
+ *
+ * The Thing arm needs none of this: `onAdd` answers synchronously, so its
+ * refusal is installed by the press that caused it.
+ */
+interface StandingRefusal {
+  readonly opening: number;
+  readonly said: string | null;
+}
+
+const NOTHING_REFUSED: StandingRefusal = { opening: 0, said: null };
+
+/**
  * The Things View: existing Things absent from the selected Diagram.
  *
  * **The list is a Popover, and that is decided.**
@@ -317,7 +347,10 @@ export function ThingsPopover({
 }: ThingsPopoverProps) {
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState<readonly ThingsFilter[]>(ALL_FILTERS);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [standing, setStanding] = useState<StandingRefusal>(NOTHING_REFUSED);
+  const refusal = standing.said;
+  const setRefusal = (said: string | null): void =>
+    setStanding((current) => ({ ...current, said }));
   /**
    * Where the caret goes when a keyboard Add takes its own row away.
    *
@@ -369,7 +402,10 @@ export function ThingsPopover({
     if (!open) {
       setQuery('');
       setShown(ALL_FILTERS);
-      setRefusal(null);
+      // The sentence goes, and the opening it belonged to is spent: a placement
+      // still in flight answers onto a list that is no longer there, and
+      // {@link StandingRefusal} is where that is dropped.
+      setStanding((current) => ({ opening: current.opening + 1, said: null }));
     }
   }
   const titleById = useMemo(
@@ -446,15 +482,26 @@ export function ThingsPopover({
   }, [titleById, spaceTitles, things, spaces, shown, needle]);
 
   /**
+   * What a Space placement answered, drawn only on the opening that asked for
+   * it — see {@link StandingRefusal}.
+   */
+  const showSettlement =
+    (asked: number) =>
+    (said: string | null): void => {
+      setStanding((current) => (current.opening === asked ? { ...current, said } : current));
+    };
+  /**
    * The rejection arm of a Space placement, hoisted so the caught value takes
    * its type from {@link SpaceThingBreak} rather than from an annotation written
    * at the `then`.
    */
-  const showBreak: SpaceThingBreak = (failure) => {
-    const said = describeSpaceThingBreak(failure);
-    setRefusal(said);
-    return said;
-  };
+  const showBreak =
+    (asked: number): SpaceThingBreak =>
+    (failure) => {
+      const said = describeSpaceThingBreak(failure);
+      showSettlement(asked)(said);
+      return said;
+    };
 
   const beginDrag = (event: DragEvent<HTMLButtonElement>, thingId: ThingId): void => {
     event.dataTransfer.effectAllowed = 'move';
@@ -650,8 +697,11 @@ export function ThingsPopover({
                     // this row having visibly done nothing, with the only trace
                     // an unhandled rejection nobody reads. `App` reports the
                     // same break on its own channel; this is what the reader
-                    // who pressed the row sees.
-                    void onAddSpace?.(row.space).then(setRefusal, showBreak);
+                    // who pressed the row sees — as long as they are still
+                    // reading the list they asked from, which the opening this
+                    // press was made on is what decides.
+                    const asked = standing.opening;
+                    void onAddSpace?.(row.space).then(showSettlement(asked), showBreak(asked));
                   }}
                 >
                   {/* Only where a drag actually starts. A Space is placed by
