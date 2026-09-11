@@ -40,16 +40,6 @@ export interface CanvasInteraction {
   readonly selectedThingId: ThingId | null;
   /** Presenting draws the active Thing's content rather than its title. */
   readonly presenting: boolean;
-  /**
-   * Whether a Thing has been dragged out of the placement the strategy computed.
-   *
-   * Its one reader was the Edge geometry: a routed Edge described the placement
-   * a strategy computed, so it stopped being true the moment a Thing left it.
-   * Nothing routes an Edge since ADR 0086, so nothing reads this — where an Edge
-   * attaches, and whether that answer needs to know a drag has happened, is
-   * `.scratch/edge-attachment/`'s open question.
-   */
-  readonly moved: boolean;
 }
 
 /** React Flow's view of the Space, ready to publish. */

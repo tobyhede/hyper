@@ -38,12 +38,12 @@ Staged across two tickets, because the deletion divides cleanly and only the fir
 
 - `packages/react-flow-adapter/src/elk/` entire — `elkStrategy`, `ElkEngine`, `elkPortId`, `PORT_ID_SEPARATOR`, `DEFAULT_ELK_LAYOUT_OPTIONS` — and the `elkjs` dependency.
 - `elk-strategy.test.ts`, and `elkStrategy`'s row in `strategy-contract.test.ts`.
-**Ticket 02 — not yet built; all four are still in the tree.**
+**Ticket 02 — built.**
 
 - `LayoutStrategyEdgeSection`, `sections` on `LayoutStrategyEdge`, and `ports` on `LayoutStrategyThing`.
 - `routedPoints` and `RoutedEdge`'s polyline branch. `RoutedEdge` keeps its name and draws the bezier it has always drawn.
 - `resolveHandles`'s `portsById` parameter and its `port?.y ??` branch. The even spread over the Thing height stops being a fallback and becomes the rule.
-- `canvas-projection.ts`'s `moved` special-case on `edgeOptions`, which selects between two results that are identical once no strategy routes.
+- `canvas-projection.ts`'s `moved` special-case on `edgeOptions`, which selects between two results that are identical once no strategy routes — and, with it, `moved` itself. That special-case was the flag's one reader, so leaving the field behind would have left the render adapter writing it on every settled drag, `App` subscribing to it and two `useMemo` dependency arrays naming it, to recompute a projection that cannot differ. It could not have served the attachment question either: `03`/`04` require the attachment follow a drag continuously, read per frame off the node positions React Flow publishes, while `moved` is a latch set once per gesture and cleared on Diagram selection.
 **Ticket 01 — built.**
 
 - Three of the eight handle rules in `docs/agents/rendering.md`: ELK port offsets driving handle positions, `FIXED_SIDE` over `FIXED_ORDER`, and the `<thingId>##<handleId>` namespacing.
@@ -51,7 +51,7 @@ Staged across two tickets, because the deletion divides cleanly and only the fir
 
 ## What survives, and why none of it was elkjs's
 
-Five of `rendering.md`'s eight handle rules survive, and the four that are React Flow's are untouched; the fifth is ADR 0033's scoping rule, which says the set belongs to the overview rather than to the domain and is the lead-in `rendering.md` counts the other four below. Handle ids must be distinguishable per Thing per side — ADR 0045 argues that on React Flow's grounds, its warning #008, not on elkjs's. A hidden handle uses `opacity: 0` or `visibility: hidden` and never `display: none`, because React Flow measures it. Handle geometry is declared and never re-measured, and `useUpdateNodeInternals` stays forbidden; that rule has E2E evidence behind it that unit tests provably cannot reproduce. And neither `toNode` nor the DOM alone answers "is this empty canvas", because `connectionRadius` resolves by distance to a handle.
+Five of `rendering.md`'s eight handle rules survive, and the four that are React Flow's are untouched; the fifth is ADR 0033's scoping rule, which says the set belongs to the overview rather than to the domain and is the lead-in `rendering.md` counts the other four below. Ticket 02 then adds one that is neither elkjs's nor React Flow's but this deletion's own — a Thing's per-Graph anchors are spread evenly down the box it occupies, and nothing can override that, which is what the removed port offsets used to be a fallback for — so the lead-in counts five below it from then on. Handle ids must be distinguishable per Thing per side — ADR 0045 argues that on React Flow's grounds, its warning #008, not on elkjs's. A hidden handle uses `opacity: 0` or `visibility: hidden` and never `display: none`, because React Flow measures it. Handle geometry is declared and never re-measured, and `useUpdateNodeInternals` stays forbidden; that rule has E2E evidence behind it that unit tests provably cannot reproduce. And neither `toNode` nor the DOM alone answers "is this empty canvas", because `connectionRadius` resolves by distance to a handle.
 
 `gridStrategy` survives too. The argument here is that a heavy dependency was wired into a render path no user can reach; that argument does not extend to a pure, dependency-free function sitting in the package where Auto-arrange will live. Keeping it also keeps `LayoutStrategy` an honest contract — one implementation on each side — rather than a type with an empty half.
 

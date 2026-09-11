@@ -106,7 +106,6 @@ export function SelectedEdgeCanvasFixture({
             activeThingId: null,
             selectedThingId: null,
             presenting: false,
-            moved: false,
           }),
     [laidOut],
   );

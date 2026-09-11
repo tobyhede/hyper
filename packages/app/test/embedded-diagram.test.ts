@@ -62,7 +62,6 @@ async function projection(open = false) {
       activeThingId: null,
       selectedThingId: null,
       presenting: false,
-      moved: false,
     },
   );
 }

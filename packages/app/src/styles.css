@@ -244,11 +244,12 @@ body {
   pointer-events: none;
 }
 
-/* Per-graph ports, positioned by the offset the projection resolves (inline
-   `top`). React Flow handles the left/right edge placement and vertical
-   centering, and the
-   size is declared alongside the handle bounds in `authoring-handle.ts` so the
-   two cannot drift.
+/* Per-Graph attachment anchors, positioned by the offset the projection resolves
+   (inline `top`). The `__port` in the class name is the older spelling and is
+   load-bearing as a selector; the word itself is `CONTEXT.md`'s to avoid, the
+   engine that made it a term having left with ADR 0086. React Flow handles the
+   left/right edge placement and vertical centering, and the size is declared
+   alongside the handle bounds in `authoring-handle.ts` so the two cannot drift.
 
    Existing Edge attachment geometry stays measurable for React Flow but is not
    presented as an authoring control (ADR 0033). */

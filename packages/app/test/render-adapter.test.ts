@@ -875,7 +875,6 @@ describe('render adapter', () => {
     store.getState().changeNodes(settled(THING_A, 10, 20));
 
     expect(spy.completions).toEqual([]);
-    expect(store.getState().moved).toBe(false);
     expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 10, y: 20 });
   });
 
@@ -898,20 +897,14 @@ describe('render adapter', () => {
     expect(store.getState().projection).toBe(published);
   });
 
-  it('records that a thing has moved, so routed Edge geometry stops being drawn', () => {
+  it('completes a settled-thing-movement Edit for a drag that lands somewhere new', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    // A diagram's routed Edge geometry describes the placement it computed, so
-    // it stops being true the moment a thing leaves the place that routing
-    // assumed. `App` reads this flag to fall back to plain curves; left false, a
-    // dragged graph keeps drawing channels routed for positions nothing is at.
-    expect(store.getState().moved).toBe(false);
     completeDrag(store, THING_A, 500, 400);
 
-    expect(store.getState().moved).toBe(true);
     expect(spy.completions).toEqual([
       {
         kind: 'settled-thing-movement',
@@ -1056,7 +1049,6 @@ describe('render adapter', () => {
 
     expect(store.getState().projection).toBeNull();
     expect(store.getState().selection).toEqual({ kind: 'none' });
-    expect(store.getState().moved).toBe(false);
     expect(store.getState().resizeDraft).toBeNull();
   });
 });

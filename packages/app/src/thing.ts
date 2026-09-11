@@ -52,7 +52,7 @@ export const snapThingSizeToClose = (size: {
 
 /**
  * Handed to the graph container so the stylesheet draws things at exactly the size
- * the strategy placed them at. If these drift, ports land where the thing isn't.
+ * the strategy placed them at. If these drift, anchors land where the thing isn't.
  */
 export const thingSizeVars =
   // SAFETY: CSSProperties doesn't type CSS custom properties (`--*`); these

@@ -82,9 +82,8 @@ export function EmbeddedDiagramAuthoring({
             activeThingId: null,
             selectedThingId: state.selection.kind === 'thing' ? state.selection.thingId : null,
             presenting: false,
-            moved: state.moved,
           }),
-    [pending, laidOut, graphId, state.selection, state.moved],
+    [pending, laidOut, graphId, state.selection],
   );
   useLayoutEffect(() => {
     if (projected !== null)

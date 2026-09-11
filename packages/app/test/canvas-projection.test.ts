@@ -35,13 +35,12 @@ const diagramOwning = (...graphs: readonly object[]) => ({
   graphs,
 });
 
-/** Nothing activated, nothing selected, nothing dragged. */
+/** Nothing activated, nothing selected. */
 const AT_REST: CanvasInteraction = {
   activeGraphId: null,
   activeThingId: null,
   selectedThingId: null,
   presenting: false,
-  moved: false,
 };
 
 function spaceWith(extra: Record<string, unknown> = {}): Space {

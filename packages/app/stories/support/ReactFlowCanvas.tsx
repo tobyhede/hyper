@@ -66,7 +66,6 @@ const interaction = (
   activeThingId: null,
   selectedThingId,
   presenting: false,
-  moved: false,
 });
 
 type ProjectedCanvas = CanvasNodesAndEdges;

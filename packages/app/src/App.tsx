@@ -665,7 +665,6 @@ export const createApp = (
         setThingsDrawerOpen(true);
       }
     }
-    const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
       strategy,
@@ -686,9 +685,8 @@ export const createApp = (
               activeThingId,
               selectedThingId,
               presenting,
-              moved,
             }),
-      [projection, laidOut, activeGraphId, activeThingId, selectedThingId, presenting, moved],
+      [projection, laidOut, activeGraphId, activeThingId, selectedThingId, presenting],
     );
 
     // Hand the complete projection to the render adapter as one state change.

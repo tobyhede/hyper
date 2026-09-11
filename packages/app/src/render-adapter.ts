@@ -193,17 +193,6 @@ export interface RenderAdapterState {
   projection: Projection | null;
   /** Gesture starts retained until each node receives a settled callback. */
   dragOrigins: ReadonlyMap<string, DiagramPosition>;
-  /**
-   * Set once a thing has actually moved.
-   *
-   * Its one reader was the Edge geometry: a routed edge described the placement
-   * a strategy computed, so it stopped being true the moment a thing left it,
-   * and from then on the edges were drawn as plain curves. Nothing routes an
-   * edge since ADR 0086, so nothing reads this — where an Edge attaches, and
-   * whether that answer needs to know a drag has happened, is the open question
-   * `.scratch/edge-attachment/` carries next.
-   */
-  moved: boolean;
   /** The ordinary React Flow selection used for continued authoring. */
   selection: CanvasSelection;
   /** One transient resize layered over the authored Placement. */
@@ -440,7 +429,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
   const adapter = create<RenderAdapterState>((set, get) => ({
     projection: null,
     dragOrigins: new Map(),
-    moved: false,
     selection: NO_SELECTION,
     resizeDraft: null,
     editingEmbeddedDiagram: false,
@@ -530,7 +518,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       set({
         projection: null,
         dragOrigins: new Map(),
-        moved: false,
         selection: NO_SELECTION,
         resizeDraft: null,
       });
@@ -639,7 +626,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       set({
         projection: { ...projection, nodes },
         dragOrigins,
-        moved: true,
         selection,
       });
       authoring.complete({
@@ -693,7 +679,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     adapter.setState({
       projection: null,
       dragOrigins: new Map(),
-      moved: false,
       selection: NO_SELECTION,
       resizeDraft: null,
     });
