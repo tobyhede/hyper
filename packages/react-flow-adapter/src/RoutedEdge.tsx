@@ -27,8 +27,8 @@ import {
  * application — no strategy in the tree ever emitted a routed section, and a
  * Diagram has nowhere to store one — so the bezier is, and always was, the only
  * edge geometry the product draws. The name stays because the edge is still the
- * one drawn along a Graph; where it attaches is `.scratch/edge-attachment/`'s
- * open question.
+ * one drawn along a Graph; where it attaches is settled by ADR 0087 and answered
+ * below by `useEdgeAttachment`, from where the two Things are at that moment.
  */
 export type RoutedEdgeData = {
   graphId: GraphId;
@@ -106,15 +106,29 @@ export function RoutedEdgePath({
   return <BaseEdge {...baseEdgeProps} />;
 }
 
+/**
+ * What `RoutedEdgePath` forwards to `BaseEdge`, built from an Edge's own props
+ * and the path it drew.
+ *
+ * Offered because the application composes its own Edge over `RoutedEdgePath`
+ * and so assembles the same object — and `exactOptionalPropertyTypes` makes that
+ * three conditional lines rather than a spread, which is exactly the shape that
+ * gets copied and then diverges. One producer, so the day the path component
+ * forwards a fourth prop there is one place it reaches.
+ */
+export function routedEdgePathProps(
+  { id, markerEnd, style }: Pick<EdgeProps<RoutedFlowEdge>, 'id' | 'markerEnd' | 'style'>,
+  path: string,
+): ComponentProps<typeof RoutedEdgePath> {
+  const props: ComponentProps<typeof RoutedEdgePath> = { id, path };
+  if (markerEnd !== undefined) props.markerEnd = markerEnd;
+  if (style !== undefined) props.style = style;
+  return props;
+}
+
 export function RoutedEdge(props: EdgeProps<RoutedFlowEdge>) {
-  const { id, markerEnd, style } = props;
   const { path } = useRoutedEdgeGeometry(props);
-
-  const pathProps: ComponentProps<typeof RoutedEdgePath> = { id, path };
-  if (markerEnd !== undefined) pathProps.markerEnd = markerEnd;
-  if (style !== undefined) pathProps.style = style;
-
-  return <RoutedEdgePath {...pathProps} />;
+  return <RoutedEdgePath {...routedEdgePathProps(props, path)} />;
 }
 
 /**

@@ -148,8 +148,10 @@ test('a self-Edge draws a visible loop', async ({ page }) => {
   const before = await page.locator('.react-flow__edge').count();
 
   // A Graph may hold an Edge from a Thing to itself (ADR 0032). The facing rule
-  // divides by the vector between two centres, which is zero here, and React
-  // Flow draws a `NaN` path as nothing at all — so this case is taken first.
+  // would answer this pair rather than fail on it — one rect against itself
+  // settles on Bottom leaving and Top entering — and those two sides face away
+  // from each other with the Thing between them, so the curve would be drawn
+  // through it. That is why the self-Edge is taken first.
   await a.hover();
   await connectHandles(
     page,
@@ -187,13 +189,23 @@ test('several Graphs over one pair of Things share the anchors and keep their co
   // deliberately: colour and the Active Graph's emphasis are what separate them,
   // and fanning is a decision to take against `.scratch/multiple-routes`'
   // measured finding rather than a rule to build in now.
+  // The reference is Long's A → B by its own id, not whichever path happens to
+  // be drawn first. Taking `[0]` would keep passing if render order put some
+  // other coincident pair there, and would then report a count for an Edge the
+  // assertion message does not name.
+  const reference = await page
+    .locator(`.react-flow__edge[data-id="${A_TO_B}"] .react-flow__edge-path`)
+    .first()
+    .getAttribute('d');
+  expect(reference, 'Long carries A → B').not.toBeNull();
+
   const between = await page.locator('.react-flow__edge-path').evaluateAll((elements) =>
     elements.map((element) => ({
       d: element.getAttribute('d') ?? '',
       stroke: getComputedStyle(element).stroke,
     })),
   );
-  const shared = between.filter((edge) => edge.d === between[0]?.d);
+  const shared = between.filter((edge) => edge.d === reference);
   expect(shared.length, 'three Graphs carry A → B').toBe(3);
   expect(new Set(shared.map((edge) => edge.stroke)).size, 'each in its own colour').toBe(3);
 });
@@ -227,9 +239,14 @@ test('a selected Edge draws its controls on the geometry it moved to', async ({ 
   await page.mouse.click(middle.x, middle.y);
   await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
 
-  const controls = page.getByTestId('edge-edit');
-  await expect(controls).toBeVisible();
-  const box = (await controls.boundingBox())!;
-  expect(Math.abs(box.x + box.width / 2 - middle.x)).toBeLessThan(box.width + 8);
+  await expect(page.getByTestId('edge-edit')).toBeVisible();
+  // The *layer* is what `labelX`/`labelY` place, and it is placed by its own
+  // middle — `translate(-50%, -50%)` in `AuthorableEdge`. A button inside it
+  // sits beside its siblings and so is offset from that middle by half its own
+  // width, which is why measuring one of them needs a tolerance wide enough to
+  // swallow a real displacement. Measuring the layer costs nothing and lets both
+  // axes hold to the same few pixels.
+  const box = (await page.locator('.edge-control-layer').boundingBox())!;
+  expect(Math.abs(box.x + box.width / 2 - middle.x)).toBeLessThan(8);
   expect(Math.abs(box.y + box.height / 2 - middle.y)).toBeLessThan(8);
 });

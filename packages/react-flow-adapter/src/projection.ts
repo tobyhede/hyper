@@ -203,7 +203,10 @@ export type ThingFlowNode = Node<ThingNodeData, 'thing'>;
 export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
 
 export interface ProjectThingNodesOptions {
-  /** Draw Things without any Thing-owned authoring controls or handles. */
+  /** Draw Things without any Thing-owned authoring controls. The four anchors of
+   *  each role are declared and rendered either way — an Edge attaches to one,
+   *  and React Flow draws no Edge at all for a Thing whose handles it cannot
+   *  resolve (ADR 0087) — so this withholds the affordance, not the anchor. */
   readOnly?: boolean;
   /** Thing id reached during traversal, if any, to flag as active. */
   activeThingId?: ThingId | null;

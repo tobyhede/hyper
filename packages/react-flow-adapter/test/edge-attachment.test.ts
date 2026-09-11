@@ -46,6 +46,50 @@ describe('facingSides', () => {
     });
   });
 
+  it('leaves the top and enters the bottom when the target is above', () => {
+    const source = { x: 0, y: 500, width: 260, height: 146 };
+    const target = { x: 0, y: 0, width: 260, height: 146 };
+
+    expect(facingSides(source, target)).toEqual({
+      source: Position.Top,
+      target: Position.Bottom,
+    });
+  });
+
+  /*
+   * Two ties, both settled by the `>=` in each comparison rather than left to
+   * whichever way a rewrite happened to fall.
+   *
+   * The first is the axis: a Thing on the exact diagonal is as far away
+   * horizontally as vertically, and the horizontal axis takes it. The second is
+   * the direction: two Things level on the chosen axis have centres that
+   * coincide on it, and the positive side takes that.
+   *
+   * Neither is arbitrary in the sense of being unobservable — a Diagram placed
+   * on a grid puts Things on exact diagonals and exact rows constantly — and
+   * neither is reachable from the browser suite, where every pair either differs
+   * on one axis or is the same size in a straight line.
+   */
+  it('takes the horizontal axis when the two gaps are equal', () => {
+    const source = { x: 0, y: 0, width: 100, height: 100 };
+    const target = { x: 500, y: 500, width: 100, height: 100 };
+
+    expect(facingSides(source, target)).toEqual({
+      source: Position.Right,
+      target: Position.Left,
+    });
+  });
+
+  it('leaves the bottom when the two are level on the chosen axis', () => {
+    const source = { x: 0, y: 0, width: 260, height: 146 };
+    const target = { x: 0, y: 0, width: 260, height: 146 };
+
+    expect(facingSides(source, target)).toEqual({
+      source: Position.Bottom,
+      target: Position.Top,
+    });
+  });
+
   /*
    * The case the centre-to-centre vector gets wrong. These two rects overlap
    * vertically and are clear of each other horizontally — they are side by side,
