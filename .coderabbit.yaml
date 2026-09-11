@@ -84,7 +84,7 @@ reviews:
         route, ELK produces routed geometry, a URL has one, and `path`
         identifiers are filesystem paths, router URLs or React Flow's
         `edge-path` class. Other retired vocabulary: `manifest`, `Arrangement`,
-        a shared `Draft`, a `things` array in the space file, an `edges` array
+        a shared `Draft`, a `cards` array in the space file, an `edges` array
         beside Graphs.
 
         ADR 0040 is BUILT: `.scratch/first-public-aggregate/` landed it. A
@@ -302,7 +302,7 @@ reviews:
           New identifiers and prose use the vocabulary in CONTEXT.md. Retired
           terms must not reappear: the names ADR 0041 retired (Route and Walk,
           in any compound), `manifest`, `Arrangement`, a shared `Draft`, a
-          `things` array in the space file, or an `edges` array beside Graphs.
+          `cards` array in the space file, or an `edges` array beside Graphs.
           `test/unit/current-domain-vocabulary.test.ts` already enforces the
           first of those over every tracked file; this check covers the rest. A
           new domain term, or a renamed one, needs a CONTEXT.md entry in the

@@ -1471,9 +1471,19 @@ const RETIRED_THING_NAME = new RegExp(
     `[a-z]-${retiredThingLower}s?(?![a-z])`,
     // The optional field, which the key arm cannot cross the `?` to reach.
     `\\b${retiredThingLower}s?\\?\\s*:`,
-    // The callback binding written as a whole parameter, where no capital
-    // follows the retired word to end a compound.
-    `\\(\\s*${retiredThingLower}\\s*\\)\\s*=>`,
+    // The binding written as a whole parameter, where no capital follows the
+    // retired word to end a compound. The terminator is `,` as well as `)`,
+    // because a binding that takes the index too is the same blind spot this
+    // arm was written for, and the arrow is gone from it, because a `function`
+    // expression binds the word without one — and an argument passed under the
+    // retired name is a survivor of the same sweep either way. The comment
+    // cannot spell any of the three, for the reason the fixtures below are
+    // composed rather than written out: this scan reads its own source.
+    `\\(\\s*${retiredThingLower}s?\\s*[,)]`,
+    // The declaration binding, which no parenthesis of its own precedes: the
+    // loop variable of a `for...of` over the Thing collection, which a sweep
+    // that renames the collection leaves standing.
+    `\\b(?:const|let|var)\\s+${retiredThingLower}s?\\b`,
   ].join('|'),
 );
 
@@ -1737,6 +1747,12 @@ describe('a Thing is named once (ADR 0085)', () => {
       `readonly ${retiredThingLower}?: ${RETIRED_THING}Id;`,
       // The binding written as a whole parameter, with no capital to end it.
       `space.things.map((${retiredThingLower}) => ${retiredThingLower}.id)`,
+      // ...and the three bindings a `)` terminator and an arrow could not
+      // reach, which are the same drift in the same shape: a second parameter
+      // after it, a `for...of` declaration, and a `function` expression.
+      `space.things.map((${retiredThingLower}, index) => ${retiredThingLower}.id)`,
+      `for (const ${retiredThingLower} of space.things) { use(${retiredThingLower}); }`,
+      `space.things.forEach(function (${retiredThingLower}) { draw(${retiredThingLower}); })`,
     ];
 
     for (const line of retired) {
@@ -1781,6 +1797,12 @@ describe('a Thing is named once (ADR 0085)', () => {
       `const ${retiredThingLower}inality = new Set(ids).size;`,
       `// the author dis${retiredThingLower}ed the draft rather than saving it`,
       `const pattern = 'wild${retiredThingLower}';`,
+      // The same three English words in the two binding shapes the arms above
+      // were widened to reach: both need the retired word whole, so a letter
+      // either side of it is what keeps them out rather than an exemption.
+      `for (const ${retiredThingLower}inality of counts) {`,
+      `matches.map((wild${retiredThingLower}, index) => wild${retiredThingLower}.source)`,
+      `rows.forEach(function (dis${retiredThingLower}ed) { drop(dis${retiredThingLower}ed); })`,
       // The vocabulary this rename arrived at.
       `const selectedThing = space.things.find((thing) => thing.id === id);`,
       `export type ThingId = z.infer<typeof uuidSchema>;`,

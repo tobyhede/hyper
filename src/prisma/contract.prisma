@@ -11,7 +11,7 @@ model Space {
   exportedRevision BigInt?  @map("exported_revision")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        temporal.updatedAt() @map("updated_at")
-  things            Thing[]
+  things           Thing[]
   repositoryStates RepositoryState[]
 
   @@map("spaces")
