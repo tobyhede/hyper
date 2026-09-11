@@ -46,8 +46,8 @@ const openingGraph = (): GraphId => {
  * `THING_SIZE` declares. **The positions are the fixture's**, which is the one
  * thing a story is allowed to supply here — a Space's placement is a Diagram
  * strategy's answer, and running one to draw a HUD would put a placement
- * computation between this story and the surface it is about. They are staggered so the minimap frame has
- * two dimensions to show rather than a single line.
+ * computation between this story and the surface it is about. They are staggered
+ * so the minimap frame has two dimensions to show rather than a single line.
  */
 const NODES: readonly Node[] = SPACE.things.map((thing, index) => ({
   id: thing.id,

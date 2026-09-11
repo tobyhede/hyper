@@ -614,7 +614,7 @@ const BEHIND = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000005'), t
 /**
  * Open the Space in a Diagram whose geometry the test states.
  *
- * The tracked fixture's Diagram is ELK-seeded, so a test written against it would
+ * The tracked fixture's Diagram is a hand-set grid in the space file, so a test written against it would
  * be reverse-engineering coordinates it never chose — and every claim below is
  * about a distance between two Things. Seeding goes through the same HTTP
  * boundary the browser uses, so the Diagram the app opens is the one written
@@ -2244,7 +2244,7 @@ test('drawing an Edge into an explicitly created Diagram then refuses its duplic
     authoringHandle(target, 'target', 'left'),
   );
 
-  // Attached rather than visible: A and B are on the same ELK row, so this Edge
+  // Attached rather than visible: A and B are on the same hand-set row, so this Edge
   // is a dead-horizontal line with a zero-height box, which Playwright reads as
   // hidden.
   await expect(page.getByLabel(new RegExp(`^Edge from A to E in `))).toBeAttached();

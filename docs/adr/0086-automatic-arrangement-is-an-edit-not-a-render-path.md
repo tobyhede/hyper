@@ -4,7 +4,7 @@ Status: accepted
 Refines: 0005, 0014
 Related: 0021, 0025, 0040, 0045, 0053, 0056, 0079, 0085
 
-elkjs leaves the repository. The `LayoutStrategy` contract keeps the one direction that has a consumer — `positionedStrategy`, which reads a Diagram and answers the graph to draw — and loses the routing output that neither direction can use. `gridStrategy` stays, unused, because it is the direction that returns.
+elkjs leaves the repository. The `LayoutStrategy` contract keeps the one direction that has a consumer — `positionedStrategy`, which reads a Diagram and answers the graph to draw — and loses the routing output that neither direction can use. `gridStrategy` stays, unused, because it is pure, costs nothing and keeps the contract honest — not because grid is the arrangement that returns. No strategy is privileged (ADR 0014, ADR 0040, ADR 0041).
 
 What returns is ADR 0014's unbuilt half, not a new idea. An automatic arrangement becomes a **destructive authoring operation over an existing Diagram**: the author places Things, invokes a named tool, and the Diagram's positions are rewritten in one Edit, undoable like any other. It is not a second kind of canvas, not a second selectable context, and not something the renderer decides.
 
@@ -32,24 +32,32 @@ The code has been saying so. `positioned.ts:16` records that the strategy emits 
 
 ## What this deletes
 
+Staged across two tickets, because the deletion divides cleanly and only the first half is behaviour-free on inspection alone. `.scratch/edge-attachment/issues/01-remove-elkjs.md` takes elkjs out; `02-narrow-the-strategy-contract.md` narrows the contract behind it. The bullets say which owns each.
+
+**Ticket 01 — built.**
+
 - `packages/react-flow-adapter/src/elk/` entire — `elkStrategy`, `ElkEngine`, `elkPortId`, `PORT_ID_SEPARATOR`, `DEFAULT_ELK_LAYOUT_OPTIONS` — and the `elkjs` dependency.
 - `elk-strategy.test.ts`, and `elkStrategy`'s row in `strategy-contract.test.ts`.
+**Ticket 02 — not yet built; all four are still in the tree.**
+
 - `LayoutStrategyEdgeSection`, `sections` on `LayoutStrategyEdge`, and `ports` on `LayoutStrategyThing`.
 - `routedPoints` and `RoutedEdge`'s polyline branch. `RoutedEdge` keeps its name and draws the bezier it has always drawn.
 - `resolveHandles`'s `portsById` parameter and its `port?.y ??` branch. The even spread over the Thing height stops being a fallback and becomes the rule.
 - `canvas-projection.ts`'s `moved` special-case on `edgeOptions`, which selects between two results that are identical once no strategy routes.
+**Ticket 01 — built.**
+
 - Three of the eight handle rules in `docs/agents/rendering.md`: ELK port offsets driving handle positions, `FIXED_SIDE` over `FIXED_ORDER`, and the `<thingId>##<handleId>` namespacing.
-- ADR 0085's three elkjs option-bag exemptions in the vocabulary guard, and the filename carve-out for `packages/react-flow-adapter/src/elk/layout.ts`. `packages/graph/src/layout.ts` keeps both its name and its carve-out, which were never elkjs's.
+- ADR 0085's three elkjs option-bag exemptions in the vocabulary guard, and the filename carve-out for `packages/react-flow-adapter/src/elk/layout.ts`. `packages/graph/src/layout.ts` keeps its name and the *shape* carve-out that protects it — the one for the `LayoutStrategy` compound, which is a different mechanism from a filename entry and was never elkjs's. It has no filename carve-out and never had one.
 
 ## What survives, and why none of it was elkjs's
 
-Five of `rendering.md`'s eight handle rules are React Flow's and are untouched. Handle ids must be distinguishable per Thing per side — ADR 0045 argues that on React Flow's grounds, its warning #008, not on elkjs's. A hidden handle uses `opacity: 0` or `visibility: hidden` and never `display: none`, because React Flow measures it. Handle geometry is declared and never re-measured, and `useUpdateNodeInternals` stays forbidden; that rule has E2E evidence behind it that unit tests provably cannot reproduce. And neither `toNode` nor the DOM alone answers "is this empty canvas", because `connectionRadius` resolves by distance to a handle.
+Five of `rendering.md`'s eight handle rules survive, and the four that are React Flow's are untouched; the fifth is ADR 0033's scoping rule, which says the set belongs to the overview rather than to the domain and is the lead-in `rendering.md` counts the other four below. Handle ids must be distinguishable per Thing per side — ADR 0045 argues that on React Flow's grounds, its warning #008, not on elkjs's. A hidden handle uses `opacity: 0` or `visibility: hidden` and never `display: none`, because React Flow measures it. Handle geometry is declared and never re-measured, and `useUpdateNodeInternals` stays forbidden; that rule has E2E evidence behind it that unit tests provably cannot reproduce. And neither `toNode` nor the DOM alone answers "is this empty canvas", because `connectionRadius` resolves by distance to a handle.
 
 `gridStrategy` survives too. The argument here is that a heavy dependency was wired into a render path no user can reach; that argument does not extend to a pure, dependency-free function sitting in the package where Auto-arrange will live. Keeping it also keeps `LayoutStrategy` an honest contract — one implementation on each side — rather than a type with an empty half.
 
 ## What this opens and does not answer
 
-Every Edge in the product leaves a Thing's right side and enters the next one's left. That has exactly one cause in the repository: `port.side === 'in' ? 'WEST' : 'EAST'` in `elk-strategy.ts`, mapping a handle to an elkjs port side. After this change **nothing in the codebase says why an Edge attaches where it does.** The per-Graph `<graphId>::in` / `::out` ids survive on React Flow's grounds; their placement does not survive on any.
+Every Edge in the product leaves a Thing's right side and enters the next one's left. What leaves here is the *argued* cause — `port.side === 'in' ? 'WEST' : 'EAST'` in `elk-strategy.ts`, mapping a handle to an elkjs port side, which is where the rule was reasoned about. What stays is the rule stated without an argument, in three live places: `projection.ts` declares `position: Position.Left` on every per-Graph target handle and `Position.Right` on every source, and `ThingNode.tsx` re-decides the same thing at render. So after this change **nothing in the codebase says *why* an Edge attaches where it does, while three places still say *that* it does.** The per-Graph `<graphId>::in` / `::out` ids survive on React Flow's grounds; their placement survives as an unexplained constant, which is what the next ticket has to answer and amend.
 
 That is a real question and this ADR deliberately leaves it open. It is the question a floating-edge design answers, and it is better answered against the smaller tree this leaves than against one where an unreachable router still has an opinion.
 

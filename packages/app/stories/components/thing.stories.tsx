@@ -51,7 +51,7 @@ const ONE_LINE_TITLE = 'Strategies';
  * 0083). Each is short enough to draw on one visual line, so what the ladder
  * does to type is legible without any line also wrapping.
  */
-const THREE_LINE_TITLE = 'Strategies\nno strategy is privileged\nelkjs is one member of a set';
+const THREE_LINE_TITLE = 'Strategies\nno strategy is privileged\ngrid is one member of a set';
 
 /**
  * One Title Line, long enough that the box breaks it. A break the box chose is

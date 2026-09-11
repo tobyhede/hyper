@@ -6,11 +6,18 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import globals from 'globals';
 
 /** Render-layer libraries: they live in `react-flow-adapter` and nowhere below
- *  it. ELK's presence here is the point of ADR 0014 — it is one strategy among
- *  several, not what "layout" means, so `graph` must not reach for it. */
+ *  it. elkjs is named although it is a dependency of no package since ADR 0086:
+ *  the ban is what keeps a *render-time* engine out of the domain, and that is
+ *  the reading to keep. It is not a ruling on where a returning elkjs lives —
+ *  ADR 0086 sites Auto-arrange in `graph`, attached to an Edit, and re-siting
+ *  the ban is part of building it rather than a lint message's decision. */
 const RENDER_ONLY = [
   { name: '@xyflow/react', message: 'React Flow lives in @project/react-flow-adapter only.' },
-  { name: 'elkjs', message: 'elkjs lives in @project/react-flow-adapter only.' },
+  {
+    name: 'elkjs',
+    message:
+      'No render-time layout engine below @project/react-flow-adapter. Auto-arrange runs in an Edit (ADR 0086) — see eslint.config.js before siting one here.',
+  },
 ];
 
 /** React itself, barred from the domain packages. `ui` is exempt: it is React
@@ -42,7 +49,8 @@ const ESCAPE_PATTERN = {
  *  match `elkjs/lib/elk.bundled.js`, which is how it would be imported. */
 const RENDER_ONLY_PATTERN = {
   group: ['elkjs/*', '@xyflow/*'],
-  message: 'React Flow and elkjs live in @project/react-flow-adapter only.',
+  message:
+    'React Flow lives in @project/react-flow-adapter only, and no render-time layout engine lives below it (ADR 0086).',
 };
 
 const REACT_DOM_PATTERN = {

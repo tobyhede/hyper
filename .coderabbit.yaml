@@ -98,8 +98,10 @@ reviews:
     - path: 'packages/core/**'
       instructions: >-
         Zod schemas plus schema-derived types only. No React, no @xyflow/react,
-        no graph-layout engine, no framework dependency — ESLint enforces this, so a finding
-        here means the rule was bypassed. Geometry rides as optional fields on
+        no framework dependency — ESLint enforces this by name for React,
+        React Flow and elkjs, so a finding naming one of those means the rule was
+        bypassed. Another layout engine is equally unwelcome here and the lint
+        rules do not yet name it, so that one is a real finding. Geometry rides as optional fields on
         elements (ADR 0005); there is no `Arrangement` type and none should be
         proposed. A Diagram is authored data; a LayoutStrategy is behaviour
         living in `graph` (ADR 0014). Do not collapse them.

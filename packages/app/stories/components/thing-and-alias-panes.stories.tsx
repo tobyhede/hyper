@@ -47,7 +47,7 @@ Placement is authored, not computed. A Diagram owns an explicitly positioned sub
 
 ## Strategies
 
-No strategy is privileged. Grid, sorts, trees, clusters, and ELK are choices over the same contract.
+No strategy is privileged. Grid, sorts, trees and clusters are choices over the same contract.
 
 ## Presentation
 

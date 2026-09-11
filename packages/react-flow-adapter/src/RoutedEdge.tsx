@@ -4,25 +4,21 @@ import type { GraphId } from '@project/core';
 import type { Point } from '@project/graph';
 
 /**
- * React Flow custom edge that draws the polyline ELK routed, not a bezier.
+ * React Flow custom edge. **It draws a bezier, and only ever has.**
  *
- * ELK computes where each edge runs — around the things, as a channel — and the
- * app used to throw that away and let React Flow draw its own curve between the
- * two handles. A forward edge looks fine either way; a back-edge (target left of
- * source, e.g. two graphs disagreeing on the order of things they share) does not:
- * the bezier leaves
- * rightward and hooks back on itself, reading as a broken stub. Drawing ELK's
- * routed points instead makes it a clean channel. See
- * `.scratch/layout-seam/issues/03-render-elk-edge-routing.md`.
+ * The polyline branch below is unreachable in the application: it needs `points`,
+ * which come from a strategy's routed `sections`, and no strategy in the tree
+ * emits any (ADR 0086). A back-edge — target left of source, e.g. two graphs
+ * disagreeing on the order of things they share — therefore leaves rightward and
+ * hooks back on itself, reading as a broken stub. That is the product's actual
+ * behaviour, not a fallback waiting for a router to resolve.
  *
- * The points are in the same coordinate space as the node positions (both come
- * from ELK verbatim), so they map straight onto React Flow's flow coordinates.
- * When a strategy places no routing (grid, or before ELK resolves on first paint)
- * we fall back to a bezier between the handles React Flow already knows.
+ * The component keeps its name and the branch leaves with ticket 02 of ADR 0086.
+ * Don't debug why routing "isn't resolving"; there is nothing to resolve.
  */
 export type RoutedEdgeData = {
   graphId: GraphId;
-  /** ELK's routed path, start → bends → end. Absent until a routing strategy runs. */
+  /** A routed path, start → bends → end. **Always absent** — nothing populates it. */
   points?: Point[];
 };
 
@@ -32,7 +28,7 @@ export type RoutedEdgeData = {
  */
 export type RoutedFlowEdge = Edge<RoutedEdgeData, 'routed'>;
 
-/** Rounded to one decimal place — ELK's coordinates carry long float tails
+/** Rounded to one decimal place — a router's coordinates carry long float tails
  *  that add nothing visible to an edge's path but bloat the SVG string. */
 function roundCoordinate(value: number): number {
   return Math.round(value * 10) / 10;

@@ -6,16 +6,17 @@
  * Diagram's, which ADR 0014 corrected once the authored kind became a value
  * you can hold.
  *
- * Modelled on how ELK does it, deliberately. Geometry lives as *optional fields
- * on the elements* — a thing carries `x`/`y`, a port carries its offset — and a
- * strategy takes a layout-strategy graph and returns the same value with those fields populated.
+ * Modelled on how a graph-layout engine does it, deliberately. Geometry lives as
+ * *optional fields on the elements* — a thing carries `x`/`y`, a port carries its
+ * offset — and a strategy takes a layout-strategy graph and returns the same value
+ * with those fields populated.
  * There is no separate arranged-result type; `CONTEXT.md` lists "arrangement"
  * under _Avoid_ and ADR 0005 records why.
  *
  * Which things a strategy arranges is decided by the view before it runs. A
  * strategy is free to ignore parts of the graph it has no use for — a grid never
- * looks at the edges, exactly as ELK's own algorithms differ in what they
- * consume.
+ * looks at the edges, exactly as one engine's algorithms differ from another's in
+ * what they consume.
  */
 
 import type { ThingId } from '@project/core';
@@ -60,9 +61,14 @@ export interface Point {
 
 /**
  * A routed span of an edge: where it starts, where it ends, and the corners it
- * turns through in between. Mirrors ELK's `ElkEdgeSection` — an orthogonal
- * back-edge routes *around* the things as a channel rather than cutting straight
+ * turns through in between. Modelled on an orthogonal router's own section type —
+ * a back-edge routes *around* the things as a channel rather than cutting straight
  * across them, and the bend points are how it does that.
+ *
+ * **No strategy in the tree emits one**, and none can: a Diagram stores placements
+ * and has nowhere to put an edge's waypoints, so this is unusable in both
+ * directions rather than merely unused. It goes with ticket 02 of ADR 0086; until
+ * then, read it as dead weight rather than as a contract with a producer.
  */
 export interface LayoutStrategyEdgeSection {
   startPoint: Point;
@@ -77,9 +83,10 @@ export interface LayoutStrategyEdge {
   sourceHandle: string;
   targetHandle: string;
   /**
-   * The routed geometry, once a routing strategy has placed it. Optional like the
-   * things' `x`/`y`: a routing strategy (ELK) populates it; a placement-only one
-   * (grid) leaves it undefined and the render layer falls back to a plain curve.
+   * The routed geometry, once a routing strategy has placed it. **Nothing
+   * populates it** — both surviving strategies are placement-only, so this is
+   * always undefined and the render layer always draws a plain curve. It leaves
+   * with ticket 02 of ADR 0086.
    */
   sections?: LayoutStrategyEdgeSection[];
 }
@@ -92,9 +99,11 @@ export interface LayoutStrategyGraph {
 /**
  * A layout strategy: takes a graph and returns it with geometry filled in.
  *
- * Always async. Engine-backed strategies (ELK) are inherently asynchronous; the
- * arithmetic ones (grid, positioned) resolve immediately but still return a
- * promise, so every caller handles a single shape. The type once carried a
+ * Always async, and it stays that way with no engine in the tree. Both surviving
+ * strategies (grid, positioned) are arithmetic and resolve immediately, but an
+ * engine-backed one is inherently asynchronous and ADR 0086 has Auto-arrange
+ * returning as an Edit that runs one — so every caller handles a single shape.
+ * Do not collapse this to sync: `placement-rendering.ts` awaits it. The type once carried a
  * `LayoutStrategyGraph | Promise<LayoutStrategyGraph>` union, but nothing exercised the sync
  * branch — `App` awaited every strategy regardless — so it was collapsed to
  * async-only (`.scratch/layout-seam/issues/06-revisit-async-optionality.md`).
