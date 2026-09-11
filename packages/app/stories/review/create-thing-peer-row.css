@@ -1,5 +1,14 @@
 /* THROWAWAY UX PROTOTYPE — see create-thing-permutations.stories.tsx.
 
+   **The question is settled and production owns the answer.** Option B packed
+   onto one row is what shipped: `command-dock.css` carries
+   `.command-dock__things` and `.command-dock__create`, and the evidence is the
+   two parity claims named in `parity-claims.ts`. What is left here is the
+   comparison that produced that decision, kept because the reasoning is worth
+   more than the rules — a later reader asking "why not a menu, or a split, or a
+   badge" is asking a question this sheet answers and the production code does
+   not. Do not develop these rules further; change the production sheet.
+
    **One rule, and it is the whole of the proposed production change.** Written
    here rather than in `command-dock.css` because the arrangement is still a
    review question; if it is accepted, this block moves into that sheet beside
