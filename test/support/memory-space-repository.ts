@@ -27,8 +27,8 @@ const ascendingById = (left: { readonly id: UUID }, right: { readonly id: UUID }
 };
 
 /**
- * PostgreSQL orders the aggregate's cards on read — `loadSpaceAggregate` sorts
- * `card.id.asc()`, on the read inside an import transaction and on the one
+ * PostgreSQL orders the aggregate's things on read — `loadSpaceAggregate` sorts
+ * `thing.id.asc()`, on the read inside an import transaction and on the one
  * outside it alike — so every `LoadedSpace` this double hands back has to be
  * ordered the same way. The shared contract compares whole snapshots, and
  * `toEqual` is order-sensitive on arrays, so insertion order here would be a
@@ -43,7 +43,7 @@ const ascendingById = (left: { readonly id: UUID }, right: { readonly id: UUID }
 const read = (loaded: LoadedSpace): LoadedSpace =>
   clone({
     ...loaded,
-    snapshot: { ...loaded.snapshot, cards: [...loaded.snapshot.cards].sort(ascendingById) },
+    snapshot: { ...loaded.snapshot, things: [...loaded.snapshot.things].sort(ascendingById) },
   });
 
 const loadedAggregate = (metaSpaceId: UUID, spaces: Iterable<LoadedSpace>): LoadedAggregate => ({
@@ -73,7 +73,7 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
     // rewrote an unsupported document into a supported one — the one thing a
     // double of an insert-only importer must not do.
     document: diagrams === undefined ? { ...document } : { ...document, diagrams },
-    cards: input.cards.map(({ id, ...card }) => ({ ...card, id: id ?? newUuid() })),
+    things: input.things.map(({ id, ...thing }) => ({ ...thing, id: id ?? newUuid() })),
   };
 };
 
@@ -290,7 +290,7 @@ export class MemorySpaceRepository implements SpaceRepository {
       const changed = new Set(request.changes.map(({ spaceId }) => spaceId));
       const incompleteDeletionIds = new Set(
         intake.errors.flatMap((error) =>
-          error.kind === 'space-card-target-missing' &&
+          error.kind === 'space-thing-target-missing' &&
           deleted.has(error.targetSpaceId) &&
           !changed.has(error.spaceId)
             ? [error.targetSpaceId]
@@ -349,13 +349,13 @@ export class MemorySpaceRepository implements SpaceRepository {
     // with nothing, so the wider read rejects no batch of id-less Spaces the
     // real backend would accept — where it, too, mints ids that cannot repeat.
     const batchSpaceIds = new Set<UUID>();
-    // Two distinct facts, deliberately not merged. `batchCardIds` is what this
-    // batch already claims, and a repeat is `duplicate-identity`. `storedCardOwner`
+    // Two distinct facts, deliberately not merged. `batchThingIds` is what this
+    // batch already claims, and a repeat is `duplicate-identity`. `storedThingOwner`
     // below is what survives the call, and claiming one of those is
-    // `card-ownership` — a collision the real backend only meets on its card
+    // `thing-ownership` — a collision the real backend only meets on its thing
     // writes, inside the transaction. Folding them together makes this double
     // reject valid input under a code the real backend never returns for it.
-    const batchCardIds = new Set<UUID>();
+    const batchThingIds = new Set<UUID>();
     for (const snapshot of identified) {
       if (batchSpaceIds.has(snapshot.id)) {
         return Promise.resolve({
@@ -366,28 +366,28 @@ export class MemorySpaceRepository implements SpaceRepository {
       }
       batchSpaceIds.add(snapshot.id);
 
-      for (const card of snapshot.cards) {
-        if (batchCardIds.has(card.id)) {
+      for (const thing of snapshot.things) {
+        if (batchThingIds.has(thing.id)) {
           return Promise.resolve({
             kind: 'rejected',
             code: 'duplicate-identity',
-            message: `Duplicate card identity "${card.id}"`,
+            message: `Duplicate thing identity "${thing.id}"`,
           });
         }
-        batchCardIds.add(card.id);
+        batchThingIds.add(thing.id);
       }
     }
 
-    const storedCardOwner = new Map<UUID, UUID>();
+    const storedThingOwner = new Map<UUID, UUID>();
     if (mode === 'insert') {
       for (const { snapshot } of this.#spaces.values()) {
-        for (const card of snapshot.cards) storedCardOwner.set(card.id, snapshot.id);
+        for (const thing of snapshot.things) storedThingOwner.set(thing.id, snapshot.id);
       }
     }
 
     // Then per Space in batch order, in the order the real transaction meets
     // each fault: the row insert a stored Space identity rejects, then domain
-    // intake, then the card writes a stored owner rejects.
+    // intake, then the thing writes a stored owner rejects.
     const snapshots: SpaceSnapshot[] = [];
     for (const identifiedSnapshot of identified) {
       if (mode === 'insert' && this.#spaces.has(identifiedSnapshot.id)) {
@@ -407,13 +407,13 @@ export class MemorySpaceRepository implements SpaceRepository {
         });
       }
 
-      for (const card of intake.snapshot.cards) {
-        const owner = storedCardOwner.get(card.id);
+      for (const thing of intake.snapshot.things) {
+        const owner = storedThingOwner.get(thing.id);
         if (owner !== undefined && owner !== intake.snapshot.id) {
           return Promise.resolve({
             kind: 'rejected',
-            code: 'card-ownership',
-            message: `Card ${card.id} belongs to space ${owner}`,
+            code: 'thing-ownership',
+            message: `Thing ${thing.id} belongs to space ${owner}`,
           });
         }
       }

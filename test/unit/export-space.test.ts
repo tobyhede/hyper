@@ -9,10 +9,10 @@ import { readSingleSpace } from '../../src/import/read-single-space';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
-const CARD_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
-const CARD_B = uuidSchema.parse('a0000000-0000-4000-8000-000000000011');
-const CARD_E = uuidSchema.parse('a0000000-0000-4000-8000-000000000012');
-const CARD_F = uuidSchema.parse('a0000000-0000-4000-8000-000000000013');
+const THING_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
+const THING_B = uuidSchema.parse('a0000000-0000-4000-8000-000000000011');
+const THING_E = uuidSchema.parse('a0000000-0000-4000-8000-000000000012');
+const THING_F = uuidSchema.parse('a0000000-0000-4000-8000-000000000013');
 const SPINE_DIAGRAM_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000020');
 const ECHO_DIAGRAM_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000021');
 const LONG_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000030');
@@ -22,7 +22,7 @@ const ECHO_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000032');
 /**
  * Two Diagrams owning three Graphs between them, which is the only shape that
  * exercises what version 1 moved: a Graph reached through its owner rather than
- * through a Space-level array. The second Diagram's Graph shares no Card with the
+ * through a Space-level array. The second Diagram's Graph shares no Thing with the
  * first, so each owned Edge is closed over its own Diagram's position keys.
  *
  * Deliberately supplied *unsorted* — positions in descending key order, Graphs
@@ -42,17 +42,17 @@ const storedSpace: LoadedSpace = {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [CARD_B]: { x: 260, y: 0, open: false },
-            [CARD_A]: { x: 0, y: 0, open: false },
+            [THING_B]: { x: 260, y: 0, open: false },
+            [THING_A]: { x: 0, y: 0, open: false },
           },
           graphs: [
             {
               id: SHORT_GRAPH_ID,
               title: 'Short',
               color: '#22aa88',
-              edges: [{ from: CARD_B, to: CARD_A }],
+              edges: [{ from: THING_B, to: THING_A }],
             },
-            { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: CARD_A, to: CARD_B }] },
+            { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: THING_A, to: THING_B }] },
           ],
           activeGraph: LONG_GRAPH_ID,
         },
@@ -61,18 +61,18 @@ const storedSpace: LoadedSpace = {
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [CARD_E]: { x: 0, y: 200, open: false },
-            [CARD_F]: { x: 260, y: 200, open: false },
+            [THING_E]: { x: 0, y: 200, open: false },
+            [THING_F]: { x: 260, y: 200, open: false },
           },
-          graphs: [{ id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: CARD_E, to: CARD_F }] }],
+          graphs: [{ id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: THING_E, to: THING_F }] }],
         },
       ],
     },
-    cards: [
-      { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
-      { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-      { id: CARD_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
-      { id: CARD_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
+    things: [
+      { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
+      { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
+      { id: THING_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
+      { id: THING_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
     ],
   },
   revision: 7n,
@@ -112,17 +112,17 @@ describe('canonical export', () => {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [CARD_A]: { x: 0, y: 0, open: false },
-            [CARD_B]: { x: 260, y: 0, open: false },
+            [THING_A]: { x: 0, y: 0, open: false },
+            [THING_B]: { x: 260, y: 0, open: false },
           },
           graphs: [
             {
               id: SHORT_GRAPH_ID,
               title: 'Short',
               color: '#22aa88',
-              edges: [{ from: CARD_B, to: CARD_A }],
+              edges: [{ from: THING_B, to: THING_A }],
             },
-            { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: CARD_A, to: CARD_B }] },
+            { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: THING_A, to: THING_B }] },
           ],
           activeGraph: LONG_GRAPH_ID,
         },
@@ -131,10 +131,10 @@ describe('canonical export', () => {
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [CARD_E]: { x: 0, y: 200, open: false },
-            [CARD_F]: { x: 260, y: 200, open: false },
+            [THING_E]: { x: 0, y: 200, open: false },
+            [THING_F]: { x: 260, y: 200, open: false },
           },
-          graphs: [{ id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: CARD_E, to: CARD_F }] }],
+          graphs: [{ id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: THING_E, to: THING_F }] }],
         },
       ],
     });
@@ -153,18 +153,18 @@ describe('canonical export', () => {
    *
    * So every object below is permuted against `storedSpace`: the document's
    * keys, each diagram's, each graph's, each edge's, the position map's, each
-   * *point's*, and the card array's. Only the exporter rebuilding all of them
+   * *point's*, and the thing array's. Only the exporter rebuilding all of them
    * makes the two agree.
    */
   const shuffledStoredSpace: LoadedSpace = {
     revision: 7n,
     exportedRevision: null,
     snapshot: {
-      cards: [
-        { id: CARD_A, document: { kind: 'markdown', body: 'A body.\n', title: 'A' } },
-        { id: CARD_E, document: { body: 'E body.\n', title: 'E', kind: 'markdown' } },
-        { id: CARD_B, document: { title: 'B', body: 'B body.\n', kind: 'markdown' } },
-        { id: CARD_F, document: { kind: 'markdown', title: 'F', body: 'F body.\n' } },
+      things: [
+        { id: THING_A, document: { kind: 'markdown', body: 'A body.\n', title: 'A' } },
+        { id: THING_E, document: { body: 'E body.\n', title: 'E', kind: 'markdown' } },
+        { id: THING_B, document: { title: 'B', body: 'B body.\n', kind: 'markdown' } },
+        { id: THING_F, document: { kind: 'markdown', title: 'F', body: 'F body.\n' } },
       ],
       id: SPACE_ID,
       document: {
@@ -176,26 +176,26 @@ describe('canonical export', () => {
             graphs: [
               {
                 color: '#22aa88',
-                edges: [{ to: CARD_A, from: CARD_B }],
+                edges: [{ to: THING_A, from: THING_B }],
                 title: 'Short',
                 id: SHORT_GRAPH_ID,
               },
-              { edges: [{ to: CARD_B, from: CARD_A }], id: LONG_GRAPH_ID, title: 'Long' },
+              { edges: [{ to: THING_B, from: THING_A }], id: LONG_GRAPH_ID, title: 'Long' },
             ],
             title: 'Spine',
             positions: {
-              [CARD_A]: { y: 0, x: 0, open: false },
-              [CARD_B]: { y: 0, x: 260, open: false },
+              [THING_A]: { y: 0, x: 0, open: false },
+              [THING_B]: { y: 0, x: 260, open: false },
             },
             id: SPINE_DIAGRAM_ID,
           },
           {
             title: 'Echo',
             positions: {
-              [CARD_F]: { y: 200, x: 260, open: false },
-              [CARD_E]: { y: 200, x: 0, open: false },
+              [THING_F]: { y: 200, x: 260, open: false },
+              [THING_E]: { y: 200, x: 0, open: false },
             },
-            graphs: [{ title: 'Echo', edges: [{ to: CARD_F, from: CARD_E }], id: ECHO_GRAPH_ID }],
+            graphs: [{ title: 'Echo', edges: [{ to: THING_F, from: THING_E }], id: ECHO_GRAPH_ID }],
             id: ECHO_DIAGRAM_ID,
             kind: 'positioned',
           },
@@ -215,16 +215,16 @@ describe('canonical export', () => {
     await expect(readFile(join(first, 'space.json'), 'utf8')).resolves.toBe(
       await readFile(join(second, 'space.json'), 'utf8'),
     );
-    for (const cardId of [CARD_A, CARD_B, CARD_E, CARD_F]) {
-      await expect(readFile(join(first, 'cards', `${cardId}.md`), 'utf8')).resolves.toBe(
-        await readFile(join(second, 'cards', `${cardId}.md`), 'utf8'),
+    for (const thingId of [THING_A, THING_B, THING_E, THING_F]) {
+      await expect(readFile(join(first, 'things', `${thingId}.md`), 'utf8')).resolves.toBe(
+        await readFile(join(second, 'things', `${thingId}.md`), 'utf8'),
       );
     }
   });
 
   /**
    * Both arms of the placement union carrying a remembered Open Size (ADR 0066)
-   * — an Open Card, and a Closed one that kept its rect for the next Open — each
+   * — an Open Thing, and a Closed one that kept its rect for the next Open — each
    * stored *height first*, which is an order `jsonb` is free to hand back.
    */
   const storedSpaceWithOpenSizes: LoadedSpace = {
@@ -239,16 +239,16 @@ describe('canonical export', () => {
             title: 'Spine',
             kind: 'positioned',
             positions: {
-              [CARD_A]: { x: 0, y: 0, open: true, openSize: { height: 420, width: 560 } },
-              [CARD_B]: { x: 260, y: 0, open: false, openSize: { height: 300, width: 400 } },
+              [THING_A]: { x: 0, y: 0, open: true, openSize: { height: 420, width: 560 } },
+              [THING_B]: { x: 260, y: 0, open: false, openSize: { height: 300, width: 400 } },
             },
-            graphs: [{ id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: CARD_A, to: CARD_B }] }],
+            graphs: [{ id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: THING_A, to: THING_B }] }],
           },
         ],
       },
-      cards: [
-        { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-        { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
+      things: [
+        { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
+        { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
       ],
     },
     revision: 7n,
@@ -272,8 +272,8 @@ describe('canonical export', () => {
     await exportSpace(repository, SPACE_ID, destination);
 
     const written = await readFile(join(destination, 'space.json'), 'utf8');
-    // Positions export sorted by Card id, so the Open Card's rect is first and
-    // the Closed Card's remembered rect second.
+    // Positions export sorted by Thing id, so the Open Thing's rect is first and
+    // the Closed Thing's remembered rect second.
     expect(exportedOpenSizeKeys(written)).toEqual([
       ['width', 'height'],
       ['width', 'height'],
@@ -288,10 +288,10 @@ describe('canonical export', () => {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [CARD_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
-            [CARD_B]: { x: 260, y: 0, open: false, openSize: { width: 400, height: 300 } },
+            [THING_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
+            [THING_B]: { x: 260, y: 0, open: false, openSize: { width: 400, height: 300 } },
           },
-          graphs: [{ id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: CARD_A, to: CARD_B }] }],
+          graphs: [{ id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: THING_A, to: THING_B }] }],
         },
       ],
     });
@@ -322,11 +322,11 @@ describe('canonical export', () => {
     await expect(readSingleSpace(destination)).resolves.toEqual({
       id: SPACE_ID,
       document: storedSpace.snapshot.document,
-      cards: [
-        { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-        { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
-        { id: CARD_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
-        { id: CARD_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
+      things: [
+        { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
+        { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
+        { id: THING_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
+        { id: THING_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
       ],
     });
   });

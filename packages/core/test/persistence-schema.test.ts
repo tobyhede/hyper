@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { importSpaceFileSchema, importSpaceSchema, spaceSnapshotSchema } from '../src/index';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
-const CARD_A = '00000000-0000-4000-8000-000000000002';
-const CARD_B = '00000000-0000-4000-8000-000000000003';
+const THING_A = '00000000-0000-4000-8000-000000000002';
+const THING_B = '00000000-0000-4000-8000-000000000003';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000004';
 const DIAGRAM_ID = '00000000-0000-4000-8000-000000000005';
 
@@ -18,17 +18,17 @@ const identified = {
         title: 'Working',
         kind: 'positioned' as const,
         positions: {
-          [CARD_A]: { x: 0, y: 0, open: false },
-          [CARD_B]: { x: 320, y: 0, open: false },
+          [THING_A]: { x: 0, y: 0, open: false },
+          [THING_B]: { x: 320, y: 0, open: false },
         },
-        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_B }] }],
       },
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown' as const, body: 'A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown' as const, body: 'B' } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown' as const, body: 'A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown' as const, body: 'B' } },
   ],
 };
 
@@ -50,8 +50,8 @@ describe('import space schema', () => {
       diagrams: [
         {
           title: 'Generated diagram',
-          positions: { [CARD_A]: { x: 0, y: 0, open: false } },
-          graphs: [{ title: 'Generated graph', edges: [{ from: CARD_A, to: CARD_B }] }],
+          positions: { [THING_A]: { x: 0, y: 0, open: false } },
+          graphs: [{ title: 'Generated graph', edges: [{ from: THING_A, to: THING_B }] }],
         },
       ],
     });
@@ -65,7 +65,7 @@ describe('import space schema', () => {
         diagrams: [
           {
             ...parsed.diagrams?.[0],
-            graphs: [{ title: 'Generated graph', edges: [{ from: 'card-a', to: CARD_B }] }],
+            graphs: [{ title: 'Generated graph', edges: [{ from: 'thing-a', to: THING_B }] }],
           },
         ],
       }).success,
@@ -79,12 +79,12 @@ describe('import space schema', () => {
         diagrams: [
           {
             title: 'Working',
-            positions: { [CARD_A]: { x: 0, y: 0, open: false } },
+            positions: { [THING_A]: { x: 0, y: 0, open: false } },
             graphs: [{ ...graph, id: undefined }],
           },
         ],
       },
-      cards: [...identified.cards, { document: { title: 'New', kind: 'markdown', body: '' } }],
+      things: [...identified.things, { document: { title: 'New', kind: 'markdown', body: '' } }],
     };
 
     const parsed = importSpaceSchema.parse(input);
@@ -92,7 +92,7 @@ describe('import space schema', () => {
     expect(parsed.id).toBeUndefined();
     expect(parsed.document.diagrams?.[0]?.id).toBeUndefined();
     expect(parsed.document.diagrams?.[0]?.graphs[0]?.id).toBeUndefined();
-    expect(parsed.cards.at(-1)?.id).toBeUndefined();
+    expect(parsed.things.at(-1)?.id).toBeUndefined();
   });
 
   /**
@@ -127,7 +127,7 @@ describe('import space schema', () => {
       { ...identified, id: 'space' },
       withDiagram({ ...diagram, graphs: [{ ...graph, id: 'main' }] }),
       withDiagram({ ...diagram, id: 'working' }),
-      { ...identified, cards: [{ ...identified.cards[0], id: 'a' }] },
+      { ...identified, things: [{ ...identified.things[0], id: 'a' }] },
     ]) {
       expect(importSpaceSchema.safeParse(input).success).toBe(false);
     }
@@ -149,7 +149,7 @@ describe('space snapshot schema', () => {
     expect(
       spaceSnapshotSchema.safeParse({
         ...identified,
-        cards: [{ ...identified.cards[0], id: undefined }],
+        things: [{ ...identified.things[0], id: undefined }],
       }).success,
     ).toBe(false);
   });

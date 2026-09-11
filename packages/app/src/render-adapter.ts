@@ -6,10 +6,10 @@ import {
   type NodePositionChange,
 } from '@xyflow/react';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import type { CardId, GraphEdge, GraphId, DiagramPosition } from '@project/core';
+import type { ThingId, GraphEdge, GraphId, DiagramPosition } from '@project/core';
 import { Placement } from '@project/graph';
-import type { CardFlowNode, RoutedEdgeData } from '@project/react-flow-adapter';
-import { snapCardSizeToClose } from './card';
+import type { ThingFlowNode, RoutedEdgeData } from '@project/react-flow-adapter';
+import { snapThingSizeToClose } from './thing';
 import type { SpaceAuthoring } from './space-authoring';
 
 /**
@@ -30,24 +30,24 @@ import type { SpaceAuthoring } from './space-authoring';
  * make it so.
  */
 export interface Projection {
-  readonly nodes: CardFlowNode[];
+  readonly nodes: ThingFlowNode[];
   readonly edges: Edge[];
 }
 
 export interface ResizeDraft {
-  readonly cardId: CardId;
+  readonly thingId: ThingId;
   readonly size: { readonly width: number; readonly height: number };
   readonly placement: Placement;
 }
 
-export interface CardResize {
-  beginResize: (cardId: CardId) => void;
+export interface ThingResize {
+  beginResize: (thingId: ThingId) => void;
   previewResize: (
-    cardId: CardId,
+    thingId: ThingId,
     size: { readonly width: number; readonly height: number },
   ) => void;
-  finishResize: (cardId: CardId) => void;
-  cancelResize: (cardId: CardId) => void;
+  finishResize: (thingId: ThingId) => void;
+  cancelResize: (thingId: ThingId) => void;
 }
 
 /**
@@ -81,14 +81,14 @@ export interface EdgeSubject {
 /**
  * What the canvas has selected — one subject of one kind, never two.
  *
- * Discriminated rather than a pair of nullable fields, because "a Card and an
+ * Discriminated rather than a pair of nullable fields, because "a Thing and an
  * Edge are both selected" is not a state React Flow produces once modifier
  * multi-selection and the selection rectangle are off, and a shape that can
  * express it invites a second mutual-exclusion policy beside React Flow's own.
  */
 export type CanvasSelection =
   | { readonly kind: 'none' }
-  | { readonly kind: 'card'; readonly cardId: CardId }
+  | { readonly kind: 'thing'; readonly thingId: ThingId }
   | ({ readonly kind: 'edge' } & EdgeSubject);
 
 export const NO_SELECTION: CanvasSelection = { kind: 'none' };
@@ -102,11 +102,11 @@ export const sameEdgeSubject = (left: EdgeSubject, right: EdgeSubject): boolean 
 /** Whether two selections name the same subject. */
 export function sameSelection(left: CanvasSelection, right: CanvasSelection): boolean {
   if (left.kind !== right.kind) return false;
-  if (left.kind === 'card') {
+  if (left.kind === 'thing') {
     // SAFETY: the `left.kind !== right.kind` guard above already confirmed
-    // the two share a discriminant, so `right` is the card variant too even
+    // the two share a discriminant, so `right` is the thing variant too even
     // though narrowing `left` here doesn't propagate to `right`.
-    return left.cardId === (right as { cardId: CardId }).cardId;
+    return left.thingId === (right as { thingId: ThingId }).thingId;
   }
   if (left.kind === 'edge') {
     // SAFETY: same discriminant-equality guard as above, for the edge variant.
@@ -115,9 +115,9 @@ export function sameSelection(left: CanvasSelection, right: CanvasSelection): bo
   return true;
 }
 
-/** The selected Card, for the projection's own emphasis. */
-export const selectedCardOf = (selection: CanvasSelection): CardId | null =>
-  selection.kind === 'card' ? selection.cardId : null;
+/** The selected Thing, for the projection's own emphasis. */
+export const selectedThingOf = (selection: CanvasSelection): ThingId | null =>
+  selection.kind === 'thing' ? selection.thingId : null;
 
 /** The Edge subject alone, so a caller that only handles Edges need not narrow. */
 export type EdgeSelection = Extract<CanvasSelection, { kind: 'edge' }>;
@@ -131,7 +131,7 @@ export type EdgeSelection = Extract<CanvasSelection, { kind: 'edge' }>;
  * Authoring, the toolbar inside the Edge itself — and three hand-rolled copies
  * would be three chances to widen `source` and `target` differently.
  *
- * They are `CardId`s widened to `string` by React Flow's `Edge` type, the same
+ * They are `ThingId`s widened to `string` by React Flow's `Edge` type, the same
  * erasure `placementFromNodes` repairs for a node id below.
  */
 export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
@@ -140,29 +140,32 @@ export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
   // edge-projection as `RoutedEdgeData` — there is no other producer.
   const graphId = (edge.data as RoutedEdgeData | undefined)?.graphId;
   if (graphId === undefined) return null;
-  // SAFETY: `source`/`target` are `CardId`s widened to `string` by React
+  // SAFETY: `source`/`target` are `ThingId`s widened to `string` by React
   // Flow's `Edge` type — the same erasure `placementFromNodes` repairs below.
   return {
     kind: 'edge',
     graphId,
-    edge: { from: edge.source as CardId, to: edge.target as CardId },
+    edge: { from: edge.source as ThingId, to: edge.target as ThingId },
   };
 }
 
 /**
- * Mark exactly the selected Card's node, and only when that is what is selected.
+ * Mark exactly the selected Thing's node, and only when that is what is selected.
  *
  * The union is authoritative for React Flow's own node selection, not merely a
- * mirror of it. Selecting an Edge has to clear the Card React Flow still holds
+ * mirror of it. Selecting an Edge has to clear the Thing React Flow still holds
  * selected — otherwise the Delete key, which reads `nodes.filter(selected)` from
- * the controlled arrays, would delete a Card the author never named.
+ * the controlled arrays, would delete a Thing the author never named.
  */
-function withSelection(nodes: readonly CardFlowNode[], selection: CanvasSelection): CardFlowNode[] {
-  const selectedCardId = selectedCardOf(selection);
+function withSelection(
+  nodes: readonly ThingFlowNode[],
+  selection: CanvasSelection,
+): ThingFlowNode[] {
+  const selectedThingId = selectedThingOf(selection);
   return nodes.map((node) =>
-    node.selected === (node.id === selectedCardId)
+    node.selected === (node.id === selectedThingId)
       ? node
-      : { ...node, selected: node.id === selectedCardId },
+      : { ...node, selected: node.id === selectedThingId },
   );
 }
 
@@ -176,25 +179,25 @@ export interface RenderAdapterState {
    * node's data, and React Flow's resize control tears down and re-registers its
    * drag handler whenever the callbacks built from it change identity. Zustand
    * merges every partial into a fresh state object, so a state that *was* a
-   * `CardResize` handed the canvas a new capability after every selection,
+   * `ThingResize` handed the canvas a new capability after every selection,
    * projection and drag frame — writes resize knows nothing about. Naming the
    * capability separately is also what stops the whole state being passed as
    * one.
    */
-  readonly cardResize: CardResize;
+  readonly thingResize: ThingResize;
   /**
    * The published projection, or `null` before the first layout resolves. Until
-   * then there is nothing worth owning — every projected card sits at the origin
+   * then there is nothing worth owning — every projected thing sits at the origin
    * — and a space is correspondingly not editable for that frame.
    */
   projection: Projection | null;
   /** Gesture starts retained until each node receives a settled callback. */
   dragOrigins: ReadonlyMap<string, DiagramPosition>;
   /**
-   * Set once a card has actually moved. A diagram's routed edge geometry
+   * Set once a thing has actually moved. A diagram's routed edge geometry
    * describes the placement it computed, so it stops being true the moment a
-   * card leaves the place that routing assumed; from then on edges are drawn as
-   * plain curves between wherever the cards now are.
+   * thing leaves the place that routing assumed; from then on edges are drawn as
+   * plain curves between wherever the things now are.
    */
   moved: boolean;
   /** The ordinary React Flow selection used for continued authoring. */
@@ -202,10 +205,10 @@ export interface RenderAdapterState {
   /** One transient resize layered over the authored Placement. */
   resizeDraft: ResizeDraft | null;
   /**
-   * Whether some embedded Diagram on this canvas is running a Card edit.
+   * Whether some embedded Diagram on this canvas is running a Thing edit.
    *
    * The one Interaction fact this store holds that it does not itself produce.
-   * A Space Card draws another Space's Diagram inside this one, and an edit
+   * A Space Thing draws another Space's Diagram inside this one, and an edit
    * begun in there withdraws authoring from the canvas around it
    * (`authoring-availability.ts`'s `editingEmbeddedDiagram`). It begins and ends
    * inside the canvas subtree, so it has to be published to be read above it —
@@ -215,18 +218,18 @@ export interface RenderAdapterState {
    * would report it an effect late instead.
    *
    * The aggregate only. Which embedding holds the edit is a question about a
-   * Card of that canvas and is answered where the Cards are.
+   * Thing of that canvas and is answered where the Things are.
    */
   editingEmbeddedDiagram: boolean;
-  /** Publish projected Card nodes, their declared handles and Graph Edges together. */
-  syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
+  /** Publish projected Thing nodes, their declared handles and Graph Edges together. */
+  syncProjection: (nodes: readonly ThingFlowNode[], edges: readonly Edge[]) => void;
   /**
    * Navigate to another Diagram. The replacement placement will arrive via
    * `syncProjection`; Diagram selection itself is not an edit.
    */
   selectDiagram: (placement: Placement | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
-  changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
+  changeNodes: (changes: NodeChange<ThingFlowNode>[]) => void;
   /**
    * Apply React Flow's Edge changes — selection, and nothing else.
    *
@@ -244,8 +247,8 @@ export interface RenderAdapterState {
    * every reader of the projection, and none of them has seen this change.
    */
   reportEmbeddedDiagramEditing: (editing: boolean) => void;
-  /** Select one Card after a completed connection. */
-  selectCard: (cardId: CardId) => void;
+  /** Select one Thing after a completed connection. */
+  selectThing: (thingId: ThingId) => void;
   /**
    * Select one Edge — the focus-to-selection bridge React Flow does not supply.
    *
@@ -261,7 +264,7 @@ export interface RenderAdapterState {
    * first placement resolves.
    *
    * What a pointer gesture reports to Authoring: a completion is the only thing
-   * that knows where React Flow has actually put the Cards, and this is that
+   * that knows where React Flow has actually put the Things, and this is that
    * reading. It is a report and not an authorship claim — `Placement.next`
    * decides which of these positions become authored.
    */
@@ -274,7 +277,7 @@ export interface RenderAdapterState {
    * the completion that calls it has already installed the placement it wrote,
    * and a second report of the same geometry could only disagree with it.
    */
-  mergeProjected: (projected: readonly CardFlowNode[]) => void;
+  mergeProjected: (projected: readonly ThingFlowNode[]) => void;
 }
 
 export type RenderAdapter = UseBoundStore<StoreApi<RenderAdapterState>>;
@@ -284,11 +287,11 @@ export type RenderAdapter = UseBoundStore<StoreApi<RenderAdapterState>>;
  * owns. Whether that geometry is a rendered report or part of a completed
  * authoring fact is decided at each call site below.
  */
-function placementFromNodes(nodes: readonly CardFlowNode[]): Placement {
-  // SAFETY: a node id is the Card id it was projected from, widened to
+function placementFromNodes(nodes: readonly ThingFlowNode[]): Placement {
+  // SAFETY: a node id is the Thing id it was projected from, widened to
   // `string` by React Flow's `Node` type — the same erasure
   // `consumeSettledMovedIds` repairs below.
-  return Placement.fromEntries(nodes.map((node) => [node.id as CardId, node.position]));
+  return Placement.fromEntries(nodes.map((node) => [node.id as ThingId, node.position]));
 }
 
 function trackDragOrigins(
@@ -308,9 +311,9 @@ function consumeSettledMovedIds(
   dragOrigins: Map<string, DiagramPosition>,
   beforeById: ReadonlyMap<string, DiagramPosition>,
   afterById: ReadonlyMap<string, DiagramPosition>,
-): CardId[] {
+): ThingId[] {
   // The same `Node.id` erasure `placementFromNodes` repairs above.
-  const movedIds: CardId[] = [];
+  const movedIds: ThingId[] = [];
   for (const change of settled) {
     const origin = dragOrigins.get(change.id) ?? beforeById.get(change.id);
     const after = afterById.get(change.id);
@@ -321,24 +324,24 @@ function consumeSettledMovedIds(
       (origin.x !== after.x || origin.y !== after.y)
     ) {
       // SAFETY: same `Node.id` erasure as `placementFromNodes` above.
-      movedIds.push(change.id as CardId);
+      movedIds.push(change.id as ThingId);
     }
   }
   return movedIds;
 }
 
 /**
- * Fold the freshly projected nodes into the live list. A card that survives
+ * Fold the freshly projected nodes into the live list. A thing that survives
  * keeps its React Flow runtime state while refreshing the geometry and domain
  * presentation the projection owns. Position is the one exception during an
  * active drag: the pointer's live position wins until the settled change authors
- * it. Mapping over `projected` also drops nodes whose card no longer exists.
+ * it. Mapping over `projected` also drops nodes whose thing no longer exists.
  */
 function reconcile(
-  current: readonly CardFlowNode[],
-  projected: readonly CardFlowNode[],
+  current: readonly ThingFlowNode[],
+  projected: readonly ThingFlowNode[],
   dragOrigins: ReadonlyMap<string, DiagramPosition>,
-): CardFlowNode[] {
+): ThingFlowNode[] {
   const byId = new Map(current.map((node) => [node.id, node]));
   return projected.map((node) => {
     const live = byId.get(node.id);
@@ -346,14 +349,14 @@ function reconcile(
     // The projection owns authored position, declared size, stacking, data,
     // className and handles. The live node owns React Flow's measured and gesture
     // bookkeeping. An active drag alone keeps its live position: replacing it
-    // would jump the Card away from the pointer mid-gesture. `handles` must come
+    // would jump the Thing away from the pointer mid-gesture. `handles` must come
     // through: React Flow builds `handleBounds`
     // from the declaration rather than measuring the DOM (docs/agents/rendering.md), so a live
     // node that kept a stale set would resolve a new Edge against the handles the
-    // Card had before it gained one. `handles`/`className` are assigned only when
+    // Thing had before it gained one. `handles`/`className` are assigned only when
     // the projection sets them, for `exactOptionalPropertyTypes`; the projection
     // always sets a className.
-    const merged: CardFlowNode = {
+    const merged: ThingFlowNode = {
       ...live,
       position: dragOrigins.has(node.id) ? live.position : node.position,
       data: node.data,
@@ -374,7 +377,7 @@ function reconcile(
 type SelectChange = { readonly id: string; readonly selected: boolean };
 
 function selectChanges(
-  changes: readonly (NodeChange<CardFlowNode> | EdgeChange<Edge>)[],
+  changes: readonly (NodeChange<ThingFlowNode> | EdgeChange<Edge>)[],
 ): SelectChange[] {
   return changes.filter(
     (change): change is SelectChange & { type: 'select' } => change.type === 'select',
@@ -440,31 +443,31 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
 
     // Written once, here, and by nothing after: every `set` below merges a
     // partial, so this reference is what the canvas keeps holding.
-    cardResize: {
-      beginResize: (cardId) => {
+    thingResize: {
+      beginResize: (thingId) => {
         const authored = authoring.authoredPlacement();
-        const at = authored?.get(cardId);
+        const at = authored?.get(thingId);
         if (authored === null || at?.open !== true) return;
         set({
           resizeDraft: {
-            cardId,
+            thingId,
             size: at.openSize,
             placement: authored,
           },
         });
       },
 
-      previewResize: (cardId, size) => {
+      previewResize: (thingId, size) => {
         const draft = get().resizeDraft;
-        if (draft?.cardId !== cardId) return;
-        const at = draft.placement.get(cardId);
+        if (draft?.thingId !== thingId) return;
+        const at = draft.placement.get(thingId);
         if (at?.open !== true) return;
-        const proposedSize = snapCardSizeToClose(size);
+        const proposedSize = snapThingSizeToClose(size);
         set({
           resizeDraft: {
-            cardId,
+            thingId,
             size: proposedSize,
-            placement: Placement.place(draft.placement, cardId, {
+            placement: Placement.place(draft.placement, thingId, {
               ...at,
               openSize: proposedSize,
             }),
@@ -472,49 +475,49 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         });
       },
 
-      finishResize: (cardId) => {
+      finishResize: (thingId) => {
         const draft = get().resizeDraft;
-        if (draft?.cardId !== cardId) return;
-        authoring.complete({ kind: 'resized-card', cardId, size: draft.size });
+        if (draft?.thingId !== thingId) return;
+        authoring.complete({ kind: 'resized-thing', thingId, size: draft.size });
         set({ resizeDraft: null });
       },
 
-      cancelResize: (cardId) => {
-        if (get().resizeDraft?.cardId === cardId) set({ resizeDraft: null });
+      cancelResize: (thingId) => {
+        if (get().resizeDraft?.thingId === thingId) set({ resizeDraft: null });
       },
     },
 
-    // Compute, publish, then tell Authoring where the cards ended up — the same
-    // order as `changeNodes` and `connectCards` below. Installing from inside
+    // Compute, publish, then tell Authoring where the things ended up — the same
+    // order as `changeNodes` and `connectThings` below. Installing from inside
     // the `set` updater put the cross-store write before the state it describes
     // was committed, so this store still held the previous projection at the
     // moment anything downstream was told about the new one.
     syncProjection: (nodes, edges) => {
       const current = get().projection;
       // The empty list rather than a separate branch for the first projection:
-      // it too may be the one that first draws a Card already selected, since
+      // it too may be the one that first draws a Thing already selected, since
       // `selectDiagram` clears the projection and a selection can be made
       // before the next one lands.
       //
-      // `withSelection` over the reconciled list is what seeds a Card the live
+      // `withSelection` over the reconciled list is what seeds a Thing the live
       // list has never seen. A projection carries no selection of its own —
-      // `projectCardNodes` sets `data.selectedForAuthoring` and never the node's
-      // `selected` — and `reconcile` has nothing to preserve for a Card that is
+      // `projectThingNodes` sets `data.selectedForAuthoring` and never the node's
+      // `selected` — and `reconcile` has nothing to preserve for a Thing that is
       // new, so without this the union and React Flow disagree from the first
-      // frame. Authoring selects a Card in the same tick it creates it, one
-      // render *before* the projection that first draws it: `selectCard` maps
+      // frame. Authoring selects a Thing in the same tick it creates it, one
+      // render *before* the projection that first draws it: `selectThing` maps
       // over the nodes it can see and the new one is not among them yet. The
-      // Card then reads as selected on screen, since `selectedForAuthoring` is
+      // Thing then reads as selected on screen, since `selectedForAuthoring` is
       // right, while React Flow holds no selected node at all — and `F2` asks
       // React Flow, so `F2` is what stops working until a click repairs it.
-      // Add Card, Add Alias and create-and-connect all land here.
+      // Add Thing, Add Alias and create-and-connect all land here.
       const state = get();
       const reconciled = withSelection(
         reconcile(current?.nodes ?? [], nodes, state.dragOrigins),
         state.selection,
       );
       set({ projection: { nodes: reconciled, edges: [...edges] } });
-      // Reporting geometry, not authoring it: only Cards the selected Diagram
+      // Reporting geometry, not authoring it: only Things the selected Diagram
       // draws can contribute placement.
       authoring.reportRendered(placementFromNodes(reconciled));
     },
@@ -534,7 +537,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       if (get().editingEmbeddedDiagram !== editing) set({ editingEmbeddedDiagram: editing });
     },
 
-    selectCard: (cardId) => set((state) => selecting(state, { kind: 'card', cardId })),
+    selectThing: (thingId) => set((state) => selecting(state, { kind: 'thing', thingId })),
 
     selectEdge: ({ graphId, edge }) =>
       set((state) => selecting(state, { kind: 'edge', graphId, edge })),
@@ -552,8 +555,8 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       if (projection === null) return;
       // Seeded for the same reason as `syncProjection`, and this is the path a
       // create-and-connect takes: the completed Edit publishes, Authoring
-      // selects the Card it has just minted, and the projection carrying that
-      // Card arrives here.
+      // selects the Thing it has just minted, and the projection carrying that
+      // Thing arrives here.
       set({
         projection: {
           ...projection,
@@ -579,10 +582,10 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       const owned = new Set(projection.nodes.map((node) => node.id));
       // No resize clause here, deliberately. `NodeResizeControl` emits its
       // node-only `dimensions` change from the same callback `shouldResize`
-      // gates, and the Card answers `false` to every frame while still handing
-      // the proposed rect on (`CardNode`), so that change is never produced and
+      // gates, and the Thing answers `false` to every frame while still handing
+      // the proposed rect on (`ThingNode`), so that change is never produced and
       // this store never has a split frame to refuse. The draft is what makes
-      // the resized Card, its handles and its Edges one publication — and only
+      // the resized Thing, its handles and its Edges one publication — and only
       // those: its neighbours are drawn from the authored placement and do not
       // move until the Edit lands (ADR 0084). `SpaceCanvas.test.tsx` drives the
       // real control and holds the whole gesture to proposing nothing here.
@@ -594,7 +597,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // Additive, from the change stream rather than from the resulting array.
       // One React Flow selection produces two batches — the new subject
       // selected, then the other kind deselected — and reading the array would
-      // let the second batch answer `none` for a Card that was never the
+      // let the second batch answer `none` for a Thing that was never the
       // subject. See `changeEdges` for the other half of the same rule.
       const selection = additiveSelection(
         state.selection,
@@ -603,7 +606,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
           // Parsing here instead would put a throw on the per-pointer-frame
           // path for a failure the other readings agree cannot happen.
           return {
-            subject: { kind: 'card', cardId: change.id as CardId } as const,
+            subject: { kind: 'thing', thingId: change.id as ThingId } as const,
             selected: change.selected,
           };
         }),
@@ -636,9 +639,9 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         selection,
       });
       authoring.complete({
-        kind: 'settled-card-movement',
+        kind: 'settled-thing-movement',
         rendered: placementFromNodes(nodes),
-        // The gesture placed exactly `movedIds`; every other Card keeps
+        // The gesture placed exactly `movedIds`; every other Thing keeps
         // whatever authorship it already had.
         placed: movedIds,
       });
@@ -670,7 +673,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     },
   }));
   // A replacement Space arrives without unmounting anything, so the projection
-  // this store is holding describes Cards that may no longer exist and drag
+  // this store is holding describes Things that may no longer exist and drag
   // bookkeeping for a gesture made against the Space that is gone. Dropping it
   // is the same reset `selectDiagram` performs, for the same reason: what is on
   // screen no longer describes what is being rendered.

@@ -1,5 +1,5 @@
 import { uuidSchema } from '@project/core';
-import type { CardPlacement, SpaceSnapshot } from '@project/core';
+import type { ThingPlacement, SpaceSnapshot } from '@project/core';
 import { expect, type Page } from './fixtures';
 
 /**
@@ -36,7 +36,7 @@ export const SEEDED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000
 export async function seedPositionedDiagram(
   page: Page,
   title: string,
-  positionsFor: (snapshot: SpaceSnapshot) => Record<string, CardPlacement>,
+  positionsFor: (snapshot: SpaceSnapshot) => Record<string, ThingPlacement>,
 ): Promise<HttpLoadedSpace> {
   const summariesResponse = await page.request.get('/api/spaces');
   expect(summariesResponse.ok()).toBe(true);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadSpace, resolveContentCard, type Space } from '../src/index';
-import { aliasFile, cardFile, uuid } from './card-files';
+import { loadSpace, resolveContentThing, type Space } from '../src/index';
+import { aliasFile, thingFile, uuid } from './thing-files';
 
 function baseSpace(): Space {
   const result = loadSpace(
@@ -32,7 +32,7 @@ function baseSpace(): Space {
       ],
     },
     [
-      cardFile(uuid('00000000-0000-4000-8000-000000000045'), 'The model', 'The model body.\n'),
+      thingFile(uuid('00000000-0000-4000-8000-000000000045'), 'The model', 'The model body.\n'),
       aliasFile(
         uuid('00000000-0000-4000-8000-000000000044'),
         'The model, again',
@@ -44,22 +44,22 @@ function baseSpace(): Space {
   return result.space;
 }
 
-describe('resolveContentCard', () => {
-  it('resolves an alias to the card whose content it shows', () => {
-    const resolved = resolveContentCard(baseSpace(), uuid('00000000-0000-4000-8000-000000000044'));
+describe('resolveContentThing', () => {
+  it('resolves an alias to the thing whose content it shows', () => {
+    const resolved = resolveContentThing(baseSpace(), uuid('00000000-0000-4000-8000-000000000044'));
     expect(resolved?.id).toBe(uuid('00000000-0000-4000-8000-000000000045'));
     expect(resolved?.body).toBe('The model body.\n');
   });
 
-  it('resolves a markdown card to itself', () => {
-    const resolved = resolveContentCard(baseSpace(), uuid('00000000-0000-4000-8000-000000000045'));
+  it('resolves a markdown thing to itself', () => {
+    const resolved = resolveContentThing(baseSpace(), uuid('00000000-0000-4000-8000-000000000045'));
     expect(resolved?.id).toBe(uuid('00000000-0000-4000-8000-000000000045'));
     expect(resolved?.kind).toBe('markdown');
   });
 
-  it('resolves a card id that names nothing to undefined', () => {
+  it('resolves a thing id that names nothing to undefined', () => {
     expect(
-      resolveContentCard(baseSpace(), uuid('00000000-0000-4000-8000-000000000098')),
+      resolveContentThing(baseSpace(), uuid('00000000-0000-4000-8000-000000000098')),
     ).toBeUndefined();
   });
 });

@@ -5,13 +5,13 @@ import type { LoadedSpace } from '@project/persistence';
 import { PersistenceControl, PersistenceNotice } from '../src/components/PersistenceControl';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a2');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a2');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a3');
 
 const SNAPSHOT: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Stored space' },
-  cards: [],
+  things: [],
 };
 
 const STORED: LoadedSpace = { snapshot: SNAPSHOT, revision: 5n, exportedRevision: null };
@@ -26,9 +26,9 @@ describe('PersistenceControl', () => {
             kind: 'aggregate-refused',
             errors: [
               {
-                kind: 'space-card-target-missing',
+                kind: 'space-thing-target-missing',
                 spaceId: SPACE_ID,
-                cardId: CARD_ID,
+                thingId: THING_ID,
                 targetSpaceId: TARGET_ID,
               },
               { kind: 'ordinary-space-unreferenced', spaceId: TARGET_ID },
@@ -40,11 +40,11 @@ describe('PersistenceControl', () => {
       />,
     );
 
-    expect(screen.getByText(/space card points at a space that no longer exists/i)).toBeVisible();
+    expect(screen.getByText(/space thing points at a space that no longer exists/i)).toBeVisible();
     expect(screen.getByText(/nothing pointing at it/i)).toBeVisible();
     // The domain identity stays in the domain: a refusal code is a stable name
     // for the repository to answer with, not a sentence to show an author.
-    expect(screen.queryByText(/space-card-target-missing/)).toBeNull();
+    expect(screen.queryByText(/space-thing-target-missing/)).toBeNull();
     expect(screen.queryByText(/ordinary-space-unreferenced/)).toBeNull();
   });
 
@@ -97,7 +97,7 @@ describe('PersistenceControl', () => {
           baseline: {
             id: SPACE_ID,
             document: { version: 1, title: 'Before the coordinated edit' },
-            cards: [],
+            things: [],
           },
         }}
         onAcceptRemote={onAcceptRemote}

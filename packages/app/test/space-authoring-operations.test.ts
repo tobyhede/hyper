@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  COLLAPSED_CARD_SIZE,
+  COLLAPSED_THING_SIZE,
   DEFAULT_OPEN_SIZE,
   uuidSchema,
-  type CardPlacement,
+  type ThingPlacement,
   type Graph,
   type DiagramId,
   type SpaceSnapshot,
@@ -19,7 +19,7 @@ import type { SpaceAuthoring } from '../src/space-authoring';
 import { mintingIds } from './minting';
 
 /**
- * The semantic operations Space Authoring gained for the complete Card and
+ * The semantic operations Space Authoring gained for the complete Thing and
  * Graph authoring experience, asserted through the interface that owns them.
  *
  * Every case here is a row of the handoff's domain transition matrix: what one
@@ -31,11 +31,11 @@ import { mintingIds } from './minting';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const CARD_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-const CARD_E = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const THING_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const THING_E = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -46,24 +46,24 @@ const SECOND_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
 /** A Graph identity minted by Diagram creation. */
 const MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 /** What a second Diagram creation would mint. */
-const UNKNOWN_CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+const UNKNOWN_THING = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
 const CENTRE = { x: 400, y: 300, open: false };
 
-const MAIN_GRAPH: Graph = { id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] };
+const MAIN_GRAPH: Graph = { id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_B }] };
 
 /** A Space with no Diagrams, and so with no Graphs at all (ADR 0040). */
 const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
 
-/** One Diagram placing both Cards and owning the Graph over them. */
+/** One Diagram placing both Things and owning the Graph over them. */
 const positionedSnapshot: SpaceSnapshot = {
   ...automaticSnapshot,
   document: {
@@ -74,8 +74,8 @@ const positionedSnapshot: SpaceSnapshot = {
         title: 'Diagram 1',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 10, y: 20, open: false },
-          [CARD_B]: { x: 300, y: 40, open: false },
+          [THING_A]: { x: 10, y: 20, open: false },
+          [THING_B]: { x: 300, y: 40, open: false },
         },
         graphs: [MAIN_GRAPH],
       },
@@ -121,8 +121,8 @@ const place = (authoring: SpaceAuthoring, entries: Record<string, [number, numbe
 const openPositioned = (newId?: () => UUID) => {
   const opened = newId === undefined ? open() : open(positionedSnapshot, undefined, newId);
   place(opened.authoring, {
-    [CARD_A]: [10, 20],
-    [CARD_B]: [300, 40],
+    [THING_A]: [10, 20],
+    [THING_B]: [300, 40],
   });
   return opened;
 };
@@ -171,42 +171,42 @@ describe('Add Diagram', () => {
   });
 });
 
-describe('Add Card', () => {
-  it('creates one neutrally titled detached Card at the anchor it was given', () => {
+describe('Add Thing', () => {
+  it('creates one neutrally titled detached Thing at the anchor it was given', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'created-card', anchor: CENTRE })).toEqual({
+    expect(authoring.complete({ kind: 'created-thing', anchor: CENTRE })).toEqual({
       kind: 'completed',
-      createdCardId: MINTED,
+      createdThingId: MINTED,
     });
 
-    expect(session.getState().working.cards[2]).toEqual({
+    expect(session.getState().working.things[2]).toEqual({
       id: MINTED,
-      document: { title: 'Card 1', kind: 'markdown', body: '' },
+      document: { title: 'Thing 1', kind: 'markdown', body: '' },
     });
     expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 40, open: false },
+      [THING_A]: { x: 10, y: 20, open: false },
+      [THING_B]: { x: 300, y: 40, open: false },
       [MINTED]: CENTRE,
     });
-    // No Edge, and no second Graph: Add Card adds neither (ADR 0040).
+    // No Edge, and no second Graph: Add Thing adds neither (ADR 0040).
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
   });
 
-  it('steps off an anchor another Card already occupies rather than stacking exactly', () => {
+  it('steps off an anchor another Thing already occupies rather than stacking exactly', () => {
     // Two creations, so two ids. The old global mock answered both with one
     // constant and the duplicate went unnoticed; naming them is what makes the
     // second creation a real one.
     const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
-    authoring.complete({ kind: 'created-card', anchor: CENTRE });
-    authoring.complete({ kind: 'created-card', anchor: CENTRE });
+    authoring.complete({ kind: 'created-thing', anchor: CENTRE });
+    authoring.complete({ kind: 'created-thing', anchor: CENTRE });
 
     const positions = diagramOf(session.getState().working, DIAGRAM_ID)?.positions ?? {};
     const stacked = Object.values(positions).filter(
       (at) => at !== undefined && at.x >= CENTRE.x && at.y >= CENTRE.y,
     );
-    // A visible stack, not collision avoidance: the first Card never moves, and
+    // A visible stack, not collision avoidance: the first Thing never moves, and
     // the second takes one small diagonal step off it.
     expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24, open: false }]);
   });
@@ -220,8 +220,8 @@ describe('Add Card', () => {
           {
             ...positionedSnapshot.document.diagrams![0]!,
             positions: {
-              [CARD_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
-              [CARD_B]: { x: 300, y: 40, open: false },
+              [THING_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+              [THING_B]: { x: 300, y: 40, open: false },
             },
           },
         ],
@@ -230,16 +230,16 @@ describe('Add Card', () => {
     const { authoring, session } = open(expandedSnapshot);
     authoring.replacePlacement(
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
-        [CARD_B, { x: 300, y: 40, open: false }],
+        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
+        [THING_B, { x: 300, y: 40, open: false }],
       ]),
     );
 
-    authoring.complete({ kind: 'created-card', anchor: { x: 500, y: 400 } });
+    authoring.complete({ kind: 'created-thing', anchor: { x: 500, y: 400 } });
 
     // A canvas coordinate is an authored one: A being Open moved its neighbours
     // when the Edit that opened it ran, and nothing converts a drop point on the
-    // way in any more (ADR 0084). The Card lands where it was dropped.
+    // way in any more (ADR 0084). The Thing lands where it was dropped.
     expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[MINTED]).toEqual({
       x: 500,
       y: 400,
@@ -248,24 +248,24 @@ describe('Add Card', () => {
   });
 });
 
-describe('Edit Card', () => {
+describe('Edit Thing', () => {
   /**
    * A blank title is refused *at the interface*, not only at the field that
    * typed it. Intake rejects an empty title, and this derivation reports an
    * unloadable Space by throwing — so without this the author's own mistake
    * arrives as an exception, which the transient-authoring contract forbids.
    */
-  it('refuses an empty Card title rather than throwing on intake', () => {
+  it('refuses an empty Thing title rather than throwing on intake', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(
       authoring.complete({
-        kind: 'edited-card',
-        cardId: CARD_A,
+        kind: 'edited-thing',
+        thingId: THING_A,
         document: { title: '', kind: 'markdown', body: 'A' },
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'card-title-required' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'thing-title-required' } });
     expect(session.getState().working).toBe(before);
   });
 
@@ -274,14 +274,14 @@ describe('Edit Card', () => {
     const before = session.getState().working;
 
     // `z.string().min(1)` counts characters and a space is one, so this would
-    // be stored and draw as a Card with no name at all.
+    // be stored and draw as a Thing with no name at all.
     expect(
       authoring.complete({
-        kind: 'edited-card',
-        cardId: CARD_A,
+        kind: 'edited-thing',
+        thingId: THING_A,
         document: { title: '   ', kind: 'markdown', body: 'A' },
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'card-title-required' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'thing-title-required' } });
     expect(session.getState().working).toBe(before);
   });
 
@@ -293,26 +293,26 @@ describe('Edit Card', () => {
     // the write path taking the trim would store a Title intake would not mint.
     expect(
       authoring.complete({
-        kind: 'edited-card',
-        cardId: CARD_A,
+        kind: 'edited-thing',
+        thingId: THING_A,
         document: { title: 'Renamed  \nA subtitle   ', kind: 'markdown', body: 'A' },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(session.getState().working.cards[0]?.document.title).toBe('Renamed\nA subtitle');
+    expect(session.getState().working.things[0]?.document.title).toBe('Renamed\nA subtitle');
 
     // "Renaming a Title to the same Title plus a trailing newline is therefore
     // unchanged rather than an Edit" (ADR 0083).
     expect(
       authoring.complete({
-        kind: 'edited-card',
-        cardId: CARD_A,
+        kind: 'edited-thing',
+        thingId: THING_A,
         document: { title: 'Renamed\nA subtitle\n', kind: 'markdown', body: 'A' },
       }),
     ).toEqual({ kind: 'unchanged' });
   });
 });
 
-describe('Expanded Card geometry', () => {
+describe('Expanded Thing geometry', () => {
   /**
    * What {@link DEFAULT_OPEN_SIZE} displaces by: the Open rect less the
    * collapsed one, per axis (ADR 0084). Named rather than derived so the
@@ -321,17 +321,17 @@ describe('Expanded Card geometry', () => {
   const GROWTH = { width: 300, height: 274 };
 
   /**
-   * Five Cards at every relation to CARD_A the per-axis comparison
+   * Five Things at every relation to THING_A the per-axis comparison
    * distinguishes: beyond on `x` and level on `y`, level on `x` and beyond on
    * `y`, beyond on both, and before on both.
    */
   const displacementSnapshot: SpaceSnapshot = {
     ...positionedSnapshot,
-    cards: [
-      ...positionedSnapshot.cards,
-      { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
-      { id: CARD_D, document: { title: 'D', kind: 'markdown', body: 'D' } },
-      { id: CARD_E, document: { title: 'E', kind: 'markdown', body: 'E' } },
+    things: [
+      ...positionedSnapshot.things,
+      { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      { id: THING_D, document: { title: 'D', kind: 'markdown', body: 'D' } },
+      { id: THING_E, document: { title: 'E', kind: 'markdown', body: 'E' } },
     ],
     document: {
       ...positionedSnapshot.document,
@@ -341,11 +341,11 @@ describe('Expanded Card geometry', () => {
           title: 'Diagram 1',
           kind: 'positioned',
           positions: {
-            [CARD_A]: { x: 100, y: 100, open: false },
-            [CARD_B]: { x: 300, y: 100, open: false },
-            [CARD_C]: { x: 100, y: 300, open: false },
-            [CARD_D]: { x: 500, y: 500, open: false },
-            [CARD_E]: { x: 40, y: 40, open: false },
+            [THING_A]: { x: 100, y: 100, open: false },
+            [THING_B]: { x: 300, y: 100, open: false },
+            [THING_C]: { x: 100, y: 300, open: false },
+            [THING_D]: { x: 500, y: 500, open: false },
+            [THING_E]: { x: 40, y: 40, open: false },
           },
           graphs: [MAIN_GRAPH],
         },
@@ -358,11 +358,11 @@ describe('Expanded Card geometry', () => {
     const opened = open(displacementSnapshot);
     // The geometry the canvas has reported by now: the Diagram as authored.
     place(opened.authoring, {
-      [CARD_A]: [100, 100],
-      [CARD_B]: [300, 100],
-      [CARD_C]: [100, 300],
-      [CARD_D]: [500, 500],
-      [CARD_E]: [40, 40],
+      [THING_A]: [100, 100],
+      [THING_B]: [300, 100],
+      [THING_C]: [100, 300],
+      [THING_D]: [500, 500],
+      [THING_E]: [40, 40],
     });
     return opened;
   };
@@ -371,19 +371,19 @@ describe('Expanded Card geometry', () => {
   const originsOf = (session: ReturnType<typeof open>['session']) => {
     const origins = new Map<string, readonly [number, number]>();
     const positions = diagramOf(session.getState().working, DIAGRAM_ID)?.positions ?? {};
-    for (const [cardId, at] of Object.entries(positions)) {
-      if (at !== undefined) origins.set(cardId, [at.x, at.y]);
+    for (const [thingId, at] of Object.entries(positions)) {
+      if (at !== undefined) origins.set(thingId, [at.x, at.y]);
     }
     return Object.fromEntries(origins);
   };
 
   /**
-   * Report canvas geometry that keeps an Open Card Open, which {@link place}
+   * Report canvas geometry that keeps an Open Thing Open, which {@link place}
    * cannot: it reports plain points, and every one of those is Closed.
    */
   const reportPlacement = (
     authoring: SpaceAuthoring,
-    entries: Record<string, CardPlacement>,
+    entries: Record<string, ThingPlacement>,
   ): void => {
     authoring.replacePlacement(
       Placement.fromEntries(Object.entries(entries).map(([id, at]) => [uuidSchema.parse(id), at])),
@@ -393,30 +393,30 @@ describe('Expanded Card geometry', () => {
   it('restores a resized Open Size after Closing and Opening again', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
     expect(
       authoring.complete({
-        kind: 'resized-card',
-        cardId: CARD_A,
+        kind: 'resized-thing',
+        thingId: THING_A,
         size: { width: 640, height: 480 },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(authoring.complete({ kind: 'closed-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'closed-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_A]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_A]).toEqual({
       x: 10,
       y: 20,
       open: false,
       openSize: { width: 640, height: 480 },
     });
 
-    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_A]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_A]).toEqual({
       x: 10,
       y: 20,
       open: true,
@@ -427,25 +427,25 @@ describe('Expanded Card geometry', () => {
   it('Closes at the exact Closed rect without replacing the remembered Open Size', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
     expect(
       authoring.complete({
-        kind: 'resized-card',
-        cardId: CARD_A,
+        kind: 'resized-thing',
+        thingId: THING_A,
         size: { width: 640, height: 480 },
       }),
     ).toEqual({ kind: 'completed' });
 
     expect(
       authoring.complete({
-        kind: 'resized-card',
-        cardId: CARD_A,
+        kind: 'resized-thing',
+        thingId: THING_A,
         size: { width: 260, height: 146 },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_A]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_A]).toEqual({
       x: 10,
       y: 20,
       open: false,
@@ -453,106 +453,106 @@ describe('Expanded Card geometry', () => {
     });
   });
 
-  it('refuses a stale resize completion for a Card that is no longer Expanded', () => {
+  it('refuses a stale resize completion for a Thing that is no longer Expanded', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(
       authoring.complete({
-        kind: 'resized-card',
-        cardId: CARD_A,
+        kind: 'resized-thing',
+        thingId: THING_A,
         size: { width: 560, height: 420 },
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'card-not-expanded' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'thing-not-expanded' } });
     expect(session.getState().working).toBe(before);
   });
 
-  it('moves the Cards strictly beyond the opening Card by that axis growth, and nobody else', () => {
+  it('moves the Things strictly beyond the opening Thing by that axis growth, and nobody else', () => {
     const { authoring, session } = openDisplacement();
 
-    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
 
     expect(originsOf(session)).toEqual({
-      // A Card does not displace itself.
-      [CARD_A]: [100, 100],
+      // A Thing does not displace itself.
+      [THING_A]: [100, 100],
       // Beyond on `x` and level on `y`, so it moves right and not down.
-      [CARD_B]: [300 + GROWTH.width, 100],
+      [THING_B]: [300 + GROWTH.width, 100],
       // The mirror of it: level on `x` and beyond on `y`.
-      [CARD_C]: [100, 300 + GROWTH.height],
-      [CARD_D]: [500 + GROWTH.width, 500 + GROWTH.height],
-      // Before the Card on both axes: the room is made after it, not around it.
-      [CARD_E]: [40, 40],
+      [THING_C]: [100, 300 + GROWTH.height],
+      [THING_D]: [500 + GROWTH.width, 500 + GROWTH.height],
+      // Before the Thing on both axes: the room is made after it, not around it.
+      [THING_E]: [40, 40],
     });
   });
 
-  it('returns every position to exactly what it was when the Card Closes again', () => {
+  it('returns every position to exactly what it was when the Thing Closes again', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
-    expect(authoring.complete({ kind: 'closed-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'closed-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
 
     expect(originsOf(session)).toEqual(before);
   });
 
-  it('reclaims from a Card the author moved beyond the Open Card, which the Open never pushed', () => {
+  it('reclaims from a Thing the author moved beyond the Open Thing, which the Open never pushed', () => {
     // ADR 0084: Open and Close each read the Diagram as it is at that moment and
     // remember nothing about who was pushed, so Close reclaims from everything
-    // currently beyond the closing Card. This is the deliberate memoryless
-    // behaviour and not a defect — recording which Cards a particular Open moved
-    // is the per-Card history that ADR rejected, because it goes stale the
+    // currently beyond the closing Thing. This is the deliberate memoryless
+    // behaviour and not a defect — recording which Things a particular Open moved
+    // is the per-Thing history that ADR rejected, because it goes stale the
     // moment the author moves anything and makes two identical Diagrams behave
     // differently.
     const { authoring, session } = openDisplacement();
 
-    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
-    // The author drags E from before the Open Card to beyond it on both axes.
+    // The author drags E from before the Open Thing to beyond it on both axes.
     reportPlacement(authoring, {
-      [CARD_A]: { x: 100, y: 100, open: true, openSize: DEFAULT_OPEN_SIZE },
-      [CARD_B]: { x: 600, y: 100, open: false },
-      [CARD_C]: { x: 100, y: 574, open: false },
-      [CARD_D]: { x: 800, y: 774, open: false },
-      [CARD_E]: { x: 900, y: 900, open: false },
+      [THING_A]: { x: 100, y: 100, open: true, openSize: DEFAULT_OPEN_SIZE },
+      [THING_B]: { x: 600, y: 100, open: false },
+      [THING_C]: { x: 100, y: 574, open: false },
+      [THING_D]: { x: 800, y: 774, open: false },
+      [THING_E]: { x: 900, y: 900, open: false },
     });
 
-    expect(authoring.complete({ kind: 'closed-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'closed-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
 
     expect(originsOf(session)).toEqual({
-      [CARD_A]: [100, 100],
-      [CARD_B]: [300, 100],
-      [CARD_C]: [100, 300],
-      [CARD_D]: [500, 500],
+      [THING_A]: [100, 100],
+      [THING_B]: [300, 100],
+      [THING_C]: [100, 300],
+      [THING_D]: [500, 500],
       // Never pushed by the Open, and moved back by the Close all the same.
-      [CARD_E]: [900 - GROWTH.width, 900 - GROWTH.height],
+      [THING_E]: [900 - GROWTH.width, 900 - GROWTH.height],
     });
   });
 
-  it('takes an already Open Card room as it finds it, with nothing summed over Open Cards', () => {
+  it('takes an already Open Thing room as it finds it, with nothing summed over Open Things', () => {
     const { authoring, session } = openDisplacement();
 
-    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
     // B is at (600, 100) by now, and its own growth is measured from there.
-    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_B })).toEqual({
+    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_B })).toEqual({
       kind: 'completed',
     });
 
     expect(originsOf(session)).toEqual({
       // Level with B on `y` and before it on `x`: A does not move for it.
-      [CARD_A]: [100, 100],
-      [CARD_B]: [600, 100],
-      [CARD_C]: [100, 574 + GROWTH.height],
-      [CARD_D]: [800 + GROWTH.width, 774 + GROWTH.height],
-      [CARD_E]: [40, 40],
+      [THING_A]: [100, 100],
+      [THING_B]: [600, 100],
+      [THING_C]: [100, 574 + GROWTH.height],
+      [THING_D]: [800 + GROWTH.width, 774 + GROWTH.height],
+      [THING_E]: [40, 40],
     });
   });
 
@@ -560,25 +560,25 @@ describe('Expanded Card geometry', () => {
     const { authoring, session } = openDisplacement();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'opened-card', cardId: UNKNOWN_CARD })).toEqual({
+    expect(authoring.complete({ kind: 'opened-thing', thingId: UNKNOWN_THING })).toEqual({
       kind: 'refused',
-      refusal: { code: 'card-not-in-diagram' },
+      refusal: { code: 'thing-not-in-diagram' },
     });
-    expect(authoring.complete({ kind: 'closed-card', cardId: UNKNOWN_CARD })).toEqual({
+    expect(authoring.complete({ kind: 'closed-thing', thingId: UNKNOWN_THING })).toEqual({
       kind: 'refused',
-      refusal: { code: 'card-not-in-diagram' },
+      refusal: { code: 'thing-not-in-diagram' },
     });
     expect(session.getState().working).toBe(before);
   });
 
   it('moves neighbours by the difference between the old growth and the new one', () => {
     const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
 
     expect(
       authoring.complete({
-        kind: 'resized-card',
-        cardId: CARD_A,
+        kind: 'resized-thing',
+        thingId: THING_A,
         size: { width: 860, height: 720 },
       }),
     ).toEqual({ kind: 'completed' });
@@ -586,41 +586,41 @@ describe('Expanded Card geometry', () => {
     // 860x720 grows by (600, 574); the Open already applied (300, 274); the
     // difference this Edit applies is (300, 300).
     expect(originsOf(session)).toEqual({
-      [CARD_A]: [100, 100],
-      [CARD_B]: [900, 100],
-      [CARD_C]: [100, 874],
-      [CARD_D]: [1100, 1074],
-      [CARD_E]: [40, 40],
+      [THING_A]: [100, 100],
+      [THING_B]: [900, 100],
+      [THING_C]: [100, 874],
+      [THING_D]: [1100, 1074],
+      [THING_E]: [40, 40],
     });
   });
 
   it('moves neighbours on one axis only when only one axis of the size changed', () => {
     const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
 
     // 100 wider at the same height, so the height difference is zero.
     authoring.complete({
-      kind: 'resized-card',
-      cardId: CARD_A,
+      kind: 'resized-thing',
+      thingId: THING_A,
       size: { width: 660, height: 420 },
     });
 
     expect(originsOf(session)).toEqual({
-      [CARD_A]: [100, 100],
-      [CARD_B]: [700, 100],
-      [CARD_C]: [100, 574],
-      [CARD_D]: [900, 774],
-      [CARD_E]: [40, 40],
+      [THING_A]: [100, 100],
+      [THING_B]: [700, 100],
+      [THING_C]: [100, 574],
+      [THING_D]: [900, 774],
+      [THING_E]: [40, 40],
     });
   });
 
-  it('is unchanged and moves nobody when the proposal is the size the Card already has', () => {
+  it('is unchanged and moves nobody when the proposal is the size the Thing already has', () => {
     const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
     const before = session.getState().working;
 
     expect(
-      authoring.complete({ kind: 'resized-card', cardId: CARD_A, size: DEFAULT_OPEN_SIZE }),
+      authoring.complete({ kind: 'resized-thing', thingId: THING_A, size: DEFAULT_OPEN_SIZE }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
   });
@@ -629,14 +629,14 @@ describe('Expanded Card geometry', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
     authoring.complete({
-      kind: 'resized-card',
-      cardId: CARD_A,
+      kind: 'resized-thing',
+      thingId: THING_A,
       size: { width: 860, height: 720 },
     });
-    authoring.complete({ kind: 'resized-card', cardId: CARD_A, size: DEFAULT_OPEN_SIZE });
-    authoring.complete({ kind: 'closed-card', cardId: CARD_A });
+    authoring.complete({ kind: 'resized-thing', thingId: THING_A, size: DEFAULT_OPEN_SIZE });
+    authoring.complete({ kind: 'closed-thing', thingId: THING_A });
 
     expect(originsOf(session)).toEqual(before);
   });
@@ -645,23 +645,23 @@ describe('Expanded Card geometry', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
+    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
     authoring.complete({
-      kind: 'resized-card',
-      cardId: CARD_A,
+      kind: 'resized-thing',
+      thingId: THING_A,
       size: { width: 860, height: 720 },
     });
 
     // The magnetic Close (ADR 0066) arrives as a resize proposal at exactly the
     // collapsed size. What it gives back is (600, 574) — the growth of the
-    // 860x720 the Card was actually Open at — and not the zero growth of the
+    // 860x720 the Thing was actually Open at — and not the zero growth of the
     // collapsed rect being proposed.
     expect(
-      authoring.complete({ kind: 'resized-card', cardId: CARD_A, size: COLLAPSED_CARD_SIZE }),
+      authoring.complete({ kind: 'resized-thing', thingId: THING_A, size: COLLAPSED_THING_SIZE }),
     ).toEqual({ kind: 'completed' });
 
     expect(originsOf(session)).toEqual(before);
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_A]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_A]).toEqual({
       x: 100,
       y: 100,
       open: false,
@@ -670,52 +670,52 @@ describe('Expanded Card geometry', () => {
   });
 
   /**
-   * A Card that leaves the Diagram takes its room with it.
+   * A Thing that leaves the Diagram takes its room with it.
    *
    * Under the derived model this reclaimed itself: the entry carried the Open
    * state, so removing the entry removed the displacement. Now the room is
    * written into the neighbours' own coordinates, and a removal that only drops
    * the entry leaves a hole with nothing left on the canvas to explain it and no
-   * Edit that can give it back. Leaving the Diagram is a Close the Card does not
+   * Edit that can give it back. Leaving the Diagram is a Close the Thing does not
    * come back from, so it reclaims exactly as Close does (ADR 0084).
    */
-  it('reclaims the room an Open Card held when it is removed from the Diagram', () => {
+  it('reclaims the room an Open Thing held when it is removed from the Diagram', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
-    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_A })).toEqual({
+    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
+    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
 
-    const { [CARD_A]: removed, ...remaining } = before;
+    const { [THING_A]: removed, ...remaining } = before;
     expect(removed).toBeDefined();
     expect(originsOf(session)).toEqual(remaining);
   });
 
-  it('reclaims the room an Open Card held when it is deleted', () => {
+  it('reclaims the room an Open Thing held when it is deleted', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    authoring.complete({ kind: 'opened-card', cardId: CARD_A });
-    expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_A })).toEqual({
+    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
+    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
 
-    const { [CARD_A]: deleted, ...remaining } = before;
+    const { [THING_A]: deleted, ...remaining } = before;
     expect(deleted).toBeDefined();
     expect(originsOf(session)).toEqual(remaining);
   });
 
-  it('moves nobody when the Card leaving the Diagram was Closed', () => {
+  it('moves nobody when the Thing leaving the Diagram was Closed', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
 
-    const { [CARD_A]: removed, ...remaining } = before;
+    const { [THING_A]: removed, ...remaining } = before;
     expect(removed).toBeDefined();
     expect(originsOf(session)).toEqual(remaining);
   });
@@ -725,16 +725,16 @@ describe('Add Alias', () => {
   it('creates and places an Alias on its Target, minting a neutral title when none was typed', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'created-alias', target: CARD_A, anchor: CENTRE })).toEqual({
+    expect(authoring.complete({ kind: 'created-alias', target: THING_A, anchor: CENTRE })).toEqual({
       kind: 'completed',
-      createdCardId: MINTED,
+      createdThingId: MINTED,
     });
 
     // The Target's own Title is never copied: an Alias that arrived already
-    // named after its Target gave the Space two Cards with one name by default.
-    expect(session.getState().working.cards[2]).toEqual({
+    // named after its Target gave the Space two Things with one name by default.
+    expect(session.getState().working.things[2]).toEqual({
       id: MINTED,
-      document: { title: 'Card 1', kind: 'alias', target: CARD_A },
+      document: { title: 'Thing 1', kind: 'alias', target: THING_A },
     });
     expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[MINTED]).toEqual(CENTRE);
   });
@@ -753,55 +753,55 @@ describe('Add Alias', () => {
 
     authoring.complete({
       kind: 'created-alias',
-      target: CARD_A,
+      target: THING_A,
       title: '  Recap  \n  the week  ',
       anchor: CENTRE,
     });
 
-    expect(session.getState().working.cards[2]?.document).toEqual({
+    expect(session.getState().working.things[2]?.document).toEqual({
       title: '  Recap\n  the week',
       kind: 'alias',
-      target: CARD_A,
+      target: THING_A,
     });
   });
 
   it('refuses a Target that is itself an Alias, so no chain is ever authored', () => {
     const aliased: SpaceSnapshot = {
       ...positionedSnapshot,
-      cards: [
-        positionedSnapshot.cards[0]!,
-        { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_A } },
+      things: [
+        positionedSnapshot.things[0]!,
+        { id: THING_B, document: { title: 'A again', kind: 'alias', target: THING_A } },
       ],
     };
     const { authoring, session } = open(aliased);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'created-alias', target: CARD_B, anchor: CENTRE })).toEqual({
+    expect(authoring.complete({ kind: 'created-alias', target: THING_B, anchor: CENTRE })).toEqual({
       kind: 'refused',
-      refusal: { code: 'alias-target-must-own-content', targetId: CARD_B },
+      refusal: { code: 'alias-target-must-own-content', targetId: THING_B },
     });
     expect(session.getState().working).toBe(before);
   });
 
-  it('refuses a Space Card Target, because an Alias can only show Markdown content', () => {
-    const withSpaceCard: SpaceSnapshot = {
+  it('refuses a Space Thing Target, because an Alias can only show Markdown content', () => {
+    const withSpaceThing: SpaceSnapshot = {
       ...positionedSnapshot,
-      cards: [
-        positionedSnapshot.cards[0]!,
+      things: [
+        positionedSnapshot.things[0]!,
         {
-          id: CARD_B,
-          document: { title: 'Nested Space', kind: 'space', spaceId: UNKNOWN_CARD },
+          id: THING_B,
+          document: { title: 'Nested Space', kind: 'space', spaceId: UNKNOWN_THING },
         },
       ],
     };
-    const { authoring, session } = open(withSpaceCard);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    const { authoring, session } = open(withSpaceThing);
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'created-alias', target: CARD_B, anchor: CENTRE })).toEqual({
+    expect(authoring.complete({ kind: 'created-alias', target: THING_B, anchor: CENTRE })).toEqual({
       kind: 'refused',
-      refusal: { code: 'alias-target-must-own-content', targetId: CARD_B },
+      refusal: { code: 'alias-target-must-own-content', targetId: THING_B },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -810,10 +810,10 @@ describe('Add Alias', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'created-alias', target: UNKNOWN_CARD, anchor: CENTRE }),
+      authoring.complete({ kind: 'created-alias', target: UNKNOWN_THING, anchor: CENTRE }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'alias-target-not-found', targetId: UNKNOWN_CARD },
+      refusal: { code: 'alias-target-not-found', targetId: UNKNOWN_THING },
     });
   });
 });
@@ -831,8 +831,8 @@ describe('Add Graph', () => {
             title: 'Diagram 2',
             kind: 'positioned',
             positions: {
-              [CARD_A]: { x: 20, y: 30, open: false },
-              [CARD_B]: { x: 310, y: 50, open: false },
+              [THING_A]: { x: 20, y: 30, open: false },
+              [THING_B]: { x: 310, y: 50, open: false },
             },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
           },
@@ -840,7 +840,7 @@ describe('Add Graph', () => {
       },
     };
     const { authoring, session } = open(snapshot);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'added-graph' })).toEqual({
       kind: 'completed',
@@ -866,7 +866,7 @@ describe('Add Graph', () => {
     ]);
     expect(diagramOf(session.getState().working, DIAGRAM_ID)?.activeGraph).toBe(MINTED);
     expect(navigation.getState().activeGraphId).toBe(MINTED);
-    expect(session.getState().working.cards).toEqual(positionedSnapshot.cards);
+    expect(session.getState().working.things).toEqual(positionedSnapshot.things);
   });
 
   it('is literal and repeatable, so an already empty active Graph does not swallow it', () => {
@@ -1000,7 +1000,7 @@ describe('Delete Diagram', () => {
           title: 'Diagram 2',
           kind: 'positioned',
           positions: {
-            [CARD_B]: {
+            [THING_B]: {
               x: 80,
               y: 90,
               open: true,
@@ -1016,19 +1016,19 @@ describe('Delete Diagram', () => {
 
   it('deletes only the selected Diagram and continues in the first survivor', () => {
     const { authoring, navigation, session } = open(twoDiagrams, OTHER_DIAGRAM_ID);
-    place(authoring, { [CARD_B]: [80, 90] });
+    place(authoring, { [THING_B]: [80, 90] });
 
     expect(authoring.complete({ kind: 'deleted-diagram', diagramId: OTHER_DIAGRAM_ID })).toEqual({
       kind: 'completed',
     });
 
-    expect(session.getState().working.cards).toEqual(twoDiagrams.cards);
+    expect(session.getState().working.things).toEqual(twoDiagrams.things);
     expect(session.getState().working.document.diagrams).toEqual([
       positionedSnapshot.document.diagrams![0]!,
     ]);
     expect(navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
-    expect(authoring.authoredPlacement()?.get(CARD_A)).toEqual({ x: 10, y: 20, open: false });
+    expect(authoring.authoredPlacement()?.get(THING_A)).toEqual({ x: 10, y: 20, open: false });
   });
 
   it('refuses to delete the last Diagram with a stable identity', () => {
@@ -1060,7 +1060,7 @@ describe('Delete Graph', () => {
 
   it('removes exactly one Graph and activates the first survivor', () => {
     const { authoring, session, navigation } = open(twoGraphs);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
       kind: 'completed',
@@ -1068,8 +1068,8 @@ describe('Delete Graph', () => {
 
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
-    // Cards and positions are untouched; only the Graph left.
-    expect(session.getState().working.cards).toEqual(positionedSnapshot.cards);
+    // Things and positions are untouched; only the Graph left.
+    expect(session.getState().working.things).toEqual(positionedSnapshot.things);
     expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions).toEqual(
       positionedSnapshot.document.diagrams![0]!.positions,
     );
@@ -1077,7 +1077,7 @@ describe('Delete Graph', () => {
 
   it('keeps the emphasis where it was when another Graph was deleted', () => {
     const { authoring, navigation } = open(twoGraphs);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID });
 
@@ -1106,14 +1106,14 @@ describe('Delete Graph', () => {
             id: OTHER_DIAGRAM_ID,
             title: 'Diagram 2',
             kind: 'positioned',
-            positions: { [CARD_A]: { x: 0, y: 400, open: false } },
+            positions: { [THING_A]: { x: 0, y: 400, open: false } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
           },
         ],
       },
     };
     const { authoring } = open(twoDiagrams);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
       kind: 'refused',
@@ -1126,9 +1126,9 @@ describe('Edge lifecycle', () => {
   it('replaces exactly one endpoint and keeps the Edge in its Graph', () => {
     const { authoring, session } = open({
       ...positionedSnapshot,
-      cards: [
-        ...positionedSnapshot.cards,
-        { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      things: [
+        ...positionedSnapshot.things,
+        { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
       ],
       document: {
         ...positionedSnapshot.document,
@@ -1136,28 +1136,28 @@ describe('Edge lifecycle', () => {
           {
             ...positionedSnapshot.document.diagrams![0]!,
             positions: {
-              [CARD_A]: { x: 10, y: 20, open: false },
-              [CARD_B]: { x: 300, y: 40, open: false },
-              [CARD_C]: { x: 600, y: 40, open: false },
+              [THING_A]: { x: 10, y: 20, open: false },
+              [THING_B]: { x: 300, y: 40, open: false },
+              [THING_C]: { x: 600, y: 40, open: false },
             },
           },
         ],
       },
     });
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40], [CARD_C]: [600, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40], [THING_C]: [600, 40] });
 
     expect(
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: CARD_A, to: CARD_B },
+        edge: { from: THING_A, to: THING_B },
         endpoint: 'to',
-        cardId: CARD_C,
+        thingId: THING_C,
       }),
     ).toEqual({ kind: 'completed' });
 
     expect(graphsOf(session.getState().working)).toEqual([
-      { id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_C }] },
+      { id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_C }] },
     ]);
   });
 
@@ -1168,12 +1168,14 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: CARD_A, to: CARD_B },
+        edge: { from: THING_A, to: THING_B },
         endpoint: 'from',
-        cardId: CARD_B,
+        thingId: THING_B,
       }),
     ).toEqual({ kind: 'completed' });
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([{ from: CARD_B, to: CARD_B }]);
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      { from: THING_B, to: THING_B },
+    ]);
   });
 
   it('treats returning an endpoint to where it came from as unchanged', () => {
@@ -1184,9 +1186,9 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: CARD_A, to: CARD_B },
+        edge: { from: THING_A, to: THING_B },
         endpoint: 'to',
-        cardId: CARD_B,
+        thingId: THING_B,
       }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
@@ -1205,8 +1207,8 @@ describe('Edge lifecycle', () => {
                 id: GRAPH_ID,
                 title: 'Main',
                 edges: [
-                  { from: CARD_A, to: CARD_B },
-                  { from: CARD_B, to: CARD_B },
+                  { from: THING_A, to: THING_B },
+                  { from: THING_B, to: THING_B },
                 ],
               },
             ],
@@ -1215,39 +1217,39 @@ describe('Edge lifecycle', () => {
       },
     };
     const { authoring } = open(both);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: CARD_A, to: CARD_B },
+        edge: { from: THING_A, to: THING_B },
         endpoint: 'from',
-        cardId: CARD_B,
+        thingId: THING_B,
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
   });
 
-  it('refuses a reconnection onto a Card this Diagram does not hold', () => {
+  it('refuses a reconnection onto a Thing this Diagram does not hold', () => {
     const sparse: SpaceSnapshot = {
       ...positionedSnapshot,
-      cards: [
-        ...positionedSnapshot.cards,
-        { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      things: [
+        ...positionedSnapshot.things,
+        { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
       ],
     };
     const { authoring } = open(sparse);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: CARD_A, to: CARD_B },
+        edge: { from: THING_A, to: THING_B },
         endpoint: 'to',
-        cardId: CARD_C,
+        thingId: THING_C,
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } });
   });
 
   it('refuses an Edge the Graph no longer holds', () => {
@@ -1257,7 +1259,7 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'deleted-edge',
         graphId: GRAPH_ID,
-        edge: { from: CARD_B, to: CARD_A },
+        edge: { from: THING_B, to: THING_A },
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'edge-not-found' } });
   });
@@ -1269,7 +1271,7 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'deleted-edge',
         graphId: GRAPH_ID,
-        edge: { from: CARD_A, to: CARD_B },
+        edge: { from: THING_A, to: THING_B },
       }),
     ).toEqual({ kind: 'completed' });
 
@@ -1295,24 +1297,29 @@ describe('Edge eligibility', () => {
   const RECONNECT = {
     kind: 'reconnect',
     graphId: GRAPH_ID,
-    edge: { from: CARD_A, to: CARD_B },
+    edge: { from: THING_A, to: THING_B },
     endpoint: 'to',
   } as const;
 
-  /** What a pointer gesture reports: where React Flow has drawn the Diagram's Cards. */
+  /** What a pointer gesture reports: where React Flow has drawn the Diagram's Things. */
   const RENDERED = Placement.fromEntries([
-    [CARD_A, { x: 10, y: 20, open: false }],
-    [CARD_B, { x: 300, y: 40, open: false }],
+    [THING_A, { x: 10, y: 20, open: false }],
+    [THING_B, { x: 300, y: 40, open: false }],
   ]);
 
   it('offers a connection the completion accepts', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_B, to: CARD_A })).toEqual({
+    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_B, to: THING_A })).toEqual({
       kind: 'eligible',
     });
     expect(
-      authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A, rendered: RENDERED }),
+      authoring.complete({
+        kind: 'connected-things',
+        from: THING_B,
+        to: THING_A,
+        rendered: RENDERED,
+      }),
     ).toEqual({
       kind: 'completed',
     });
@@ -1322,64 +1329,69 @@ describe('Edge eligibility', () => {
     const { authoring } = openPositioned();
 
     const refusal = { kind: 'refused', refusal: { code: 'edge-already-exists' } };
-    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B })).toEqual(
+    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_B })).toEqual(
       refusal,
     );
     expect(
-      authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_B, rendered: RENDERED }),
+      authoring.complete({
+        kind: 'connected-things',
+        from: THING_A,
+        to: THING_B,
+        rendered: RENDERED,
+      }),
     ).toEqual(refusal);
   });
 
   it('offers a self-Edge and a cycle, which are legal authored structure', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_A })).toEqual({
+    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_A })).toEqual({
       kind: 'eligible',
     });
-    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_B, to: CARD_A })).toEqual({
+    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_B, to: THING_A })).toEqual({
       kind: 'eligible',
     });
   });
 
-  it('refuses a Card the selected Diagram does not hold', () => {
+  it('refuses a Thing the selected Diagram does not hold', () => {
     const sparse: SpaceSnapshot = {
       ...positionedSnapshot,
-      cards: [
-        ...positionedSnapshot.cards,
-        { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      things: [
+        ...positionedSnapshot.things,
+        { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
       ],
     };
     const { authoring } = open(sparse);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
-    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_C })).toEqual({
+    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_C })).toEqual({
       kind: 'refused',
-      refusal: { code: 'edge-card-outside-diagram' },
+      refusal: { code: 'edge-thing-outside-diagram' },
     });
-    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: CARD_C })).toEqual({
+    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: THING_C })).toEqual({
       kind: 'refused',
-      refusal: { code: 'edge-card-outside-diagram' },
+      refusal: { code: 'edge-thing-outside-diagram' },
     });
   });
 
   /**
-   * An empty drop's Card does not exist yet, so it can duplicate nothing. The
+   * An empty drop's Thing does not exist yet, so it can duplicate nothing. The
    * two connecting proposals therefore diverge on exactly one rule, and this is
    * the case that would go unnoticed if they were folded into one query.
    */
-  it('offers an empty drop from a Card whose every existing Edge is taken', () => {
+  it('offers an empty drop from a Thing whose every existing Edge is taken', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B }).kind).toBe(
+    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_B }).kind).toBe(
       'refused',
     );
-    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: CARD_A })).toEqual({
+    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: THING_A })).toEqual({
       kind: 'eligible',
     });
   });
 
   /**
-   * **Returning an endpoint to the Card it already names is eligible**, and
+   * **Returning an endpoint to the Thing it already names is eligible**, and
    * completes as `unchanged`. Eligibility answers what the author may still do,
    * not what the Edit will turn out to have changed — a picker that disabled the
    * current value would show it as the one forbidden choice.
@@ -1387,48 +1399,50 @@ describe('Edge eligibility', () => {
   it('offers a reconnection back to the endpoint it came from, which completes unchanged', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.edgeEligibility({ ...RECONNECT, cardId: CARD_B })).toEqual({
+    expect(authoring.edgeEligibility({ ...RECONNECT, thingId: THING_B })).toEqual({
       kind: 'eligible',
     });
-    expect(authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: CARD_B })).toEqual({
+    expect(
+      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', thingId: THING_B }),
+    ).toEqual({
       kind: 'unchanged',
     });
   });
 
-  it('refuses a reconnection onto a Card outside this Diagram, and completes the same way', () => {
+  it('refuses a reconnection onto a Thing outside this Diagram, and completes the same way', () => {
     const sparse: SpaceSnapshot = {
       ...positionedSnapshot,
-      cards: [
-        ...positionedSnapshot.cards,
-        { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      things: [
+        ...positionedSnapshot.things,
+        { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
       ],
     };
     const { authoring } = open(sparse);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
-    const refusal = { kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } };
-    expect(authoring.edgeEligibility({ ...RECONNECT, cardId: CARD_C })).toEqual(refusal);
-    expect(authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: CARD_C })).toEqual(
-      refusal,
-    );
+    const refusal = { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } };
+    expect(authoring.edgeEligibility({ ...RECONNECT, thingId: THING_C })).toEqual(refusal);
+    expect(
+      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', thingId: THING_C }),
+    ).toEqual(refusal);
   });
 
   /**
-   * The placement is not the Space. A Card can be drawn — and so be a position
+   * The placement is not the Space. A Thing can be drawn — and so be a position
    * key — while the Space no longer holds it, and an Edge naming one derives a
    * snapshot intake rejects, which this derivation answers by throwing. So the
    * reconnect rule asks the same second question a connection does, and refuses
    * rather than putting a defect in front of the author as their own mistake.
    */
-  it('refuses a reconnection onto a Card the Space no longer holds', () => {
+  it('refuses a reconnection onto a Thing the Space no longer holds', () => {
     const { authoring } = openPositioned();
-    // Placed, so the Diagram would take it — but never a Card of this Space.
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40], [UNKNOWN_CARD]: [600, 40] });
+    // Placed, so the Diagram would take it — but never a Thing of this Space.
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40], [UNKNOWN_THING]: [600, 40] });
 
-    const refusal = { kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } };
-    expect(authoring.edgeEligibility({ ...RECONNECT, cardId: UNKNOWN_CARD })).toEqual(refusal);
+    const refusal = { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } };
+    expect(authoring.edgeEligibility({ ...RECONNECT, thingId: UNKNOWN_THING })).toEqual(refusal);
     expect(
-      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: UNKNOWN_CARD }),
+      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', thingId: UNKNOWN_THING }),
     ).toEqual(refusal);
   });
 
@@ -1436,7 +1450,7 @@ describe('Edge eligibility', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.edgeEligibility({ ...RECONNECT, graphId: UNKNOWN_GRAPH, cardId: CARD_A }),
+      authoring.edgeEligibility({ ...RECONNECT, graphId: UNKNOWN_GRAPH, thingId: THING_A }),
     ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
   });
 
@@ -1450,7 +1464,11 @@ describe('Edge eligibility', () => {
    */
   it('refuses an Edge the Graph no longer holds, and completes the same way', () => {
     const { authoring } = openPositioned();
-    const absent = { ...RECONNECT, edge: { from: CARD_B, to: CARD_A }, cardId: CARD_A } as const;
+    const absent = {
+      ...RECONNECT,
+      edge: { from: THING_B, to: THING_A },
+      thingId: THING_A,
+    } as const;
 
     const refusal = { kind: 'refused', refusal: { code: 'edge-not-found' } };
     expect(authoring.edgeEligibility(absent)).toEqual(refusal);
@@ -1459,32 +1477,32 @@ describe('Edge eligibility', () => {
 });
 
 describe('Diagram membership', () => {
-  /** A Space holding a third Card the Diagram does not place. */
+  /** A Space holding a third Thing the Diagram does not place. */
   const sparse: SpaceSnapshot = {
     ...positionedSnapshot,
-    cards: [
-      ...positionedSnapshot.cards,
-      { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+    things: [
+      ...positionedSnapshot.things,
+      { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
     ],
   };
 
-  it('adds an absent Space Card at a deliberate position and infers no Edge', () => {
+  it('adds an absent Space Thing at a deliberate position and infers no Edge', () => {
     const { authoring, session } = open(sparse);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(
-      authoring.complete({ kind: 'added-card-to-diagram', cardId: CARD_C, anchor: CENTRE }),
+      authoring.complete({ kind: 'added-thing-to-diagram', thingId: THING_C, anchor: CENTRE }),
     ).toEqual({ kind: 'completed' });
 
     expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 40, open: false },
-      [CARD_C]: CENTRE,
+      [THING_A]: { x: 10, y: 20, open: false },
+      [THING_B]: { x: 300, y: 40, open: false },
+      [THING_C]: CENTRE,
     });
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
   });
 
-  it('places a Card added to a Diagram at the anchor given, whatever is Open', () => {
+  it('places a Thing added to a Diagram at the anchor given, whatever is Open', () => {
     const expandedSparse: SpaceSnapshot = {
       ...sparse,
       document: {
@@ -1493,8 +1511,8 @@ describe('Diagram membership', () => {
           {
             ...sparse.document.diagrams![0]!,
             positions: {
-              [CARD_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
-              [CARD_B]: { x: 300, y: 40, open: false },
+              [THING_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+              [THING_B]: { x: 300, y: 40, open: false },
             },
           },
         ],
@@ -1503,39 +1521,43 @@ describe('Diagram membership', () => {
     const { authoring, session } = open(expandedSparse);
     authoring.replacePlacement(
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
-        [CARD_B, { x: 300, y: 40, open: false }],
+        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
+        [THING_B, { x: 300, y: 40, open: false }],
       ]),
     );
 
     authoring.complete({
-      kind: 'added-card-to-diagram',
-      cardId: CARD_C,
+      kind: 'added-thing-to-diagram',
+      thingId: THING_C,
       anchor: { x: 500, y: 400 },
     });
 
     // As above: the anchor is authorship, not a drawn coordinate to invert.
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[CARD_C]).toEqual({
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_C]).toEqual({
       x: 500,
       y: 400,
       open: false,
     });
   });
 
-  it('refuses a Card the Space no longer holds', () => {
+  it('refuses a Thing the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'added-card-to-diagram', cardId: UNKNOWN_CARD, anchor: CENTRE }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'card-not-found' } });
+      authoring.complete({
+        kind: 'added-thing-to-diagram',
+        thingId: UNKNOWN_THING,
+        anchor: CENTRE,
+      }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'thing-not-found' } });
   });
 
-  it('refuses a Card the Diagram already holds', () => {
+  it('refuses a Thing the Diagram already holds', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'added-card-to-diagram', cardId: CARD_A, anchor: CENTRE }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'card-already-in-diagram' } });
+      authoring.complete({ kind: 'added-thing-to-diagram', thingId: THING_A, anchor: CENTRE }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'thing-already-in-diagram' } });
   });
 
   it('removes membership and every incident Edge, in this Diagram only', () => {
@@ -1548,7 +1570,7 @@ describe('Diagram membership', () => {
             ...positionedSnapshot.document.diagrams![0]!,
             graphs: [
               MAIN_GRAPH,
-              { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: CARD_B, to: CARD_A }] },
+              { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: THING_B, to: THING_A }] },
             ],
           },
           {
@@ -1556,46 +1578,46 @@ describe('Diagram membership', () => {
             title: 'Diagram 2',
             kind: 'positioned',
             positions: {
-              [CARD_A]: { x: 0, y: 400, open: false },
-              [CARD_B]: { x: 0, y: 600, open: false },
+              [THING_A]: { x: 0, y: 400, open: false },
+              [THING_B]: { x: 0, y: 600, open: false },
             },
-            graphs: [{ id: MINTED, title: 'Elsewhere', edges: [{ from: CARD_A, to: CARD_B }] }],
+            graphs: [{ id: MINTED, title: 'Elsewhere', edges: [{ from: THING_A, to: THING_B }] }],
           },
         ],
       },
     };
     const { authoring, session } = open(twoDiagrams);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
-    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_B })).toEqual({
+    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_B })).toEqual({
       kind: 'completed',
     });
 
     const working = session.getState().working;
     expect(diagramOf(working, DIAGRAM_ID)?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
+      [THING_A]: { x: 10, y: 20, open: false },
     });
     expect(diagramOf(working, DIAGRAM_ID)?.graphs).toEqual([
       { id: GRAPH_ID, title: 'Main', edges: [] },
       { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
     ]);
-    // The Card stays in the Space and in every other Diagram, Edges and all.
-    expect(working.cards).toEqual(positionedSnapshot.cards);
+    // The Thing stays in the Space and in every other Diagram, Edges and all.
+    expect(working.things).toEqual(positionedSnapshot.things);
     expect(diagramOf(working, OTHER_DIAGRAM_ID)).toEqual(twoDiagrams.document.diagrams![1]);
   });
 
-  it('refuses removing a Card the Diagram does not hold', () => {
+  it('refuses removing a Thing the Diagram does not hold', () => {
     const { authoring } = open(sparse);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
-    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_C })).toEqual({
+    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_C })).toEqual({
       kind: 'refused',
-      refusal: { code: 'card-not-in-diagram' },
+      refusal: { code: 'thing-not-in-diagram' },
     });
   });
 });
 
-describe('Delete Card from Space', () => {
+describe('Delete Thing from Space', () => {
   const twoDiagrams: SpaceSnapshot = {
     ...positionedSnapshot,
     document: {
@@ -1607,16 +1629,16 @@ describe('Delete Card from Space', () => {
           title: 'Diagram 2',
           kind: 'positioned',
           positions: {
-            [CARD_A]: { x: 0, y: 400, open: false },
-            [CARD_B]: { x: 0, y: 600, open: false },
+            [THING_A]: { x: 0, y: 400, open: false },
+            [THING_B]: { x: 0, y: 600, open: false },
           },
           graphs: [
             {
               id: OTHER_GRAPH_ID,
               title: 'Elsewhere',
               edges: [
-                { from: CARD_A, to: CARD_B },
-                { from: CARD_B, to: CARD_A },
+                { from: THING_A, to: THING_B },
+                { from: THING_B, to: THING_A },
               ],
             },
           ],
@@ -1625,24 +1647,24 @@ describe('Delete Card from Space', () => {
     },
   };
 
-  it('deletes the Card and cascades it out of every Diagram at once', () => {
+  it('deletes the Thing and cascades it out of every Diagram at once', () => {
     const { authoring, session } = open(twoDiagrams);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
-    expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_B })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
       kind: 'completed',
     });
 
     const working = session.getState().working;
-    expect(working.cards).toEqual([positionedSnapshot.cards[0]]);
+    expect(working.things).toEqual([positionedSnapshot.things[0]]);
     expect(diagramOf(working, DIAGRAM_ID)?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
+      [THING_A]: { x: 10, y: 20, open: false },
     });
     expect(diagramOf(working, DIAGRAM_ID)?.graphs).toEqual([{ ...MAIN_GRAPH, edges: [] }]);
     expect(diagramOf(working, OTHER_DIAGRAM_ID)?.positions).toEqual({
-      [CARD_A]: { x: 0, y: 400, open: false },
+      [THING_A]: { x: 0, y: 400, open: false },
     });
-    // Empty Graphs and Diagrams remain: deleting a Card is not an instruction to
+    // Empty Graphs and Diagrams remain: deleting a Thing is not an instruction to
     // delete either.
     expect(diagramOf(working, OTHER_DIAGRAM_ID)?.graphs).toEqual([
       { id: OTHER_GRAPH_ID, title: 'Elsewhere', edges: [] },
@@ -1650,22 +1672,22 @@ describe('Delete Card from Space', () => {
     expect(loadSpaceSnapshot(working).ok).toBe(true);
   });
 
-  it('refuses a Card its Aliases still point at, naming them', () => {
+  it('refuses a Thing its Aliases still point at, naming them', () => {
     const aliased: SpaceSnapshot = {
       ...positionedSnapshot,
-      cards: [
-        positionedSnapshot.cards[0]!,
-        { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_A } },
+      things: [
+        positionedSnapshot.things[0]!,
+        { id: THING_B, document: { title: 'A again', kind: 'alias', target: THING_A } },
       ],
     };
     const { authoring, session } = open(aliased);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_A })).toEqual({
       kind: 'refused',
       refusal: {
-        code: 'card-has-aliases',
+        code: 'thing-has-aliases',
         aliasTitles: ['A again'],
       },
     });
@@ -1673,28 +1695,28 @@ describe('Delete Card from Space', () => {
   });
 
   /*
-   * A Space Card owns the Space it names (ADR 0058), so deleting it deletes
+   * A Space Thing owns the Space it names (ADR 0058), so deleting it deletes
    * that Space and the closure below it — one coordinated multi-Space Edit,
    * which is the session registry's and not a single-Space update this seam can
    * make. Completing it here stores a Space whose target is unreachable, and
-   * aggregate intake refuses that commit permanently with the Card already gone
+   * aggregate intake refuses that commit permanently with the Thing already gone
    * from the working state, leaving the author nothing to correct.
    */
-  it('refuses deleting a Space Card rather than orphaning the Space it owns', () => {
+  it('refuses deleting a Space Thing rather than orphaning the Space it owns', () => {
     const linked: SpaceSnapshot = {
       ...positionedSnapshot,
-      cards: [
-        positionedSnapshot.cards[0]!,
-        { id: CARD_B, document: { title: 'Nested Space', kind: 'space', spaceId: UNKNOWN_CARD } },
+      things: [
+        positionedSnapshot.things[0]!,
+        { id: THING_B, document: { title: 'Nested Space', kind: 'space', spaceId: UNKNOWN_THING } },
       ],
     };
     const { authoring, session } = open(linked);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_B })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
       kind: 'refused',
-      refusal: { code: 'space-card-deletion-unsupported' },
+      refusal: { code: 'space-thing-deletion-unsupported' },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -1702,43 +1724,43 @@ describe('Delete Card from Space', () => {
   it('deletes an Alias and leaves its Target untouched', () => {
     const aliased: SpaceSnapshot = {
       ...positionedSnapshot,
-      cards: [
-        positionedSnapshot.cards[0]!,
-        { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_A } },
+      things: [
+        positionedSnapshot.things[0]!,
+        { id: THING_B, document: { title: 'A again', kind: 'alias', target: THING_A } },
       ],
     };
     const { authoring, session } = open(aliased);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
-    expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_B })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
       kind: 'completed',
     });
-    expect(session.getState().working.cards).toEqual([positionedSnapshot.cards[0]]);
+    expect(session.getState().working.things).toEqual([positionedSnapshot.things[0]]);
   });
 
-  it('removing a Card from one Diagram is never blocked by an incoming Alias', () => {
+  it('removing a Thing from one Diagram is never blocked by an incoming Alias', () => {
     const aliased: SpaceSnapshot = {
       ...positionedSnapshot,
-      cards: [
-        positionedSnapshot.cards[0]!,
-        { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_A } },
+      things: [
+        positionedSnapshot.things[0]!,
+        { id: THING_B, document: { title: 'A again', kind: 'alias', target: THING_A } },
       ],
     };
     const { authoring, session } = open(aliased);
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
-    expect(authoring.complete({ kind: 'removed-card-from-diagram', cardId: CARD_A })).toEqual({
+    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
-    expect(session.getState().working.cards).toEqual(aliased.cards);
+    expect(session.getState().working.things).toEqual(aliased.things);
   });
 
-  it('refuses a Card the Space no longer holds', () => {
+  it('refuses a Thing the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.complete({ kind: 'deleted-card', cardId: UNKNOWN_CARD })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-thing', thingId: UNKNOWN_THING })).toEqual({
       kind: 'refused',
-      refusal: { code: 'card-not-found' },
+      refusal: { code: 'thing-not-found' },
     });
   });
 });
@@ -1765,7 +1787,7 @@ describe('Keep local', () => {
       selection: DIAGRAM_ID,
       initialPlacement: null,
     });
-    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Before conflict' });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));

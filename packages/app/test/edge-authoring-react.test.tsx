@@ -11,10 +11,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId, inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { CardFlowNode } from '@project/react-flow-adapter';
+import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { Toolbar, ToolbarButton } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
-import { CARDS_TRIGGER } from '../src/components/command-dock-triggers';
+import { THINGS_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import { edgeSelectionOf } from '../src/render-adapter';
 import type { ConnectionCompletion } from '../src/connection-completion';
@@ -22,7 +22,7 @@ import { useEdgeAuthoring } from '../src/edge-authoring-react';
 import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
-import { CARD_SIZE } from '../src/card';
+import { THING_SIZE } from '../src/thing';
 
 /**
  * Edge Authoring's React interface: what it hands React Flow, and the controls
@@ -34,18 +34,18 @@ import { CARD_SIZE } from '../src/card';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const CARD_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const THING_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
-const EDGE = { from: CARD_A, to: CARD_B } as const;
+const EDGE = { from: THING_A, to: THING_B } as const;
 /** The Graph and Edge an Edge operation is named by, which travel together. */
 const SUBJECT = { graphId: GRAPH_ID, edge: EDGE } as const;
-const ASIDE_EDGE = { from: CARD_B, to: CARD_C } as const;
+const ASIDE_EDGE = { from: THING_B, to: THING_C } as const;
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -58,9 +58,9 @@ const snapshot: SpaceSnapshot = {
         title: 'Diagram 1',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 0, y: 0, open: false },
-          [CARD_B]: { x: 400, y: 0, open: false },
-          [CARD_C]: { x: 800, y: 0, open: false },
+          [THING_A]: { x: 0, y: 0, open: false },
+          [THING_B]: { x: 400, y: 0, open: false },
+          [THING_C]: { x: 800, y: 0, open: false },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -70,10 +70,10 @@ const snapshot: SpaceSnapshot = {
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
   ],
 };
 
@@ -83,14 +83,14 @@ const snapshot: SpaceSnapshot = {
  * and jsdom measures nothing, so without these no Edge resolves a position and
  * none is drawn at all.
  */
-function cardNode(id: string, x: number, title: string): CardFlowNode {
+function thingNode(id: string, x: number, title: string): ThingFlowNode {
   const anchors = [GRAPH_ID, OTHER_GRAPH_ID].flatMap((graphId) => [
     {
       id: inHandleId(graphId),
       type: 'target' as const,
       position: Position.Left,
       x: 0,
-      y: CARD_SIZE.height / 2,
+      y: THING_SIZE.height / 2,
       width: 6,
       height: 6,
     },
@@ -98,21 +98,21 @@ function cardNode(id: string, x: number, title: string): CardFlowNode {
       id: outHandleId(graphId),
       type: 'source' as const,
       position: Position.Right,
-      x: CARD_SIZE.width,
-      y: CARD_SIZE.height / 2,
+      x: THING_SIZE.width,
+      y: THING_SIZE.height / 2,
       width: 6,
       height: 6,
     },
   ]);
   return {
     id,
-    type: 'card',
+    type: 'thing',
     position: { x, y: 0 },
-    width: CARD_SIZE.width,
-    height: CARD_SIZE.height,
+    width: THING_SIZE.width,
+    height: THING_SIZE.height,
     handles: anchors,
     data: {
-      cardId: uuidSchema.parse(id),
+      thingId: uuidSchema.parse(id),
       title,
       readOnly: false,
       kind: 'markdown',
@@ -128,7 +128,11 @@ function cardNode(id: string, x: number, title: string): CardFlowNode {
   };
 }
 
-const NODES = [cardNode(CARD_A, 0, 'A'), cardNode(CARD_B, 400, 'B'), cardNode(CARD_C, 800, 'C')];
+const NODES = [
+  thingNode(THING_A, 0, 'A'),
+  thingNode(THING_B, 400, 'B'),
+  thingNode(THING_C, 800, 'C'),
+];
 
 /**
  * One projected Edge, with the id minted by the thing that mints it in
@@ -151,7 +155,7 @@ const flowEdge = (graphId: string, from: string, to: string): Edge => ({
   data: { graphId },
 });
 
-const EDGES = [flowEdge(GRAPH_ID, CARD_A, CARD_B), flowEdge(OTHER_GRAPH_ID, CARD_B, CARD_C)];
+const EDGES = [flowEdge(GRAPH_ID, THING_A, THING_B), flowEdge(OTHER_GRAPH_ID, THING_B, THING_C)];
 
 /**
  * The composition every canvas test runs on.
@@ -160,7 +164,7 @@ const EDGES = [flowEdge(GRAPH_ID, CARD_A, CARD_B), flowEdge(OTHER_GRAPH_ID, CARD
  * dependency of `createEdgeAuthoring`, and one refusal channel is reachable
  * only through it. `diagram-active-graph-required` is the sole refusal that can
  * reach `connect-form-refusal` on a connect gesture — the others are
- * `correctableByCardChoice` and mark the Target field instead (ADR 0057,
+ * `correctableByThingChoice` and mark the Target field instead (ADR 0057,
  * `authoring-refusal.ts`) — and it needs a selected Diagram whose Active Graph
  * the Diagram does not own. **No legal Space can be in that state**, not merely
  * no gesture over this fixture: `spaceFileSchema` gives a Diagram
@@ -189,9 +193,9 @@ function compose({
     spaceSession: session,
     selection,
     initialPlacement: Placement.fromEntries([
-      [CARD_A, { x: 0, y: 0, open: false }],
-      [CARD_B, { x: 400, y: 0, open: false }],
-      [CARD_C, { x: 800, y: 0, open: false }],
+      [THING_A, { x: 0, y: 0, open: false }],
+      [THING_B, { x: 400, y: 0, open: false }],
+      [THING_C, { x: 800, y: 0, open: false }],
     ]),
     connections,
   });
@@ -327,23 +331,23 @@ function CanvasHarness({
           projection React Flow has drawn. */}
       <CanvasContinuation
         continuation={continuation}
-        onSelectCard={adapter.getState().selectCard}
+        onSelectThing={adapter.getState().selectThing}
         onSelectEdge={adapter.getState().selectEdge}
       />
       <SpaceCanvas
         nodes={projection?.nodes ?? []}
         edges={projection?.edges ?? []}
         projectedNodes={null}
-        activeCardId={null}
+        activeThingId={null}
         presenting={presenting}
         placementReady={true}
         availability={authoringAvailability({
           editable: true,
           presenting,
-          creatingCard: covered,
-          editingCardBody: false,
-          editingCardTitle: false,
-          cardIsOpen: false,
+          creatingThing: covered,
+          editingThingBody: false,
+          editingThingTitle: false,
+          thingIsOpen: false,
           editingChromeTitle: false,
           spaceOnCanvas: true,
           editingEmbeddedDiagram: false,
@@ -352,16 +356,16 @@ function CanvasHarness({
         onEdgesChange={adapter.getState().changeEdges}
         edgeAuthoring={edgeAuthoring}
         selection={selection}
-        onSelectCard={adapter.getState().selectCard}
+        onSelectThing={adapter.getState().selectThing}
         onSelectEdge={adapter.getState().selectEdge}
-        placedCards={currentSpace().cards}
-        newCardTitle="Card 4"
-        onAddCard={() => undefined}
-        onAddExistingCard={() => undefined}
+        placedThings={currentSpace().things}
+        newThingTitle="Thing 4"
+        onAddThing={() => undefined}
+        onAddExistingThing={() => undefined}
         nameOnCreation={null}
         authoring={authoring}
         spaceSession={session}
-        cardResize={{
+        thingResize={{
           beginResize: () => undefined,
           previewResize: () => undefined,
           finishResize: () => undefined,
@@ -371,7 +375,7 @@ function CanvasHarness({
         graphs={currentSpace().graphs}
         colorByGraphId={{}}
         activeGraphId={GRAPH_ID}
-        activeGraphCardIds={new Set([CARD_A, CARD_B])}
+        activeGraphThingIds={new Set([THING_A, THING_B])}
       />
     </>
   );
@@ -473,7 +477,7 @@ describe('the Edge toolbar', () => {
    * The picker's disabled rows are eligibility's answer, so they say whether the
    * right *question* was asked.
    *
-   * `Main` holds A→B, so every Card of this Diagram is a legal `to` for it: B is
+   * `Main` holds A→B, so every Thing of this Diagram is a legal `to` for it: B is
    * unchanged, C is a new Edge, and A is a self-Edge, which is valid authored
    * structure (ADR 0032). The subject handed in is an `EdgeSelection`, which is
    * what the callbacks really hold and which carries a `kind` of its own —
@@ -492,8 +496,8 @@ describe('the Edge toolbar', () => {
         selection: { kind: 'edge', ...SUBJECT },
         activeGraphId: GRAPH_ID,
         graphs: composed.currentSpace().graphs,
-        placedCards: composed.currentSpace().cards,
-        newCardTitle: 'Card 4',
+        placedThings: composed.currentSpace().things,
+        newThingTitle: 'Thing 4',
         enabled: true,
         onSelectEdge: NO_OP,
       });
@@ -537,65 +541,65 @@ describe("the app's canvas delete key", () => {
   });
 
   it.each(DELETE_KEYS)(
-    'removes the selected Card from its Diagram when %s is aimed at the canvas',
+    'removes the selected Thing from its Diagram when %s is aimed at the canvas',
     (key) => {
       const { adapter, session } = mountCanvas();
-      act(() => adapter.getState().selectCard(CARD_A));
+      act(() => adapter.getState().selectThing(THING_A));
 
       fireEvent.keyDown(canvasElement(), { key });
 
       const current = session.getState().working;
-      expect(current.cards.map(({ id }) => id)).toContain(CARD_A);
-      expect(current.document.diagrams?.[0]?.positions[CARD_A]).toBeUndefined();
+      expect(current.things.map(({ id }) => id)).toContain(THING_A);
+      expect(current.document.diagrams?.[0]?.positions[THING_A]).toBeUndefined();
     },
   );
 
   it.each(DELETE_KEYS)(
-    'leaves the selected Card standing when %s is aimed outside the canvas',
+    'leaves the selected Thing standing when %s is aimed outside the canvas',
     (key) => {
       const { adapter, session } = mountCanvas(<main tabIndex={-1}>Outside the canvas</main>);
-      act(() => adapter.getState().selectCard(CARD_A));
+      act(() => adapter.getState().selectThing(THING_A));
 
       fireEvent.keyDown(screen.getByText('Outside the canvas'), { key });
 
-      expect(session.getState().working.document.diagrams?.[0]?.positions[CARD_A]).toBeDefined();
+      expect(session.getState().working.document.diagrams?.[0]?.positions[THING_A]).toBeDefined();
     },
   );
 
   /**
-   * The key acts on the Card it was aimed at, not the one selected before.
+   * The key acts on the Thing it was aimed at, not the one selected before.
    *
    * React Flow never selects a node on focus — its `onFocus` only auto-pans —
    * and only the Edge half of this canvas has a focus-to-selection bridge. So a
-   * Tab to another Card leaves the selection where it was, while the node's own
+   * Tab to another Thing leaves the selection where it was, while the node's own
    * assistive description promises Delete removes *it*. The open command one
-   * branch above already resolves its Card from the event target; this one now
+   * branch above already resolves its Thing from the event target; this one now
    * agrees, and falls back to the selection when the key came from the pane.
    */
-  it.each(DELETE_KEYS)('removes the focused Card rather than the selected one on %s', (key) => {
+  it.each(DELETE_KEYS)('removes the focused Thing rather than the selected one on %s', (key) => {
     const { adapter, session } = mountCanvas();
-    act(() => adapter.getState().selectCard(CARD_A));
-    const focused = document.querySelector(`.react-flow__node[data-id="${CARD_B}"]`);
-    if (focused === null) throw new Error('The Card the key is aimed at must be on the canvas.');
+    act(() => adapter.getState().selectThing(THING_A));
+    const focused = document.querySelector(`.react-flow__node[data-id="${THING_B}"]`);
+    if (focused === null) throw new Error('The Thing the key is aimed at must be on the canvas.');
 
     fireEvent.keyDown(focused, { key, bubbles: true });
 
     const diagram = session.getState().working.document.diagrams?.[0];
-    expect(diagram?.positions[CARD_B]).toBeUndefined();
-    expect(diagram?.positions[CARD_A]).toBeDefined();
+    expect(diagram?.positions[THING_B]).toBeUndefined();
+    expect(diagram?.positions[THING_A]).toBeDefined();
   });
 
   /**
    * The same two exclusions the `C` binding spells out, for the same reasons: a
    * command runs once per press, and a modifier makes the key somebody else's.
    */
-  it('ignores an auto-repeated Backspace so one press removes one Card', () => {
+  it('ignores an auto-repeated Backspace so one press removes one Thing', () => {
     const { adapter, session } = mountCanvas();
-    act(() => adapter.getState().selectCard(CARD_A));
+    act(() => adapter.getState().selectThing(THING_A));
 
     fireEvent.keyDown(document.body, { key: 'Backspace', repeat: true });
 
-    expect(session.getState().working.document.diagrams?.[0]?.positions[CARD_A]).toBeDefined();
+    expect(session.getState().working.document.diagrams?.[0]?.positions[THING_A]).toBeDefined();
   });
 
   /**
@@ -614,11 +618,11 @@ describe("the app's canvas delete key", () => {
     'leaves a %s-modified Backspace to whatever else would have had it',
     (modifier) => {
       const { adapter, session } = mountCanvas();
-      act(() => adapter.getState().selectCard(CARD_A));
+      act(() => adapter.getState().selectThing(THING_A));
 
       fireEvent.keyDown(document.body, { key: 'Backspace', [modifier]: true });
 
-      expect(session.getState().working.document.diagrams?.[0]?.positions[CARD_A]).toBeDefined();
+      expect(session.getState().working.document.diagrams?.[0]?.positions[THING_A]).toBeDefined();
     },
   );
 
@@ -649,27 +653,27 @@ describe("the app's canvas delete key", () => {
   });
 
   it.each(DELETE_KEYS)(
-    'leaves the Edge standing when %s reaches the Add Card menu trigger',
+    'leaves the Edge standing when %s reaches the Add Thing menu trigger',
     (key) => {
       // The real treatment, mounted where the real control is: outside the flow
       // entirely, in chrome that marks itself `.nokey` — which is the marker
-      // the canvas guard reads rather than a list of its own. `CARDS_TRIGGER` is
-      // the Command Dock's own Cards trigger, exported for whoever supplies that
+      // the canvas guard reads rather than a list of its own. `THINGS_TRIGGER` is
+      // the Command Dock's own Things trigger, exported for whoever supplies that
       // surface, so the class under test here is the class the Dock ships.
       //
-      // It carried two cases beside it once, over `AddCardControl` and a
+      // It carried two cases beside it once, over `AddThingControl` and a
       // `SpaceSidebar` mounted the same way. ADR 0082 retired the Sidebar,
       // `.scratch/command-dock/issues/08` deleted the control, and the Dock that
       // replaced both marks itself the same way — so one production trigger
       // proves one guard.
       const { adapter, session } = mountCanvas(
         <Toolbar>
-          <ToolbarButton {...CARDS_TRIGGER}>Cards</ToolbarButton>
+          <ToolbarButton {...THINGS_TRIGGER}>Things</ToolbarButton>
         </Toolbar>,
       );
       act(() => adapter.getState().selectEdge(SUBJECT));
 
-      fireEvent.keyDown(screen.getByRole('button', { name: 'Cards' }), { key });
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Things' }), { key });
 
       expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
     },
@@ -749,7 +753,7 @@ describe("the app's canvas delete key", () => {
  * A creation pane is a `Dialog` — a backdrop at `inset: 0` over the whole graph
  * area, and a focus trap — and `authorOnCanvas` carries it, alongside the live
  * chrome rename, which withdraws canvas authoring without covering anything.
- * The canvas once fed that condition to every Card control and *not* to Edge
+ * The canvas once fed that condition to every Thing control and *not* to Edge
  * authoring, so the two disagreed about when the graph is authorable.
  *
  * The `covered` prop below is the pane, which is the case this file exercises.
@@ -777,7 +781,7 @@ describe('a pane covering the graph', () => {
   /**
    * The handles themselves, not just the control that opens the picker.
    *
-   * A Card's four authoring handles are rendered unconditionally and withdrawn
+   * A Thing's four authoring handles are rendered unconditionally and withdrawn
    * only by CSS and by the pane's own backdrop — so before `nodesConnectable`
    * reached them, a pane hid the affordance while leaving a live drag target
    * underneath it. React Flow marks a handle it will accept a drag at with
@@ -788,7 +792,7 @@ describe('a pane covering the graph', () => {
   it('leaves no handle a drag could start from', () => {
     mountCanvas(null, { covered: true });
 
-    const handles = document.querySelectorAll('.rf-card-node__authoring-handle');
+    const handles = document.querySelectorAll('.rf-thing-node__authoring-handle');
     expect(handles.length).toBeGreaterThan(0);
     expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(
       false,
@@ -799,18 +803,18 @@ describe('a pane covering the graph', () => {
    * Presenting is the exception, and it is the reason `nodesConnectable` reads
    * `connectOnCanvas` rather than `authorOnCanvas`.
    *
-   * The presenting chrome enumerates the active Card's outgoing Edges at render
-   * time so an Edge drawn from the presented Card is a move available without
+   * The presenting chrome enumerates the active Thing's outgoing Edges at render
+   * time so an Edge drawn from the presented Thing is a move available without
    * leaving the presentation (ADR 0027). `editing.spec.ts` authors a self-Edge
    * mid-presentation and asserts exactly that. Withdrawing the handles here
    * would take the feature with them — which is what happened the first time
-   * `CardNode` was made to honour the flag, because the flag had been carrying
+   * `ThingNode` was made to honour the flag, because the flag had been carrying
    * `!presenting` unread for as long as nothing forwarded it.
    */
   it('keeps the handles connectable while presenting, where the Edge is a move', () => {
     mountCanvas(null, { presenting: true });
 
-    const handles = document.querySelectorAll('.rf-card-node__authoring-handle');
+    const handles = document.querySelectorAll('.rf-thing-node__authoring-handle');
     expect(handles.length).toBeGreaterThan(0);
     expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(true);
   });
@@ -853,8 +857,8 @@ const surface = (composed: ReturnType<typeof compose>) =>
         selection: { kind: 'edge', ...SUBJECT },
         activeGraphId: GRAPH_ID,
         graphs: composed.currentSpace().graphs,
-        placedCards: composed.currentSpace().cards,
-        newCardTitle: 'Card 4',
+        placedThings: composed.currentSpace().things,
+        newThingTitle: 'Thing 4',
         enabled: true,
         onSelectEdge: NO_OP,
       }),
@@ -866,7 +870,7 @@ describe("React Flow's reconnect callback order", () => {
     // The order React Flow uses, verbatim.
     props.reactFlowProps.onReconnectStart(null, edge, 'target');
     props.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
-      nodeId: CARD_B,
+      nodeId: THING_B,
       handleId: null,
       handleType: 'target',
     });
@@ -890,7 +894,7 @@ describe("React Flow's reconnect callback order", () => {
    * it has to be asked the reconnect question or the anchor reads invalid for
    * the whole drag.
    *
-   * Dropping either end of A→B back on its own Card is the case that exposes
+   * Dropping either end of A→B back on its own Thing is the case that exposes
    * it: as a *connect* proposal that is the duplicate rule, and as a *reconnect*
    * proposal it is the endpoint returning to where it came from, which
    * `reconnectOutcome` answers `unchanged` before it ever reaches the duplicate
@@ -913,13 +917,13 @@ describe("React Flow's reconnect callback order", () => {
     act(() => {
       result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, handleType);
       result.current.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
-        nodeId: CARD_B,
+        nodeId: THING_B,
         handleId: null,
         handleType: 'target',
       });
     });
 
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_A, CARD_B))).toBe(
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_A, THING_B))).toBe(
       true,
     );
   });
@@ -936,24 +940,24 @@ describe("React Flow's reconnect callback order", () => {
   it('refuses a reconnection that would duplicate another Edge in the Graph', () => {
     const composed = compose();
     act(() => {
-      composed.edgeAuthoring.beginPointerConnect(CARD_A);
-      composed.edgeAuthoring.connect(CARD_A, CARD_C, null);
+      composed.edgeAuthoring.beginPointerConnect(THING_A);
+      composed.edgeAuthoring.connect(THING_A, THING_C, null);
       composed.edgeAuthoring.endPointerDrag();
     });
     expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([
       EDGE,
-      { from: CARD_A, to: CARD_C },
+      { from: THING_A, to: THING_C },
     ]);
 
     const { result } = surface(composed);
     act(() => result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, 'target'));
 
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_A, CARD_C))).toBe(
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_A, THING_C))).toBe(
       false,
     );
-    // And the endpoint's own Card is still offered, so the refusal is the
+    // And the endpoint's own Thing is still offered, so the refusal is the
     // duplicate rule rather than the reconnect branch refusing everything.
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_A, CARD_B))).toBe(
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_A, THING_B))).toBe(
       true,
     );
   });
@@ -964,10 +968,10 @@ describe("React Flow's reconnect callback order", () => {
     const { result } = surface(composed);
 
     // A→B already exists in Main, so as a plain connection it is a duplicate.
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_A, CARD_B))).toBe(
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_A, THING_B))).toBe(
       false,
     );
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_B, CARD_C))).toBe(
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_B, THING_C))).toBe(
       true,
     );
   });
@@ -979,15 +983,15 @@ describe("React Flow's reconnect callback order", () => {
 
     act(() => {
       result.current.reactFlowProps.onReconnect(EDGES[0]!, {
-        source: CARD_A,
-        target: CARD_C,
+        source: THING_A,
+        target: THING_C,
         sourceHandle: null,
         targetHandle: null,
       });
     });
 
     expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([
-      { from: CARD_A, to: CARD_C },
+      { from: THING_A, to: THING_C },
     ]);
   });
 
@@ -1018,7 +1022,7 @@ describe("React Flow's reconnect callback order", () => {
    * session.** They are the same handlers an ordinary connection uses, so a flag
    * left raised silently disables every later pointer connection and the Alt
    * empty-drop for the life of the canvas — and `onConnect` is unguarded, so a
-   * plain Card-to-Card drag still authors and hides it.
+   * plain Thing-to-Thing drag still authors and hides it.
    */
   it('takes its connection handlers back once the reconnect drag ends', () => {
     const composed = compose();
@@ -1033,7 +1037,7 @@ describe("React Flow's reconnect callback order", () => {
         FINISHED_CONNECTION,
       );
       result.current.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
-        nodeId: CARD_C,
+        nodeId: THING_C,
         handleId: null,
         handleType: 'source',
       });
@@ -1041,16 +1045,16 @@ describe("React Flow's reconnect callback order", () => {
 
     expect(composed.edgeAuthoring.getState().draft).toEqual({
       kind: 'pointer-connect',
-      from: CARD_C,
+      from: THING_C,
     });
   });
 
   /**
    * The connection release arrives first and must author nothing: with Alt held
-   * it would otherwise create a Card and an Edge from the anchored end, and then
+   * it would otherwise create a Thing and an Edge from the anchored end, and then
    * `onReconnectEnd` would delete the Edge — one gesture, two Edits.
    */
-  it('authors no Card when an Alt-held reconnect release reaches the connection callback', () => {
+  it('authors no Thing when an Alt-held reconnect release reaches the connection callback', () => {
     const composed = compose();
     const { result } = surface(composed);
     const before = composed.session.getState().working;
@@ -1074,7 +1078,7 @@ describe("React Flow's reconnect callback order", () => {
  * *"Neither React Flow's `toNode` nor the DOM alone answers"* bullet, and
  * the one that is easiest to miss: it composes React Flow's answer with the
  * DOM's exactly as the connect path does, and then asks a different question of
- * the result — delete this Edge, rather than author a Card. Nothing but
+ * the result — delete this Edge, rather than author a Thing. Nothing but
  * `editing.spec.ts` used to cover it.
  *
  * jsdom performs no hit-testing, so `elementFromPoint` is answered with a
@@ -1086,12 +1090,12 @@ describe('what a reconnect release decides', () => {
   const mountFlowDom = () => {
     const renderer = document.createElement('div');
     renderer.className = 'react-flow__renderer';
-    const card = document.createElement('div');
-    card.className = 'react-flow__node';
-    renderer.append(card);
+    const thing = document.createElement('div');
+    thing.className = 'react-flow__node';
+    renderer.append(thing);
     document.body.append(renderer);
     mounted = renderer;
-    return { renderer, card };
+    return { renderer, thing };
   };
 
   /** The node `mountFlowDom` put in the document, so cleanup removes that one. */
@@ -1101,7 +1105,7 @@ describe('what a reconnect release decides', () => {
     const userNode = { id, position: { x: 0, y: 0 }, data: {} };
     return {
       ...userNode,
-      measured: { width: CARD_SIZE.width, height: CARD_SIZE.height },
+      measured: { width: THING_SIZE.width, height: THING_SIZE.height },
       internals: { positionAbsolute: { x: 0, y: 0 }, z: 0, userNode },
     };
   };
@@ -1124,7 +1128,7 @@ describe('what a reconnect release decides', () => {
     from: { x: 0, y: 0 },
     fromHandle: {
       id: null,
-      nodeId: CARD_A,
+      nodeId: THING_A,
       type: 'source',
       position: Position.Right,
       x: 0,
@@ -1133,11 +1137,11 @@ describe('what a reconnect release decides', () => {
       height: 6,
     },
     fromPosition: Position.Right,
-    fromNode: internalNode(CARD_A),
+    fromNode: internalNode(THING_A),
     to: { x: 400, y: 0 },
     toHandle: null,
     toPosition: Position.Left,
-    toNode: internalNode(CARD_B),
+    toNode: internalNode(THING_B),
     pointer: { x: 400, y: 0 },
   } satisfies FinalConnectionState;
 
@@ -1173,9 +1177,9 @@ describe('what a reconnect release decides', () => {
     expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([]);
   });
 
-  it('keeps the Edge when the release lands on a Card body', () => {
+  it('keeps the Edge when the release lands on a Thing body', () => {
     const composed = compose();
-    release(composed, mountFlowDom().card, FINISHED_CONNECTION);
+    release(composed, mountFlowDom().thing, FINISHED_CONNECTION);
 
     expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
@@ -1207,8 +1211,8 @@ describe('what a reconnect release decides', () => {
  * anywhere but the "Edited Edge" the matrix names.
  */
 describe('spending a continuation on the canvas', () => {
-  const RECONNECTED = { graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_C } } as const;
-  const reconnectedFlowEdge = flowEdge(GRAPH_ID, CARD_A, CARD_C);
+  const RECONNECTED = { graphId: GRAPH_ID, edge: { from: THING_A, to: THING_C } } as const;
+  const reconnectedFlowEdge = flowEdge(GRAPH_ID, THING_A, THING_C);
 
   it('focuses the Edge on the projection that draws it, not the one before', () => {
     // The real canvas, because resolving the continuation is a DOM lookup: the
@@ -1218,7 +1222,7 @@ describe('spending a continuation on the canvas', () => {
 
     act(() => {
       edgeAuthoring.openEdgeEditor(SUBJECT);
-      edgeAuthoring.reconnect('to', CARD_C);
+      edgeAuthoring.reconnect('to', THING_C);
     });
 
     // The Edit has completed, but the projection still holds the Edge as it
@@ -1263,7 +1267,7 @@ describe('spending a continuation on the canvas', () => {
 
     act(() => {
       edgeAuthoring.openEdgeEditor(SUBJECT);
-      edgeAuthoring.reconnect('to', CARD_C);
+      edgeAuthoring.reconnect('to', THING_C);
     });
     act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
 
@@ -1283,7 +1287,7 @@ describe('spending a continuation on the canvas', () => {
   /**
    * **The other kind `staysOwed` waits for, on the same schedule.**
    *
-   * A card target is resolved by `data-id` against the DOM, so it needs the
+   * A thing target is resolved by `data-id` against the DOM, so it needs the
    * commit that draws just as much as an Edge does — React Flow syncs the
    * `nodes` prop into its own store from an effect and draws from that.
    *
@@ -1292,7 +1296,7 @@ describe('spending a continuation on the canvas', () => {
    * (`edges: [...edges]`), so every publication through it moves the Edge
    * subscription whether or not an Edge changed. `mergeProjected` spreads the
    * projection and replaces only `nodes` — it is the path a create-and-connect
-   * takes, where Authoring has just minted a Card and the projection carrying
+   * takes, where Authoring has just minted a Thing and the projection carrying
    * it arrives with the Edges untouched. `decorated` memoises on that same
    * reference, so React Flow's store keeps the edges it has and the drawn nodes
    * are the only thing that moves. Without the node subscription the spend
@@ -1300,31 +1304,31 @@ describe('spending a continuation on the canvas', () => {
    * none does, which is a caret left on `document.body` and, for `reveal`, a
    * camera that never arrives.
    */
-  it('focuses a Card on the projection that draws it, not the one before', () => {
+  it('focuses a Thing on the projection that draws it, not the one before', () => {
     const { adapter, continuation } = mountCanvas();
     document.body.focus();
 
     act(() =>
       continuation.request({
-        target: { kind: 'card', cardId: CARD_D },
+        target: { kind: 'thing', thingId: THING_D },
         select: false,
         then: 'focus',
       }),
     );
 
-    // Owed rather than spent: the canvas is not drawing this Card yet.
+    // Owed rather than spent: the canvas is not drawing this Thing yet.
     expect(continuation.getState().pending).not.toBeNull();
 
-    act(() => adapter.getState().mergeProjected([...NODES, cardNode(CARD_D, 1200, 'D')]));
+    act(() => adapter.getState().mergeProjected([...NODES, thingNode(THING_D, 1200, 'D')]));
 
     expect(continuation.getState().pending).toBeNull();
     expect(document.activeElement).toBe(
-      document.querySelector(`.react-flow__node[data-id="${CARD_D}"]`),
+      document.querySelector(`.react-flow__node[data-id="${THING_D}"]`),
     );
   });
 
-  /** A Card already on the canvas resolves on the render that receives it. */
-  it('focuses a Card that is already drawn without waiting', () => {
+  /** A Thing already on the canvas resolves on the render that receives it. */
+  it('focuses a Thing that is already drawn without waiting', () => {
     const { edgeAuthoring, continuation } = mountCanvas();
     document.body.focus();
 
@@ -1334,7 +1338,7 @@ describe('spending a continuation on the canvas', () => {
 
     expect(continuation.getState().pending).toBeNull();
     expect(document.activeElement).toBe(
-      document.querySelector(`.react-flow__node[data-id="${CARD_A}"]`),
+      document.querySelector(`.react-flow__node[data-id="${THING_A}"]`),
     );
   });
 });
@@ -1352,13 +1356,13 @@ describe('announcing a refusal', () => {
     // A→B already exists in Main, so this is the duplicate rule — reached
     // directly, as a completion whose drag has already ended.
     act(() => {
-      edgeAuthoring.beginPointerConnect(CARD_A);
-      edgeAuthoring.connect(CARD_A, CARD_B, null);
+      edgeAuthoring.beginPointerConnect(THING_A);
+      edgeAuthoring.connect(THING_A, THING_B, null);
       edgeAuthoring.endPointerDrag();
     });
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'These Cards are already connected in this Graph.',
+      'These Things are already connected in this Graph.',
     );
   });
 });
@@ -1379,8 +1383,8 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          placedCards: composed.currentSpace().cards,
-          newCardTitle: 'Card 4',
+          placedThings: composed.currentSpace().things,
+          newThingTitle: 'Thing 4',
           enabled: true,
           onSelectEdge: NO_OP,
         }),
@@ -1407,8 +1411,8 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          placedCards: composed.currentSpace().cards,
-          newCardTitle: 'Card 4',
+          placedThings: composed.currentSpace().things,
+          newThingTitle: 'Thing 4',
           enabled: true,
           onSelectEdge: NO_OP,
         }),
@@ -1441,8 +1445,8 @@ describe('the React Flow properties', () => {
           selection: { kind: 'edge', graphId: GRAPH_ID, edge: EDGE },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          placedCards: composed.currentSpace().cards,
-          newCardTitle: 'Card 4',
+          placedThings: composed.currentSpace().things,
+          newThingTitle: 'Thing 4',
           enabled: true,
           onSelectEdge: NO_OP,
         }),
@@ -1473,8 +1477,8 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          placedCards: composed.currentSpace().cards,
-          newCardTitle: 'Card 4',
+          placedThings: composed.currentSpace().things,
+          newThingTitle: 'Thing 4',
           enabled: false,
           onSelectEdge: NO_OP,
         }),

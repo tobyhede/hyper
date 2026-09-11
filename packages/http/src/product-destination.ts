@@ -1,7 +1,7 @@
 import {
   decodeCompactUuid,
   encodeCompactUuid,
-  type CardId,
+  type ThingId,
   type GraphId,
   type SpaceSnapshot,
   type UUID,
@@ -11,13 +11,13 @@ import type { LoadedSpace, SpaceResourceRepository } from '@project/persistence'
 export type ProductDestination =
   | { readonly kind: 'space'; readonly spaceId: UUID }
   | { readonly kind: 'diagram'; readonly spaceId: UUID; readonly diagramId: UUID }
-  | { readonly kind: 'card'; readonly spaceId: UUID; readonly cardId: CardId }
+  | { readonly kind: 'thing'; readonly spaceId: UUID; readonly thingId: ThingId }
   | { readonly kind: 'graph'; readonly spaceId: UUID; readonly graphId: GraphId }
   | {
-      readonly kind: 'diagram-card';
+      readonly kind: 'diagram-thing';
       readonly spaceId: UUID;
       readonly diagramId: UUID;
-      readonly cardId: CardId;
+      readonly thingId: ThingId;
     }
   | {
       readonly kind: 'diagram-graph';
@@ -30,7 +30,7 @@ export type ProductDestination =
       readonly spaceId: UUID;
       readonly diagramId: UUID;
       readonly graphId: GraphId;
-      readonly cardId: CardId;
+      readonly thingId: ThingId;
     };
 
 export type ProductDestinationResolution =
@@ -52,18 +52,19 @@ export type ProductDestinationSnapshotResolution =
 export const productDestinationPath = (destination: ProductDestination): string => {
   const space = `/spaces/${encodeCompactUuid(destination.spaceId)}`;
   if (destination.kind === 'space') return space;
-  if (destination.kind === 'card') return `${space}/cards/${encodeCompactUuid(destination.cardId)}`;
+  if (destination.kind === 'thing')
+    return `${space}/things/${encodeCompactUuid(destination.thingId)}`;
   if (destination.kind === 'graph') {
     return `${space}/graphs/${encodeCompactUuid(destination.graphId)}`;
   }
   const diagram = `${space}/diagrams/${encodeCompactUuid(destination.diagramId)}`;
   if (destination.kind === 'presentation') {
-    return `${diagram}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.cardId)}`;
+    return `${diagram}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.thingId)}`;
   }
   return destination.kind === 'diagram'
     ? diagram
-    : destination.kind === 'diagram-card'
-      ? `${diagram}/cards/${encodeCompactUuid(destination.cardId)}`
+    : destination.kind === 'diagram-thing'
+      ? `${diagram}/things/${encodeCompactUuid(destination.thingId)}`
       : `${diagram}/graphs/${encodeCompactUuid(destination.graphId)}`;
 };
 
@@ -83,9 +84,9 @@ const parseProductDestination = (pathname: string): ProductDestination | undefin
   const spaceId = decodeCompactUuid(segments[2] ?? '');
   if (spaceId === undefined) return undefined;
   if (segments.length === 3) return { kind: 'space', spaceId };
-  if (segments[3] === 'cards' && segments.length === 5) {
-    const cardId = decodeCompactUuid(segments[4] ?? '');
-    return cardId === undefined ? undefined : { kind: 'card', spaceId, cardId };
+  if (segments[3] === 'things' && segments.length === 5) {
+    const thingId = decodeCompactUuid(segments[4] ?? '');
+    return thingId === undefined ? undefined : { kind: 'thing', spaceId, thingId };
   }
   if (segments[3] === 'graphs' && segments.length === 5) {
     const graphId = decodeCompactUuid(segments[4] ?? '');
@@ -98,14 +99,16 @@ const parseProductDestination = (pathname: string): ProductDestination | undefin
   if (segments.length === 9) {
     if (segments[5] !== 'graphs' || segments[7] !== 'present') return undefined;
     const graphId = decodeCompactUuid(segments[6] ?? '');
-    const cardId = decodeCompactUuid(segments[8] ?? '');
-    return graphId === undefined || cardId === undefined
+    const thingId = decodeCompactUuid(segments[8] ?? '');
+    return graphId === undefined || thingId === undefined
       ? undefined
-      : { kind: 'presentation', spaceId, diagramId, graphId, cardId };
+      : { kind: 'presentation', spaceId, diagramId, graphId, thingId };
   }
-  if (segments[5] === 'cards') {
-    const cardId = decodeCompactUuid(segments[6] ?? '');
-    return cardId === undefined ? undefined : { kind: 'diagram-card', spaceId, diagramId, cardId };
+  if (segments[5] === 'things') {
+    const thingId = decodeCompactUuid(segments[6] ?? '');
+    return thingId === undefined
+      ? undefined
+      : { kind: 'diagram-thing', spaceId, diagramId, thingId };
   }
   if (segments[5] === 'graphs') {
     const graphId = decodeCompactUuid(segments[6] ?? '');
@@ -122,11 +125,12 @@ const destinationInSnapshot = (
 ): ProductDestinationSnapshotResolution => {
   if (destination.spaceId !== snapshot.id) return { kind: 'unresolved' };
   if (
-    destination.kind === 'card' ||
-    destination.kind === 'diagram-card' ||
+    destination.kind === 'thing' ||
+    destination.kind === 'diagram-thing' ||
     destination.kind === 'presentation'
   ) {
-    if (!snapshot.cards.some(({ id }) => id === destination.cardId)) return { kind: 'unresolved' };
+    if (!snapshot.things.some(({ id }) => id === destination.thingId))
+      return { kind: 'unresolved' };
   }
   const graphOwner =
     destination.kind === 'graph' ||
@@ -146,15 +150,15 @@ const destinationInSnapshot = (
   }
   if (
     destination.kind === 'diagram' ||
-    destination.kind === 'diagram-card' ||
+    destination.kind === 'diagram-thing' ||
     destination.kind === 'diagram-graph' ||
     destination.kind === 'presentation'
   ) {
     const diagram = snapshot.document.diagrams?.find(({ id }) => id === destination.diagramId);
     if (diagram === undefined) return { kind: 'unresolved' };
     if (
-      destination.kind === 'diagram-card' &&
-      diagram.positions[destination.cardId] === undefined
+      destination.kind === 'diagram-thing' &&
+      diagram.positions[destination.thingId] === undefined
     ) {
       return { kind: 'unresolved' };
     }
@@ -166,10 +170,10 @@ const destinationInSnapshot = (
     }
     if (destination.kind === 'presentation') {
       const graph = graphOwner?.graphs.find(({ id }) => id === destination.graphId);
-      const graphContainsCard = graph?.edges.some(
-        ({ from, to }) => from === destination.cardId || to === destination.cardId,
+      const graphContainsThing = graph?.edges.some(
+        ({ from, to }) => from === destination.thingId || to === destination.thingId,
       );
-      if (graphContainsCard !== true) return { kind: 'unresolved' };
+      if (graphContainsThing !== true) return { kind: 'unresolved' };
     }
   }
   return { kind: 'resolved', destination };

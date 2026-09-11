@@ -27,11 +27,11 @@ const MINTED_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006
 const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+  things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 const updateCommit = {
   changes: [
@@ -502,7 +502,7 @@ describe('Vite Hono host', () => {
     expect(malformed.status).toBe(400);
     await expect(malformed.text()).resolves.toBe('');
 
-    const missing = await fetch(`${host.url}/spaces/${encodeCompactUuid(CARD_ID)}`, {
+    const missing = await fetch(`${host.url}/spaces/${encodeCompactUuid(THING_ID)}`, {
       method: 'HEAD',
     });
     expect(missing.status).toBe(404);

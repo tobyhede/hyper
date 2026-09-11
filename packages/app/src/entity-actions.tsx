@@ -1,6 +1,6 @@
 import {
   titleName,
-  type Card,
+  type Thing,
   type Graph,
   type GraphId,
   type Diagram,
@@ -27,8 +27,8 @@ import {
  * step — a menu on screen in the catalogue that the application does not have
  * is worse evidence than none.
  *
- * **It has two consumers and they spend it differently.** A Card's own rail
- * draws the `card` arm as a menu (ADR 0073), and the Command Dock spends the
+ * **It has two consumers and they spend it differently.** A Thing's own rail
+ * draws the `thing` arm as a menu (ADR 0073), and the Command Dock spends the
  * other three one command at a time — its Diagram, Graph and Space clusters are
  * menus of their own with a radio group in them, so what they take from here is
  * the *decision* about which address an entity offers rather than a list to
@@ -74,7 +74,7 @@ export type EntityCommandId =
 /**
  * An entity a surface offers commands for, named the way that surface knows it.
  *
- * It carries the whole `Diagram`/`Graph`/`Card` rather than an id: handed an id,
+ * It carries the whole `Diagram`/`Graph`/`Thing` rather than an id: handed an id,
  * a caller has to find the thing again down a second path, and the surface and
  * the menu it draws are then free to disagree about what they are naming.
  */
@@ -82,7 +82,7 @@ export type SpaceEntity =
   | { readonly kind: 'space' }
   | { readonly kind: 'diagram'; readonly diagram: Diagram }
   | { readonly kind: 'graph'; readonly graph: Graph; readonly diagram: Diagram }
-  | { readonly kind: 'card'; readonly card: Card; readonly diagram: Diagram };
+  | { readonly kind: 'thing'; readonly thing: Thing; readonly diagram: Diagram };
 
 /** What an inline rename names, for the two entities that have one. */
 export type SpaceChromeTitleSubject =
@@ -106,7 +106,7 @@ export interface SpaceEntityActionsOptions {
    * Begins the entity's inline rename, or `null` while no rename may begin.
    *
    * `null` rather than a disabled item: Rename here is a second path to the
-   * very chrome title edit that a live Card title editor withdraws, so while it
+   * very chrome title edit that a live Thing title editor withdraws, so while it
    * cannot run there is nothing to offer.
    */
   readonly onRename: ((subject: SpaceChromeTitleSubject, title: string) => void) | null;
@@ -285,18 +285,18 @@ export function spaceEntityActions({
       ];
     }
 
-    const { card, diagram } = entity;
-    // A menu row names the Card, so it says the Card's name (ADR 0083).
-    const cardName = titleName(card.title);
-    const permanent: ProductDestination = { kind: 'card', spaceId, cardId: card.id };
-    // A Diagram's members *are* its position keys (ADR 0040). A Card the Cards
+    const { thing, diagram } = entity;
+    // A menu row names the Thing, so it says the Thing's name (ADR 0083).
+    const thingName = titleName(thing.title);
+    const permanent: ProductDestination = { kind: 'thing', spaceId, thingId: thing.id };
+    // A Diagram's members *are* its position keys (ADR 0040). A Thing the Things
     // drawer reveals but this Diagram does not place has no within-Diagram
     // address at all, so the one link it has is its own — and there is nothing
     // left for a permanent link to differ from. Withheld, never shown and
-    // refused: `diagram-card` would 404 on the address it copied.
-    const placed = diagram.positions[card.id] !== undefined;
+    // refused: `diagram-thing` would 404 on the address it copied.
+    const placed = diagram.positions[thing.id] !== undefined;
     return [
-      // No Rename: a Card's title is renamed in place on the canvas, and the
+      // No Rename: a Thing's title is renamed in place on the canvas, and the
       // chrome title edit takes Diagram and Graph subjects only.
       [],
       placed
@@ -304,14 +304,14 @@ export function spaceEntityActions({
             copy(
               COPY_LINK_ACTION_ID,
               COPY_LINK,
-              `Opens ${cardName} inside ${diagram.title}, selected the way it is now`,
-              { kind: 'diagram-card', spaceId, diagramId: diagram.id, cardId: card.id },
+              `Opens ${thingName} inside ${diagram.title}, selected the way it is now`,
+              { kind: 'diagram-thing', spaceId, diagramId: diagram.id, thingId: thing.id },
               onCopy,
             ),
             copy(
               COPY_PERMANENT_LINK_ACTION_ID,
               COPY_PERMANENT_LINK,
-              `Always opens ${cardName} on its own, wherever it is placed`,
+              `Always opens ${thingName} on its own, wherever it is placed`,
               permanent,
               onCopy,
             ),
@@ -320,7 +320,7 @@ export function spaceEntityActions({
             copy(
               COPY_LINK_ACTION_ID,
               COPY_LINK,
-              `Opens ${cardName} on its own — ${diagram.title} does not place it`,
+              `Opens ${thingName} on its own — ${diagram.title} does not place it`,
               permanent,
               onCopy,
             ),

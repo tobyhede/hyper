@@ -1,28 +1,33 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { buildCardHandles, buildGraphRenderEdges, loadSpace, type CardFile } from '@project/graph';
-import { projectCardNodes, projectGraphEdges } from '../src/index';
-import { cardFile } from './card-files';
+import {
+  buildThingHandles,
+  buildGraphRenderEdges,
+  loadSpace,
+  type ThingFile,
+} from '@project/graph';
+import { projectThingNodes, projectGraphEdges } from '../src/index';
+import { thingFile } from './thing-files';
 
 /**
  * The projection's handle invariants, as properties rather than examples.
  *
  * React Flow warning #008 — "Couldn't create edge for source/target handle id" —
  * fires when an edge names a handle that doesn't resolve on the node it points
- * at, and that condition is fully determined by what `projectCardNodes` and
+ * at, and that condition is fully determined by what `projectThingNodes` and
  * `projectGraphEdges` produce *together*. Each projection is well covered on its
  * own in `projection.test.ts`; nothing there asserts the relationship, so a
  * change to the handle id scheme on one side only would pass every test and
  * render a graph with no edges.
  *
  * Properties rather than examples because the failure mode is multi-graph: a
- * card carries more than one same-side handle only when graphs share it. See
+ * thing carries more than one same-side handle only when graphs share it. See
  * `.scratch/react-flow-guidance/issues/02-projection-handle-invariants.md`.
  */
 
-/** Ids from a shared pool, so generated graphs overlap on cards — the case that
+/** Ids from a shared pool, so generated graphs overlap on things — the case that
  *  puts several same-side handles on one node. */
-const cardIdPool = fc
+const thingIdPool = fc
   .uniqueArray(fc.integer({ min: 0, max: 25 }), { minLength: 2, maxLength: 8 })
   .map((ns) => ns.map(uuidFrom));
 
@@ -31,13 +36,13 @@ function uuidFrom(value: number): string {
 }
 
 /**
- * A space file whose graphs each run over distinct cards in some order: a chain
+ * A space file whose graphs each run over distinct things in some order: a chain
  * through all of them, plus up to three **shortcuts** skipping ahead. Every edge
  * points forward in that order and each exact Edge appears once, so `loadSpace`
- * always accepts what we generate; cards are the union of what the graphs
+ * always accepts what we generate; things are the union of what the graphs
  * touch, so there are no orphans either.
  *
- * The shortcuts are the point. They fork a card and merge into a later one,
+ * The shortcuts are the point. They fork a thing and merge into a later one,
  * which is the shape a step list could not express and the one that puts several
  * edges on a single handle.
  */
@@ -47,27 +52,27 @@ const graphArb = (pool: string[]) =>
       fc.shuffledSubarray(pool, { minLength: 2 }),
       fc.array(fc.tuple(fc.nat(), fc.nat()), { maxLength: 3 }),
     )
-    .map(([cards, shortcuts]) => {
-      const edges = cards.slice(0, -1).map((from, i) => ({ from, to: cards[i + 1]! }));
+    .map(([things, shortcuts]) => {
+      const edges = things.slice(0, -1).map((from, i) => ({ from, to: things[i + 1]! }));
       for (const [rawFrom, rawSkip] of shortcuts) {
-        const from = rawFrom % cards.length;
-        const to = from + 2 + (rawSkip % cards.length);
-        const edge = { from: cards[from]!, to: cards[to]! };
+        const from = rawFrom % things.length;
+        const to = from + 2 + (rawSkip % things.length);
+        const edge = { from: things[from]!, to: things[to]! };
         if (
-          to < cards.length &&
+          to < things.length &&
           !edges.some((candidate) => candidate.from === edge.from && candidate.to === edge.to)
         ) {
           edges.push(edge);
         }
       }
-      return { cards, edges };
+      return { things, edges };
     });
 
-const spaceFileArb = cardIdPool.chain((pool) =>
+const spaceFileArb = thingIdPool.chain((pool) =>
   fc.array(graphArb(pool), { minLength: 1, maxLength: 4 }).map((graphs) => {
-    const visited = [...new Set(graphs.flatMap((r) => r.cards))];
+    const visited = [...new Set(graphs.flatMap((r) => r.things))];
     return {
-      // One diagram owning every generated graph, taking membership of every card
+      // One diagram owning every generated graph, taking membership of every thing
       // they touch: a graph is an owned value of its diagram (ADR 0040) and its
       // edges are closed over that diagram's members.
       file: {
@@ -90,20 +95,20 @@ const spaceFileArb = cardIdPool.chain((pool) =>
           },
         ],
       },
-      cardFiles: visited.map((id) => cardFile(id)),
+      thingFiles: visited.map((id) => thingFile(id)),
     };
   }),
 );
 
 /** Project a generated space to React Flow nodes and edges. Colors are
  *  irrelevant to these invariants, so the fallback is fine. */
-function project(generated: { file: unknown; cardFiles: CardFile[] }) {
-  const result = loadSpace(generated.file, generated.cardFiles);
+function project(generated: { file: unknown; thingFiles: ThingFile[] }) {
+  const result = loadSpace(generated.file, generated.thingFiles);
   if (!result.ok) throw new Error(`generated space should load: ${JSON.stringify(result.errors)}`);
   const space = result.space;
 
   return {
-    nodes: projectCardNodes(space, buildCardHandles(space), {}),
+    nodes: projectThingNodes(space, buildThingHandles(space), {}),
     edges: projectGraphEdges(buildGraphRenderEdges(space), {}),
   };
 }
@@ -139,14 +144,14 @@ describe('projection handle invariants', () => {
     );
   });
 
-  it('a card never carries two handles of the same kind with the same id', () => {
+  it('a thing never carries two handles of the same kind with the same id', () => {
     fc.assert(
       fc.property(spaceFileArb, (generated) => {
         const { nodes } = project(generated);
 
         // React Flow can't tell two same-side handles apart otherwise, and picks
         // whichever it finds first. Holds here because a handle id is
-        // `<graphId>::out`/`::in` — one per graph per side, so a card a graph
+        // `<graphId>::out`/`::in` — one per graph per side, so a thing a graph
         // forks at still carries exactly one outbound handle however many edges
         // leave it. The scheme, not a domain rule, is what makes this true.
         for (const node of nodes) {

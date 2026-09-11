@@ -26,12 +26,12 @@ function Fixture({
         Behind the drawer
       </button>
       <Drawer modal={false} disablePointerDismissal={disablePointerDismissal}>
-        <DrawerTrigger>Cards</DrawerTrigger>
+        <DrawerTrigger>Things</DrawerTrigger>
         <DrawerPortal>
           <DrawerViewport>
             <DrawerPopup>
               <DrawerContent>
-                <DrawerTitle>Cards</DrawerTitle>
+                <DrawerTitle>Things</DrawerTitle>
                 <DrawerClose>Close</DrawerClose>
               </DrawerContent>
             </DrawerPopup>
@@ -43,8 +43,8 @@ function Fixture({
 }
 
 const openDrawer = async () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
-  return await screen.findByRole('dialog', { name: 'Cards' });
+  fireEvent.click(screen.getByRole('button', { name: 'Things' }));
+  return await screen.findByRole('dialog', { name: 'Things' });
 };
 
 describe('Drawer', () => {
@@ -57,7 +57,7 @@ describe('Drawer', () => {
 
   it('closes on Escape and returns focus to the trigger', async () => {
     render(<Fixture />);
-    const trigger = screen.getByRole('button', { name: 'Cards' });
+    const trigger = screen.getByRole('button', { name: 'Things' });
     const popup = await openDrawer();
 
     fireEvent.keyDown(popup, { key: 'Escape' });
@@ -87,7 +87,7 @@ describe('Drawer', () => {
       outside.focus();
     });
 
-    expect(screen.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Things' })).toBeVisible();
   });
 
   it('closes on a press outside it by default', async () => {

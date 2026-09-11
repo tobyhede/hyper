@@ -20,8 +20,8 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import {
   beginRename,
   exitSpaceItem,
-  createCard,
-  createCardControl,
+  createThing,
+  createThingControl,
   newDiagram,
   openGraphMenu,
   openDiagramMenu,
@@ -30,16 +30,16 @@ import {
 } from './command-dock';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const MISSING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const OWNED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const OUTSIDE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const OUTSIDE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
-const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
+const snapshot = (title: string, thingTitle: string, x: number, y: number): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: SPACE_ID,
     document: {
@@ -50,27 +50,27 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
           id: DIAGRAM_ID,
           title: 'Diagram',
           kind: 'positioned',
-          positions: { [CARD_ID]: { x, y, open: false } },
-          // A Diagram owns at least one Graph (ADR 0040), and one Card has
+          positions: { [THING_ID]: { x, y, open: false } },
+          // A Diagram owns at least one Graph (ADR 0040), and one Thing has
           // nothing to connect — so the Graph it opens on holds no Edges.
           graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
       defaultDiagram: DIAGRAM_ID,
     },
-    cards: [
+    things: [
       {
-        id: CARD_ID,
-        document: { title: cardTitle, kind: 'markdown', body: cardTitle },
+        id: THING_ID,
+        document: { title: thingTitle, kind: 'markdown', body: thingTitle },
       },
     ],
   });
 
 /**
- * The same Space with its Diagram owning a Graph that reaches a Card the Space
+ * The same Space with its Diagram owning a Graph that reaches a Thing the Space
  * does not hold — the unloadable snapshot every test below is about.
  *
- * An Edge is closed over the Cards its owning Diagram positions (ADR 0040), so
+ * An Edge is closed over the Things its owning Diagram positions (ADR 0040), so
  * the dangling endpoint lives inside the Diagram rather than beside it, and
  * intake names it there.
  */
@@ -81,7 +81,7 @@ const withDanglingGraph = (base: SpaceSnapshot, title: string): SpaceSnapshot =>
     title,
     diagrams: (base.document.diagrams ?? []).map((diagram) => ({
       ...diagram,
-      graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
+      graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: THING_ID, to: MISSING_THING_ID }] }],
       // Named outright rather than carried through: replacing the owned Graphs
       // would otherwise strand an inherited `activeGraph` on an id this Diagram
       // no longer holds, and the snapshot would be unloadable for two reasons
@@ -128,8 +128,8 @@ afterAll(() => vi.unstubAllGlobals());
  * Space can be left.
  */
 it('offers Exit on a Space opened by its own address, which has no opener', async () => {
-  const meta = snapshot('Meta', 'Meta Card', 0, 0);
-  const other = { ...snapshot('Elsewhere', 'Other Card', 0, 0), id: newUuid() };
+  const meta = snapshot('Meta', 'Meta Thing', 0, 0);
+  const other = { ...snapshot('Elsewhere', 'Other Thing', 0, 0), id: newUuid() };
   const backend = new MemorySpaceBackend(
     SPACE_ID,
     [meta, other].map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
@@ -156,18 +156,18 @@ it('offers Exit on a Space opened by its own address, which has no opener', asyn
 });
 
 it('keeps a hidden Space presentation unchanged when the active Space receives Escape', async () => {
-  const base = snapshot('First Space', 'First Card', 0, 0);
+  const base = snapshot('First Space', 'First Thing', 0, 0);
   const first = {
     ...base,
     document: {
       ...base.document,
       diagrams: base.document.diagrams?.map((diagram) => ({
         ...diagram,
-        graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: CARD_ID }] }],
+        graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [{ from: THING_ID, to: THING_ID }] }],
       })),
     },
   };
-  const second = { ...snapshot('Second Space', 'Second Card', 0, 0), id: newUuid() };
+  const second = { ...snapshot('Second Space', 'Second Thing', 0, 0), id: newUuid() };
   const backend = new MemorySpaceBackend(
     SPACE_ID,
     [first, second].map((value) => ({
@@ -211,12 +211,12 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
 
 describe('Space app conflict recovery', () => {
   it('replaces the visible runtime and editor placement when remote state is accepted', async () => {
-    const local = snapshot('Local space', 'Local card', 10, 20);
-    const remote = snapshot('Remote space', 'Remote card', 900, 700);
+    const local = snapshot('Local space', 'Local thing', 10, 20);
+    const remote = snapshot('Remote space', 'Remote thing', 900, 700);
     const backend = new MemorySpaceBackend(SPACE_ID, [
       { snapshot: remote, revision: 4n, exportedRevision: null },
     ]);
-    const { spaceSession: session, spaceCards } = openTestSpace(backend, {
+    const { spaceSession: session, spaceThings } = openTestSpace(backend, {
       snapshot: local,
       revision: 3n,
       exportedRevision: null,
@@ -239,7 +239,7 @@ describe('Space app conflict recovery', () => {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session }),
-        spaceCards,
+        spaceThings,
       },
       (app) => {
         if (view === undefined) view = render(app);
@@ -254,13 +254,13 @@ describe('Space app conflict recovery', () => {
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
 
     expect(await screen.findByText('Remote space')).toBeVisible();
-    expect(await screen.findByRole('heading', { name: 'Remote card' })).toBeVisible();
-    expect(screen.queryByRole('heading', { name: 'Local card' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Remote thing' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Local thing' })).not.toBeInTheDocument();
     expect(session.getState().working).toEqual(remote);
-    const cardNode = screen
-      .getByRole('heading', { name: 'Remote card' })
+    const thingNode = screen
+      .getByRole('heading', { name: 'Remote thing' })
       .closest('.react-flow__node');
-    expect(cardNode).toHaveStyle({ transform: 'translate(900px,700px)' });
+    expect(thingNode).toHaveStyle({ transform: 'translate(900px,700px)' });
   });
 
   /**
@@ -269,7 +269,7 @@ describe('Space app conflict recovery', () => {
    * behind.
    */
   const refusedRemote = async (): Promise<{ local: SpaceSnapshot; session: SpaceSession }> => {
-    const local = snapshot('Local space', 'Local card', 10, 20);
+    const local = snapshot('Local space', 'Local thing', 10, 20);
     const dangling = withDanglingGraph(local, 'Remote space');
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
@@ -281,7 +281,7 @@ describe('Space app conflict recovery', () => {
         },
       ],
     });
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [], control),
       {
         snapshot: local,
@@ -304,7 +304,7 @@ describe('Space app conflict recovery', () => {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session }),
-        spaceCards,
+        spaceThings,
       },
       (app) => {
         if (view === undefined) view = render(app);
@@ -332,7 +332,7 @@ describe('Space app conflict recovery', () => {
     // keyboard or touch user never gets.
     const refusal = await screen.findByTestId('persistence-remote-refused');
     expect(refusal).toHaveTextContent('The remote space is invalid and was not accepted');
-    expect(refusal).toHaveTextContent(MISSING_CARD_ID);
+    expect(refusal).toHaveTextContent(MISSING_THING_ID);
     expect(session.getState().working).toEqual(local);
     expect(session.getState().persistence.kind).toBe('conflicted');
   });
@@ -344,9 +344,9 @@ describe('Space app conflict recovery', () => {
    * it tells the author their work cannot be replaced when in fact it can.
    */
   it('drops a refusal once a different remote snapshot is the one in conflict', async () => {
-    const local = snapshot('Local space', 'Local card', 10, 20);
+    const local = snapshot('Local space', 'Local thing', 10, 20);
     const dangling = withDanglingGraph(local, 'Broken remote');
-    const loadable = snapshot('Remote space', 'Remote card', 900, 700);
+    const loadable = snapshot('Remote space', 'Remote thing', 900, 700);
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
       kind: 'conflict',
@@ -366,7 +366,7 @@ describe('Space app conflict recovery', () => {
         },
       ],
     });
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [], control),
       {
         snapshot: local,
@@ -383,7 +383,7 @@ describe('Space app conflict recovery', () => {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session }),
-        spaceCards,
+        spaceThings,
       },
       (app) => {
         if (view === undefined) view = render(app);
@@ -423,9 +423,9 @@ describe('Space app conflict recovery', () => {
     await refusedRemote();
 
     expect(screen.getByText('Local space')).toBeVisible();
-    // Awaited because placement is asynchronous — the Card arrives with the
+    // Awaited because placement is asynchronous — the Thing arrives with the
     // placement, not with the mount.
-    expect(await screen.findByRole('heading', { name: 'Local card', hidden: true })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Local thing', hidden: true })).toBeVisible();
     expect(screen.getByTestId('persistence-accept-remote')).toBeVisible();
     expect(screen.queryByTestId('space-app-failure')).not.toBeInTheDocument();
   });
@@ -433,14 +433,14 @@ describe('Space app conflict recovery', () => {
 
 describe('Space app permanent save refusal', () => {
   it('explains the server refusal and returns the author to their local work', async () => {
-    const local = snapshot('Local space', 'Local card', 10, 20);
+    const local = snapshot('Local space', 'Local thing', 10, 20);
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
       kind: 'permanent-failure',
       code: 'invalid-commit',
-      message: 'Graph names an absent card',
+      message: 'Graph names an absent thing',
     });
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [], control),
       {
         snapshot: local,
@@ -457,7 +457,7 @@ describe('Space app permanent save refusal', () => {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session }),
-        spaceCards,
+        spaceThings,
       },
       (app) => {
         if (view === undefined) view = render(app);
@@ -469,7 +469,7 @@ describe('Space app permanent save refusal', () => {
     // The code's sentence, not the server's. `message` here is `problem.detail`
     // off the wire, and ADR 0057 leaves the wording to the application.
     expect(screen.getByText('These changes are not in a form the server can store.')).toBeVisible();
-    expect(screen.queryByText('Graph names an absent card')).toBeNull();
+    expect(screen.queryByText('Graph names an absent thing')).toBeNull();
 
     fireEvent.click(screen.getByTestId('persistence-rejection-continue'));
 
@@ -479,7 +479,7 @@ describe('Space app permanent save refusal', () => {
       ).not.toBeInTheDocument(),
     );
     expect(screen.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
-    expect(await screen.findByRole('heading', { name: 'Local card' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Local thing' })).toBeVisible();
     expect(session.getState().persistence.kind).toBe('rejected');
   });
 });
@@ -487,16 +487,16 @@ describe('Space app permanent save refusal', () => {
 describe('Space app failure reporting', () => {
   it('opens an addressed Graph as navigation context without editing the Space', async () => {
     const addressed = {
-      ...snapshot('Space', 'Card', 10, 20),
+      ...snapshot('Space', 'Thing', 10, 20),
       document: {
-        ...snapshot('Space', 'Card', 10, 20).document,
-        diagrams: snapshot('Space', 'Card', 10, 20).document.diagrams?.map((diagram) => ({
+        ...snapshot('Space', 'Thing', 10, 20).document,
+        diagrams: snapshot('Space', 'Thing', 10, 20).document.diagrams?.map((diagram) => ({
           ...diagram,
           graphs: [...diagram.graphs, { id: GRAPH_ID, title: 'Addressed', edges: [] }],
         })),
       },
     };
-    const { spaceSession: session, spaceCards } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
+    const { spaceSession: session, spaceThings } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
       snapshot: addressed,
       revision: 0n,
       exportedRevision: null,
@@ -507,14 +507,14 @@ describe('Space app failure reporting', () => {
         id: runtime(addressed).id,
         session,
         app: composeApp({ spaceSession: session }),
-        spaceCards,
+        spaceThings,
       },
       (app) => render(app),
       {
         selection: DIAGRAM_ID,
-        cardId: null,
+        thingId: null,
         graphId: GRAPH_ID,
-        presentationCardId: null,
+        presentationThingId: null,
       },
     );
 
@@ -533,8 +533,8 @@ describe('Space app failure reporting', () => {
    * the area the alert renders in, which is the whole reason a copy command had
    * to report a second time in its own label.
    *
-   * The **item's own label** survives on the Card rail, and only there: that
-   * menu is on the canvas, over the Card, so a reader following it is not
+   * The **item's own label** survives on the Thing rail, and only there: that
+   * menu is on the canvas, over the Thing, so a reader following it is not
    * looking at the shell's corner. The Dock's Graph menu is chrome beside the
    * alert and needs no second voice — see `CommandDock.tsx`.
    *
@@ -544,15 +544,15 @@ describe('Space app failure reporting', () => {
    * nothing outside the popup.
    */
   it.each([
-    { entity: 'Actions for Card Card', command: /^Copy link/, reportsInPlace: true },
-    { entity: 'Actions for Card Card', command: /^Copy permanent link/, reportsInPlace: true },
+    { entity: 'Actions for Thing Thing', command: /^Copy link/, reportsInPlace: true },
+    { entity: 'Actions for Thing Thing', command: /^Copy permanent link/, reportsInPlace: true },
     { entity: 'Active Graph: Graph', command: /^Copy link/, reportsInPlace: false },
     { entity: 'Active Graph: Graph', command: /^Copy permanent link/, reportsInPlace: false },
   ])(
     'reports a rejected clipboard write from $entity $command without unmounting the Space',
     async ({ entity, command, reportsInPlace }) => {
-      const valid = snapshot('Space', 'Card', 10, 20);
-      const { spaceSession: session, spaceCards } = openTestSpace(
+      const valid = snapshot('Space', 'Thing', 10, 20);
+      const { spaceSession: session, spaceThings } = openTestSpace(
         new MemorySpaceBackend(SPACE_ID),
         {
           snapshot: valid,
@@ -573,24 +573,24 @@ describe('Space app failure reporting', () => {
             id: runtime(valid).id,
             session,
             app: composeApp({ spaceSession: session }),
-            spaceCards,
+            spaceThings,
           },
           (app) => render(app),
           {
             selection: DIAGRAM_ID,
-            cardId: CARD_ID,
+            thingId: THING_ID,
             graphId: null,
-            presentationCardId: null,
+            presentationThingId: null,
           },
-          // The location the Card is addressed from: `openPath` composes the
+          // The location the Thing is addressed from: `openPath` composes the
           // opening from the same pathname the browser location then follows,
           // so the two agree in production and have to agree here.
           recordingHistory(
             productDestinationPath({
-              kind: 'diagram-card',
+              kind: 'diagram-thing',
               spaceId: SPACE_ID,
               diagramId: DIAGRAM_ID,
-              cardId: CARD_ID,
+              thingId: THING_ID,
             }),
           ),
         );
@@ -604,7 +604,7 @@ describe('Space app failure reporting', () => {
         expect(screen.getByText('Space')).toBeInTheDocument();
 
         // The command did not do what its label says, so a rail item does not
-        // say it did — it reads the failure in place, over the Card the reader
+        // say it did — it reads the failure in place, over the Thing the reader
         // is looking at. Either way nothing anywhere claims it was copied.
         if (reportsInPlace) {
           expect(await screen.findByRole('menuitem', { name: /^Not copied/ })).toBeVisible();
@@ -634,8 +634,8 @@ describe('Space app failure reporting', () => {
    * dismissing is *acknowledgement*: the report goes and the Space is untouched.
    */
   it('puts a standing clipboard failure away when the reader dismisses it', async () => {
-    const valid = snapshot('Space', 'Card', 10, 20);
-    const { spaceSession: session, spaceCards } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
+    const valid = snapshot('Space', 'Thing', 10, 20);
+    const { spaceSession: session, spaceThings } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
       snapshot: valid,
       revision: 0n,
       exportedRevision: null,
@@ -648,7 +648,7 @@ describe('Space app failure reporting', () => {
 
     try {
       mountSpace(
-        { id: runtime(valid).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+        { id: runtime(valid).id, session, app: composeApp({ spaceSession: session }), spaceThings },
         (app) => render(app),
       );
 
@@ -679,8 +679,8 @@ describe('Space app failure reporting', () => {
    * React traces for us, nothing else would say what threw.
    */
   it('names a working snapshot that stopped loading instead of blanking the page', () => {
-    const valid = snapshot('Space', 'Card', 10, 20);
-    const { spaceSession: session, spaceCards } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
+    const valid = snapshot('Space', 'Thing', 10, 20);
+    const { spaceSession: session, spaceThings } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
       snapshot: valid,
       revision: 0n,
       exportedRevision: null,
@@ -699,16 +699,16 @@ describe('Space app failure reporting', () => {
     // was one. What is pinned here is the mount, not the location.
     expect(() =>
       mountSpaceApp(
-        { id: runtime(valid).id, session, app, spaceCards },
+        { id: runtime(valid).id, session, app, spaceThings },
         createBrowserLocation(recordingHistory()),
         (view) => {
           render(view);
         },
-        { selection: DIAGRAM_ID, cardId: null, graphId: GRAPH_ID, presentationCardId: null },
+        { selection: DIAGRAM_ID, thingId: null, graphId: GRAPH_ID, presentationThingId: null },
       ),
     ).not.toThrow();
 
-    expect(screen.getByTestId('space-app-failure')).toHaveTextContent(MISSING_CARD_ID);
+    expect(screen.getByTestId('space-app-failure')).toHaveTextContent(MISSING_THING_ID);
     expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
     expect(reported).toHaveBeenCalledWith('Composing the Space app failed', expect.any(Error));
   });
@@ -720,8 +720,8 @@ describe('Space app failure reporting', () => {
    * render, so the throw lands in the boundary rather than in `mountSpaceApp`.
    */
   it('names a working snapshot that stops loading under a mounted Space app', () => {
-    const valid = snapshot('Space', 'Card', 10, 20);
-    const { spaceSession: session, spaceCards } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
+    const valid = snapshot('Space', 'Thing', 10, 20);
+    const { spaceSession: session, spaceThings } = openTestSpace(new MemorySpaceBackend(SPACE_ID), {
       snapshot: valid,
       revision: 0n,
       exportedRevision: null,
@@ -732,7 +732,7 @@ describe('Space app failure reporting', () => {
         id: runtime(valid).id,
         session,
         app: composeApp({ spaceSession: session }),
-        spaceCards,
+        spaceThings,
       },
       (app) => {
         render(app);
@@ -746,16 +746,16 @@ describe('Space app failure reporting', () => {
       session.submit(withDanglingGraph(valid, valid.document.title));
     });
 
-    expect(screen.getByTestId('space-app-failure')).toHaveTextContent(MISSING_CARD_ID);
+    expect(screen.getByTestId('space-app-failure')).toHaveTextContent(MISSING_THING_ID);
     expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
   });
 });
 
-describe('Space app Cards drawer', () => {
+describe('Space app Things drawer', () => {
   it('opens once for the client whose working load created the empty Diagram', () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+    const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 1n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
@@ -765,29 +765,29 @@ describe('Space app Cards drawer', () => {
         id: runtime(base).id,
         session,
         app: composeApp({ spaceSession: session }),
-        spaceCards,
+        spaceThings,
         initialization: 'created-diagram',
       },
       (app) => render(app),
     );
 
-    expect(screen.getByRole('dialog', { name: 'Cards' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
-    expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Things' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Things' }));
+    expect(screen.queryByRole('dialog', { name: 'Things' })).not.toBeInTheDocument();
   });
 
-  it('opens an accessible empty drawer for an initialized zero-Card Space', () => {
-    const seeded = snapshot('Space', 'Card', 10, 20);
+  it('opens an accessible empty drawer for an initialized zero-Thing Space', () => {
+    const seeded = snapshot('Space', 'Thing', 10, 20);
     const empty: SpaceSnapshot = {
       ...seeded,
-      cards: [],
+      things: [],
       document: {
         ...seeded.document,
         diagrams: seeded.document.diagrams?.map((diagram) => ({ ...diagram, positions: {} })),
       },
     };
     const stored = { snapshot: empty, revision: 1n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
@@ -797,30 +797,30 @@ describe('Space app Cards drawer', () => {
         id: runtime(empty).id,
         session,
         app: composeApp({ spaceSession: session }),
-        spaceCards,
+        spaceThings,
         initialization: 'created-diagram',
       },
       (app) => render(app),
     );
 
-    expect(screen.getByRole('dialog', { name: 'Cards' })).toHaveTextContent(
-      'This Space has no Cards.',
+    expect(screen.getByRole('dialog', { name: 'Things' })).toHaveTextContent(
+      'This Space has no Things.',
     );
-    expect(unavailable(createCardControl())).toBe(false);
-    createCard('Markdown Card');
-    expect(session.getState().working.cards).toHaveLength(1);
+    expect(unavailable(createThingControl())).toBe(false);
+    createThing('Markdown Thing');
+    expect(session.getState().working.things).toHaveLength(1);
   });
 
-  it('adds an empty selected Diagram and reveals its existing Cards once', () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+  it('adds an empty selected Diagram and reveals its existing Things once', () => {
+    const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
 
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
 
@@ -830,13 +830,13 @@ describe('Space app Cards drawer', () => {
     expect(session.getState().working.document.diagrams?.[1]?.positions).toEqual({});
     expect(session.getState().working.document.diagrams?.[1]?.graphs).toHaveLength(1);
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Diagram 1');
-    expect(screen.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Things' })).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
-    expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Things' }));
+    expect(screen.queryByRole('dialog', { name: 'Things' })).not.toBeInTheDocument();
 
-    createCard('Markdown Card');
-    expect(screen.queryByRole('dialog', { name: 'Cards' })).not.toBeInTheDocument();
+    createThing('Markdown Thing');
+    expect(screen.queryByRole('dialog', { name: 'Things' })).not.toBeInTheDocument();
   });
 
   /**
@@ -856,15 +856,15 @@ describe('Space app Cards drawer', () => {
    * anything at all lets the strategy settle and the Edits come back.
    */
   it('withholds a menu’s Edits until the canvas has a placement to edit', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+    const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
 
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
 
@@ -894,18 +894,18 @@ describe('Space app Cards drawer', () => {
    * is closed by a render-time transition for that reason — but closing it also
    * tells the App a chrome rename has ended, and a *parent's* state cannot be
    * written from a child's render body. React says so out loud, and the state
-   * it withdraws is what gates Present, Create Card and every entity Edit.
+   * it withdraws is what gates Present, Create Thing and every entity Edit.
    */
   it('ends a live Diagram rename when the Diagram changes, without writing to the App during render', async () => {
     const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const base = snapshot('Space', 'Card', 10, 20);
+    const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
 
@@ -936,14 +936,14 @@ describe('Space app Cards drawer', () => {
    * `onReturnFocus` from its own Enter and Escape handlers for exactly this.
    */
   it('returns the caret to the name it was opened from when a Diagram rename ends', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+    const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
 
@@ -969,14 +969,14 @@ describe('Space app Cards drawer', () => {
    * `onComplete` reinstated the theft with the commit as its cover.
    */
   it('leaves the caret where the reader put it when a Diagram rename ends by blur', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+    const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
 
@@ -1014,14 +1014,14 @@ describe('Space app Cards drawer', () => {
    * opens next clears whatever was open.
    */
   it('leaves one Dock name editor standing when a second rename is begun over a live one', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+    const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
 
@@ -1040,7 +1040,7 @@ describe('Space app Cards drawer', () => {
   /**
    * **What the bar reports and what the bar draws are one answer.**
    *
-   * A live chrome rename withdraws Create Card, Present, Delete Card and the
+   * A live chrome rename withdraws Create Thing, Present, Delete Thing and the
    * canvas's own title editing, because each of those re-derives the canvas or
    * takes the caret from under the editor. Three identities drawing three
    * editors over one boolean is what let that come apart: with a blank Diagram
@@ -1050,19 +1050,19 @@ describe('Space app Cards drawer', () => {
    *
    * The claim is the coupling rather than either half of it, because the fix is
    * free to end the first rename or to keep it — what it may not do is disagree
-   * with itself. Create Card is the one asserted: it reads `addCard`, which
+   * with itself. Create Thing is the one asserted: it reads `addThing`, which
    * carries `editingChromeTitle` and nothing else about this Space, while
    * Present here is withheld anyway for a Graph with no Edges to traverse.
    */
-  it('withdraws Create Card for as long as a Dock name editor is standing', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+  it('withdraws Create Thing for as long as a Dock name editor is standing', async () => {
+    const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
 
@@ -1070,7 +1070,7 @@ describe('Space app Cards drawer', () => {
     const diagramEditor = await screen.findByRole('textbox', { name: 'Diagram name' });
     fireEvent.change(diagramEditor, { target: { value: '' } });
     fireEvent.keyDown(diagramEditor, { key: 'Enter' });
-    expect(unavailable(createCardControl())).toBe(true);
+    expect(unavailable(createThingControl())).toBe(true);
 
     await beginRename('active-graph');
     const graphEditor = await screen.findByRole('textbox', { name: 'Graph name' });
@@ -1078,7 +1078,7 @@ describe('Space app Cards drawer', () => {
 
     const standing =
       screen.queryAllByRole('textbox', { name: /^(Diagram|Graph) name$/ }).length > 0;
-    expect(unavailable(createCardControl())).toBe(standing);
+    expect(unavailable(createThingControl())).toBe(standing);
   });
 
   /**
@@ -1093,15 +1093,15 @@ describe('Space app Cards drawer', () => {
    * back on what is left.
    */
   it('withholds Delete from the last Diagram and runs the lifecycle once there are two', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+    const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
 
     mountSpace(
-      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceCards },
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
 
@@ -1109,7 +1109,7 @@ describe('Space app Cards drawer', () => {
     expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Diagram' }))).toBe(true);
 
     newDiagram('Diagram');
-    fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Things' }));
     // Renaming is the name itself, not a menu row: there is one name on the bar
     // and clicking it is the whole command.
     await beginRename('selected-canvas');
@@ -1121,7 +1121,7 @@ describe('Space app Cards drawer', () => {
     openDiagramMenu('Workshop');
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Workshop' }));
     expect(session.getState().working.document.diagrams).toHaveLength(1);
-    expect(session.getState().working.cards).toEqual(base.cards);
+    expect(session.getState().working.things).toEqual(base.things);
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Diagram');
   });
 
@@ -1142,17 +1142,17 @@ describe('Space app Cards drawer', () => {
    * run would have to catch.
    */
 
-  it('keeps the Cards drawer closed after the reader closes it, even once the Space gains another Card', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+  it('keeps the Things drawer closed after the reader closes it, even once the Space gains another Thing', async () => {
+    const base = snapshot('Space', 'Thing', 10, 20);
     const local: SpaceSnapshot = {
       ...base,
-      cards: [
-        ...base.cards,
-        { id: OUTSIDE_CARD_ID, document: { title: 'Outside card', kind: 'markdown', body: '' } },
+      things: [
+        ...base.things,
+        { id: OUTSIDE_THING_ID, document: { title: 'Outside thing', kind: 'markdown', body: '' } },
       ],
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
@@ -1162,36 +1162,36 @@ describe('Space app Cards drawer', () => {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session, selection: DIAGRAM_ID }),
-        spaceCards,
+        spaceThings,
       },
       (app) => render(app),
       {
         selection: DIAGRAM_ID,
-        cardId: OUTSIDE_CARD_ID,
+        thingId: OUTSIDE_THING_ID,
         graphId: null,
-        presentationCardId: null,
+        presentationThingId: null,
       },
-      // The Card is in no Diagram, so the address that names it is the canonical
+      // The Thing is in no Diagram, so the address that names it is the canonical
       // one — which opens the Space's default Diagram, the one selected here.
       recordingHistory(
-        productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: OUTSIDE_CARD_ID }),
+        productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: OUTSIDE_THING_ID }),
       ),
     );
 
-    expect(screen.getByRole('button', { name: 'Add Outside card to Diagram' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Outside thing to Diagram' })).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cards' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Things' }));
     expect(
-      screen.queryByRole('button', { name: 'Add Outside card to Diagram' }),
+      screen.queryByRole('button', { name: 'Add Outside thing to Diagram' }),
     ).not.toBeInTheDocument();
 
-    await waitFor(() => expect(unavailable(createCardControl())).toBe(false));
-    const before = session.getState().working.cards.length;
-    createCard('Markdown Card');
-    expect(session.getState().working.cards.length).toBe(before + 1);
+    await waitFor(() => expect(unavailable(createThingControl())).toBe(false));
+    const before = session.getState().working.things.length;
+    createThing('Markdown Thing');
+    expect(session.getState().working.things.length).toBe(before + 1);
 
     expect(
-      screen.queryByRole('button', { name: 'Add Outside card to Diagram' }),
+      screen.queryByRole('button', { name: 'Add Outside thing to Diagram' }),
     ).not.toBeInTheDocument();
   });
 
@@ -1202,18 +1202,18 @@ describe('Space app Cards drawer', () => {
    * The Graph subject is the demanding one: Graph rows are the selected
    * Diagram's, so the arrival unmounts the row the draft was begun on. A draft
    * outliving that has no editor left to cancel it and still withdraws Add
-   * Card, Present, Delete Card and every entity menu's Edits.
+   * Thing, Present, Delete Thing and every entity menu's Edits.
    *
    * Choosing a Diagram row spends `setSpaceChromeEdit(null)` at the call site,
    * and this arrival does not — it is `authoringAvailability`'s
    * `chromeTitleEdit` that answers it,
    * because the Diagram change clears the published projection and the canvas
-   * holds no Cards until placement resolves. That is one clear standing on
+   * holds no Things until placement resolves. That is one clear standing on
    * another's condition, which is why the behaviour is pinned here rather than
    * left to the reader of either.
    */
   it('discards an open chrome title draft when a Back moves to another Diagram', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+    const base = snapshot('Space', 'Thing', 10, 20);
     const local: SpaceSnapshot = {
       ...base,
       document: {
@@ -1224,17 +1224,17 @@ describe('Space app Cards drawer', () => {
             id: OTHER_DIAGRAM_ID,
             title: 'Other Diagram',
             kind: 'positioned',
-            // The Card is placed here too, so this Diagram stays editable: an
+            // The Thing is placed here too, so this Diagram stays editable: an
             // empty Diagram withdraws chrome editing on its own and would clear
             // the draft for a reason that has nothing to do with the arrival.
-            positions: { [CARD_ID]: { x: 40, y: 50, open: false } },
+            positions: { [THING_ID]: { x: 40, y: 50, open: false } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
           },
         ],
       },
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
@@ -1247,17 +1247,17 @@ describe('Space app Cards drawer', () => {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session, selection: DIAGRAM_ID }),
-        spaceCards,
+        spaceThings,
       },
       (app) => render(app),
-      { selection: DIAGRAM_ID, cardId: null, graphId: null, presentationCardId: null },
+      { selection: DIAGRAM_ID, thingId: null, graphId: null, presentationThingId: null },
       history,
     );
 
     // The Graph's name is renamed where it is drawn, exactly as the Diagram's is.
     await beginRename('active-graph');
     expect(await screen.findByRole('textbox', { name: 'Graph name' })).toBeVisible();
-    expect(unavailable(createCardControl())).toBe(true);
+    expect(unavailable(createThingControl())).toBe(true);
 
     act(() => {
       history.popTo(
@@ -1267,11 +1267,11 @@ describe('Space app Cards drawer', () => {
 
     expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Diagram');
     expect(screen.queryByRole('textbox', { name: 'Graph name' })).not.toBeInTheDocument();
-    expect(unavailable(createCardControl())).toBe(false);
+    expect(unavailable(createThingControl())).toBe(false);
   });
 
-  it('reveals the addressed Card again in a newly adopted default Diagram that omits it, even though the same Card was already addressed once', async () => {
-    const base = snapshot('Space', 'Card', 10, 20);
+  it('reveals the addressed Thing again in a newly adopted default Diagram that omits it, even though the same Thing was already addressed once', async () => {
+    const base = snapshot('Space', 'Thing', 10, 20);
     const local: SpaceSnapshot = {
       ...base,
       document: {
@@ -1286,23 +1286,23 @@ describe('Space app Cards drawer', () => {
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
           },
         ],
-        // The canonical Card link below resolves to the Space's default
+        // The canonical Thing link below resolves to the Space's default
         // Diagram, so this second navigation lands on the Diagram that omits
-        // the Card rather than the one it started on.
+        // the Thing rather than the one it started on.
         defaultDiagram: OTHER_DIAGRAM_ID,
       },
     };
     const stored = { snapshot: local, revision: 0n, exportedRevision: null };
-    const { spaceSession: session, spaceCards } = openTestSpace(
+    const { spaceSession: session, spaceThings } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
     const history = recordingHistory(
       productDestinationPath({
-        kind: 'diagram-card',
+        kind: 'diagram-thing',
         spaceId: SPACE_ID,
         diagramId: DIAGRAM_ID,
-        cardId: CARD_ID,
+        thingId: THING_ID,
       }),
     );
 
@@ -1311,30 +1311,32 @@ describe('Space app Cards drawer', () => {
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session, selection: DIAGRAM_ID }),
-        spaceCards,
+        spaceThings,
       },
       (app) => render(app),
       {
         selection: DIAGRAM_ID,
-        cardId: CARD_ID,
+        thingId: THING_ID,
         graphId: null,
-        presentationCardId: null,
+        presentationThingId: null,
       },
       history,
     );
 
-    // Card is a member of the selected Diagram, so there is nothing to reveal yet.
-    expect(screen.queryByRole('button', { name: 'Add Card to Diagram' })).not.toBeInTheDocument();
+    // Thing is a member of the selected Diagram, so there is nothing to reveal yet.
+    expect(screen.queryByRole('button', { name: 'Add Thing to Diagram' })).not.toBeInTheDocument();
 
     // The second of the two mount tests, and the other direction: a Back the
     // injected History API reports has to reach Navigation and redraw. The
-    // canonical Card link carries no Diagram of its own — it opens wherever the
-    // Space's default Diagram is, which is now the Diagram that omits this Card.
+    // canonical Thing link carries no Diagram of its own — it opens wherever the
+    // Space's default Diagram is, which is now the Diagram that omits this Thing.
     act(() => {
-      history.popTo(productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: CARD_ID }));
+      history.popTo(
+        productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: THING_ID }),
+      );
     });
 
     expect(await screen.findByTestId('selected-canvas')).toHaveTextContent('Other Diagram');
-    expect(await screen.findByRole('button', { name: 'Add Card to Diagram' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Add Thing to Diagram' })).toBeVisible();
   });
 });

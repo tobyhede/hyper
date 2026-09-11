@@ -6,33 +6,33 @@ const uuid = (value: string): UUID => uuidSchema.parse(value);
 const META = uuid('00000000-0000-4000-8000-000000000101');
 const CHILD = uuid('00000000-0000-4000-8000-000000000102');
 const OTHER = uuid('00000000-0000-4000-8000-000000000103');
-const META_CARD = uuid('00000000-0000-4000-8000-000000000201');
-const SECOND_META_CARD = uuid('00000000-0000-4000-8000-000000000202');
-const CHILD_CARD = uuid('00000000-0000-4000-8000-000000000203');
+const META_THING = uuid('00000000-0000-4000-8000-000000000201');
+const SECOND_META_THING = uuid('00000000-0000-4000-8000-000000000202');
+const CHILD_THING = uuid('00000000-0000-4000-8000-000000000203');
 const DIAGRAM = uuid('00000000-0000-4000-8000-000000000301');
 const SECOND_DIAGRAM = uuid('00000000-0000-4000-8000-000000000302');
 const GRAPH = uuid('00000000-0000-4000-8000-000000000401');
 const SECOND_GRAPH = uuid('00000000-0000-4000-8000-000000000402');
 
-type StoredCard = SpaceSnapshot['cards'][number];
+type StoredThing = SpaceSnapshot['things'][number];
 
-const markdown = (id: UUID, title = id): StoredCard => ({
+const markdown = (id: UUID, title = id): StoredThing => ({
   id,
   document: { title, kind: 'markdown', body: '' },
 });
 
-const spaceCard = (
+const spaceThing = (
   id: UUID,
   target: UUID,
   selection: { readonly diagram?: UUID; readonly graph?: UUID } = {},
-): StoredCard => ({
+): StoredThing => ({
   id,
   document: { title: id, kind: 'space', spaceId: target, ...selection },
 });
 
 const snapshot = (
   id: UUID,
-  cards: readonly StoredCard[],
+  things: readonly StoredThing[],
   options: {
     readonly diagram?: boolean;
     readonly secondDiagram?: boolean;
@@ -53,8 +53,8 @@ const snapshot = (
                 title: 'Diagram',
                 kind: 'positioned',
                 positions: Object.fromEntries(
-                  cards.map(({ id: cardId }, index) => [
-                    cardId,
+                  things.map(({ id: thingId }, index) => [
+                    thingId,
                     { x: index * 100, y: 0, open: false },
                   ]),
                 ),
@@ -70,8 +70,8 @@ const snapshot = (
                 title: 'Second Diagram',
                 kind: 'positioned' as const,
                 positions: Object.fromEntries(
-                  cards.map(({ id: cardId }, index) => [
-                    cardId,
+                  things.map(({ id: thingId }, index) => [
+                    thingId,
                     { x: index * 100, y: 100, open: false },
                   ]),
                 ),
@@ -82,7 +82,7 @@ const snapshot = (
           : []),
       ],
     },
-    cards,
+    things,
   });
 
 const errorsOf = (result: ReturnType<typeof loadSpaceAggregate>) => {
@@ -95,7 +95,7 @@ describe('loadSpaceAggregate', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
-        snapshots: [snapshot(META, []), { id: CHILD, document: { version: 1 }, cards: [] }],
+        snapshots: [snapshot(META, []), { id: CHILD, document: { version: 1 }, things: [] }],
       }),
     );
 
@@ -110,12 +110,12 @@ describe('loadSpaceAggregate', () => {
         snapshot(
           META,
           [
-            spaceCard(META_CARD, CHILD, { diagram: DIAGRAM, graph: GRAPH }),
-            spaceCard(SECOND_META_CARD, CHILD),
+            spaceThing(META_THING, CHILD, { diagram: DIAGRAM, graph: GRAPH }),
+            spaceThing(SECOND_META_THING, CHILD),
           ],
           { diagram: true },
         ),
-        snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true }),
+        snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true }),
       ],
     });
 
@@ -139,19 +139,19 @@ describe('loadSpaceAggregate', () => {
     ]);
   });
 
-  it('refuses duplicate Card ids across Spaces while allowing Diagram and Graph id reuse', () => {
+  it('refuses duplicate Thing ids across Spaces while allowing Diagram and Graph id reuse', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceCard(META_CARD, CHILD), markdown(CHILD_CARD)], { diagram: true }),
-          snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true }),
+          snapshot(META, [spaceThing(META_THING, CHILD), markdown(CHILD_THING)], { diagram: true }),
+          snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true }),
         ],
       }),
     );
 
     expect(errors).toEqual([
-      { kind: 'duplicate-card-id', cardId: CHILD_CARD, spaceIds: [META, CHILD] },
+      { kind: 'duplicate-thing-id', thingId: CHILD_THING, spaceIds: [META, CHILD] },
     ]);
   });
 
@@ -163,50 +163,50 @@ describe('loadSpaceAggregate', () => {
     expect(errors).toEqual([{ kind: 'meta-space-missing', metaSpaceId: META }]);
   });
 
-  it('locates a Space Card whose target is absent', () => {
+  it('locates a Space Thing whose target is absent', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
-        snapshots: [snapshot(META, [spaceCard(META_CARD, CHILD)])],
+        snapshots: [snapshot(META, [spaceThing(META_THING, CHILD)])],
       }),
     );
 
     expect(errors).toEqual([
       {
-        kind: 'space-card-target-missing',
+        kind: 'space-thing-target-missing',
         spaceId: META,
-        cardId: META_CARD,
+        thingId: META_THING,
         targetSpaceId: CHILD,
       },
     ]);
   });
 
-  it('refuses a multi-Space reference cycle at the closing Card', () => {
+  it('refuses a multi-Space reference cycle at the closing Thing', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceCard(META_CARD, CHILD)]),
-          snapshot(CHILD, [spaceCard(CHILD_CARD, META)]),
+          snapshot(META, [spaceThing(META_THING, CHILD)]),
+          snapshot(CHILD, [spaceThing(CHILD_THING, META)]),
         ],
       }),
     );
 
     expect(errors).toEqual([
       {
-        kind: 'space-card-reference-cycle',
+        kind: 'space-thing-reference-cycle',
         spaceId: CHILD,
-        cardId: CHILD_CARD,
+        thingId: CHILD_THING,
         targetSpaceId: META,
       },
     ]);
   });
 
-  it('refuses every ordinary Space with no inbound Space Card', () => {
+  it('refuses every ordinary Space with no inbound Space Thing', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
         metaSpaceId: META,
-        snapshots: [snapshot(META, []), snapshot(CHILD, [markdown(CHILD_CARD)])],
+        snapshots: [snapshot(META, []), snapshot(CHILD, [markdown(CHILD_THING)])],
       }),
     );
 
@@ -218,17 +218,17 @@ describe('loadSpaceAggregate', () => {
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceCard(META_CARD, CHILD, { diagram: OTHER })]),
-          snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true }),
+          snapshot(META, [spaceThing(META_THING, CHILD, { diagram: OTHER })]),
+          snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true }),
         ],
       }),
     );
 
     expect(errors).toEqual([
       {
-        kind: 'space-card-diagram-missing',
+        kind: 'space-thing-diagram-missing',
         spaceId: META,
-        cardId: META_CARD,
+        thingId: META_THING,
         targetSpaceId: CHILD,
         diagramId: OTHER,
       },
@@ -238,9 +238,9 @@ describe('loadSpaceAggregate', () => {
   it('cannot report a missing Diagram without naming the Diagram it looked for', () => {
     type DiagramMissing = Extract<
       SpaceAggregateError,
-      { readonly kind: 'space-card-diagram-missing' }
+      { readonly kind: 'space-thing-diagram-missing' }
     >;
-    // The only producer resolves `card.diagram ?? target.defaultDiagram` and
+    // The only producer resolves `thing.diagram ?? target.defaultDiagram` and
     // continues when that is absent, so the refusal always names a Diagram.
     expectTypeOf<DiagramMissing['diagramId']>().toEqualTypeOf<UUID>();
   });
@@ -250,17 +250,17 @@ describe('loadSpaceAggregate', () => {
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceCard(META_CARD, CHILD, { graph: OTHER })]),
-          snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true }),
+          snapshot(META, [spaceThing(META_THING, CHILD, { graph: OTHER })]),
+          snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true }),
         ],
       }),
     );
 
     expect(errors).toEqual([
       {
-        kind: 'space-card-graph-missing',
+        kind: 'space-thing-graph-missing',
         spaceId: META,
-        cardId: META_CARD,
+        thingId: META_THING,
         targetSpaceId: CHILD,
         graphId: OTHER,
       },
@@ -287,8 +287,8 @@ describe('loadSpaceAggregate', () => {
     const result = loadSpaceAggregate({
       metaSpaceId: META,
       snapshots: [
-        snapshot(META, [spaceCard(META_CARD, CHILD, selection)]),
-        snapshot(CHILD, [markdown(CHILD_CARD)], target),
+        snapshot(META, [spaceThing(META_THING, CHILD, selection)]),
+        snapshot(CHILD, [markdown(CHILD_THING)], target),
       ],
     });
 
@@ -300,17 +300,19 @@ describe('loadSpaceAggregate', () => {
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceCard(META_CARD, CHILD, { diagram: DIAGRAM, graph: SECOND_GRAPH })]),
-          snapshot(CHILD, [markdown(CHILD_CARD)], { diagram: true, secondDiagram: true }),
+          snapshot(META, [
+            spaceThing(META_THING, CHILD, { diagram: DIAGRAM, graph: SECOND_GRAPH }),
+          ]),
+          snapshot(CHILD, [markdown(CHILD_THING)], { diagram: true, secondDiagram: true }),
         ],
       }),
     );
 
     expect(errors).toEqual([
       {
-        kind: 'space-card-graph-outside-diagram',
+        kind: 'space-thing-graph-outside-diagram',
         spaceId: META,
-        cardId: META_CARD,
+        thingId: META_THING,
         targetSpaceId: CHILD,
         diagramId: DIAGRAM,
         graphId: SECOND_GRAPH,
@@ -323,8 +325,8 @@ describe('loadSpaceAggregate', () => {
       loadSpaceAggregate({
         metaSpaceId: META,
         snapshots: [
-          snapshot(META, [spaceCard(META_CARD, CHILD, { graph: GRAPH })]),
-          snapshot(CHILD, [markdown(CHILD_CARD)], {
+          snapshot(META, [spaceThing(META_THING, CHILD, { graph: GRAPH })]),
+          snapshot(CHILD, [markdown(CHILD_THING)], {
             diagram: true,
             secondDiagram: true,
             defaultDiagram: SECOND_DIAGRAM,
@@ -335,9 +337,9 @@ describe('loadSpaceAggregate', () => {
 
     expect(errors).toEqual([
       {
-        kind: 'space-card-graph-outside-diagram',
+        kind: 'space-thing-graph-outside-diagram',
         spaceId: META,
-        cardId: META_CARD,
+        thingId: META_THING,
         targetSpaceId: CHILD,
         diagramId: SECOND_DIAGRAM,
         graphId: GRAPH,

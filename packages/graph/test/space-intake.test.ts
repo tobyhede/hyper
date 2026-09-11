@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { type Card, type CardPlacement } from '@project/core';
+import { type Thing, type ThingPlacement } from '@project/core';
 import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
-import { aliasFile, cardFile, uuid } from './card-files';
+import { aliasFile, thingFile, uuid } from './thing-files';
 
 /**
  * The Space intake contract, run against **both** loaders.
@@ -35,59 +35,59 @@ const THIRD = uuid('00000000-0000-4000-8000-000000000021');
 /** Held back from every fixture: the id of something no space below holds. */
 const ABSENT = uuid('00000000-0000-4000-8000-000000000099');
 
-/** What both loaders are handed: a document's structure, and the cards under it. */
+/** What both loaders are handed: a document's structure, and the things under it. */
 interface Document {
   readonly diagrams?: readonly unknown[];
   readonly defaultDiagram?: string;
-  readonly cards: readonly Card[];
+  readonly things: readonly Thing[];
 }
 
 type Loader = (document: Document) => LoadSpaceResult;
 
 /**
- * The file loader: cards arrive as the markdown files an author wrote, so the
+ * The file loader: things arrive as the markdown files an author wrote, so the
  * document under test is turned back into frontmatter on the way in.
  */
-const viaFiles: Loader = ({ cards, ...structure }) =>
+const viaFiles: Loader = ({ things, ...structure }) =>
   loadSpace(
     { version: 1, id: SPACE, title: 'Test space', ...structure },
-    cards.map((card) =>
-      card.kind === 'alias'
-        ? aliasFile(card.id, card.title, card.target)
-        : card.kind === 'space'
+    things.map((thing) =>
+      thing.kind === 'alias'
+        ? aliasFile(thing.id, thing.title, thing.target)
+        : thing.kind === 'space'
           ? {
-              path: `cards/${card.id}.md`,
-              text: `---\nid: ${card.id}\ntitle: ${card.title}\nkind: space\nspaceId: ${card.spaceId}\n${card.diagram === undefined ? '' : `diagram: ${card.diagram}\n`}${card.graph === undefined ? '' : `graph: ${card.graph}\n`}---\n`,
+              path: `things/${thing.id}.md`,
+              text: `---\nid: ${thing.id}\ntitle: ${thing.title}\nkind: space\nspaceId: ${thing.spaceId}\n${thing.diagram === undefined ? '' : `diagram: ${thing.diagram}\n`}${thing.graph === undefined ? '' : `graph: ${thing.graph}\n`}---\n`,
             }
-          : cardFile(card.id, card.title, card.body),
+          : thingFile(thing.id, thing.title, thing.body),
     ),
   );
 
 /** The persistence loader: the same aggregate, fully identified. */
-const viaSnapshot: Loader = ({ cards, ...structure }) => {
+const viaSnapshot: Loader = ({ things, ...structure }) => {
   const result = loadSpaceSnapshot({
     id: SPACE,
     document: { version: 1, title: 'Test space', ...structure },
-    cards: cards.map(({ id, ...document }) => ({ id, document })),
+    things: things.map(({ id, ...document }) => ({ id, document })),
   });
   return result.ok ? { ok: true, space: result.space } : result;
 };
 
-const markdown = (id: string, title = id): Card => ({
+const markdown = (id: string, title = id): Thing => ({
   id: uuid(id),
   title,
   kind: 'markdown',
   body: '',
 });
 
-const aliasTo = (id: string, target: string): Card => ({
+const aliasTo = (id: string, target: string): Thing => ({
   id: uuid(id),
   title: `alias ${id}`,
   kind: 'alias',
   target: uuid(target),
 });
 
-const spaceCard = (id: string, spaceId: string): Card => ({
+const spaceThing = (id: string, spaceId: string): Thing => ({
   id: uuid(id),
   title: `Space ${spaceId}`,
   kind: 'space',
@@ -102,7 +102,7 @@ const graph = (id: string, title: string, edges: { from: string; to: string }[] 
 
 const diagram = (
   id: string,
-  positions: Record<string, CardPlacement>,
+  positions: Record<string, ThingPlacement>,
   graphs: unknown[],
   extra: { readonly activeGraph?: string } = {},
 ) => ({ id, title: `Diagram ${id}`, kind: 'positioned', positions, graphs, ...extra });
@@ -110,7 +110,7 @@ const diagram = (
 /** One Diagram over A and B, owning one Graph that joins them. */
 const simple = (defaultDiagram?: string): Document => {
   const document: Document = {
-    cards: [markdown(A, 'A'), markdown(B, 'B')],
+    things: [markdown(A, 'A'), markdown(B, 'B')],
     diagrams: [
       diagram(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
         graph(MAIN, 'Main', [{ from: A, to: B }]),
@@ -147,7 +147,7 @@ describe.each([
     it('flattens the graphs its diagrams own, in diagram then authored order', () => {
       const space = loaded(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -176,7 +176,7 @@ describe.each([
       const space = loaded(load(simple()));
       expect(space.lookup.diagram(WORKING)).toBe(space.lookup.diagram(WORKING));
       expect(space.lookup.graph(MAIN)).toBe(space.lookup.graph(MAIN));
-      expect(space.lookup.card(A)).toBe(space.lookup.card(A));
+      expect(space.lookup.thing(A)).toBe(space.lookup.thing(A));
     });
 
     it('answers a graph with the very value its owner resolves to', () => {
@@ -188,7 +188,7 @@ describe.each([
     it('answers a diagram with the exact owned graph it opens active on', () => {
       const space = loaded(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -207,7 +207,7 @@ describe.each([
     it('falls back to a diagram’s first graph when it names none', () => {
       const space = loaded(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -232,16 +232,16 @@ describe.each([
 
     it('answers nothing for an id the space does not hold', () => {
       const space = loaded(load(simple()));
-      expect(space.lookup.card(ABSENT)).toBeUndefined();
+      expect(space.lookup.thing(ABSENT)).toBeUndefined();
       expect(space.lookup.diagram(ABSENT)).toBeUndefined();
       expect(space.lookup.graph(ABSENT)).toBeUndefined();
     });
 
-    it('builds a space with cards and no diagrams, and so no graphs (ADR 0015)', () => {
-      const space = loaded(load({ cards: [markdown(A, 'A')], diagrams: [] }));
+    it('builds a space with things and no diagrams, and so no graphs (ADR 0015)', () => {
+      const space = loaded(load({ things: [markdown(A, 'A')], diagrams: [] }));
       expect(space.graphs).toEqual([]);
       expect(space.diagrams).toEqual([]);
-      expect(space.lookup.card(A)?.title).toBe('A');
+      expect(space.lookup.thing(A)?.title).toBe('A');
     });
 
     it('loads a diagram whose only graph holds no edges', () => {
@@ -251,7 +251,7 @@ describe.each([
       // set is vacuous, not exempt.
       const space = loaded(
         load({
-          cards: [markdown(A, 'A')],
+          things: [markdown(A, 'A')],
           diagrams: [
             diagram(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
           ],
@@ -265,7 +265,7 @@ describe.each([
     it('accepts a cycle, a self-edge, a fork and a merge (ADR 0032)', () => {
       const space = loaded(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
+          things: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           diagrams: [
             diagram(
               WORKING,
@@ -293,7 +293,7 @@ describe.each([
     it('accepts the same edge in two graphs one diagram owns', () => {
       const space = loaded(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -312,7 +312,7 @@ describe.each([
     it('refuses an exact duplicate edge within one graph', () => {
       const errors = refused(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -332,10 +332,10 @@ describe.each([
       );
     });
 
-    it('refuses an endpoint naming a card the space does not hold, and says only that', () => {
+    it('refuses an endpoint naming a thing the space does not hold, and says only that', () => {
       const errors = refused(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -346,20 +346,20 @@ describe.each([
         }),
       );
 
-      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-missing-card']);
+      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-missing-thing']);
       expect(errors[0]?.ref).toBe(ABSENT);
       expect(errors[0]?.message).toContain('as its to');
     });
 
-    it('refuses an endpoint naming a space card outside its diagram, and says only that', () => {
+    it('refuses an endpoint naming a space thing outside its diagram, and says only that', () => {
       // The failure a space-wide check could not see: `C` is a perfectly good
-      // Space card, but this Diagram does not position it, so it is not a member
+      // Space thing, but this Diagram does not position it, so it is not a member
       // and an Edge here cannot reach it. Told apart from the case above because
-      // the two send an author to different places — add a member, or find a card
+      // the two send an author to different places — add a member, or find a thing
       // that is gone.
       const errors = refused(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
+          things: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           diagrams: [
             diagram(
               WORKING,
@@ -370,15 +370,15 @@ describe.each([
         }),
       );
 
-      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-card-outside-diagram']);
+      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-thing-outside-diagram']);
       expect(errors[0]?.ref).toBe(C);
       expect(errors[0]?.message).toContain(WORKING);
     });
 
-    it('refuses an endpoint naming a card only a second diagram holds', () => {
+    it('refuses an endpoint naming a thing only a second diagram holds', () => {
       const errors = refused(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
+          things: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           diagrams: [
             diagram(
               WORKING,
@@ -389,15 +389,15 @@ describe.each([
           ],
         }),
       );
-      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-card-outside-diagram']);
+      expect(errors.map(({ kind }) => kind)).toEqual(['graph-edge-thing-outside-diagram']);
     });
 
-    it('says only that a position names a missing card, not that edges into it dangle', () => {
+    it('says only that a position names a missing thing, not that edges into it dangle', () => {
       // The position is the fault; an edge reaching that member is a consequence.
       // Diagnosing both would send an author looking for two problems.
       const errors = refused(
         load({
-          cards: [markdown(A, 'A')],
+          things: [markdown(A, 'A')],
           diagrams: [
             diagram(
               WORKING,
@@ -408,14 +408,14 @@ describe.each([
         }),
       );
 
-      expect(errors.map(({ kind }) => kind)).toEqual(['diagram-member-missing-card']);
+      expect(errors.map(({ kind }) => kind)).toEqual(['diagram-member-missing-thing']);
       expect(errors[0]?.ref).toBe(ABSENT);
     });
 
-    it('accepts a diagram that omits cards — a card it leaves out is not in it', () => {
+    it('accepts a diagram that omits things — a thing it leaves out is not in it', () => {
       const space = loaded(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
+          things: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           diagrams: [
             diagram(
               WORKING,
@@ -425,7 +425,7 @@ describe.each([
           ],
         }),
       );
-      expect(space.cards).toHaveLength(3);
+      expect(space.things).toHaveLength(3);
     });
   });
 
@@ -433,7 +433,7 @@ describe.each([
     it('accepts any graph the diagram owns', () => {
       const space = loaded(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -450,7 +450,7 @@ describe.each([
     it('refuses one no diagram in the space owns, and says only that', () => {
       const errors = refused(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -472,7 +472,7 @@ describe.each([
       // is not this diagram's to open on, which is what ownership makes checkable.
       const errors = refused(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -499,7 +499,7 @@ describe.each([
       // occurrence is, since that is the only actionable part.
       const errors = refused(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -521,10 +521,10 @@ describe.each([
       );
     });
 
-    it('accepts two diagrams owning distinct graphs over the same cards', () => {
+    it('accepts two diagrams owning distinct graphs over the same things', () => {
       const space = loaded(
         load({
-          cards: [markdown(A, 'A'), markdown(B, 'B')],
+          things: [markdown(A, 'A'), markdown(B, 'B')],
           diagrams: [
             diagram(
               WORKING,
@@ -545,7 +545,7 @@ describe.each([
     it('refuses duplicate diagram ids, which the lookup would silently collapse', () => {
       const errors = refused(
         load({
-          cards: [markdown(A, 'A')],
+          things: [markdown(A, 'A')],
           diagrams: [
             diagram(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
             diagram(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
@@ -559,25 +559,25 @@ describe.each([
   });
 
   describe('aliases (ADR 0009)', () => {
-    it('accepts a single-hop alias to a markdown card', () => {
+    it('accepts a single-hop alias to a markdown thing', () => {
       const space = loaded(
         load({
-          cards: [markdown(A, 'A'), aliasTo(B, A)],
+          things: [markdown(A, 'A'), aliasTo(B, A)],
           diagrams: [],
         }),
       );
-      expect(space.cards).toHaveLength(2);
+      expect(space.things).toHaveLength(2);
     });
 
-    it('refuses an alias whose target resolves to no card', () => {
-      const errors = refused(load({ cards: [aliasTo(A, ABSENT)], diagrams: [] }));
+    it('refuses an alias whose target resolves to no thing', () => {
+      const errors = refused(load({ things: [aliasTo(A, ABSENT)], diagrams: [] }));
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'unresolved-alias-target', ref: ABSENT }),
       );
     });
 
     it('refuses an alias that points at itself', () => {
-      const errors = refused(load({ cards: [aliasTo(A, A)], diagrams: [] }));
+      const errors = refused(load({ things: [aliasTo(A, A)], diagrams: [] }));
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'alias-self-reference', ref: A }),
       );
@@ -585,34 +585,36 @@ describe.each([
 
     it('refuses an alias whose target is itself an alias', () => {
       const errors = refused(
-        load({ cards: [markdown(A, 'A'), aliasTo(B, A), aliasTo(C, B)], diagrams: [] }),
+        load({ things: [markdown(A, 'A'), aliasTo(B, A), aliasTo(C, B)], diagrams: [] }),
       );
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'alias-targets-alias', ref: B }),
       );
     });
 
-    it('refuses an alias whose target is a Space Card', () => {
-      const errors = refused(load({ cards: [spaceCard(A, ABSENT), aliasTo(B, A)], diagrams: [] }));
+    it('refuses an alias whose target is a Space Thing', () => {
+      const errors = refused(
+        load({ things: [spaceThing(A, ABSENT), aliasTo(B, A)], diagrams: [] }),
+      );
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'alias-target-must-own-content', ref: A }),
       );
     });
   });
 
-  describe('Space Card reference cycles (ADR 0068)', () => {
-    it('refuses a Space Card that targets the Space containing it', () => {
-      const errors = refused(load({ cards: [spaceCard(A, SPACE)], diagrams: [] }));
+  describe('Space Thing reference cycles (ADR 0068)', () => {
+    it('refuses a Space Thing that targets the Space containing it', () => {
+      const errors = refused(load({ things: [spaceThing(A, SPACE)], diagrams: [] }));
 
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'space-card-reference-cycle', ref: SPACE }),
+        expect.objectContaining({ kind: 'space-thing-reference-cycle', ref: SPACE }),
       );
     });
 
-    it('accepts several Space Cards that converge on one target', () => {
-      const space = loaded(load({ cards: [spaceCard(A, C), spaceCard(B, C)], diagrams: [] }));
+    it('accepts several Space Things that converge on one target', () => {
+      const space = loaded(load({ things: [spaceThing(A, C), spaceThing(B, C)], diagrams: [] }));
 
-      expect(space.cards).toHaveLength(2);
+      expect(space.things).toHaveLength(2);
     });
   });
 
@@ -638,7 +640,7 @@ describe.each([
     it('accumulates unrelated errors rather than reporting the first', () => {
       const errors = refused(
         load({
-          cards: [markdown(A, 'A'), aliasTo(B, ABSENT)],
+          things: [markdown(A, 'A'), aliasTo(B, ABSENT)],
           diagrams: [
             diagram(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
             diagram(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
@@ -655,7 +657,7 @@ describe.each([
     it('is deterministic for one input', () => {
       const document = () =>
         load({
-          cards: [markdown(A, 'A')],
+          things: [markdown(A, 'A')],
           diagrams: [
             diagram(
               WORKING,

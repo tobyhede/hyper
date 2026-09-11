@@ -1,8 +1,8 @@
 /**
- * Where focus goes when a `CardPane` opens, when its first focusable is the
+ * Where focus goes when a `ThingPane` opens, when its first focusable is the
  * wrong answer. An Alias pane opens on its Target picker, which the
  * storyboard draws *below* the title it is more urgent than — the title
- * remains editable from the Card's own front, so the picker is the field
+ * remains editable from the Thing's own front, so the picker is the field
  * that needs the pane to open it.
  *
  * A module of its own, holding both halves of one contract: the selector the
@@ -12,13 +12,13 @@
  * typecheck, lint, render, and simply put focus somewhere else. Written here
  * once, neither side can drift from the other.
  *
- * Not exported from `CardPane` itself, where it began: `react-refresh` holds a
+ * Not exported from `ThingPane` itself, where it began: `react-refresh` holds a
  * component module to exporting components only, and the rule is right — a
  * constant re-exported from there costs the pane its Fast Refresh.
  */
 const PANE_INITIAL_FOCUS_ATTRIBUTE = 'data-pane-focus';
 
-/** What `CardPane` looks for. */
+/** What `ThingPane` looks for. */
 export const PANE_INITIAL_FOCUS = `[${PANE_INITIAL_FOCUS_ATTRIBUTE}]`;
 
 /**

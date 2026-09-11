@@ -11,7 +11,7 @@ import {
 import { captureError } from '../support/capture-error';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
-const ROOT_CARD_ID = '00000000-0000-4000-8000-000000000002';
+const ROOT_THING_ID = '00000000-0000-4000-8000-000000000002';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000003';
 const DIAGRAM_ID = '00000000-0000-4000-8000-000000000004';
 
@@ -57,39 +57,43 @@ afterEach(async () => {
 });
 
 describe('readSingleSpace', () => {
-  it('reads a space-file or directory input with globally sorted, non-recursive cards', async () => {
+  it('reads a space-file or directory input with globally sorted, non-recursive things', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
     const talkDirectory = join(temporaryDirectory, 'talk');
-    const cardsDirectory = join(talkDirectory, 'cards');
-    await mkdir(join(cardsDirectory, 'nested'), { recursive: true });
+    const thingsDirectory = join(talkDirectory, 'things');
+    await mkdir(join(thingsDirectory, 'nested'), { recursive: true });
     await mkdir(join(talkDirectory, 'notes'));
 
     const spaceFile = join(talkDirectory, 'space.json');
     await writeFile(spaceFile, JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }));
     await writeFile(join(talkDirectory, 'a.md'), '---\ntitle: A\n---\nA body\n');
     await writeFile(
-      join(cardsDirectory, 'detail.md'),
+      join(thingsDirectory, 'detail.md'),
       '---\ntitle: Detail\nkind: markdown\n---\nDetail body\n',
     );
-    await writeFile(join(cardsDirectory, 'z.md'), '---\ntitle: Z\n---\nZ body\n');
+    await writeFile(join(thingsDirectory, 'z.md'), '---\ntitle: Z\n---\nZ body\n');
     await writeFile(
       join(talkDirectory, 'root.md'),
-      `---\nid: ${ROOT_CARD_ID}\ntitle: Root\n---\nRoot body\n`,
+      `---\nid: ${ROOT_THING_ID}\ntitle: Root\n---\nRoot body\n`,
     );
-    await writeFile(join(cardsDirectory, 'nested', 'ignored.md'), 'not a discovered card');
-    await writeFile(join(talkDirectory, 'notes', 'ignored.md'), 'not a discovered card');
+    await writeFile(join(thingsDirectory, 'nested', 'ignored.md'), 'not a discovered thing');
+    await writeFile(join(talkDirectory, 'notes', 'ignored.md'), 'not a discovered thing');
 
     const expected = {
       id: SPACE_ID,
       document: { version: 1, title: 'Talk' },
-      cards: [
+      things: [
+        // Sorted globally by relative path, so the two files inside the
+        // inventory directory now follow `root.md` rather than preceding it:
+        // ADR 0085 renamed the directory and `things/` sorts after `root`
+        // where `cards/` sorted before it. The rule under test is unchanged.
         { document: { title: 'A', kind: 'markdown', body: 'A body\n' } },
-        { document: { title: 'Detail', kind: 'markdown', body: 'Detail body\n' } },
-        { document: { title: 'Z', kind: 'markdown', body: 'Z body\n' } },
         {
-          id: ROOT_CARD_ID,
+          id: ROOT_THING_ID,
           document: { title: 'Root', kind: 'markdown', body: 'Root body\n' },
         },
+        { document: { title: 'Detail', kind: 'markdown', body: 'Detail body\n' } },
+        { document: { title: 'Z', kind: 'markdown', body: 'Z body\n' } },
       ],
     };
 
@@ -97,7 +101,7 @@ describe('readSingleSpace', () => {
     await expect(readSingleSpace(spaceFile)).resolves.toEqual(expected);
   });
 
-  // Unreadable-mode is the only way to fail a *discovered* card file's read:
+  // Unreadable-mode is the only way to fail a *discovered* thing file's read:
   // `markdownFilesIn` keeps `entry.isFile()` entries only, so a directory or a
   // symlink named `x.md` is filtered out before any read and never produces the
   // EISDIR/ELOOP a uid-independent version would need. Root ignores the mode bits
@@ -108,19 +112,19 @@ describe('readSingleSpace', () => {
     async () => {
       const temporaryDirectory = await makeTemporaryDirectory();
       const talkDirectory = join(temporaryDirectory, 'talk');
-      const cardsDirectory = join(talkDirectory, 'cards');
-      await mkdir(cardsDirectory, { recursive: true });
+      const thingsDirectory = join(talkDirectory, 'things');
+      await mkdir(thingsDirectory, { recursive: true });
 
-      const rootCard = join(talkDirectory, 'a.md');
-      const nestedCard = join(cardsDirectory, 'z.md');
+      const rootThing = join(talkDirectory, 'a.md');
+      const nestedThing = join(thingsDirectory, 'z.md');
       await writeFile(
         join(talkDirectory, 'space.json'),
         JSON.stringify({ version: 1, title: 'Talk' }),
       );
-      await writeFile(rootCard, '---\ntitle: A\n---\nA body\n');
-      await writeFile(nestedCard, '---\ntitle: Z\n---\nZ body\n');
-      await chmod(rootCard, 0o000);
-      await chmod(nestedCard, 0o000);
+      await writeFile(rootThing, '---\ntitle: A\n---\nA body\n');
+      await writeFile(nestedThing, '---\ntitle: Z\n---\nZ body\n');
+      await chmod(rootThing, 0o000);
+      await chmod(nestedThing, 0o000);
 
       const thrown = await captureError(() => readSingleSpace(talkDirectory));
 
@@ -128,8 +132,8 @@ describe('readSingleSpace', () => {
       if (!(thrown instanceof SpaceImportFileError)) return;
       expect(thrown.kind).toBe('discovery');
       expect(thrown.diagnostics).toHaveLength(2);
-      expect(thrown.diagnostics[0]).toContain(rootCard);
-      expect(thrown.diagnostics[1]).toContain(nestedCard);
+      expect(thrown.diagnostics[0]).toContain(rootThing);
+      expect(thrown.diagnostics[1]).toContain(nestedThing);
     },
   );
 
@@ -148,7 +152,7 @@ describe('readSingleSpace', () => {
 
   // A directory standing in for `space.json` fails its read as EISDIR for every
   // uid, where an unreadable mode would let root through. Nothing filters the
-  // space file on type the way `markdownFilesIn` filters cards, so the resolved
+  // space file on type the way `markdownFilesIn` filters things, so the resolved
   // path is read as-is and this needs no root guard.
   it('reports an unreadable space file as an absolute discovery diagnostic', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
@@ -172,15 +176,15 @@ describe('readSingleSpace', () => {
   it('reports every malformed file by absolute path through a relative input', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
     const talkDirectory = join(temporaryDirectory, 'talk');
-    const cardsDirectory = join(talkDirectory, 'cards');
-    await mkdir(cardsDirectory, { recursive: true });
+    const thingsDirectory = join(talkDirectory, 'things');
+    await mkdir(thingsDirectory, { recursive: true });
 
     const spaceFile = join(talkDirectory, 'space.json');
-    const invalidYamlCard = join(talkDirectory, 'invalid-yaml.md');
-    const missingFrontmatterCard = join(cardsDirectory, 'missing-frontmatter.md');
+    const invalidYamlThing = join(talkDirectory, 'invalid-yaml.md');
+    const missingFrontmatterThing = join(thingsDirectory, 'missing-frontmatter.md');
     await writeFile(spaceFile, '{ invalid JSON');
-    await writeFile(invalidYamlCard, '---\ntitle: [broken\n---\n');
-    await writeFile(missingFrontmatterCard, 'No frontmatter here.\n');
+    await writeFile(invalidYamlThing, '---\ntitle: [broken\n---\n');
+    await writeFile(missingFrontmatterThing, 'No frontmatter here.\n');
 
     const thrown = await captureError(() =>
       readSingleSpace(relative(process.cwd(), talkDirectory)),
@@ -190,8 +194,8 @@ describe('readSingleSpace', () => {
     if (!(thrown instanceof SpaceImportFileError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain(spaceFile);
-    expect(thrown.diagnostics.join('\n')).toContain(invalidYamlCard);
-    expect(thrown.diagnostics.join('\n')).toContain(missingFrontmatterCard);
+    expect(thrown.diagnostics.join('\n')).toContain(invalidYamlThing);
+    expect(thrown.diagnostics.join('\n')).toContain(missingFrontmatterThing);
   });
 
   it('reports schema-invalid JSON against the absolute space-file path', async () => {
@@ -209,11 +213,11 @@ describe('readSingleSpace', () => {
           {
             title: 'Diagram',
             kind: 'positioned',
-            positions: { [ROOT_CARD_ID]: { x: 0, y: 0 } },
+            positions: { [ROOT_THING_ID]: { x: 0, y: 0 } },
             graphs: [
               {
                 title: 'Graph',
-                edges: [{ from: 'not-a-uuid', to: ROOT_CARD_ID }],
+                edges: [{ from: 'not-a-uuid', to: ROOT_THING_ID }],
               },
             ],
           },
@@ -256,9 +260,9 @@ describe('readSingleSpace', () => {
   // rather than exercise it — the same reason the deterministic-order test above
   // is skipped there.
   it.skipIf(process.getuid?.() === 0)(
-    'refuses the document ahead of a card it could not even read',
+    'refuses the document ahead of a thing it could not even read',
     async () => {
-      // The refusal is decided from the space file alone, so an unreadable card
+      // The refusal is decided from the space file alone, so an unreadable thing
       // cannot answer ahead of it. A reader told to fix a file permission, who
       // then discovers the document was never going to load anyway, has been
       // sent to do work for nothing.
@@ -267,10 +271,10 @@ describe('readSingleSpace', () => {
       await mkdir(talkDirectory);
 
       const spaceFile = join(talkDirectory, 'space.json');
-      const unreadableCard = join(talkDirectory, 'a.md');
+      const unreadableThing = join(talkDirectory, 'a.md');
       await writeFile(spaceFile, JSON.stringify(versionTwoDocument));
-      await writeFile(unreadableCard, '---\ntitle: A\n---\nA body\n');
-      await chmod(unreadableCard, 0o000);
+      await writeFile(unreadableThing, '---\ntitle: A\n---\nA body\n');
+      await chmod(unreadableThing, 0o000);
 
       const thrown = await captureError(() => readSingleSpace(talkDirectory));
 
@@ -299,11 +303,10 @@ describe('readSingleSpace', () => {
   });
 
   it('refuses a retired space-level graphs key rather than stripping it', async () => {
-    // `importSpaceFileSchema` is a plain Zod object, so an undeclared key is
-    // dropped. For the retired `cards` and `edges` that is right — they carried
-    // nothing the rest of the document does not say. A space-level `graphs`
-    // carried the whole topology (ADR 0040), so stripping it discards exactly
-    // what the author wrote and imports a Space that looks complete.
+    // `importSpaceFileSchema` is strict, so an undeclared key is already
+    // refused rather than dropped. This check survives that to *name* the one
+    // that matters: a space-level `graphs` carried the whole topology
+    // (ADR 0040), and a generic unrecognized-key refusal does not say so.
     const temporaryDirectory = await makeTemporaryDirectory();
     const talkDirectory = join(temporaryDirectory, 'talk');
     await mkdir(talkDirectory);

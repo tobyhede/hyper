@@ -2,13 +2,13 @@ import {
   SPACE_FILE_VERSION,
   spaceFileSchema,
   spaceSnapshotSchema,
-  type Card,
+  type Thing,
   type Diagram,
   type Graph,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { parseCardFile, type CardFile, type CardFileError } from './card-file';
+import { parseThingFile, type ThingFile, type ThingFileError } from './thing-file';
 import { buildSpaceLookup, type SpaceLookup } from './lookup';
 import { validateReferences, type SpaceReferenceError } from './validate';
 
@@ -37,14 +37,14 @@ export interface Space {
   /** What names this space (ADR 0019). Not its title, and not its file path. */
   readonly id: UUID;
   readonly title: string;
-  readonly cards: readonly Card[];
+  readonly things: readonly Thing[];
   /**
    * Every graph in the space, **flattened** across the diagrams that own them —
    * diagrams in declared order, each diagram's graphs in authored order (ADR
    * 0045). Derived, never stored: a graph is an owned value of one diagram (ADR
-   * 0040), and this is the collection a view whose subject is the space's cards
-   * draws. Closed for free, since every edge endpoint is a card of some diagram
-   * and so a card of the space.
+   * 0040), and this is the collection a view whose subject is the space's things
+   * draws. Closed for free, since every edge endpoint is a thing of some diagram
+   * and so a thing of the space.
    *
    * The exact nested values, never copies: a graph read off here and one read
    * through `lookup.graph` are the same object.
@@ -71,14 +71,14 @@ export interface Space {
 type UnsupportedVersionError = { kind: 'unsupported-version'; message: string };
 
 /**
- * Why a load failed: a bad shape, a card file that will not parse, or a
+ * Why a load failed: a bad shape, a thing file that will not parse, or a
  * reference that does not resolve.
  */
 export type SpaceError =
   | { kind: 'invalid-shape'; message: string }
   | UnsupportedVersionError
   | { kind: 'retired-space-graphs'; message: string }
-  | CardFileError
+  | ThingFileError
   | SpaceReferenceError;
 
 /**
@@ -147,15 +147,15 @@ function retiredSpaceGraphs(document: unknown): SpaceError | null {
  * answered by its version rather than by the shape it happens to carry.
  *
  * **Offered, and composed rather than named one at a time — that composition is
- * the point.** Both checks above exist because the schema's own answer for these
- * documents misleads: a cascade of moved keys in one case, a silently stripped
- * topology in the other. Any door that parses ahead of intake needs *all* of
- * them, and a door that reaches for them individually gets the ones its author
- * knew about. `readSingleSpace` asked the version check alone and imported a
- * Space with its whole `graphs` array dropped, looking complete (ticket `10`);
- * ticket `08` is where it came to ask the version check at all. One function is
- * what makes the next check added here reach the importer without anyone
- * remembering to carry it there.
+ * the point.** Both checks above exist because the schema's own answer for
+ * these documents misleads: a cascade of moved keys in one case, a refusal that
+ * names the key without saying it is retired in the other. Any door that parses
+ * ahead of intake needs *all* of them, and a door that reaches for them
+ * individually gets the ones its author knew about. `readSingleSpace` asked the
+ * version check alone and imported a Space with its whole `graphs` array
+ * dropped, looking complete (ticket `10`); ticket `08` is where it came to ask
+ * the version check at all. One function is what makes the next check added
+ * here reach the importer without anyone remembering to carry it there.
  *
  * **This docblock is where that argument is written out** — the index clause,
  * the importer and both tickets point here rather than restating it.
@@ -180,12 +180,12 @@ export type LoadSpaceSnapshotResult =
 /**
  * Parse, validate references, and index raw input into a {@link Space}.
  *
- * Takes the space file *and* the card files, because a card exists by virtue of
+ * Takes the space file *and* the thing files, because a thing exists by virtue of
  * its file existing (ADR 0020) — the space file holds structure and nothing
  * else. This is one more argument, not one more capability: it does no I/O and
  * stays synchronous. Reading the bytes belongs to the caller, as it always did.
  */
-export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadSpaceResult {
+export function loadSpace(input: unknown, thingFiles: readonly ThingFile[]): LoadSpaceResult {
   const refusal = documentRefusal(input);
   if (refusal !== null) return { ok: false, errors: [refusal] };
 
@@ -199,36 +199,36 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
   }
   const file = parsed.data;
 
-  const cards: Card[] = [];
+  const things: Thing[] = [];
   const pathById = new Map<string, string>();
-  const cardErrors: SpaceError[] = [];
-  for (const cardFile of cardFiles) {
-    const parsedCard = parseCardFile(cardFile);
-    if (!parsedCard.ok) {
-      cardErrors.push(...parsedCard.errors);
+  const thingErrors: SpaceError[] = [];
+  for (const thingFile of thingFiles) {
+    const parsedThing = parseThingFile(thingFile);
+    if (!parsedThing.ok) {
+      thingErrors.push(...parsedThing.errors);
       continue;
     }
     // Which file you are editing must not depend on scan order, so a repeated
     // id is an error and not a silent winner. The message names both files —
     // "which two" is the only useful part of it.
-    const seen = pathById.get(parsedCard.card.id);
+    const seen = pathById.get(parsedThing.thing.id);
     if (seen !== undefined) {
-      cardErrors.push({
-        kind: 'duplicate-card-id',
-        ref: parsedCard.card.id,
-        message: `Duplicate card id "${parsedCard.card.id}" in ${seen} and ${cardFile.path}`,
+      thingErrors.push({
+        kind: 'duplicate-thing-id',
+        ref: parsedThing.thing.id,
+        message: `Duplicate thing id "${parsedThing.thing.id}" in ${seen} and ${thingFile.path}`,
       });
       continue;
     }
-    pathById.set(parsedCard.card.id, cardFile.path);
-    cards.push(parsedCard.card);
+    pathById.set(parsedThing.thing.id, thingFile.path);
+    things.push(parsedThing.thing);
   }
-  if (cardErrors.length > 0) return { ok: false, errors: cardErrors };
+  if (thingErrors.length > 0) return { ok: false, errors: thingErrors };
 
   return buildSpace({
     id: file.id,
     title: file.title,
-    cards,
+    things,
     diagrams: file.diagrams,
     defaultDiagram: file.defaultDiagram,
   });
@@ -257,20 +257,20 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
     };
   }
 
-  const { id, document, cards: storedCards } = parsed.data;
-  // SAFETY: `cardDocument` is `cardDocumentSchema`'s output, which is exactly
-  // `cardSchema.omit({ id: true })` per card kind — re-adding the `id` this
-  // schema stores alongside it reconstructs precisely a `Card`. TypeScript
+  const { id, document, things: storedThings } = parsed.data;
+  // SAFETY: `thingDocument` is `thingDocumentSchema`'s output, which is exactly
+  // `thingSchema.omit({ id: true })` per thing kind — re-adding the `id` this
+  // schema stores alongside it reconstructs precisely a `Thing`. TypeScript
   // can't confirm that itself: spreading a discriminated union plus one field
   // doesn't re-infer back to the original union.
-  const cards = storedCards.map(({ id: cardId, document: cardDocument }) => ({
-    id: cardId,
-    ...cardDocument,
-  })) as Card[];
+  const things = storedThings.map(({ id: thingId, document: thingDocument }) => ({
+    id: thingId,
+    ...thingDocument,
+  })) as Thing[];
   const loaded = buildSpace({
     id,
     title: document.title,
-    cards,
+    things,
     diagrams: document.diagrams,
     defaultDiagram: document.defaultDiagram,
   });
@@ -280,18 +280,18 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
 function buildSpace(input: {
   id: UUID;
   title: string;
-  cards: Card[];
+  things: Thing[];
   diagrams: Diagram[] | undefined;
   defaultDiagram: UUID | undefined;
 }): LoadSpaceResult {
   // Array order is read only by automatic strategies, so title order is the one
   // default stable across filesystem scans and unordered relational reads. Ties
   // break on id, making the order total rather than dependent on input order.
-  const cards = [...input.cards].sort(
+  const things = [...input.things].sort(
     (left, right) => left.title.localeCompare(right.title) || left.id.localeCompare(right.id),
   );
   const diagrams = input.diagrams ?? [];
-  const referenceErrors = validateReferences({ ...input, cards, diagrams });
+  const referenceErrors = validateReferences({ ...input, things, diagrams });
   if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
 
   // The flatten: diagrams in declared order, each diagram's owned graphs in
@@ -301,7 +301,7 @@ function buildSpace(input: {
   // The reference check above has already refused a repeated id, so the lookup
   // built below can drop nothing.
   const graphs = diagrams.flatMap((diagram) => diagram.graphs);
-  const built = buildSpaceLookup({ cards, diagrams });
+  const built = buildSpaceLookup({ things, diagrams });
   if (!built.ok) {
     return {
       ok: false,
@@ -318,7 +318,7 @@ function buildSpace(input: {
     space: intake({
       id: input.id,
       title: input.title,
-      cards,
+      things,
       graphs,
       diagrams,
       defaultDiagram: input.defaultDiagram,

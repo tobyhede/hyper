@@ -1,5 +1,5 @@
 import {
-  cardDocumentSchema,
+  thingDocumentSchema,
   importSpaceSchema,
   newUuid,
   SPACE_FILE_VERSION,
@@ -41,7 +41,7 @@ class SnapshotValidationError extends Error {}
 
 class DuplicateIdentityError extends Error {}
 
-class CardOwnershipError extends Error {}
+class ThingOwnershipError extends Error {}
 
 /**
  * A Space row moved between this transaction's conflict check and its write.
@@ -50,7 +50,7 @@ class CardOwnershipError extends Error {}
  * earlier Spaces in the change set by the time it can be detected. Returning a
  * conflict from inside the transaction callback would commit those writes
  * beside it, publishing half a coordinated edit; escaping the callback is what
- * rolls the whole change set back. `CardOwnershipError` above escapes for the
+ * rolls the whole change set back. `ThingOwnershipError` above escapes for the
  * same reason.
  */
 class StaleSpaceRevisionError extends Error {
@@ -89,8 +89,8 @@ const isPrimaryKeyConflict = (
 const isSpacePrimaryKeyConflict = (error: unknown): error is SqlPrimaryKeyConflictFields =>
   isPrimaryKeyConflict(error, 'spaces', 'spaces_pkey');
 
-const isCardPrimaryKeyConflict = (error: unknown): error is SqlPrimaryKeyConflictFields =>
-  isPrimaryKeyConflict(error, 'cards', 'cards_pkey');
+const isThingPrimaryKeyConflict = (error: unknown): error is SqlPrimaryKeyConflictFields =>
+  isPrimaryKeyConflict(error, 'things', 'things_pkey');
 
 const isRepositoryStatePrimaryKeyConflict = (
   error: unknown,
@@ -212,10 +212,10 @@ const parseImport = (input: unknown): ImportSpace => {
 };
 
 /**
- * The identities a batch may not repeat: space ids among spaces, card ids among
- * cards. Both are rows, so both must stay unique across the database.
+ * The identities a batch may not repeat: space ids among spaces, thing ids among
+ * things. Both are rows, so both must stay unique across the database.
  *
- * Per kind, and no wider. An earlier version pooled space, card, graph and
+ * Per kind, and no wider. An earlier version pooled space, thing, graph and
  * diagram ids into one set spanning the whole batch, which rejected two things
  * the model allows (ADR 0030): a graph id reused in a second Space, and one UUID
  * naming entities of different kinds. It also made acceptance depend on how a
@@ -232,17 +232,17 @@ const duplicateIdentity = (
   spaces: readonly ImportSpace[],
 ): { readonly kind: string; readonly id: UUID } | undefined => {
   const spaceIds = new Set<UUID>();
-  const cardIds = new Set<UUID>();
+  const thingIds = new Set<UUID>();
 
   for (const space of spaces) {
     if (space.id !== undefined) {
       if (spaceIds.has(space.id)) return { kind: 'space', id: space.id };
       spaceIds.add(space.id);
     }
-    for (const { id } of space.cards) {
+    for (const { id } of space.things) {
       if (id === undefined) continue;
-      if (cardIds.has(id)) return { kind: 'card', id };
-      cardIds.add(id);
+      if (thingIds.has(id)) return { kind: 'thing', id };
+      thingIds.add(id);
     }
   }
 
@@ -271,13 +271,13 @@ const validateImportIdentities = (spaces: readonly ImportSpace[]): void => {
  * when `Space.create` omits it, and the created row hands the value back as
  * `reservedSpaceId`. Graphs and diagrams are not rows at all — they live inside
  * the space document (ADR 0030) — so no column default can reach them, and
- * cards are minted here too, so the whole snapshot can be validated before the
- * first card is written.
+ * things are minted here too, so the whole snapshot can be validated before the
+ * first thing is written.
  *
  * A diagram's id and the ids of the graphs it owns are minted in the **same
  * pass**, because under version 1 a graph is reached only through its owner
  * (ADR 0040): there is no space-level collection to walk beside the diagrams.
- * That the pass runs before `parseSnapshotSchema` and before the first card write
+ * That the pass runs before `parseSnapshotSchema` and before the first thing write
  * is what keeps a rejection rolling the complete batch back.
  */
 const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot => {
@@ -292,7 +292,7 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
   return parseSnapshotSchema({
     id: input.id ?? reservedSpaceId,
     document,
-    cards: input.cards.map((card) => ({ ...card, id: card.id ?? newUuid() })),
+    things: input.things.map((thing) => ({ ...thing, id: thing.id ?? newUuid() })),
   });
 };
 
@@ -300,22 +300,24 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
  * One statement, so one snapshot: PostgreSQL fixes it at statement start, and
  * `include` compiles the child rows into a correlated aggregate rather than a
  * second round trip. Other transactions still commit while this runs — they are
- * simply not in the snapshot it reads from, so the document and its cards
+ * simply not in the snapshot it reads from, so the document and its things
  * cannot come from either side of one. There is no torn read to detect and no
  * revision comparison to make.
  */
 const loadSpaceAggregate = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefined> => {
   const stored = await orm.public.Space.where({ id })
-    .include('cards', (cards) => cards.select('id', 'document').orderBy((card) => card.id.asc()))
+    .include('things', (things) =>
+      things.select('id', 'document').orderBy((thing) => thing.id.asc()),
+    )
     .first();
   if (stored === null) return undefined;
 
   const snapshot = parseSnapshot({
     id: stored.id,
     document: spaceDocumentSchema.parse(stored.document),
-    cards: stored.cards.map((card) => ({
-      id: card.id,
-      document: cardDocumentSchema.parse(card.document),
+    things: stored.things.map((thing) => ({
+      id: thing.id,
+      document: thingDocumentSchema.parse(thing.document),
     })),
   });
 
@@ -343,7 +345,9 @@ const loadSpaceAggregate = async (orm: Orm, id: UUID): Promise<LoadedSpace | und
  */
 const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
   const stored = await orm.public.Space.orderBy((space) => space.id.asc())
-    .include('cards', (cards) => cards.select('id', 'document').orderBy((card) => card.id.asc()))
+    .include('things', (things) =>
+      things.select('id', 'document').orderBy((thing) => thing.id.asc()),
+    )
     .all();
 
   return stored.map((space) => {
@@ -352,7 +356,7 @@ const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
         snapshot: parseSnapshot({
           id: space.id,
           document: space.document,
-          cards: space.cards.map((card) => ({ id: card.id, document: card.document })),
+          things: space.things.map((thing) => ({ id: thing.id, document: thing.document })),
         }),
         revision: toRevision(space.revision),
         exportedRevision: toOptionalRevision(space.exportedRevision),
@@ -455,11 +459,13 @@ const replaceStoredSpace = async (
   await orm.public.Space.where({ id: snapshot.id }).update({
     revision: toDatabaseRevision(revision),
   });
-  await upsertCards(orm, snapshot);
-  const ownedCards = orm.public.Card.where({ spaceId: snapshot.id });
-  if (snapshot.cards.length === 0) await ownedCards.deleteAll();
+  await upsertThings(orm, snapshot);
+  const ownedThings = orm.public.Thing.where({ spaceId: snapshot.id });
+  if (snapshot.things.length === 0) await ownedThings.deleteAll();
   else {
-    await ownedCards.where((card) => card.id.notIn(snapshot.cards.map(({ id }) => id))).deleteAll();
+    await ownedThings
+      .where((thing) => thing.id.notIn(snapshot.things.map(({ id }) => id)))
+      .deleteAll();
   }
 };
 
@@ -470,16 +476,16 @@ const preservesAggregateBoundary = (current: SpaceSnapshot, next: SpaceSnapshot)
   ) {
     return false;
   }
-  if (current.cards.length !== next.cards.length) return false;
-  const currentById = new Map(current.cards.map((card) => [card.id, card]));
-  return next.cards.every((card) => {
-    const previous = currentById.get(card.id);
-    if (previous?.document.kind !== card.document.kind) return false;
-    if (card.document.kind !== 'space' || previous.document.kind !== 'space') return true;
+  if (current.things.length !== next.things.length) return false;
+  const currentById = new Map(current.things.map((thing) => [thing.id, thing]));
+  return next.things.every((thing) => {
+    const previous = currentById.get(thing.id);
+    if (previous?.document.kind !== thing.document.kind) return false;
+    if (thing.document.kind !== 'space' || previous.document.kind !== 'space') return true;
     return (
-      previous.document.spaceId === card.document.spaceId &&
-      previous.document.diagram === card.document.diagram &&
-      previous.document.graph === card.document.graph
+      previous.document.spaceId === thing.document.spaceId &&
+      previous.document.diagram === thing.document.diagram &&
+      previous.document.graph === thing.document.graph
     );
   });
 };
@@ -515,7 +521,7 @@ const commitTopologyPreservingUpdate = async (
   await orm.public.Space.where({ id: change.spaceId }).update({
     revision: toDatabaseRevision(revision),
   });
-  await upsertCards(orm, change.snapshot);
+  await upsertThings(orm, change.snapshot);
   return {
     kind: 'committed',
     revisions: [{ spaceId: change.spaceId, revision }],
@@ -529,7 +535,7 @@ const createStoredSpace = async (orm: Orm, snapshot: SpaceSnapshot): Promise<voi
     document: toJsonValue(snapshot.document),
     revision: 0,
   });
-  await importCards(orm, snapshot);
+  await importThings(orm, snapshot);
 };
 
 const commitIdentityRefusal = (request: SpaceCommit): string | undefined => {
@@ -544,37 +550,37 @@ const commitIdentityRefusal = (request: SpaceCommit): string | undefined => {
   return undefined;
 };
 
-const upsertCards = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
-  for (const card of snapshot.cards) {
-    const stored = await orm.public.Card.upsert({
+const upsertThings = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
+  for (const thing of snapshot.things) {
+    const stored = await orm.public.Thing.upsert({
       create: {
-        id: card.id,
+        id: thing.id,
         spaceId: snapshot.id,
-        document: toJsonValue(card.document),
+        document: toJsonValue(thing.document),
       },
       update: {
-        document: toJsonValue(card.document),
+        document: toJsonValue(thing.document),
       },
     });
     if (stored.spaceId !== snapshot.id) {
-      throw new CardOwnershipError(
-        `Card ${card.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
+      throw new ThingOwnershipError(
+        `Thing ${thing.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
       );
     }
   }
 };
 
-const importCards = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
-  for (const card of snapshot.cards) {
+const importThings = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
+  for (const thing of snapshot.things) {
     try {
-      await orm.public.Card.create({
-        id: card.id,
+      await orm.public.Thing.create({
+        id: thing.id,
         spaceId: snapshot.id,
-        document: toJsonValue(card.document),
+        document: toJsonValue(thing.document),
       });
     } catch (error) {
-      if (isCardPrimaryKeyConflict(error)) {
-        throw new CardOwnershipError(`Card ${card.id} already belongs to another space`);
+      if (isThingPrimaryKeyConflict(error)) {
+        throw new ThingOwnershipError(`Thing ${thing.id} already belongs to another space`);
       }
       throw error;
     }
@@ -587,7 +593,7 @@ const truncateHyperContent = async (orm: Orm): Promise<void> => {
   await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
   const spaces = await orm.public.Space.all();
   for (const space of spaces) {
-    await orm.public.Card.where({ spaceId: space.id }).deleteAll();
+    await orm.public.Thing.where({ spaceId: space.id }).deleteAll();
     await orm.public.Space.where({ id: space.id }).delete();
   }
 };
@@ -683,7 +689,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
       // identity. The loser reads the winner after its transaction rolls back
       // and classifies authored meaning, rather than exposing SQL timing.
       if (
-        !(error instanceof CardOwnershipError) &&
+        !(error instanceof ThingOwnershipError) &&
         !isSpacePrimaryKeyConflict(error) &&
         !isRepositoryStatePrimaryKeyConflict(error)
       ) {
@@ -749,14 +755,14 @@ export class PostgresSpaceRepository implements SpaceRepository {
     try {
       return await this.#commitInTransaction(request);
     } catch (error) {
-      // A Card the commit writes is still owned by a Space the same commit did
+      // A Thing the commit writes is still owned by a Space the same commit did
       // not release. Complete intake cannot see it — the candidate aggregate is
       // consistent and the collision only exists in the stored rows the write
       // loop meets in request order. It is permanent, so it has to leave here
       // as a rejection: escaping instead becomes 503 `persistence-unavailable`,
       // which the client retries forever. `importSpaces` answers the same
       // error the same way.
-      if (error instanceof CardOwnershipError) {
+      if (error instanceof ThingOwnershipError) {
         return { kind: 'rejected', code: 'invalid-commit', message: error.message };
       }
       // The transaction has rolled back, so the current state is read fresh
@@ -853,7 +859,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
         aggregate.ok
           ? []
           : aggregate.errors.flatMap((error) =>
-              error.kind === 'space-card-target-missing' &&
+              error.kind === 'space-thing-target-missing' &&
               deletedIds.has(error.targetSpaceId) &&
               !changedIds.has(error.spaceId)
                 ? [error.targetSpaceId]
@@ -880,7 +886,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
       const deletedSpaceIds: UUID[] = [];
       for (const change of request.changes) {
         if (change.kind === 'delete') {
-          await orm.public.Card.where({ spaceId: change.spaceId }).deleteAll();
+          await orm.public.Thing.where({ spaceId: change.spaceId }).deleteAll();
           const deleted = await orm.public.Space.where({ id: change.spaceId }).delete();
           if (deleted === null)
             throw new Error(`Space ${change.spaceId} disappeared during commit`);
@@ -1038,7 +1044,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
             throw new Error(`Newly inserted space ${snapshot.id} disappeared during import`);
           }
 
-          await importCards(orm, snapshot);
+          await importThings(orm, snapshot);
 
           // The only read that runs inside a transaction, and it reads rows this
           // transaction has just written and not yet committed. That is exactly
@@ -1061,10 +1067,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
           message: error.message,
         };
       }
-      if (error instanceof CardOwnershipError) {
+      if (error instanceof ThingOwnershipError) {
         return {
           kind: 'rejected',
-          code: 'card-ownership',
+          code: 'thing-ownership',
           message: error.message,
         };
       }

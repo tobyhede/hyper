@@ -5,7 +5,7 @@ import { lazy } from 'react';
  * (ADR 0063), owned by the package the editor lives in.
  *
  * It used to live in `app`, because `app` was the only consumer and a dynamic
- * import there was enough. `MarkdownCardBody` is the second consumer and it
+ * import there was enough. `MarkdownThingBody` is the second consumer and it
  * lives here, so a static import from it would put the whole stack back into
  * the barrel — and from the barrel into every consumer of `@project/ui`,
  * including the adapter, with nothing in `app` to catch it. Beside the

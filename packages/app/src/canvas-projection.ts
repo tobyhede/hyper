@@ -1,6 +1,6 @@
-import type { CardId, Graph, GraphId } from '@project/core';
+import type { ThingId, Graph, GraphId } from '@project/core';
 import {
-  buildCardHandles,
+  buildThingHandles,
   buildGraphRenderEdges,
   buildLayoutStrategyGraph,
   filterHandlesByGraphs,
@@ -11,14 +11,14 @@ import {
 } from '@project/graph';
 import type { Edge } from '@xyflow/react';
 import {
-  projectCardNodes,
+  projectThingNodes,
   projectGraphEdges,
-  type CardFlowNode,
+  type ThingFlowNode,
   type GraphEmphasis,
 } from '@project/react-flow-adapter';
-import { CARD_HEIGHT, CARD_SIZE } from './card';
+import { THING_HEIGHT, THING_SIZE } from './thing';
 import { activeGraphColor, graphColorMap } from './colors';
-import { diagramCards } from './diagram-resolution';
+import { diagramThings } from './diagram-resolution';
 
 /**
  * What the canvas draws, derived from a Space and the Diagram drawing it.
@@ -26,7 +26,7 @@ import { diagramCards } from './diagram-resolution';
  * Everything here is a pure function of the Space, the resolved Diagram and the
  * interaction state — no store, no React, no DOM. It is split in two because a
  * layout strategy runs asynchronously: the outer call answers everything a
- * strategy needs and everything the canvas draws *around* the cards, and
+ * strategy needs and everything the canvas draws *around* the things, and
  * `project` turns the resolved placement into React Flow's nodes and edges.
  */
 
@@ -34,36 +34,36 @@ import { diagramCards } from './diagram-resolution';
 export interface CanvasInteraction {
   /** The Graph being emphasised, if one is active. */
   readonly activeGraphId: GraphId | null;
-  /** The Card reached during traversal, if any. */
-  readonly activeCardId: CardId | null;
-  /** The Card named by an authoring gesture, if any. */
-  readonly selectedCardId: CardId | null;
-  /** Presenting draws the active Card's content rather than its title. */
+  /** The Thing reached during traversal, if any. */
+  readonly activeThingId: ThingId | null;
+  /** The Thing named by an authoring gesture, if any. */
+  readonly selectedThingId: ThingId | null;
+  /** Presenting draws the active Thing's content rather than its title. */
   readonly presenting: boolean;
-  /** Whether a Card has been dragged out of the placement the strategy computed. */
+  /** Whether a Thing has been dragged out of the placement the strategy computed. */
   readonly moved: boolean;
 }
 
 /** React Flow's view of the Space, ready to publish. */
 export interface CanvasNodesAndEdges {
-  readonly nodes: readonly CardFlowNode[];
+  readonly nodes: readonly ThingFlowNode[];
   readonly edges: readonly Edge[];
 }
 
 export interface PendingCanvasProjection {
-  /** What a layout strategy arranges: the visible cards, handles and edges. */
+  /** What a layout strategy arranges: the visible things, handles and edges. */
   readonly strategyGraph: LayoutStrategyGraph;
   /** Every visible Graph's resolved colour. */
   readonly colors: Readonly<Record<string, string>>;
   /** The Graphs this Diagram draws — its own, in authored order. */
   readonly visibleGraphs: readonly Graph[];
   /**
-   * The placed cards and their Edges, coloured by the interaction state.
+   * The placed things and their Edges, coloured by the interaction state.
    *
    * Takes a resolved `LayoutStrategyGraph` rather than a nullable one on
    * purpose: there is nothing worth projecting before a strategy has run, and
    * requiring one here is what stops a caller publishing a projection whose
-   * every card sits at the origin.
+   * every thing sits at the origin.
    */
   project(laidOut: LayoutStrategyGraph, interaction: CanvasInteraction): CanvasNodesAndEdges;
 }
@@ -76,18 +76,20 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
   const visibleGraphs = resolved.diagram.graphs;
   const drawnGraphIds = visibleGraphs.map((graph) => graph.id);
   const visible = new Set<GraphId>(drawnGraphIds);
-  const handles = filterHandlesByGraphs(buildCardHandles(space), drawnGraphIds);
+  const handles = filterHandlesByGraphs(buildThingHandles(space), drawnGraphIds);
   const edges = buildGraphRenderEdges(space).filter((edge) => visible.has(edge.graphId));
-  // The Diagram chooses the Cards it draws. In particular, a Diagram's sparse
-  // placement omits Cards from its canvas; the Cards drawer is the surface that
-  // reveals those Cards without manufacturing positions (ADR 0040, ADR 0069) —
-  // the Sidebar's Cards collection before ADR 0082, the Dock's drawer now.
-  const cardIds = diagramCards(space, resolved.diagram).map((card) => card.id);
+  // The Diagram chooses the Things it draws. In particular, a Diagram's sparse
+  // placement omits Things from its canvas; the Things drawer is the surface that
+  // reveals those Things without manufacturing positions (ADR 0040, ADR 0069) —
+  // the Sidebar's Things collection before ADR 0082, the Dock's drawer now.
+  const thingIds = diagramThings(space, resolved.diagram).map((thing) => thing.id);
   const authored = Placement.fromDiagram(resolved.diagram);
-  const openCardIds = new Set([...authored].filter(([, at]) => at.open).map(([cardId]) => cardId));
-  const strategyGraph = buildLayoutStrategyGraph(cardIds, handles, edges, (cardId) => {
-    const at = authored.get(cardId);
-    return at?.open === true ? at.openSize : CARD_SIZE;
+  const openThingIds = new Set(
+    [...authored].filter(([, at]) => at.open).map(([thingId]) => thingId),
+  );
+  const strategyGraph = buildLayoutStrategyGraph(thingIds, handles, edges, (thingId) => {
+    const at = authored.get(thingId);
+    return at?.open === true ? at.openSize : THING_SIZE;
   });
 
   return {
@@ -100,26 +102,26 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
       const emphasis: GraphEmphasis = activeGraphId === null ? 'equal' : 'subtle';
 
       // A diagram's routed Edge geometry describes the placement it computed,
-      // so it stops being true once a Card is dragged out of it. From then on
-      // the Edges fall back to plain curves between wherever the Cards now are
+      // so it stops being true once a Thing is dragged out of it. From then on
+      // the Edges fall back to plain curves between wherever the Things now are
       // — which is what a positioned view draws anyway, since it routes nothing.
       const edgeOptions = interaction.moved
         ? { activeGraphId, emphasis }
         : { activeGraphId, emphasis, strategyGraph: laidOut };
 
       return {
-        nodes: projectCardNodes(space, handles, colors, {
+        nodes: projectThingNodes(space, handles, colors, {
           readOnly: false,
-          activeCardId: interaction.activeCardId,
-          selectedCardId: interaction.selectedCardId,
-          showActiveCardContent: interaction.presenting,
+          activeThingId: interaction.activeThingId,
+          selectedThingId: interaction.selectedThingId,
+          showActiveThingContent: interaction.presenting,
           activeGraphId,
           activeGraphColor: activeGraphColor(colors, activeGraphId),
           emphasis,
           strategyGraph: laidOut,
-          nodeHeight: CARD_HEIGHT,
-          cardIds,
-          openCardIds,
+          nodeHeight: THING_HEIGHT,
+          thingIds,
+          openThingIds,
         }),
         edges: projectGraphEdges(edges, colors, edgeOptions),
       };

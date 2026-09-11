@@ -1,4 +1,4 @@
-import type { CardId } from '@project/core';
+import type { ThingId } from '@project/core';
 import {
   createObservableState,
   type ObservableState,
@@ -11,7 +11,7 @@ import type { SpaceAuthoring } from './space-authoring';
  * Where an Edit continues, as one module.
  *
  * `CONTEXT.md` states the rule in several places — **an Edit continues at the
- * thing it produced** — and before this it had six implementations in five
+ * entity it produced** — and before this it had six implementations in five
  * mechanisms: a boolean ref, a projection poll, a component inside
  * `ReactFlowProvider`, an attribute query, a DOM closure held on React state,
  * and Edge Authoring's published one-shot. Each carried a paragraph about a
@@ -27,13 +27,13 @@ import type { SpaceAuthoring } from './space-authoring';
  * author should be *now*, so an unspent one is stale the moment a second
  * gesture finishes: {@link Continuation.request} replaces it silently. Firing
  * *twice* is the bug class this exists to close, and {@link Continuation.take}
- * is what closes it — `createdCardId` was set from two places and cleared from
+ * is what closes it — `createdThingId` was set from two places and cleared from
  * none.
  */
 
 /** What a continuation names. */
 export type ContinuationTarget =
-  | { readonly kind: 'card'; readonly cardId: CardId }
+  | { readonly kind: 'thing'; readonly thingId: ThingId }
   | ({ readonly kind: 'edge' } & EdgeSubject)
   | { readonly kind: 'canvas' }
   | { readonly kind: 'control'; readonly name: ContinuationControl };
@@ -56,7 +56,7 @@ export type ContinuationTarget =
  * to address (`components/CommandDock.tsx`). Renaming it would have been a name
  * for a thing that no longer exists.
  */
-export type ContinuationControl = 'add-card';
+export type ContinuationControl = 'add-thing';
 
 export interface PendingContinuation {
   readonly target: ContinuationTarget;
@@ -113,23 +113,23 @@ const NONE: ContinuationState = { pending: null };
  *
  * A canvas subject stays owed. A continuation is published synchronously with
  * the Edit that produced it, and the projection carrying that Edit's result
- * arrives a strategy later — so a Card just created, just added to the Diagram
+ * arrives a strategy later — so a Thing just created, just added to the Diagram
  * or an Edge just reconnected resolves to nothing *yet*, and spending it on
  * the canvas fallback lands focus anywhere but the thing the author made.
  * A chrome control and the canvas itself fall through: both are drawn already,
  * so unresolvable means gone, and a wait with no end is worse than a fallback.
  *
- * **Every card target waits**, not only `reveal` and `rename`. Add to Diagram
+ * **Every thing target waits**, not only `reveal` and `rename`. Add to Diagram
  * is a `focus` whose target arrives a projection later exactly as a creation
  * does — it is why the mechanism this replaces polled the live projection —
- * and keying the wait on `then` would drop it. The two card targets that name
+ * and keying the wait on `then` would drop it. The two thing targets that name
  * something already drawn (a cancelled Edge draft's anchor, a deleted Edge's
  * source) resolve on the first render either way, so waiting costs them
- * nothing; a card that never arrives stays owed until the next request
+ * nothing; a thing that never arrives stays owed until the next request
  * replaces it or an invalidation discards it.
  */
 export const staysOwed = ({ target }: PendingContinuation): boolean =>
-  target.kind === 'card' || target.kind === 'edge';
+  target.kind === 'thing' || target.kind === 'edge';
 
 export function createContinuation({
   authoring,

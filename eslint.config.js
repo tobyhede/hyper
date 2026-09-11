@@ -7,7 +7,7 @@ import globals from 'globals';
 
 /** Render-layer libraries: they live in `react-flow-adapter` and nowhere below
  *  it. ELK's presence here is the point of ADR 0014 — it is one strategy among
- *  several, not the thing "layout" means, so `graph` must not reach for it. */
+ *  several, not what "layout" means, so `graph` must not reach for it. */
 const RENDER_ONLY = [
   { name: '@xyflow/react', message: 'React Flow lives in @project/react-flow-adapter only.' },
   { name: 'elkjs', message: 'elkjs lives in @project/react-flow-adapter only.' },

@@ -1,6 +1,6 @@
 import { createContext } from 'react';
-import type { CardId } from '@project/core';
-import type { CardChoice } from '@project/ui';
+import type { ThingId } from '@project/core';
+import type { ThingChoice } from '@project/ui';
 import type { EdgeRefusal } from '../edge-authoring';
 import type { EdgeSubject } from '../render-adapter';
 import type { EdgeEndpoint } from '../space-authoring';
@@ -27,10 +27,13 @@ export interface EdgeAuthoringCommands {
   readonly refusal: EdgeRefusal | null;
   readonly openEditor: (subject: EdgeSubject) => void;
   readonly closeEditor: () => void;
-  readonly reconnect: (endpoint: EdgeEndpoint, cardId: CardId) => void;
+  readonly reconnect: (endpoint: EdgeEndpoint, thingId: ThingId) => void;
   readonly deleteEdge: (subject: EdgeSubject) => void;
-  /** Which Cards an endpoint may be moved to, and why each cannot. */
-  readonly endpointChoices: (subject: EdgeSubject, endpoint: EdgeEndpoint) => readonly CardChoice[];
+  /** Which Things an endpoint may be moved to, and why each cannot. */
+  readonly endpointChoices: (
+    subject: EdgeSubject,
+    endpoint: EdgeEndpoint,
+  ) => readonly ThingChoice[];
 }
 
 export const EdgeAuthoringContext = createContext<EdgeAuthoringCommands | null>(null);

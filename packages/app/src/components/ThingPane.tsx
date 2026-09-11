@@ -1,0 +1,82 @@
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogPopup,
+  DialogPortal,
+  DialogTitle,
+  DialogViewport,
+} from '@project/ui';
+import { PANE_INITIAL_FOCUS } from './pane-focus';
+
+export interface ThingPaneProps {
+  readonly ariaLabel: string;
+  readonly testId: string;
+  /** Cancel and Escape both discard this surface's draft (ADR 0048). */
+  readonly onDismiss: () => void;
+  /**
+   * An Edit begun from this pane is still running.
+   *
+   * Stated on the dialog rather than left to be read off the controls it
+   * disables: a pane whose exits have gone quiet is otherwise indistinguishable
+   * from one that has broken, and a coordinated Edit can take a while
+   * (ADR 0076).
+   */
+  readonly busy?: boolean;
+  readonly children: ReactNode;
+}
+
+/**
+ * A modal surface shared by opening a Thing and creating an Alias. Base UI owns
+ * containment, Escape and accessible dialog semantics; App owns focus return.
+ */
+export function ThingPane({ ariaLabel, testId, onDismiss, busy, children }: ThingPaneProps) {
+  const popup = useRef<HTMLDivElement>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+  const captureOwnerDocument = useCallback((node: HTMLSpanElement | null) => {
+    setPortalContainer(node?.ownerDocument.body ?? null);
+  }, []);
+
+  // Base UI supplies the focus trap; this only selects the product's declared
+  // starting field (Target for an Alias, otherwise the first field).
+  useEffect(() => {
+    if (portalContainer === null) return;
+    const timer = window.setTimeout(() => {
+      const destination =
+        popup.current?.querySelector<HTMLElement>(PANE_INITIAL_FOCUS) ??
+        popup.current?.querySelector<HTMLElement>('input, textarea, button');
+      destination?.focus();
+    });
+    return () => window.clearTimeout(timer);
+  }, [portalContainer]);
+
+  return (
+    <Dialog open disablePointerDismissal onOpenChange={(open) => !open && onDismiss()}>
+      {/* Base UI otherwise portals through the JavaScript realm's global
+          document. Ladle mounts stories into an iframe with a React portal, so
+          that default escapes the story and makes its modal own the catalogue
+          shell. The mount marker supplies the document this component actually
+          belongs to; in the application it resolves to the ordinary body. */}
+      <span ref={captureOwnerDocument} hidden />
+      {portalContainer !== null && (
+        <DialogPortal container={portalContainer}>
+          <DialogViewport className="thing-pane" data-testid={testId}>
+            <DialogBackdrop className="thing-pane__backdrop" />
+            <DialogPopup
+              ref={popup}
+              aria-busy={busy === true ? true : undefined}
+              className="thing-pane__panel"
+              // The primitive still owns modality; the effect above supplies the
+              // declared field instead of its generic first-tabbable default.
+              initialFocus={false}
+              finalFocus={false}
+            >
+              <DialogTitle className="sr-only">{ariaLabel}</DialogTitle>
+              {children}
+            </DialogPopup>
+          </DialogViewport>
+        </DialogPortal>
+      )}
+    </Dialog>
+  );
+}

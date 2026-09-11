@@ -29,7 +29,7 @@ const typeScriptSourceFiles = (directory: string): readonly string[] =>
  * TypeScript is structural, so a re-declared `interface DiagramPoint { x: number;
  * y: number }` *is* `DiagramPosition` as far as the type system is concerned —
  * measured, not assumed: restoring the duplicate and typing `Placement` over it
- * leaves `expectTypeOf<Placement>().toExtend<ReadonlyMap<CardId,
+ * leaves `expectTypeOf<Placement>().toExtend<ReadonlyMap<ThingId,
  * Readonly<DiagramPosition>>>()` in `packages/graph/test/identity-types.test.ts`
  * green, along with both typechecks and lint. That assertion pins the shape, and
  * the shape is exactly what the two types agree on. Only the declarations differ,
@@ -37,7 +37,7 @@ const typeScriptSourceFiles = (directory: string): readonly string[] =>
  *
  * The check is structural rather than a search for a name: it finds a point
  * re-declared under any name, and it stays silent about the many legitimate uses
- * of `x` and `y` next door (`LayoutStrategyCard`, `LayoutStrategyPort`), whose
+ * of `x` and `y` next door (`LayoutStrategyThing`, `LayoutStrategyPort`), whose
  * members are optional and not alone. The one declaration the split allows is
  * named and located, so a second one — or the same one moving to a module that
  * is not the strategy contract — is still reported.

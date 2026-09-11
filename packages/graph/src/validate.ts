@@ -1,8 +1,8 @@
-import { uuidSchema, type Card, type Diagram, type UUID } from '@project/core';
+import { uuidSchema, type Thing, type Diagram, type UUID } from '@project/core';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
- * The cards and diagrams a reference check reads. Structural so it accepts both
+ * The things and diagrams a reference check reads. Structural so it accepts both
  * a freshly parsed space file (inside `loadSpace`) and an already-built
  * `Space`. `diagrams` and `defaultDiagram` are optional: a space may declare
  * neither and open in an automatic view (ADR 0025).
@@ -10,11 +10,11 @@ import { repeatedGraphEdges } from './graph-edges';
  * There is no `graphs` here, and that is the whole of ADR 0040 in one shape: a
  * graph is reached through the diagram that owns it, so a check written over a
  * space-level collection could not ask the question that now matters — whether
- * an edge endpoint is a card of *that* diagram.
+ * an edge endpoint is a thing of *that* diagram.
  */
 export interface Referenceable {
   readonly id: UUID;
-  readonly cards: readonly Card[];
+  readonly things: readonly Thing[];
   readonly diagrams?: readonly Diagram[] | undefined;
   readonly defaultDiagram?: UUID | undefined;
 }
@@ -23,38 +23,38 @@ export interface Referenceable {
  * Why a Space failed its reference check.
  *
  * The membership kinds name **ownership**, which is the era the aggregate is in
- * (ADR 0040): a Diagram's position keys are its Card membership, and every Edge
+ * (ADR 0040): a Diagram's position keys are its Thing membership, and every Edge
  * of an owned Graph is closed over exactly that set. Where the superseded
- * vocabulary had one kind for "does not resolve", there are now two — the Card
+ * vocabulary had one kind for "does not resolve", there are now two — the Thing
  * or Graph does not exist at all, or it exists and belongs somewhere else. They
  * are different mistakes and lead an author to different places, which is the
  * whole reason for the split.
  */
 export type SpaceReferenceErrorKind =
-  | 'duplicate-card-id'
+  | 'duplicate-thing-id'
   | 'duplicate-graph-id'
   | 'duplicate-diagram-id'
-  /** A Diagram's position names a Card the Space does not hold. */
-  | 'diagram-member-missing-card'
+  /** A Diagram's position names a Thing the Space does not hold. */
+  | 'diagram-member-missing-thing'
   /** A Diagram opens active on a Graph no Diagram in the Space owns. */
   | 'diagram-active-graph-missing'
   /** A Diagram opens active on a Graph another Diagram owns. */
   | 'diagram-active-graph-outside-diagram'
-  /** An Edge endpoint names a Card the Space does not hold. */
-  | 'graph-edge-missing-card'
-  /** An Edge endpoint names a Space Card that is not a member of its own Diagram. */
-  | 'graph-edge-card-outside-diagram'
+  /** An Edge endpoint names a Thing the Space does not hold. */
+  | 'graph-edge-missing-thing'
+  /** An Edge endpoint names a Space Thing that is not a member of its own Diagram. */
+  | 'graph-edge-thing-outside-diagram'
   | 'unresolved-default-diagram'
   | 'duplicate-graph-edge'
   | 'unresolved-alias-target'
   | 'alias-self-reference'
   | 'alias-targets-alias'
   | 'alias-target-must-own-content'
-  | 'space-card-reference-cycle';
+  | 'space-thing-reference-cycle';
 
 /**
  * One failed cross-reference. Named for the space whose references it is about,
- * beside `CardFileError` and inside `SpaceError` — and deliberately not
+ * beside `ThingFileError` and inside `SpaceError` — and deliberately not
  * `ReferenceError`, which is a JavaScript global that any file importing the
  * bare name would lose.
  */
@@ -100,11 +100,11 @@ interface GraphOccurrence {
 export function validateReferences(space: Referenceable): SpaceReferenceError[] {
   const errors: SpaceReferenceError[] = [];
 
-  const cardById = new Map(space.cards.map((c) => [c.id, c]));
-  const cardIds = new Set(space.cards.map((c) => c.id));
+  const thingById = new Map(space.things.map((t) => [t.id, t]));
+  const thingIds = new Set(space.things.map((t) => t.id));
 
-  for (const id of duplicates(space.cards.map((c) => c.id))) {
-    errors.push({ kind: 'duplicate-card-id', ref: id, message: `Duplicate card id "${id}"` });
+  for (const id of duplicates(space.things.map((t) => t.id))) {
+    errors.push({ kind: 'duplicate-thing-id', ref: id, message: `Duplicate thing id "${id}"` });
   }
 
   const diagrams = space.diagrams ?? [];
@@ -144,33 +144,33 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   }
 
   for (const diagram of diagrams) {
-    // A diagram's position keys **are** its card membership (ADR 0040). They may
-    // omit cards — a card the map leaves out is simply not in this diagram — but
-    // may not name a card that does not exist, a position left behind by a
-    // deleted card (ADR 0025).
+    // A diagram's position keys **are** its thing membership (ADR 0040). They may
+    // omit things — a thing the map leaves out is simply not in this diagram — but
+    // may not name a thing that does not exist, a position left behind by a
+    // deleted thing (ADR 0025).
     //
-    // A key naming a missing card still joins `members`, which is what keeps
-    // this the *only* thing said about it: an edge into that card is then a
+    // A key naming a missing thing still joins `members`, which is what keeps
+    // this the *only* thing said about it: an edge into that thing is then a
     // consequence of this fault rather than a second one.
     const members = new Set<string>();
     for (const key of Object.keys(diagram.positions)) {
-      const cardId = uuidSchema.parse(key);
-      members.add(cardId);
-      if (!cardIds.has(cardId)) {
+      const thingId = uuidSchema.parse(key);
+      members.add(thingId);
+      if (!thingIds.has(thingId)) {
         errors.push({
-          kind: 'diagram-member-missing-card',
-          ref: cardId,
-          message: `Diagram "${diagram.id}" holds a position for card "${cardId}", which the space does not hold`,
+          kind: 'diagram-member-missing-thing',
+          ref: thingId,
+          message: `Diagram "${diagram.id}" holds a position for thing "${thingId}", which the space does not hold`,
         });
       }
     }
 
-    // Every edge endpoint of an owned graph names a card **in that diagram** —
+    // Every edge endpoint of an owned graph names a thing **in that diagram** —
     // one rule, and the two kinds below are two readings of failing it rather
-    // than two rules. An endpoint naming no card at all is a dangling reference;
-    // one naming a card another diagram holds is a closure failure, and telling
+    // than two rules. An endpoint naming no thing at all is a dangling reference;
+    // one naming a thing another diagram holds is a closure failure, and telling
     // an author which they have is the difference between hunting for a deleted
-    // card and adding a member.
+    // thing and adding a member.
     for (const graph of diagram.graphs) {
       // Asked once, up front, and read inside the loop below so a graph's
       // diagnostics still arrive in edge order rather than in two passes.
@@ -179,14 +179,14 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         for (const end of ['from', 'to'] as const) {
           if (members.has(edge[end])) continue;
           errors.push(
-            cardIds.has(edge[end])
+            thingIds.has(edge[end])
               ? {
-                  kind: 'graph-edge-card-outside-diagram',
+                  kind: 'graph-edge-thing-outside-diagram',
                   ref: edge[end],
-                  message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which is a card of the space but not a member of its diagram "${diagram.id}"`,
+                  message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which is a thing of the space but not a member of its diagram "${diagram.id}"`,
                 }
               : {
-                  kind: 'graph-edge-missing-card',
+                  kind: 'graph-edge-missing-thing',
                   ref: edge[end],
                   message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which the space does not hold`,
                 },
@@ -239,48 +239,48 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     }
   }
 
-  for (const card of space.cards) {
-    if (card.kind !== 'alias') continue;
-    if (card.target === card.id) {
+  for (const thing of space.things) {
+    if (thing.kind !== 'alias') continue;
+    if (thing.target === thing.id) {
       errors.push({
         kind: 'alias-self-reference',
-        ref: card.id,
-        message: `Alias "${card.id}" points at itself`,
+        ref: thing.id,
+        message: `Alias "${thing.id}" points at itself`,
       });
       continue;
     }
-    const target = cardById.get(card.target);
+    const target = thingById.get(thing.target);
     if (!target) {
       errors.push({
         kind: 'unresolved-alias-target',
-        ref: card.target,
-        message: `Alias "${card.id}" targets missing card "${card.target}"`,
+        ref: thing.target,
+        message: `Alias "${thing.id}" targets missing thing "${thing.target}"`,
       });
       continue;
     }
     if (target.kind === 'alias') {
       errors.push({
         kind: 'alias-targets-alias',
-        ref: card.target,
-        message: `Alias "${card.id}" targets alias "${card.target}"; aliasing is a single hop`,
+        ref: thing.target,
+        message: `Alias "${thing.id}" targets alias "${thing.target}"; aliasing is a single hop`,
       });
       continue;
     }
     if (target.kind !== 'markdown') {
       errors.push({
         kind: 'alias-target-must-own-content',
-        ref: card.target,
-        message: `Alias "${card.id}" targets ${target.kind} Card "${card.target}"; aliases show Markdown content`,
+        ref: thing.target,
+        message: `Alias "${thing.id}" targets ${target.kind} Thing "${thing.target}"; aliases show Markdown content`,
       });
     }
   }
 
-  for (const card of space.cards) {
-    if (card.kind !== 'space' || card.spaceId !== space.id) continue;
+  for (const thing of space.things) {
+    if (thing.kind !== 'space' || thing.spaceId !== space.id) continue;
     errors.push({
-      kind: 'space-card-reference-cycle',
-      ref: card.spaceId,
-      message: `Space Card "${card.id}" targets its own Space "${card.spaceId}"`,
+      kind: 'space-thing-reference-cycle',
+      ref: thing.spaceId,
+      message: `Space Thing "${thing.id}" targets its own Space "${thing.spaceId}"`,
     });
   }
 

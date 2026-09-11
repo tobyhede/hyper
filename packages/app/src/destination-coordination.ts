@@ -1,4 +1,4 @@
-import type { CardId, SpaceSnapshot } from '@project/core';
+import type { ThingId, SpaceSnapshot } from '@project/core';
 import { resolveProductDestinationInSnapshot, type ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
@@ -58,29 +58,29 @@ export interface DestinationSyncInput {
 }
 
 /**
- * The complete position a browser location shows: the address, plus the Card
+ * The complete position a browser location shows: the address, plus the Thing
  * the location addresses within it.
  *
  * It **extends** the address rather than restating its three fields, and the
- * Card arrives inside it rather than beside it. Both were separate once and
+ * Thing arrives inside it rather than beside it. Both were separate once and
  * both cost the same thing: a caller could hand `destinationSync` an address
- * already carrying a Card and a second Card argument that disagreed with it,
+ * already carrying a Thing and a second Thing argument that disagreed with it,
  * and structural typing had nothing to say — the spread that built the position
  * silently preferred the loose one while the `synced` comparison had seen the
  * other. One value cannot disagree with itself.
  *
- * The addressed Card is `app`'s and not Navigation's (ADR 0081): it is read
+ * The addressed Thing is `app`'s and not Navigation's (ADR 0081): it is read
  * from a URL and never written back, so it belongs to the position the browser
  * is showing without belonging to the address that decides push from replace.
  */
 export interface AddressedPosition extends NavigationAddress {
-  readonly addressedCardId: CardId | null;
+  readonly addressedThingId: ThingId | null;
 }
 
 const sameAddress = (one: NavigationAddress, other: NavigationAddress): boolean =>
   one.selectedDiagramId === other.selectedDiagramId &&
   one.activeGraphId === other.activeGraphId &&
-  one.presentingCardId === other.presentingCardId;
+  one.presentingThingId === other.presentingThingId;
 
 /**
  * Whether two positions are the same one.
@@ -90,7 +90,7 @@ const sameAddress = (one: NavigationAddress, other: NavigationAddress): boolean 
  * invocation of the same effect, from writing history at all.
  */
 export const samePosition = (one: AddressedPosition, other: AddressedPosition): boolean =>
-  sameAddress(one, other) && one.addressedCardId === other.addressedCardId;
+  sameAddress(one, other) && one.addressedThingId === other.addressedThingId;
 
 /**
  * The position an opening puts the application in, decided the way
@@ -104,22 +104,22 @@ function openingPosition(space: Space, opening: DestinationOpening): AddressedPo
   return {
     selectedDiagramId: opening.selection,
     activeGraphId: opening.graphId ?? openingGraphId(resolveDiagram(space, opening.selection)),
-    presentingCardId: opening.presentationCardId,
-    addressedCardId: opening.cardId,
+    presentingThingId: opening.presentationThingId,
+    addressedThingId: opening.thingId,
   };
 }
 
 /**
  * The destination that names a position, no more specifically than it has to.
  *
- * Three kinds are writable and a Card destination is not one of them, in either
- * spelling. A Card address is something the application *arrives at* — read off
- * a location and held in `addressedCardId` until a choice clears it — and never
+ * Three kinds are writable and a Thing destination is not one of them, in either
+ * spelling. A Thing address is something the application *arrives at* — read off
+ * a location and held in `addressedThingId` until a choice clears it — and never
  * something it moves to, so writing one would answer a URL no operation asked
  * for: the canonical spelling silently narrowed into its contextual form, the
- * Active Graph dropped out of the address it names nothing of, and, for a Card
- * the Diagram omits, a location this Space's own resolver refuses. The Card
- * still decides {@link samePosition}, which is how a restored Card location is
+ * Active Graph dropped out of the address it names nothing of, and, for a Thing
+ * the Diagram omits, a location this Space's own resolver refuses. The Thing
+ * still decides {@link samePosition}, which is how a restored Thing location is
  * recognised as already open.
  *
  * Two rules decide whether the URL names the Active Graph. It must, when the
@@ -137,14 +137,14 @@ function positionDestination(
   opening: DestinationOpening | null,
 ): ProductDestination {
   const spaceId = space.id;
-  const { selectedDiagramId, activeGraphId, presentingCardId } = position;
-  if (presentingCardId !== null && activeGraphId !== null) {
+  const { selectedDiagramId, activeGraphId, presentingThingId } = position;
+  if (presentingThingId !== null && activeGraphId !== null) {
     return {
       kind: 'presentation',
       spaceId,
       diagramId: selectedDiagramId,
       graphId: activeGraphId,
-      cardId: presentingCardId,
+      thingId: presentingThingId,
     };
   }
   const namesGraph =

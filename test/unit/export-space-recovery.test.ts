@@ -58,16 +58,16 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
-const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 
 const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
     document: { version: 1, title: 'Stored talk' },
-    cards: [
+    things: [
       {
-        id: CARD_ID,
-        document: { title: 'Stored card', kind: 'markdown', body: 'Stored body.\n' },
+        id: THING_ID,
+        document: { title: 'Stored thing', kind: 'markdown', body: 'Stored body.\n' },
       },
     ],
   },
@@ -104,9 +104,9 @@ describe('canonical export recovery cleanup', () => {
       revision: 7n,
     });
 
-    await expect(readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8')).resolves.toContain(
-      `id: ${CARD_ID}`,
-    );
+    await expect(
+      readFile(join(destination, 'things', `${THING_ID}.md`), 'utf8'),
+    ).resolves.toContain(`id: ${THING_ID}`);
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: 7n,
     });
@@ -121,9 +121,9 @@ describe('canonical export recovery cleanup', () => {
       revision: 7n,
     });
 
-    await expect(readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8')).resolves.toContain(
-      `id: ${CARD_ID}`,
-    );
+    await expect(
+      readFile(join(destination, 'things', `${THING_ID}.md`), 'utf8'),
+    ).resolves.toContain(`id: ${THING_ID}`);
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: 7n,
     });

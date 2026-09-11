@@ -20,11 +20,11 @@ import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
-const OTHER_CARD_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+const THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const OTHER_THING_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const DIAGRAM_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const GRAPH_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
-const LINK_CARD_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
+const LINK_THING_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 
 /**
  * The identities startup is about to mint, named in the order it mints them
@@ -43,16 +43,16 @@ const mintingIds = (...ids: readonly [UUID, ...UUID[]]): (() => UUID) => {
 const storedSpace = (
   revision: bigint,
   id = SPACE_ID,
-  cardId = CARD_ID,
+  thingId = THING_ID,
   title = 'Existing space',
 ): LoadedSpace => ({
   snapshot: {
     id,
     document: { version: 1, title },
-    cards: [
+    things: [
       {
-        id: cardId,
-        document: { title: 'Existing card', kind: 'markdown', body: '' },
+        id: thingId,
+        document: { title: 'Existing thing', kind: 'markdown', body: '' },
       },
     ],
   },
@@ -62,7 +62,7 @@ const storedSpace = (
 
 describe('defaultContentAggregate', () => {
   it('mints one complete Meta Space through the injected identity source', () => {
-    const aggregate = defaultContentAggregate(mintingIds(SPACE_ID, CARD_ID, DIAGRAM_ID, GRAPH_ID));
+    const aggregate = defaultContentAggregate(mintingIds(SPACE_ID, THING_ID, DIAGRAM_ID, GRAPH_ID));
 
     expect(aggregate).toEqual({
       metaSpaceId: SPACE_ID,
@@ -78,13 +78,13 @@ describe('defaultContentAggregate', () => {
                 id: DIAGRAM_ID,
                 title: 'Diagram 1',
                 kind: 'positioned',
-                positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+                positions: { [THING_ID]: { x: 0, y: 0, open: false } },
                 graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
                 activeGraph: GRAPH_ID,
               },
             ],
           },
-          cards: [{ id: CARD_ID, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+          things: [{ id: THING_ID, document: { title: 'Thing 1', kind: 'markdown', body: '' } }],
         },
       ],
     });
@@ -93,7 +93,7 @@ describe('defaultContentAggregate', () => {
 
 describe('openDatabaseSelection', () => {
   it('opens the space selected by its UUID', async () => {
-    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space');
+    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_THING_ID, 'Other space');
     const repository = new MemorySpaceRepository([storedSpace(4n), selected], SPACE_ID);
 
     const result = await openDatabaseSelection(repository, OTHER_SPACE_ID);
@@ -103,7 +103,7 @@ describe('openDatabaseSelection', () => {
 
   it('rejects a selected UUID that disappeared without falling back to another space', async () => {
     const remaining = storedSpace(0n);
-    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space');
+    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_THING_ID, 'Other space');
     const repository = new MemorySpaceRepository([remaining, selected], SPACE_ID);
     await repository.importSpaces([remaining.snapshot], 'truncate');
 
@@ -121,7 +121,7 @@ describe('establishMetaSpace', () => {
 
     const metaSpaceId = await establishMetaSpace(
       repository,
-      mintingIds(SPACE_ID, CARD_ID, DIAGRAM_ID, GRAPH_ID),
+      mintingIds(SPACE_ID, THING_ID, DIAGRAM_ID, GRAPH_ID),
     );
 
     expect(metaSpaceId).toBe(SPACE_ID);
@@ -210,7 +210,7 @@ const recordingWait = (waits: number[]) => (milliseconds: number) => {
 };
 
 /** The four ids one establishment mints, and no more. */
-const establishmentIds = () => mintingIds(SPACE_ID, CARD_ID, DIAGRAM_ID, GRAPH_ID);
+const establishmentIds = () => mintingIds(SPACE_ID, THING_ID, DIAGRAM_ID, GRAPH_ID);
 
 describe('retryMetaSpaceEstablishment', () => {
   it('establishes the Meta Space once the database comes back', async () => {
@@ -383,7 +383,7 @@ describe('resolveDatabaseStartup', () => {
 
     const result = await resolveDatabaseStartup(
       repository,
-      mintingIds(SPACE_ID, CARD_ID, DIAGRAM_ID, GRAPH_ID),
+      mintingIds(SPACE_ID, THING_ID, DIAGRAM_ID, GRAPH_ID),
     );
 
     expect(result).toEqual({
@@ -400,13 +400,13 @@ describe('resolveDatabaseStartup', () => {
                 id: DIAGRAM_ID,
                 title: 'Diagram 1',
                 kind: 'positioned',
-                positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
+                positions: { [THING_ID]: { x: 0, y: 0, open: false } },
                 graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
                 activeGraph: GRAPH_ID,
               },
             ],
           },
-          cards: [{ id: CARD_ID, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+          things: [{ id: THING_ID, document: { title: 'Thing 1', kind: 'markdown', body: '' } }],
         },
         revision: 0n,
         exportedRevision: null,
@@ -426,15 +426,15 @@ describe('resolveDatabaseStartup', () => {
 
   it('opens the Meta Space rather than the first of several stored Spaces', async () => {
     // Ordinary Spaces live inside the Meta reachability closure, so the second
-    // one is stored *because* a Space Card in Meta names it.
+    // one is stored *because* a Space Thing in Meta names it.
     const meta: LoadedSpace = {
       snapshot: {
         id: OTHER_SPACE_ID,
         document: { version: 1, title: 'Meta space' },
-        cards: [
-          { id: OTHER_CARD_ID, document: { title: 'Meta card', kind: 'markdown', body: '' } },
+        things: [
+          { id: OTHER_THING_ID, document: { title: 'Meta thing', kind: 'markdown', body: '' } },
           {
-            id: LINK_CARD_ID,
+            id: LINK_THING_ID,
             document: { title: 'Open the child', kind: 'space', spaceId: SPACE_ID },
           },
         ],

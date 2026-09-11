@@ -1,13 +1,13 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
-import { COLLAPSED_CARD_SIZE } from './card-geometry';
-import { CARD_TITLE_REQUIRED, normalizeTitle } from './title';
+import { COLLAPSED_THING_SIZE } from './thing-geometry';
+import { THING_TITLE_REQUIRED, normalizeTitle } from './title';
 
 /**
  * Zod schemas for the space file (`space.json`).
  *
  * These validate *shape* only. Referential integrity (do a graph's edge
- * endpoints actually resolve to real cards) is checked separately in `@project/graph`,
+ * endpoints actually resolve to real things) is checked separately in `@project/graph`,
  * because it needs the whole space in view. A value that passes here is not yet
  * a Space — `loadSpace` adds the reference check and the index (ADR 0010).
  */
@@ -22,7 +22,7 @@ const idSchema = uuidSchema;
  *
  * **Mint, not allocate.** Nothing reserves an id from a registry, and in
  * particular PostgreSQL does not hand them out: a space's id comes from its
- * column default, and every other id — card, graph, diagram — is generated here,
+ * column default, and every other id — thing, graph, diagram — is generated here,
  * in whichever process is doing the work. Calling it allocation is what made the
  * importer read as though the database had to be consulted for a random value.
  *
@@ -35,7 +35,7 @@ const idSchema = uuidSchema;
 export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
 
 /**
- * A Card's Title: one or more Title Lines, normalized here (ADR 0083).
+ * A Thing's Title: one or more Title Lines, normalized here (ADR 0083).
  *
  * This is the boundary the rule sits at, so a stored Title, an imported one and
  * one an author just typed all get the same answer, and no surface normalizes
@@ -44,7 +44,7 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
  * but whitespace no longer passes: it carries no name, and the name is what
  * every list, search and accessible label shows.
  *
- * Cards only. Space, Diagram and Graph titles keep their plain single-line
+ * Things only. Space, Diagram and Graph titles keep their plain single-line
  * field: they are labels in lists with no front to draw a ladder on, and giving
  * all four the capability because they share a field type would be the model
  * following the implementation (ADR 0083).
@@ -52,9 +52,9 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
  * One instance, shared by the three kinds — `omit` and `extend` copy a field
  * schema by reference, so the stored document and the import variants inherit
  * this rule rather than restating it, which is what
- * `card-document-equality.test.ts` holds them to.
+ * `thing-document-equality.test.ts` holds them to.
  */
-const cardTitleSchema = z
+const thingTitleSchema = z
   .string()
   .transform(normalizeTitle)
   .refine((title) => title.length > 0, {
@@ -63,32 +63,32 @@ const cardTitleSchema = z
     // that fails intake prints, and a `refine` with no message prints Zod's
     // "Invalid input" — which names neither the field's rule nor the fix.
     message: 'A title must have at least one line with something in it',
-    params: { code: CARD_TITLE_REQUIRED },
+    params: { code: THING_TITLE_REQUIRED },
   });
 
 /**
- * The frontmatter of a markdown card file (ADR 0020). No `content` key: the
- * body of the file *is* the content, so the card and its text are one artifact.
+ * The frontmatter of a markdown thing file (ADR 0020). No `content` key: the
+ * body of the file *is* the content, so the thing and its text are one artifact.
  */
-export const markdownCardFrontmatterSchema = z.object({
+export const markdownThingFrontmatterSchema = z.object({
   id: idSchema,
-  title: cardTitleSchema,
+  title: thingTitleSchema,
   kind: z.literal('markdown'),
 });
 
-/** The frontmatter of an alias card file — a pointer to the card whose content it shows. */
-export const aliasCardFrontmatterSchema = z.object({
+/** The frontmatter of an alias thing file — a pointer to the thing whose content it shows. */
+export const aliasThingFrontmatterSchema = z.object({
   id: idSchema,
-  title: cardTitleSchema,
+  title: thingTitleSchema,
   kind: z.literal('alias'),
-  /** The id of the card this alias shows. Referential checks live in `@project/graph`. */
+  /** The id of the thing this alias shows. Referential checks live in `@project/graph`. */
   target: idSchema,
 });
 
-/** A Card that shows one selected view of another independently stored Space (ADR 0068). */
-export const spaceCardFrontmatterSchema = z.object({
+/** A Thing that shows one selected view of another independently stored Space (ADR 0068). */
+export const spaceThingFrontmatterSchema = z.object({
   id: idSchema,
-  title: cardTitleSchema,
+  title: thingTitleSchema,
   kind: z.literal('space'),
   spaceId: idSchema,
   diagram: uuidSchema.optional(),
@@ -101,65 +101,65 @@ const defaultMarkdownKind = (value: unknown): unknown =>
     : value;
 
 /**
- * What a card file's frontmatter must contain (ADR 0020). A card's identity
+ * What a thing file's frontmatter must contain (ADR 0020). A thing's identity
  * lives here and never in its filename, so renaming the file is not an identity
- * change. `kind` defaults to `'markdown'` exactly as {@link cardSchema} does —
- * the common card declares an id and a title and nothing else.
+ * change. `kind` defaults to `'markdown'` exactly as {@link thingSchema} does —
+ * the common thing declares an id and a title and nothing else.
  */
-export const cardFrontmatterSchema = z.preprocess(
+export const thingFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
   z.discriminatedUnion('kind', [
-    markdownCardFrontmatterSchema,
-    aliasCardFrontmatterSchema,
-    spaceCardFrontmatterSchema,
+    markdownThingFrontmatterSchema,
+    aliasThingFrontmatterSchema,
+    spaceThingFrontmatterSchema,
   ]),
 );
 
-export const importMarkdownCardFrontmatterSchema = markdownCardFrontmatterSchema.extend({
+export const importMarkdownThingFrontmatterSchema = markdownThingFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
-export const importAliasCardFrontmatterSchema = aliasCardFrontmatterSchema.extend({
+export const importAliasThingFrontmatterSchema = aliasThingFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
-export const importSpaceCardFrontmatterSchema = spaceCardFrontmatterSchema.extend({
+export const importSpaceThingFrontmatterSchema = spaceThingFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
-export const importCardFrontmatterSchema = z.preprocess(
+export const importThingFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
   z.discriminatedUnion('kind', [
-    importMarkdownCardFrontmatterSchema,
-    importAliasCardFrontmatterSchema,
-    importSpaceCardFrontmatterSchema,
+    importMarkdownThingFrontmatterSchema,
+    importAliasThingFrontmatterSchema,
+    importSpaceThingFrontmatterSchema,
   ]),
 );
 
-/** A card written directly by the author; the body of its file is its content. */
-export const markdownCardSchema = markdownCardFrontmatterSchema.extend({ body: z.string() });
+/** A thing written directly by the author; the body of its file is its content. */
+export const markdownThingSchema = markdownThingFrontmatterSchema.extend({ body: z.string() });
 
-/** A card that shows its target's content at a second position (ADR 0009). */
-export const aliasCardSchema = aliasCardFrontmatterSchema;
+/** A thing that shows its target's content at a second position (ADR 0009). */
+export const aliasThingSchema = aliasThingFrontmatterSchema;
 
-/** A card that embeds one selected view of another Space (ADR 0068). */
-export const spaceCardSchema = spaceCardFrontmatterSchema;
+/** A thing that embeds one selected view of another Space (ADR 0068). */
+export const spaceThingSchema = spaceThingFrontmatterSchema;
 
 /**
- * A card parsed from its file (ADR 0020). A markdown card carries the file body
+ * A thing parsed from its file (ADR 0020). A markdown thing carries the file body
  * that stores its content; an alias carries only the pointer to its target's
- * content (ADR 0009). No default for `kind` here — by the time a card exists
+ * content (ADR 0009). No default for `kind` here — by the time a thing exists
  * its frontmatter has been parsed, and that is where the default was applied.
  */
-export const cardSchema = z.discriminatedUnion('kind', [
-  markdownCardSchema,
-  aliasCardSchema,
-  spaceCardSchema,
+export const thingSchema = z.discriminatedUnion('kind', [
+  markdownThingSchema,
+  aliasThingSchema,
+  spaceThingSchema,
 ]);
 
 /**
- * One edge of a graph: a directed connection from one card to another (ADR
+ * One edge of a graph: a directed connection from one thing to another (ADR
  * 0032). This is the element an author draws, and the graph is the set of them.
  *
- * Shape only, as everywhere in this file. Whether both ids name real cards,
- * whether they name cards of the diagram that owns this graph, and whether an
+ * Shape only, as everywhere in this file. Whether both ids name real things,
+ * whether they name things of the diagram that owns this graph, and whether an
  * exact edge occurs more than once need the whole Graph/Space in view and are
  * checked in `@project/graph`.
  */
@@ -182,41 +182,41 @@ export const graphSchema = z.object({
    * it. The superseded rule read ADR 0033's connect gesture as the only way a
    * graph came into being, which ADR 0040 replaced.
    *
-   * A card may appear as the `from` of several edges (a fork) and the `to` of
+   * A thing may appear as the `from` of several edges (a fork) and the `to` of
    * several (a merge); nothing here constrains that.
    */
   edges: z.array(graphEdgeSchema),
 });
 
-/** Where a positioned diagram puts a card, in the diagram's own coordinate space. */
+/** Where a positioned diagram puts a thing, in the diagram's own coordinate space. */
 export const diagramPositionSchema = z.object({
   x: z.number(),
   y: z.number(),
 });
 
 const openSizeSchema = z.object({
-  width: z.number().min(COLLAPSED_CARD_SIZE.width),
-  height: z.number().min(COLLAPSED_CARD_SIZE.height),
+  width: z.number().min(COLLAPSED_THING_SIZE.width),
+  height: z.number().min(COLLAPSED_THING_SIZE.height),
 });
 
-/** What a Diagram stores for one Card: its origin, Open/Closed state and remembered Open Size. */
-export const cardPlacementSchema = z.discriminatedUnion('open', [
+/** What a Diagram stores for one Thing: its origin, Open/Closed state and remembered Open Size. */
+export const thingPlacementSchema = z.discriminatedUnion('open', [
   diagramPositionSchema.extend({ open: z.literal(true), openSize: openSizeSchema }),
   diagramPositionSchema.extend({ open: z.literal(false), openSize: openSizeSchema.optional() }),
 ]);
 
 /**
- * A diagram the author wrote: a card-to-position map and the graphs over it
+ * A diagram the author wrote: a thing-to-position map and the graphs over it
  * (ADR 0025, ADR 0040).
  *
- * Its position keys **are** its card membership. A card the map omits is not in
- * this diagram — and a position may not name a card the space does not hold;
+ * Its position keys **are** its thing membership. A thing the map omits is not in
+ * this diagram — and a position may not name a thing the space does not hold;
  * that is a reference error, checked in `@project/graph` where the whole space
  * is in view.
  *
  * The graphs are **owned**, not referenced: they are nested values of the one
  * diagram that holds them, ordered, and never shared with a second (ADR 0040).
- * Every edge endpoint of an owned graph names a card in this diagram, which
+ * Every edge endpoint of an owned graph names a thing in this diagram, which
  * again needs the whole space in view. Ownership is diagram-scoped while a graph
  * id is unique across the *space* (ADR 0045), because the flatten a
  * space-subject view draws keys colour, handles and activation on the id alone.
@@ -232,7 +232,7 @@ export const positionedDiagramSchema = z
     id: idSchema,
     title: z.string().min(1),
     kind: z.literal('positioned'),
-    positions: z.record(idSchema, cardPlacementSchema),
+    positions: z.record(idSchema, thingPlacementSchema),
     /**
      * The graphs this diagram owns, in author order. **At least one**: creating a
      * diagram creates its initial graph in the same edit, and graph management
@@ -253,12 +253,12 @@ export const positionedDiagramSchema = z
 
 /**
  * A diagram carried by the space file, discriminated by `kind`. Every Diagram is
- * authored: an automatic strategy computes placement from the cards and graphs
+ * authored: an automatic strategy computes placement from the things and graphs
  * alone, so it has nothing to write down and appears here nowhere (ADR 0025).
  * There is one kind today; the union is what makes a second one cost no
  * migration.
  *
- * `kind` defaults to `'positioned'` when absent, the same shape `cardSchema`
+ * `kind` defaults to `'positioned'` when absent, the same shape `thingSchema`
  * uses — here it is for hand-authoring rather than back-compat, so a diagram can
  * be written as just an id, a title, and its positions.
  */
@@ -294,12 +294,12 @@ export const SPACE_FILE_VERSION = 1;
  * (references unchecked, no index). "manifest" is retired: this is the space
  * file, not a manifest.
  *
- * It holds **structure and nothing else** (ADR 0020): cards are not listed here,
- * because a card exists by virtue of its file existing. `loadSpace` takes the
- * card files alongside this.
+ * It holds **structure and nothing else** (ADR 0020): things are not listed here,
+ * because a thing exists by virtue of its file existing. `loadSpace` takes the
+ * thing files alongside this.
  *
  * **Strict**, for the reason `positionedDiagramSchema` is. A stripped key is a
- * question answered silently: a top-level `cards` or `edges` array (ADR 0020,
+ * question answered silently: a top-level `things` or `edges` array (ADR 0020,
  * ADR 0007) half-describes a space nothing loads from, and a file still
  * spelling the opening selection the way ADR 0079 renamed it reaches
  * `workingSpace`, which adopts `diagrams[0]` and commits it — the Diagram its
@@ -341,21 +341,21 @@ export const spaceFileSchema = spaceFileObjectSchema;
 /** The JSONB document stored beside a space's relational UUID. */
 export const spaceDocumentSchema = spaceFileObjectSchema.omit({ id: true });
 
-/** The JSONB document stored beside a card's relational UUID. */
-export const markdownCardDocumentSchema = markdownCardSchema.omit({ id: true });
-export const aliasCardDocumentSchema = aliasCardSchema.omit({ id: true });
-export const spaceCardDocumentSchema = spaceCardSchema.omit({ id: true });
-export const cardDocumentSchema = z.discriminatedUnion('kind', [
-  markdownCardDocumentSchema,
-  aliasCardDocumentSchema,
-  spaceCardDocumentSchema,
+/** The JSONB document stored beside a thing's relational UUID. */
+export const markdownThingDocumentSchema = markdownThingSchema.omit({ id: true });
+export const aliasThingDocumentSchema = aliasThingSchema.omit({ id: true });
+export const spaceThingDocumentSchema = spaceThingSchema.omit({ id: true });
+export const thingDocumentSchema = z.discriminatedUnion('kind', [
+  markdownThingDocumentSchema,
+  aliasThingDocumentSchema,
+  spaceThingDocumentSchema,
 ]);
 
 /** A complete, fully identified aggregate exchanged at persistence seams. */
 export const spaceSnapshotSchema = z.object({
   id: uuidSchema,
   document: spaceDocumentSchema,
-  cards: z.array(z.object({ id: uuidSchema, document: cardDocumentSchema })),
+  things: z.array(z.object({ id: uuidSchema, document: thingDocumentSchema })),
 });
 
 export const importGraphSchema = graphSchema.extend({ id: uuidSchema.optional() });
@@ -387,5 +387,5 @@ export const importSpaceFileSchema = importSpaceFileObjectSchema;
 export const importSpaceSchema = z.object({
   id: uuidSchema.optional(),
   document: importSpaceFileObjectSchema.omit({ id: true }),
-  cards: z.array(z.object({ id: uuidSchema.optional(), document: cardDocumentSchema })),
+  things: z.array(z.object({ id: uuidSchema.optional(), document: thingDocumentSchema })),
 });

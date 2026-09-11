@@ -17,18 +17,18 @@
  *   Spaces  — which Space this is, rename it, cross into and out of one
  *   Diagrams — which is drawing, select another, add/rename/delete
  *   Graphs  — which is active, select another, present, add/rename/delete
- *   Cards   — Create, and the Cards this Space holds
+ *   Things   — Create, and the Things this Space holds
  *
- * **A Card's own commands are absent on purpose.** Open, Edit, Delete, a Card's
- * links and taking a Card back out of a Diagram belong to the Card rail (ADR
- * 0073), which draws them on the Card itself. This surface is *about* the
- * canvas; a Card is the literal object on it. That is a dependency and not just
- * an exclusion — the Space Sidebar carried a Card's links and its Delete in a
+ * **A Thing's own commands are absent on purpose.** Open, Edit, Delete, a Thing's
+ * links and taking a Thing back out of a Diagram belong to the Thing rail (ADR
+ * 0073), which draws them on the Thing itself. This surface is *about* the
+ * canvas; a Thing is the literal object on it. That is a dependency and not just
+ * an exclusion — the Space Sidebar carried a Thing's links and its Delete in a
  * footer, and this arrangement is only complete because the rail carries them
  * now.
  *
- * **A Space is a Space Card, held by the Meta Space above it.** So the Spaces
- * *inside* a Space are Cards in it and the Cards surface already offers them,
+ * **A Space is a Space Thing, held by the Meta Space above it.** So the Spaces
+ * *inside* a Space are Things in it and the Things surface already offers them,
  * while the bar names one step back and the Open Spaces menu holds the set open
  * beside it — drawn as the tree the Opener makes. Moving between them closes
  * nothing; Exit, in the Space menu, is what takes one out of the set (ADR 0068).
@@ -72,8 +72,8 @@ import {
   BreadcrumbLink,
   BreadcrumbList,
   buttonVariants,
-  CardKindIcon,
-  cardKindName,
+  ThingKindIcon,
+  thingKindName,
   ChevronDownIcon,
   CloseIcon,
   cn,
@@ -166,7 +166,7 @@ const GRAPH_COLORS: readonly (readonly [string, string])[] = GRAPH_PALETTE.map(
 );
 
 /** The three kinds Create offers, in the order the menu lists them. */
-const CARD_KINDS = ['markdown', 'space', 'alias'] as const;
+const THING_KINDS = ['markdown', 'space', 'alias'] as const;
 
 /**
  * Every disclosure opens the same way, whichever primitive draws it.
@@ -203,7 +203,7 @@ const DISCLOSURE_WIDTH = 'w-72';
  * `onValueChange` wearing the brand — so `onSelect(diagramId: DiagramId)` is
  * handed a string that is not one, and its declared type is a lie the compiler
  * helped tell. Bound, that literal is a `TS2322` where it is written.
- * `CardsDrawer`'s `KindFilterItem` binds the same way, and
+ * `ThingsDrawer`'s `KindFilterItem` binds the same way, and
  * `tools/typing-fixtures/must-fail/mismatched-menu-item.tsx` is the standing
  * evidence that the rule bites.
  *
@@ -228,7 +228,7 @@ const SpaceItem = DropdownMenuRadioItem<UUID>;
  * components — so `PresentingExit`, which reads four of them, was declared to
  * take every command in the surface, and no signature in the file said what any
  * component actually used. `SpaceSidebar` did not do that: it took `canvas`,
- * `graph`, `addCard`, `createDiagram`, `persistence`, `selectedCard`,
+ * `graph`, `addThing`, `createDiagram`, `persistence`, `selectedThing`,
  * `entityActions` and `titleEdit`, and each of its own pieces took the group it
  * drew.
  *
@@ -250,7 +250,7 @@ export interface DockChrome {
    * `InlineTitleEditor` and which name is open is the bar's own slot
    * ({@link useDockRenaming}) — which is the whole reason the shared draft the
    * Sidebar needed is gone. But the *application* still has to know one is
-   * running: a live chrome rename withdraws Create Card, Present, Delete Card
+   * running: a live chrome rename withdraws Create Thing, Present, Delete Thing
    * and the canvas's own title editing, because each of those would re-derive
    * the canvas or take the caret from under it (`authoring-availability.ts`).
    *
@@ -287,7 +287,7 @@ export interface DockChrome {
   readonly space: DockSpace;
   readonly canvas: DockCanvas;
   readonly graph: DockGraph;
-  readonly cards: DockCards;
+  readonly things: DockThings;
   readonly persistence: DockPersistence;
 }
 
@@ -299,7 +299,7 @@ export interface DockChrome {
  * its menu are what you can do while you are in it.
  */
 export interface DockSpace {
-  /** This Space's name — a Space Card's title, seen from inside it. */
+  /** This Space's name — a Space Thing's title, seen from inside it. */
   readonly title: string;
   /** Which Space the Dock is in, which is what the Open Spaces menu marks. */
   readonly currentSpaceId: UUID;
@@ -314,8 +314,8 @@ export interface DockSpace {
    * surface can close.** Space Authoring's completion union has
    * `renamed-diagram` and `renamed-graph` and no `renamed-space`: a Space's title
    * lives on the stored document, and a Space is named from outside by the Space
-   * Card that references it (ADR 0074), so what a rename from *inside* does to
-   * that Card is a domain question rather than a control this component can
+   * Thing that references it (ADR 0074), so what a rename from *inside* does to
+   * that Thing is a domain question rather than a control this component can
    * answer by drawing a field. Until it is answered, the name is a label.
    *
    * Nullable rather than optional so both callers state it: the catalogue
@@ -327,11 +327,11 @@ export interface DockSpace {
   /** Copy this Space's own address — the one link a Space offers (`entity-actions.tsx`). */
   readonly onCopyLink: () => void;
   /**
-   * Create a Space, which is Create Card → Space.
+   * Create a Space, which is Create Thing → Space.
    *
    * It sits in the Space menu against that rule, and it is the one item in the
    * Dock that has not been reconciled: the arrangement asked for a way to make a
-   * Space from the Space you are in, and Create Card offers the same command one
+   * Space from the Space you are in, and Create Thing offers the same command one
    * cluster along. Both spend the same operation, so the duplication is a second
    * path rather than a second behaviour.
    */
@@ -354,7 +354,7 @@ export interface DockSpace {
    * can be exited. This read {@link parent} instead — "is there a Space I was
    * opened from" — which answers `null` for every Space reached by its own
    * address as well, and so withheld Exit from a pasted link. The two happen to
-   * agree while the reader arrived by pressing Space Cards, which is what hid
+   * agree while the reader arrived by pressing Space Things, which is what hid
    * it.
    */
   readonly exitDisabled: boolean;
@@ -403,8 +403,8 @@ export interface DockCanvas {
   /**
    * Whether New Diagram may run.
    *
-   * Its own term beyond Create Card's: creating a Diagram **selects** it, and the
-   * created Diagram is empty — so the canvas re-derives with no nodes and a Card
+   * Its own term beyond Create Thing's: creating a Diagram **selects** it, and the
+   * created Diagram is empty — so the canvas re-derives with no nodes and a Thing
    * holding a live title draft unmounts, taking the draft, the announced reason
    * and the caret with it. A valid draft is safe, because pressing the control
    * blurs the input and a valid blur completes the Title (ADR 0065); a refused
@@ -428,7 +428,7 @@ export interface DockCanvas {
    *
    * A Diagram offers no permanent link because it has no second address to be
    * permanent *against*: its own address is the only one there is
-   * (`entity-actions.tsx`), where a Graph and a Card each have a within-Diagram
+   * (`entity-actions.tsx`), where a Graph and a Thing each have a within-Diagram
    * form as well.
    */
   readonly onCopyLink: () => void;
@@ -486,38 +486,38 @@ export interface DockGraph {
   readonly presentDisabled: boolean;
 }
 
-export interface DockCards {
+export interface DockThings {
   /**
-   * The Cards surface itself — its trigger and its panel, supplied whole.
+   * The Things surface itself — its trigger and its panel, supplied whole.
    *
-   * **A slot rather than a list, because there is one Cards surface and it is
+   * **A slot rather than a list, because there is one Things surface and it is
    * not this one's.** The prototype drew its own filtered popover here and it
    * was compared against a Drawer and a second dock at the scale that separates
    * them; the Popover won that comparison. What settled it the other way is that
-   * the application already had `CardsDrawer` — a production surface with its
+   * the application already had `ThingsDrawer` — a production surface with its
    * own stable story, its own behaviour tests and seven parity claims — and two
-   * surfaces offering "add an existing Card to this Diagram" is the second place
+   * surfaces offering "add an existing Thing to this Diagram" is the second place
    * commands live that ADR 0082 rules out. So the Dock offers the *way* to the
-   * Cards and the drawer is what it opens; re-deciding which of the two the
+   * Things and the drawer is what it opens; re-deciding which of the two the
    * product wants is a promotion of its own rather than a side effect of this
    * one.
    *
    * The caller supplies trigger and panel together because they are one
    * component: a toggle whose `disabled` and whose surface are decided in two
    * places is a toggle that comes to disagree with what it names. It draws in
-   * the Dock's own name slot through {@link CARDS_TRIGGER} and
-   * {@link CardsTrigger}, so it lands in the column the other three names land
+   * the Dock's own name slot through {@link THINGS_TRIGGER} and
+   * {@link ThingsTrigger}, so it lands in the column the other three names land
    * in, whichever edge the dock is on.
    */
   readonly surface: ReactNode;
   /**
-   * Create a Card of one kind — the one command about the *set*.
+   * Create a Thing of one kind — the one command about the *set*.
    *
    * The kind is chosen at creation, so the menu offers three peers rather than a
    * split button with a hidden default. This is *Create*, distinct from adding
-   * an existing Card, which is what the surface above is for.
+   * an existing Thing, which is what the surface above is for.
    */
-  readonly onCreate: (kind: (typeof CARD_KINDS)[number]) => void;
+  readonly onCreate: (kind: (typeof THING_KINDS)[number]) => void;
   /** Whether creating is available at all — presenting and an open pane both withdraw it. */
   readonly createDisabled: boolean;
 }
@@ -593,9 +593,9 @@ function IdentityLabel({ children }: { readonly children: ReactNode }) {
 /**
  * The Space, Diagram or Graph name, renamed in place by clicking it.
  *
- * This is `InlineTitleEditor` — the component Cards and the Space Sidebar
+ * This is `InlineTitleEditor` — the component Things and the Space Sidebar
  * already rename through — in its `header` variant, which exists for named
- * chrome rather than a Card's own title. Reusing it buys the whole edit
+ * chrome rather than a Thing's own title. Reusing it buys the whole edit
  * lifecycle a hand-rolled rename would otherwise fake and get wrong: select on entry,
  * Enter and blur complete, Escape cancels, focus returns to the control, and a
  * refused draft stays open and editable.
@@ -641,7 +641,7 @@ function IdentityName({
    * Two editors could stand at once — a blank draft is refused and
    * `InlineTitleEditor` holds a refused draft open, so pressing a second name
    * left the first one live — and the first cleanup to run then told the App no
-   * rename was live at all, handing Create Card, Present and the canvas's own
+   * rename was live at all, handing Create Thing, Present and the canvas's own
    * title editing back underneath an editor still on screen.
    *
    * One slot under the whole bar makes that unrepresentable rather than
@@ -770,16 +770,16 @@ function IdentityName({
  * Diagram: `[name][v]`. Graph: `[name][v][>]`.
  *
  * Each is one named `ToolbarGroup` inside the Dock's single `Toolbar` — ADR
- * 0073's pair, the same one a Card rail is built from — so the controls share a
+ * 0073's pair, the same one a Thing rail is built from — so the controls share a
  * box treatment with the rail, the whole bar is one tab stop, and the arrows
  * cross a group boundary exactly as they cross any other gap. What the grouping
- * says is that these are commands *on* one named thing, which is exactly what a
- * rail says about a Card.
+ * says is that these are commands *on* one named entity, which is exactly what a
+ * rail says about a Thing.
  *
  * Only Rename left the menu, because the name is right there and clicking a
  * name to change it needs no menu at all. Everything else stays behind the
  * chevron — including New, which is a command about the *set* rather than
- * about the named thing the cluster is showing, and so belongs with the list
+ * about the named entity the cluster is showing, and so belongs with the list
  * of that set rather than beside its current member. Present is the exception
  * on the Graph side: it acts on the Active Graph the cluster is naming.
  */
@@ -894,12 +894,12 @@ function GraphControls({
    * **Present leads along a row and trails down a column**, and this is the one
    * thing in the Dock the edge reorders.
    *
-   * Along a row it leads: it acts on the named thing the cluster is showing, so
+   * Along a row it leads: it acts on the named entity the cluster is showing, so
    * it sits at the edge the eye enters from, ahead of the name it acts on.
    *
    * Down a column it cannot, because a column pays for it differently. A
    * leading verb needs a track of its own on *every* row — three of the four
-   * rows have no verb, and the 28px sits empty on each — and Cards' Create
+   * rows have no verb, and the 28px sits empty on each — and Things' Create
    * trails, so a leading Present makes the grid four tracks wide: 84px of a
    * 208px column spent on gutters. Trailing, both verbs share one track and the
    * column is three.
@@ -938,7 +938,7 @@ function GraphControls({
       {/* The one identity that carries colour, and it carries it on the glyph
           alone — the stroke the Edges of this Graph are drawn in. A neutral
           swatch stood here and said only "a colour applies"; a Graph glyph
-          says which *kind* of thing the colour belongs to, and it is
+          says which *kind* of entity the colour belongs to, and it is
           `@project/ui`'s own `GraphIcon` rather than a mark this module
           invents. */}
       <IdentityName
@@ -1037,7 +1037,7 @@ function GraphControls({
                 not see the report any other way. This surface has no Sheet and
                 covers nothing: "Link not copied" is pinned in the shell at every
                 width, so the in-place swap has lost the reason it existed for.
-                The Card rail keeps it, being a menu on the canvas itself. */}
+                The Thing rail keeps it, being a menu on the canvas itself. */}
             {/* Both forms, always: a Diagram owns its Graphs (ADR 0040), so a
                 Graph always has a within-Diagram address as well as its own —
                 which is exactly what `spaceEntityActions` offers on a Graph.
@@ -1077,25 +1077,25 @@ function GraphControls({
 }
 
 /**
- * Create Card, as three commands behind one trigger, in the Cards cluster.
+ * Create Thing, as three commands behind one trigger, in the Things cluster.
  *
  * The kind is chosen at creation, so the menu offers three peers rather than a
  * split button with a hidden default — and this is *Create*, distinct from
- * adding an existing Card, which is the list's drag.
+ * adding an existing Thing, which is the list's drag.
  *
  * **This is the one New that stayed a control**, against the rule that put New
  * Diagram and New Graph inside their menus, and it is an exception on two
- * stated grounds. Frequency: Diagrams and Graphs are made rarely and Cards
+ * stated grounds. Frequency: Diagrams and Graphs are made rarely and Things
  * constantly, which is the same thing that earns Present its own control on
  * the Graph cluster rather than a menu row. And shape: the other two disclose
  * a short exclusive list, so a New at the end of it costs nothing, while the
- * Cards surface is a long scrolling list you drag out of — a New pinned above
+ * Things surface is a long scrolling list you drag out of — a New pinned above
  * or below it is a second region to build and reason about, and a New inside
  * it scrolls away.
  *
  * It carries no chevron of its own. In the cluster it sits in the slot Present
  * holds on the Graph cluster — a bare glyph after the disclosure — and a
- * second chevron beside `Cards ⌄` would read as a second disclosure of the
+ * second chevron beside `Things ⌄` would read as a second disclosure of the
  * same list.
  */
 function CreateMenu({
@@ -1104,7 +1104,7 @@ function CreateMenu({
   disabled,
 }: {
   readonly side?: MenuSide;
-  readonly onCreate: (kind: (typeof CARD_KINDS)[number]) => void;
+  readonly onCreate: (kind: (typeof THING_KINDS)[number]) => void;
   readonly disabled: boolean;
 }) {
   const { id: triggerId, open, onOpenChange } = useDockDisclosure();
@@ -1113,13 +1113,13 @@ function CreateMenu({
       <DropdownMenuTrigger
         id={triggerId}
         className="nokey command-dock__set-verb"
-        aria-label="Create Card"
-        title="Create Card"
+        aria-label="Create Thing"
+        title="Create Thing"
         // Where a cancelled creation pane puts the caret back. The pane is modal
         // and unmounts on cancel, so there is no element to have held on to —
         // the continuation names this control by address instead, and one
         // adapter resolves it (`continuation.ts`, `ChromeContinuation`).
-        data-continuation-control="add-card"
+        data-continuation-control="add-thing"
         disabled={disabled}
         render={<ToolbarButton variant="ghost" size="icon" />}
       >
@@ -1132,11 +1132,11 @@ function CreateMenu({
         className={`nokey ${DISCLOSURE_WIDTH}`}
       >
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Create Card</DropdownMenuLabel>
-          {CARD_KINDS.map((kind) => (
+          <DropdownMenuLabel>Create Thing</DropdownMenuLabel>
+          {THING_KINDS.map((kind) => (
             <DropdownMenuItem key={kind} className="gap-2" onClick={() => onCreate(kind)}>
-              <CardKindIcon kind={kind} />
-              {cardKindName(kind)}
+              <ThingKindIcon kind={kind} />
+              {thingKindName(kind)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
@@ -1146,13 +1146,13 @@ function CreateMenu({
 }
 
 /**
- * `Cards ⌄` — the same shape as `Diagram ⌄` and `Graph ⌄` beside it, and one
+ * `Things ⌄` — the same shape as `Diagram ⌄` and `Graph ⌄` beside it, and one
  * trigger whichever surface opens.
  *
  * It carries a chevron because it discloses a list, which is what the chevron
  * says next to it on the other three. What it does **not** carry is the name as
- * a control: Space, Diagram and Graph name one thing each, so clicking that
- * name to rename it is the whole of `IdentityName`. "Cards" names a set, and a
+ * a control: Space, Diagram and Graph name one entity each, so clicking that
+ * name to rename it is the whole of `IdentityName`. "Things" names a set, and a
  * set has no name to edit — so the word is a label inside the trigger rather
  * than a button of its own, and the cluster is one target instead of two.
  *
@@ -1177,20 +1177,20 @@ function SetTrigger({
   );
 }
 
-export function CardsTrigger() {
+export function ThingsTrigger() {
   return (
-    /* The Card glyph the rows in its own list carry, not `OpenCardIcon`'s
+    /* The Thing glyph the rows in its own list carry, not `OpenThingIcon`'s
        expand arrows: beside a Space, a Diagram and a Graph's colour, the icon
        slot names what the cluster is about, and "expand" named a gesture this
        cluster does not have. */
-    <SetTrigger icon={<CardKindIcon kind="markdown" />}>Cards</SetTrigger>
+    <SetTrigger icon={<ThingKindIcon kind="markdown" />}>Things</SetTrigger>
   );
 }
 
 /**
  * Which of the Dock's list disclosures is open, if any.
  *
- * A `Menubar` makes the Dock's *menus* exclusive, but the Cards list is a
+ * A `Menubar` makes the Dock's *menus* exclusive, but the Things list is a
  * Popover rather than a menu — it holds a filter field and drag sources, and
  * menu semantics would take the arrow keys and typeahead the input needs and
  * would dismiss on activating a row. So the exclusivity a menubar gives its
@@ -1330,7 +1330,7 @@ function useDockRenaming(chrome: DockChrome): DockRenaming {
  *
  * **Base UI's `Menubar` is the documented answer and it cannot be used here.**
  * It is a roving-focus container, and so is `Toolbar` — and the Dock is a
- * Toolbar because ADR 0073 makes a command cluster the component a Card rail is
+ * Toolbar because ADR 0073 makes a command cluster the component a Thing rail is
  * built from. Nesting them puts `role="menubar"` inside `role="toolbar"` and two
  * focus managers over the same buttons: the menu opens, the toolbar takes focus
  * back, and it closes again within a frame. It fails silently, with nothing in
@@ -1349,7 +1349,7 @@ function useDockRenaming(chrome: DockChrome): DockRenaming {
  * now produced a menu that flashes and never appears.
  *
  * The id is `useId` rather than a caller-chosen string, so two disclosures
- * cannot collide by both calling themselves "cards" and adding a control needs
+ * cannot collide by both calling themselves "things" and adding a control needs
  * no registry kept in step.
  */
 interface DisclosureBinding {
@@ -1368,11 +1368,11 @@ function useDockDisclosure() {
   } satisfies DisclosureBinding;
 }
 
-function CardsControl({
-  cards,
+function ThingsControl({
+  things,
   side = 'bottom',
 }: {
-  readonly cards: DockCards;
+  readonly things: DockThings;
   readonly side?: MenuSide;
 }) {
   /**
@@ -1385,30 +1385,30 @@ function CardsControl({
    * announces once on the way past rather than on every item.
    */
   return (
-    <ToolbarGroup aria-label="Cards" className="command-dock__cluster">
+    <ToolbarGroup aria-label="Things" className="command-dock__cluster">
       {/* **The surface carries no commands, and that is the shape rather than a
-          gap in it.** Cards names no one thing — a Card's own commands are the
-          Card rail's (ADR 0073) and this Dock deliberately carries none — and
+          gap in it.** Things names no one entity — a Thing's own commands are the
+          Thing rail's (ADR 0073) and this Dock deliberately carries none — and
           its one set command, Create, is the `+` beside this trigger.
           Repeating Create inside the list as well would be the second path to
           one command that the Sidebar's own actions menu was built to remove.
 
-          It offers Space Cards like any other Card and does nothing special
-          with them: entering one is the canvas Card's gesture (ADR 0068), not a
+          It offers Space Things like any other Thing and does nothing special
+          with them: entering one is the canvas Thing's gesture (ADR 0068), not a
           list's. */}
-      {cards.surface}
+      {things.surface}
       {/* **Trailing, where Present leads**, and the asymmetry is the point.
-          Present acts on the named thing the cluster is showing — present *this
+          Present acts on the named entity the cluster is showing — present *this
           Graph* — so it sits at the edge the eye enters from, ahead of the name
-          it acts on. Create acts on the **set**: Cards names no one thing, which
+          it acts on. Create acts on the **set**: Things names no one entity, which
           is why it has no name to edit, and a command about the set reads after
-          the disclosure that lists it. `[▢ Cards ⌄][+]` is "the Cards, and add
-          one"; `[+][▢ Cards ⌄]` would be a verb with no subject in front of it.
+          the disclosure that lists it. `[▢ Things ⌄][+]` is "the Things, and add
+          one"; `[+][▢ Things ⌄]` would be a verb with no subject in front of it.
 
           It costs the vertical dock a fourth track — see the grid in
           `command-dock.css` — because this is the one cluster with a control on
           both sides of its name. */}
-      <CreateMenu side={side} onCreate={cards.onCreate} disabled={cards.createDisabled} />
+      <CreateMenu side={side} onCreate={things.onCreate} disabled={things.createDisabled} />
     </ToolbarGroup>
   );
 }
@@ -1417,8 +1417,8 @@ function CardsControl({
  * The Space's chevron: an ordinary menu, the same one Diagram and Graph carry.
  *
  * **It used to disclose a list of Spaces and that list is gone.** A Space is a
- * Space Card, so the Spaces in this Space are Cards in it, and the surface that
- * offers Cards already offers them. Two disclosures over overlapping sets was
+ * Space Thing, so the Spaces in this Space are Things in it, and the surface that
+ * offers Things already offers them. Two disclosures over overlapping sets was
  * the duplication, and the one that had to go is the one whose set was a
  * subset.
  *
@@ -1473,7 +1473,7 @@ function SpaceMenu({
       >
         <DropdownMenuGroup>
           {/* Against the rule stated at the top of this module: creating a Space
-              is Create Card → Space, so this is a second path to one command.
+              is Create Thing → Space, so this is a second path to one command.
               Drawn because the arrangement asked for it; it is the one item
               here that has not been reconciled. */}
           <DropdownMenuItem className="gap-2" onClick={space.onNewSpace}>
@@ -1488,7 +1488,7 @@ function SpaceMenu({
               the commands above make something, this one takes something away.
               It is **not** destructive though, and does not draw as it — exiting
               a Space discards a session's place in it, not the Space, and
-              re-entering costs one press on a Card. Meta cannot be exited, so
+              re-entering costs one press on a Thing. Meta cannot be exited, so
               there the row is present and unavailable rather than gone — and
               that is the *only* case, which `exitDisabled` is named for and
               `space.parent` was not.
@@ -1726,7 +1726,7 @@ function ParentSpace({
                 }
               >
                 {/* **At the root the chevron says what it discloses**, and it
-                    says it the way Cards does — the same `SetTrigger`, so the
+                    says it the way Things does — the same `SetTrigger`, so the
                     two cannot space themselves differently. Below the root the
                     parent's name stands beside the chevron and the pair reads
                     as a place and a way out of it; at the top there is no
@@ -1841,10 +1841,10 @@ function ParentSpace({
  * The **cluster** is the Space you are in — a Diagram or Graph cluster in every
  * respect: a name you click to rename, and a chevron opening an ordinary menu.
  *
- * **The Spaces inside this one are not in either.** They are Space Cards, so
- * they are in the Cards list with every other Card — as Cards, with nothing on
+ * **The Spaces inside this one are not in either.** They are Space Things, so
+ * they are in the Things list with every other Thing — as Things, with nothing on
  * the row that goes into one. That is the difference the two surfaces keep: the Open Spaces menu
- * lists the Spaces already **open**, and the Cards list holds Cards. At the top
+ * lists the Spaces already **open**, and the Things list holds Things. At the top
  * — the Meta Space — that list is every Space there is, which is the "All
  * Spaces" every comparable tool builds a separate screen for.
  *
@@ -1892,7 +1892,7 @@ function SpacesControl({
       )}
       <ToolbarGroup aria-label="Space" className="command-dock__cluster">
         <IdentityName
-          icon={<CardKindIcon kind="space" />}
+          icon={<ThingKindIcon kind="space" />}
           kind="Space"
           testId="space-title"
           title={space.title}
@@ -2072,7 +2072,7 @@ interface DragState {
  *
  * The pointer capture, the snap hint and the edge arithmetic are all here
  * rather than in the dock, which is what let a second docked surface — the
- * Cards panel, while the list surface was still under comparison — be the same
+ * Things panel, while the list surface was still under comparison — be the same
  * drag rather than a second copy of it. That panel is gone with the decision;
  * this stays one component because the arithmetic is the awkward part and a
  * later docked surface should not write it again.
@@ -2571,7 +2571,7 @@ export function CommandDock({
           label="Command Dock"
           report={<PersistenceReport persistence={chrome.persistence} edge={dock.edge} />}
         >
-          {/* Space | Diagram Graph | Cards.
+          {/* Space | Diagram Graph | Things.
             The three selections first, then the inventory. Which Space, which
             Diagram and which Graph are one question asked three times — each names
             the current one, discloses the set, and promotes at most one verb — and
@@ -2582,7 +2582,7 @@ export function CommandDock({
             ⌄]` reads as a Present belonging to the Diagram beside it. The
             containment is still true and the order still says it; the rule no
             longer has to be carried by an absent line.
-            Cards comes last because it is the odd cluster and should read as one:
+            Things comes last because it is the odd cluster and should read as one:
             it names a set rather than a selection, so it has no name to edit and
             nothing to promote but Create. Between Diagram and Space it looked like
             a fourth selection that had lost its name. */}
@@ -2601,7 +2601,7 @@ export function CommandDock({
             vertical={vertical}
           />
           <Divider orientation={divider} />
-          <CardsControl cards={chrome.cards} side={side} />
+          <ThingsControl things={chrome.things} side={side} />
         </Dock>
       </DockRenamingContext.Provider>
     </DockDisclosureContext.Provider>
@@ -2618,7 +2618,7 @@ export function CommandDock({
  * to see any edge, or press the grip and pick a slot, and the orientation
  * follows either way.
  *
- * Drag a Card out of the Cards popover onto the canvas, or press the row where
- * it stands. Both are real and both are the same Edit: the Card joins the
+ * Drag a Thing out of the Things popover onto the canvas, or press the row where
+ * it stands. Both are real and both are the same Edit: the Thing joins the
  * Diagram and the popover stays open, so the next one costs nothing either way.
  */

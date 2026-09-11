@@ -10,16 +10,16 @@ import * as graphPackage from '@project/graph';
  * The rule behind the list: the unit of curation is the module, not the name. A
  * module reaches the index when something outside the package calls into it, and
  * every type that module exports is offered with it — which is why
- * `GridStrategyOptions`, `LayoutStrategyPort` and `CardFileErrorKind` are listed below
+ * `GridStrategyOptions`, `LayoutStrategyPort` and `ThingFileErrorKind` are listed below
  * with nothing importing them. Functions are named one at a time: a helper whose
  * only callers are inside the package stays in its module, behind the form
  * consumers do call.
  *
- * Two whole modules are absent by that rule. `frontmatter` is how `card-file`
- * reads a fence, and `parseCardFile` is the intake it exists to serve.
+ * Two whole modules are absent by that rule. `frontmatter` is how `thing-file`
+ * reads a fence, and `parseThingFile` is the intake it exists to serve.
  * `validate` runs inside `loadSpace`, which ADR 0010 makes the one intake — a
  * caller never checks references itself, so it never names the check, its input
- * or its errors. `SpaceReferenceError` is the edge: `CardFileError` sits beside
+ * or its errors. `SpaceReferenceError` is the edge: `ThingFileError` sits beside
  * it in the same `SpaceError` union and is offered, so what separates them is
  * the module each belongs to and not how a consumer reaches it.
  *
@@ -37,7 +37,7 @@ import * as graphPackage from '@project/graph';
 const OFFERED_VALUES = [
   'Placement',
   'documentRefusal',
-  'buildCardHandles',
+  'buildThingHandles',
   'buildLayoutStrategyGraph',
   'buildGraphRenderEdges',
   'filterHandlesByGraphs',
@@ -51,25 +51,25 @@ const OFFERED_VALUES = [
   'newSpace',
   'outHandleId',
   'outgoingEdges',
-  'parseCardFile',
-  'parseImportCardFile',
+  'parseThingFile',
+  'parseImportThingFile',
   'positionedStrategy',
   'repeatedGraphEdges',
-  'resolveContentCard',
-  'graphCardIds',
-  'graphStartCard',
-  'serializeCardFile',
+  'resolveContentThing',
+  'graphThingIds',
+  'graphStartThing',
+  'serializeThingFile',
 ] as const;
 
 const OFFERED_TYPES = [
-  'CardFile',
-  'CardFileError',
-  'CardFileErrorKind',
-  'CardHandleSet',
+  'ThingFile',
+  'ThingFileError',
+  'ThingFileErrorKind',
+  'ThingHandleSet',
   'GraphRenderEdge',
   'GridStrategyOptions',
   'InitializeSpaceOptions',
-  'LayoutStrategyCard',
+  'LayoutStrategyThing',
   'LayoutStrategyEdge',
   'LayoutStrategyEdgeSection',
   'LayoutStrategyGraph',
@@ -80,11 +80,11 @@ const OFFERED_TYPES = [
   'LoadSpaceAggregateResult',
   'LoadSpaceSnapshotResult',
   'NewSpace',
-  'ParseCardFileResult',
-  'ParseImportCardFileResult',
+  'ParseThingFileResult',
+  'ParseImportThingFileResult',
   'Point',
   'OwnedGraph',
-  'ResolvedContentCard',
+  'ResolvedContentThing',
   'ResolvedDiagram',
   'GraphRenderHandleRef',
   'Space',

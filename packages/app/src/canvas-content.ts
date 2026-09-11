@@ -1,13 +1,13 @@
 import type { PlacementRenderingState } from './placement-rendering';
 
-/** What the canvas draws, given the placement and whether Cards are on screen. */
+/** What the canvas draws, given the placement and whether Things are on screen. */
 export type CanvasContent =
   | { readonly kind: 'failure'; readonly error: Error }
-  | { readonly kind: 'cards' }
+  | { readonly kind: 'things' }
   | { readonly kind: 'placeholder' };
 
 /**
- * A pending placement is not by itself a reason to blank the canvas. Once Cards
+ * A pending placement is not by itself a reason to blank the canvas. Once Things
  * are on the canvas the editor owns those positions outright, so they are the
  * current state rather than a stale copy of whatever is being recomputed —
  * and taking them away mid-recompute would interrupt a drag. Navigating to
@@ -16,9 +16,9 @@ export type CanvasContent =
  */
 export function canvasContent(
   placement: PlacementRenderingState,
-  hasCardsOnCanvas: boolean,
+  hasThingsOnCanvas: boolean,
 ): CanvasContent {
   if (placement.kind === 'failed') return { kind: 'failure', error: placement.error };
-  if (hasCardsOnCanvas) return { kind: 'cards' };
+  if (hasThingsOnCanvas) return { kind: 'things' };
   return { kind: 'placeholder' };
 }

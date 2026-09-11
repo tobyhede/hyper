@@ -1,7 +1,7 @@
 import {
-  aliasCardFrontmatterSchema,
+  aliasThingFrontmatterSchema,
   importSpaceSchema,
-  markdownCardFrontmatterSchema,
+  markdownThingFrontmatterSchema,
   spaceSnapshotSchema,
 } from '@project/core';
 import { decodeCommitRequest } from '@project/persistence';
@@ -24,7 +24,7 @@ describe('PostgresSpaceRepository import decoding', () => {
   const repository = new PostgresSpaceRepository();
 
   const SPACE_ID = '11111111-1111-4111-8111-111111111111';
-  const CARD_ID = '22222222-2222-4222-8222-222222222222';
+  const THING_ID = '22222222-2222-4222-8222-222222222222';
 
   /** The rejection message the CLI prints for a batch of one malformed Space. */
   const cliMessage = async (input: unknown): Promise<string> => {
@@ -57,7 +57,7 @@ describe('PostgresSpaceRepository import decoding', () => {
     // `importSpaces`'s own runtime validation — the cast only bypasses the
     // compile-time check that a real snapshot would already satisfy.
     const result = await repository.importSpaces(
-      [{ document: { version: 1, title: 7 }, cards: [] } as never],
+      [{ document: { version: 1, title: 7 }, things: [] } as never],
       'insert',
     );
 
@@ -78,7 +78,7 @@ describe('PostgresSpaceRepository import decoding', () => {
       [
         {
           document: { version: 9, title: 7, diagrams: 4, defaultDiagram: 7 },
-          cards: [{ document: { title: 5, kind: 'nope', body: 3 } }],
+          things: [{ document: { title: 5, kind: 'nope', body: 3 } }],
         } as never,
       ],
       'insert',
@@ -110,7 +110,7 @@ describe('PostgresSpaceRepository import decoding', () => {
     const malformed = {
       id: SPACE_ID,
       document: { version: 9, title: 7, diagrams: 4, defaultDiagram: 7 },
-      cards: [{ id: CARD_ID, document: { title: 5, kind: 'nope', body: 3 } }],
+      things: [{ id: THING_ID, document: { title: 5, kind: 'nope', body: 3 } }],
     };
 
     const cli = await cliMessage(malformed);
@@ -146,7 +146,7 @@ describe('PostgresSpaceRepository import decoding', () => {
     return {
       id: SPACE_ID,
       document,
-      cards: paths >= 5 ? [{ id: CARD_ID, document: { title: 5, kind: 'nope', body: 3 } }] : [],
+      things: paths >= 5 ? [{ id: THING_ID, document: { title: 5, kind: 'nope', body: 3 } }] : [],
     };
   };
 
@@ -205,11 +205,11 @@ describe('PostgresSpaceRepository import decoding', () => {
   it('folds no acronym and no capitalised identifier out of a Zod message', () => {
     const malformed: readonly unknown[] = [
       // A bad UUID, in each position one can occupy.
-      { id: 'not-a-uuid', document: { version: 1, title: 'T' }, cards: [] },
+      { id: 'not-a-uuid', document: { version: 1, title: 'T' }, things: [] },
       {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
-        cards: [{ id: 'nope', document: { title: 'C', kind: 'markdown', body: '' } }],
+        things: [{ id: 'nope', document: { title: 'C', kind: 'markdown', body: '' } }],
       },
       {
         id: SPACE_ID,
@@ -226,20 +226,20 @@ describe('PostgresSpaceRepository import decoding', () => {
             },
           ],
         },
-        cards: [],
+        things: [],
       },
       // A bad literal version, and wrong-typed fields.
-      { id: SPACE_ID, document: { version: 9, title: 'T' }, cards: [] },
+      { id: SPACE_ID, document: { version: 9, title: 'T' }, things: [] },
       {
         id: SPACE_ID,
         document: { version: 1, title: 7, diagrams: 4, defaultDiagram: 7 },
-        cards: [],
+        things: [],
       },
-      // Discriminated-union failures, on a card's kind and on a diagram's.
+      // Discriminated-union failures, on a thing's kind and on a diagram's.
       {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
-        cards: [{ id: CARD_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
+        things: [{ id: THING_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
       },
       {
         id: SPACE_ID,
@@ -248,17 +248,17 @@ describe('PostgresSpaceRepository import decoding', () => {
           title: 'T',
           diagrams: [{ id: SPACE_ID, title: 'L', kind: 'Weird', positions: {}, graphs: [] }],
         },
-        cards: [],
+        things: [],
       },
       // A bounded string and the one union that is not discriminated — each
       // writes a different sentence.
-      { id: SPACE_ID, document: { version: 1, title: '' }, cards: [] },
+      { id: SPACE_ID, document: { version: 1, title: '' }, things: [] },
       {
         id: SPACE_ID,
         document: { version: 1, title: 'T', defaultDiagram: 'SpaceCanvas' },
-        cards: [],
+        things: [],
       },
-      { id: SPACE_ID, document: { version: 1, title: 'T', defaultDiagram: 7 }, cards: [] },
+      { id: SPACE_ID, document: { version: 1, title: 'T', defaultDiagram: 7 }, things: [] },
       // And the root-path renders, where neither schema sees an object at all.
       'nope',
       42,
@@ -284,19 +284,19 @@ describe('PostgresSpaceRepository import decoding', () => {
   });
 
   /**
-   * The same conclusion at the level a reader meets it: the kinds a card may
+   * The same conclusion at the level a reader meets it: the kinds a thing may
    * declare survive the fold verbatim. Read off the schemas rather than written
    * out, so changing a literal to `'Markdown'` fails here instead of quietly
    * shipping a summary that names a kind nothing accepts.
    */
-  it('leaves a card kind legible in the summary it prints', async () => {
+  it('leaves a thing kind legible in the summary it prints', async () => {
     const cli = await cliMessage({
       id: SPACE_ID,
       document: { version: 1, title: 'T' },
-      cards: [{ id: CARD_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
+      things: [{ id: THING_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
     });
 
-    expect(cli).toContain(`'${markdownCardFrontmatterSchema.shape.kind.value}'`);
-    expect(cli).toContain(`'${aliasCardFrontmatterSchema.shape.kind.value}'`);
+    expect(cli).toContain(`'${markdownThingFrontmatterSchema.shape.kind.value}'`);
+    expect(cli).toContain(`'${aliasThingFrontmatterSchema.shape.kind.value}'`);
   });
 });

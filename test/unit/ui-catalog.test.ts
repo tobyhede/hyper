@@ -286,7 +286,7 @@ describe('UI catalogue', () => {
 
 describe('production component coverage', () => {
   const storyRendering = (specifier: string): string =>
-    `import { Thing } from '${specifier}';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Thing;\n`;
+    `import { Widget } from '${specifier}';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Widget;\n`;
 
   it('reports a production component no stable story renders', () => {
     const root = fixture();
@@ -299,7 +299,7 @@ describe('production component coverage', () => {
 
   it('follows a relative import out of a story into the component it renders', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -319,9 +319,9 @@ describe('production component coverage', () => {
       'packages/ui/package.json',
       '{"imports":{"#components/*":"./src/components/*.tsx"}}',
     );
-    write(root, 'packages/ui/src/index.ts', "export { Thing } from './Sidebar';");
-    write(root, 'packages/ui/src/Sidebar.tsx', "export { Thing } from '#components/sheet';");
-    write(root, 'packages/ui/src/components/sheet.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/index.ts', "export { Widget } from './Sidebar';");
+    write(root, 'packages/ui/src/Sidebar.tsx', "export { Widget } from '#components/sheet';");
+    write(root, 'packages/ui/src/components/sheet.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -333,8 +333,8 @@ describe('production component coverage', () => {
 
   it('resolves a package entry point written as index.tsx', () => {
     const root = fixture();
-    write(root, 'packages/react-flow-adapter/src/index.tsx', "export { Thing } from './Node';");
-    write(root, 'packages/react-flow-adapter/src/Node.tsx', 'export const Thing = null;');
+    write(root, 'packages/react-flow-adapter/src/index.tsx', "export { Widget } from './Node';");
+    write(root, 'packages/react-flow-adapter/src/Node.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -346,7 +346,7 @@ describe('production component coverage', () => {
 
   it('follows a public package subpath directly to the component it renders', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/MarkdownSourceEditor.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/MarkdownSourceEditor.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -359,7 +359,7 @@ describe('production component coverage', () => {
   it('resolves a subpath entry declared without a wildcard', () => {
     const root = fixture();
     write(root, 'packages/app/package.json', '{"imports":{"#shell":"./src/Shell.tsx"}}');
-    write(root, 'packages/app/src/Shell.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/Shell.tsx', 'export const Widget = null;');
     write(root, 'packages/app/stories/components/button.stories.tsx', storyRendering('#shell'));
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -375,11 +375,11 @@ describe('production component coverage', () => {
       '{"imports":{"#shell":"./src/Shell.tsx","#components/*":"./src/components/*.tsx"}}',
     );
     write(root, 'packages/app/src/Shell.tsx', 'export const Shell = null;');
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      `import { Thing } from '#components/NewAlias';\nimport { Shell } from '#shell';\nexport default { title: 'Components/Button' };\nexport const Primary = () => [Thing, Shell];\n`,
+      `import { Widget } from '#components/NewAlias';\nimport { Shell } from '#shell';\nexport default { title: 'Components/Button' };\nexport const Primary = () => [Widget, Shell];\n`,
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -392,7 +392,7 @@ describe('production component coverage', () => {
       'packages/app/package.json',
       '{"imports":{"#components/*":"./src/components/*.tsx"}}',
     );
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -407,9 +407,9 @@ describe('production component coverage', () => {
     write(
       root,
       'packages/ui/src/index.ts',
-      "export { Thing } from './Rendered';\nexport { Other } from './Unrendered';",
+      "export { Widget } from './Rendered';\nexport { Other } from './Unrendered';",
     );
-    write(root, 'packages/ui/src/Rendered.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
     write(root, 'packages/ui/src/Unrendered.tsx', 'export const Other = null;');
     write(
       root,
@@ -423,11 +423,11 @@ describe('production component coverage', () => {
   });
 
   it.each([
-    ["import type { Thing } from '../../src/components/NewAlias';", 'a type-only declaration'],
-    ["import { type Thing } from '../../src/components/NewAlias';", 'a type-only specifier'],
+    ["import type { Widget } from '../../src/components/NewAlias';", 'a type-only declaration'],
+    ["import { type Widget } from '../../src/components/NewAlias';", 'a type-only specifier'],
   ])('does not treat %s as rendering the module it names', (statement) => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export type Thing = string;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export type Widget = string;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -444,14 +444,14 @@ describe('production component coverage', () => {
     write(
       root,
       'packages/ui/src/index.ts',
-      "export { Thing } from './Rendered';\nexport { Other } from './Unrendered';",
+      "export { Widget } from './Rendered';\nexport { Other } from './Unrendered';",
     );
-    write(root, 'packages/ui/src/Rendered.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
     write(root, 'packages/ui/src/Unrendered.tsx', 'export const Other = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      "import * as UI from '@project/ui';\nexport default { title: 'Components/Button' };\nexport const Primary = () => UI.Thing;\n",
+      "import * as UI from '@project/ui';\nexport default { title: 'Components/Button' };\nexport const Primary = () => UI.Widget;\n",
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
@@ -461,17 +461,20 @@ describe('production component coverage', () => {
 
   it('resolves a re-export alias by the name consumers import, not the local one', () => {
     const root = fixture();
-    // `packages/ui/src/index.ts` really does this: `CardContent` from one module
-    // and `CardContent as CardSection` from another. Reading `propertyName` on an
-    // export specifier takes the local name, so importing `CardContent` matched
-    // the aliased line too and catalogued a module the story never rendered.
+    // `packages/ui/src/index.ts` really did this, re-exporting the shadcn
+    // registry's content component under a second name because a domain
+    // component held the first one. Reading `propertyName` on an export
+    // specifier takes the local name, so importing either matched the aliased
+    // line too and catalogued a module the story never rendered. ADR 0085
+    // resolved that collision and the barrel aliases nothing today — which is
+    // why this fixture is synthetic rather than a quotation.
     write(
       root,
       'packages/ui/src/index.ts',
-      "export { Thing } from './Rendered';\nexport { Thing as Aliased } from './Unrendered';",
+      "export { Widget } from './Rendered';\nexport { Widget as Aliased } from './Unrendered';",
     );
-    write(root, 'packages/ui/src/Rendered.tsx', 'export const Thing = null;');
-    write(root, 'packages/ui/src/Unrendered.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
+    write(root, 'packages/ui/src/Unrendered.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -485,8 +488,8 @@ describe('production component coverage', () => {
 
   it('follows an aliased re-export when the story imports the alias', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/index.ts', "export { Thing as Aliased } from './Rendered';");
-    write(root, 'packages/ui/src/Rendered.tsx', 'export const Thing = null;');
+    write(root, 'packages/ui/src/index.ts', "export { Widget as Aliased } from './Rendered';");
+    write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -502,7 +505,7 @@ describe('production component coverage', () => {
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      "import Thing, { type Props } from '../../src/components/NewAlias';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Thing as Props;\n",
+      "import Widget, { type Props } from '../../src/components/NewAlias';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Widget as Props;\n",
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -525,7 +528,7 @@ describe('production component coverage', () => {
 
   it('rejects the same module recorded twice', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
@@ -545,7 +548,7 @@ describe('production component coverage', () => {
 
   it('reads the exported list, not a same-named local declaration above it', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
@@ -585,7 +588,7 @@ describe('production component coverage', () => {
 
   it('rejects a recorded reason for a component a stable story does render', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -620,11 +623,11 @@ describe('production component coverage', () => {
 
   it('does not ask a review-only story to catalogue anything', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/review/proposal.stories.tsx',
-      `import { Thing } from '../../src/components/NewAlias';\nexport default { title: 'Review/Proposal' };\nexport const Draft = () => Thing;\n`,
+      `import { Widget } from '../../src/components/NewAlias';\nexport default { title: 'Review/Proposal' };\nexport const Draft = () => Widget;\n`,
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
@@ -634,13 +637,13 @@ describe('production component coverage', () => {
 
   it('lets a review-only surface appear beside its future Space stories', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/review/multiple-spaces.stories.tsx',
-      `import { Thing } from '../../src/components/NewAlias';
+      `import { Widget } from '../../src/components/NewAlias';
 export default { title: 'Space/Multiple Spaces' };
-export const MultipleSpaces = () => Thing;
+export const MultipleSpaces = () => Widget;
 `,
     );
 
@@ -687,30 +690,30 @@ describe('hand-rolled application styles', () => {
   });
 
   /**
-   * A colocated component stylesheet is not inventory debt — `canvas-card.css` beside
-   * `CanvasCard` is the pattern, not the exception — so the *recorded block* half does
+   * A colocated component stylesheet is not inventory debt — `canvas-thing.css` beside
+   * `CanvasThing` is the pattern, not the exception — so the *recorded block* half does
    * not apply to it. The dead-rule half does: moving a block out of `styles.css` and
    * beside its component must not be a way to stop the ratchet reading it.
    */
   it('reports a dead rule in a stylesheet colocated with its component', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/canvas-card.css', '.canvas-card__ghost { color: red; }');
+    write(root, 'packages/ui/src/canvas-thing.css', '.canvas-thing__ghost { color: red; }');
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/ui\/src\/canvas-card\.css declares \.canvas-card__ghost, which no production module names/,
+      /packages\/ui\/src\/canvas-thing\.css declares \.canvas-thing__ghost, which no production module names/,
     );
   });
 
   it('asks a colocated stylesheet for no inventory entry', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/canvas-card.css', '.canvas-card__rail { color: red; }');
+    write(root, 'packages/ui/src/canvas-thing.css', '.canvas-thing__rail { color: red; }');
     write(
       root,
-      'packages/ui/src/CanvasCard.tsx',
-      'export const CanvasCard = () => <div className="canvas-card__rail" />;',
+      'packages/ui/src/CanvasThing.tsx',
+      'export const CanvasThing = () => <div className="canvas-thing__rail" />;',
     );
 
-    expect(() => buildUiCatalog(root)).not.toThrowError(/canvas-card__rail.*is not recorded/);
+    expect(() => buildUiCatalog(root)).not.toThrowError(/canvas-thing__rail.*is not recorded/);
   });
 
   it('reports a rule no production module names', () => {
@@ -834,7 +837,7 @@ describe('hand-rolled application styles', () => {
   });
 
   it.each([
-    ['[data-card-search-combobox]', 'data-card-search-combobox'],
+    ['[data-thing-search-combobox]', 'data-thing-search-combobox'],
     ['#root', 'root'],
     ['html,\nbody,\n#root', 'root'],
     ['*', '*'],
@@ -851,25 +854,25 @@ describe('hand-rolled application styles', () => {
 
   it('does not count a domain string that merely spells a class name', () => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '.card { color: red; }');
+    write(root, 'packages/app/src/styles.css', '.thing { color: red; }');
     // React Flow's node type, an Edge drop target, a refusal code — none of these
     // is a class name, and reading every string literal made them look like one.
     write(
       root,
       'packages/app/src/App.tsx',
-      "export const App = () => ({ kind: 'card', type: 'card' });",
+      "export const App = () => ({ kind: 'thing', type: 'thing' });",
     );
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
       inventory(
         [{ module: 'packages/app/src/App.tsx', reason: 'Composition root.' }],
-        [{ block: 'card', reason: 'React Flow card geometry.' }],
+        [{ block: 'thing', reason: 'React Flow thing geometry.' }],
       ),
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /styles\.css declares \.card, which no production module names/,
+      /styles\.css declares \.thing, which no production module names/,
     );
   });
 
@@ -903,7 +906,7 @@ describe('hand-rolled application styles', () => {
 
   it('does not read a class name out of a comment', () => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '/* .btn is gone; see .card-pane */\n');
+    write(root, 'packages/app/src/styles.css', '/* .btn is gone; see .thing-pane */\n');
 
     expect(buildUiCatalog(root).handRolledStyles).toEqual([]);
   });
@@ -912,10 +915,14 @@ describe('hand-rolled application styles', () => {
 describe('story support harnesses', () => {
   it('rejects a support stylesheet rule that is not catalogue furniture', () => {
     const root = fixture();
-    write(root, 'packages/app/stories/support/inventory.css', '.card-pane__panel { width: 10px; }');
+    write(
+      root,
+      'packages/app/stories/support/inventory.css',
+      '.thing-pane__panel { width: 10px; }',
+    );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/stories\/support\/inventory\.css declares \.card-pane__panel, which is not catalogue furniture/,
+      /packages\/app\/stories\/support\/inventory\.css declares \.thing-pane__panel, which is not catalogue furniture/,
     );
   });
 
@@ -928,30 +935,30 @@ describe('story support harnesses', () => {
 
   it('rejects a support harness that names a production class instead of rendering its owner', () => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '.card-pane { inset: 0; }');
+    write(root, 'packages/app/src/styles.css', '.thing-pane { inset: 0; }');
     write(
       root,
       'packages/app/src/App.tsx',
-      'export const App = () => <div className="card-pane" />;',
+      'export const App = () => <div className="thing-pane" />;',
     );
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
       inventory(
         [{ module: 'packages/app/src/App.tsx', reason: 'Composition root.' }],
-        [{ block: 'card-pane', reason: 'The pane React Flow is covered by.' }],
+        [{ block: 'thing-pane', reason: 'The pane React Flow is covered by.' }],
       ),
     );
     write(
       root,
       'packages/app/stories/support/Facsimile.tsx',
-      'export const Facsimile = () => <div className="card-pane" />;',
+      'export const Facsimile = () => <div className="thing-pane" />;',
     );
 
     // The reproduction is the whole complaint: production really does name the
     // class, so the rule is live and the harness is copying a real surface.
     expect(problemsOf(root)).toEqual([
-      'packages/app/stories/support/Facsimile.tsx names the production class card-pane — render the production component instead of reproducing it (ADR 0052)',
+      'packages/app/stories/support/Facsimile.tsx names the production class thing-pane — render the production component instead of reproducing it (ADR 0052)',
     ]);
   });
 });

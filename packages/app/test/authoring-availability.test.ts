@@ -14,26 +14,26 @@ import {
 const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editable: true,
   presenting: false,
-  creatingCard: false,
-  editingCardBody: false,
-  editingCardTitle: false,
-  cardIsOpen: false,
+  creatingThing: false,
+  editingThingBody: false,
+  editingThingTitle: false,
+  thingIsOpen: false,
   editingChromeTitle: false,
   spaceOnCanvas: true,
   editingEmbeddedDiagram: false,
 };
 
 const ALL_AVAILABLE: AuthoringAvailability = {
-  cardsView: true,
+  thingsView: true,
   chromeTitleEdit: true,
   entityEdits: true,
-  deleteCard: true,
+  deleteThing: true,
   present: true,
-  addCard: true,
+  addThing: true,
   createDiagram: true,
   authorOnCanvas: true,
   authorInEmbeddedDiagram: true,
-  editCardBody: true,
+  editThingBody: true,
   connectOnCanvas: true,
   dragNodes: true,
   selectNodes: true,
@@ -52,10 +52,10 @@ describe('authoring availability', () => {
         ...ALL_AVAILABLE,
         chromeTitleEdit: false,
         entityEdits: false,
-        deleteCard: false,
+        deleteThing: false,
         authorOnCanvas: false,
         authorInEmbeddedDiagram: false,
-        editCardBody: false,
+        editThingBody: false,
         connectOnCanvas: false,
         dragNodes: false,
       },
@@ -65,29 +65,29 @@ describe('authoring availability', () => {
       { presenting: true },
       {
         ...ALL_AVAILABLE,
-        cardsView: false,
+        thingsView: false,
         chromeTitleEdit: false,
         entityEdits: false,
-        deleteCard: false,
-        addCard: false,
+        deleteThing: false,
+        addThing: false,
         createDiagram: false,
         authorOnCanvas: false,
         authorInEmbeddedDiagram: false,
-        editCardBody: false,
+        editThingBody: false,
         dragNodes: false,
         selectNodes: false,
       },
     ],
     [
       'an open creation pane',
-      { creatingCard: true },
+      { creatingThing: true },
       {
         ...ALL_AVAILABLE,
-        cardsView: false,
+        thingsView: false,
         chromeTitleEdit: false,
         entityEdits: false,
-        deleteCard: false,
-        addCard: false,
+        deleteThing: false,
+        addThing: false,
         createDiagram: false,
         authorOnCanvas: false,
         authorInEmbeddedDiagram: false,
@@ -95,39 +95,39 @@ describe('authoring availability', () => {
       },
     ],
     [
-      'a live Card content edit',
-      { editingCardBody: true },
+      'a live Thing content edit',
+      { editingThingBody: true },
       {
         ...ALL_AVAILABLE,
         chromeTitleEdit: false,
         entityEdits: false,
-        deleteCard: false,
+        deleteThing: false,
         present: false,
-        addCard: false,
+        addThing: false,
         createDiagram: false,
       },
     ],
     [
-      'a live Card rename',
-      { editingCardTitle: true },
+      'a live Thing rename',
+      { editingThingTitle: true },
       {
         ...ALL_AVAILABLE,
         chromeTitleEdit: false,
         entityEdits: false,
-        deleteCard: false,
+        deleteThing: false,
         createDiagram: false,
       },
     ],
-    ['an Open Card', { cardIsOpen: true }, { ...ALL_AVAILABLE, deleteCard: false }],
+    ['an Open Thing', { thingIsOpen: true }, { ...ALL_AVAILABLE, deleteThing: false }],
     [
       'a live chrome title edit',
       { editingChromeTitle: true },
       {
         ...ALL_AVAILABLE,
         entityEdits: false,
-        deleteCard: false,
+        deleteThing: false,
         present: false,
-        addCard: false,
+        addThing: false,
         createDiagram: false,
         authorOnCanvas: false,
         authorInEmbeddedDiagram: false,
@@ -145,7 +145,7 @@ describe('authoring availability', () => {
       },
     ],
     [
-      'a live Card edit inside an embedded Diagram',
+      'a live Thing edit inside an embedded Diagram',
       { editingEmbeddedDiagram: true },
       { ...ALL_AVAILABLE, authorOnCanvas: false },
     ],
@@ -156,25 +156,25 @@ describe('authoring availability', () => {
   });
 
   describe('the asymmetries', () => {
-    it('offers Add Card during a live Card rename and withholds Add Diagram', () => {
+    it('offers Add Thing during a live Thing rename and withholds Add Diagram', () => {
       const availability = authoringAvailability({
         ...NOTHING_IN_PROGRESS,
-        editingCardTitle: true,
+        editingThingTitle: true,
       });
 
-      expect(availability.addCard).toBe(true);
+      expect(availability.addThing).toBe(true);
       expect(availability.createDiagram).toBe(false);
     });
 
-    it('withholds only Delete Card while a Card is open', () => {
-      const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, cardIsOpen: true });
+    it('withholds only Delete Thing while a Thing is open', () => {
+      const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, thingIsOpen: true });
 
-      expect(availability.deleteCard).toBe(false);
+      expect(availability.deleteThing).toBe(false);
       expect(availability.entityEdits).toBe(true);
-      expect(availability.addCard).toBe(true);
+      expect(availability.addThing).toBe(true);
     });
 
-    it('keeps a connection reachable on the presented Card that authoring is withdrawn from', () => {
+    it('keeps a connection reachable on the presented Thing that authoring is withdrawn from', () => {
       const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, presenting: true });
 
       expect(availability.connectOnCanvas).toBe(true);
@@ -184,16 +184,16 @@ describe('authoring availability', () => {
     it('withdraws the connection a modal pane covers, presented or not', () => {
       for (const presenting of [false, true]) {
         expect(
-          authoringAvailability({ ...NOTHING_IN_PROGRESS, presenting, creatingCard: true })
+          authoringAvailability({ ...NOTHING_IN_PROGRESS, presenting, creatingThing: true })
             .connectOnCanvas,
         ).toBe(false);
       }
     });
 
     it('keeps a live content editor through a modal pane that withdraws canvas authoring', () => {
-      const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, creatingCard: true });
+      const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, creatingThing: true });
 
-      expect(availability.editCardBody).toBe(true);
+      expect(availability.editThingBody).toBe(true);
       expect(availability.authorOnCanvas).toBe(false);
     });
 
@@ -211,7 +211,7 @@ describe('authoring availability', () => {
       for (const inProgress of [
         { editable: false },
         { presenting: true },
-        { creatingCard: true },
+        { creatingThing: true },
         { editingChromeTitle: true },
         { spaceOnCanvas: false },
       ]) {

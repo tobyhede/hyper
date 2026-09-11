@@ -39,7 +39,7 @@ describe('application UI import restrictions', () => {
     '@project/ui/components/button',
     '../../ui/src/components/button',
   ])('rejects %s from the React Flow adapter', async (specifier) => {
-    const messages = await lintImport(specifier, 'packages/react-flow-adapter/src/CardNode.tsx');
+    const messages = await lintImport(specifier, 'packages/react-flow-adapter/src/ThingNode.tsx');
     expect(messages).toHaveLength(1);
   });
 

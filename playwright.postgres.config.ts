@@ -10,7 +10,7 @@ export default defineConfig({
   // one-test project to nothing and still report green.
   forbidOnly: !!process.env['CI'],
   // Deliberately not the `retries: 2` of the other two configs. Each attempt
-  // mints its own Space and Card ids and deletes them in `finally`, so a retry
+  // mints its own Space and Thing ids and deletes them in `finally`, so a retry
   // is safe — but this test exists to answer whether an edit is durable, and a
   // pass on the second attempt does not answer that question the way a pass on
   // a flaky interaction test does.

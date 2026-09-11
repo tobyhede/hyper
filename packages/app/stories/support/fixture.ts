@@ -1,19 +1,19 @@
 import {
   uuidSchema,
-  type Card,
+  type Thing,
   type Graph,
   type Diagram,
   type SpaceFile,
   type UUID,
 } from '@project/core';
-import { loadSpace, serializeCardFile, type CardFile, type Space } from '@project/graph';
+import { loadSpace, serializeThingFile, type ThingFile, type Space } from '@project/graph';
 import { GRAPH_PALETTE as PRODUCTION_GRAPH_PALETTE } from '#src/colors';
 
 /**
  * The inventory's fixture: a small, believable Space, shaped to exercise the
  * cases the design has to survive rather than to tell a story.
  *
- * Six Cards, two Graphs sharing two of them, one Alias, and one deliberately
+ * Six Things, two Graphs sharing two of them, one Alias, and one deliberately
  * long title.
  *
  * Real ids, parsed through `uuidSchema`, so this data is the same shape the
@@ -23,7 +23,7 @@ import { GRAPH_PALETTE as PRODUCTION_GRAPH_PALETTE } from '#src/colors';
 
 const id = (value: string): UUID => uuidSchema.parse(value);
 
-export const cardIds = {
+export const thingIds = {
   opening: id('0b6f4a52-8f1e-4a7c-9f2d-1c4b5e6a7d80'),
   problem: id('1c7a5b63-9021-4b8d-8a3e-2d5c6f7b8e91'),
   strategies: id('2d8b6c74-a132-4c9e-9b4f-3e6d7a8c9f02'),
@@ -43,41 +43,41 @@ export const spaceId = id('a0f3e4fc-29ba-4416-9dcb-b0efc10e6b8a');
 /** The application palette, reused rather than translated for the catalogue. */
 export const GRAPH_PALETTE = PRODUCTION_GRAPH_PALETTE;
 
-export const cards: readonly Card[] = [
+export const things: readonly Thing[] = [
   {
-    id: cardIds.opening,
+    id: thingIds.opening,
     kind: 'markdown',
     title: 'Opening',
     body: '# Opening\n\nWhere the traversal begins.',
   },
   {
-    id: cardIds.problem,
-    // The long title: three lines at 18px in a 260px card, which is what
+    id: thingIds.problem,
+    // The long title: three lines at 18px in a 260px thing, which is what
     // `text-wrap: balance` and the three-line clamp are there to survive.
     title: 'Why authored placement beats a layout engine that reshuffles on every edit',
     kind: 'markdown',
-    body: '# Placement\n\nThree spike increments each reshuffled the existing cards.',
+    body: '# Placement\n\nThree spike increments each reshuffled the existing things.',
   },
   {
-    id: cardIds.strategies,
+    id: thingIds.strategies,
     title: 'Strategies',
     kind: 'markdown',
     body: '# Strategies\n\nNo strategy is privileged.',
   },
   {
-    id: cardIds.traversal,
+    id: thingIds.traversal,
     title: 'Traversal',
     kind: 'markdown',
     body: '# Traversal\n\nPresenting is this canvas, closer in.',
   },
   {
-    id: cardIds.openingAlias,
+    id: thingIds.openingAlias,
     title: 'Strategy overview',
     kind: 'alias',
-    target: cardIds.strategies,
+    target: thingIds.strategies,
   },
   {
-    id: cardIds.closing,
+    id: thingIds.closing,
     title: 'Closing',
     kind: 'markdown',
     body: '# Closing\n',
@@ -90,10 +90,10 @@ export const graphs: readonly Graph[] = [
     title: 'Long path',
     color: GRAPH_PALETTE[0],
     edges: [
-      { from: cardIds.opening, to: cardIds.problem },
-      { from: cardIds.problem, to: cardIds.strategies },
-      { from: cardIds.strategies, to: cardIds.traversal },
-      { from: cardIds.traversal, to: cardIds.openingAlias },
+      { from: thingIds.opening, to: thingIds.problem },
+      { from: thingIds.problem, to: thingIds.strategies },
+      { from: thingIds.strategies, to: thingIds.traversal },
+      { from: thingIds.traversal, to: thingIds.openingAlias },
     ],
   },
   {
@@ -103,8 +103,8 @@ export const graphs: readonly Graph[] = [
     title: 'Short path',
     color: GRAPH_PALETTE[1],
     edges: [
-      { from: cardIds.opening, to: cardIds.strategies },
-      { from: cardIds.strategies, to: cardIds.closing },
+      { from: thingIds.opening, to: thingIds.strategies },
+      { from: thingIds.strategies, to: thingIds.closing },
     ],
   },
 ];
@@ -115,19 +115,19 @@ export const colorByGraphId = {
 } as const;
 
 /**
- * Where the static canvas draws each Card. Authored, as placement always is —
+ * Where the static canvas draws each Thing. Authored, as placement always is —
  * these are hand-set so both Graphs read forward, left to right, which is the
  * only way two overlaid Graphs stay legible (the acyclic-union
  * limit). `closing` belongs to only the short Graph, so the design still has to
- * distinguish Cards with different Graph membership.
+ * distinguish Things with different Graph membership.
  */
 export const positions = {
-  [cardIds.opening]: { x: 40, y: 170, open: false },
-  [cardIds.problem]: { x: 380, y: 30, open: false },
-  [cardIds.strategies]: { x: 720, y: 170, open: false },
-  [cardIds.traversal]: { x: 1060, y: 30, open: false },
-  [cardIds.openingAlias]: { x: 1400, y: 170, open: false },
-  [cardIds.closing]: { x: 1060, y: 330, open: false },
+  [thingIds.opening]: { x: 40, y: 170, open: false },
+  [thingIds.problem]: { x: 380, y: 30, open: false },
+  [thingIds.strategies]: { x: 720, y: 170, open: false },
+  [thingIds.traversal]: { x: 1060, y: 30, open: false },
+  [thingIds.openingAlias]: { x: 1400, y: 170, open: false },
+  [thingIds.closing]: { x: 1060, y: 330, open: false },
 } as const;
 
 export const diagrams: readonly Diagram[] = [
@@ -136,7 +136,7 @@ export const diagrams: readonly Diagram[] = [
     kind: 'positioned',
     title: 'Collection 1',
     positions: Object.fromEntries(
-      cards.map((card) => [card.id, positions[card.id] ?? { x: 0, y: 0, open: false }]),
+      things.map((thing) => [thing.id, positions[thing.id] ?? { x: 0, y: 0, open: false }]),
     ),
     graphs: [...graphs],
     activeGraph: graphIds.long,
@@ -145,9 +145,9 @@ export const diagrams: readonly Diagram[] = [
 
 export const spaceTitle = 'Graph-native presentations';
 
-const cardFiles: CardFile[] = cards.map((card) => ({
-  path: `cards/${card.id}.md`,
-  text: serializeCardFile(card),
+const thingFiles: ThingFile[] = things.map((thing) => ({
+  path: `things/${thing.id}.md`,
+  text: serializeThingFile(thing),
 }));
 
 const spaceFile: SpaceFile = {
@@ -157,7 +157,7 @@ const spaceFile: SpaceFile = {
   diagrams: [...diagrams],
 };
 
-const loaded = loadSpace(spaceFile, cardFiles);
+const loaded = loadSpace(spaceFile, thingFiles);
 if (!loaded.ok) {
   throw new Error(
     `Invalid surface-inventory fixture: ${loaded.errors.map(({ message }) => message).join('; ')}`,

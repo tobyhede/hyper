@@ -3,17 +3,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type DiagramId, type SpaceSnapshot, type UUID } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { CardFlowNode } from '@project/react-flow-adapter';
+import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { composeApp } from '../src/compose-app';
 import {
   dropTarget,
-  newCardDrop,
+  newThingDrop,
   type ConnectionGesture,
   type DropTarget,
   type ElementDropTarget,
 } from '../src/edge-authoring';
 
-import { CARD_SIZE } from '../src/card';
+import { THING_SIZE } from '../src/thing';
 import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
 
@@ -28,9 +28,9 @@ import { node } from './render-adapter-fixtures';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -39,27 +39,27 @@ const THIRD_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
-const EDGE = { from: CARD_A, to: CARD_B } as const;
+const EDGE = { from: THING_A, to: THING_B } as const;
 /** The Graph and Edge an Edge operation is named by, which travel together. */
 const SUBJECT = { graphId: GRAPH_ID, edge: EDGE } as const;
 
-const PROJECTED: CardFlowNode[] = [
-  node(CARD_A, 10, 20),
-  node(CARD_B, 300, 40),
-  node(CARD_C, 600, 40),
+const PROJECTED: ThingFlowNode[] = [
+  node(THING_A, 10, 20),
+  node(THING_B, 300, 40),
+  node(THING_C, 600, 40),
 ];
 
 const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
   ],
 };
 
-/** One Diagram holding all three Cards, with two Graphs over them. */
+/** One Diagram holding all three Things, with two Graphs over them. */
 const positionedSnapshot: SpaceSnapshot = {
   ...automaticSnapshot,
   document: {
@@ -70,9 +70,9 @@ const positionedSnapshot: SpaceSnapshot = {
         title: 'Diagram 1',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 10, y: 20, open: false },
-          [CARD_B]: { x: 300, y: 40, open: false },
-          [CARD_C]: { x: 600, y: 40, open: false },
+          [THING_A]: { x: 10, y: 20, open: false },
+          [THING_B]: { x: 300, y: 40, open: false },
+          [THING_C]: { x: 600, y: 40, open: false },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -83,7 +83,7 @@ const positionedSnapshot: SpaceSnapshot = {
         id: OTHER_DIAGRAM_ID,
         title: 'Diagram 2',
         kind: 'positioned',
-        positions: { [CARD_C]: { x: 0, y: 0, open: false } },
+        positions: { [THING_C]: { x: 0, y: 0, open: false } },
         graphs: [{ id: THIRD_GRAPH_ID, title: 'Third', edges: [] }],
       },
     ],
@@ -103,9 +103,9 @@ function open(
     selection: diagramId,
     newId,
     initialPlacement: Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, open: false }],
-      [CARD_B, { x: 300, y: 40, open: false }],
-      [CARD_C, { x: 600, y: 40, open: false }],
+      [THING_A, { x: 10, y: 20, open: false }],
+      [THING_B, { x: 300, y: 40, open: false }],
+      [THING_C, { x: 600, y: 40, open: false }],
     ]),
   });
   adapter.getState().syncProjection(PROJECTED, []);
@@ -119,8 +119,8 @@ describe('the one Edge interaction draft', () => {
   it('holds at most one draft, whichever kind starts next', () => {
     const { edges } = open();
 
-    edges.beginPointerConnect(CARD_A);
-    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: CARD_A });
+    edges.beginPointerConnect(THING_A);
+    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: THING_A });
 
     edges.openEdgeEditor(SUBJECT);
     expect(edges.getState().draft).toEqual({
@@ -138,15 +138,15 @@ describe('the one Edge interaction draft', () => {
     });
   });
 
-  it('cancels the draft and asks for focus back at the Card the author was on', () => {
+  it('cancels the draft and asks for focus back at the Thing the author was on', () => {
     const { edges, continuation } = open();
-    edges.beginPointerConnect(CARD_A);
+    edges.beginPointerConnect(THING_A);
 
     edges.cancelDraft();
 
     expect(edges.getState().draft).toBeNull();
     expect(continuation.getState().pending).toEqual({
-      target: { kind: 'card', cardId: CARD_A },
+      target: { kind: 'thing', thingId: THING_A },
       select: false,
       then: 'focus',
     });
@@ -163,7 +163,7 @@ describe('the one Edge interaction draft', () => {
     edges.cancelDraft();
 
     expect(continuation.getState().pending).toEqual({
-      target: { kind: 'card', cardId: CARD_A },
+      target: { kind: 'thing', thingId: THING_A },
       select: false,
       then: 'focus',
     });
@@ -180,7 +180,7 @@ describe('a refused proposal', () => {
     const { edges } = open();
     edges.openEdgeEditor(SUBJECT);
 
-    // A Card outside this Diagram, so the rule is Authoring's rather than this
+    // A Thing outside this Diagram, so the rule is Authoring's rather than this
     // module's — which is the point: the identity comes from where the rule is,
     // and the endpoint beside it is the only context presentation needs to mark
     // one Field and not the other.
@@ -196,7 +196,7 @@ describe('a refused proposal', () => {
     expect(edges.getState().refusal).toEqual({
       kind: 'reconnection',
       endpoint: 'to',
-      refusal: { code: 'edge-card-outside-diagram' },
+      refusal: { code: 'edge-thing-outside-diagram' },
     });
   });
 
@@ -205,7 +205,7 @@ describe('a refused proposal', () => {
     edges.openEdgeEditor(SUBJECT);
     edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
 
-    edges.beginPointerConnect(CARD_A);
+    edges.beginPointerConnect(THING_A);
 
     expect(edges.getState().refusal).toBeNull();
   });
@@ -214,10 +214,12 @@ describe('a refused proposal', () => {
     const { edges, session } = open();
     edges.openEdgeEditor(SUBJECT);
 
-    expect(edges.reconnect('to', CARD_C)).toBe(true);
+    expect(edges.reconnect('to', THING_C)).toBe(true);
 
     expect(edges.getState().draft).toBeNull();
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([{ from: CARD_A, to: CARD_C }]);
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      { from: THING_A, to: THING_C },
+    ]);
   });
 
   /**
@@ -232,9 +234,9 @@ describe('a refused proposal', () => {
     adapter.getState().selectEdge(SUBJECT);
     edges.openEdgeEditor(SUBJECT);
 
-    expect(edges.reconnect('to', CARD_C)).toBe(true);
+    expect(edges.reconnect('to', THING_C)).toBe(true);
 
-    const reconnected = { graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_C } };
+    const reconnected = { graphId: GRAPH_ID, edge: { from: THING_A, to: THING_C } };
     expect(adapter.getState().selection).toEqual({ kind: 'edge', ...reconnected });
     expect(continuation.getState().pending).toEqual({
       target: { kind: 'edge', ...reconnected },
@@ -249,7 +251,7 @@ describe('a refused proposal', () => {
     adapter.getState().selectEdge(SUBJECT);
     edges.openEdgeEditor(SUBJECT);
 
-    expect(edges.reconnect('to', CARD_B)).toBe(true);
+    expect(edges.reconnect('to', THING_B)).toBe(true);
 
     expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
   });
@@ -260,7 +262,7 @@ describe('a refused proposal', () => {
     const before = session.getState().working;
     edges.openEdgeEditor(SUBJECT);
 
-    expect(edges.reconnect('to', CARD_B)).toBe(true);
+    expect(edges.reconnect('to', THING_B)).toBe(true);
 
     expect(edges.getState().draft).toBeNull();
     expect(session.getState().working).toBe(before);
@@ -268,14 +270,14 @@ describe('a refused proposal', () => {
 });
 
 describe('deleting an Edge', () => {
-  it('removes it from its Graph and asks for focus at the source Card', () => {
+  it('removes it from its Graph and asks for focus at the source Thing', () => {
     const { edges, session, continuation } = open();
 
     expect(edges.deleteEdge(SUBJECT)).toBe(true);
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([]);
     expect(continuation.getState().pending).toEqual({
-      target: { kind: 'card', cardId: CARD_A },
+      target: { kind: 'thing', thingId: THING_A },
       select: false,
       then: 'focus',
     });
@@ -305,7 +307,7 @@ describe('deleting an Edge', () => {
     edges.deleteEdge({ graphId: UNKNOWN_GRAPH, edge: EDGE });
     expect(edges.getState().refusal).not.toBeNull();
 
-    adapter.getState().selectEdge({ graphId: GRAPH_ID, edge: { from: CARD_B, to: CARD_C } });
+    adapter.getState().selectEdge({ graphId: GRAPH_ID, edge: { from: THING_B, to: THING_C } });
 
     expect(edges.getState().refusal).toBeNull();
   });
@@ -318,7 +320,7 @@ describe('deleting an Edge', () => {
 describe('draft invalidation', () => {
   it('cancels the draft when the selected Diagram changes', () => {
     const { edges, navigation } = open();
-    edges.beginPointerConnect(CARD_A);
+    edges.beginPointerConnect(THING_A);
 
     navigation.selectDiagram(OTHER_DIAGRAM_ID);
 
@@ -357,9 +359,9 @@ describe('draft invalidation', () => {
       spaceSession: session,
       selection: DIAGRAM_ID,
       initialPlacement: Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, open: false }],
-        [CARD_B, { x: 300, y: 40, open: false }],
-        [CARD_C, { x: 600, y: 40, open: false }],
+        [THING_A, { x: 10, y: 20, open: false }],
+        [THING_B, { x: 300, y: 40, open: false }],
+        [THING_C, { x: 600, y: 40, open: false }],
       ]),
     });
     edges.openEdgeEditor(SUBJECT);
@@ -380,7 +382,7 @@ describe('draft invalidation', () => {
    */
   it('cancels the draft when presenting withdraws Edge authoring', () => {
     const { edges, navigation } = open();
-    edges.beginPointerConnect(CARD_A);
+    edges.beginPointerConnect(THING_A);
 
     navigation.present();
 
@@ -389,7 +391,7 @@ describe('draft invalidation', () => {
   });
 
   /**
-   * A refusal names Cards and Graphs of the Space it was made against, so the
+   * A refusal names Things and Graphs of the Space it was made against, so the
    * context that invalidates a draft invalidates the sentence too — and a
    * *pointer* refusal has no draft left to be cancelled with it. The handoff's
    * shared case 7 is the hard one: accepting the stored Space "cancels all
@@ -406,8 +408,8 @@ describe('draft invalidation', () => {
     ],
   ])('clears a refusal left by a finished gesture when %s', (_name, change) => {
     const opened = open();
-    opened.edges.beginPointerConnect(CARD_A);
-    opened.edges.connect(CARD_A, CARD_B, null);
+    opened.edges.beginPointerConnect(THING_A);
+    opened.edges.connect(THING_A, THING_B, null);
     opened.edges.endPointerDrag();
     expect(opened.edges.getState().refusal).not.toBeNull();
 
@@ -467,49 +469,49 @@ describe('draft invalidation', () => {
     });
   });
 
-  it('cancels a pointer connection when the canvas selects another Card', () => {
+  it('cancels a pointer connection when the canvas selects another Thing', () => {
     const { edges, adapter } = open();
-    edges.beginPointerConnect(CARD_A);
+    edges.beginPointerConnect(THING_A);
 
-    adapter.getState().selectCard(CARD_B);
+    adapter.getState().selectThing(THING_B);
 
     expect(edges.getState().draft).toBeNull();
   });
 
   /**
-   * React Flow clears the Card selection as a connection drag begins, so a
+   * React Flow clears the Thing selection as a connection drag begins, so a
    * pointer draft that treated `none` as "the author moved on" would end on its
    * own first frame.
    */
   it('survives the selection React Flow clears when a pointer drag begins', () => {
     const { edges, adapter } = open();
-    adapter.getState().selectCard(CARD_A);
-    edges.beginPointerConnect(CARD_A);
+    adapter.getState().selectThing(THING_A);
+    edges.beginPointerConnect(THING_A);
 
     adapter.getState().clearSelection();
 
-    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: CARD_A });
+    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: THING_A });
   });
 });
 
 describe('completing a pointer connection', () => {
-  it('authors the Edge and continues at the Card it reached', () => {
+  it('authors the Edge and continues at the Thing it reached', () => {
     const { edges, session, continuation } = open();
-    edges.beginPointerConnect(CARD_B);
+    edges.beginPointerConnect(THING_B);
 
-    edges.connect(CARD_B, CARD_C, PROJECTED);
+    edges.connect(THING_B, THING_C, PROJECTED);
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
       EDGE,
-      { from: CARD_B, to: CARD_C },
+      { from: THING_B, to: THING_C },
     ]);
     // Held until the drag ends, and published as one continuation then: the
-    // Card is selected and there is nothing to do there, which is why `select`
+    // Thing is selected and there is nothing to do there, which is why `select`
     // and `then` are separate axes.
     expect(continuation.getState().pending).toBeNull();
     edges.endPointerDrag();
     expect(continuation.getState().pending).toEqual({
-      target: { kind: 'card', cardId: CARD_C },
+      target: { kind: 'thing', thingId: THING_C },
       select: true,
       then: 'nothing',
     });
@@ -518,9 +520,9 @@ describe('completing a pointer connection', () => {
   it('reports the refusal and continues at nobody when Authoring declines', () => {
     const { edges, session, continuation } = open();
     const before = session.getState().working;
-    edges.beginPointerConnect(CARD_A);
+    edges.beginPointerConnect(THING_A);
 
-    edges.connect(CARD_A, CARD_B, PROJECTED);
+    edges.connect(THING_A, THING_B, PROJECTED);
 
     expect(session.getState().working).toBe(before);
     // The canvas announcement channel: this gesture's drag is over by the time
@@ -540,18 +542,18 @@ describe('completing a pointer connection', () => {
    */
   it('clears a previous refusal when the next connection completes', () => {
     const { edges } = open();
-    edges.beginPointerConnect(CARD_A);
-    edges.connect(CARD_A, CARD_B, null);
+    edges.beginPointerConnect(THING_A);
+    edges.connect(THING_A, THING_B, null);
     expect(edges.getState().refusal).not.toBeNull();
 
-    edges.connect(CARD_A, CARD_C, null);
+    edges.connect(THING_A, THING_C, null);
 
     expect(edges.getState().refusal).toBeNull();
   });
 
   it('ends the pointer draft with the drag, whatever it produced', () => {
     const { edges } = open();
-    edges.beginPointerConnect(CARD_B);
+    edges.beginPointerConnect(THING_B);
 
     edges.endPointerDrag();
 
@@ -567,7 +569,7 @@ describe('completing a pointer connection', () => {
   it.each([
     [
       'a connection',
-      (edges: ReturnType<typeof open>['edges']) => edges.beginPointerConnect(CARD_A),
+      (edges: ReturnType<typeof open>['edges']) => edges.beginPointerConnect(THING_A),
     ],
     [
       'a reconnection',
@@ -577,8 +579,8 @@ describe('completing a pointer connection', () => {
     const { edges } = open();
     begin(edges);
     // Both refuse for a reason Space Authoring owns: A→B already exists in this
-    // Graph, and this Card is not in this Diagram.
-    if (edges.getState().draft?.kind === 'pointer-connect') edges.connect(CARD_A, CARD_B, null);
+    // Graph, and this Thing is not in this Diagram.
+    if (edges.getState().draft?.kind === 'pointer-connect') edges.connect(THING_A, THING_B, null);
     else edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
     expect(edges.getState().refusal).not.toBeNull();
 
@@ -590,7 +592,7 @@ describe('completing a pointer connection', () => {
 });
 
 /**
- * The empty-drop rule: five facts in, one Card or none out.
+ * The empty-drop rule: five facts in, one Thing or none out.
  *
  * A table rather than a browser test because nothing here touches the DOM — the
  * `over` classification is the DOM's answer *arriving*, and how each supplier
@@ -599,34 +601,34 @@ describe('completing a pointer connection', () => {
 describe('the Option/Alt empty drop', () => {
   const dragging = (over: DropTarget, modifierHeld: boolean): ConnectionGesture => ({
     kind: 'dragging',
-    sourceId: CARD_A,
+    sourceId: THING_A,
     point: { x: 400, y: 300 },
     over,
     modifierHeld,
   });
 
-  it('authors a Card centred on the drop point', () => {
-    expect(newCardDrop(dragging('empty-canvas', true), () => true)).toEqual({
-      sourceId: CARD_A,
-      position: { x: 400 - CARD_SIZE.width / 2, y: 300 - CARD_SIZE.height / 2 },
+  it('authors a Thing centred on the drop point', () => {
+    expect(newThingDrop(dragging('empty-canvas', true), () => true)).toEqual({
+      sourceId: THING_A,
+      position: { x: 400 - THING_SIZE.width / 2, y: 300 - THING_SIZE.height / 2 },
     });
   });
 
   it.each([
     ['an idle gesture', { kind: 'idle' } satisfies ConnectionGesture, true],
     ['a connection target in range', dragging('connection-target', true), true],
-    ['a release over a Card', dragging('card', true), true],
+    ['a release over a Thing', dragging('thing', true), true],
     ['a release off the canvas', dragging('off-canvas', true), true],
     ['the modifier not held', dragging('empty-canvas', false), true],
     ['a source Authoring refuses', dragging('empty-canvas', true), false],
   ])('authors nothing for %s', (_name, gesture, accepts) => {
-    expect(newCardDrop(gesture, () => accepts)).toBeNull();
+    expect(newThingDrop(gesture, () => accepts)).toBeNull();
   });
 
-  it('never authors a Card unless every fact agrees', () => {
+  it('never authors a Thing unless every fact agrees', () => {
     const anyTarget = fc.constantFrom<DropTarget>(
       'connection-target',
-      'card',
+      'thing',
       'empty-canvas',
       'off-canvas',
     );
@@ -638,8 +640,8 @@ describe('the Option/Alt empty drop', () => {
         fc.integer({ min: -5000, max: 5000 }),
         fc.integer({ min: -5000, max: 5000 }),
         (over, modifierHeld, accepts, x, y) => {
-          const drop = newCardDrop(
-            { kind: 'dragging', sourceId: CARD_A, point: { x, y }, over, modifierHeld },
+          const drop = newThingDrop(
+            { kind: 'dragging', sourceId: THING_A, point: { x, y }, over, modifierHeld },
             () => accepts,
           );
           if (over !== 'empty-canvas' || !modifierHeld || !accepts) {
@@ -647,10 +649,10 @@ describe('the Option/Alt empty drop', () => {
             return;
           }
           // The preview draws from this same answer, so the ghost and the
-          // authored Card cannot land in different places.
+          // authored Thing cannot land in different places.
           expect(drop).toEqual({
-            sourceId: CARD_A,
-            position: { x: x - CARD_SIZE.width / 2, y: y - CARD_SIZE.height / 2 },
+            sourceId: THING_A,
+            position: { x: x - THING_SIZE.width / 2, y: y - THING_SIZE.height / 2 },
           });
         },
       ),
@@ -665,7 +667,7 @@ describe('the Option/Alt empty drop', () => {
  * Flow's `toNode` nor the DOM alone answers"*. `getClosestHandle` resolves
  * `toNode` by distance to a *handle* within `connectionRadius` — 20 at the
  * pinned 12.11.2 — so it is non-null over blank canvas near a handle and null
- * over the middle of a Card, whose centre is some 73px from the nearest handle
+ * over the middle of a Thing, whose centre is some 73px from the nearest handle
  * at 260x146. Neither source answers alone, and a connection target in range
  * outranks the element underneath.
  *
@@ -681,11 +683,11 @@ describe('composing the two answers to a drop target', () => {
    * member added to the union cannot be answered with an existing one; and the
    * list both tables run over is derived from it, so the enumeration and the
    * union cannot fall out of step. A `Record<ElementDropTarget, …>` over a
-   * separate tuple checked only the keys — `toolbar: 'card'` compiled, and the
+   * separate tuple checked only the keys — `toolbar: 'thing'` compiled, and the
    * new member went untested.
    */
   const EVERY_ELEMENT = Object.values({
-    card: 'card',
+    thing: 'thing',
     'empty-canvas': 'empty-canvas',
     'off-canvas': 'off-canvas',
   } satisfies { [K in ElementDropTarget]: K });

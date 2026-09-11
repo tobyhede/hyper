@@ -273,7 +273,7 @@ export const openManagedSpaceSession = (
        * Space stays `pending` with `retry` and `resolveConflict` both
        * early-returning and `waitForIdle()` never resolving. The registry's
        * lifecycle barrier waits on every session, so one stuck this way blocks
-       * every coordinated Space Card commit — with each session already paused.
+       * every coordinated Space Thing commit — with each session already paused.
        * Reported as retryable because a throw says nothing about the snapshot,
        * only that the attempt did not produce an answer.
        */

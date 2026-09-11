@@ -92,7 +92,7 @@
       // schema itself rather than a hand-copied literal (see each file's own
       // docstring for why the duplication would be worse than the exception).
       "files": [
-        "packages/core/test/card-document-equality.test.ts",
+        "packages/core/test/thing-document-equality.test.ts",
         "test/unit/postgres-import-decoding.test.ts"
       ],
       "rules": {
@@ -111,7 +111,7 @@
       // dependency rather than a wire format.
       "files": [
         "packages/ui/test/Button.test.tsx",
-        "packages/react-flow-adapter/test/CardNode.test.tsx",
+        "packages/react-flow-adapter/test/ThingNode.test.tsx",
         "packages/react-flow-adapter/test/GraphHud.test.tsx",
         "packages/app/test/cameras.test.tsx"
       ],
@@ -333,7 +333,7 @@
       // error-reporting seam, the same case as the override below — kept here
       // rather than folded in because it shares a file with the genuine
       // external-contract case above.
-      "files": ["packages/graph/src/card-file.ts"],
+      "files": ["packages/graph/src/thing-file.ts"],
       "rules": {
         "anti-slop/no-unknown-parameters": "off"
       }

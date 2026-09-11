@@ -10,7 +10,7 @@ import {
 } from '@project/core';
 import { graphRenderEdgeId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { CardFlowNode } from '@project/react-flow-adapter';
+import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { mintingIds } from './minting';
 import { composeApp } from '../src/compose-app';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
@@ -24,15 +24,15 @@ import type {
 
 import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const CREATED_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
-const PROJECTED = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
+const PROJECTED = [node(THING_A, 10, 20), node(THING_B, 300, 20)];
 
 /**
  * One projected Graph Edge, in the shape `projectGraphEdges` builds: the id
@@ -42,9 +42,9 @@ const PROJECTED = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
  * it.
  */
 const EDGE: Edge = {
-  id: graphRenderEdgeId(GRAPH_ID, { from: CARD_A, to: CARD_B }),
-  source: CARD_A,
-  target: CARD_B,
+  id: graphRenderEdgeId(GRAPH_ID, { from: THING_A, to: THING_B }),
+  source: THING_A,
+  target: THING_B,
   data: { graphId: GRAPH_ID },
 };
 
@@ -52,7 +52,7 @@ interface InstallRecord {
   readonly kind: 'reported' | 'replaced';
   readonly placement: ReadonlyMap<string, DiagramPosition> | null;
   /** What the adapter's own state held at the moment the effect ran. */
-  readonly nodesAtCall: readonly CardFlowNode[] | null;
+  readonly nodesAtCall: readonly ThingFlowNode[] | null;
 }
 
 /** What Authoring answers about an Edge gesture before the coordinator attempts it. */
@@ -92,7 +92,7 @@ function authoringSpy({ refusing, authoredPlacement = null }: AuthoringCapabilit
     },
     edgeEligibility: (proposal: EdgeProposal): EdgeEligibility =>
       proposal.kind === refusing
-        ? { kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } }
+        ? { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } }
         : { kind: 'eligible' },
     complete: (completion): AuthoringResult => {
       completions.push(completion);
@@ -165,10 +165,10 @@ function sessionBackedAdapter(
 }
 
 /**
- * A Space whose Diagram places Cards A and B, leaving C outside the Diagram.
+ * A Space whose Diagram places Things A and B, leaving C outside the Diagram.
  *
- * The Diagram's position keys are its Card membership and every Edge of a Graph
- * it owns is closed over them (ADR 0040), so the omitted Card is one the Graph
+ * The Diagram's position keys are its Thing membership and every Edge of a Graph
+ * it owns is closed over them (ADR 0040), so the omitted Thing is one the Graph
  * never names — C, which the positioned projection does not draw.
  */
 function sparsePositionedAdapter(newId?: () => UUID) {
@@ -183,31 +183,31 @@ function sparsePositionedAdapter(newId?: () => UUID) {
           title: 'Diagram 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(CARD_A)]: { x: 10, y: 20, open: false },
-            [uuidSchema.parse(CARD_B)]: { x: 300, y: 20, open: false },
+            [uuidSchema.parse(THING_A)]: { x: 10, y: 20, open: false },
+            [uuidSchema.parse(THING_B)]: { x: 300, y: 20, open: false },
           },
           graphs: [
             {
               id: GRAPH_ID,
               title: 'Main',
-              edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
+              edges: [{ from: uuidSchema.parse(THING_A), to: uuidSchema.parse(THING_B) }],
             },
           ],
         },
       ],
       defaultDiagram: DIAGRAM_ID,
     },
-    cards: [
+    things: [
       {
-        id: uuidSchema.parse(CARD_A),
+        id: uuidSchema.parse(THING_A),
         document: { title: 'A', kind: 'markdown', body: 'A' },
       },
       {
-        id: uuidSchema.parse(CARD_B),
+        id: uuidSchema.parse(THING_B),
         document: { title: 'B', kind: 'markdown', body: 'B' },
       },
       {
-        id: uuidSchema.parse(CARD_C),
+        id: uuidSchema.parse(THING_C),
         document: { title: 'C', kind: 'markdown', body: 'C' },
       },
     ],
@@ -216,8 +216,8 @@ function sparsePositionedAdapter(newId?: () => UUID) {
     snapshot,
     DIAGRAM_ID,
     Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, open: false }],
-      [CARD_B, { x: 300, y: 20, open: false }],
+      [THING_A, { x: 10, y: 20, open: false }],
+      [THING_B, { x: 300, y: 20, open: false }],
     ]),
     undefined,
     newId,
@@ -237,23 +237,23 @@ function storedSpaceAdapter() {
           title: 'Diagram 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(CARD_A)]: { x: 10, y: 20, open: false },
-            [uuidSchema.parse(CARD_B)]: { x: 300, y: 20, open: false },
+            [uuidSchema.parse(THING_A)]: { x: 10, y: 20, open: false },
+            [uuidSchema.parse(THING_B)]: { x: 300, y: 20, open: false },
           },
           graphs: [
             {
               id: GRAPH_ID,
               title: 'Main',
-              edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
+              edges: [{ from: uuidSchema.parse(THING_A), to: uuidSchema.parse(THING_B) }],
             },
           ],
         },
       ],
       defaultDiagram: DIAGRAM_ID,
     },
-    cards: [
-      { id: uuidSchema.parse(CARD_A), document: { title: 'A', kind: 'markdown', body: 'A' } },
-      { id: uuidSchema.parse(CARD_B), document: { title: 'B', kind: 'markdown', body: 'B' } },
+    things: [
+      { id: uuidSchema.parse(THING_A), document: { title: 'A', kind: 'markdown', body: 'A' } },
+      { id: uuidSchema.parse(THING_B), document: { title: 'B', kind: 'markdown', body: 'B' } },
     ],
   };
   const stored: SpaceSnapshot = {
@@ -264,8 +264,8 @@ function storedSpaceAdapter() {
     snapshot,
     DIAGRAM_ID,
     Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, open: false }],
-      [CARD_B, { x: 300, y: 20, open: false }],
+      [THING_A, { x: 10, y: 20, open: false }],
+      [THING_B, { x: 300, y: 20, open: false }],
     ]),
     stored,
   );
@@ -305,24 +305,24 @@ describe('render adapter', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    completeDrag(store, CARD_A, 500, 400);
-    store.getState().selectCard(uuidSchema.parse(CARD_A));
+    completeDrag(store, THING_A, 500, 400);
+    store.getState().selectThing(uuidSchema.parse(THING_A));
 
     expect(store.getState().projection?.edges).toEqual([EDGE]);
     expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 500, y: 400 });
   });
 
-  it("takes React Flow's own selection change as the Card selected for authoring", () => {
-    // The other path into the selection: `selectCard` is the explicit store
+  it("takes React Flow's own selection change as the Thing selected for authoring", () => {
+    // The other path into the selection: `selectThing` is the explicit store
     // action, this is React Flow reporting an ordinary click. Both read a node
-    // id as a Card identity, and only the first was covered.
+    // id as a Thing identity, and only the first was covered.
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: true }]);
-    expect(store.getState().selection).toEqual({ kind: 'card', cardId: CARD_A });
+    store.getState().changeNodes([{ type: 'select', id: THING_A, selected: true }]);
+    expect(store.getState().selection).toEqual({ kind: 'thing', thingId: THING_A });
 
-    store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: false }]);
+    store.getState().changeNodes([{ type: 'select', id: THING_A, selected: false }]);
     expect(store.getState().selection).toEqual({ kind: 'none' });
   });
 
@@ -337,39 +337,39 @@ describe('render adapter', () => {
     const selectingEdge = (store: RenderAdapter) =>
       store.getState().changeEdges([{ type: 'select', id: EDGE.id, selected: true }]);
 
-    it('keeps a newly selected Edge when the Card deselection arrives after it', () => {
+    it('keeps a newly selected Edge when the Thing deselection arrives after it', () => {
       const store = adapter();
       store.getState().syncProjection(PROJECTED, [EDGE]);
-      store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: THING_A, selected: true }]);
 
       selectingEdge(store);
-      store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: false }]);
+      store.getState().changeNodes([{ type: 'select', id: THING_A, selected: false }]);
 
       expect(store.getState().selection).toEqual({
         kind: 'edge',
         graphId: GRAPH_ID,
-        edge: { from: CARD_A, to: CARD_B },
+        edge: { from: THING_A, to: THING_B },
       });
     });
 
-    it('keeps a newly selected Card when the Edge deselection arrives after it', () => {
+    it('keeps a newly selected Thing when the Edge deselection arrives after it', () => {
       const store = adapter();
       store.getState().syncProjection(PROJECTED, [EDGE]);
       selectingEdge(store);
 
-      store.getState().changeNodes([{ type: 'select', id: CARD_B, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: THING_B, selected: true }]);
       store.getState().changeEdges([{ type: 'select', id: EDGE.id, selected: false }]);
 
-      expect(store.getState().selection).toEqual({ kind: 'card', cardId: CARD_B });
+      expect(store.getState().selection).toEqual({ kind: 'thing', thingId: THING_B });
     });
 
-    it('clears the Card React Flow still holds selected when an Edge takes the selection', () => {
+    it('clears the Thing React Flow still holds selected when an Edge takes the selection', () => {
       // The controlled node array is what React Flow's Delete key reads, so a
-      // Card left `selected` there would be deleted alongside the Edge the
+      // Thing left `selected` there would be deleted alongside the Edge the
       // author actually named.
       const store = adapter();
       store.getState().syncProjection(PROJECTED, [EDGE]);
-      store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: THING_A, selected: true }]);
 
       selectingEdge(store);
 
@@ -386,12 +386,12 @@ describe('render adapter', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    store.getState().selectEdge({ graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_B } });
+    store.getState().selectEdge({ graphId: GRAPH_ID, edge: { from: THING_A, to: THING_B } });
 
     expect(store.getState().selection).toEqual({
       kind: 'edge',
       graphId: GRAPH_ID,
-      edge: { from: CARD_A, to: CARD_B },
+      edge: { from: THING_A, to: THING_B },
     });
   });
 
@@ -405,33 +405,33 @@ describe('render adapter', () => {
   it('ignores a selection change for an Edge this projection does not draw', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
-    store.getState().selectCard(uuidSchema.parse(CARD_A));
+    store.getState().selectThing(uuidSchema.parse(THING_A));
 
     store.getState().changeEdges([
       {
         type: 'select',
-        id: graphRenderEdgeId(GRAPH_ID, { from: CARD_A, to: CARD_C }),
+        id: graphRenderEdgeId(GRAPH_ID, { from: THING_A, to: THING_C }),
         selected: false,
       },
     ]);
 
-    expect(store.getState().selection).toEqual({ kind: 'card', cardId: CARD_A });
+    expect(store.getState().selection).toEqual({ kind: 'thing', thingId: THING_A });
   });
 
   /**
-   * A Card selected before the projection draws it is selected in React Flow's
+   * A Thing selected before the projection draws it is selected in React Flow's
    * own node array once it does.
    *
-   * Authoring selects a Card in the same tick it creates it, one render before
-   * the projection that first draws it — so `selectCard` records the subject
+   * Authoring selects a Thing in the same tick it creates it, one render before
+   * the projection that first draws it — so `selectThing` records the subject
    * while no live node carries `selected`, and `selecting` maps over nodes that
    * do not include it yet. A projection carries no selection of its own either:
-   * `projectCardNodes` sets `data.selectedForAuthoring` and never the node's
-   * `selected`. So unless the sync folds the union back in, the Card arrives
+   * `projectThingNodes` sets `data.selectedForAuthoring` and never the node's
+   * `selected`. So unless the sync folds the union back in, the Thing arrives
    * unselected and stays that way — it *reads* as selected, since
    * `selectedForAuthoring` is right, while React Flow holds no selected node at
    * all. `F2` asks React Flow, so `F2` is what stops working, until any click
-   * repairs it. Add Card, Add Alias and create-and-connect all land here.
+   * repairs it. Add Thing, Add Alias and create-and-connect all land here.
    *
    * The `dimensions` change is the window in front of it: React Flow measures
    * anything it renders, so `changeNodes` is reached before that projection
@@ -440,39 +440,39 @@ describe('render adapter', () => {
    * and this pins that too, since the model this replaced *did* erase it by
    * re-deriving the selection from the live node array.
    */
-  it('keeps a selection seeded for a Card the projection has not drawn yet', () => {
+  it('keeps a selection seeded for a Thing the projection has not drawn yet', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    store.getState().selectCard(CREATED_CARD_ID);
+    store.getState().selectThing(CREATED_THING_ID);
     store
       .getState()
-      .changeNodes([{ type: 'dimensions', id: CARD_A, dimensions: { width: 260, height: 146 } }]);
+      .changeNodes([{ type: 'dimensions', id: THING_A, dimensions: { width: 260, height: 146 } }]);
 
-    expect(store.getState().selection).toEqual({ kind: 'card', cardId: CREATED_CARD_ID });
+    expect(store.getState().selection).toEqual({ kind: 'thing', thingId: CREATED_THING_ID });
 
-    store.getState().syncProjection([...PROJECTED, node(CREATED_CARD_ID, 900, 20)], [EDGE]);
+    store.getState().syncProjection([...PROJECTED, node(CREATED_THING_ID, 900, 20)], [EDGE]);
 
-    const seeded = store.getState().projection?.nodes.find((each) => each.id === CREATED_CARD_ID);
+    const seeded = store.getState().projection?.nodes.find((each) => each.id === CREATED_THING_ID);
     expect(seeded?.selected).toBe(true);
   });
 
   /**
-   * The same seeding on the other path a created Card arrives by.
+   * The same seeding on the other path a created Thing arrives by.
    *
-   * A completed create-and-connect publishes, Authoring selects the Card it has
-   * just minted, and the projection carrying that Card reaches the store through
+   * A completed create-and-connect publishes, Authoring selects the Thing it has
+   * just minted, and the projection carrying that Thing reaches the store through
    * `mergeProjected` rather than `syncProjection`. Two call sites, one rule —
    * and this is the one the Edge Authoring seam uses.
    */
-  it('seeds a selection for a Card that arrives through a merged projection', () => {
+  it('seeds a selection for a Thing that arrives through a merged projection', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    store.getState().selectCard(CREATED_CARD_ID);
-    store.getState().mergeProjected([...PROJECTED, node(CREATED_CARD_ID, 900, 20)]);
+    store.getState().selectThing(CREATED_THING_ID);
+    store.getState().mergeProjected([...PROJECTED, node(CREATED_THING_ID, 900, 20)]);
 
-    const seeded = store.getState().projection?.nodes.find((each) => each.id === CREATED_CARD_ID);
+    const seeded = store.getState().projection?.nodes.find((each) => each.id === CREATED_THING_ID);
     expect(seeded?.selected).toBe(true);
   });
 
@@ -484,8 +484,8 @@ describe('render adapter', () => {
     const targetHandle = `${graphId}::in`;
     const edge: Edge = {
       id: `${graphId}:A->B`,
-      source: CARD_A,
-      target: CARD_B,
+      source: THING_A,
+      target: THING_B,
       sourceHandle,
       targetHandle,
     };
@@ -531,20 +531,20 @@ describe('render adapter', () => {
     // notified read the projection from before the one it was told about.
     expect(spy.installs).toHaveLength(1);
     expect(spy.installs[0]?.kind).toBe('reported');
-    expect(spy.installs[0]?.nodesAtCall?.map((entry) => entry.id)).toEqual([CARD_A, CARD_B]);
+    expect(spy.installs[0]?.nodesAtCall?.map((entry) => entry.id)).toEqual([THING_A, THING_B]);
     expect(spy.installs[0]?.placement).toEqual(
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, open: false }],
-        [CARD_B, { x: 300, y: 20, open: false }],
+        [THING_A, { x: 10, y: 20, open: false }],
+        [THING_B, { x: 300, y: 20, open: false }],
       ]),
     );
-    expect(store.getState().projection?.nodes.map((entry) => entry.id)).toEqual([CARD_A, CARD_B]);
+    expect(store.getState().projection?.nodes.map((entry) => entry.id)).toEqual([THING_A, THING_B]);
   });
 
-  it('keeps the Cards on screen when a connection completes with no fresh projection', () => {
+  it('keeps the Things on screen when a connection completes with no fresh projection', () => {
     // A Space change starts a replacement placement, so the render path has no
     // projection to hand over — while the canvas deliberately keeps drawing the
-    // Cards already on screen, which is what makes it still connectable. Nothing
+    // Things already on screen, which is what makes it still connectable. Nothing
     // fresh to merge means keep what is live: reconciling against an empty list
     // would blank the canvas until the strategy resolved.
     const spy = authoringSpy();
@@ -554,17 +554,17 @@ describe('render adapter', () => {
     store.getState().syncProjection(PROJECTED, []);
     expect(
       connections(store, spy.authoring).connect(
-        uuidSchema.parse(CARD_A),
-        uuidSchema.parse(CARD_B),
+        uuidSchema.parse(THING_A),
+        uuidSchema.parse(THING_B),
         null,
       ),
-    ).toEqual({ kind: 'completed', cardId: CARD_B });
+    ).toEqual({ kind: 'completed', thingId: THING_B });
 
-    expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([CARD_A, CARD_B]);
+    expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([THING_A, THING_B]);
   });
 
   /*
-   * A reprojection can land while a Card is in flight — an activated Graph or a
+   * A reprojection can land while a Thing is in flight — an activated Graph or a
    * selection redraws the graph without the gesture ending. The nodes it reports
    * carry the live position, and the author has settled on nothing, so that
    * geometry is not theirs to author. Reported at review as reaching the Diagram
@@ -576,35 +576,35 @@ describe('render adapter', () => {
     const { authoring, store } = sparsePositionedAdapter();
     store.getState().syncProjection(PROJECTED, []);
 
-    store.getState().changeNodes(moving(CARD_A, 90, 90));
+    store.getState().changeNodes(moving(THING_A, 90, 90));
     store.getState().syncProjection(PROJECTED, []);
     // The gesture ends where it began, so no Edit completes and nothing reports.
-    store.getState().changeNodes(settled(CARD_A, 10, 20));
+    store.getState().changeNodes(settled(THING_A, 10, 20));
 
     expect(authoring.authoredPlacement()).toEqual(
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, open: false }],
-        [CARD_B, { x: 300, y: 20, open: false }],
+        [THING_A, { x: 10, y: 20, open: false }],
+        [THING_B, { x: 300, y: 20, open: false }],
       ]),
     );
   });
 
-  it('adds a newly created Card without placing other omitted Cards', () => {
-    const { session, store, authoring } = sparsePositionedAdapter(mintingIds(CREATED_CARD_ID));
+  it('adds a newly created Thing without placing other omitted Things', () => {
+    const { session, store, authoring } = sparsePositionedAdapter(mintingIds(CREATED_THING_ID));
     store.getState().syncProjection(PROJECTED, []);
 
     expect(
       connections(store, authoring).createAndConnect(
-        uuidSchema.parse(CARD_A),
+        uuidSchema.parse(THING_A),
         { x: 420, y: 360 },
         null,
       ),
-    ).toEqual({ kind: 'completed', cardId: CREATED_CARD_ID });
+    ).toEqual({ kind: 'completed', thingId: CREATED_THING_ID });
 
     expect(session.getState().working.document.diagrams?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20, open: false },
-      [CARD_B]: { x: 300, y: 20, open: false },
-      [CREATED_CARD_ID]: { x: 420, y: 360, open: false },
+      [THING_A]: { x: 10, y: 20, open: false },
+      [THING_B]: { x: 300, y: 20, open: false },
+      [CREATED_THING_ID]: { x: 420, y: 360, open: false },
     });
   });
 
@@ -624,21 +624,21 @@ describe('render adapter', () => {
 
     expect(
       connections(store, spy.authoring).connect(
-        uuidSchema.parse(CARD_A),
-        uuidSchema.parse(CARD_B),
+        uuidSchema.parse(THING_A),
+        uuidSchema.parse(THING_B),
         PROJECTED,
       ),
       // The refusal travels with the outcome, so nothing asks eligibility a
       // second time to recover the identity it already had — and it travels
       // structured, because the sentence is the surface's (ADR 0057).
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } });
 
     expect(spy.completions).toEqual([]);
     expect(spy.installs).toHaveLength(installedBefore);
     expect(store.getState().projection).toBe(published);
   });
 
-  it('installs and completes nothing for a created Card Authoring refuses', () => {
+  it('installs and completes nothing for a created Thing Authoring refuses', () => {
     const spy = authoringSpy({ refusing: 'create-and-connect' });
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
@@ -647,11 +647,11 @@ describe('render adapter', () => {
 
     expect(
       connections(store, spy.authoring).createAndConnect(
-        uuidSchema.parse(CARD_A),
+        uuidSchema.parse(THING_A),
         { x: 420, y: 360 },
         null,
       ),
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-diagram' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } });
 
     expect(spy.completions).toEqual([]);
     expect(spy.installs).toHaveLength(installedBefore);
@@ -662,12 +662,12 @@ describe('render adapter', () => {
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
 
-    const closed = node(CARD_A, 10, 20);
+    const closed = node(THING_A, 10, 20);
     closed.width = 260;
     closed.height = 146;
     store.getState().syncProjection([closed], []);
 
-    const expanded = node(CARD_A, 40, 60);
+    const expanded = node(THING_A, 40, 60);
     expanded.width = 560;
     expanded.height = 420;
     expanded.zIndex = 10;
@@ -694,99 +694,99 @@ describe('render adapter', () => {
   it('answers one resize capability across writes resize knows nothing about', () => {
     const spy = authoringSpy({
       authoredPlacement: Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
-    const capability = store.getState().cardResize;
+    const capability = store.getState().thingResize;
 
     store.getState().syncProjection(PROJECTED, []);
-    store.getState().selectCard(CARD_A);
-    completeDrag(store, CARD_A, 111, 222);
+    store.getState().selectThing(THING_A);
+    completeDrag(store, THING_A, 111, 222);
 
-    expect(store.getState().cardResize).toBe(capability);
+    expect(store.getState().thingResize).toBe(capability);
     // Still the live capability and not a snapshot of one: the canvas holds it
     // from before the gesture and the store has to answer that same value.
-    capability.beginResize(CARD_A);
-    expect(store.getState().resizeDraft?.cardId).toBe(CARD_A);
+    capability.beginResize(THING_A);
+    expect(store.getState().resizeDraft?.thingId).toBe(THING_A);
   });
 
-  it('previews the resizing Card and nobody else, and completes only its final size', () => {
+  it('previews the resizing Thing and nobody else, and completes only its final size', () => {
     // The draft layers the proposed Open Size over the authored Placement and
     // nothing more. B keeps its authored coordinate through the whole gesture
-    // although A grows past it, because a Card's neighbours do not move until
+    // although A grows past it, because a Thing's neighbours do not move until
     // the Edit lands (ADR 0084) — there is no derived layer left to preview.
     // This is what stops the render adapter reacquiring a `move` draft: a
-    // dragged Card displaces nobody either.
+    // dragged Thing displaces nobody either.
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
-      [CARD_B, { x: 300, y: 200, open: false }],
+      [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [THING_B, { x: 300, y: 200, open: false }],
     ]);
     const spy = authoringSpy({ authoredPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
 
-    store.getState().cardResize.beginResize(CARD_A);
-    store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
+    store.getState().thingResize.beginResize(THING_A);
+    store.getState().thingResize.previewResize(THING_A, { width: 620, height: 440 });
 
     expect(store.getState().resizeDraft).toEqual({
-      cardId: CARD_A,
+      thingId: THING_A,
       size: { width: 620, height: 440 },
       placement: Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 620, height: 440 } }],
-        [CARD_B, { x: 300, y: 200, open: false }],
+        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 620, height: 440 } }],
+        [THING_B, { x: 300, y: 200, open: false }],
       ]),
     });
     expect(spy.completions).toEqual([]);
 
-    store.getState().cardResize.finishResize(CARD_A);
+    store.getState().thingResize.finishResize(THING_A);
 
     expect(spy.completions).toEqual([
-      { kind: 'resized-card', cardId: CARD_A, size: { width: 620, height: 440 } },
+      { kind: 'resized-thing', thingId: THING_A, size: { width: 620, height: 440 } },
     ]);
     expect(store.getState().resizeDraft).toBeNull();
   });
 
   it('snaps both dimensions inside the Close range to the exact Closed rect', () => {
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
     ]);
     const spy = authoringSpy({ authoredPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
 
-    store.getState().cardResize.beginResize(CARD_A);
-    store.getState().cardResize.previewResize(CARD_A, { width: 280, height: 166 });
+    store.getState().thingResize.beginResize(THING_A);
+    store.getState().thingResize.previewResize(THING_A, { width: 280, height: 166 });
 
     expect(store.getState().resizeDraft).toMatchObject({
-      cardId: CARD_A,
+      thingId: THING_A,
       size: { width: 260, height: 146 },
     });
-    expect(store.getState().resizeDraft?.placement.get(CARD_A)).toEqual({
+    expect(store.getState().resizeDraft?.placement.get(THING_A)).toEqual({
       x: 10,
       y: 20,
       open: true,
       openSize: { width: 260, height: 146 },
     });
 
-    store.getState().cardResize.finishResize(CARD_A);
+    store.getState().thingResize.finishResize(THING_A);
 
     expect(spy.completions).toEqual([
-      { kind: 'resized-card', cardId: CARD_A, size: { width: 260, height: 146 } },
+      { kind: 'resized-thing', thingId: THING_A, size: { width: 260, height: 146 } },
     ]);
   });
 
   it('keeps an Open resize proposal when only one dimension reaches the Close range', () => {
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
     ]);
     const store = createRenderAdapter(authoringSpy({ authoredPlacement: authored }).authoring);
 
-    store.getState().cardResize.beginResize(CARD_A);
-    store.getState().cardResize.previewResize(CARD_A, { width: 280, height: 240 });
+    store.getState().thingResize.beginResize(THING_A);
+    store.getState().thingResize.previewResize(THING_A, { width: 280, height: 240 });
 
     expect(store.getState().resizeDraft).toMatchObject({
-      cardId: CARD_A,
+      thingId: THING_A,
       size: { width: 280, height: 240 },
     });
   });
@@ -795,25 +795,25 @@ describe('render adapter', () => {
    * A resize draft leaves the live nodes alone. Nothing rejects a node-only
    * rect here because React Flow never proposes one: its resize control emits
    * that `dimensions` change from the callback `shouldResize` gates, and the
-   * Card refuses every frame while still handing the rect on. What proves that
+   * Thing refuses every frame while still handing the rect on. What proves that
    * end of it is the real control under a real gesture, in
    * `SpaceCanvas.test.tsx`; what this holds is that the draft alone does not
    * touch the published projection.
    */
   it('leaves the published projection alone while the resize draft grows', () => {
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
-      [CARD_B, { x: 300, y: 200, open: false }],
+      [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [THING_B, { x: 300, y: 200, open: false }],
     ]);
     const store = createRenderAdapter(authoringSpy({ authoredPlacement: authored }).authoring);
-    const open = node(CARD_A, 10, 20);
+    const open = node(THING_A, 10, 20);
     open.width = 500;
     open.height = 360;
-    store.getState().syncProjection([open, node(CARD_B, 300, 200)], [EDGE]);
+    store.getState().syncProjection([open, node(THING_B, 300, 200)], [EDGE]);
     const beforeDraftProjection = store.getState().projection;
 
-    store.getState().cardResize.beginResize(CARD_A);
-    store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
+    store.getState().thingResize.beginResize(THING_A);
+    store.getState().thingResize.previewResize(THING_A, { width: 620, height: 440 });
 
     expect(store.getState().projection).toBe(beforeDraftProjection);
     expect(store.getState().projection?.nodes[0]).toMatchObject({ width: 500, height: 360 });
@@ -822,14 +822,14 @@ describe('render adapter', () => {
   it('discards the complete resize draft without an Edit when the gesture is cancelled', () => {
     const spy = authoringSpy({
       authoredPlacement: Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
 
-    store.getState().cardResize.beginResize(CARD_A);
-    store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
-    store.getState().cardResize.cancelResize(CARD_A);
+    store.getState().thingResize.beginResize(THING_A);
+    store.getState().thingResize.previewResize(THING_A, { width: 620, height: 440 });
+    store.getState().thingResize.cancelResize(THING_A);
 
     expect(store.getState().resizeDraft).toBeNull();
     expect(spy.completions).toEqual([]);
@@ -840,10 +840,10 @@ describe('render adapter', () => {
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
 
-    store.getState().syncProjection([node(CARD_A, 10, 20)], []);
-    store.getState().changeNodes(moving(CARD_A, 111, 222));
+    store.getState().syncProjection([node(THING_A, 10, 20)], []);
+    store.getState().changeNodes(moving(THING_A, 111, 222));
 
-    const expanded = node(CARD_A, 40, 60);
+    const expanded = node(THING_A, 40, 60);
     expanded.width = 560;
     expanded.height = 420;
     expanded.zIndex = 10;
@@ -863,16 +863,16 @@ describe('render adapter', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
-    store.getState().syncProjection([node(CARD_A, 10, 20)], []);
+    store.getState().syncProjection([node(THING_A, 10, 20)], []);
 
     // React Flow reports a drag as many moving frames and one settled frame, and
     // the settled frame is measured against the *gesture's* start, not the
     // previous frame. `dragOrigins` is what retains that start across the two
     // callbacks; without it the comparison falls back to the last moving frame,
-    // and a card put back where it came from reads as moved — persisting an Edit
+    // and a thing put back where it came from reads as moved — persisting an Edit
     // the author did not make.
-    store.getState().changeNodes(moving(CARD_A, 500, 400));
-    store.getState().changeNodes(settled(CARD_A, 10, 20));
+    store.getState().changeNodes(moving(THING_A, 500, 400));
+    store.getState().changeNodes(settled(THING_A, 10, 20));
 
     expect(spy.completions).toEqual([]);
     expect(store.getState().moved).toBe(false);
@@ -883,12 +883,12 @@ describe('render adapter', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
-    store.getState().syncProjection([node(CARD_A, 10, 20)], []);
+    store.getState().syncProjection([node(THING_A, 10, 20)], []);
     const published = store.getState().projection;
 
     store
       .getState()
-      .changeNodes([{ type: 'dimensions', id: CARD_C, dimensions: { width: 240, height: 120 } }]);
+      .changeNodes([{ type: 'dimensions', id: THING_C, dimensions: { width: 240, height: 120 } }]);
 
     // React Flow measures everything it renders and reports a `dimensions`
     // change for it, while `applyNodeChanges` always returns a fresh array. An
@@ -898,28 +898,28 @@ describe('render adapter', () => {
     expect(store.getState().projection).toBe(published);
   });
 
-  it('records that a card has moved, so routed Edge geometry stops being drawn', () => {
+  it('records that a thing has moved, so routed Edge geometry stops being drawn', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
     // A diagram's routed Edge geometry describes the placement it computed, so
-    // it stops being true the moment a card leaves the place that routing
+    // it stops being true the moment a thing leaves the place that routing
     // assumed. `App` reads this flag to fall back to plain curves; left false, a
     // dragged graph keeps drawing channels routed for positions nothing is at.
     expect(store.getState().moved).toBe(false);
-    completeDrag(store, CARD_A, 500, 400);
+    completeDrag(store, THING_A, 500, 400);
 
     expect(store.getState().moved).toBe(true);
     expect(spy.completions).toEqual([
       {
-        kind: 'settled-card-movement',
+        kind: 'settled-thing-movement',
         rendered: Placement.fromEntries([
-          [CARD_A, { x: 500, y: 400, open: false }],
-          [CARD_B, { x: 300, y: 20, open: false }],
+          [THING_A, { x: 500, y: 400, open: false }],
+          [THING_B, { x: 300, y: 20, open: false }],
         ]),
-        placed: [CARD_A],
+        placed: [THING_A],
       },
     ]);
   });
@@ -941,20 +941,20 @@ describe('render adapter', () => {
     const store = createRenderAdapter(failing);
     store.getState().syncProjection(PROJECTED, []);
     const published = store.getState().projection;
-    const projected = PROJECTED.map((card) => ({ ...card, className: 'connected' }));
+    const projected = PROJECTED.map((thing) => ({ ...thing, className: 'connected' }));
 
     expect(() =>
       connections(store, failing).connect(
-        uuidSchema.parse(CARD_A),
-        uuidSchema.parse(CARD_B),
+        uuidSchema.parse(THING_A),
+        uuidSchema.parse(THING_B),
         projected,
       ),
     ).toThrow('Authoring produced an invalid Space');
 
     expect(store.getState().projection).toBe(published);
-    expect(store.getState().projection?.nodes.every((card) => card.className !== 'connected')).toBe(
-      true,
-    );
+    expect(
+      store.getState().projection?.nodes.every((thing) => thing.className !== 'connected'),
+    ).toBe(true);
   });
 
   /*
@@ -975,13 +975,13 @@ describe('render adapter', () => {
     const store = createRenderAdapter(queueing);
     store.getState().syncProjection(PROJECTED, []);
     const published = store.getState().projection;
-    const projected = PROJECTED.map((card) => ({ ...card, className: 'connected' }));
+    const projected = PROJECTED.map((thing) => ({ ...thing, className: 'connected' }));
     const reported: unknown[] = [];
 
     expect(
       connections(store, queueing, (error) => reported.push(error)).connect(
-        uuidSchema.parse(CARD_A),
-        uuidSchema.parse(CARD_B),
+        uuidSchema.parse(THING_A),
+        uuidSchema.parse(THING_B),
         projected,
       ),
       // Not a refusal: the author is owed no sentence for a diagnostic, and a
@@ -990,9 +990,9 @@ describe('render adapter', () => {
 
     expect(reported).toHaveLength(1);
     expect(store.getState().projection).toBe(published);
-    expect(store.getState().projection?.nodes.every((card) => card.className !== 'connected')).toBe(
-      true,
-    );
+    expect(
+      store.getState().projection?.nodes.every((thing) => thing.className !== 'connected'),
+    ).toBe(true);
   });
 
   /*
@@ -1037,18 +1037,18 @@ describe('render adapter', () => {
 
   /*
    * Accepting a stored Space replaces the working state without unmounting
-   * anything, so this store is left holding a projection of Cards that may no
+   * anything, so this store is left holding a projection of Things that may no
    * longer exist. Local placement cannot outlive the Space it belonged to
    * (ADR 0030).
    */
   it('drops the published projection when a replacement Space is opened', async () => {
     const { store, session, authoring } = storedSpaceAdapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
-    completeDrag(store, CARD_A, 500, 400);
+    completeDrag(store, THING_A, 500, 400);
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
-    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A }).kind).toBe('completed');
-    store.getState().cardResize.beginResize(CARD_A);
-    store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
+    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A }).kind).toBe('completed');
+    store.getState().thingResize.beginResize(THING_A);
+    store.getState().thingResize.previewResize(THING_A, { width: 620, height: 440 });
     expect(store.getState().projection).not.toBeNull();
     expect(store.getState().resizeDraft).not.toBeNull();
 

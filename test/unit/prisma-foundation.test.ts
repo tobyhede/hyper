@@ -25,7 +25,7 @@ describe('Prisma Next foundation', () => {
 
   it.each([
     ['Space', 'spaces'],
-    ['Card', 'cards'],
+    ['Thing', 'things'],
   ] as const)('advances %s.updatedAt when a record is updated', (_modelName, table) => {
     const updatedAt = emittedContract.execution?.mutations.defaults.find(
       (entry) => entry.ref.table === table && entry.ref.column === 'updated_at',

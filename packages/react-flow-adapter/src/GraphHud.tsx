@@ -6,7 +6,7 @@ export interface GraphHudProps {
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: string | null;
-  activeGraphCardIds: ReadonlySet<string>;
+  activeGraphThingIds: ReadonlySet<string>;
 }
 
 /** What a node outside the Active Graph is outlined with on the minimap. */
@@ -31,13 +31,13 @@ export function GraphHud({
   graphs,
   colorByGraphId,
   activeGraphId,
-  activeGraphCardIds,
+  activeGraphThingIds,
 }: GraphHudProps) {
   const activeGraph = graphs.find((graph) => graph.id === activeGraphId);
   const activeGraphColor =
     activeGraph === undefined ? FALLBACK_GRAPH_COLOR : graphColor(activeGraph, colorByGraphId);
   const nodeStrokeColor = ({ id }: { id: string }) =>
-    activeGraphId !== null && activeGraphCardIds.has(id) ? activeGraphColor : INACTIVE_NODE_COLOR;
+    activeGraphId !== null && activeGraphThingIds.has(id) ? activeGraphColor : INACTIVE_NODE_COLOR;
 
   return (
     <Panel position="bottom-right">

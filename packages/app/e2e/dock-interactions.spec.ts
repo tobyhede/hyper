@@ -27,7 +27,7 @@ for (const delay of [0, 120]) {
       await settled(page);
       const persistence = page.getByTestId('persistence-status');
       const revision = await persistence.getAttribute('data-revision');
-      const closed = await page.locator('.canvas-card[data-expanded="false"]').count();
+      const closed = await page.locator('.canvas-thing[data-expanded="false"]').count();
       await dock(page)
         .getByRole('button', { name: /^Space: / })
         .click({ delay });
@@ -44,8 +44,8 @@ for (const delay of [0, 120]) {
       // Give an unintended asynchronous Edit time to publish before checking
       // the unchanged revision, as the editing suite does for negative gestures.
       await page.waitForTimeout(250);
-      await expect(page.locator('.canvas-card[data-expanded="false"]')).toHaveCount(closed);
-      await expect(page.locator('.canvas-card[data-expanded="true"]')).toHaveCount(0);
+      await expect(page.locator('.canvas-thing[data-expanded="false"]')).toHaveCount(closed);
+      await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
       await expect(persistence).toHaveAttribute('data-revision', revision ?? '');
     });
   }
@@ -136,22 +136,22 @@ test('a secondary-button drag on the grip leaves the Dock in its slot', async ({
   await expect(dock(page)).toHaveAttribute('data-orientation', 'horizontal');
 });
 
-test('hovering a Card handle keeps its rail revealed with entity actions', async ({ page }) => {
+test('hovering a Thing handle keeps its rail revealed with entity actions', async ({ page }) => {
   await page.goto('/');
-  const card = nodeByTitle(page, 'A');
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A');
+  await expect(thing).toBeVisible();
   await settled(page);
-  await card.hover();
-  const rail = card.locator('.canvas-card__rail');
-  const handle = card.locator('[data-handleid="authoring-source-right"]');
+  await thing.hover();
+  const rail = thing.locator('.canvas-thing__rail');
+  const handle = thing.locator('[data-handleid="authoring-source-right"]');
   const color = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
   const box = await handle.boundingBox();
-  if (box === null) throw new Error('Card handle has no box');
-  // The outside half is beyond the Card face but inside the handle hit target.
+  if (box === null) throw new Error('Thing handle has no box');
+  // The outside half is beyond the Thing face but inside the handle hit target.
   await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2);
   await expect(handle).toBeVisible();
   await expect(rail).toHaveCSS('background-color', color);
-  await expect(card.getByTestId('canvas-card-actions')).toHaveCSS('opacity', '1');
+  await expect(thing.getByTestId('canvas-thing-actions')).toHaveCSS('opacity', '1');
 });
 
 /**

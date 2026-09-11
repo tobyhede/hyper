@@ -1,5 +1,5 @@
 /**
- * The entity-actions menu on a **Card rail** — the one surface the application
+ * The entity-actions menu on a **Thing rail** — the one surface the application
  * still cannot reach. See `.scratch/link-ux/issues/01-choose-the-link-action-pattern.md`.
  *
  * **Review, not stable**, and only this half of it is. The Sidebar half moved
@@ -8,8 +8,8 @@
  * 0052 parity claims a production-reachable surface owes. A second Sidebar
  * story here would have been a copy of that one, free to disagree with it.
  *
- * The rail stays a review surface because `CardNode` still does not pass
- * `entityActions` through, so no Card on a canvas opens this menu. What the
+ * The rail stays a review surface because `ThingNode` still does not pass
+ * `entityActions` through, so no Thing on a canvas opens this menu. What the
  * commands *are*, however, is no longer invented here: they come from
  * production's own `spaceEntityActions`, so the rail cannot advertise a command
  * the application does not have. Copying is replaced by a line in the
@@ -18,8 +18,8 @@
 import type { Story } from '@ladle/react';
 import { useRef, useState } from 'react';
 import { productDestinationPath } from '@project/http';
-import { CanvasCard, cn, type CanvasCardState } from '@project/ui';
-import { cardSizeVars } from '#src/card';
+import { CanvasThing, cn, type CanvasThingState } from '@project/ui';
+import { thingSizeVars } from '#src/thing';
 import { spaceEntityActions } from '#src/entity-actions';
 import { authoredSpace } from '../support/spaces';
 
@@ -61,7 +61,7 @@ function ActivityLog({ log, className }: { readonly log: readonly Logged[]; clas
     >
       <p className="mb-1 font-sans text-xs font-semibold text-muted-foreground">Last actions</p>
       {log.length === 0 ? (
-        <p className="text-muted-foreground">Nothing yet — try a Card's actions.</p>
+        <p className="text-muted-foreground">Nothing yet — try a Thing's actions.</p>
       ) : (
         <ul className="grid gap-1">
           {log.map((entry) => (
@@ -82,29 +82,29 @@ function PrototypeBanner({ children }: { readonly children: string }) {
 }
 
 /**
- * The Card's own rail carrying the menu, at four of the states a Card is drawn
+ * The Thing's own rail carrying the menu, at four of the states a Thing is drawn
  * in.
  *
- * The rail is `CanvasCard`'s, not a replica: the icon sits in the shared
+ * The rail is `CanvasThing`'s, not a replica: the icon sits in the shared
  * command group ahead of Open/Close, so what a reviewer is looking at is the
  * order `[link][open-or-close]` on the real control cluster, with the real
- * roving-tabindex keyboard contract (ADR 0073) over it. Hover a Card, or Tab to
+ * roving-tabindex keyboard contract (ADR 0073) over it. Hover a Thing, or Tab to
  * it and press ArrowRight, to reach the icon.
  *
  * The rail keeps the **link** glyph while a Sidebar row now draws the general
  * one: every other control here names its own command, so a generic glyph would
  * be the one saying nothing. Whether that survives is a rail decision, taken
- * when `CardNode` first supplies the actions.
+ * when `ThingNode` first supplies the actions.
  *
- * There is no Rename in this menu, because production has none to offer: a Card
+ * There is no Rename in this menu, because production has none to offer: a Thing
  * title is renamed in place on its Front. The prototype's "Open in a new tab"
  * is gone for the same reason — the application does not implement it, and a
  * story is not the place to promise one.
  */
-export const CardRail: Story = () => {
+export const ThingRail: Story = () => {
   const { log, record } = useActivityLog();
   const diagram = authoredSpace.diagrams[0];
-  if (diagram === undefined) throw new Error('CardRail fixture requires an authored Diagram');
+  if (diagram === undefined) throw new Error('ThingRail fixture requires an authored Diagram');
   const actions = spaceEntityActions({
     spaceId: authoredSpace.id,
     spaceTitle: authoredSpace.title,
@@ -117,29 +117,29 @@ export const CardRail: Story = () => {
     onRename: null,
     onDeleteDiagram: null,
   });
-  const cards = authoredSpace.cards.slice(0, 4);
+  const things = authoredSpace.things.slice(0, 4);
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <PrototypeBanner>
-        The link icon is one more control on the real Card rail, ahead of Open/Close.
+        The link icon is one more control on the real Thing rail, ahead of Open/Close.
       </PrototypeBanner>
-      <div className="flex flex-1 flex-wrap items-start gap-6 p-6" style={cardSizeVars}>
-        {cards.map((card, index) => {
-          const state: CanvasCardState = index === 1 ? 'selected' : 'rest';
+      <div className="flex flex-1 flex-wrap items-start gap-6 p-6" style={thingSizeVars}>
+        {things.map((thing, index) => {
+          const state: CanvasThingState = index === 1 ? 'selected' : 'rest';
           return (
-            <div key={card.id} className="grid gap-2">
-              <p className="text-xs text-muted-foreground">card · {state}</p>
-              <CanvasCard
+            <div key={thing.id} className="grid gap-2">
+              <p className="text-xs text-muted-foreground">thing · {state}</p>
+              <CanvasThing
                 front={{
                   kind: 'markdown',
                   source: '',
                   open: false,
                   onOpenChange: () => 'retained',
                 }}
-                title={card.title}
+                title={thing.title}
                 state={state}
                 graphColor="#ffc53d"
-                entityActions={actions({ kind: 'card', card, diagram })}
+                entityActions={actions({ kind: 'thing', thing, diagram })}
               />
             </div>
           );
@@ -149,4 +149,4 @@ export const CardRail: Story = () => {
     </div>
   );
 };
-CardRail.meta = { iframed: true };
+ThingRail.meta = { iframed: true };

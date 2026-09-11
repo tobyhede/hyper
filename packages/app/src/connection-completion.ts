@@ -1,6 +1,6 @@
-import type { CardId, DiagramPosition } from '@project/core';
+import type { ThingId, DiagramPosition } from '@project/core';
 import { createNonThrowingReporter, type ObserverErrorReporter } from '@project/persistence';
-import type { CardFlowNode } from '@project/react-flow-adapter';
+import type { ThingFlowNode } from '@project/react-flow-adapter';
 import type { RenderAdapter } from './render-adapter';
 import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
 
@@ -20,7 +20,7 @@ import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
 /**
  * What a connection attempt came to.
  *
- * Three outcomes rather than `CardId | null`, because the caller has to tell a
+ * Three outcomes rather than `ThingId | null`, because the caller has to tell a
  * **refusal** — which owes the author the identity carried here — from a gesture
  * that simply had nowhere to land, which owes them nothing and must not wipe a
  * message already on screen. Answering the refusal here is also what keeps
@@ -33,32 +33,32 @@ import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
  * `reason` string here would have decided both before the surface was reached.
  */
 export type ConnectionResult =
-  | { readonly kind: 'completed'; readonly cardId: CardId }
+  | { readonly kind: 'completed'; readonly thingId: ThingId }
   | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal }
-  /** No Cards on the canvas to write into, or an invariant already reported. */
+  /** No Things on the canvas to write into, or an invariant already reported. */
   | { readonly kind: 'unavailable' };
 
 export interface ConnectionCompletion {
   /**
-   * Author one Edge between two Cards already on screen.
+   * Author one Edge between two Things already on screen.
    *
    * `projected` is the render path's next projection, merged onto the live
    * nodes so the Edge draws without waiting for a strategy. It is `null` while
    * a replacement placement is still resolving — the canvas keeps drawing the
-   * Cards already on screen, so a connection stays reachable through that window
+   * Things already on screen, so a connection stays reachable through that window
    * — and then there is nothing to merge and the live nodes stand until the
    * next `syncProjection`.
    */
   readonly connect: (
-    from: CardId,
-    to: CardId,
-    projected: readonly CardFlowNode[] | null,
+    from: ThingId,
+    to: ThingId,
+    projected: readonly ThingFlowNode[] | null,
   ) => ConnectionResult;
-  /** Author a Card at an Option/Alt empty drop and the Edge that reaches it. */
+  /** Author a Thing at an Option/Alt empty drop and the Edge that reaches it. */
   readonly createAndConnect: (
-    from: CardId,
+    from: ThingId,
     position: DiagramPosition,
-    projected: readonly CardFlowNode[] | null,
+    projected: readonly ThingFlowNode[] | null,
   ) => ConnectionResult;
 }
 
@@ -83,11 +83,11 @@ export function createConnectionCompletion({
    *
    * The placement handed to Authoring is read from the **live** nodes while the
    * list merged back is the **projected** one, deliberately. `renderedPlacement`
-   * reads positions only, and `mergeProjected` takes every surviving Card's
-   * position from its live node, so the two agree on every Card already on
-   * screen. They diverge only for a Card the projection has gained and the live
+   * reads positions only, and `mergeProjected` takes every surviving Thing's
+   * position from its live node, so the two agree on every Thing already on
+   * screen. They diverge only for a Thing the projection has gained and the live
    * list has not, which `App` makes reachable by withholding `syncProjection`
-   * until a strategy resolves. That Card has no resolved position yet, and
+   * until a strategy resolves. That Thing has no resolved position yet, and
    * authoring the origin it is standing on is exactly what a sparse Diagram
    * exists to avoid.
    *
@@ -106,8 +106,8 @@ export function createConnectionCompletion({
    */
   const complete = (
     completion: Parameters<SpaceAuthoring['complete']>[0],
-    projected: readonly CardFlowNode[] | null,
-    continueAt: (result: { readonly createdCardId?: CardId }) => CardId | undefined,
+    projected: readonly ThingFlowNode[] | null,
+    continueAt: (result: { readonly createdThingId?: ThingId }) => ThingId | undefined,
   ): ConnectionResult => {
     const result = authoring.complete(completion);
     if (result.kind === 'refused') return { kind: 'refused', refusal: result.refusal };
@@ -124,8 +124,8 @@ export function createConnectionCompletion({
     // and a listener may have replaced the projection — accepting a stored
     // Space drops it outright.
     if (projected !== null) adapter.getState().mergeProjected(projected);
-    const cardId = continueAt(result);
-    return cardId === undefined ? UNAVAILABLE : { kind: 'completed', cardId };
+    const thingId = continueAt(result);
+    return thingId === undefined ? UNAVAILABLE : { kind: 'completed', thingId };
   };
 
   /**
@@ -148,7 +148,7 @@ export function createConnectionCompletion({
       if (rendered === null) return UNAVAILABLE;
       const refusal = eligible({ kind: 'connect', from, to });
       if (refusal !== null) return { kind: 'refused', refusal };
-      return complete({ kind: 'connected-cards', from, to, rendered }, projected, () => to);
+      return complete({ kind: 'connected-things', from, to, rendered }, projected, () => to);
     },
 
     createAndConnect: (from, position, projected) => {
@@ -156,11 +156,11 @@ export function createConnectionCompletion({
       if (rendered === null) return UNAVAILABLE;
       const refusal = eligible({ kind: 'create-and-connect', from });
       if (refusal !== null) return { kind: 'refused', refusal };
-      // The dropped Card is placed by `position` inside the completion itself.
+      // The dropped Thing is placed by `position` inside the completion itself.
       return complete(
         { kind: 'create-and-connect', from, position, rendered },
         projected,
-        (result) => result.createdCardId,
+        (result) => result.createdThingId,
       );
     },
   };

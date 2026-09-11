@@ -2,16 +2,16 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   AliasIcon,
-  CardKindIcon,
+  ThingKindIcon,
   CheckIcon,
   ChevronDownIcon,
-  CloseCardIcon,
+  CloseThingIcon,
   EditIcon,
   FitViewIcon,
   GraphIcon,
   DiagramIcon,
   MarkdownIcon,
-  OpenCardIcon,
+  OpenThingIcon,
   PlusIcon,
   PresentIcon,
   StopPresentingIcon,
@@ -47,11 +47,11 @@ describe('the public icon facade', () => {
         <span data-testid="alias">
           <AliasIcon />
         </span>
-        <span data-testid="open-card">
-          <OpenCardIcon />
+        <span data-testid="open-thing">
+          <OpenThingIcon />
         </span>
-        <span data-testid="close-card">
-          <CloseCardIcon />
+        <span data-testid="close-thing">
+          <CloseThingIcon />
         </span>
         <span data-testid="markdown">
           <MarkdownIcon />
@@ -82,8 +82,8 @@ describe('the public icon facade', () => {
       edit: 'pencil',
       chevron: 'chevron-down',
       plus: 'plus',
-      'open-card': 'maximize-2',
-      'close-card': 'minimize-2',
+      'open-thing': 'maximize-2',
+      'close-thing': 'minimize-2',
       markdown: 'sticky-note',
       check: 'check',
       'zoom-in': 'plus',
@@ -183,40 +183,40 @@ describe('the public icon facade', () => {
     expect(glyphs[1]).toHaveAttribute('stroke', '#654321');
   });
 
-  it('keeps Card-kind glyphs decorative while their wrapper names the kind', () => {
+  it('keeps Thing-kind glyphs decorative while their wrapper names the kind', () => {
     render(
       <>
-        <CardKindIcon kind="markdown" />
-        <CardKindIcon kind="alias" />
-        <CardKindIcon kind="space" />
+        <ThingKindIcon kind="markdown" />
+        <ThingKindIcon kind="alias" />
+        <ThingKindIcon kind="space" />
       </>,
     );
 
-    const markdown = screen.getByRole('img', { name: 'Markdown Card' });
+    const markdown = screen.getByRole('img', { name: 'Markdown Thing' });
     const alias = screen.getByRole('img', { name: 'Alias' });
-    const space = screen.getByRole('img', { name: 'Space Card' });
-    expect(markdown).toHaveAttribute('title', 'Markdown Card');
+    const space = screen.getByRole('img', { name: 'Space Thing' });
+    expect(markdown).toHaveAttribute('title', 'Markdown Thing');
     expect(alias).toHaveAttribute('title', 'Alias');
-    expect(space).toHaveAttribute('title', 'Space Card');
+    expect(space).toHaveAttribute('title', 'Space Thing');
     expect(markdown.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(alias.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(space.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('tells an Alias of a Space Card from an Alias of a Markdown Card', () => {
+  it('tells an Alias of a Space Thing from an Alias of a Markdown Thing', () => {
     render(
       <>
-        <CardKindIcon kind="alias" aliasOf="markdown" />
-        <CardKindIcon kind="alias" aliasOf="space" />
+        <ThingKindIcon kind="alias" aliasOf="markdown" />
+        <ThingKindIcon kind="alias" aliasOf="space" />
       </>,
     );
 
     // The glyph carries the distinction, so the accessible name has to as well —
     // otherwise the two draw differently and announce identically, which is
     // worse than the single Alias glyph this replaced.
-    const ofMarkdown = screen.getByRole('img', { name: 'Alias of a Markdown Card' });
-    const ofSpace = screen.getByRole('img', { name: 'Alias of a Space Card' });
-    expect(ofMarkdown).toHaveAttribute('data-card-kind', 'alias');
+    const ofMarkdown = screen.getByRole('img', { name: 'Alias of a Markdown Thing' });
+    const ofSpace = screen.getByRole('img', { name: 'Alias of a Space Thing' });
+    expect(ofMarkdown).toHaveAttribute('data-thing-kind', 'alias');
     expect(ofMarkdown).toHaveAttribute('data-alias-of', 'markdown');
     expect(ofSpace).toHaveAttribute('data-alias-of', 'space');
     expect(ofMarkdown.querySelector('svg svg')).toHaveClass('lucide-sticky-note');

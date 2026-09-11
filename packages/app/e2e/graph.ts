@@ -6,19 +6,19 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * Reading and driving the React Flow graph from e2e.
  *
  * Shared rather than duplicated because several specs need it: `editing.spec`
- * drags cards around the fixture and draws Edges between them, `read-only.spec`
+ * drags things around the fixture and draws Edges between them, `read-only.spec`
  * does the same to prove none of it reaches the imported files, and
- * `new-space.spec` drags the single card of a space the app minted. The
+ * `new-space.spec` drags the single thing of a space the app minted. The
  * `settled` gate and the mid-connection waits in `connectHandles` are the
  * non-obvious parts, and the ones worth having in exactly one place.
  */
 
 /* -------------------------------------------------------------------------- */
-/* The fixture's cardinalities                                                 */
+/* The fixture's thinginalities                                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * How many Cards and Edges `packages/app/fixture/` actually declares, read from
+ * How many Things and Edges `packages/app/fixture/` actually declares, read from
  * the authored files at load.
  *
  * Four assertions used to spell these out as literals — `40` target handles,
@@ -36,12 +36,12 @@ const markdownFileCount = (directory: string): number =>
   ).length;
 
 /**
- * Cards are discovered non-recursively in two places — beside the space file and
- * in `cards/` — and every `.md` in scope *is* a card (ADR 0020), so counting
- * those files counts the Cards.
+ * Things are discovered non-recursively in two places — beside the space file and
+ * in `things/` — and every `.md` in scope *is* a thing (ADR 0020), so counting
+ * those files counts the Things.
  */
-export const FIXTURE_CARD_COUNT =
-  markdownFileCount(fixtureDir) + markdownFileCount(`${fixtureDir}/cards`);
+export const FIXTURE_THING_COUNT =
+  markdownFileCount(fixtureDir) + markdownFileCount(`${fixtureDir}/things`);
 
 /**
  * Graphs are a Diagram's only connection structure, so every Edge the overview
@@ -68,7 +68,7 @@ export const FIXTURE_EDGE_COUNT =
     0,
   );
 
-/** Authoring presents one handle per side of a Card, source and target alike —
+/** Authoring presents one handle per side of a Thing, source and target alike —
  *  four sides, graph-independent (ADR 0033). */
 export const AUTHORING_HANDLE_SIDES = 4;
 
@@ -83,12 +83,12 @@ export function nodeByTitle(page: Page, title: string): Locator {
 }
 
 /** The visible face shares its node's complete rectangle, including during resize. */
-export async function expectCardFillsNode(node: Locator): Promise<void> {
+export async function expectThingFillsNode(node: Locator): Promise<void> {
   await expect
     .poll(() =>
       node.evaluate((element) => {
-        const face = element.querySelector('.canvas-card');
-        if (face === null) throw new Error('Card face is missing');
+        const face = element.querySelector('.canvas-thing');
+        if (face === null) throw new Error('Thing face is missing');
         const outer = element.getBoundingClientRect();
         const inner = face.getBoundingClientRect();
         return Math.max(
@@ -103,7 +103,7 @@ export async function expectCardFillsNode(node: Locator): Promise<void> {
 }
 
 /**
- * The Card reached during traversal, by the class the projection marks it with.
+ * The Thing reached during traversal, by the class the projection marks it with.
  *
  * Shared because presenting is asserted from both projects: `presenting.spec`
  * traverses the fixture's authored Graphs, and `new-space.spec` presents the Graph a
@@ -111,19 +111,19 @@ export async function expectCardFillsNode(node: Locator): Promise<void> {
  * render layer's, not the domain's, so a second copy of the string is one the
  * next rename leaves behind.
  */
-export function activeCard(page: Page): Locator {
-  return page.locator('.react-flow__node.rf-card-node--active');
+export function activeThing(page: Page): Locator {
+  return page.locator('.react-flow__node.rf-thing-node--active');
 }
 
 /**
- * Open a Card in place, without beginning content editing (ADR 0064).
+ * Open a Thing in place, without beginning content editing (ADR 0064).
  *
- * No pointer gesture on a Card's body opens it (ADR 0036) — the Card's own
- * control does, and it is revealed by hovering the Card.
+ * No pointer gesture on a Thing's body opens it (ADR 0036) — the Thing's own
+ * control does, and it is revealed by hovering the Thing.
  */
-export async function openCard(node: Locator, title: string): Promise<void> {
+export async function openThing(node: Locator, title: string): Promise<void> {
   await node.hover();
-  await node.getByRole('button', { name: `Open Card ${title}` }).click();
+  await node.getByRole('button', { name: `Open Thing ${title}` }).click();
 }
 
 /**
@@ -185,7 +185,7 @@ export function selectedCanvas(page: Page): Locator {
  * One exclusive choice over authored Diagrams, with no second control and no
  * empty value — ADR 0053's one durable clause, which ADR 0082 keeps verbatim.
  * The fixture declares two Diagrams (`fixture/space.json`), so a test can open
- * one without authoring it first, which is the only way to drag a Card in a
+ * one without authoring it first, which is the only way to drag a Thing in a
  * Diagram that already owns Edges.
  */
 export async function selectCanvas(page: Page, title: string): Promise<void> {
@@ -239,18 +239,18 @@ export function presentControl(page: Page): Locator {
   return dock(page).getByRole('button', { name: /^Present / });
 }
 
-/** Whether creating a Card is available at all, which the `+` reports. */
-export function createCardControl(page: Page): Locator {
-  return dock(page).getByRole('button', { name: 'Create Card' });
+/** Whether creating a Thing is available at all, which the `+` reports. */
+export function createThingControl(page: Page): Locator {
+  return dock(page).getByRole('button', { name: 'Create Thing' });
 }
 
-/** Create a Card of one kind, from the Cards cluster's `+`. */
-export async function createCard(
+/** Create a Thing of one kind, from the Things cluster's `+`. */
+export async function createThing(
   page: Page,
-  kind: 'Markdown Card' | 'Space Card' | 'Alias',
+  kind: 'Markdown Thing' | 'Space Thing' | 'Alias',
 ): Promise<void> {
-  const menu = await disclose(page, 'Create Card');
-  // The row says the kind twice — `CardKindIcon` announces it and the word
+  const menu = await disclose(page, 'Create Thing');
+  // The row says the kind twice — `ThingKindIcon` announces it and the word
   // beside it repeats it — so which of the two carries the accessible name is
   // the glyph's decision and not this module's.
   await menu.getByRole('menuitem', { name: new RegExp(`^(${kind}\\s*)+$`) }).click();
@@ -309,7 +309,7 @@ export const viewportTransform = (page: Page) =>
  * Wait until the viewport stops moving.
  *
  * Camera moves while presenting are animated. A bounding box read during one is
- * stale by the time the mouse gets there, so mousedown lands beside the card and
+ * stale by the time the mouse gets there, so mousedown lands beside the thing and
  * no drag starts — a failure that looks exactly like dragging being broken.
  */
 export async function settled(page: Page): Promise<void> {
@@ -353,11 +353,11 @@ const NUDGE = 2;
 /**
  * Drag by a flow-space delta, scaled through the current zoom.
  *
- * Anything a caller wants to assert *while* the Card is being dragged goes in
+ * Anything a caller wants to assert *while* the Thing is being dragged goes in
  * `whileDragging`, which runs between the two moves — the same shape
  * `connectHandles` uses above, and for the same kind of reason. What a drag does
  * to the rest of the canvas mid-flight is invisible from either resting frame:
- * the defect ADR 0084 removes moved a neighbour as the dragged Card crossed its
+ * the defect ADR 0084 removes moved a neighbour as the dragged Thing crossed its
  * origin and moved it back before release, so a test that reads only the before
  * and after sees a gesture that did nothing. The callback runs after the first
  * move, which lands on exactly the halfway point of the delta — a crossing a
@@ -374,21 +374,21 @@ export async function dragBy(
   const box = (await node.boundingBox())!;
   const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
 
-  // Grab the card's header rather than its centre: the body scrolls its markdown
+  // Grab the thing's header rather than its centre: the body scrolls its markdown
   // and the ports sit at the edges.
   await page.mouse.move(box.x + box.width / 2, box.y + 12);
   await page.mouse.down();
-  // The opening nudge is its own move, and it is the difference between a Card
+  // The opening nudge is its own move, and it is the difference between a Thing
   // that lands where the delta says and one that lands ninety per cent of the
   // way there. React Flow begins the drag at the first pointer event past
-  // `nodeDragThreshold` (1px at the pinned 12.11.2) and measures the Card's
+  // `nodeDragThreshold` (1px at the pinned 12.11.2) and measures the Thing's
   // travel from *that* position, so everything covered before it is lost — and a
   // `steps: 5` move to the halfway point spends a tenth of the whole delta on
   // its first event.
   //
   // Spending the nudge on its own move makes that loss a known constant instead
   // of a proportion, and **every coordinate below is then measured from the
-  // nudge rather than from the press**, so the Card travels exactly `dx`/`dy`
+  // nudge rather than from the press**, so the Thing travels exactly `dx`/`dy`
   // flow units. Leaving the nudge uncompensated would have left an error of
   // `NUDGE / zoom` — small at the fixture's zoom, and growing as a Diagram gets
   // wider or a viewport narrower, which is precisely the shape of assertion
@@ -407,17 +407,17 @@ export async function dragBy(
   await page.mouse.up();
 }
 
-/** Which side of a Card an authoring handle sits on. The side is interaction
+/** Which side of a Thing an authoring handle sits on. The side is interaction
  *  geometry and is never authored (ADR 0033). */
 export type HandleSide = 'top' | 'right' | 'bottom' | 'left';
 
-/** A Card's graph-independent authoring handle on one side. */
+/** A Thing's graph-independent authoring handle on one side. */
 export function authoringHandle(
   node: Locator,
   type: 'source' | 'target',
   side: HandleSide,
 ): Locator {
-  return node.locator(`.rf-card-node__authoring-handle--${type}.react-flow__handle-${side}`);
+  return node.locator(`.rf-thing-node__authoring-handle--${type}.react-flow__handle-${side}`);
 }
 
 /**
@@ -482,7 +482,7 @@ export async function connectToEmptyWithAlt(
     await page.keyboard.down('Alt');
     altDown = true;
     await page.mouse.move(pane.x + 36, pane.y + 36, { steps: 4 });
-    const preview = page.getByTestId('new-card-preview');
+    const preview = page.getByTestId('new-thing-preview');
     await expect(preview).toBeVisible();
     previewed = true;
     // Read the position while the drag is still live — the preview is gone the
@@ -495,9 +495,9 @@ export async function connectToEmptyWithAlt(
     // an unrelated-looking reason.
     //
     // Which key comes up first is the difference between a drop and a cancel.
-    // On the way out with a preview in hand, the drop is what creates the Card,
+    // On the way out with a preview in hand, the drop is what creates the Thing,
     // so it must still see Alt down. On the way out through a failed assertion
-    // it must not: an Alt-drop would create a Card the aborted test never asked
+    // it must not: an Alt-drop would create a Thing the aborted test never asked
     // for, and whatever that broke next would be reported instead of the
     // assertion that actually failed.
     if (!previewed && altDown) await page.keyboard.up('Alt');

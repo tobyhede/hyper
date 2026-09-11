@@ -119,7 +119,7 @@ describe('MarkdownSourceEditor', () => {
    * owns is whether the key arrives *unconsumed*, which is `defaultPrevented === false`.
    *
    * `Mod-Enter` is here because `defaultKeymap` binds it to `insertBlankLine`, and it is
-   * the key `CardEditorShell` commits on: consuming it edits the document underneath the
+   * the key `ThingEditorShell` commits on: consuming it edits the document underneath the
    * commit it triggers. Pressed with Control, because CodeMirror reads `Mod` off the
    * user agent and jsdom is not a Mac — the Command half is the browser suites' to prove,
    * where the platform is real and `PRIMARY_MODIFIER` names it.

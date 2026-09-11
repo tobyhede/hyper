@@ -8,7 +8,7 @@ import { nodeTypes } from '@project/react-flow-adapter';
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { canvasProjection } from '#src/canvas-projection';
-import { cardChoiceOf } from '#src/card-choice';
+import { thingChoiceOf } from '#src/thing-choice';
 import type { SelectedEdgeRefusal } from '#src/edge-authoring';
 import { edgeSelectionOf } from '#src/render-adapter';
 import { requireDefaultDiagram, resolveDiagram } from '#src/diagram-resolution';
@@ -33,7 +33,7 @@ import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
  * `EdgeLabelRenderer` portals the controls into the flow's transformed layer, so
  * they are drawn at the viewport's scale: the fixture opens at roughly 0.55 and
  * the controls are correspondingly small, which a story rendering the component
- * at 1:1 flatters out of existence. Legibility, collision with Cards and the
+ * at 1:1 flatters out of existence. Legibility, collision with Things and the
  * HUD, and weight against the drawn Edges are all questions only this can
  * answer.
  *
@@ -63,7 +63,7 @@ export interface SelectedEdgeCanvasFixtureProps {
   /**
    * How close the canvas is.
    *
-   * `fit` is what an author sees on opening — every Card in view, and the
+   * `fit` is what an author sees on opening — every Thing in view, and the
    * controls drawn at that scale. `close` is the same surface at 1:1, which is
    * what the component stories show; the pair together is the comparison worth
    * looking at.
@@ -103,8 +103,8 @@ export function SelectedEdgeCanvasFixture({
         ? null
         : PENDING.project(laidOut, {
             activeGraphId: ACTIVE_GRAPH,
-            activeCardId: null,
-            selectedCardId: null,
+            activeThingId: null,
+            selectedThingId: null,
             presenting: false,
             moved: false,
           }),
@@ -116,7 +116,7 @@ export function SelectedEdgeCanvasFixture({
    *
    * Read through the production `edgeSelectionOf` rather than off `source` and
    * `target` here: that translation — including the widening React Flow's `Edge`
-   * type does to a `CardId` — is the render adapter's, and a second copy in a
+   * type does to a `ThingId` — is the render adapter's, and a second copy in a
    * fixture is exactly the transcription ADR 0052 rules out.
    */
   const selected = useMemo(
@@ -139,17 +139,18 @@ export function SelectedEdgeCanvasFixture({
       refusal,
       openEditor: () => setOpen(true),
       closeEditor: () => setOpen(false),
-      reconnect: (endpoint, cardId) => {
+      reconnect: (endpoint, thingId) => {
         if (endpoints === null) return;
         setReconnected(
           endpoint === 'from'
-            ? { from: cardId, to: endpoints.to }
-            : { from: endpoints.from, to: cardId },
+            ? { from: thingId, to: endpoints.to }
+            : { from: endpoints.from, to: thingId },
         );
         setOpen(false);
       },
       deleteEdge: () => setOpen(false),
-      endpointChoices: () => SPACE.cards.map((card) => cardChoiceOf(card, { kind: 'eligible' })),
+      endpointChoices: () =>
+        SPACE.things.map((thing) => thingChoiceOf(thing, { kind: 'eligible' })),
     }),
     [open, refusal, selected, endpoints],
   );
@@ -179,5 +180,5 @@ export function SelectedEdgeCanvasFixture({
   );
 }
 
-/** 1:1, roughly over the first Edge, so the two zoom stories frame the same Cards. */
+/** 1:1, roughly over the first Edge, so the two zoom stories frame the same Things. */
 const CLOSE_VIEWPORT = { x: -120, y: -40, zoom: 1 };

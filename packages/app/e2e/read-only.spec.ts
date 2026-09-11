@@ -4,7 +4,7 @@ import { expect, test } from './fixtures';
 import {
   authoringHandle,
   connectToEmptyWithAlt,
-  createCardControl,
+  createThingControl,
   nodeByTitle,
   settled,
 } from './graph';
@@ -28,25 +28,25 @@ test('database persistence never writes structural edits back to imported author
 }) => {
   const before = readFixture();
   await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   await settled(page);
 
   // Authoring is offered, which is the premise: what this test proves is that
   // running it changes no file on disk, not that it is unavailable.
-  await expect(createCardControl(page)).not.toHaveAttribute('aria-disabled', 'true');
-  await card.hover();
-  await connectToEmptyWithAlt(page, authoringHandle(card, 'source', 'right'));
-  const created = nodeByTitle(page, 'Card 1');
+  await expect(createThingControl(page)).not.toHaveAttribute('aria-disabled', 'true');
+  await thing.hover();
+  await connectToEmptyWithAlt(page, authoringHandle(thing, 'source', 'right'));
+  const created = nodeByTitle(page, 'Thing 1');
   await expect(created).toBeVisible();
   const createdId = await created.getAttribute('data-id');
-  if (createdId === null) throw new Error('The created Card has no id.');
+  if (createdId === null) throw new Error('The created Thing has no id.');
 
   // A revision bump only proves *something* committed. Name the connection that
   // was drawn, so a commit that recorded a placement and dropped the Edge fails
   // here rather than passing as "persisted".
-  await expect(page.getByLabel(/^Edge from A to Card 1 in /)).toBeVisible();
+  await expect(page.getByLabel(/^Edge from A to Thing 1 in /)).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(10);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');

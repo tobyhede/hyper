@@ -26,11 +26,11 @@ import {
 import type { CommitRefusalBody, HyperProblemCode, HyperProblemType } from '../src/http-protocol';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+  things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 
 /** The wire is JSON, so a round trip that skips it would not prove anything. */
@@ -167,9 +167,9 @@ describe('aggregate wire protocol', () => {
       kind: 'aggregate-refused' as const,
       errors: [
         {
-          kind: 'space-card-target-missing' as const,
+          kind: 'space-thing-target-missing' as const,
           spaceId: SPACE_ID,
-          cardId: CARD_ID,
+          thingId: THING_ID,
           targetSpaceId: secondId,
         },
       ],
@@ -184,39 +184,39 @@ describe('aggregate wire protocol', () => {
       { kind: 'invalid-shape', message: 'message' },
       { kind: 'unsupported-version', message: 'message' },
       { kind: 'retired-space-graphs', message: 'message' },
-      { kind: 'missing-frontmatter', path: 'card.md', message: 'message' },
-      { kind: 'unterminated-frontmatter', path: 'card.md', message: 'message' },
-      { kind: 'invalid-yaml', path: 'card.md', message: 'message' },
-      { kind: 'invalid-frontmatter', path: 'card.md', message: 'message' },
-      { kind: 'duplicate-card-id', ...described },
+      { kind: 'missing-frontmatter', path: 'thing.md', message: 'message' },
+      { kind: 'unterminated-frontmatter', path: 'thing.md', message: 'message' },
+      { kind: 'invalid-yaml', path: 'thing.md', message: 'message' },
+      { kind: 'invalid-frontmatter', path: 'thing.md', message: 'message' },
+      { kind: 'duplicate-thing-id', ...described },
       { kind: 'duplicate-graph-id', ...described },
       { kind: 'duplicate-diagram-id', ...described },
-      { kind: 'diagram-member-missing-card', ...described },
+      { kind: 'diagram-member-missing-thing', ...described },
       { kind: 'diagram-active-graph-missing', ...described },
       { kind: 'diagram-active-graph-outside-diagram', ...described },
-      { kind: 'graph-edge-missing-card', ...described },
-      { kind: 'graph-edge-card-outside-diagram', ...described },
+      { kind: 'graph-edge-missing-thing', ...described },
+      { kind: 'graph-edge-thing-outside-diagram', ...described },
       { kind: 'unresolved-default-diagram', ...described },
       { kind: 'duplicate-graph-edge', ...described },
       { kind: 'unresolved-alias-target', ...described },
       { kind: 'alias-self-reference', ...described },
       { kind: 'alias-targets-alias', ...described },
       { kind: 'alias-target-must-own-content', ...described },
-      { kind: 'space-card-reference-cycle', ...described },
+      { kind: 'space-thing-reference-cycle', ...described },
     ];
-    const location = { spaceId: SPACE_ID, cardId: CARD_ID, targetSpaceId: secondId };
+    const location = { spaceId: SPACE_ID, thingId: THING_ID, targetSpaceId: secondId };
     const errors: SpaceAggregateError[] = [
       { kind: 'invalid-space-snapshot', snapshotIndex: 0, errors: intakeErrors },
       { kind: 'duplicate-space-id', spaceId: SPACE_ID, snapshotIndexes: [0, 2] },
-      { kind: 'duplicate-card-id', cardId: CARD_ID, spaceIds: [SPACE_ID, secondId] },
+      { kind: 'duplicate-thing-id', thingId: THING_ID, spaceIds: [SPACE_ID, secondId] },
       { kind: 'meta-space-missing', metaSpaceId: SPACE_ID },
-      { kind: 'space-card-target-missing', ...location },
-      { kind: 'space-card-reference-cycle', ...location },
+      { kind: 'space-thing-target-missing', ...location },
+      { kind: 'space-thing-reference-cycle', ...location },
       { kind: 'ordinary-space-unreferenced', spaceId: secondId },
-      { kind: 'space-card-diagram-missing', ...location, diagramId: secondId },
-      { kind: 'space-card-graph-missing', ...location, graphId: secondId },
+      { kind: 'space-thing-diagram-missing', ...location, diagramId: secondId },
+      { kind: 'space-thing-graph-missing', ...location, graphId: secondId },
       {
-        kind: 'space-card-graph-outside-diagram',
+        kind: 'space-thing-graph-outside-diagram',
         ...location,
         diagramId: SPACE_ID,
         graphId: secondId,
@@ -227,10 +227,10 @@ describe('aggregate wire protocol', () => {
     expect(decodeCommitRefusal(encodeCommitRefusal(refusal))).toEqual(refusal);
   });
 
-  it('declares the Space Card Diagram refusal the way its decoder reads it', () => {
+  it('declares the Space Thing Diagram refusal the way its decoder reads it', () => {
     type WireDiagramMissing = Extract<
       CommitRefusalBody['errors'][number],
-      { readonly kind: 'space-card-diagram-missing' }
+      { readonly kind: 'space-thing-diagram-missing' }
     >;
     // `decodeCommitRefusal` reads this key with `requiredUuid`, so a body
     // omitting it is refused rather than decoded.
@@ -288,7 +288,7 @@ describe('aggregate wire protocol', () => {
             },
           ],
         },
-        'Card file path must be a string',
+        'Thing file path must be a string',
       ],
       [
         {
@@ -296,7 +296,7 @@ describe('aggregate wire protocol', () => {
             {
               kind: 'invalid-space-snapshot',
               snapshotIndex: 0,
-              errors: [{ kind: 'duplicate-card-id', ref: 7, message: 'message' }],
+              errors: [{ kind: 'duplicate-thing-id', ref: 7, message: 'message' }],
             },
           ],
         },
@@ -323,7 +323,7 @@ describe('aggregate wire protocol', () => {
         'snapshot index must be a non-negative safe integer',
       ],
       [
-        { errors: [{ kind: 'duplicate-card-id', cardId: CARD_ID, spaceIds: 'nope' }] },
+        { errors: [{ kind: 'duplicate-thing-id', thingId: THING_ID, spaceIds: 'nope' }] },
         'Space ids must be an array',
       ],
     ];

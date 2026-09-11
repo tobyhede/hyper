@@ -1,12 +1,12 @@
-import type { CardId, DiagramPosition } from '@project/core';
+import type { ThingId, DiagramPosition } from '@project/core';
 import {
   createNonThrowingReporter,
   createObservableState,
   type ObserverErrorReporter,
   type ObservableState,
 } from '@project/persistence';
-import type { CardFlowNode } from '@project/react-flow-adapter';
-import { CARD_SIZE } from './card';
+import type { ThingFlowNode } from '@project/react-flow-adapter';
+import { THING_SIZE } from './thing';
 import type { ConnectionCompletion, ConnectionResult } from './connection-completion';
 import type { Continuation, ContinuationTarget } from './continuation';
 import type { CanvasSelection, EdgeSubject, RenderAdapter } from './render-adapter';
@@ -42,11 +42,11 @@ import type {
  * reach it. Declaring the DOM half over three values rather than four is what
  * stops a supplier handing on an answer it could not have produced.
  *
- * `card` and `off-canvas` are refused for the same reason today and are still
+ * `thing` and `off-canvas` are refused for the same reason today and are still
  * two values, because this is a fact a supplier reports rather than a verdict it
  * reaches. Collapsing them would name an input after the answer it produces.
  */
-export type ElementDropTarget = 'card' | 'empty-canvas' | 'off-canvas';
+export type ElementDropTarget = 'thing' | 'empty-canvas' | 'off-canvas';
 
 /**
  * What a connection drag currently points at.
@@ -54,11 +54,11 @@ export type ElementDropTarget = 'card' | 'empty-canvas' | 'off-canvas';
  * Two sources answer this and neither is sufficient alone. React Flow resolves
  * `toNode` through `getClosestHandle`, by distance from the pointer to a handle
  * within `connectionRadius` — 20 in the pinned 12.11.2 — so it is non-null over
- * blank canvas near a handle, and **null over the middle of a Card**, whose
+ * blank canvas near a handle, and **null over the middle of a Thing**, whose
  * centre is some 73px from the nearest handle at 260x146. The DOM answers the
  * rest, from the element under the pointer — an `ElementDropTarget`. Drop the
- * DOM half and an Alt-release onto a Card's body authors a Card on top of it;
- * drop React Flow's half and a release just outside a Card authors one where the
+ * DOM half and an Alt-release onto a Thing's body authors a Thing on top of it;
+ * drop React Flow's half and a release just outside a Thing authors one where the
  * author was aiming at a handle. A connection target in range therefore outranks
  * what lies underneath, which is what `dropTarget` below composes.
  */
@@ -74,7 +74,7 @@ export type DropTarget = 'connection-target' | ElementDropTarget;
  *
  * **Every supplier asks this, including the reconnect release**, which composes
  * the same two answers and then asks a *different* question of the result:
- * whether to delete the Edge rather than whether to author a Card. That site is
+ * whether to delete the Edge rather than whether to author a Thing. That site is
  * why the rule is a function and not a paragraph — it is the one nobody greps
  * when changing how drops are classified.
  *
@@ -86,7 +86,7 @@ export type DropTarget = 'connection-target' | ElementDropTarget;
  * difference belongs in the argument, not in here
  * (`.scratch/card-route-editing/edge-authoring-design.md`).
  *
- * An object argument rather than two positional ones: `dropTarget(true, 'card')`
+ * An object argument rather than two positional ones: `dropTarget(true, 'thing')`
  * gives a reader no way to tell which source is which, and the site this exists
  * for is one nobody reads twice.
  */
@@ -103,7 +103,7 @@ export function dropTarget(over: {
  * `sourceId` and `point` exist only under `dragging`, so a gesture naming a
  * source while idle is unrepresentable rather than rejected on a branch. The id
  * is a plain string because that is what React Flow knows a node by; the uuid
- * parse belongs where a Card identity is actually needed.
+ * parse belongs where a Thing identity is actually needed.
  */
 export type ConnectionGesture =
   | { readonly kind: 'idle' }
@@ -117,14 +117,14 @@ export type ConnectionGesture =
       readonly modifierHeld: boolean;
     };
 
-/** The Card an empty-drop would author: its source, and its top-left. */
-export interface NewCardDrop {
+/** The Thing an empty-drop would author: its source, and its top-left. */
+export interface NewThingDrop {
   readonly sourceId: string;
   readonly position: DiagramPosition;
 }
 
 /**
- * The Card this gesture would author, or `null` for one that authors none.
+ * The Thing this gesture would author, or `null` for one that authors none.
  *
  * **The preview and the release ask this with different DOM facts, and that is
  * deliberate.** Four of the five inputs come from sources that track the
@@ -146,14 +146,14 @@ export interface NewCardDrop {
  *
  * `accepts` is a parameter rather than a sixth field because it is a capability
  * and not a fact, which keeps `ConnectionGesture` plain data a table test can
- * write as a literal. The position returned is the Card's top-left, centred on
- * the drop point, so the ghost and the authored Card cannot land in different
+ * write as a literal. The position returned is the Thing's top-left, centred on
+ * the drop point, so the ghost and the authored Thing cannot land in different
  * places.
  */
-export function newCardDrop(
+export function newThingDrop(
   gesture: ConnectionGesture,
   accepts: (from: string) => boolean,
-): NewCardDrop | null {
+): NewThingDrop | null {
   if (gesture.kind !== 'dragging') return null;
   if (gesture.over !== 'empty-canvas') return null;
   if (!gesture.modifierHeld) return null;
@@ -161,8 +161,8 @@ export function newCardDrop(
   return {
     sourceId: gesture.sourceId,
     position: {
-      x: gesture.point.x - CARD_SIZE.width / 2,
-      y: gesture.point.y - CARD_SIZE.height / 2,
+      x: gesture.point.x - THING_SIZE.width / 2,
+      y: gesture.point.y - THING_SIZE.height / 2,
     },
   };
 }
@@ -171,12 +171,12 @@ export function newCardDrop(
  * The one Edge interaction in progress.
  *
  * Three kinds, mutually exclusive by type: starting one cancels whatever was
- * there. A connect draft names the Card an Edge would leave; a reconnect draft
+ * there. A connect draft names the Thing an Edge would leave; a reconnect draft
  * names the Edge whose endpoint is being moved. The selected Edge's endpoint
  * editor outlives browser events until the author settles or cancels it.
  */
 export type EdgeDraft =
-  | { readonly kind: 'pointer-connect'; readonly from: CardId }
+  | { readonly kind: 'pointer-connect'; readonly from: ThingId }
   | ({ readonly kind: 'pointer-reconnect'; readonly endpoint: EdgeEndpoint } & EdgeSubject)
   /** The Edge popover: both endpoints are editable while it stands. */
   | ({ readonly kind: 'keyboard-reconnect' } & EdgeSubject);
@@ -250,18 +250,22 @@ export interface EdgeAuthoring {
   /** Whether a proposal may be offered — React Flow's `isValidConnection` shape. */
   readonly accepts: (proposal: EdgeProposal) => boolean;
 
-  readonly beginPointerConnect: (from: CardId) => void;
+  readonly beginPointerConnect: (from: ThingId) => void;
   /** One completed React Flow connection. */
-  readonly connect: (from: CardId, to: CardId, projected: readonly CardFlowNode[] | null) => void;
-  /** An Option/Alt empty drop: author the Card and the Edge that reaches it. */
-  readonly createConnectedCard: (
-    from: CardId,
+  readonly connect: (
+    from: ThingId,
+    to: ThingId,
+    projected: readonly ThingFlowNode[] | null,
+  ) => void;
+  /** An Option/Alt empty drop: author the Thing and the Edge that reaches it. */
+  readonly createConnectedThing: (
+    from: ThingId,
     position: DiagramPosition,
-    projected: readonly CardFlowNode[] | null,
+    projected: readonly ThingFlowNode[] | null,
   ) => void;
   /**
    * End whichever pointer drag was in flight, requesting the continuation a
-   * completed connection earns — the Card it reached, selected.
+   * completed connection earns — the Thing it reached, selected.
    *
    * One operation for both pointer drafts because a drag ends the same way
    * whatever it was doing: **the draft goes and the refusal stays.** A refusal
@@ -269,7 +273,7 @@ export interface EdgeAuthoring {
    * finished drag leaves no surface to correct — the sentence is the whole of
    * what they are told, and cancelling would take it away with the draft.
    *
-   * The Card is held until the drag ends rather than answered to the caller: it
+   * The Thing is held until the drag ends rather than answered to the caller: it
    * used to be a return value the two connecting operations passed up and their
    * call sites discarded, which is the second continuation channel
    * `continuation.ts` replaced.
@@ -278,8 +282,8 @@ export interface EdgeAuthoring {
 
   readonly beginPointerReconnect: (subject: EdgeSubject, endpoint: EdgeEndpoint) => void;
   readonly openEdgeEditor: (subject: EdgeSubject) => void;
-  /** Move one endpoint of the drafted Edge to a Card. */
-  readonly reconnect: (endpoint: EdgeEndpoint, cardId: CardId) => boolean;
+  /** Move one endpoint of the drafted Edge to a Thing. */
+  readonly reconnect: (endpoint: EdgeEndpoint, thingId: ThingId) => boolean;
   readonly deleteEdge: (subject: EdgeSubject) => boolean;
   /** Cancel the topmost Edge surface, producing no Edit. */
   readonly cancelDraft: () => void;
@@ -301,24 +305,24 @@ const IDLE: EdgeAuthoringState = { draft: null, refusal: null };
 const gestureRefusal = (refusal: AuthoringRefusal): EdgeRefusal => ({ kind: 'gesture', refusal });
 
 /**
- * The Card a draft is anchored at, if the draft has one.
+ * The Thing a draft is anchored at, if the draft has one.
  *
  * A connect draft's source, and a reconnect draft's *unmoved* endpoint: both are
  * where the author was, and both are where focus returns after a cancellation.
  */
-const anchorCardOf = (draft: EdgeDraft): CardId => {
+const anchorThingOf = (draft: EdgeDraft): ThingId => {
   if (draft.kind === 'pointer-connect') return draft.from;
   if (draft.kind === 'keyboard-reconnect') return draft.edge.from;
   return draft.endpoint === 'from' ? draft.edge.to : draft.edge.from;
 };
 
-/** Whether a canvas selection names the thing this draft is about. */
+/** Whether a canvas selection names the entity this draft is about. */
 const selectionMatchesDraft = (selection: CanvasSelection, draft: EdgeDraft): boolean => {
   if (draft.kind === 'pointer-connect') {
     // A pointer connect deliberately survives an empty selection: React Flow
-    // clears the Card as the drag begins, and cancelling there would end the
+    // clears the Thing as the drag begins, and cancelling there would end the
     // gesture on its first frame.
-    return selection.kind !== 'card' || selection.cardId === draft.from;
+    return selection.kind !== 'thing' || selection.thingId === draft.from;
   }
   return selection.kind !== 'edge' || sameEdgeSubject(selection, draft);
 };
@@ -351,14 +355,14 @@ export function createEdgeAuthoring({
   const accepts = (proposal: EdgeProposal): boolean => eligibility(proposal).kind === 'eligible';
 
   /**
-   * Whether the thing a draft is about still exists and can still be authored.
+   * Whether the entity a draft is about still exists and can still be authored.
    *
    * Asked through the eligibility query rather than by reading the Space: the
-   * *identity* proposal — reconnecting an endpoint to the Card it already names
+   * *identity* proposal — reconnecting an endpoint to the Thing it already names
    * — is eligible exactly when the Graph is still one this Diagram owns and still
    * holds the Edge, which is the whole of what "the subject survives" means. A
    * connect draft asks the empty-drop proposal for the same reason: it is the
-   * question "may this Card still be an Edge's source here", with no target to
+   * question "may this Thing still be an Edge's source here", with no target to
    * confuse it.
    */
   const subjectSurvives = (draft: EdgeDraft): boolean => {
@@ -370,7 +374,7 @@ export function createEdgeAuthoring({
       graphId: draft.graphId,
       edge: draft.edge,
       endpoint: 'to',
-      cardId: draft.edge.to,
+      thingId: draft.edge.to,
     });
   };
 
@@ -432,8 +436,8 @@ export function createEdgeAuthoring({
     return true;
   };
 
-  /** The Card a finished pointer connection continues at, held across the drag's end. */
-  let continueAt: CardId | null = null;
+  /** The Thing a finished pointer connection continues at, held across the drag's end. */
+  let continueAt: ThingId | null = null;
 
   /**
    * Take what a connection attempt came to, and say what the author sees.
@@ -441,32 +445,32 @@ export function createEdgeAuthoring({
    * The three outcomes are not interchangeable. A **refusal** is retained on the
    * channel the caller names; a **completion** clears whatever refusal was
    * there, because a refusal describes the proposal that produced it and this
-   * one has landed; and **unavailable** — no Cards on the canvas yet, or an invariant
+   * one has landed; and **unavailable** — no Things on the canvas yet, or an invariant
    * already reported — says nothing either way, so a refusal already on screen
    * stands.
    */
   const settleConnection = (
     result: ConnectionResult,
     channel: (refusal: AuthoringRefusal) => EdgeRefusal,
-  ): CardId | null => {
+  ): ThingId | null => {
     if (result.kind === 'refused') {
       publish({ refusal: channel(result.refusal) });
       return null;
     }
     if (result.kind !== 'completed') return null;
     publish({ refusal: null });
-    return result.cardId;
+    return result.thingId;
   };
 
   /**
-   * Hold the Card a pointer connection continues at until its drag ends.
+   * Hold the Thing a pointer connection continues at until its drag ends.
    */
-  const holdForDrag = (cardId: CardId | null): void => {
-    if (cardId !== null) continueAt = cardId;
+  const holdForDrag = (thingId: ThingId | null): void => {
+    if (thingId !== null) continueAt = thingId;
   };
 
   /**
-   * Ask the author be put back on the thing this Edit left them with.
+   * Ask the author be put back on the entity this Edit left them with.
    *
    * One line, because where an Edit continues is one module now
    * (`continuation.ts`): this lifecycle says what it owes and an adapter that
@@ -500,7 +504,7 @@ export function createEdgeAuthoring({
     presenting = nowPresenting;
     const { draft, refusal } = observable.getState();
     // **The refusal is invalidated even when no draft is left to carry it.** It
-    // names Cards and a Graph of the Space it was made against, and a *pointer*
+    // names Things and a Graph of the Space it was made against, and a *pointer*
     // gesture's refusal outlives its own draft by design — so without this a
     // sentence about the replaced Space survives an accepted replacement, which
     // the handoff's shared case 7 forbids outright ("cancels all target-bound
@@ -571,7 +575,7 @@ export function createEdgeAuthoring({
     connect: (from, to, projected) =>
       holdForDrag(settleConnection(connections.connect(from, to, projected), gestureRefusal)),
 
-    createConnectedCard: (from, position, projected) =>
+    createConnectedThing: (from, position, projected) =>
       holdForDrag(
         settleConnection(connections.createAndConnect(from, position, projected), gestureRefusal),
       ),
@@ -583,12 +587,12 @@ export function createEdgeAuthoring({
       if (draft?.kind === 'pointer-connect' || draft?.kind === 'pointer-reconnect') {
         publish({ draft: null });
       }
-      // The storyboard's connected Card is the selected one, so continued
+      // The storyboard's connected Thing is the selected one, so continued
       // authoring carries on from it — and there is nothing to do *there*, which
       // is the whole reason `select` is an axis of its own.
       if (reached !== null) {
         continuation.request({
-          target: { kind: 'card', cardId: reached },
+          target: { kind: 'thing', thingId: reached },
           select: true,
           then: 'nothing',
         });
@@ -602,7 +606,7 @@ export function createEdgeAuthoring({
 
     openEdgeEditor: ({ graphId, edge }) => begin({ kind: 'keyboard-reconnect', graphId, edge }),
 
-    reconnect: (endpoint, cardId) => {
+    reconnect: (endpoint, thingId) => {
       const drafted = reconnectDraft();
       if (drafted === null) return false;
       // **Which surface owns the refusal is the draft's kind, not the Edit's.**
@@ -615,7 +619,7 @@ export function createEdgeAuthoring({
           graphId: drafted.graphId,
           edge: drafted.edge,
           endpoint,
-          cardId,
+          thingId,
         },
         drafted.kind === 'keyboard-reconnect'
           ? (refusal) => ({ kind: 'reconnection', endpoint, refusal })
@@ -637,8 +641,8 @@ export function createEdgeAuthoring({
         graphId: drafted.graphId,
         edge:
           endpoint === 'from'
-            ? { from: cardId, to: drafted.edge.to }
-            : { from: drafted.edge.from, to: cardId },
+            ? { from: thingId, to: drafted.edge.to }
+            : { from: drafted.edge.from, to: thingId },
       };
       adapter.getState().selectEdge(reconnected);
       requestFocus({ kind: 'edge', ...reconnected });
@@ -656,7 +660,7 @@ export function createEdgeAuthoring({
       }));
       // The Edge that held focus is about to leave the projection, and React
       // Flow moves focus only for elements it still draws.
-      if (deleted) requestFocus({ kind: 'card', cardId: edge.from });
+      if (deleted) requestFocus({ kind: 'thing', thingId: edge.from });
       return deleted;
     },
 
@@ -664,7 +668,7 @@ export function createEdgeAuthoring({
       const { draft } = observable.getState();
       if (draft === null) return;
       publish({ draft: null, refusal: null });
-      requestFocus({ kind: 'card', cardId: anchorCardOf(draft) });
+      requestFocus({ kind: 'thing', thingId: anchorThingOf(draft) });
     },
 
     dispose: () => {

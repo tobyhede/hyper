@@ -13,13 +13,13 @@ export const Startup: Story = () => (
 
 /** What `SpaceAppFailure`'s error boundary renders when the mounted app throws. */
 export const SpaceApp: Story = () => (
-  <SpaceAppFailureView message="Graph names an absent card 00000000-0000-4000-8000-000000000005" />
+  <SpaceAppFailureView message="Graph names an absent thing 00000000-0000-4000-8000-000000000005" />
 );
 
 /** The canvas when no strategy produced positions for the active Diagram. */
 export const Placement: Story = () => (
-  <PlacementFailure error={new Error('No position for Card A')} />
+  <PlacementFailure error={new Error('No position for Thing A')} />
 );
 
-/** The canvas while a strategy is still arranging Cards. */
+/** The canvas while a strategy is still arranging Things. */
 export const Arranging: Story = () => <PlacementPending />;

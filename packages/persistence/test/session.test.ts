@@ -7,13 +7,13 @@ import { openManagedSpaceSession } from '../src/session';
 import { MemorySpaceBackendTestControl } from '../src/memory';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 const loaded: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
     document: { version: 1, title: 'One' },
-    cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
+    things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
   },
   revision: 3n,
   exportedRevision: 2n,
@@ -872,7 +872,7 @@ describe('openSpaceSession', () => {
    * `pending` with `retry` and `resolveConflict` both early-returning, and
    * `waitForIdle()` never resolves. `SpaceSessionRegistry`'s lifecycle barrier
    * waits on *every* session, so one stuck this way blocks every coordinated
-   * Space Card commit in the registry, with each session already paused.
+   * Space Thing commit in the registry, with each session already paused.
    */
   it('reports a throwing commit as a failure and returns to idle', async () => {
     const control = new MemorySpaceBackendTestControl();

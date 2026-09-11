@@ -1,4 +1,4 @@
-import type { Card, Diagram, DiagramId } from '@project/core';
+import type { Thing, Diagram, DiagramId } from '@project/core';
 import { Placement, type ResolvedDiagram, type Space } from '@project/graph';
 
 /**
@@ -38,7 +38,7 @@ export function requireDefaultDiagram(space: Space): DiagramId {
  * Answers `@project/graph`'s own `ResolvedDiagram` rather than wrapping it.
  * There is no second kind of Diagram here, so there is no second value type:
  * what this adds to the index's answer is the fallback and the refusal, and
- * `diagramCards` below is the one derivation a caller may want beside it.
+ * `diagramThings` below is the one derivation a caller may want beside it.
  */
 export function resolveDiagram(space: Space, diagramId?: DiagramId): ResolvedDiagram {
   const selection = diagramId ?? requireDefaultDiagram(space);
@@ -50,14 +50,14 @@ export function resolveDiagram(space: Space, diagramId?: DiagramId): ResolvedDia
 }
 
 /**
- * The Cards a Diagram places: the Space's own `Card` objects, for that Diagram's
- * members only, in `space.cards` order.
+ * The Things a Diagram places: the Space's own `Thing` objects, for that Diagram's
+ * members only, in `space.things` order.
  *
- * Under ADR 0040 a Diagram's position keys *are* its Card membership, so this is
+ * Under ADR 0040 a Diagram's position keys *are* its Thing membership, so this is
  * a filter and never a manufactured position. One named operation, so two call
  * sites cannot derive membership differently.
  */
-export function diagramCards(space: Space, diagram: Diagram): readonly Card[] {
+export function diagramThings(space: Space, diagram: Diagram): readonly Thing[] {
   const members = Placement.fromDiagram(diagram);
-  return space.cards.filter((card) => members.has(card.id));
+  return space.things.filter((thing) => members.has(thing.id));
 }

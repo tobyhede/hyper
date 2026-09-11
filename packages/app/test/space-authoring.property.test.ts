@@ -4,7 +4,7 @@ import { expect, it } from 'vitest';
 import {
   normalizeTitle,
   uuidSchema,
-  type Card,
+  type Thing,
   type Graph,
   type Diagram,
   type DiagramId,
@@ -43,16 +43,16 @@ import type { AuthoringCompletion, AuthoringResult } from '../src/space-authorin
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 
 /**
- * Two Diagrams, an Alias, a Card one Diagram omits and a Graph in each — the
+ * Two Diagrams, an Alias, a Thing one Diagram omits and a Graph in each — the
  * smallest Space in which every rule under test has something to bite on.
  */
 const start: SpaceSnapshot = {
@@ -66,12 +66,12 @@ const start: SpaceSnapshot = {
         title: 'Diagram 1',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 10, y: 20, open: false },
-          [CARD_B]: { x: 300, y: 40, open: false },
+          [THING_A]: { x: 10, y: 20, open: false },
+          [THING_B]: { x: 300, y: 40, open: false },
         },
         graphs: [
-          { id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] },
-          { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: CARD_B, to: CARD_B }] },
+          { id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_B }] },
+          { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: THING_B, to: THING_B }] },
         ],
       },
       {
@@ -79,24 +79,24 @@ const start: SpaceSnapshot = {
         title: 'Diagram 2',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 0, y: 400, open: false },
-          [CARD_C]: { x: 0, y: 600, open: false },
+          [THING_A]: { x: 0, y: 400, open: false },
+          [THING_C]: { x: 0, y: 600, open: false },
         },
         graphs: [
           {
             id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
             title: 'Elsewhere',
-            edges: [{ from: CARD_A, to: CARD_C }],
+            edges: [{ from: THING_A, to: THING_C }],
           },
         ],
       },
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: CARD_C, document: { title: 'A again', kind: 'alias', target: CARD_A } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: THING_C, document: { title: 'A again', kind: 'alias', target: THING_A } },
   ],
 };
 
@@ -110,27 +110,27 @@ const anchor = fc.record({
 /**
  * A generated operation, still holding indices rather than identities.
  *
- * `settled-card-movement` and the two connect gestures are absent because they
+ * `settled-thing-movement` and the two connect gestures are absent because they
  * carry rendered geometry a pointer produces; their eligibility is pinned in
  * `space-authoring.test.ts` against the real report.
  */
 const operation = fc.oneof(
-  fc.record({ op: fc.constant('created-card' as const), anchor }),
-  fc.record({ op: fc.constant('created-alias' as const), card: index, anchor }),
+  fc.record({ op: fc.constant('created-thing' as const), anchor }),
+  fc.record({ op: fc.constant('created-alias' as const), thing: index, anchor }),
   /**
-   * Card editing includes attempts to change an Alias's immutable Target. The
+   * Thing editing includes attempts to change an Alias's immutable Target. The
    * title is generated blank sometimes on purpose: an empty one must refuse
    * rather than reach intake.
    */
   fc.record({
-    op: fc.constant('edited-card' as const),
-    card: index,
+    op: fc.constant('edited-thing' as const),
+    thing: index,
     title: fc.oneof(fc.constant(''), fc.constant('  '), fc.string({ maxLength: 8 })),
     proposedTarget: fc.option(index, { nil: undefined }),
   }),
-  fc.record({ op: fc.constant('added-card-to-diagram' as const), card: index, anchor }),
-  fc.record({ op: fc.constant('removed-card-from-diagram' as const), card: index }),
-  fc.record({ op: fc.constant('deleted-card' as const), card: index }),
+  fc.record({ op: fc.constant('added-thing-to-diagram' as const), thing: index, anchor }),
+  fc.record({ op: fc.constant('removed-thing-from-diagram' as const), thing: index }),
+  fc.record({ op: fc.constant('deleted-thing' as const), thing: index }),
   fc.record({ op: fc.constant('added-graph' as const) }),
   fc.record({
     op: fc.constant('renamed-graph' as const),
@@ -149,7 +149,7 @@ const operation = fc.oneof(
     graph: index,
     edge: index,
     endpoint: fc.constantFrom('from' as const, 'to' as const),
-    card: index,
+    thing: index,
   }),
 );
 
@@ -163,7 +163,7 @@ const pick = <T>(items: readonly T[], at: number): T | undefined => items[at];
 it('keeps an existing Alias Target immutable while accepting Title edits', () => {
   fc.assert(
     fc.property(
-      fc.constantFrom(CARD_A, CARD_B),
+      fc.constantFrom(THING_A, THING_B),
       fc.oneof(
         fc.constant('Alias'),
         // Normalized, not trimmed: the write path stores what the schema would
@@ -174,13 +174,13 @@ it('keeps an existing Alias Target immutable while accepting Title edits', () =>
           .filter((title) => normalizeTitle(title).length > 0 && normalizeTitle(title) !== 'Alias'),
       ),
       (target, proposedTitle) => {
-        const alternativeTarget = target === CARD_A ? CARD_B : CARD_A;
+        const alternativeTarget = target === THING_A ? THING_B : THING_A;
         const snapshot: SpaceSnapshot = {
           ...start,
-          cards: start.cards.map((card) =>
-            card.id === CARD_C
-              ? { id: CARD_C, document: { title: 'Alias', kind: 'alias', target } }
-              : card,
+          things: start.things.map((thing) =>
+            thing.id === THING_C
+              ? { id: THING_C, document: { title: 'Alias', kind: 'alias', target } }
+              : thing,
           ),
         };
         const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -199,23 +199,23 @@ it('keeps an existing Alias Target immutable while accepting Title edits', () =>
 
         expect(
           authoring.complete({
-            kind: 'edited-card',
-            cardId: CARD_C,
+            kind: 'edited-thing',
+            thingId: THING_C,
             document: { title: proposedTitle, kind: 'alias', target },
           }),
         ).toEqual(
           normalizeTitle(proposedTitle) === 'Alias' ? { kind: 'unchanged' } : { kind: 'completed' },
         );
-        expect(session.getState().working.cards).toContainEqual({
-          id: CARD_C,
+        expect(session.getState().working.things).toContainEqual({
+          id: THING_C,
           document: { title: normalizeTitle(proposedTitle), kind: 'alias', target },
         });
 
         const beforeRetarget = session.getState().working;
         expect(
           authoring.complete({
-            kind: 'edited-card',
-            cardId: CARD_C,
+            kind: 'edited-thing',
+            thingId: THING_C,
             document: { title: proposedTitle, kind: 'alias', target: alternativeTarget },
           }),
         ).toEqual({ kind: 'refused', refusal: { code: 'alias-target-immutable' } });
@@ -253,9 +253,9 @@ it('keeps the working Space loadable through any sequence of semantic operations
         authoring.replacePlacement(
           opened === undefined
             ? Placement.fromEntries([
-                [CARD_A, { x: 10, y: 20, open: false }],
-                [CARD_B, { x: 300, y: 40, open: false }],
-                [CARD_C, { x: 600, y: 40, open: false }],
+                [THING_A, { x: 10, y: 20, open: false }],
+                [THING_B, { x: 300, y: 40, open: false }],
+                [THING_C, { x: 600, y: 40, open: false }],
               ])
             : Placement.fromDiagram(opened),
         );
@@ -263,7 +263,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
         for (const generated of operations) {
           const space = currentSpace();
           const graphs: readonly Graph[] = selectedDiagram()?.graphs ?? space.graphs;
-          const completion = resolve(generated, space.cards, graphs);
+          const completion = resolve(generated, space.things, graphs);
 
           const before = session.getState().working;
           const result: AuthoringResult = authoring.complete(completion);
@@ -290,30 +290,30 @@ it('keeps the working Space loadable through any sequence of semantic operations
 /** Turn generated indices into the identities the live Space actually holds. */
 function resolve(
   generated: GeneratedOperation,
-  cards: readonly Card[],
+  things: readonly Thing[],
   graphs: readonly Graph[],
 ): AuthoringCompletion {
-  const cardId = uuidSchema.parse(
-    'card' in generated ? (pick(cards, generated.card)?.id ?? NOTHING) : NOTHING,
+  const thingId = uuidSchema.parse(
+    'thing' in generated ? (pick(things, generated.thing)?.id ?? NOTHING) : NOTHING,
   );
   const graph = 'graph' in generated ? pick(graphs, generated.graph) : undefined;
   const graphId = uuidSchema.parse(graph?.id ?? NOTHING);
   switch (generated.op) {
-    case 'edited-card': {
-      const card = pick(cards, generated.card);
-      if (card === undefined) {
+    case 'edited-thing': {
+      const thing = pick(things, generated.thing);
+      if (thing === undefined) {
         return {
-          kind: 'edited-card',
-          cardId,
+          kind: 'edited-thing',
+          thingId,
           document: { title: generated.title, kind: 'markdown', body: '' },
         };
       }
-      const { id: _id, ...document } = card;
+      const { id: _id, ...document } = thing;
       const proposedTarget =
-        generated.proposedTarget === undefined ? undefined : pick(cards, generated.proposedTarget);
+        generated.proposedTarget === undefined ? undefined : pick(things, generated.proposedTarget);
       return {
-        kind: 'edited-card',
-        cardId: card.id,
+        kind: 'edited-thing',
+        thingId: thing.id,
         document:
           document.kind === 'alias'
             ? {
@@ -324,16 +324,16 @@ function resolve(
             : { ...document, title: generated.title },
       };
     }
-    case 'created-card':
-      return { kind: 'created-card', anchor: generated.anchor };
+    case 'created-thing':
+      return { kind: 'created-thing', anchor: generated.anchor };
     case 'created-alias':
-      return { kind: 'created-alias', target: cardId, anchor: generated.anchor };
-    case 'added-card-to-diagram':
-      return { kind: 'added-card-to-diagram', cardId, anchor: generated.anchor };
-    case 'removed-card-from-diagram':
-      return { kind: 'removed-card-from-diagram', cardId };
-    case 'deleted-card':
-      return { kind: 'deleted-card', cardId };
+      return { kind: 'created-alias', target: thingId, anchor: generated.anchor };
+    case 'added-thing-to-diagram':
+      return { kind: 'added-thing-to-diagram', thingId, anchor: generated.anchor };
+    case 'removed-thing-from-diagram':
+      return { kind: 'removed-thing-from-diagram', thingId };
+    case 'deleted-thing':
+      return { kind: 'deleted-thing', thingId };
     case 'added-graph':
       return { kind: 'added-graph' };
     case 'renamed-graph':
@@ -354,7 +354,7 @@ function resolve(
         graphId,
         edge: pick(graph?.edges ?? [], generated.edge) ?? { from: NOTHING, to: NOTHING },
         endpoint: generated.endpoint,
-        cardId,
+        thingId,
       };
   }
 }

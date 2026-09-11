@@ -24,11 +24,6 @@
       "count": 3
     }
   },
-  "packages/app/src/card.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "packages/app/src/render-adapter.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 8
@@ -37,6 +32,11 @@
   "packages/app/src/space-authoring.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 2
+    }
+  },
+  "packages/app/src/thing.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 1
     }
   },
   "packages/app/test/render-adapter.test.ts": {
@@ -49,17 +49,17 @@
       "count": 2
     }
   },
-  "packages/graph/src/card-file.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "packages/graph/src/placement.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 2
     }
   },
   "packages/graph/src/space.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "packages/graph/src/thing-file.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1
     }

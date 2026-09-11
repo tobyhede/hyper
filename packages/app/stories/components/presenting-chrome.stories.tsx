@@ -18,13 +18,13 @@ export default { title: 'Components/Presenting Chrome' };
 /** A line: the degenerate fork, and the shape most talks are. */
 export const Line: Story = () => <PresentingChromeFixture />;
 
-/** Four Edges out of one Card, the longest of them well past what the row can hold. */
+/** Four Edges out of one Thing, the longest of them well past what the row can hold. */
 export const Fork: Story = () => <PresentingChromeFixture space={deepDiveSpace} />;
 
 /**
  * The end of the Graph, two moves in, with the way back still open.
  *
- * A sink cannot be the Card a traversal begins at — every Card a Graph can start
+ * A sink cannot be the Thing a traversal begins at — every Thing a Graph can start
  * from has an Edge leaving it — so this is where the traversal arrives rather than
  * where it opens.
  */

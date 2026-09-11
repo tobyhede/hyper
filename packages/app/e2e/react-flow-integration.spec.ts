@@ -1,27 +1,27 @@
 import { expect, test } from './fixtures';
 import { nodeByTitle, selectCanvas, settled } from './graph';
 
-test('a focused Card opens with Enter and Space', async ({ page }) => {
+test('a focused Thing opens with Enter and Space', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
   await settled(page);
 
-  // The guard that opening did not follow the pointer off the Card when it
+  // The guard that opening did not follow the pointer off the Thing when it
   // stopped being a gesture (ADR 0036, 0037).
-  await card.focus();
-  await expect(card).toBeFocused();
+  await thing.focus();
+  await expect(thing).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(card).toContainText('entry point');
+  await expect(thing).toContainText('entry point');
 
-  await card.hover();
-  await card.getByRole('button', { name: 'Close Card A' }).click();
-  await card.focus();
-  await expect(card).toBeFocused();
+  await thing.hover();
+  await thing.getByRole('button', { name: 'Close Thing A' }).click();
+  await thing.focus();
+  await expect(thing).toBeFocused();
   const scrollBefore = await page.evaluate(() => window.scrollY);
   await page.keyboard.press('Space');
-  await expect(card).toContainText('entry point');
+  await expect(thing).toContainText('entry point');
   expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
 });
 

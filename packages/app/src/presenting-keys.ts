@@ -24,7 +24,7 @@ const MODAL = '[role="dialog"],[role="alertdialog"]';
  * inside it. The Command Dock has no Sheet and hides itself while presenting
  * (ADR 0082), so that particular surface is not what this defers to any more.
  * The rule stays because the *shape* is not the Sheet's: a creation pane, the
- * persistence conflict dialog and the Card deletion confirmation are all modal
+ * persistence conflict dialog and the Thing deletion confirmation are all modal
  * and all reachable, and a window listener that went on traversing would run
  * a Traversal command behind a surface the presenter is looking at: one Escape
  * both dismissing the dialog and leaving presentation, Arrow keys moving a Graph

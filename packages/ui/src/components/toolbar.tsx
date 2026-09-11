@@ -13,7 +13,7 @@ import { Button } from '../Button';
  * gives Hyper the component in its own vocabulary.
  *
  * It supplies no layout of its own. A toolbar is drawn by the surface that
- * owns it — the Card rail's row and gap are the Card's, not the toolbar's —
+ * owns it — the Thing rail's row and gap are the Thing's, not the toolbar's —
  * so this contributes semantics and keyboard behaviour and nothing visual.
  * With no classes of its own to merge, `className` reaches the primitive
  * untouched, which is what keeps Base UI's state-callback form usable through
@@ -22,7 +22,7 @@ import { Button } from '../Button';
  * Both halves stay `forwardRef` although neither takes a ref here. Base UI's
  * prop types include `ref`, and a plain function component under React 18
  * would advertise one and then drop it — silently, and at the call site that
- * needed it most (`CanvasCard` returns focus to its Edit control this way).
+ * needed it most (`CanvasThing` returns focus to its Edit control this way).
  */
 const Toolbar = React.forwardRef<HTMLDivElement, ToolbarPrimitive.Root.Props>(
   function Toolbar(props, ref) {

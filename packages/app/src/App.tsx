@@ -14,39 +14,39 @@ import {
   type EntityActionOutcome,
 } from '@project/ui';
 import {
-  type Card,
-  type CardId,
+  type Thing,
+  type ThingId,
   type DiagramId,
   type DiagramPosition,
   type UUID,
 } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import { createNonThrowingReporter } from '@project/persistence';
-import { graphCardIds, Placement, positionedStrategy } from '@project/graph';
+import { graphThingIds, Placement, positionedStrategy } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpacesState, RejectedExitConfirmation } from './open-spaces';
 import type { AuthoringRefusal, AuthoringResult } from './space-authoring';
 import { authoringAvailability } from './authoring-availability';
-import { selectedCardOf, type EdgeSubject } from './render-adapter';
+import { selectedThingOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
 import { canvasContent } from './canvas-content';
 import {
   describeAuthoringRefusal,
-  describeSpaceCardRefusal,
+  describeSpaceThingRefusal,
   presentNewAliasRefusal,
-  presentNewSpaceCardRefusal,
+  presentNewSpaceThingRefusal,
 } from './authoring-refusal';
-import { useCardCreation } from './card-creation-react';
-import { cardCreationMessage } from './card-creation';
+import { useThingCreation } from './thing-creation-react';
+import { thingCreationMessage } from './thing-creation';
 import type {
-  CardCreationInput,
-  CardCreationOutcome,
-  CardCreationRead,
-  CardCreationSeams,
-} from './card-creation';
-import { useSpaceCardTargets } from './space-card-targets';
+  ThingCreationInput,
+  ThingCreationOutcome,
+  ThingCreationRead,
+  ThingCreationSeams,
+} from './thing-creation';
+import { useSpaceThingTargets } from './space-thing-targets';
 import { usePlacementRendering } from './placement-rendering';
-import { cardSizeVars } from './card';
+import { thingSizeVars } from './thing';
 import { canRetreat } from './navigation';
 import { copyLink } from './clipboard';
 import {
@@ -59,24 +59,24 @@ import {
   type SpaceEntity,
 } from './entity-actions';
 import { usePresentingKeys } from './presenting-keys';
-import { nextCardTitle } from './titles';
-import { diagramCards, resolveDiagram } from './diagram-resolution';
+import { nextThingTitle } from './titles';
+import { diagramThings, resolveDiagram } from './diagram-resolution';
 import type { DestinationOpening } from './destination-opening';
 import { SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CanvasContinuation } from './components/CanvasContinuation';
 import { ChromeContinuation } from './components/ChromeContinuation';
-import { CardsDrawer } from './components/CardsDrawer';
-import { CARDS_TRIGGER } from './components/command-dock-triggers';
-import { DeleteCardConfirmation } from './components/DeleteCardConfirmation';
+import { ThingsDrawer } from './components/ThingsDrawer';
+import { THINGS_TRIGGER } from './components/command-dock-triggers';
+import { DeleteThingConfirmation } from './components/DeleteThingConfirmation';
 import {
-  CardsTrigger,
+  ThingsTrigger,
   CommandDock,
   type DockChrome,
   type SpaceExitReport,
 } from './components/CommandDock';
 import { NewAlias } from './components/NewAlias';
-import { NewSpaceCard } from './components/NewSpaceCard';
+import { NewSpaceThing } from './components/NewSpaceThing';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -103,7 +103,7 @@ const noOpenSpaces = (): OpenSpacesState => NO_OPEN_SPACES;
 const noOpenSpacesChanges = (): (() => void) => () => undefined;
 
 export const createApp = (
-  { app: composition, session: spaceSession, spaceCards, initialization }: OpenSpace,
+  { app: composition, session: spaceSession, spaceThings, initialization }: OpenSpace,
   browserLocation: BrowserLocation,
   opening?: DestinationOpening,
 ) => {
@@ -128,7 +128,7 @@ export const createApp = (
    */
   const reportBreak = createNonThrowingReporter(reportObserverError);
   /**
-   * The Spaces a Space Card may reference, or the fact that they could not be
+   * The Spaces a Space Thing may reference, or the fact that they could not be
    * read.
    *
    * Answers rather than rejects, which is what lets the pane word the failure
@@ -137,7 +137,7 @@ export const createApp = (
    * — without it, a transport failure is the one failure on this pane that
    * is shown to the author and then discarded.
    */
-  const readReferenceableSpaces = async (): Promise<CardCreationRead> => {
+  const readReferenceableSpaces = async (): Promise<ThingCreationRead> => {
     // Outside the `try`, because this reads the working snapshot rather than
     // the repository: `currentSpace` throws for a snapshot that fails intake,
     // and catching that here would word it as a stored-Spaces read that was
@@ -145,23 +145,23 @@ export const createApp = (
     // own `currentSpace` read takes, so one failure is said one way.
     const containingSpaceId = currentSpace().id;
     try {
-      const spaces = await spaceCards.referenceableSpaces(containingSpaceId);
+      const spaces = await spaceThings.referenceableSpaces(containingSpaceId);
       return { choices: { kind: 'space', targets: { kind: 'read', spaces } }, listing: null };
     } catch (failure) {
       reportBreak(failure);
       return {
         choices: { kind: 'space', targets: { kind: 'unreadable' } },
-        listing: presentNewSpaceCardRefusal({ code: 'persistence-read-failed' }),
+        listing: presentNewSpaceThingRefusal({ code: 'persistence-read-failed' }),
       };
     }
   };
   const openingGraphId = opening?.graphId ?? null;
-  const openingPresentationCardId = opening?.presentationCardId ?? null;
-  if (openingGraphId !== null && openingPresentationCardId !== null) {
+  const openingPresentationThingId = opening?.presentationThingId ?? null;
+  if (openingGraphId !== null && openingPresentationThingId !== null) {
     navigation.openPresentation(
       navigation.getState().selectedDiagramId,
       openingGraphId,
-      openingPresentationCardId,
+      openingPresentationThingId,
     );
   } else if (openingGraphId !== null) {
     navigation.openGraph(navigation.getState().selectedDiagramId, openingGraphId);
@@ -203,45 +203,45 @@ export const createApp = (
      * the position that module last synced to — publishing it would let this
      * decide about a position twice.
      */
-    const { addressedCardId, destinationNotFound } = useSyncExternalStore(
+    const { addressedThingId, destinationNotFound } = useSyncExternalStore(
       browserLocation.subscribe,
       browserLocation.getState,
     );
-    // Keyed on the Diagram as well as the Card: a deliberate move clears the
+    // Keyed on the Diagram as well as the Thing: a deliberate move clears the
     // published selection, and moving between two Diagrams that address
-    // the *same* Card leaves `addressedCardId` untouched, so keying on the Card
+    // the *same* Thing leaves `addressedThingId` untouched, so keying on the Thing
     // alone would let React bail out and never restore it. Clearing on `null` is
-    // the other half — an address that stops naming a Card must stop selecting
-    // one, or the Card's rail keeps offering copy commands for a Card the URL
+    // the other half — an address that stops naming a Thing must stop selecting
+    // one, or the Thing's rail keeps offering copy commands for a Thing the URL
     // has left behind.
     useEffect(() => {
       const adapter = useRenderAdapter.getState();
-      if (addressedCardId === null) {
+      if (addressedThingId === null) {
         adapter.clearSelection();
         return;
       }
-      adapter.selectCard(addressedCardId);
+      adapter.selectThing(addressedThingId);
       // Centred and focused once its projection exists — the one member that
-      // touches the camera, because a Card arrived at by URL is somewhere the
+      // touches the camera, because a Thing arrived at by URL is somewhere the
       // reader has never been. The wait is the canvas adapter's, which is what
       // replaced the component that polled the live projection for it.
       continuation.request({
-        target: { kind: 'card', cardId: addressedCardId },
+        target: { kind: 'thing', thingId: addressedThingId },
         select: false,
         then: 'reveal',
       });
-    }, [addressedCardId, selectedDiagramId]);
+    }, [addressedThingId, selectedDiagramId]);
     /**
-     * Whether a Card's content edit is running, reported up by the canvas.
+     * Whether a Thing's content edit is running, reported up by the canvas.
      *
-     * Read by one control. Presenting draws the active Card's content *instead
-     * of* the Card (`showActiveCardContent`), so a live editor cannot survive it
+     * Read by one control. Presenting draws the active Thing's content *instead
+     * of* the Thing (`showActiveThingContent`), so a live editor cannot survive it
      * and the draft would go without one of ADR 0064's four exits being spent.
-     * The two modal surfaces need nothing here: `CardPane` owns its own
+     * The two modal surfaces need nothing here: `ThingPane` owns its own
      * modality, and the editor is still there when it closes.
      */
-    const [editingCardBody, setEditingCardBody] = useState(false);
-    const [editingCardTitle, setEditingCardTitle] = useState(false);
+    const [editingThingBody, setEditingThingBody] = useState(false);
+    const [editingThingTitle, setEditingThingTitle] = useState(false);
     const [createDiagramRefusal, setCreateDiagramRefusal] = useState<AuthoringRefusal | null>(null);
     const [diagramManagementRefusal, setDiagramManagementRefusal] =
       useState<AuthoringRefusal | null>(null);
@@ -262,25 +262,25 @@ export const createApp = (
     const [graphRefusal, setGraphRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     /**
-     * Why the last Delete Card did not run, or `null`.
+     * Why the last Delete Thing did not run, or `null`.
      *
-     * The Card rail's menu reports *that* the command failed in its own label,
+     * The Thing rail's menu reports *that* the command failed in its own label,
      * which is all a two-word report can say; the reason has to be somewhere,
      * and the canvas is where the author who pressed it is looking. Same shape
      * and same place as the clipboard failure above, for the same reason: a
      * command that did not do what its label says owes the reader words.
      */
-    const [cardDeletionRefusal, setCardDeletionRefusal] = useState<string | null>(null);
+    const [thingDeletionRefusal, setThingDeletionRefusal] = useState<string | null>(null);
     /**
-     * The Card a confirmation is standing over, and the deletion it would run.
+     * The Thing a confirmation is standing over, and the deletion it would run.
      *
-     * The operation travels with the Card rather than being rebuilt when the
-     * answer comes: which Edit a deletion is depends on the kind of Card, and
+     * The operation travels with the Thing rather than being rebuilt when the
+     * answer comes: which Edit a deletion is depends on the kind of Thing, and
      * deciding that twice — once to arm the question, once to answer it — is two
      * places to get it wrong about a command with no undo behind it.
      */
-    const [pendingCardDeletion, setPendingCardDeletion] = useState<{
-      readonly card: Card;
+    const [pendingThingDeletion, setPendingThingDeletion] = useState<{
+      readonly thing: Thing;
       readonly remove: () => string | null | Promise<string | null>;
     } | null>(null);
     /**
@@ -306,9 +306,9 @@ export const createApp = (
       },
       [],
     );
-    const [cardsDrawerOpen, setCardsDrawerOpen] = useState(initialization === 'created-diagram');
-    const cardsDrag = useRef<{
-      readonly cardId: CardId;
+    const [thingsDrawerOpen, setThingsDrawerOpen] = useState(initialization === 'created-diagram');
+    const thingsDrag = useRef<{
+      readonly thingId: ThingId;
       readonly diagramId: DiagramId;
     } | null>(null);
     const renderedSpace = useMemo(
@@ -317,16 +317,16 @@ export const createApp = (
     );
 
     /**
-     * Where a Card created from a control rather than a pointer goes.
+     * Where a Thing created from a control rather than a pointer goes.
      *
      * Read at the gesture, never captured earlier: an author who pans between
      * opening the Alias picker and choosing a Target is looking somewhere else
-     * by the time the Card is placed, and the whole point of the visible centre
+     * by the time the Thing is placed, and the whole point of the visible centre
      * is that it is where they are looking now.
      */
     /**
      * **State rather than a ref, and the difference is a lint rule with a point
-     * behind it.** The reporter is installed once when the canvas's `cards`
+     * behind it.** The reporter is installed once when the canvas's `things`
      * branch mounts and withdrawn once when it unmounts (`CanvasCentre`), so
      * there is no per-frame write to keep out of React's hands — and a ref read
      * by a handler that the Command Dock's chrome object carries makes that
@@ -352,9 +352,9 @@ export const createApp = (
     const reportVisibleCentre = useCallback((centre: VisibleCentre | null) => {
       setVisibleCentre(() => centre);
     }, []);
-    // The origin is unreachable in practice — the control is withdrawn until Cards
+    // The origin is unreachable in practice — the control is withdrawn until Things
     // are on the canvas, and the reporter is mounted with them — but a created
-    // Card must land *somewhere*, and a refusal would be the wrong answer to a
+    // Thing must land *somewhere*, and a refusal would be the wrong answer to a
     // question about geometry.
     const centreAnchor = useCallback(
       (): DiagramPosition => visibleCentre?.() ?? { x: 0, y: 0 },
@@ -379,13 +379,13 @@ export const createApp = (
      * reachable from here today — named rather than trusted to stay that way.
      */
     const createAlias = useCallback(
-      ({ target, title }: Extract<CardCreationInput, { kind: 'alias' }>): CardCreationOutcome => {
+      ({ target, title }: Extract<ThingCreationInput, { kind: 'alias' }>): ThingCreationOutcome => {
         const created = authoring.complete({
           kind: 'created-alias',
           target,
           // Exactly as typed, the empty string included. The default is
-          // Authoring's: an empty title mints the same neutral `Card N` any
-          // other created Card gets (ADR 0083), so nothing here guesses a name
+          // Authoring's: an empty title mints the same neutral `Thing N` any
+          // other created Thing gets (ADR 0083), so nothing here guesses a name
           // — and normalization is the schema's rule, which Authoring applies.
           title,
           anchor: centreAnchor(),
@@ -396,32 +396,32 @@ export const createApp = (
         // compiler asks again the day a fifth joins the union.
         if (created.kind === 'queued') return { kind: 'none' };
         if (created.kind === 'unchanged') return { kind: 'none' };
-        if (created.createdCardId === undefined) return { kind: 'none' };
-        return { kind: 'created', cardId: created.createdCardId };
+        if (created.createdThingId === undefined) return { kind: 'none' };
+        return { kind: 'created', thingId: created.createdThingId };
       },
       [centreAnchor],
     );
 
     /**
-     * Making a Space Card: one coordinated Edit across Spaces (ADR 0076).
+     * Making a Space Thing: one coordinated Edit across Spaces (ADR 0076).
      *
      * There is no naming continuation. The lifecycle answers `completed` and
-     * nothing else, so the created Card has no id to select from the result,
+     * nothing else, so the created Thing has no id to select from the result,
      * and it needs none: the title was typed on the pane before the Edit ran,
-     * which is why this pane has a title field where Add Card has an inline
-     * editor. So it continues the way a cancelled pane does, at Add Card,
+     * which is why this pane has a title field where Add Thing has an inline
+     * editor. So it continues the way a cancelled pane does, at Add Thing,
      * rather than leaving focus on `<body>` when the modal unmounts.
      *
-     * The Cards the Space held before the Edit are what recognise the one it
+     * The Things the Space held before the Edit are what recognise the one it
      * added: the Edit is atomic and installs every participant at once, so
-     * exactly one Card can have appeared in this Space.
+     * exactly one Thing can have appeared in this Space.
      */
-    const createSpaceCard = useCallback(
+    const createSpaceThing = useCallback(
       async ({
         targetSpaceId,
         title,
-      }: Extract<CardCreationInput, { kind: 'space' }>): Promise<CardCreationOutcome> => {
-        // Resolved here rather than closed over: the Diagram a Space Card is added
+      }: Extract<ThingCreationInput, { kind: 'space' }>): Promise<ThingCreationOutcome> => {
+        // Resolved here rather than closed over: the Diagram a Space Thing is added
         // to is the one drawing when the author confirms, and the pane has been
         // open across renders. `create` still refuses `diagram-not-found` on its
         // own account, against the Diagram the coordinated Edit actually sees.
@@ -432,33 +432,33 @@ export const createApp = (
           title,
           position: centreAnchor(),
         };
-        const before = new Set(spaceSession.getState().working.cards.map(({ id }) => id));
+        const before = new Set(spaceSession.getState().working.things.map(({ id }) => id));
         const result = await (targetSpaceId === null
-          ? spaceCards.create(input)
-          : spaceCards.link({ ...input, targetSpaceId }));
+          ? spaceThings.create(input)
+          : spaceThings.link({ ...input, targetSpaceId }));
         if (result.kind === 'refused')
-          return { kind: 'refused', errors: presentNewSpaceCardRefusal(result.refusal) };
+          return { kind: 'refused', errors: presentNewSpaceThingRefusal(result.refusal) };
         // Named rather than narrowed to "not refused", the way `createAlias`
-        // names its own arms: a lifecycle that changed nothing made no Card, so
-        // closing the pane on it would return the author to Add Card believing
+        // names its own arms: a lifecycle that changed nothing made no Thing, so
+        // closing the pane on it would return the author to Add Thing believing
         // one exists. Not reachable from `create` or `link` today.
         if (result.kind === 'unchanged') return { kind: 'none' };
-        const created = spaceSession.getState().working.cards.find(({ id }) => !before.has(id));
-        if (created !== undefined) useRenderAdapter.getState().selectCard(created.id);
-        // `null` rather than the Card just selected: there is nothing to
+        const created = spaceSession.getState().working.things.find(({ id }) => !before.has(id));
+        if (created !== undefined) useRenderAdapter.getState().selectThing(created.id);
+        // `null` rather than the Thing just selected: there is nothing to
         // continue *at*, because the title was typed on the pane before the
-        // Edit ran, so the author goes back to Add Card.
-        return { kind: 'created', cardId: null };
+        // Edit ran, so the author goes back to Add Thing.
+        return { kind: 'created', thingId: null };
       },
       [centreAnchor],
     );
 
     /**
-     * The two ways the kinds differ, and the only two (`card-creation.ts`).
+     * The two ways the kinds differ, and the only two (`thing-creation.ts`).
      *
      * An Alias filters the Space it is already holding, so its read is
      * synchronous and its Edit is over before anything could draw a disabled
-     * control. A Space Card reads the repository and completes across Spaces,
+     * control. A Space Thing reads the repository and completes across Spaces,
      * so both of its seams answer a promise and the pane goes busy for the
      * second. Everything else about the two panes is one state machine.
      *
@@ -469,7 +469,7 @@ export const createApp = (
      * coordination itself uses for an unreadable repository, so one failure is
      * not worded two ways.
      */
-    const cardCreationSeams = useMemo<CardCreationSeams>(
+    const thingCreationSeams = useMemo<ThingCreationSeams>(
       () => ({
         readChoices: (kind) =>
           kind === 'alias'
@@ -477,22 +477,22 @@ export const createApp = (
                 choices: {
                   kind: 'alias',
                   // The single-hop rule read forwards (ADR 0009): a Target must
-                  // own its Markdown content. The Space's own Cards, not the
-                  // Diagram's — an Alias points at content, and content is not a
-                  // thing a Diagram owns.
-                  targets: currentSpace().cards.filter((card) => card.kind === 'markdown'),
+                  // own its Markdown content. The Space's own Things, not the
+                  // Diagram's — an Alias points at content, and content is not
+                  // something a Diagram owns.
+                  targets: currentSpace().things.filter((thing) => thing.kind === 'markdown'),
                 },
                 listing: null,
               }
             : readReferenceableSpaces(),
-        submit: (input) => (input.kind === 'alias' ? createAlias(input) : createSpaceCard(input)),
+        submit: (input) => (input.kind === 'alias' ? createAlias(input) : createSpaceThing(input)),
         reportBreak,
         continuation,
       }),
-      [createAlias, createSpaceCard],
+      [createAlias, createSpaceThing],
     );
-    const cardCreation = useCardCreation(cardCreationSeams);
-    const creationPane = cardCreation.state.pane;
+    const thingCreation = useThingCreation(thingCreationSeams);
+    const creationPane = thingCreation.state.pane;
     /**
      * A creation pane is open, whichever kind it is creating.
      *
@@ -502,11 +502,11 @@ export const createApp = (
      * of its call sites is how a third kind would come to be withdrawn from
      * some of them.
      */
-    const creatingCard = creationPane.status !== 'closed';
+    const creatingThing = creationPane.status !== 'closed';
     // A refusal describes the attempt; a failed listing describes the list. The
     // pane draws whichever is current on one channel, and which that is belongs
     // to the module that owns the arms.
-    const creationRefusal = cardCreationMessage(creationPane);
+    const creationRefusal = thingCreationMessage(creationPane);
 
     const selectedDiagram = useMemo(
       () => resolveDiagram(renderedSpace, selectedDiagramId),
@@ -518,13 +518,13 @@ export const createApp = (
       () => positionedStrategy(Placement.fromDiagram(selectedDiagram.diagram)),
       [selectedDiagram],
     );
-    // The Cards this Diagram places. Memoized on the same two values the Diagram
-    // is: it is the sole dependency of Edge Authoring's Card-title map and its
+    // The Things this Diagram places. Memoized on the same two values the Diagram
+    // is: it is the sole dependency of Edge Authoring's Thing-title map and its
     // endpoint choices, and a fresh array per render would rebuild both on every
     // intermediate drag frame — which is the identity churn
     // `edge-authoring-react.tsx` says its commands object must not have.
-    const placedCards = useMemo(
-      () => diagramCards(renderedSpace, selectedDiagram.diagram),
+    const placedThings = useMemo(
+      () => diagramThings(renderedSpace, selectedDiagram.diagram),
       [renderedSpace, selectedDiagram],
     );
     // Everything the canvas draws, derived once from the Space and the Diagram.
@@ -538,13 +538,13 @@ export const createApp = (
     const { activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
     useEffect(() => {
-      cardsDrag.current = null;
+      thingsDrag.current = null;
     }, [selectedDiagramId, presenting, authoringState.replacementEpoch]);
-    // There is a Card to go back to only once a traversal has left its first, and only
+    // There is a Thing to go back to only once a traversal has left its first, and only
     // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
     const selectBranch = navigation.selectBranch;
-    const activeCardId = navigation.activeCardId();
+    const activeThingId = navigation.activeThingId();
     // Derived here rather than in a store selector: the array is rebuilt on every
     // call, so a selector would hand Zustand a new identity each render — a
     // re-render producing a new value producing a re-render, until React gives up.
@@ -552,7 +552,7 @@ export const createApp = (
     // computation and **not** memoized.
     //
     // Navigation reads the session's current working Space. Authoring an Edge from
-    // the Card being presented leaves the navigation values unchanged, so deriving
+    // the Thing being presented leaves the navigation values unchanged, so deriving
     // moves during render makes the newly authored Edge immediately traversable.
     // A render-time call is not the selector case above — nothing subscribes to
     // this identity, so a fresh array cannot feed a re-render — and the work is a
@@ -570,14 +570,14 @@ export const createApp = (
     const authoredPositions = authoring.authoredPlacement();
     const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
     const selection = useRenderAdapter((s) => s.selection);
-    const selectedCardId = selectedCardOf(selection);
+    const selectedThingId = selectedThingOf(selection);
 
-    const cardsOutsideSelectedDiagram = useMemo(
+    const thingsOutsideSelectedDiagram = useMemo(
       () =>
-        renderedSpace.cards.filter(
-          (card) => selectedDiagram.diagram.positions[card.id] === undefined,
+        renderedSpace.things.filter(
+          (thing) => selectedDiagram.diagram.positions[thing.id] === undefined,
         ),
-      [selectedDiagram, renderedSpace.cards],
+      [selectedDiagram, renderedSpace.things],
     );
     const liveProjection = useRenderAdapter((s) => s.projection);
     // Reported by the canvas, which is the only place it can be seen: an
@@ -586,9 +586,9 @@ export const createApp = (
     // answers derived from it reach the command surface and the canvas in one
     // render rather than an effect apart.
     const editingEmbeddedDiagram = useRenderAdapter((s) => s.editingEmbeddedDiagram);
-    // There are Cards on the canvas to interact with once placement resolves
+    // There are Things on the canvas to interact with once placement resolves
     // and the store has taken it.
-    const hasCardsOnCanvas = liveProjection !== null;
+    const hasThingsOnCanvas = liveProjection !== null;
     /**
      * Whether a chrome name is being renamed in place.
      *
@@ -602,7 +602,7 @@ export const createApp = (
      * canvas's own title editing beside it (`authoring-availability.ts`).
      */
     const [editingChromeTitle, setEditingChromeTitle] = useState(false);
-    const cardIsOpen = Object.values(selectedDiagram.diagram.positions).some(
+    const thingIsOpen = Object.values(selectedDiagram.diagram.positions).some(
       (at) => at?.open === true,
     );
     /**
@@ -615,54 +615,54 @@ export const createApp = (
      * and a term added for one of them is added for all of them.
      */
     const availability = authoringAvailability({
-      editable: hasCardsOnCanvas,
+      editable: hasThingsOnCanvas,
       presenting,
-      creatingCard,
-      editingCardBody,
-      editingCardTitle,
-      cardIsOpen,
+      creatingThing,
+      editingThingBody,
+      editingThingTitle,
+      thingIsOpen,
       editingChromeTitle,
       spaceOnCanvas: active,
       editingEmbeddedDiagram,
     });
     // Withdrawing the drawer *closes* it rather than hiding it behind a still-true
-    // `cardsDrawerOpen`. Presenting and creating an Alias both pass through here,
+    // `thingsDrawerOpen`. Presenting and creating an Alias both pass through here,
     // and a drawer that reopened itself on the way back would take
     // focus with it — `Drawer.Popup` moves focus in on every open, so Stop would
-    // land the reader in the Cards list instead of on the canvas they returned to.
+    // land the reader in the Things list instead of on the canvas they returned to.
     //
     // Read during render rather than in an effect, like the rename guards below:
     // an effect closes it one frame after the presentation has already started
-    // drawing over it. `cardsView` is `!presenting && !creatingCard` and carries
+    // drawing over it. `thingsView` is `!presenting && !creatingThing` and carries
     // nothing derived from this flag, so setting it false here settles in one
     // pass.
-    if (cardsDrawerOpen && !availability.cardsView) setCardsDrawerOpen(false);
+    if (thingsDrawerOpen && !availability.thingsView) setThingsDrawerOpen(false);
     // Reveals the drawer once per (Diagram, address) rather than on every
     // dependency change: an unrelated edit elsewhere in the Space still
-    // recomputes `cardsOutsideSelectedDiagram` with a fresh array identity, and
+    // recomputes `thingsOutsideSelectedDiagram` with a fresh array identity, and
     // re-running on that alone would reopen a drawer the reader just closed.
-    // The Diagram is part of the key, not just the Card id — a canonical Card
-    // link addresses no Diagram of its own, so the same Card can be
+    // The Diagram is part of the key, not just the Thing id — a canonical Thing
+    // link addresses no Diagram of its own, so the same Thing can be
     // revealed once in one Diagram and then adopt a different default Diagram
     // that omits it, and that is a second reveal rather than a repeat.
     const [revealedAddress, setRevealedAddress] = useState<{
       readonly diagramId: DiagramId;
-      readonly cardId: CardId;
+      readonly thingId: ThingId;
     } | null>(null);
-    if (addressedCardId === null) {
+    if (addressedThingId === null) {
       // Only a real navigation clears the address — choosing a Diagram,
-      // activating a Graph, or restoring a destination that names no Card — so
+      // activating a Graph, or restoring a destination that names no Thing — so
       // leaving it is the reader moving on rather than the incidental
       // recomputation this guard absorbs. Arriving back at the same address
       // afterwards is a fresh reveal, not the repeat being suppressed.
       if (revealedAddress !== null) setRevealedAddress(null);
     } else if (
       revealedAddress?.diagramId !== selectedDiagramId ||
-      revealedAddress.cardId !== addressedCardId
+      revealedAddress.thingId !== addressedThingId
     ) {
-      setRevealedAddress({ diagramId: selectedDiagramId, cardId: addressedCardId });
-      if (cardsOutsideSelectedDiagram.some(({ id }) => id === addressedCardId)) {
-        setCardsDrawerOpen(true);
+      setRevealedAddress({ diagramId: selectedDiagramId, thingId: addressedThingId });
+      if (thingsOutsideSelectedDiagram.some(({ id }) => id === addressedThingId)) {
+        setThingsDrawerOpen(true);
       }
     }
     const moved = useRenderAdapter((s) => s.moved);
@@ -673,7 +673,7 @@ export const createApp = (
     );
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
 
-    // Nothing is worth projecting before a strategy resolves — every card would
+    // Nothing is worth projecting before a strategy resolves — every thing would
     // sit at the origin — and `project` will not take a null `LayoutStrategyGraph`,
     // so this is the whole of that gate rather than a rule the sync effect
     // remembers.
@@ -683,16 +683,16 @@ export const createApp = (
           ? null
           : projection.project(laidOut, {
               activeGraphId,
-              activeCardId,
-              selectedCardId,
+              activeThingId,
+              selectedThingId,
               presenting,
               moved,
             }),
-      [projection, laidOut, activeGraphId, activeCardId, selectedCardId, presenting, moved],
+      [projection, laidOut, activeGraphId, activeThingId, selectedThingId, presenting, moved],
     );
 
     // Hand the complete projection to the render adapter as one state change.
-    // A Card keeps its live position, measured size and drag state, while an Edge
+    // A Thing keeps its live position, measured size and drag state, while an Edge
     // can never become visible before the endpoint nodes declare its handles.
     const syncProjection = useRenderAdapter((s) => s.syncProjection);
     useEffect(() => {
@@ -701,18 +701,18 @@ export const createApp = (
 
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
-    const cardResize = useRenderAdapter((s) => s.cardResize);
+    const thingResize = useRenderAdapter((s) => s.thingResize);
     const reportEmbeddedDiagramEditing = useRenderAdapter((s) => s.reportEmbeddedDiagramEditing);
-    const canvas = canvasContent(placement, hasCardsOnCanvas);
+    const canvas = canvasContent(placement, hasThingsOnCanvas);
     // Every standing refusal is about the Diagram that was selected when it was
     // refused — the Edit New Diagram would have made, the Rename or Delete on
-    // the one it named, the Graph Edit inside it, the Card it would not remove
+    // the one it named, the Graph Edit inside it, the Thing it would not remove
     // from it. None of them says anything about the Diagram the reader has moved
     // to, so the move clears them together, during the render that moves rather
     // than one frame after it.
     //
-    // The Card deletion refusal was outside this and cleared only when the next
-    // Delete Card was armed, so a refused deletion stayed pinned to the shell
+    // The Thing deletion refusal was outside this and cleared only when the next
+    // Delete Thing was armed, so a refused deletion stayed pinned to the shell
     // through Diagram switches and unrelated Edits until someone pressed Delete
     // again.
     const [refusedUnder, setRefusedUnder] = useState(selectedDiagramId);
@@ -721,7 +721,7 @@ export const createApp = (
       setCreateDiagramRefusal(null);
       setDiagramManagementRefusal(null);
       setGraphRefusal(null);
-      setCardDeletionRefusal(null);
+      setThingDeletionRefusal(null);
     }
     /**
      * The two facts that end a chrome rename that is not the author ending it,
@@ -746,8 +746,8 @@ export const createApp = (
      * things and reading them as one is what left the defect. The editor is the
      * bar's own rename slot, so the epoch is *also* handed to the Dock
      * (`replacementEpoch` below) and the slot ends the rename on it. What
-     * this branch still owes is that the withdrawal it drives — Create Card,
-     * Present, Delete Card, the canvas's own title editing — comes back in the
+     * this branch still owes is that the withdrawal it drives — Create Thing,
+     * Present, Delete Thing, the canvas's own title editing — comes back in the
      * same render as the replacement rather than on the commit after, when the
      * name control's effect cleanup would otherwise report it.
      */
@@ -783,11 +783,11 @@ export const createApp = (
     /**
      * **Rebuilt every render, and memoizing it is not the fix.**
      *
-     * `cardRailActions` below hangs off this and is a dependency of the
-     * node-decoration memo in `canvas-card-authoring.ts`, so a fresh builder
-     * rebuilds every node object, re-renders every `CardNode` and runs
-     * `spaceEntityActions` once per Card — on renders that touch nothing on the
-     * canvas, the Cards drawer opening among them. `SpaceCanvas`'s own note
+     * `thingRailActions` below hangs off this and is a dependency of the
+     * node-decoration memo in `canvas-thing-authoring.ts`, so a fresh builder
+     * rebuilds every node object, re-renders every `ThingNode` and runs
+     * `spaceEntityActions` once per Thing — on renders that touch nothing on the
+     * canvas, the Things drawer opening among them. `SpaceCanvas`'s own note
      * measures that and calls the widening harmless.
      *
      * Wrapping both builders in `useMemo` was tried and reverted: with the
@@ -806,7 +806,7 @@ export const createApp = (
       // No Rename item: the Dock renames a Diagram and a Graph by clicking the
       // name it already draws, so a menu row that opened the same editor would
       // be the second path to one command this arrangement keeps removing. The
-      // Card rail is this builder's other consumer and a Card has no rename here
+      // Thing rail is this builder's other consumer and a Thing has no rename here
       // either — its title is renamed in place on the canvas.
       onRename: null,
       onDeleteDiagram: availability.entityEdits
@@ -822,15 +822,15 @@ export const createApp = (
     });
 
     /**
-     * Deleting one Card, answering a refusal in words rather than a code.
+     * Deleting one Thing, answering a refusal in words rather than a code.
      *
-     * Two paths, because deleting a Space Card is a different Edit.
+     * Two paths, because deleting a Space Thing is a different Edit.
      *
-     * An ordinary Card is removed from one Space, which is Space Authoring's. A
-     * Space Card owns its target's lifetime together with every other reference
+     * An ordinary Thing is removed from one Space, which is Space Authoring's. A
+     * Space Thing owns its target's lifetime together with every other reference
      * to it, so deleting one can delete that Space and every Space below it that
      * nothing else references — one atomic Edit over coordinated per-Space
-     * sessions, which is the Space Card lifecycle's and not a single-Space
+     * sessions, which is the Space Thing lifecycle's and not a single-Space
      * update this seam could make (ADR 0074, ADR 0076). Space Authoring refuses
      * it on its own account, so the choice is made here rather than discovered
      * there.
@@ -838,60 +838,60 @@ export const createApp = (
      * It answers the *operation* rather than performing the deletion, because
      * the two surfaces that spend it need different things from it: the Space's
      * command surface hands it to a confirmation that calls it later, and the
-     * Card's own rail runs it on the press. Which kind of Card it is stays a
+     * Thing's own rail runs it on the press. Which kind of Thing it is stays a
      * decision made once, here, for both.
      */
-    const cardDeletion = (card: Card): (() => string | null | Promise<string | null>) =>
-      card.kind === 'space'
+    const thingDeletion = (thing: Thing): (() => string | null | Promise<string | null>) =>
+      thing.kind === 'space'
         ? async () => {
-            const result = await spaceCards.delete({
+            const result = await spaceThings.delete({
               containingSpaceId: renderedSpace.id,
-              cardId: card.id,
+              thingId: thing.id,
             });
-            return result.kind === 'refused' ? describeSpaceCardRefusal(result.refusal) : null;
+            return result.kind === 'refused' ? describeSpaceThingRefusal(result.refusal) : null;
           }
         : () => {
-            const result = authoring.complete({ kind: 'deleted-card', cardId: card.id });
+            const result = authoring.complete({ kind: 'deleted-thing', thingId: thing.id });
             return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
           };
 
     /**
-     * What a Card's own rail offers (ADR 0073): the addresses every Card has,
+     * What a Thing's own rail offers (ADR 0073): the addresses every Thing has,
      * and the deletion that used to be reachable only from the Space's command
      * surface.
      *
      * The addresses are `spaceEntityActions`' answer and nothing else — the
-     * same menu the Space's surface builds for the same entity, so the Card's
+     * same menu the Space's surface builds for the same entity, so the Thing's
      * two links cannot come to mean different things on the two surfaces. What
-     * is appended here is the one command that is a Card's own rather than an
-     * address: a Card's deletion belongs to the Card, and the Space's surface is
-     * where it was only because the Card had no menu of its own.
+     * is appended here is the one command that is a Thing's own rather than an
+     * address: a Thing's deletion belongs to the Thing, and the Space's surface is
+     * where it was only because the Thing had no menu of its own.
      *
-     * A Card the drawing Diagram does not place still has commands — its own
+     * A Thing the drawing Diagram does not place still has commands — its own
      * permanent address — so nothing here reads `diagram.positions`; which
      * addresses exist is decided from the Diagram by the builder above.
      */
-    const cardRailActions = (cardId: CardId): readonly EntityActionGroup[] => {
-      const card = renderedSpace.lookup.card(cardId);
-      // A node the projection is still drawing for a Card the working Space no
+    const thingRailActions = (thingId: ThingId): readonly EntityActionGroup[] => {
+      const thing = renderedSpace.lookup.thing(thingId);
+      // A node the projection is still drawing for a Thing the working Space no
       // longer has. No commands rather than commands that name nothing.
-      if (card === undefined) return [];
-      const addresses = entityActions({ kind: 'card', card, diagram: selectedDiagram.diagram });
-      if (!availability.deleteCard) return addresses;
-      const remove = cardDeletion(card);
+      if (thing === undefined) return [];
+      const addresses = entityActions({ kind: 'thing', thing, diagram: selectedDiagram.diagram });
+      if (!availability.deleteThing) return addresses;
+      const remove = thingDeletion(thing);
       return [
         ...addresses,
         [
           {
-            id: 'delete-card',
-            // "Delete Card", not "Delete Card <title>": the menu that draws
-            // this item is already named for the Card it belongs to, and the
+            id: 'delete-thing',
+            // "Delete Thing", not "Delete Thing <title>": the menu that draws
+            // this item is already named for the Thing it belongs to, and the
             // Diagram menu's own destructive command is spelled the same way.
-            label: 'Delete Card',
+            label: 'Delete Thing',
             icon: <DeleteIcon />,
             variant: 'destructive',
-            // **It asks, and the confirmation runs it.** Deleting a Card is
-            // not undoable in V1, and deleting a Space Card can take the Space
+            // **It asks, and the confirmation runs it.** Deleting a Thing is
+            // not undoable in V1, and deleting a Space Thing can take the Space
             // it references and every Space below it that nothing else
             // references (ADR 0074) — so the command that used to sit behind
             // the Sidebar's own `AlertDialog` keeps one. The dialog is drawn
@@ -902,14 +902,14 @@ export const createApp = (
             // **And it carries no `report`.** An item that names words has
             // its menu held open and its label swapped to the word its
             // outcome picks — machinery for a command that *runs* on the
-            // press. This one raises a question, so `done` said "Card deleted"
+            // press. This one raises a question, so `done` said "Thing deleted"
             // beside a dialog still asking whether to, and announced it to a
             // reader who might then press Cancel. What the deletion did is the
             // canvas's to report; why it did not is the confirmation's, which
             // prints it into the shell's standing notice.
             onSelect: (): EntityActionOutcome => {
-              setCardDeletionRefusal(null);
-              setPendingCardDeletion({ card, remove });
+              setThingDeletionRefusal(null);
+              setPendingThingDeletion({ thing, remove });
               return 'done';
             },
           },
@@ -948,16 +948,16 @@ export const createApp = (
       return () => window.removeEventListener('beforeunload', onBeforeUnload);
     }, [sessionState.persistence.kind]);
 
-    const activeGraphCardIds = useMemo(
-      () => new Set(activeGraphId === null ? [] : graphCardIds(renderedSpace, activeGraphId)),
+    const activeGraphThingIds = useMemo(
+      () => new Set(activeGraphId === null ? [] : graphThingIds(renderedSpace, activeGraphId)),
       [renderedSpace, activeGraphId],
     );
 
     // The two selection writes the canvas makes that are not React Flow's own —
-    // continuing at a connected Card, and the focus-to-selection bridge for an
+    // continuing at a connected Thing, and the focus-to-selection bridge for an
     // Edge. Both are plain store writes with nothing to decide.
-    const selectCard = useCallback((cardId: CardId) => {
-      useRenderAdapter.getState().selectCard(cardId);
+    const selectThing = useCallback((thingId: ThingId) => {
+      useRenderAdapter.getState().selectThing(thingId);
     }, []);
 
     const selectEdge = useCallback((subject: EdgeSubject) => {
@@ -967,28 +967,28 @@ export const createApp = (
     /**
      * The refusal goes back to the caller, and only the caller can place it.
      *
-     * Both `added-card-to-diagram` outcomes this can produce
-     * (`card-already-in-diagram`, `card-not-found`) mean the Card just left
-     * `cardsOutsideSelectedDiagram`, so the row the reader activated is already
+     * Both `added-thing-to-diagram` outcomes this can produce
+     * (`thing-already-in-diagram`, `thing-not-found`) mean the Thing just left
+     * `thingsOutsideSelectedDiagram`, so the row the reader activated is already
      * gone. The drawer is still on screen though, and it is the surface that
      * asked — so it keeps the sentence, in the `Alert` above its list.
      *
-     * `dropExistingCard` below discards the same string on purpose: a drop
-     * ends on the canvas, and by then the drawer that named the Card may be
+     * `dropExistingThing` below discards the same string on purpose: a drop
+     * ends on the canvas, and by then the drawer that named the Thing may be
      * dismissed, leaving nowhere the sentence belongs.
      */
-    const addExistingCard = useCallback(
-      (cardId: CardId, anchor: DiagramPosition, focus: boolean): string | null => {
-        const result = authoring.complete({ kind: 'added-card-to-diagram', cardId, anchor });
+    const addExistingThing = useCallback(
+      (thingId: ThingId, anchor: DiagramPosition, focus: boolean): string | null => {
+        const result = authoring.complete({ kind: 'added-thing-to-diagram', thingId, anchor });
         if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
         if (result.kind !== 'completed') return null;
-        useRenderAdapter.getState().selectCard(cardId);
-        // The Card is not drawn yet — the projection carrying this Edit arrives
+        useRenderAdapter.getState().selectThing(thingId);
+        // The Thing is not drawn yet — the projection carrying this Edit arrives
         // a strategy later — so the continuation waits for it rather than this
         // component polling the live projection, which is what it used to do.
         if (focus) {
           continuation.request({
-            target: { kind: 'card', cardId },
+            target: { kind: 'thing', thingId },
             select: false,
             then: 'focus',
           });
@@ -998,18 +998,18 @@ export const createApp = (
       [],
     );
 
-    const dropExistingCard = useCallback(
-      (cardId: CardId, anchor: DiagramPosition): void => {
-        const drag = cardsDrag.current;
-        cardsDrag.current = null;
-        if (drag?.cardId !== cardId || drag.diagramId !== selectedDiagramId) return;
-        addExistingCard(cardId, anchor, false);
+    const dropExistingThing = useCallback(
+      (thingId: ThingId, anchor: DiagramPosition): void => {
+        const drag = thingsDrag.current;
+        thingsDrag.current = null;
+        if (drag?.thingId !== thingId || drag.diagramId !== selectedDiagramId) return;
+        addExistingThing(thingId, anchor, false);
       },
-      [addExistingCard, selectedDiagramId],
+      [addExistingThing, selectedDiagramId],
     );
 
     /**
-     * Add Card: one completed Edit, and then the naming continuation.
+     * Add Thing: one completed Edit, and then the naming continuation.
      *
      * **This is the one operation whose refusal no surface shows, and that is a
      * decision rather than an oversight** — the asymmetry with `createAlias`
@@ -1017,39 +1017,39 @@ export const createApp = (
      * sentence for the author (ADR 0042), which is worth showing exactly where
      * the author can act on it: the Alias pane keeps its own open because both
      * of its refusals are about the Target just chosen, and the field that
-     * answers them is on screen. Add Card takes no input at all. It completes on
+     * answers them is on screen. Add Thing takes no input at all. It completes on
      * one activation, from a toolbar button and a keystroke, and leaves nothing
      * standing that a sentence could correct.
      *
      * The toolbar remains available for an empty authored Diagram: it is the
-     * zero-Card Space's way to create the first Card. Canvas-local authoring is
-     * still gated on a resolved placement — `hasCardsOnCanvas`, which reaches
+     * zero-Thing Space's way to create the first Thing. Canvas-local authoring is
+     * still gated on a resolved placement — `hasThingsOnCanvas`, which reaches
      * the canvas as `availability.authorOnCanvas` — because there is no
-     * projected node surface to receive its shortcut until that first Card
+     * projected node surface to receive its shortcut until that first Thing
      * exists.
      *
      * What that argument does *not* license is a catch-all, so each outcome is
-     * named below. If Add Card ever grows an input — a kind, a title, a
+     * named below. If Add Thing ever grows an input — a kind, a title, a
      * placement mode — it grows a surface with it, and the refusal goes there.
      */
-    const addCard = useCallback(() => {
-      const created = authoring.complete({ kind: 'created-card', anchor: centreAnchor() });
+    const addThing = useCallback(() => {
+      const created = authoring.complete({ kind: 'created-thing', anchor: centreAnchor() });
       // Each outcome named rather than caught. `refused` is the paragraph
       // above. `queued` is an Edit that will still be performed, whose
-      // projection draws the Card without help from here. `unchanged` this
+      // projection draws the Thing without help from here. `unchanged` this
       // operation cannot answer — it mints unconditionally — but the shared
       // completion union carries it, so it is narrowed rather than asserted
       // away, and the day one of these grows an answer the compiler asks here.
       if (created.kind === 'refused') return;
       if (created.kind === 'queued') return;
       if (created.kind === 'unchanged') return;
-      if (created.createdCardId === undefined) return;
-      // Selected as well as named: the storyboard's created Card is the selected
-      // one, so continued authoring — a connection, a second Card — carries on
+      if (created.createdThingId === undefined) return;
+      // Selected as well as named: the storyboard's created Thing is the selected
+      // one, so continued authoring — a connection, a second Thing — carries on
       // from it. Both are the one continuation, spent when the projection that
-      // draws the Card arrives.
+      // draws the Thing arrives.
       continuation.request({
-        target: { kind: 'card', cardId: created.createdCardId },
+        target: { kind: 'thing', thingId: created.createdThingId },
         select: true,
         then: 'rename',
       });
@@ -1065,24 +1065,24 @@ export const createApp = (
      * whether or not the surface that began it is still mounted, and closing
      * here would make exactly that abandonment through a route the pane cannot
      * refuse. Presenting is reachable from under a modal pane in one way — Back
-     * onto a presenting Card URL is a browser navigation, and `popstate` does
+     * onto a presenting Thing URL is a browser navigation, and `popstate` does
      * not consult a focus trap. The completion leaves `submitting`, which runs
      * this again and takes the pane away then.
      */
     useEffect(() => {
-      if (presenting) cardCreation.withdraw();
-    }, [presenting, cardCreation]);
+      if (presenting) thingCreation.withdraw();
+    }, [presenting, thingCreation]);
     /**
      * A replacement takes a creation pane away too (ADR 0042).
      *
      * Reachable under the modal: a conflict draws its `AlertDialog` over
      * everything, so Accept stored Space is pressable with the pane up. The
      * pane's choices are read once per opening, so one left standing would go
-     * on offering Cards from the Space that is gone and refuse every one of
+     * on offering Things from the Space that is gone and refuse every one of
      * them against a row still on screen.
      *
      * A transition read during render rather than an effect, the way
-     * `canvas-card-authoring.ts` reads `nameOnCreation`: `cardCreation` is a
+     * `canvas-thing-authoring.ts` reads `nameOnCreation`: `thingCreation` is a
      * new object on every dispatch, so an effect would need either the epoch
      * alone as its dependency — the one `exhaustive-deps` suppression in the
      * repository — or the operations, which would close the pane the render
@@ -1091,12 +1091,12 @@ export const createApp = (
     const [replacedAt, setReplacedAt] = useState(authoringState.replacementEpoch);
     if (replacedAt !== authoringState.replacementEpoch) {
       setReplacedAt(authoringState.replacementEpoch);
-      cardCreation.discard();
+      thingCreation.discard();
     }
     /**
-     * The Card whose inline Title editor a creation opens.
+     * The Thing whose inline Title editor a creation opens.
      *
-     * `rename` reaches `CanvasCard` as a prop rather than through the module:
+     * `rename` reaches `CanvasThing` as a prop rather than through the module:
      * `@project/ui` owns that editor and depends only on `core`, so it cannot
      * import this — and it should not. A component refocusing its own control
      * after its own edit is genuine locality.
@@ -1106,22 +1106,25 @@ export const createApp = (
       continuation.getState,
     ).pending;
     const nameOnCreation =
-      pendingContinuation?.then === 'rename' && pendingContinuation.target.kind === 'card'
-        ? pendingContinuation.target.cardId
+      pendingContinuation?.then === 'rename' && pendingContinuation.target.kind === 'thing'
+        ? pendingContinuation.target.thingId
         : null;
 
     // Scans every title in the Space, so it must not re-run on every drag
     // frame — `projection` (and this component) re-renders on each
     // intermediate drag position, but `sessionState.working` only changes on
     // a completed Edit.
-    const newCardTitle = useMemo(() => nextCardTitle(sessionState.working), [sessionState.working]);
-    // One read per set of referenced Spaces, shared by the canvas and the Cards
-    // collection so a Space Card names the same Space wherever it is drawn.
-    const readSpaceCardTarget = useCallback((spaceId: UUID) => spaceCards.target(spaceId), []);
-    const spaceCardTargets = useSpaceCardTargets(renderedSpace.cards, readSpaceCardTarget);
+    const newThingTitle = useMemo(
+      () => nextThingTitle(sessionState.working),
+      [sessionState.working],
+    );
+    // One read per set of referenced Spaces, shared by the canvas and the Things
+    // collection so a Space Thing names the same Space wherever it is drawn.
+    const readSpaceThingTarget = useCallback((spaceId: UUID) => spaceThings.target(spaceId), []);
+    const spaceThingTargets = useSpaceThingTargets(renderedSpace.things, readSpaceThingTarget);
     const spaceTitleById = useMemo(
-      () => new Map([...spaceCardTargets].map(([id, target]) => [id, target.title])),
-      [spaceCardTargets],
+      () => new Map([...spaceThingTargets].map(([id, target]) => [id, target.title])),
+      [spaceThingTargets],
     );
     // Inactive Spaces keep their traversal mounted without receiving global keys.
     usePresentingKeys(active && presenting, {
@@ -1240,7 +1243,7 @@ export const createApp = (
      * own.
      *
      * The Dock's Diagram, Graph and Space clusters are menus with a radio group in
-     * them, so they cannot render an `EntityActionGroup[]` whole the way a Card's
+     * them, so they cannot render an `EntityActionGroup[]` whole the way a Thing's
      * rail does — but *which* address each entity offers is a decision this
      * application makes once, in `entity-actions.tsx`. This reads that decision
      * out by id rather than rebuilding the destination beside it, so the two
@@ -1292,7 +1295,7 @@ export const createApp = (
               // rather than one this surface can settle.
               onRename: null,
               onCopyLink: runEntityCommand({ kind: 'space' }, COPY_LINK_ACTION_ID),
-              onNewSpace: () => cardCreation.open('space'),
+              onNewSpace: () => thingCreation.open('space'),
               onSwitchTo: (spaceId) => {
                 if (spaces === null) return;
                 const title =
@@ -1334,7 +1337,7 @@ export const createApp = (
                 const result = authoring.complete({ kind: 'created-diagram' });
                 setCreateDiagramRefusal(result.kind === 'refused' ? result.refusal : null);
                 setDiagramManagementRefusal(null);
-                if (result.kind === 'completed') setCardsDrawerOpen(true);
+                if (result.kind === 'completed') setThingsDrawerOpen(true);
               },
               // The Dock's Delete names the Diagram its cluster is showing, which is
               // the drawing one — resolved from the id it hands back rather than
@@ -1396,7 +1399,7 @@ export const createApp = (
               presentDisabled:
                 !presenting && (!availability.present || activeGraph.edges.length === 0),
             },
-            cards: {
+            things: {
               /* Trigger and panel are one component: only the trigger draws in the
            cluster, the drawer portalling its popup over the canvas. That is what
            stops the toggle's `disabled` and the surface it names from drifting
@@ -1404,32 +1407,32 @@ export const createApp = (
            trigger takes the Dock's own name treatment so the word lands in the
            column the other three names land in. */
               surface: (
-                <CardsDrawer
-                  open={cardsDrawerOpen}
-                  onOpenChange={setCardsDrawerOpen}
-                  disabled={!availability.cardsView}
-                  triggerRender={<ToolbarButton variant="ghost" {...CARDS_TRIGGER} />}
-                  triggerLabel={<CardsTrigger />}
-                  cards={cardsOutsideSelectedDiagram}
-                  allCards={renderedSpace.cards}
+                <ThingsDrawer
+                  open={thingsDrawerOpen}
+                  onOpenChange={setThingsDrawerOpen}
+                  disabled={!availability.thingsView}
+                  triggerRender={<ToolbarButton variant="ghost" {...THINGS_TRIGGER} />}
+                  triggerLabel={<ThingsTrigger />}
+                  things={thingsOutsideSelectedDiagram}
+                  allThings={renderedSpace.things}
                   spaceTitleById={spaceTitleById}
-                  onAdd={(card, activation) =>
-                    addExistingCard(card.id, centreAnchor(), activation === 'keyboard')
+                  onAdd={(thing, activation) =>
+                    addExistingThing(thing.id, centreAnchor(), activation === 'keyboard')
                   }
-                  onDragStart={(cardId) => {
-                    cardsDrag.current = { cardId, diagramId: selectedDiagramId };
+                  onDragStart={(thingId) => {
+                    thingsDrag.current = { thingId, diagramId: selectedDiagramId };
                   }}
                   onDragEnd={() => {
-                    cardsDrag.current = null;
+                    thingsDrag.current = null;
                   }}
-                  revealedCardId={addressedCardId}
+                  revealedThingId={addressedThingId}
                 />
               ),
               onCreate: (kind) => {
-                if (kind === 'markdown') addCard();
-                else cardCreation.open(kind);
+                if (kind === 'markdown') addThing();
+                else thingCreation.open(kind);
               },
-              createDisabled: !availability.addCard,
+              createDisabled: !availability.addThing,
             },
             persistence: {
               state: sessionState.persistence,
@@ -1446,7 +1449,7 @@ export const createApp = (
         // Graph key and a standing notice are all pinned to that same edge. The
         // shell yields exactly the panel's own width so the three stay beside it
         // rather than behind it — `DRAWER_WIDTH` is the one place that number is.
-        insetEnd={cardsDrawerOpen ? DRAWER_WIDTH : undefined}
+        insetEnd={thingsDrawerOpen ? DRAWER_WIDTH : undefined}
         notice={
           <>
             {clipboardFailure === null ? null : (
@@ -1454,9 +1457,12 @@ export const createApp = (
                 {clipboardFailure}
               </ShellNotice>
             )}
-            {cardDeletionRefusal === null ? null : (
-              <ShellNotice title="Card not deleted" onDismiss={() => setCardDeletionRefusal(null)}>
-                {cardDeletionRefusal}
+            {thingDeletionRefusal === null ? null : (
+              <ShellNotice
+                title="Thing not deleted"
+                onDismiss={() => setThingDeletionRefusal(null)}
+              >
+                {thingDeletionRefusal}
               </ShellNotice>
             )}
             {diagramRefusal === null ? null : (
@@ -1496,7 +1502,7 @@ export const createApp = (
                 stale location to be corrected (`browser-location.ts`), so a
                 dismissal would be a move dressed as an acknowledgement. It is
                 answered by the first move the reader makes — including opening
-                a Card on the canvas, which the notice never covers. */}
+                a Thing on the canvas, which the notice never covers. */}
             {destinationNotFound ? (
               <Alert variant="destructive">
                 <AlertIcon />
@@ -1528,18 +1534,18 @@ export const createApp = (
             ? 'Persisted'
             : sessionState.persistence.kind}
         </span>
-        {pendingCardDeletion === null ? null : (
-          <DeleteCardConfirmation
-            card={pendingCardDeletion.card}
-            onDelete={pendingCardDeletion.remove}
-            onDismiss={() => setPendingCardDeletion(null)}
-            onRefused={setCardDeletionRefusal}
+        {pendingThingDeletion === null ? null : (
+          <DeleteThingConfirmation
+            thing={pendingThingDeletion.thing}
+            onDelete={pendingThingDeletion.remove}
+            onDismiss={() => setPendingThingDeletion(null)}
+            onRefused={setThingDeletionRefusal}
           />
         )}
-        {/* One child, not a row: the Cards drawer portals over this rather than
+        {/* One child, not a row: the Things drawer portals over this rather than
             sitting beside it, so a toggle that says nothing about the Diagram no
-            longer re-flows the canvas and re-measures every Card on it. */}
-        <div ref={graphArea} className="graph-area size-full min-w-0" style={cardSizeVars}>
+            longer re-flows the canvas and re-measures every Thing on it. */}
+        <div ref={graphArea} className="graph-area size-full min-w-0" style={thingSizeVars}>
           {/* **The Space's one command surface, over the canvas rather than
               beside it** (ADR 0082). It docks to this element: the twelve slots
               are its edges and stops, and every measurement the drag makes is
@@ -1555,7 +1561,7 @@ export const createApp = (
           )}
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />
-          ) : canvas.kind === 'cards' ? (
+          ) : canvas.kind === 'things' ? (
             <ReactFlowProvider>
               {/* Inside the provider and outside the canvas: it reads React
                   Flow's viewport for controls that live in the toolbar and in
@@ -1567,55 +1573,55 @@ export const createApp = (
                   provider because `reveal` moves the camera and because an Edge
                   subject becomes an element only through the projection React
                   Flow is drawing. Its chrome half is mounted at the root, since
-                  this subtree is conditional on there being Cards at all. */}
+                  this subtree is conditional on there being Things at all. */}
               <CanvasContinuation
                 continuation={continuation}
-                onSelectCard={selectCard}
+                onSelectThing={selectThing}
                 onSelectEdge={selectEdge}
               />
               <SpaceCanvas
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but
-                // an open title editor is the graph's own: it names a Card from
+                // an open title editor is the graph's own: it names a Thing from
                 // a Space that is gone, and its raised invalid guard would go on
                 // swallowing clicks in the one that replaced it.
                 key={authoringState.replacementEpoch}
                 nodes={liveProjection?.nodes ?? []}
                 edges={liveProjection?.edges ?? []}
                 // Null while a replacement placement resolves. The canvas keeps
-                // drawing the Cards on screen through that window — deliberately, so
+                // drawing the Things on screen through that window — deliberately, so
                 // a gesture is never interrupted — so a connection is reachable
                 // with no fresh projection to hand over, and the store keeps its
                 // live nodes rather than reconciling against nothing.
                 projectedNodes={projected?.nodes ?? null}
-                activeCardId={activeCardId}
+                activeThingId={activeThingId}
                 presenting={presenting}
-                placementReady={hasCardsOnCanvas}
+                placementReady={hasThingsOnCanvas}
                 availability={availability}
                 onNodesChange={changeNodes}
                 onEdgesChange={changeEdges}
                 edgeAuthoring={edgeAuthoring}
                 selection={selection}
-                onSelectCard={selectCard}
+                onSelectThing={selectThing}
                 onSelectEdge={selectEdge}
-                placedCards={placedCards}
-                newCardTitle={newCardTitle}
-                onAddCard={addCard}
-                onAddExistingCard={dropExistingCard}
+                placedThings={placedThings}
+                newThingTitle={newThingTitle}
+                onAddThing={addThing}
+                onAddExistingThing={dropExistingThing}
                 nameOnCreation={nameOnCreation}
                 authoring={authoring}
                 spaceSession={spaceSession}
-                onBodyEditingChange={setEditingCardBody}
-                onTitleEditingChange={setEditingCardTitle}
-                cardResize={cardResize}
+                onBodyEditingChange={setEditingThingBody}
+                onTitleEditingChange={setEditingThingTitle}
+                thingResize={thingResize}
                 reportEmbeddedDiagramEditing={reportEmbeddedDiagramEditing}
                 graphs={projection.visibleGraphs}
                 colorByGraphId={projection.colors}
                 activeGraphId={activeGraphId}
-                activeGraphCardIds={activeGraphCardIds}
-                spaceCardTargets={spaceCardTargets}
-                cardEntityActions={cardRailActions}
+                activeGraphThingIds={activeGraphThingIds}
+                spaceThingTargets={spaceThingTargets}
+                thingEntityActions={thingRailActions}
               />
             </ReactFlowProvider>
           ) : (
@@ -1631,7 +1637,7 @@ export const createApp = (
               onRetreat={retreat}
               onExit={exitPresenting}
               onCopyLink={() => {
-                if (activeGraphId === null || activeCardId === null) return;
+                if (activeGraphId === null || activeThingId === null) return;
                 // `void`: presenting chrome's Copy link is a plain button with
                 // no label to swap, so it has nothing to do with the outcome
                 // beyond the alert `copyProductDestination` already renders.
@@ -1640,7 +1646,7 @@ export const createApp = (
                   spaceId: renderedSpace.id,
                   diagramId: selectedDiagramId,
                   graphId: activeGraphId,
-                  cardId: activeCardId,
+                  thingId: activeThingId,
                 });
               }}
             />
@@ -1650,22 +1656,22 @@ export const createApp = (
             <NewAlias
               targets={creationPane.choices.targets}
               refusal={creationRefusal}
-              onCreate={(target, title) => cardCreation.submit({ kind: 'alias', target, title })}
-              onCancel={cardCreation.cancel}
-              onRefusalStale={cardCreation.refusalStale}
+              onCreate={(target, title) => thingCreation.submit({ kind: 'alias', target, title })}
+              onCancel={thingCreation.cancel}
+              onRefusalStale={thingCreation.refusalStale}
             />
           )}
 
           {creationPane.status !== 'closed' && creationPane.choices.kind === 'space' && (
-            <NewSpaceCard
+            <NewSpaceThing
               targets={creationPane.choices.targets}
               refusal={creationRefusal}
               busy={creationPane.status === 'submitting'}
               onCreate={(targetSpaceId, title) =>
-                cardCreation.submit({ kind: 'space', targetSpaceId, title })
+                thingCreation.submit({ kind: 'space', targetSpaceId, title })
               }
-              onCancel={cardCreation.cancel}
-              onRefusalStale={cardCreation.refusalStale}
+              onCancel={thingCreation.cancel}
+              onRefusalStale={thingCreation.refusalStale}
             />
           )}
         </div>

@@ -1,8 +1,8 @@
 import {
   newUuid,
   uuidSchema,
-  type CardPlacement,
-  type CardId,
+  type ThingPlacement,
+  type ThingId,
   type GraphEdge,
   type GraphId,
   type SpaceSnapshot,
@@ -43,16 +43,16 @@ const loaded = (result: LoadSpaceResult | LoadSpaceSnapshotResult): Space => {
   return result.space;
 };
 
-const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const CARD_D = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const CARD_E = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
+const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const THING_D = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const THING_E = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 
-/** Five Cards in a row. The sidebar draws none of them; the geometry only has to be legal. */
-const SPINE = [CARD_A, CARD_B, CARD_C, CARD_D, CARD_E] as const;
+/** Five Things in a row. The sidebar draws none of them; the geometry only has to be legal. */
+const SPINE = [THING_A, THING_B, THING_C, THING_D, THING_E] as const;
 
-const positions = (count: number): Record<string, CardPlacement> =>
+const positions = (count: number): Record<string, ThingPlacement> =>
   Object.fromEntries(
     SPINE.slice(0, count).map((id, index) => [id, { x: index * 420, y: 0, open: false }]),
   );
@@ -134,21 +134,21 @@ export const authoredSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  cards: SPINE.map((id, index) => ({
+  things: SPINE.map((id, index) => ({
     id,
-    document: { title: `Card ${index + 1}`, kind: 'markdown', body: '' },
+    document: { title: `Thing ${index + 1}`, kind: 'markdown', body: '' },
   })),
 };
 
 /**
- * The same Space opened on Collection 2, which holds two of the five Cards.
+ * The same Space opened on Collection 2, which holds two of the five Things.
  *
- * The Cards drawer's stories need a Diagram some Cards are *absent* from, and
+ * The Things drawer's stories need a Diagram some Things are *absent* from, and
  * this **declares where it opens** like every other fixture here rather than
  * leaving a story to index into `diagrams` — array order is not a declaration,
  * and a Diagram inserted before it would move the story somewhere else in
  * silence. `story-spaces.test.ts` holds both halves: where it opens, and that
- * Cards remain outside it.
+ * Things remain outside it.
  */
 export const sparseAuthoredSnapshot: SpaceSnapshot = {
   ...authoredSnapshot,
@@ -163,7 +163,7 @@ export const authoredSpace: Space = loaded(loadSpaceSnapshot(authoredSnapshot));
  * What a story submits has to differ from what it loaded, or a failed save and
  * a successful one draw the same list and nothing proves the sidebar read the
  * session at all. The Diagram only has to be legal — a title, positions naming
- * Cards this Space already holds, and one owned Graph whose Edge endpoints are
+ * Things this Space already holds, and one owned Graph whose Edge endpoints are
  * members of it (ADR 0040) — so it is built from the same spine helpers the two
  * Diagrams above it are, rather than by transcribing coordinates a third time.
  *
@@ -197,24 +197,24 @@ export const editedSnapshot: SpaceSnapshot = {
 };
 
 /**
- * A newly created Space: one Card, placed in one authored Diagram owning one
+ * A newly created Space: one Thing, placed in one authored Diagram owning one
  * empty Active Graph (ADR 0018, ADR 0080).
  *
  * `newSpace()` is the one encoding of that starting state, and a hand-written
- * snapshot beside it would be a second — the story would go on saying "one Card
+ * snapshot beside it would be a second — the story would go on saying "one Thing
  * and no Diagram" long after the rule said something else. It returns the
- * **on-disk** shape, a space file and its card files, which is why this is
+ * **on-disk** shape, a space file and its thing files, which is why this is
  * `loadSpace` rather than `loadSpaceSnapshot`.
  *
  * It mints fresh ids on every page load, and nothing reads one: no story and no
- * Ladle spec names a Card, a Diagram or a Graph of this Space by id, only the
+ * Ladle spec names a Thing, a Diagram or a Graph of this Space by id, only the
  * `Diagram 1` and `Graph 1` titles `newSpace()` mints for them. The ambient
  * generator is named here rather than inside `newSpace`, which takes its
  * identity source like every other minting operation (ADR 0016); this fixture
  * is the composition root that supplies it.
  */
 const minted = newSpace(newUuid);
-export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.cardFiles));
+export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.thingFiles));
 
 /**
  * Where a story's converted Graph takes its identity.
@@ -222,10 +222,10 @@ export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.cardF
  * Here rather than in the fixture, because the only thing that decides whether
  * a minted id is safe is the block of ids declared above it, and the two were
  * in different files: the fixture counted from one and handed out the very ids
- * `CARD_A` and `CARD_B` already carry. `convertSubject` would not have refused
+ * `THING_A` and `THING_B` already carry. `convertSubject` would not have refused
  * either — a conversion's freshness is checked against the Space's *Graphs*
- * (ADR 0045), and a Card's id is not one — so a story that converted a View
- * would have minted a Graph wearing a Card's identity, in silence.
+ * (ADR 0045), and a Thing's id is not one — so a story that converted a View
+ * would have minted a Graph wearing a Thing's identity, in silence.
  *
  * No story converts one today. The counter is the fixture's answer to ADR
  * 0016's composition seam, and nothing presses it; the collision is one Ladle
@@ -234,10 +234,10 @@ export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.cardF
  * together, and `story-spaces.test.ts` holds them apart.
  *
  * The base is a **reserved block** rather than one past the highest id, so a
- * story that declares another Card or Diagram does not have to move it — the
+ * story that declares another Thing or Diagram does not have to move it — the
  * literals above occupy `0x02`..`0x40`, and this leaves the whole space between
  * them and here. Hexadecimal throughout, which is what the ids are: the
- * decimal counter this replaced rendered `12` as `…0000012` while `CARD_E` is
+ * decimal counter this replaced rendered `12` as `…0000012` while `THING_E` is
  * `…000000c`, so the two spellings did not even sort against each other.
  */
 export const MINTED_GRAPH_ID_BASE = 0x1000;
@@ -259,8 +259,8 @@ export const storyGraphIds = (): (() => GraphId) => {
  *
  * Purpose-built, and deliberately not the sidebar's `authoredSpace`: that one
  * exists to draw four Graphs in a list and every one of them is a line, so it
- * can show a one-member choice and nothing else. A fork needs a Card with
- * several outgoing Edges, and there is no such Card anywhere in the tracked
+ * can show a one-member choice and nothing else. A fork needs a Thing with
+ * several outgoing Edges, and there is no such Thing anywhere in the tracked
  * fixtures — the E2E fixture's Graphs are deliberately all lines too.
  *
  * Each **declares where it opens**, so `defaultDiagram` and ADR 0026's Active
@@ -269,25 +269,27 @@ export const storyGraphIds = (): (() => GraphId) => {
  * first it owns. A story therefore calls `present()` and nothing else to be
  * presenting the Graph it is about.
  *
- * The titles are a talk's, not `Card N`: what the chrome draws is a choice
+ * The titles are a talk's, not `Thing N`: what the chrome draws is a choice
  * between destinations, and the design pass this catalogue exists for cannot
  * judge a row of choices whose labels are all the same length.
  */
-const traversalPositions = (ids: readonly CardId[]): Record<string, CardPlacement> =>
+const traversalPositions = (ids: readonly ThingId[]): Record<string, ThingPlacement> =>
   Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0, open: false }]));
 
-const traversalCards = (titled: readonly (readonly [CardId, string])[]): SpaceSnapshot['cards'] =>
+const traversalThings = (
+  titled: readonly (readonly [ThingId, string])[],
+): SpaceSnapshot['things'] =>
   titled.map(([id, title]) => ({ id, document: { title, kind: 'markdown', body: '' } }));
 
 const TRAVERSAL_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
-const TRAVERSAL_CARDS = [
+const TRAVERSAL_THINGS = [
   [uuidSchema.parse('00000000-0000-4000-8000-000000000062'), 'Introduction'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000063'), 'How it works'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000064'), 'Wrap up'],
-] as const satisfies readonly (readonly [CardId, string])[];
+] as const satisfies readonly (readonly [ThingId, string])[];
 
 /**
- * A line: one move at each Card, and a sink two moves in.
+ * A line: one move at each Thing, and a sink two moves in.
  *
  * The degenerate fork rather than a second mode (ADR 0024) — which is exactly
  * what the one-move story has to show, and what a sink reached by advancing
@@ -304,27 +306,27 @@ export const traversalSnapshot: SpaceSnapshot = {
         id: TRAVERSAL_DIAGRAM,
         title: 'Traversal',
         kind: 'positioned',
-        positions: traversalPositions(TRAVERSAL_CARDS.map(([id]) => id)),
+        positions: traversalPositions(TRAVERSAL_THINGS.map(([id]) => id)),
         graphs: [
           {
             id: uuidSchema.parse('00000000-0000-4000-8000-000000000061'),
             title: 'Traversal',
             edges: [
-              { from: TRAVERSAL_CARDS[0][0], to: TRAVERSAL_CARDS[1][0] },
-              { from: TRAVERSAL_CARDS[1][0], to: TRAVERSAL_CARDS[2][0] },
+              { from: TRAVERSAL_THINGS[0][0], to: TRAVERSAL_THINGS[1][0] },
+              { from: TRAVERSAL_THINGS[1][0], to: TRAVERSAL_THINGS[2][0] },
             ],
           },
         ],
       },
     ],
   },
-  cards: traversalCards(TRAVERSAL_CARDS),
+  things: traversalThings(TRAVERSAL_THINGS),
 };
 
 export const traversalSpace: Space = loaded(loadSpaceSnapshot(traversalSnapshot));
 
 const DEEP_DIVE_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
-const DEEP_DIVE_CARDS = [
+const DEEP_DIVE_THINGS = [
   [uuidSchema.parse('00000000-0000-4000-8000-000000000072'), 'Introduction'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000073'), 'Read path'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000074'), 'Write path'],
@@ -333,15 +335,15 @@ const DEEP_DIVE_CARDS = [
     uuidSchema.parse('00000000-0000-4000-8000-000000000076'),
     'Operating notes, rollback and the on-call runbook',
   ],
-] as const satisfies readonly (readonly [CardId, string])[];
+] as const satisfies readonly (readonly [ThingId, string])[];
 
 /**
- * A fork: four Edges out of the Card a traversal begins at, each to a sink.
+ * A fork: four Edges out of the Thing a traversal begins at, each to a sink.
  *
  * Four rather than two, and one title deliberately longer than the bounded
  * button can hold, because the row this chrome renders has to be judged on a
  * choice set that can genuinely outrun it — a Graph's out-degree has no upper
- * bound and a Card's title no length limit, so a design that only ever sees two
+ * bound and a Thing's title no length limit, so a design that only ever sees two
  * short choices never shows what it does with either.
  */
 export const deepDiveSnapshot: SpaceSnapshot = {
@@ -355,13 +357,13 @@ export const deepDiveSnapshot: SpaceSnapshot = {
         id: DEEP_DIVE_DIAGRAM,
         title: 'Deep dive',
         kind: 'positioned',
-        positions: traversalPositions(DEEP_DIVE_CARDS.map(([id]) => id)),
+        positions: traversalPositions(DEEP_DIVE_THINGS.map(([id]) => id)),
         graphs: [
           {
             id: uuidSchema.parse('00000000-0000-4000-8000-000000000071'),
             title: 'Deep dive',
-            edges: DEEP_DIVE_CARDS.slice(1).map(([id]) => ({
-              from: DEEP_DIVE_CARDS[0][0],
+            edges: DEEP_DIVE_THINGS.slice(1).map(([id]) => ({
+              from: DEEP_DIVE_THINGS[0][0],
               to: id,
             })),
           },
@@ -369,7 +371,7 @@ export const deepDiveSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  cards: traversalCards(DEEP_DIVE_CARDS),
+  things: traversalThings(DEEP_DIVE_THINGS),
 };
 
 export const deepDiveSpace: Space = loaded(loadSpaceSnapshot(deepDiveSnapshot));
@@ -382,7 +384,7 @@ export const deepDiveSpace: Space = loaded(loadSpaceSnapshot(deepDiveSnapshot));
  * Where the Command Dock prototype's identities live: `0x80`..`0xbf`.
  *
  * A reserved block, like {@link MINTED_GRAPH_ID_BASE} and for the same reason.
- * Thirty-four Cards, Diagrams and Graphs written out as full literals would bury
+ * Thirty-four Things, Diagrams and Graphs written out as full literals would bury
  * the shape of the fixture in uuids, so they are minted from this base instead
  * — and the base is declared here, above everything that draws from it, so the
  * block a reader has to keep clear is visible in one place.
@@ -398,17 +400,17 @@ const DOCK_COLLECTION_ONE = dockId(0);
 const DOCK_COLLECTION_TWO = dockId(1);
 
 /**
- * The Cards `Collection 1` places, and all three kinds among them.
+ * The Things `Collection 1` places, and all three kinds among them.
  *
- * The kinds are the point rather than decoration: the Dock's Cards list draws
- * `CardKindIcon` on every row and the canvas draws the production `CardNode`,
- * so a fixture of five markdown Cards would let a list and a canvas disagree
- * about what a Space Card looks like without either being wrong.
+ * The kinds are the point rather than decoration: the Dock's Things list draws
+ * `ThingKindIcon` on every row and the canvas draws the production `ThingNode`,
+ * so a fixture of five markdown Things would let a list and a canvas disagree
+ * about what a Space Thing looks like without either being wrong.
  *
  * The second title is the long one, carried over from the inventory fixture for
- * the same reason it exists there: three lines at 18px in a 260px Card is what
+ * the same reason it exists there: three lines at 18px in a 260px Thing is what
  * the balance and the clamp are there to survive, and a Dock that occludes a
- * Card is judged against a Card that is actually full.
+ * Thing is judged against a Thing that is actually full.
  */
 const DOCK_PLACED = [
   { id: dockId(0x10), title: 'Opening', kind: 'markdown' },
@@ -423,19 +425,19 @@ const DOCK_PLACED = [
 ] as const;
 
 /**
- * The Cards `Collection 1` does *not* place — what the Dock's Cards surface offers.
+ * The Things `Collection 1` does *not* place — what the Dock's Things surface offers.
  *
  * **Twenty-nine rather than four, and that count is the fixture's whole claim.**
  * A list of four fits any surface and settles nothing, while a real Space's
- * unplaced Cards outnumber its Diagrams and Graphs by an order of magnitude. The
+ * unplaced Things outnumber its Diagrams and Graphs by an order of magnitude. The
  * open question the Dock's list surfaces are compared on — an edge drawer, an
  * anchored popover, a second dock — is whether each can carry that many rows
  * and still be dragged out of, so a fixture that cannot overrun a popover
  * cannot be evidence either way.
  *
- * The Space Cards among them are not a separate fixture. They are what the
+ * The Space Things among them are not a separate fixture. They are what the
  * Dock's Spaces list draws, which is the whole of the claim that a Space is a
- * Card and needs no construct of its own.
+ * Thing and needs no construct of its own.
  */
 const DOCK_UNPLACED = [
   { title: 'Constraints', kind: 'markdown' },
@@ -450,7 +452,7 @@ const DOCK_UNPLACED = [
   { title: 'Edge authoring', kind: 'space' },
   { title: 'Traversal', kind: 'markdown' },
   { title: 'Entry points', kind: 'markdown' },
-  { title: 'Unreachable Cards', kind: 'markdown' },
+  { title: 'Unreachable Things', kind: 'markdown' },
   { title: 'Fork ranking', kind: 'markdown' },
   { title: 'Vocabulary', kind: 'markdown' },
   { title: 'Add vs Create', kind: 'markdown' },
@@ -469,23 +471,23 @@ const DOCK_UNPLACED = [
   { title: 'Traversal overview', kind: 'alias' },
 ] as const;
 
-/** Every Card in the fixture, placed and unplaced, keyed by the title an alias names. */
-const DOCK_CARD_IDS: ReadonlyMap<string, UUID> = new Map([
-  ...DOCK_PLACED.map((card): [string, UUID] => [card.title, card.id]),
-  ...DOCK_UNPLACED.map((card, index): [string, UUID] => [card.title, dockId(0x20 + index)]),
+/** Every Thing in the fixture, placed and unplaced, keyed by the title an alias names. */
+const DOCK_THING_IDS: ReadonlyMap<string, UUID> = new Map([
+  ...DOCK_PLACED.map((thing): [string, UUID] => [thing.title, thing.id]),
+  ...DOCK_UNPLACED.map((thing, index): [string, UUID] => [thing.title, dockId(0x20 + index)]),
 ]);
 
-const dockCardId = (title: string): UUID => {
-  const id = DOCK_CARD_IDS.get(title);
-  if (id === undefined) throw new Error(`Command Dock fixture has no Card titled ${title}`);
+const dockThingId = (title: string): UUID => {
+  const id = DOCK_THING_IDS.get(title);
+  if (id === undefined) throw new Error(`Command Dock fixture has no Thing titled ${title}`);
   return id;
 };
 
 /**
- * The Spaces a Space Card here points at: the other tracked fixtures, in turn.
+ * The Spaces a Space Thing here points at: the other tracked fixtures, in turn.
  *
- * Real ids rather than minted ones, because a Space Card's whole content is the
- * Space it names — a fixture pointing at nothing would draw a Space Card that
+ * Real ids rather than minted ones, because a Space Thing's whole content is the
+ * Space it names — a fixture pointing at nothing would draw a Space Thing that
  * could never resolve, and the Dock's Spaces list is exactly the surface that
  * would have to pretend otherwise.
  */
@@ -495,7 +497,7 @@ const dockTargetSpace = (index: number): UUID =>
   DOCK_TARGET_SPACES[index % DOCK_TARGET_SPACES.length] ?? authoredSnapshot.id;
 
 /**
- * Which Card each Alias shows, named rather than derived from its title.
+ * Which Thing each Alias shows, named rather than derived from its title.
  *
  * A rule that stripped a suffix would make the Target a fact about spelling —
  * `Strategy overview` would have to point at `Strategys` — and an Alias whose
@@ -512,43 +514,43 @@ const DOCK_ALIAS_TARGETS = new Map([
 const dockAliasTarget = (title: string): UUID => {
   const target = DOCK_ALIAS_TARGETS.get(title);
   if (target === undefined) throw new Error(`Command Dock fixture Alias ${title} names no Target`);
-  return dockCardId(target);
+  return dockThingId(target);
 };
 
-type DockCardKind = 'markdown' | 'space' | 'alias';
+type DockThingKind = 'markdown' | 'space' | 'alias';
 
-const dockCardDocument = (
+const dockThingDocument = (
   title: string,
-  kind: DockCardKind,
+  kind: DockThingKind,
   index: number,
-): SpaceSnapshot['cards'][number]['document'] => {
+): SpaceSnapshot['things'][number]['document'] => {
   if (kind === 'space') return { title, kind, spaceId: dockTargetSpace(index) };
   if (kind === 'alias') return { title, kind, target: dockAliasTarget(title) };
   return { title, kind, body: '' };
 };
 
-const DOCK_CARDS: SpaceSnapshot['cards'] = [
-  ...DOCK_PLACED.map((card, index) => ({
-    id: card.id,
-    document: dockCardDocument(card.title, card.kind, index),
+const DOCK_THINGS: SpaceSnapshot['things'] = [
+  ...DOCK_PLACED.map((thing, index) => ({
+    id: thing.id,
+    document: dockThingDocument(thing.title, thing.kind, index),
   })),
-  ...DOCK_UNPLACED.map((card, index) => ({
-    id: dockCardId(card.title),
-    document: dockCardDocument(card.title, card.kind, index),
+  ...DOCK_UNPLACED.map((thing, index) => ({
+    id: dockThingId(thing.title),
+    document: dockThingDocument(thing.title, thing.kind, index),
   })),
 ];
 
-/** The first `links` steps along the placed Cards: Graphs of one shape at three lengths. */
+/** The first `links` steps along the placed Things: Graphs of one shape at three lengths. */
 const dockChain = (links: number): GraphEdge[] =>
-  DOCK_PLACED.flatMap((card, index) => {
+  DOCK_PLACED.flatMap((thing, index) => {
     const to = DOCK_PLACED[index + 1];
-    return index < links && to !== undefined ? [{ from: card.id, to: to.id }] : [];
+    return index < links && to !== undefined ? [{ from: thing.id, to: to.id }] : [];
   });
 
-const dockPositions = (count: number): Record<string, CardPlacement> =>
+const dockPositions = (count: number): Record<string, ThingPlacement> =>
   Object.fromEntries(
-    DOCK_PLACED.slice(0, count).map((card, index) => [
-      card.id,
+    DOCK_PLACED.slice(0, count).map((thing, index) => [
+      thing.id,
       { x: index * 420, y: 0, open: false },
     ]),
   );
@@ -557,11 +559,11 @@ const dockPositions = (count: number): Record<string, CardPlacement> =>
  * The Space the Command Dock prototype draws.
  *
  * Purpose-built, and deliberately not {@link authoredSpace}: that one exists to
- * draw a sidebar and every Card in it is placed, so a Cards surface opened over
+ * draw a sidebar and every Thing in it is placed, so a Things surface opened over
  * it would have nothing to offer. The Dock needs three things at once that no
  * existing fixture has together — **two Diagrams** to switch between, **three
  * Graphs over one Diagram** so emphasis is a visible answer rather than a
- * one-member choice, and **many more unplaced Cards than placed ones**, which
+ * one-member choice, and **many more unplaced Things than placed ones**, which
  * is what its list surfaces are being compared on.
  *
  * **No Graph carries a colour**, exactly as `authoredSnapshot` does not: a Graph
@@ -599,7 +601,7 @@ export const commandDockSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  cards: DOCK_CARDS,
+  things: DOCK_THINGS,
 };
 
 export const commandDockSpace: Space = loaded(loadSpaceSnapshot(commandDockSnapshot));
@@ -617,7 +619,7 @@ const chainId = (offset: number): UUID =>
   );
 
 /**
- * A Space whose Cards are all Space Cards: one link in a chain of crossings.
+ * A Space whose Things are all Space Things: one link in a chain of crossings.
  *
  * **Depth is what these exist for.** Meta held every other fixture directly, so
  * the deepest trail a reader could walk was two — Meta and the Space they
@@ -627,12 +629,12 @@ const chainId = (offset: number): UUID =>
  * collapsed form is judged on.
  *
  * They are ordinary Spaces and the crossing into them is the ordinary one: a
- * Space Card names a target, and the target is a tracked fixture that loads.
- * Seeding a session with a path no Space Card supports would draw a trail the
+ * Space Thing names a target, and the target is a tracked fixture that loads.
+ * Seeding a session with a path no Space Thing supports would draw a trail the
  * prototype could not have been walked into.
  *
  * Each takes a **block of sixteen** off {@link CHAIN_ID_BASE} — the Space, its
- * Diagram, its Graph, then one Card per target — so a link that gains a target
+ * Diagram, its Graph, then one Thing per target — so a link that gains a target
  * cannot reach into the next link's ids.
  */
 const crossingSpace = (
@@ -651,7 +653,7 @@ const crossingSpace = (
         title: 'Catalogue',
         kind: 'positioned',
         positions: Object.fromEntries(
-          targets.map((_, index): [string, CardPlacement] => [
+          targets.map((_, index): [string, ThingPlacement] => [
             chainId(block + 3 + index),
             { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
           ]),
@@ -660,9 +662,9 @@ const crossingSpace = (
       },
     ],
   },
-  cards: targets.map(([cardTitle, spaceId], index) => ({
+  things: targets.map(([thingTitle, spaceId], index) => ({
     id: chainId(block + 3 + index),
-    document: { title: cardTitle, kind: 'space', spaceId },
+    document: { title: thingTitle, kind: 'space', spaceId },
   })),
 });
 
@@ -695,9 +697,9 @@ const metaId = (offset: number): UUID =>
   );
 
 /**
- * Every Space there is, as the Space Cards that reference them (ADR 0074).
+ * Every Space there is, as the Space Things that reference them (ADR 0074).
  *
- * A Card's title is its own and the Space it points at has its own name, so
+ * A Thing's title is its own and the Space it points at has its own name, so
  * one of these deliberately disagrees: `Design system` in the Command Dock
  * fixture targets the Space titled `Space`. That is not a fixture error — it is
  * the question a crossing trail has to answer, since the row you pressed and
@@ -731,9 +733,9 @@ const META_GRAPH = metaId(2);
  * the one crumb a crossing trail can never pop — and a prototype whose trail
  * bottoms out in whichever Space the story happened to open cannot show that.
  *
- * Its Cards are all Space Cards, which is the whole of CONTEXT's claim that at
+ * Its Things are all Space Things, which is the whole of CONTEXT's claim that at
  * the top level "every Space there is" needs no construct of its own: the list
- * a Space offers is the Space Cards in it, and up here that list is the
+ * a Space offers is the Space Things in it, and up here that list is the
  * catalogue.
  */
 export const metaSnapshot: SpaceSnapshot = {
@@ -748,7 +750,7 @@ export const metaSnapshot: SpaceSnapshot = {
         title: 'Catalogue',
         kind: 'positioned',
         positions: Object.fromEntries(
-          META_TARGETS.map((_, index): [string, CardPlacement] => [
+          META_TARGETS.map((_, index): [string, ThingPlacement] => [
             metaId(0x8 + index),
             { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
           ]),
@@ -757,7 +759,7 @@ export const metaSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  cards: META_TARGETS.map(([title, spaceId], index) => ({
+  things: META_TARGETS.map(([title, spaceId], index) => ({
     id: metaId(0x8 + index),
     document: { title, kind: 'space', spaceId },
   })),

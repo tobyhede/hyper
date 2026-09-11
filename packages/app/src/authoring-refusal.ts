@@ -1,11 +1,11 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import type { AuthoringRefusal, EdgeEndpoint, StoredSpaceRefusal } from './space-authoring';
-import type { SpaceCardLifecycleResult } from './space-card-lifecycle';
+import type { SpaceThingLifecycleResult } from './space-thing-lifecycle';
 import { failureMessage } from './failure-message';
 
-/** Why a coordinated Space Card lifecycle operation refused (ADR 0076). */
-export type SpaceCardRefusal = Extract<SpaceCardLifecycleResult, { kind: 'refused' }>['refusal'];
+/** Why a coordinated Space Thing lifecycle operation refused (ADR 0076). */
+export type SpaceThingRefusal = Extract<SpaceThingLifecycleResult, { kind: 'refused' }>['refusal'];
 
 type PresentedAuthoringRefusal =
   AuthoringRefusal | { readonly code: 'placement-failed'; readonly error: Error };
@@ -14,9 +14,9 @@ type PresentedAuthoringRefusal =
  * The one sentence for a Diagram the Space no longer holds.
  *
  * Both switches in this module answer that fact — an ordinary Authoring
- * refusal and a coordinated Space Card one — and a Diagram that has gone means
+ * refusal and a coordinated Space Thing one — and a Diagram that has gone means
  * the same thing either way. It is written here rather than in each arm for
- * the reason the Space Card translation below states for aggregate refusals:
+ * the reason the Space Thing translation below states for aggregate refusals:
  * the two can reach the author on the same screen, so one of them reading
  * differently would be a difference nothing could explain.
  */
@@ -26,16 +26,16 @@ const DIAGRAM_NO_LONGER_IN_SPACE = 'This Diagram is no longer part of the Space.
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
   switch (refusal.code) {
     case 'placement-failed':
-      return `This view could not place its Cards: ${refusal.error.message}`;
+      return `This view could not place its Things: ${refusal.error.message}`;
     case 'placement-pending':
-      return 'This view has not finished placing its Cards, so there is nowhere to write yet.';
+      return 'This view has not finished placing its Things, so there is nowhere to write yet.';
     case 'diagram-not-found':
       return DIAGRAM_NO_LONGER_IN_SPACE;
     case 'diagram-required':
-      if (refusal.operation === 'added-card-to-diagram')
-        return 'Select a Diagram to add an existing Card to it.';
-      if (refusal.operation === 'removed-card-from-diagram')
-        return 'Select a Diagram to remove a Card from it.';
+      if (refusal.operation === 'added-thing-to-diagram')
+        return 'Select a Diagram to add an existing Thing to it.';
+      if (refusal.operation === 'removed-thing-from-diagram')
+        return 'Select a Diagram to remove a Thing from it.';
       if (
         refusal.operation === 'renamed-graph' ||
         refusal.operation === 'recolored-graph' ||
@@ -43,18 +43,18 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       )
         return 'Select a Diagram to manage its Graphs.';
       return 'Select a Diagram to edit its Edges.';
-    case 'card-not-found':
-      return 'This Card is no longer part of the Space.';
-    case 'card-kind-immutable':
-      return 'A Card keeps the kind it was created with.';
+    case 'thing-not-found':
+      return 'This Thing is no longer part of the Space.';
+    case 'thing-kind-immutable':
+      return 'A Thing keeps the kind it was created with.';
     case 'alias-target-immutable':
       return 'An Alias keeps the Target it was created with.';
-    case 'space-card-target-immutable':
-      return 'A Space Card keeps the target Space it was created with.';
-    case 'space-card-deletion-unsupported':
-      return 'Deleting this Space Card requires a coordinated multi-Space Edit, which this control cannot perform.';
-    case 'card-title-required':
-      return 'A Card title is required.';
+    case 'space-thing-target-immutable':
+      return 'A Space Thing keeps the target Space it was created with.';
+    case 'space-thing-deletion-unsupported':
+      return 'Deleting this Space Thing requires a coordinated multi-Space Edit, which this control cannot perform.';
+    case 'thing-title-required':
+      return 'A Thing title is required.';
     case 'diagram-title-required':
       return 'A Diagram title is required.';
     case 'space-must-keep-diagram':
@@ -62,15 +62,15 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
     case 'alias-target-not-found':
       return 'That Target is no longer part of the Space.';
     case 'alias-target-must-own-content':
-      return 'An Alias must target a Card that owns its content.';
-    case 'card-already-in-diagram':
-      return 'This Card is already in this Diagram.';
-    case 'card-not-in-diagram':
-      return 'This Card is not in this Diagram.';
-    case 'card-not-expanded':
-      return 'Open this Card before resizing it.';
-    case 'card-has-aliases':
-      return `Delete the Aliases of this Card first: ${refusal.aliasTitles.join(', ')}.`;
+      return 'An Alias must target a Thing that owns its content.';
+    case 'thing-already-in-diagram':
+      return 'This Thing is already in this Diagram.';
+    case 'thing-not-in-diagram':
+      return 'This Thing is not in this Diagram.';
+    case 'thing-not-expanded':
+      return 'Open this Thing before resizing it.';
+    case 'thing-has-aliases':
+      return `Delete the Aliases of this Thing first: ${refusal.aliasTitles.join(', ')}.`;
     case 'graph-title-required':
       return 'A Graph title is required.';
     case 'diagram-must-keep-graph':
@@ -79,10 +79,10 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'That Graph is not one this Diagram owns.';
     case 'edge-not-found':
       return 'That Edge is no longer in this Graph.';
-    case 'edge-card-outside-diagram':
-      return 'An Edge can only join Cards in this Diagram.';
+    case 'edge-thing-outside-diagram':
+      return 'An Edge can only join Things in this Diagram.';
     case 'edge-already-exists':
-      return 'These Cards are already connected in this Graph.';
+      return 'These Things are already connected in this Graph.';
     case 'diagram-active-graph-required':
       return 'This Diagram has no active Graph for the connection to join.';
   }
@@ -114,25 +114,25 @@ const titleAndTargetPlacements = {
   'placement-pending': form,
   'diagram-not-found': form,
   'diagram-required': form,
-  'card-not-found': form,
-  'card-kind-immutable': form,
+  'thing-not-found': form,
+  'thing-kind-immutable': form,
   'alias-target-immutable': form,
-  'space-card-target-immutable': form,
-  'space-card-deletion-unsupported': form,
-  'card-title-required': 'title',
+  'space-thing-target-immutable': form,
+  'space-thing-deletion-unsupported': form,
+  'thing-title-required': 'title',
   'diagram-title-required': form,
   'space-must-keep-diagram': form,
   'alias-target-not-found': 'target',
   'alias-target-must-own-content': 'target',
-  'card-already-in-diagram': form,
-  'card-not-in-diagram': form,
-  'card-not-expanded': form,
-  'card-has-aliases': form,
+  'thing-already-in-diagram': form,
+  'thing-not-in-diagram': form,
+  'thing-not-expanded': form,
+  'thing-has-aliases': form,
   'graph-title-required': form,
   'diagram-must-keep-graph': form,
   'graph-not-owned': form,
   'edge-not-found': form,
-  'edge-card-outside-diagram': form,
+  'edge-thing-outside-diagram': form,
   'edge-already-exists': form,
   'diagram-active-graph-required': form,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | 'target' | null>>;
@@ -140,52 +140,52 @@ const titleAndTargetPlacements = {
 /**
  * Error placement for a creation pane, which owns Title and Target.
  *
- * One type for both kinds of creation. It is `card-creation.ts`'s refusal
+ * One type for both kinds of creation. It is `thing-creation.ts`'s refusal
  * type, which is what lets that module hold one state machine rather than one
  * generic over two refusal unions.
  */
-export type CardCreationRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
+export type ThingCreationRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
 
 /** Error placement for Alias creation, which owns Title and Target. */
-export const presentNewAliasRefusal = (refusal: AuthoringRefusal): CardCreationRefusalErrors =>
+export const presentNewAliasRefusal = (refusal: AuthoringRefusal): ThingCreationRefusalErrors =>
   presentRefusal(refusal, titleAndTargetPlacements);
 
 /**
- * Whether choosing another Card would answer this refusal.
+ * Whether choosing another Thing would answer this refusal.
  *
  * A picker refusal is *correctable* exactly when it is about the choice: the
- * Card lies outside this Diagram, or the Edge it would produce is one the Graph
+ * Thing lies outside this Diagram, or the Edge it would produce is one the Graph
  * already holds. Everything else — a placement still resolving, a Diagram or
  * Graph the Space no longer holds, an Edge that has gone — describes the
  * subject rather than the choice, and no row in either list would fix it.
  *
- * Endpoint editing names two Cards and cannot correct a stale subject. The
+ * Endpoint editing names two Things and cannot correct a stale subject. The
  * record is exhaustive over the codes rather than a list of the two that are
  * true, so a new refusal has to be decided here before it will compile.
  */
-const correctableByCardChoice = {
+const correctableByThingChoice = {
   'placement-pending': false,
   'diagram-not-found': false,
   'diagram-required': false,
-  'card-not-found': false,
-  'card-kind-immutable': false,
+  'thing-not-found': false,
+  'thing-kind-immutable': false,
   'alias-target-immutable': false,
-  'space-card-target-immutable': false,
-  'space-card-deletion-unsupported': false,
-  'card-title-required': false,
+  'space-thing-target-immutable': false,
+  'space-thing-deletion-unsupported': false,
+  'thing-title-required': false,
   'diagram-title-required': false,
   'space-must-keep-diagram': false,
   'alias-target-not-found': false,
   'alias-target-must-own-content': false,
-  'card-already-in-diagram': false,
-  'card-not-in-diagram': false,
-  'card-not-expanded': false,
-  'card-has-aliases': false,
+  'thing-already-in-diagram': false,
+  'thing-not-in-diagram': false,
+  'thing-not-expanded': false,
+  'thing-has-aliases': false,
   'graph-title-required': false,
   'diagram-must-keep-graph': false,
   'graph-not-owned': false,
   'edge-not-found': false,
-  'edge-card-outside-diagram': true,
+  'edge-thing-outside-diagram': true,
   'edge-already-exists': true,
   'diagram-active-graph-required': false,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, boolean>>;
@@ -213,14 +213,14 @@ const formChannel = <Field extends string>(
  * Error placement for endpoint editing, which owns From and To.
  *
  * **Only the endpoint the author attempted is marked invalid.** The other one
- * names a Card the Edit never questioned, and marking it would ask for a
+ * names a Thing the Edit never questioned, and marking it would ask for a
  * correction to a value nothing refused.
  */
 export const presentEdgeEndpointRefusal = (
   refusal: AuthoringRefusal,
   endpoint: EdgeEndpoint,
 ): EdgeEndpointRefusalErrors =>
-  correctableByCardChoice[refusal.code]
+  correctableByThingChoice[refusal.code]
     ? { fields: { [endpoint]: describeAuthoringRefusal(refusal) } }
     : formChannel(refusal);
 
@@ -244,7 +244,7 @@ export const presentEdgeDeletionRefusal = (
  * repository's.
  *
  * A refusal kind is a stable domain identity (ADR 0057), which is exactly why
- * it is the wrong thing to show: `space-card-target-missing` names the fact for
+ * it is the wrong thing to show: `space-thing-target-missing` names the fact for
  * a caller matching on it, and says nothing to the person who has just been
  * told their work would not save. The identity stays on the wire; only this
  * translation is user-facing.
@@ -255,21 +255,21 @@ export const presentEdgeDeletionRefusal = (
  *
  * It lives here rather than beside the persistence dialog that first needed it
  * because a coordinated Edit is refused in two places now — as a rejected
- * commit, and as a Space Card lifecycle operation that never got to commit at
+ * commit, and as a Space Thing lifecycle operation that never got to commit at
  * all — and one refusal reading differently in the two would be a difference
  * the author could see and nothing could explain.
  */
 const AGGREGATE_REFUSAL_REASONS = {
   'invalid-space-snapshot': 'A space in this edit is not valid.',
   'duplicate-space-id': 'Two spaces in this edit share one identity.',
-  'duplicate-card-id': 'Two spaces in this edit claim the same card.',
+  'duplicate-thing-id': 'Two spaces in this edit claim the same thing.',
   'meta-space-missing': 'The repository’s Meta Space is missing.',
-  'space-card-target-missing': 'A space card points at a space that no longer exists.',
-  'space-card-reference-cycle': 'A space card would make a space contain itself.',
+  'space-thing-target-missing': 'A space thing points at a space that no longer exists.',
+  'space-thing-reference-cycle': 'A space thing would make a space contain itself.',
   'ordinary-space-unreferenced': 'A space would be left with nothing pointing at it.',
-  'space-card-diagram-missing': 'A space card points at a Diagram that no longer exists.',
-  'space-card-graph-missing': 'A space card points at a Graph that no longer exists.',
-  'space-card-graph-outside-diagram': 'A space card names a Graph that its Diagram does not own.',
+  'space-thing-diagram-missing': 'A space thing points at a Diagram that no longer exists.',
+  'space-thing-graph-missing': 'A space thing points at a Graph that no longer exists.',
+  'space-thing-graph-outside-diagram': 'A space thing names a Graph that its Diagram does not own.',
   // `satisfies` rather than an annotation: it still fails the moment a refusal
   // kind is added without a sentence, and it keeps each value's literal type
   // instead of widening the map to an open dictionary.
@@ -301,7 +301,7 @@ const STORED_SPACE_REFS_RECITED = 3;
 
 /**
  * What the application can name about one intake error: the id that failed to
- * resolve, the card file that would not parse, or nothing.
+ * resolve, the thing file that would not parse, or nothing.
  *
  * Never `error.message`. Intake writes those for a CLI and a log, in
  * `@project/graph`'s vocabulary, and a sentence the application did not write
@@ -411,11 +411,11 @@ const PERSISTENCE_FAILURE_REASONS = {
     'Changes were sent faster than the server accepts. Wait a moment before retrying.',
   'invalid-commit': 'These changes are not in a form the server can store.',
   forbidden: 'You do not have permission to save this space.',
-  // The limit is on the whole change, not one Card: a Space can exceed it on
-  // Card count with nothing long in it. And the rejection dialog offers only
+  // The limit is on the whole change, not one Thing: a Space can exceed it on
+  // Thing count with nothing long in it. And the rejection dialog offers only
   // Continue editing, so this names no retry.
   'payload-too-large':
-    'This space is larger than the server accepts in one save. Shortening its longest cards is what brings it under the limit.',
+    'This space is larger than the server accepts in one save. Shortening its longest things is what brings it under the limit.',
   protocol: 'The application and the server disagree about how changes are saved.',
   // `satisfies` for the reason the aggregate table above gives: it still fails
   // the moment a code is added without a sentence, without widening the map.
@@ -425,13 +425,13 @@ const PERSISTENCE_FAILURE_REASONS = {
 export const describePersistenceFailure = (failure: PersistenceFailure): string =>
   PERSISTENCE_FAILURE_REASONS[failure.code];
 
-/** Why a coordinated Space Card operation refused, in the author's terms. */
-export const describeSpaceCardRefusal = (refusal: SpaceCardRefusal): string => {
+/** Why a coordinated Space Thing operation refused, in the author's terms. */
+export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string => {
   switch (refusal.code) {
     case 'diagram-not-found':
       return DIAGRAM_NO_LONGER_IN_SPACE;
-    case 'space-card-not-found':
-      return 'This Space Card is no longer part of the Space.';
+    case 'space-thing-not-found':
+      return 'This Space Thing is no longer part of the Space.';
     case 'persistence-recovery-required':
       return refusal.recovery === 'retry'
         ? 'A Space in this edit has not saved. Retry that save first.'
@@ -444,7 +444,7 @@ export const describeSpaceCardRefusal = (refusal: SpaceCardRefusal): string => {
 };
 
 /**
- * Error placement for Space Card creation, which owns Title and Target.
+ * Error placement for Space Thing creation, which owns Title and Target.
  *
  * Only `aggregate-refused` reaches the Target field, and it is the one that
  * has to: a cycle, a target that has gone and a Diagram the target no
@@ -452,10 +452,12 @@ export const describeSpaceCardRefusal = (refusal: SpaceCardRefusal): string => {
  * describe the containing Space or the repository, which no row in that list
  * would fix.
  */
-export const presentNewSpaceCardRefusal = (refusal: SpaceCardRefusal): CardCreationRefusalErrors =>
+export const presentNewSpaceThingRefusal = (
+  refusal: SpaceThingRefusal,
+): ThingCreationRefusalErrors =>
   refusal.code === 'aggregate-refused'
-    ? { fields: { target: describeSpaceCardRefusal(refusal) } }
-    : { fields: {}, form: describeSpaceCardRefusal(refusal) };
+    ? { fields: { target: describeSpaceThingRefusal(refusal) } }
+    : { fields: {}, form: describeSpaceThingRefusal(refusal) };
 
 /**
  * What a rejected creation says, on the channel a refusal with no field takes.
@@ -472,22 +474,22 @@ export const presentNewSpaceCardRefusal = (refusal: SpaceCardRefusal): CardCreat
  * written at the parameter, the way `ObserverErrorReporter` names its own.
  * What it says is `failureMessage`'s; what it means is written here.
  */
-export type CardCreationBreak = (failure: unknown) => CardCreationRefusalErrors;
+export type ThingCreationBreak = (failure: unknown) => ThingCreationRefusalErrors;
 
-/** @see CardCreationBreak */
-export const presentCardCreationBreak: CardCreationBreak = (failure) => ({
+/** @see ThingCreationBreak */
+export const presentThingCreationBreak: ThingCreationBreak = (failure) => ({
   fields: {},
-  form: `This Card was not created: ${failureMessage(failure)}`,
+  form: `This Thing was not created: ${failureMessage(failure)}`,
 });
 
 /**
  * What a choices read that threw says, rather than what a creation says.
  *
- * A read that failed attempted no Edit, so `presentCardCreationBreak`'s
+ * A read that failed attempted no Edit, so `presentThingCreationBreak`'s
  * sentence would be false on this path. Both stay here for the reason the one
  * above gives: a creation's prose is written in this module or nowhere.
  */
-export const presentCardChoicesBreak: CardCreationBreak = (failure) => ({
+export const presentThingChoicesBreak: ThingCreationBreak = (failure) => ({
   fields: {},
-  form: `The choices for this Card could not be read: ${failureMessage(failure)}`,
+  form: `The choices for this Thing could not be read: ${failureMessage(failure)}`,
 });

@@ -12,16 +12,16 @@ import {
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 
 /**
- * React Flow re-measures a card's handles through `updateNodeInternals`, and
+ * React Flow re-measures a thing's handles through `updateNodeInternals`, and
  * that path reads the viewport's zoom with `new window.DOMMatrixReadOnly(...)`
  * (`@xyflow/system`). jsdom ships no `DOMMatrixReadOnly`, so the call throws —
  * from inside a `requestAnimationFrame` callback, which is exactly why nothing
  * caught it: the error never reaches a test body, so Vitest prints every test as
  * passing and then exits 1 on the unhandled error.
  *
- * `CardNode` deliberately does *not* call `updateNodeInternals` — a forced
+ * `ThingNode` deliberately does *not* call `updateNodeInternals` — a forced
  * remeasure discards the handles `projection.ts` declares for Graphs not yet
- * incident to the card, which breaks the next connection. But the stub is still
+ * incident to the thing, which breaks the next connection. But the stub is still
  * required: React Flow's own `useResizeObserver` reaches the same
  * `DOMMatrixReadOnly` call with `force: true`, so any test rendering a real
  * `<ReactFlow>` can hit it without anyone calling the hook directly.

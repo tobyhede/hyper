@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpace } from '../src/index';
-import { cardFile, uuid } from './card-files';
+import { thingFile, uuid } from './thing-files';
 
 /**
- * `loadSpace`'s own half of intake: the space file's shape, the card files
+ * `loadSpace`'s own half of intake: the space file's shape, the thing files
  * beside it, and the version it declares.
  *
  * What it shares with `loadSpaceSnapshot` — the aggregate relationships, the
@@ -23,7 +23,7 @@ const MAIN = {
   ],
 };
 
-/** The Diagram that owns `MAIN`; its position keys are its Card membership. */
+/** The Diagram that owns `MAIN`; its position keys are its Thing membership. */
 const WORKING = {
   id: uuid('00000000-0000-4000-8000-000000000022'),
   title: 'Working',
@@ -45,27 +45,27 @@ const validInput = {
 /** The same input with no Diagrams, and so no Graphs (ADR 0015). */
 const noStructure = { ...validInput, diagrams: [] };
 
-const validCards = [
-  cardFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
-  cardFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', 'Body of B.\n'),
+const validThings = [
+  thingFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
+  thingFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', 'Body of B.\n'),
 ];
 
 describe('loadSpace', () => {
   it('carries the space id and title through to the Space', () => {
-    const result = loadSpace(validInput, validCards);
+    const result = loadSpace(validInput, validThings);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.space.id).toBe(uuid('00000000-0000-4000-8000-000000000001'));
     expect(result.space.title).toBe('Test space');
-    expect(result.space.cards).toHaveLength(2);
+    expect(result.space.things).toHaveLength(2);
     expect(result.space.graphs).toHaveLength(1);
     expect(result.space.diagrams).toHaveLength(1);
   });
 
-  it('builds each card from its file, body included', () => {
-    const result = loadSpace(validInput, validCards);
+  it('builds each thing from its file, body included', () => {
+    const result = loadSpace(validInput, validThings);
     if (!result.ok) throw new Error('expected a valid space');
-    expect(result.space.lookup.card(uuid('00000000-0000-4000-8000-000000000002'))).toEqual({
+    expect(result.space.lookup.thing(uuid('00000000-0000-4000-8000-000000000002'))).toEqual({
       id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',
       kind: 'markdown',
@@ -75,9 +75,9 @@ describe('loadSpace', () => {
 
   it('rejects an alias file with a body, because its content comes from its target', () => {
     const result = loadSpace(noStructure, [
-      cardFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'The source.\n'),
+      thingFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'The source.\n'),
       {
-        path: 'cards/a-again.md',
+        path: 'things/a-again.md',
         text: '---\nid: 00000000-0000-4000-8000-000000000007\ntitle: A again\nkind: alias\ntarget: 00000000-0000-4000-8000-000000000002\n---\n\nThis would be discarded.\n',
       },
     ]);
@@ -85,47 +85,49 @@ describe('loadSpace', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors).toEqual([
-      expect.objectContaining({ kind: 'invalid-frontmatter', path: 'cards/a-again.md' }),
+      expect.objectContaining({ kind: 'invalid-frontmatter', path: 'things/a-again.md' }),
     ]);
   });
 
-  it('orders cards by title, whatever order the files arrived in', () => {
+  it('orders things by title, whatever order the files arrived in', () => {
     const result = loadSpace(noStructure, [
-      cardFile(uuid('00000000-0000-4000-8000-000000000005'), 'Carla'),
-      cardFile(uuid('00000000-0000-4000-8000-000000000002'), 'Anders'),
-      cardFile(uuid('00000000-0000-4000-8000-000000000003'), 'Bo'),
+      thingFile(uuid('00000000-0000-4000-8000-000000000005'), 'Carla'),
+      thingFile(uuid('00000000-0000-4000-8000-000000000002'), 'Anders'),
+      thingFile(uuid('00000000-0000-4000-8000-000000000003'), 'Bo'),
     ]);
     if (!result.ok) throw new Error('expected a valid space');
-    expect(result.space.cards.map((c) => c.title)).toEqual(['Anders', 'Bo', 'Carla']);
+    expect(result.space.things.map((t) => t.title)).toEqual(['Anders', 'Bo', 'Carla']);
   });
 
-  it('rejects the same card id in two files, naming both', () => {
+  it('rejects the same thing id in two files, naming both', () => {
     const result = loadSpace(noStructure, [
       { path: 'intro.md', text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n---\n' },
       {
-        path: 'cards/a.md',
+        path: 'things/a.md',
         text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A again\n---\n',
       },
     ]);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    const duplicate = result.errors.find((e) => e.kind === 'duplicate-card-id');
+    const duplicate = result.errors.find((e) => e.kind === 'duplicate-thing-id');
     expect(duplicate?.message).toContain('intro.md');
-    expect(duplicate?.message).toContain('cards/a.md');
+    expect(duplicate?.message).toContain('things/a.md');
   });
 
-  it('reports a card file that will not parse, without throwing', () => {
-    const result = loadSpace(noStructure, [{ path: 'cards/a.md', text: 'No frontmatter here.\n' }]);
+  it('reports a thing file that will not parse, without throwing', () => {
+    const result = loadSpace(noStructure, [
+      { path: 'things/a.md', text: 'No frontmatter here.\n' },
+    ]);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors.some((e) => e.kind === 'missing-frontmatter')).toBe(true);
   });
 
-  it('loads a space with no cards at all — a new space, before anything is written', () => {
+  it('loads a space with no things at all — a new space, before anything is written', () => {
     const result = loadSpace(noStructure, []);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.space.cards).toEqual([]);
+    expect(result.space.things).toEqual([]);
   });
 
   it('rejects a version 2 document by its version, not by every key that moved', () => {
@@ -150,7 +152,7 @@ describe('loadSpace', () => {
           },
         ],
       },
-      validCards,
+      validThings,
     );
 
     expect(result.ok).toBe(false);
@@ -161,15 +163,14 @@ describe('loadSpace', () => {
   });
 
   it('rejects a version 1 space that still carries a Space-level graphs array', () => {
-    // Read before parsing, beside the version check and for the same reason:
-    // `spaceFileSchema` is a plain object, so an undeclared key is *stripped*.
-    // That is right for the retired `cards` and `edges` keys, which carried
-    // nothing the rest of the document does not already say. A Space-level
-    // `graphs` carried the whole topology (ADR 0040), so stripping it in silence
-    // discards what its author wrote and yields a Space that loads looking
-    // complete. Declaring the key in the schema instead would put it in the
+    // Read before parsing, beside the version check: `spaceFileSchema` is
+    // strict, so an undeclared key is already refused rather than stripped.
+    // This check survives that to *name* the one that matters — a Space-level
+    // `graphs` carried the whole topology (ADR 0040), and a generic
+    // unrecognized-key refusal leaves a reader to work out why that one
+    // mattered. Declaring the key in the schema instead would put it in the
     // inferred document type, which the HTTP contract is checked against.
-    const result = loadSpace({ ...validInput, graphs: [MAIN] }, validCards);
+    const result = loadSpace({ ...validInput, graphs: [MAIN] }, validThings);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -181,11 +182,11 @@ describe('loadSpace', () => {
   it('accepts a version 1 space whose only graphs are the ones its Diagrams own', () => {
     // The other side of the check above: ownership nested under a Diagram is the
     // shape, so the key it looks for is absent and nothing is rejected.
-    expect(loadSpace(validInput, validCards).ok).toBe(true);
+    expect(loadSpace(validInput, validThings).ok).toBe(true);
   });
 
   it('reports a bad shape as errors rather than throwing', () => {
-    const result = loadSpace({ version: 1, title: 'X' }, validCards); // id missing
+    const result = loadSpace({ version: 1, title: 'X' }, validThings); // id missing
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors.length).toBeGreaterThan(0);
@@ -194,7 +195,7 @@ describe('loadSpace', () => {
 
   it('gives a space with no declared diagrams an empty list, never undefined', () => {
     const { diagrams: _diagrams, ...withoutDiagrams } = validInput;
-    const result = loadSpace(withoutDiagrams, validCards);
+    const result = loadSpace(withoutDiagrams, validThings);
     if (!result.ok) throw new Error('expected a valid space');
     expect(result.space.diagrams).toEqual([]);
     expect(result.space.graphs).toEqual([]);
@@ -204,7 +205,7 @@ describe('loadSpace', () => {
   it('carries a declared diagram’s positions through unchanged', () => {
     const result = loadSpace(
       { ...validInput, defaultDiagram: uuid('00000000-0000-4000-8000-000000000022') },
-      validCards,
+      validThings,
     );
     if (!result.ok) throw new Error('expected a valid space');
     expect(result.space.defaultDiagram).toBe(uuid('00000000-0000-4000-8000-000000000022'));
@@ -226,7 +227,7 @@ describe('loadSpace', () => {
         ...validInput,
         diagrams: [{ ...WORKING, graphs: [uuid('00000000-0000-4000-8000-000000000004')] }],
       },
-      validCards,
+      validThings,
     );
     expect(result.ok).toBe(false);
     if (result.ok) return;

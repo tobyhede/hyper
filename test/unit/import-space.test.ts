@@ -24,16 +24,16 @@ import { captureError } from '../support/capture-error';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const GRAPH_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 
 const storedSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Stored talk' },
-  cards: [
+  things: [
     {
-      id: CARD_ID,
-      document: { title: 'Stored card', kind: 'markdown', body: 'Stored body.\n' },
+      id: THING_ID,
+      document: { title: 'Stored thing', kind: 'markdown', body: 'Stored body.\n' },
     },
   ],
 };
@@ -48,7 +48,7 @@ const otherStoredSpace: LoadedSpace = {
   snapshot: {
     id: OTHER_SPACE_ID,
     document: { version: 1, title: 'Other stored talk' },
-    cards: [],
+    things: [],
   },
   revision: 0n,
   exportedRevision: null,
@@ -112,12 +112,12 @@ const makeTemporaryDirectory = async (): Promise<string> => {
 
 const writeValidSpace = async (): Promise<string> => {
   const directory = await makeTemporaryDirectory();
-  await mkdir(join(directory, 'cards'));
+  await mkdir(join(directory, 'things'));
   await writeFile(
     join(directory, 'space.json'),
     JSON.stringify({ version: 1, id: SPACE_ID, title: 'Imported talk' }),
   );
-  await writeFile(join(directory, 'cards', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
+  await writeFile(join(directory, 'things', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
   return directory;
 };
 
@@ -180,8 +180,8 @@ describe('importSingleSpace', () => {
 
   it('refuses a retired space-level graphs key rather than importing what survives it', async () => {
     // The regression this exists for is not a bad diagnostic — it is a
-    // successful import. `importSpaceFileSchema` is a plain Zod object, so it
-    // dropped the retired key and handed the repository a Space missing its
+    // successful import. `importSpaceFileSchema` was a plain Zod object then, so
+    // it dropped the retired key and handed the repository a Space missing its
     // whole topology, reported as imported (issue `10`). Refusing is what the
     // test above proves; what this adds is that nothing reaches the repository.
     const directory = await makeTemporaryDirectory();
@@ -222,7 +222,7 @@ describe('importSingleSpace', () => {
         {
           id: SPACE_ID,
           document: { version: 1, title: 'Imported talk' },
-          cards: [
+          things: [
             {
               document: { title: 'Opening', kind: 'markdown', body: 'Hello.\n' },
             },
@@ -245,20 +245,20 @@ describe('importSingleSpace', () => {
     {
       result: {
         kind: 'rejected',
-        code: 'card-ownership',
-        message: `Card ${CARD_ID} belongs to space ${OTHER_SPACE_ID}`,
+        code: 'thing-ownership',
+        message: `Thing ${THING_ID} belongs to space ${OTHER_SPACE_ID}`,
       } satisfies RepositoryImportResult,
       expectedKind: 'identity',
-      expectedMessage: `Card ${CARD_ID} belongs to space ${OTHER_SPACE_ID}`,
+      expectedMessage: `Thing ${THING_ID} belongs to space ${OTHER_SPACE_ID}`,
     },
     {
       result: {
         kind: 'rejected',
         code: 'invalid-snapshot',
-        message: `Graph ${GRAPH_ID} has an unresolved card`,
+        message: `Graph ${GRAPH_ID} has an unresolved thing`,
       } satisfies RepositoryImportResult,
       expectedKind: 'domain-validation',
-      expectedMessage: `Graph ${GRAPH_ID} has an unresolved card`,
+      expectedMessage: `Graph ${GRAPH_ID} has an unresolved thing`,
     },
   ] as const)(
     'maps a repository result to $expectedKind without changing its diagnostic',
@@ -352,10 +352,10 @@ describe('importSpaceBatch', () => {
       result: {
         kind: 'rejected',
         code: 'invalid-snapshot',
-        message: `Graph ${GRAPH_ID} has an unresolved card`,
+        message: `Graph ${GRAPH_ID} has an unresolved thing`,
       } satisfies RepositoryImportResult,
       expectedKind: 'domain-validation',
-      expectedMessage: `Graph ${GRAPH_ID} has an unresolved card`,
+      expectedMessage: `Graph ${GRAPH_ID} has an unresolved thing`,
     },
   ] as const)(
     'maps a repository result to $expectedKind without changing its diagnostic',

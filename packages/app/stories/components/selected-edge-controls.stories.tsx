@@ -10,7 +10,7 @@ export default { title: 'Components/Selected Edge Controls' };
  * Four of them are refusals, and every one is handed in **structured**: the
  * sentence, the channel and the Field are derived by the same adapters the
  * canvas uses (ADR 0057). Three of the four are unreachable through any browser
- * gesture — the pickers only ever offer eligible Cards, so a refused completion
+ * gesture — the pickers only ever offer eligible Things, so a refused completion
  * needs the Space to have moved under an open editor — which is exactly why the
  * catalogue is where they are exercised.
  */
@@ -18,14 +18,14 @@ export default { title: 'Components/Selected Edge Controls' };
 /** Selection alone: Edit and Delete, and nothing opened. */
 export const Closed: Story = () => <SelectedEdgeFixture />;
 
-/** Edit pressed: both endpoints, each showing the Card it currently names. */
+/** Edit pressed: both endpoints, each showing the Thing it currently names. */
 export const EndpointEditor: Story = () => <SelectedEdgeFixture editorOpen />;
 
-/** A Card the Graph already reaches: still listed, disabled, with its reason. */
+/** A Thing the Graph already reaches: still listed, disabled, with its reason. */
 export const DisabledChoice: Story = () => (
   <SelectedEdgeFixture
     editorOpen
-    ineligible={{ cardId: DUPLICATE_TARGET, refusal: 'edge-already-exists' }}
+    ineligible={{ thingId: DUPLICATE_TARGET, refusal: 'edge-already-exists' }}
   />
 );
 

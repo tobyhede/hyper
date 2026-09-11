@@ -27,20 +27,20 @@ _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id
 **Thing**:
 A single addressable piece of a space, and what a Graph's Edges run between.
 
-A thing has a **Title** and a **kind**, which owns everything else: the additional fields, the opened editor, and what the Thing front draws around the Title. Thing fronts keep one uniform geometry across kinds. Markdown owns its body; Alias owns its Target. There is no shared Description, summary, or second content slot on Thing, and the Thing front draws no text the author did not write there — a kind shows as treatment, not as a line of prose beneath the Title.
+A Thing has a **Title** and a **kind**, which owns everything else: the additional fields, the opened editor, and what the Thing front draws around the Title. Thing fronts keep one uniform geometry across kinds. Markdown owns its body; Alias owns its Target. There is no shared Description, summary, or second content slot on Thing, and the Thing front draws no text the author did not write there — a kind shows as treatment, not as a line of prose beneath the Title.
 
 A Title is one or more **Title Lines**. The first line is the Thing's **name**: it is what every surface that lists or refers to the Thing shows, and it is the Thing's accessible name. The lines after it draw only on the Thing front, beneath the name, at descending typographic weight. They name and qualify the Thing — they are not content, which lives in the body an Open Thing reads. A Title with one line is the ordinary case and the whole of what most Things have.
 _Avoid_: heading, label, caption as a name for the Title itself (a caption is the role the third and later Title Lines take), and description or subtitle as a name for a separate field — there is no separate field.
 
-A thing is one of three kinds, and the kind is what its content is: **Markdown** — written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or an **alias** — another thing, shown again here.
-_Avoid_: Card (retired by ADR 0085), node, slide, page, tile, subgraph. For the content: prose (it may be a table, a drawing or code, not only writing), body (works for markdown, but a space thing's content is a graph).
+A Thing is one of three kinds, and the kind is what its content is: **Markdown** — written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or an **alias** — another Thing, shown again here.
+_Avoid_: Card (retired by ADR 0085), node, slide, page, tile, subgraph. For the content: prose (it may be a table, a drawing or code, not only writing), body (works for markdown, but a Space Thing's content is a graph).
 
 **Space Thing**:
-A thing of kind **space**: a reference to another Space, shown through the target's selected Diagram and Graph. The Space reference is immutable but the selections are authored on the Thing; many Space Things may show the same Space differently. The Space Things referencing a Space own its lifetime together: deleting one leaves the target alive while another reference remains, and deleting the last one deletes the target and every Space below it that nothing else references (ADR 0074). Space Thing references may converge but may not form a cycle.
+A Thing of kind **space**: a reference to another Space, shown through the target's selected Diagram and Graph. The Space reference is immutable but the selections are authored on the Thing; many Space Things may show the same Space differently. The Space Things referencing a Space own its lifetime together: deleting one leaves the target alive while another reference remains, and deleting the last one deletes the target and every Space below it that nothing else references (ADR 0074). Space Thing references may converge but may not form a cycle.
 _Avoid_: subspace, portal, link, nested space (as a second name for the same entity — it is a Space, full stop).
 
 **Alias**:
-A thing that shows another thing's **content** read-only: the same content appearing again elsewhere in the space, with a single source of truth, so editing the Target changes every place it appears. An Alias carries its own Title and chooses its immutable Target when created; it may target any non-Alias thing kind, including a Markdown Thing or a Space Thing, but never itself or another Alias.
+A Thing that shows another Thing's **content** read-only: the same content appearing again elsewhere in the space, with a single source of truth, so editing the Target changes every place it appears. An Alias carries its own Title and chooses its immutable Target when created; it may target any non-Alias Thing kind, including a Markdown Thing or a Space Thing, but never itself or another Alias.
 
 An Alias is authorable as a Thing and through the Diagrams and Graphs that contain it: it may be renamed, moved, connected, Opened, Closed and Resized. An Open Alias renders its Target's content without authoring it; the Target Thing must be opened explicitly to author that content or its kind-specific configuration.
 _Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
@@ -98,7 +98,7 @@ Availability reads what is in progress and never reads the Space. Whether a prop
 _Avoid_: eligibility (that is the Space's answer about a proposed entity — an Edge between two Things — and this one never reads the Space), permission, enabled and disabled (how a surface draws an answer, not the answer; a withheld command may equally be absent), refusal (reserved for an attempt that was made), mode.
 
 **Replacement epoch**:
-Which epoch of the working Space a piece of local work was made against. Replacing the working Space wholesale — accepting the stored Space is the only thing that does it — advances the epoch once, as part of the same transition that installs the replacement. Nothing else advances it: retrying, keeping local work, a change in persistence status, choosing another Diagram, and completing an Edit all leave it where it is.
+Which epoch of the working Space a piece of local work was made against. Replacing the working Space wholesale — accepting the stored Space is the only operation that does it — advances the epoch once, as part of the same transition that installs the replacement. Nothing else advances it: retrying, keeping local work, a change in persistence status, choosing another Diagram, and completing an Edit all leave it where it is.
 
 It is invalidation rather than a registry. Nothing learns which fields, pickers, drags or armed controls are open; each owner remembers the epoch its work was made under, or is keyed by it, and discards that work itself once the epoch no longer matches. Completed work is covered as well as Interaction drafts: an authoring operation that completed but is still waiting its turn behind an earlier one names identities and positions read from the Space it was derived from, so an epoch that has moved on means that work is discarded rather than applied to the Space that replaced it. Discarding it produces no Edit and is not a refusal the author asked for.
 _Avoid_: revision (that is what a stored Space is versioned by, and the two move for unrelated reasons), version, generation, session, dirty flag, cancellation registry, and _opening_ (the code's superseded name for this counter, and already the word for bringing a Thing up).
@@ -106,13 +106,13 @@ _Avoid_: revision (that is what a stored Space is versioned by, and the two move
 ## Diagrams
 
 **Diagram**:
-A thing-to-rect map the author wrote — which of a Space's Things are in the Diagram, where they sit, their Open/Closed state, and the Open Size each remembers. It belongs to the Space and is part of what the Space is. A working Space always has at least one Diagram and may hold several. Membership, position, Open/Closed state and Open Size are properties of the Diagram, never of the Thing: the same Thing may be absent from one Diagram, sit at different coordinates in others, and be Open at different sizes in each. A Diagram may not name Things the Space does not have.
+A Thing-to-rect map the author wrote — which of a Space's Things are in the Diagram, where they sit, their Open/Closed state, and the Open Size each remembers. It belongs to the Space and is part of what the Space is. A working Space always has at least one Diagram and may hold several. Membership, position, Open/Closed state and Open Size are properties of the Diagram, never of the Thing: the same Thing may be absent from one Diagram, sit at different coordinates in others, and be Open at different sizes in each. A Diagram may not name Things the Space does not have.
 
 A Diagram owns a non-empty ordered collection of Graphs over its Things. Several Graphs may share Things within that Diagram. A Diagram may also name which of its Graphs opens active; otherwise its first Graph opens active.
 _Avoid_: Layout (retired by ADR 0085 — it named both this entity and the behaviour that arranges Things, which is why a **layout strategy** keeps the word and this does not), View, placement as a synonym (a Diagram *holds* a placement, and adds an identity, a title and its owned Graphs), manual and custom and free-form (a Diagram is authored, so the qualifiers say nothing).
 
 **Placement**:
-The thing-to-rect map itself — which Things are present, where they sit, whether each is **Open** or **Closed**, and its remembered **Open Size**, and nothing more. A **Diagram** is the authored entity a Space holds; the placement is the map inside it. Every Closed Thing has the same **Closed Size** by domain rule, so that fixed size is not authored alongside each Thing. Placement is also what an automatic **layout strategy** computes and what the positioned strategy reads.
+The Thing-to-rect map itself — which Things are present, where they sit, whether each is **Open** or **Closed**, and its remembered **Open Size**, and nothing more. A **Diagram** is the authored entity a Space holds; the placement is the map inside it. Every Closed Thing has the same **Closed Size** by domain rule, so that fixed size is not authored alongside each Thing. Placement is also what an automatic **layout strategy** computes and what the positioned strategy reads.
 
 A Diagram's placement is **sparse** relative to the Space, and omission is meaningful: a Thing the map leaves out is not in that Diagram and is not rendered there. Adding an existing Thing to a Diagram writes its position. Removing it from the Diagram removes that entry and the incident Edges the Diagram owns without deleting the Thing from the Space. Omission is never the origin.
 
@@ -124,7 +124,7 @@ This is not the placement layer ADR 0004 rejected. That was an entity sitting *b
 _Avoid_: arrangement (ADR 0005 — applying a strategy produces no separate entity), layer.
 
 **Layout strategy**:
-A named strategy for arranging a space's things — how they are organised and positioned. Which things it arranges is the Diagram's choice, not the strategy's.
+A named strategy for arranging a Space's Things — how they are organised and positioned. Which Things it arranges is the Diagram's choice, not the strategy's.
 
 It keeps the word *layout*, which here is the verb. The **Diagram** is the authored artifact; a layout strategy is the behaviour that positions Things, and two of the three that ship read no Diagram at all (ADR 0014, ADR 0085).
 
@@ -132,18 +132,18 @@ A strategy is either **automatic** or **positioned**. An automatic strategy comp
 
 No strategy is the primary one. A space is arranged by whichever the author or the application chose, the set of them grows, and any particular graph-layout engine is one member of it rather than what layout means.
 
-_Avoid_: arrangement (applying a strategy produces no separate entity — the things themselves carry the positions), algorithm, engine.
+_Avoid_: arrangement (applying a strategy produces no separate entity — the Things themselves carry the positions), algorithm, engine.
 
 **Things View**:
 An application-supplied collection of the Space's Things absent from the selected Diagram. Its current rendering is a drawer reached from the Command Dock's Things cluster, but that mounting location is not part of the collection's identity (ADR 0082).
-_Avoid_: Space-thing palette, Thing panel, drawer or Dock as the domain name.
+_Avoid_: Space-Thing palette, Thing panel, drawer or Dock as the domain name.
 
 **Exporting**:
 Projecting a space into the repository-friendly form an author can review, commit and share. Exporting is not what makes an edit durable; it records the space outside Hyper at a chosen revision.
 _Avoid_: saving, publishing, syncing.
 
 **Opening**:
-Bringing a single thing's content up **on the Thing itself**, by growing it where it already sits. A Markdown Thing opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias opens on its own Title and its immutable Target's content read-only, while the Target Thing must be opened explicitly to author that content. A Space Thing opens on the Diagram it selects. Opening is not presenting — the canvas it happens on is still what is being worked in — and Open Markdown content reads through the same renderer used while presenting.
+Bringing a single Thing's content up **on the Thing itself**, by growing it where it already sits. A Markdown Thing opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias opens on its own Title and its immutable Target's content read-only, while the Target Thing must be opened explicitly to author that content. A Space Thing opens on the Diagram it selects. Opening is not presenting — the canvas it happens on is still what is being worked in — and Open Markdown content reads through the same renderer used while presenting.
 
 A Thing is **Open** or **Closed**, and that state is a property of the **Diagram**, not of the Thing and not of the viewer: opening a Thing is an Edit, it survives a reload, and any number of a Diagram's Things may be Open at once. Every Closed Thing has the fixed Thing size. Every Open Thing has an **Open Size**: the concrete dimensions authored when it first Opens and changed by Resize. Close preserves the Open Size, so reopening returns to it. Resizing is a Thing capability, not behavior supplied by a Thing kind; a kind decides what its Open Thing contains.
 
@@ -174,16 +174,16 @@ _Avoid_: overview traversal, browsing, walking.
 The ordered Things actually visited during one Graph navigation or presentation interaction. It is transient viewer state used to retrace the path actually taken through merges and cycles; the Space never owns or persists it.
 _Avoid_: Walk, route, trail, session, playthrough.
 
-**Selected thing**:
-The thing an authoring gesture will act on, named without being read. It is not opening and not activating: selecting a thing shows nothing new and changes nothing about the space, it says *this one*. One thing is selected at a time, and it is what reveals the controls drawn on a thing and what a keyboard rename acts on. Selecting is not authoring, because it produces no Edit.
-Selecting a Thing clears any Selected Edge, and selecting an Edge clears the Selected thing: authoring has one selected subject, never a multi-selection.
+**Selected Thing**:
+The Thing an authoring gesture will act on, named without being read. It is not opening and not activating: selecting a Thing shows nothing new and changes nothing about the Space, it says *this one*. One Thing is selected at a time, and it is what reveals the controls drawn on a Thing and what a keyboard rename acts on. Selecting is not authoring, because it produces no Edit.
+Selecting a Thing clears any Selected Edge, and selecting an Edge clears the Selected Thing: authoring has one selected subject, never a multi-selection.
 _Avoid_: focus (that is the browser's, and a Thing may be selected without it), highlight, current Thing, Active Thing (that belongs to Graph navigation or Presenting).
 
 **Selected Edge**:
-The one Edge an authoring gesture will act on in the Active Graph. Selecting it reveals the controls that reconnect or delete that Edge; it does not author the Edge, activate its Graph, or move keyboard focus by itself. An Edge outside the Active Graph cannot remain selected. Selecting an Edge clears the Selected thing, and selecting a Thing clears the Selected Edge: authoring has one selected subject, never a multi-selection.
+The one Edge an authoring gesture will act on in the Active Graph. Selecting it reveals the controls that reconnect or delete that Edge; it does not author the Edge, activate its Graph, or move keyboard focus by itself. An Edge outside the Active Graph cannot remain selected. Selecting an Edge clears the Selected Thing, and selecting a Thing clears the Selected Edge: authoring has one selected subject, never a multi-selection.
 _Avoid_: Active Edge (Active belongs to the Graph and Thing used by Graph navigation or Presenting), focused Edge (focus is the browser's), highlighted Edge.
 
-**Active thing**:
+**Active Thing**:
 The Thing currently reached during Graph navigation or Presenting, whose outgoing Edges are the moves available. It pairs with the **Active Graph**: the Graph names what is being traversed, and the Thing names the position in it. Going back reads Traversal history rather than the Graph, because a Thing reached by a merge has several Edges in and only the path taken says which one was used.
 _Avoid_: current slide, cursor, position, step.
 

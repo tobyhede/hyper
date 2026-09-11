@@ -55,7 +55,7 @@ test(
     await zoomIn.click();
     await expect.poll(() => viewportZoom(page)).toBeGreaterThan(zoomedOut);
 
-    // Fit view frames the Cards, so what it owes is one framing reached from
+    // Fit view frames the Things, so what it owes is one framing reached from
     // either side — not a direction. A direction held only by arithmetic
     // accident here: the fit zoom sits inside the range these clicks walk
     // through, so a run ending just below it read as a zoom *out*, and the

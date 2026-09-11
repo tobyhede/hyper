@@ -53,7 +53,7 @@ const openImportedSpace = async (
   // slot is addressed the way every other spec addresses it, and the visible
   // filter is the open-Spaces rule: every open Space stays mounted, and only
   // the one on the canvas is showing.
-  // `toContainText`, which is the matcher `space-card.spec.ts` spends on this
+  // `toContainText`, which is the matcher `space-thing.spec.ts` spends on this
   // same locator and the one actually proven green against the Dock. The title
   // carries the Space's own UUID, so containment is unambiguous here.
   await expect(page.locator('[data-testid="space-title"]:visible')).toContainText(title);
@@ -63,7 +63,7 @@ const openImportedSpace = async (
 test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) => {
   const repository = new PostgresSpaceRepository(db);
   const spaceId = newUuid();
-  const cardId = newUuid();
+  const thingId = newUuid();
   const diagramId = newUuid();
   const graphId = newUuid();
   const title = `HTTP restart ${spaceId}`;
@@ -77,9 +77,9 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     // The Diagram is part of the fixture, and has to be. A diagramless Space is
     // initialized on its first working load (ADR 0079), and that initialization
     // mints an *empty* Diagram — `positions: {}` in `working-space.ts`. The
-    // imported Card would then belong to the Space and to no Diagram, so the
+    // imported Thing would then belong to the Space and to no Diagram, so the
     // canvas would draw nothing and `nodeByTitle` below would wait out the
-    // timeout with the Card sitting in the Cards drawer. Placing the Card here
+    // timeout with the Thing sitting in the Things drawer. Placing the Thing here
     // also keeps this test about durability alone: initialization is a write,
     // and an unasked-for write is one more thing between the drag and the
     // revision this asserts.
@@ -94,17 +94,17 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
               id: diagramId,
               title: 'Diagram 1',
               kind: 'positioned',
-              positions: { [cardId]: { x: 0, y: 0, open: false } },
+              positions: { [thingId]: { x: 0, y: 0, open: false } },
               graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
               activeGraph: graphId,
             },
           ],
           defaultDiagram: diagramId,
         },
-        cards: [
+        things: [
           {
-            id: cardId,
-            document: { title: 'Restart card', kind: 'markdown', body: 'Durable.' },
+            id: thingId,
+            document: { title: 'Restart thing', kind: 'markdown', body: 'Durable.' },
           },
         ],
       },
@@ -115,14 +115,14 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     firstHost = first.server;
     const openedFirst = await openImportedSpace(browser, first.baseURL, spaceId, title);
     firstContext = openedFirst.context;
-    const card = nodeByTitle(openedFirst.page, 'Restart card');
+    const thing = nodeByTitle(openedFirst.page, 'Restart thing');
     await settled(openedFirst.page);
-    await dragBy(openedFirst.page, card, 0, 220);
+    await dragBy(openedFirst.page, thing, 0, 220);
     await expect(openedFirst.page.getByTestId('persistence-status')).toHaveAttribute(
       'data-revision',
       '1',
     );
-    const durablePosition = await positionOf(card);
+    const durablePosition = await positionOf(thing);
 
     await firstContext.close();
     firstContext = undefined;
@@ -136,7 +136,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     secondHost = second.server;
     const openedSecond = await openImportedSpace(browser, second.baseURL, spaceId, title);
     secondContext = openedSecond.context;
-    const reloaded = nodeByTitle(openedSecond.page, 'Restart card');
+    const reloaded = nodeByTitle(openedSecond.page, 'Restart thing');
     await expect(reloaded).toBeVisible();
     await settled(openedSecond.page);
     expect(await positionOf(reloaded)).toEqual(durablePosition);

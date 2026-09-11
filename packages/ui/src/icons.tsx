@@ -23,13 +23,13 @@ import {
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
-import type { Card } from '@project/core';
+import type { Thing } from '@project/core';
 
-type CardActionIconProps = ComponentProps<typeof Pencil>;
+type ThingActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
 
 /**
- * An authored Diagram: the Cards a Space placed, and the Graphs over them.
+ * An authored Diagram: the Things a Space placed, and the Graphs over them.
  *
  * Placements on a plane. This was `PanelsTopLeft` — a header, a sidebar and a
  * content well, which is a *web page chrome* and describes nothing the product
@@ -43,7 +43,7 @@ export const DiagramIcon = () => <LayoutGrid size={16} />;
  *
  * A path from a start pin to an end pin. This was `Network` — one node above
  * two, joined by a bracket — which draws a *hierarchy*, and a Graph is a
- * curated traversal over Cards a Diagram has already placed. Present is what a
+ * curated traversal over Things a Diagram has already placed. Present is what a
  * Graph is for, and a path is the thing you present.
  *
  * Drawn heavier than Lucide's default 2. This is the only glyph in the set
@@ -81,22 +81,22 @@ export const StopPresentingIcon = ({ color }: { color: string }) => (
   <Square color={color} size={12} />
 );
 
-/** Edit the content of a Markdown Card. */
-export const EditIcon = (props: CardActionIconProps) => <Pencil size={14} {...props} />;
+/** Edit the content of a Markdown Thing. */
+export const EditIcon = (props: ThingActionIconProps) => <Pencil size={14} {...props} />;
 
-/** Commit the edit running on a Card's content. */
-export const CommitEditIcon = (props: CardActionIconProps) => <Check size={14} {...props} />;
+/** Commit the edit running on a Thing's content. */
+export const CommitEditIcon = (props: ThingActionIconProps) => <Check size={14} {...props} />;
 
-/** Abandon the edit running on a Card's content. */
-export const AbandonEditIcon = (props: CardActionIconProps) => (
+/** Abandon the edit running on a Thing's content. */
+export const AbandonEditIcon = (props: ThingActionIconProps) => (
   <X size={14} strokeWidth={3} {...props} />
 );
 
-/** Open a Card in place. */
-export const OpenCardIcon = (props: CardActionIconProps) => <Maximize2 size={14} {...props} />;
+/** Open a Thing in place. */
+export const OpenThingIcon = (props: ThingActionIconProps) => <Maximize2 size={14} {...props} />;
 
-/** Close a Card that is open in place. */
-export const CloseCardIcon = (props: CardActionIconProps) => <Minimize2 size={14} {...props} />;
+/** Close a Thing that is open in place. */
+export const CloseThingIcon = (props: ThingActionIconProps) => <Minimize2 size={14} {...props} />;
 
 /** The shared affordance for a trigger that opens a list or menu. */
 export const ChevronDownIcon = () => <ChevronDown size={14} />;
@@ -104,7 +104,7 @@ export const ChevronDownIcon = () => <ChevronDown size={14} />;
 /** Search within the collection named by the surrounding input. */
 export const SearchIcon = () => <Search size={16} />;
 
-/** Create a Markdown Card. */
+/** Create a Markdown Thing. */
 export const PlusIcon = () => <Plus size={14} />;
 
 /** Move the canvas camera one zoom step farther away. */
@@ -113,16 +113,16 @@ export const ZoomOutIcon = (props: CanvasControlIconProps) => <Minus size={14} {
 /** Move the canvas camera one zoom step closer. */
 export const ZoomInIcon = (props: CanvasControlIconProps) => <Plus size={14} {...props} />;
 
-/** Frame every visible canvas Card in the viewport. */
+/** Frame every visible canvas Thing in the viewport. */
 export const FitViewIcon = (props: CanvasControlIconProps) => <Maximize size={14} {...props} />;
 
-/** The Card kind that owns the Markdown it draws. */
+/** The Thing kind that owns the Markdown it draws. */
 export const MarkdownIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <StickyNote size={size} />
 );
 
-/** The Card kind that shows one selected view of another Space (ADR 0068). */
-export const SpaceCardIcon = ({ size = 14 }: { size?: number | undefined }) => (
+/** The Thing kind that shows one selected view of another Space (ADR 0068). */
+export const SpaceThingIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <Frame size={size} />
 );
 
@@ -131,7 +131,7 @@ export const SpaceCardIcon = ({ size = 14 }: { size?: number | undefined }) => (
  *
  * **Two Spaces named side by side cannot both take the Space glyph.** The
  * Command Dock draws the Space you are in beside the Space you entered it from,
- * and giving both {@link SpaceCardIcon} drew two identical clusters at the same
+ * and giving both {@link SpaceThingIcon} drew two identical clusters at the same
  * size and the same `--muted-foreground` — the glyph is what a reader matches
  * on, so repeating it made the pair harder to tell apart rather than easier.
  *
@@ -166,7 +166,7 @@ export const SpaceCardIcon = ({ size = 14 }: { size?: number | undefined }) => (
  * **What it costs.** It says *containing*, not *above* and not *back*, so the
  * reader learns the relationship but nothing in the mark says which way to
  * travel — and pressing it is still a move. It also gives one domain kind two
- * glyphs, so {@link SpaceCardIcon} stops answering "what does a Space look
+ * glyphs, so {@link SpaceThingIcon} stops answering "what does a Space look
  * like" on its own. A cube in isometric has an up-face, and filling it would
  * add the direction back; that is not taken here.
  */
@@ -198,39 +198,39 @@ export const ParentIcon = ({ size = 14 }: { size?: number | undefined }) => {
 };
 
 /**
- * The Card kinds that own what they draw, and so have a glyph of their own.
+ * The Thing kinds that own what they draw, and so have a glyph of their own.
  *
  * An Alias is deliberately absent: it is not a third silhouette but a badge on
  * one of these two.
  *
  * **Subtracted from the domain union rather than restated as its own.** Written
- * out as `'markdown' | 'space'` it was a second list agreeing with `Card['kind']`
+ * out as `'markdown' | 'space'` it was a second list agreeing with `Thing['kind']`
  * only by hand, so a kind added to the domain left every record keyed by this
  * type exhaustive and wrong. Derived, the addition lands here, and
  * {@link BASE_GLYPHS} fails to build until the new kind has a silhouette.
  */
-export type CardBaseKind = Exclude<Card['kind'], 'alias'>;
+export type ThingBaseKind = Exclude<Thing['kind'], 'alias'>;
 
-/** The silhouette each Card kind that owns one draws. */
+/** The silhouette each Thing kind that owns one draws. */
 export const BASE_GLYPHS = {
   markdown: MarkdownIcon,
-  space: SpaceCardIcon,
-} satisfies Record<CardBaseKind, ComponentType<{ size?: number }>>;
+  space: SpaceThingIcon,
+} satisfies Record<ThingBaseKind, ComponentType<{ size?: number }>>;
 
 /**
- * An Alias, drawn as the glyph of the Card it points at with a badge on it.
+ * An Alias, drawn as the glyph of the Thing it points at with a badge on it.
  *
- * **An Alias is not a third Card silhouette.** A single Alias glyph can say
- * *that* a Card refers elsewhere but never *what it refers to* — and a Space
- * Card is as legitimate a Target as a Markdown Card (ADR 0070), so the two
+ * **An Alias is not a third Thing silhouette.** A single Alias glyph can say
+ * *that* a Thing refers elsewhere but never *what it refers to* — and a Space
+ * Thing is as legitimate a Target as a Markdown Thing (ADR 0070), so the two
  * would draw identically while the kind on the canvas is exactly what the
  * glyph exists to carry. Keeping the base and adding a mark is also what the
- * canvas already does: `canvas-card.css` keeps the Card and changes only
+ * canvas already does: `canvas-thing.css` keeps the Thing and changes only
  * `border-style` to dotted.
  *
  * **The hole is cut, not painted.** The badge sits over the base's own stroke,
  * and a disc filled with a background colour would have to know which surface
- * it is on — a menu, a popover, a Card's cream face. An SVG mask removes that
+ * it is on — a menu, a popover, a Thing's cream face. An SVG mask removes that
  * region from the base instead, so whatever is behind shows through and the
  * mark is legible on every surface. `useId` keeps the mask reference unique
  * when several of these are drawn in one list, which they are.
@@ -244,7 +244,7 @@ export function AliasIcon({
   size = 14,
 }: {
   /** The kind of the Target. Absent, an Alias draws over the Markdown base. */
-  base?: CardBaseKind | undefined;
+  base?: ThingBaseKind | undefined;
   size?: number | undefined;
 }) {
   const maskId = useId();
@@ -294,20 +294,20 @@ export const AlertIcon = () => <CircleAlert />;
 export const CloseIcon = () => <X size={14} strokeWidth={3} />;
 
 /**
- * Open an entity's actions menu, on a **Card rail**.
+ * Open an entity's actions menu, on a **Thing rail**.
  *
  * A link glyph rather than the conventional kebab, and that argument is the
  * rail's alone: every other control there names its command (`EditIcon`,
- * `OpenCardIcon`, `CloseCardIcon`), so a generic "more" glyph beside them would
+ * `OpenThingIcon`, `CloseThingIcon`), so a generic "more" glyph beside them would
  * be the one control saying nothing about what it does.
  *
  * It is no longer the glyph the menu wears everywhere. The menu grew a rename
  * and a delete beside its addresses, so a Sidebar row — which has no cluster of
  * self-naming commands to sit in — draws `EntityActionsIcon` instead. Whether
- * the rail follows is a rail decision, taken when `CardNode` first supplies the
+ * the rail follows is a rail decision, taken when `ThingNode` first supplies the
  * actions; until then this stays exactly what it draws today.
  */
-export const LinkActionsIcon = (props: CardActionIconProps) => <Link size={14} {...props} />;
+export const LinkActionsIcon = (props: ThingActionIconProps) => <Link size={14} {...props} />;
 
 /**
  * Open an entity's actions menu, where the menu is not mostly one thing.
@@ -317,10 +317,10 @@ export const LinkActionsIcon = (props: CardActionIconProps) => <Link size={14} {
  * and the menu behind it holds a rename, two addresses and a delete. A glyph
  * naming any one of those would name the wrong one.
  */
-export const EntityActionsIcon = (props: CardActionIconProps) => <Ellipsis size={14} {...props} />;
+export const EntityActionsIcon = (props: ThingActionIconProps) => <Ellipsis size={14} {...props} />;
 
 /** Put an address on the clipboard. */
-export const CopyIcon = (props: CardActionIconProps) => <Copy size={14} {...props} />;
+export const CopyIcon = (props: ThingActionIconProps) => <Copy size={14} {...props} />;
 
 /** Remove the entity the surrounding command names. */
-export const DeleteIcon = (props: CardActionIconProps) => <Trash2 size={14} {...props} />;
+export const DeleteIcon = (props: ThingActionIconProps) => <Trash2 size={14} {...props} />;

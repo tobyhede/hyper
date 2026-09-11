@@ -14,7 +14,7 @@ import {
  * Both are one `fitView` call (ADR 0044). Framing a set of nodes is what React
  * Flow's own presentation tutorial navigates with, and what the docs point to
  * when they call `getViewportForBounds` "quite a low-level utility". The
- * arithmetic that used to sit here — half a card's width, a letterbox divisor, a
+ * arithmetic that used to sit here — half a thing's width, a letterbox divisor, a
  * zoom computed from the viewport — is all inside `fitView`, and unlike our
  * version it clamps into `[minZoom, maxZoom]` so the camera cannot leave the
  * extent the canvas declares.
@@ -80,10 +80,10 @@ export function OverviewCamera({ presenting }: { presenting: boolean }) {
 }
 
 /**
- * Moves the camera to the Card the traversal has reached (ADR 0027).
+ * Moves the camera to the Thing the traversal has reached (ADR 0027).
  *
  * There is no second surface: presenting is this canvas, drawn close enough that
- * one card fills the screen. One `fitView` over that one card is the whole
+ * one thing fills the screen. One `fitView` over that one thing is the whole
  * mechanism (ADR 0044).
  *
  * It used to be two moves — pan at the wider scale, then close in — copied from
@@ -96,26 +96,26 @@ export function OverviewCamera({ presenting }: { presenting: boolean }) {
  *
  * The viewport size is a dependency rather than an argument to the fit: `fitView`
  * reads the container itself, but the effect must re-run when it changes, or a
- * resized window leaves the card framed for the old one.
+ * resized window leaves the thing framed for the old one.
  */
-export function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
+export function PresentingCamera({ activeThingId }: { activeThingId: string | null }) {
   const { fitView, getNode } = useReactFlow();
   const viewportWidth = useStore((s) => s.width);
   const viewportHeight = useStore((s) => s.height);
 
   useEffect(() => {
-    if (!activeCardId || viewportWidth === 0 || viewportHeight === 0) return;
+    if (!activeThingId || viewportWidth === 0 || viewportHeight === 0) return;
     // A `nodes` filter that matches nothing does not cancel the fit — it fits the
     // bounds of nothing, a zero-size rect at the origin, which lands the camera
-    // at `maxZoom` on empty canvas. So the card has to be on screen first.
-    if (!getNode(activeCardId)) return;
+    // at `maxZoom` on empty canvas. So the thing has to be on screen first.
+    if (!getNode(activeThingId)) return;
 
     void fitView({
-      nodes: [{ id: activeCardId }],
+      nodes: [{ id: activeThingId }],
       padding: PRESENTING_PADDING,
       duration: PRESENTING_DURATION,
     });
-  }, [activeCardId, viewportWidth, viewportHeight, getNode, fitView]);
+  }, [activeThingId, viewportWidth, viewportHeight, getNode, fitView]);
 
   return null;
 }

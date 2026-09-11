@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
 import { encodeProblemDetails, type HyperProblemCode } from '@project/persistence';
-import { CARD_ID, SPACE_ID, oneCardSnapshot as snapshot } from '../support/space-fixtures';
+import { THING_ID, SPACE_ID, oneThingSnapshot as snapshot } from '../support/space-fixtures';
 
 const backendFor = (response: Response): HttpSpaceBackend =>
   new HttpSpaceBackend('/', { fetch: () => Promise.resolve(response) });
@@ -174,7 +174,7 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
   it('decodes a listing into summaries and rejects one it cannot', async () => {
     const summaries = [
       { id: SPACE_ID, title: 'One' },
-      { id: CARD_ID, title: 'Two' },
+      { id: THING_ID, title: 'Two' },
     ];
     await expect(
       backendFor(new Response(JSON.stringify(summaries), { status: 200 })).listSpaces(),

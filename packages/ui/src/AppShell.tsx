@@ -13,14 +13,14 @@ export interface AppShellProps {
    * The shell positions its own chrome, so it is the shell that has to know
    * something covers that edge — the canvas is pinned to it, and so is the
    * notice above. Yielding the strip rather than layering over it is what keeps
-   * a Card the reader is dragging, the Graph key and a standing notice all
+   * a Thing the reader is dragging, the Graph key and a standing notice all
    * visible beside the panel instead of behind it. Any CSS length; omitted
    * means nothing overlays and the main area is full-bleed.
    *
    * **This is not the command surface taking room.** ADR 0082 binds that the
    * Space's command surface takes no layout space from the canvas, and the
    * Command Dock takes none — it floats over `.shell__area`. The strip is the
-   * Cards drawer's, a surface the author opens and closes rather than furniture
+   * Things drawer's, a surface the author opens and closes rather than furniture
    * standing on every screen.
    */
   insetEnd?: string | undefined;

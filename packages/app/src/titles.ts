@@ -4,12 +4,12 @@ import { titleName, type Graph, type SpaceSnapshot } from '@project/core';
  * The neutral titles the app mints for structure the author did not name.
  *
  * It sits in its own module so every authoring operation shares one numbering
- * rule for Cards, Diagrams and Graphs.
+ * rule for Things, Diagrams and Graphs.
  *
  * Three named operations rather than one helper taking a prefix. What a caller
  * knows is *what it is naming*; the `<Prefix> N` arithmetic and the prefix
  * literal are this module's, so no call site can spell "Diagram" a second way or
- * number one kind of thing differently from another. This is a deterministic
+ * number one kind of entity differently from another. This is a deterministic
  * rule and stays one — it is not injected, because there is nothing about it a
  * test would want to replace.
  */
@@ -36,17 +36,17 @@ function nextNumberedTitle(prefix: string, titles: Iterable<string>): string {
 }
 
 /**
- * What an Edit calls the Card it creates.
+ * What an Edit calls the Thing it creates.
  *
- * The scan reads **first lines** (ADR 0083). A Card whose Title opens `Card 3`
- * and continues onto further Title Lines is still the Card called `Card 3`, so
+ * The scan reads **first lines** (ADR 0083). A Thing whose Title opens `Thing 3`
+ * and continues onto further Title Lines is still the Thing called `Thing 3`, so
  * it occupies 3 and the next Edit mints 4 — otherwise adding a subtitle to a
- * minted Card would silently free its number for a duplicate.
+ * minted Thing would silently free its number for a duplicate.
  */
-export const nextCardTitle = (snapshot: SpaceSnapshot): string =>
+export const nextThingTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
-    'Card',
-    snapshot.cards.map((card) => titleName(card.document.title)),
+    'Thing',
+    snapshot.things.map((thing) => titleName(thing.document.title)),
   );
 
 /** What an Edit calls the next Diagram it creates. */

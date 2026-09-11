@@ -6,7 +6,7 @@ import { waitForSettled } from './session-fixtures';
 const snapshot: SpaceSnapshot = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
   document: { version: 1, title: 'Space' },
-  cards: [],
+  things: [],
 };
 
 const withPersistence = (persistence: SpaceSessionState['persistence']): SpaceSessionState => ({

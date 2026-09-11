@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Card, type Graph, type Diagram } from '@project/core';
+import { uuidSchema, type Thing, type Graph, type Diagram } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { EntityActionGroup } from '@project/ui';
 import {
@@ -11,18 +11,18 @@ import {
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const PLACED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const OUTSIDE_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const PLACED_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const OUTSIDE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
 const GRAPH: Graph = { id: GRAPH_ID, title: 'Long', edges: [] };
 const DIAGRAM: Diagram = {
   id: DIAGRAM_ID,
   title: 'Collection 1',
   kind: 'positioned',
-  positions: { [PLACED_CARD_ID]: { x: 0, y: 0, open: false } },
+  positions: { [PLACED_THING_ID]: { x: 0, y: 0, open: false } },
   graphs: [GRAPH],
 };
-const card = (id: typeof PLACED_CARD_ID, title: string): Card => ({
+const thing = (id: typeof PLACED_THING_ID, title: string): Thing => ({
   id,
   title,
   kind: 'markdown',
@@ -79,8 +79,8 @@ describe('spaceEntityActions', () => {
     { name: 'a Diagram', entity: { kind: 'diagram', diagram: DIAGRAM } as const },
     { name: 'a Graph', entity: { kind: 'graph', graph: GRAPH, diagram: DIAGRAM } as const },
     {
-      name: 'a Card',
-      entity: { kind: 'card', card: card(PLACED_CARD_ID, 'A'), diagram: DIAGRAM } as const,
+      name: 'a Thing',
+      entity: { kind: 'thing', thing: thing(PLACED_THING_ID, 'A'), diagram: DIAGRAM } as const,
     },
   ])('never says canonical or contextual in $name’s menu', ({ entity }) => {
     const written = commands(build()(entity))
@@ -166,31 +166,31 @@ describe('spaceEntityActions', () => {
     });
   });
 
-  it('offers a placed Card both link forms and no rename', () => {
+  it('offers a placed Thing both link forms and no rename', () => {
     const entity: SpaceEntity = {
-      kind: 'card',
-      card: card(PLACED_CARD_ID, 'A'),
+      kind: 'thing',
+      thing: thing(PLACED_THING_ID, 'A'),
       diagram: DIAGRAM,
     };
 
     expect(labels(build()(entity))).toEqual(['Copy link', 'Copy permanent link']);
     expect(copied(entity, 'Copy link')).toEqual({
-      kind: 'diagram-card',
+      kind: 'diagram-thing',
       spaceId: SPACE_ID,
       diagramId: DIAGRAM_ID,
-      cardId: PLACED_CARD_ID,
+      thingId: PLACED_THING_ID,
     });
   });
 
   /**
-   * A menu row refers to a Card, so its sentence names the Card's **name**
+   * A menu row refers to a Thing, so its sentence names the Thing's **name**
    * (ADR 0083). The description is one line of prose beneath a label, and a
    * Title's later lines reaching it would break the sentence in half.
    */
-  it('describes a Card’s addresses by the Card’s name', () => {
+  it('describes a Thing’s addresses by the Thing’s name', () => {
     const entity: SpaceEntity = {
-      kind: 'card',
-      card: card(PLACED_CARD_ID, 'Auth\nHow a session begins'),
+      kind: 'thing',
+      thing: thing(PLACED_THING_ID, 'Auth\nHow a session begins'),
       diagram: DIAGRAM,
     };
 
@@ -203,22 +203,22 @@ describe('spaceEntityActions', () => {
   });
 
   /**
-   * A Card the Cards drawer reveals but this Diagram does not place has one
+   * A Thing the Things drawer reveals but this Diagram does not place has one
    * address, so there is nothing for a second to differ from. Offering it
-   * anyway would copy a `diagram-card` path the host answers 404 for.
+   * anyway would copy a `diagram-thing` path the host answers 404 for.
    */
-  it('withholds the permanent link from a Card this Diagram does not place', () => {
+  it('withholds the permanent link from a Thing this Diagram does not place', () => {
     const entity: SpaceEntity = {
-      kind: 'card',
-      card: card(OUTSIDE_CARD_ID, 'Outside'),
+      kind: 'thing',
+      thing: thing(OUTSIDE_THING_ID, 'Outside'),
       diagram: DIAGRAM,
     };
 
     expect(labels(build()(entity))).toEqual(['Copy link']);
     expect(copied(entity, 'Copy link')).toEqual({
-      kind: 'card',
+      kind: 'thing',
       spaceId: SPACE_ID,
-      cardId: OUTSIDE_CARD_ID,
+      thingId: OUTSIDE_THING_ID,
     });
   });
 

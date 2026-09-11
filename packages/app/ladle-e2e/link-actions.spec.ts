@@ -14,7 +14,7 @@ import { expect, test } from '@playwright/test';
  * `space-sidebar-entity-actions-menu` — described a menu "reached two ways from
  * a Sidebar row". The Command Dock has clusters rather than rows and no
  * `onContextMenu` anywhere, so that behaviour did not move: it belongs to the
- * Card rail (ADR 0073), which is what the last two tests in this file press.
+ * Thing rail (ADR 0073), which is what the last two tests in this file press.
  * What is left of the Sidebar's half is the one thing the Dock does keep — a
  * Space name that offers its address and no rename — restated below in the
  * Dock's own words and untagged, the claim it stood for having been retired
@@ -70,7 +70,7 @@ test('the Space name is a label with one address, beside a Diagram that renames'
 /**
  * A copy confirms by swapping the item's own label, without the menu closing.
  *
- * **This is the Card rail's and no longer the chrome's.** `EntityActionsMenu`
+ * **This is the Thing rail's and no longer the chrome's.** `EntityActionsMenu`
  * swaps a pressed item's words because the Sidebar's menus were drawn inside a
  * Sheet over the area a pinned notice renders in, and on a phone the reader
  * could not see the report any other way. The Command Dock has no Sheet and
@@ -78,9 +78,9 @@ test('the Space name is a label with one address, beside a Diagram that renames'
  * instead; the rail keeps the swap, being a menu on the canvas itself.
  */
 test('a copy command confirms in the rail menu it was pressed in', async ({ page }) => {
-  await page.goto('/?story=review--link-actions--card-rail&mode=preview');
+  await page.goto('/?story=review--link-actions--thing-rail&mode=preview');
 
-  await page.getByRole('button', { name: 'Actions for Card Card 2' }).click({ delay: 120 });
+  await page.getByRole('button', { name: 'Actions for Thing Thing 2' }).click({ delay: 120 });
   const menu = page.getByRole('menu');
   await menu.getByRole('menuitem', { name: /^Copy permanent link/ }).click();
 
@@ -88,26 +88,26 @@ test('a copy command confirms in the rail menu it was pressed in', async ({ page
   await expect(menu.getByRole('menuitem', { name: 'Copied' })).toBeVisible();
 });
 
-test('a Card rail opens its actions menu from the link control', async ({ page }) => {
-  await page.goto('/?story=review--link-actions--card-rail&mode=preview');
+test('a Thing rail opens its actions menu from the link control', async ({ page }) => {
+  await page.goto('/?story=review--link-actions--thing-rail&mode=preview');
 
-  await page.getByRole('button', { name: 'Actions for Card Card 2' }).click({ delay: 120 });
+  await page.getByRole('button', { name: 'Actions for Thing Thing 2' }).click({ delay: 120 });
 
   const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
   await menu.getByRole('menuitem', { name: /^Copy link/ }).click();
   await expect(
-    page.getByText(/Copied → .*\/diagrams\/AAAAAAAAQACAAAAAAAAAIA\/cards\//),
+    page.getByText(/Copied → .*\/diagrams\/AAAAAAAAQACAAAAAAAAAIA\/things\//),
   ).toBeVisible();
 });
 
-test('a Card opens the same actions menu from a right click', async ({ page }) => {
-  await page.goto('/?story=review--link-actions--card-rail&mode=preview');
+test('a Thing opens the same actions menu from a right click', async ({ page }) => {
+  await page.goto('/?story=review--link-actions--thing-rail&mode=preview');
 
-  await page.getByRole('article', { name: 'Card 2' }).click({ button: 'right' });
+  await page.getByRole('article', { name: 'Thing 2' }).click({ button: 'right' });
 
   const menu = page.getByRole('menu');
-  // No Rename: a Card's title is renamed in place on its Front, so the menu
+  // No Rename: a Thing's title is renamed in place on its Front, so the menu
   // production would supply here holds its two addresses and nothing else.
   await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
   await expect(menu.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();

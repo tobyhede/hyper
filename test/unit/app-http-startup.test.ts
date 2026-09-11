@@ -19,23 +19,25 @@ const startupOver = (backend: SpaceBackend, newId: () => UUID = newUuid): SpaceS
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
-const snapshot = (id = SPACE_ID, cardId = CARD_ID, title = 'Stored space'): SpaceSnapshot => ({
+const snapshot = (id = SPACE_ID, thingId = THING_ID, title = 'Stored space'): SpaceSnapshot => ({
   id,
   document: { version: 1, title },
-  cards: [{ id: cardId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } }],
+  things: [
+    { id: thingId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } },
+  ],
 });
 
 const metaReferencingOther = (): SpaceSnapshot => ({
   id: SPACE_ID,
   document: { version: 1, title: 'Stored space' },
-  cards: [
+  things: [
     {
-      id: CARD_ID,
+      id: THING_ID,
       document: { title: 'Other space', kind: 'space', spaceId: OTHER_SPACE_ID },
     },
   ],
@@ -92,7 +94,7 @@ describe('HTTP space startup composition', () => {
   it('fails when the product-route id no longer resolves', async () => {
     const startup = startupFor(
       OTHER_SPACE_ID,
-      snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'),
+      snapshot(OTHER_SPACE_ID, OTHER_THING_ID, 'Other space'),
     );
 
     await expect(
@@ -104,7 +106,7 @@ describe('HTTP space startup composition', () => {
     const startup = startupFor(
       SPACE_ID,
       metaReferencingOther(),
-      snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'),
+      snapshot(OTHER_SPACE_ID, OTHER_THING_ID, 'Other space'),
     );
 
     const result = await startup.resolve(
@@ -162,7 +164,7 @@ describe('HTTP space startup composition', () => {
               id: DIAGRAM_ID,
               title: 'Diagram 1',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [THING_ID]: { x: 0, y: 0, open: false as const } },
               graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
             },
           ],
@@ -217,7 +219,7 @@ describe('HTTP space startup composition', () => {
               id: DIAGRAM_ID,
               title: 'Diagram',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [THING_ID]: { x: 0, y: 0, open: false as const } },
               graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
             },
           ],
@@ -236,13 +238,13 @@ describe('HTTP space startup composition', () => {
     expect(result.opening?.graphId).toBe(GRAPH_ID);
   });
 
-  it('opens an exact presentation point with its named View, Graph and Card', async () => {
+  it('opens an exact presentation point with its named View, Graph and Thing', async () => {
     const loaded = {
       snapshot: {
         ...snapshot(),
-        cards: [
-          ...snapshot().cards,
-          { id: OTHER_CARD_ID, document: { title: 'Next', kind: 'markdown' as const, body: '' } },
+        things: [
+          ...snapshot().things,
+          { id: OTHER_THING_ID, document: { title: 'Next', kind: 'markdown' as const, body: '' } },
         ],
         document: {
           version: 1 as const,
@@ -253,14 +255,14 @@ describe('HTTP space startup composition', () => {
               title: 'Diagram',
               kind: 'positioned' as const,
               positions: {
-                [CARD_ID]: { x: 0, y: 0, open: false as const },
-                [OTHER_CARD_ID]: { x: 320, y: 0, open: false as const },
+                [THING_ID]: { x: 0, y: 0, open: false as const },
+                [OTHER_THING_ID]: { x: 320, y: 0, open: false as const },
               },
               graphs: [
                 {
                   id: GRAPH_ID,
                   title: 'Graph',
-                  edges: [{ from: CARD_ID, to: OTHER_CARD_ID }],
+                  edges: [{ from: THING_ID, to: OTHER_THING_ID }],
                 },
               ],
             },
@@ -278,16 +280,16 @@ describe('HTTP space startup composition', () => {
         spaceId: SPACE_ID,
         diagramId: DIAGRAM_ID,
         graphId: GRAPH_ID,
-        cardId: OTHER_CARD_ID,
+        thingId: OTHER_THING_ID,
       }),
     );
 
     expect(result.opening?.selection).toBe(DIAGRAM_ID);
     expect(result.opening?.graphId).toBe(GRAPH_ID);
-    expect(result.opening?.presentationCardId).toBe(OTHER_CARD_ID);
+    expect(result.opening?.presentationThingId).toBe(OTHER_THING_ID);
   });
 
-  it('opens a contextual Card in its named Diagram without authoring it open', async () => {
+  it('opens a contextual Thing in its named Diagram without authoring it open', async () => {
     const diagramId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
     const loaded = {
       snapshot: {
@@ -300,7 +302,7 @@ describe('HTTP space startup composition', () => {
               id: diagramId,
               title: 'Diagram',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [THING_ID]: { x: 0, y: 0, open: false as const } },
               graphs: [
                 {
                   id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -319,21 +321,21 @@ describe('HTTP space startup composition', () => {
 
     const result = await startup.resolve(
       productDestinationPath({
-        kind: 'diagram-card',
+        kind: 'diagram-thing',
         spaceId: SPACE_ID,
         diagramId: diagramId,
-        cardId: CARD_ID,
+        thingId: THING_ID,
       }),
     );
 
     expect(result.opening?.selection).toBe(diagramId);
-    expect(result.opening?.cardId).toBe(CARD_ID);
+    expect(result.opening?.thingId).toBe(THING_ID);
     expect(
-      result.opened.app.currentSpace().lookup.diagram(diagramId)?.diagram.positions[CARD_ID]?.open,
+      result.opened.app.currentSpace().lookup.diagram(diagramId)?.diagram.positions[THING_ID]?.open,
     ).toBe(false);
   });
 
-  it('reveals a canonical Card omitted by the default Diagram in the Cards collection', async () => {
+  it('reveals a canonical Thing omitted by the default Diagram in the Things collection', async () => {
     const diagramId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
     const omittedId = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
     const loaded = {
@@ -348,7 +350,7 @@ describe('HTTP space startup composition', () => {
               id: diagramId,
               title: 'Diagram',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [THING_ID]: { x: 0, y: 0, open: false as const } },
               graphs: [
                 {
                   id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -359,8 +361,8 @@ describe('HTTP space startup composition', () => {
             },
           ],
         },
-        cards: [
-          ...snapshot().cards,
+        things: [
+          ...snapshot().things,
           {
             id: omittedId,
             document: { title: 'Omitted', kind: 'markdown' as const, body: '' },
@@ -373,11 +375,11 @@ describe('HTTP space startup composition', () => {
     const startup = startupOver(new MemorySpaceBackend([loaded]));
 
     const result = await startup.resolve(
-      productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: omittedId }),
+      productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: omittedId }),
     );
 
     expect(result.opening?.selection).toBe(diagramId);
-    expect(result.opening?.cardId).toBe(omittedId);
+    expect(result.opening?.thingId).toBe(omittedId);
     expect(
       result.opened.app.currentSpace().lookup.diagram(diagramId)?.diagram.positions[omittedId],
     ).toBeUndefined();

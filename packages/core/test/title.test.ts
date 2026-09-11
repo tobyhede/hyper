@@ -1,103 +1,103 @@
 import { describe, expect, it } from 'vitest';
 import type { ZodIssue, ZodType, ZodTypeDef } from 'zod';
 import {
-  CARD_TITLE_REQUIRED,
-  aliasCardFrontmatterSchema,
-  cardDocumentSchema,
-  cardFrontmatterSchema,
-  cardSchema,
+  THING_TITLE_REQUIRED,
+  aliasThingFrontmatterSchema,
+  thingDocumentSchema,
+  thingFrontmatterSchema,
+  thingSchema,
   graphSchema,
-  importAliasCardFrontmatterSchema,
-  importCardFrontmatterSchema,
-  importMarkdownCardFrontmatterSchema,
-  importSpaceCardFrontmatterSchema,
-  markdownCardFrontmatterSchema,
+  importAliasThingFrontmatterSchema,
+  importThingFrontmatterSchema,
+  importMarkdownThingFrontmatterSchema,
+  importSpaceThingFrontmatterSchema,
+  markdownThingFrontmatterSchema,
   normalizeTitle,
   positionedDiagramSchema,
-  spaceCardFrontmatterSchema,
+  spaceThingFrontmatterSchema,
   spaceFileSchema,
   titleLines,
   titleName,
 } from '../src/index';
 
-const CARD_ID = '00000000-0000-4000-8000-000000000001';
+const THING_ID = '00000000-0000-4000-8000-000000000001';
 const TARGET_ID = '00000000-0000-4000-8000-000000000002';
 const SPACE_ID = '00000000-0000-4000-8000-000000000003';
 const DIAGRAM_ID = '00000000-0000-4000-8000-000000000004';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000005';
 
 /**
- * Any schema that reads a Card's Title, written so the three kinds and the
+ * Any schema that reads a Thing's Title, written so the three kinds and the
  * three unions can sit in one list. Only the Title is under test here, so what
  * each one answers with is `unknown` and the assertions read the Title off it.
  */
-type CardTitleSchema = ZodType<unknown, ZodTypeDef, unknown>;
+type ThingTitleSchema = ZodType<unknown, ZodTypeDef, unknown>;
 
 /**
- * A Card frontmatter as it arrives at a schema, before one has read it: every
- * field a Card of any kind declares is written down, and all of them are text.
+ * A Thing frontmatter as it arrives at a schema, before one has read it: every
+ * field a Thing of any kind declares is written down, and all of them are text.
  */
-type CardFrontmatterDraft = Readonly<Record<string, string>>;
+type ThingFrontmatterDraft = Readonly<Record<string, string>>;
 
 const markdownFrontmatter = (title: string) => ({
-  id: CARD_ID,
+  id: THING_ID,
   title,
   kind: 'markdown',
   body: '',
 });
 const aliasFrontmatter = (title: string) => ({
-  id: CARD_ID,
+  id: THING_ID,
   title,
   kind: 'alias',
   target: TARGET_ID,
 });
 const spaceFrontmatter = (title: string) => ({
-  id: CARD_ID,
+  id: THING_ID,
   title,
   kind: 'space',
   spaceId: SPACE_ID,
 });
 
-/** The schemas that read one Card kind, each beside the frontmatter it reads. */
+/** The schemas that read one Thing kind, each beside the frontmatter it reads. */
 const kindSchemas: readonly {
   readonly label: string;
-  readonly schema: CardTitleSchema;
-  readonly frontmatter: (title: string) => CardFrontmatterDraft;
+  readonly schema: ThingTitleSchema;
+  readonly frontmatter: (title: string) => ThingFrontmatterDraft;
 }[] = [
   {
-    label: 'markdown card',
-    schema: markdownCardFrontmatterSchema,
+    label: 'markdown thing',
+    schema: markdownThingFrontmatterSchema,
     frontmatter: markdownFrontmatter,
   },
-  { label: 'alias card', schema: aliasCardFrontmatterSchema, frontmatter: aliasFrontmatter },
-  { label: 'space card', schema: spaceCardFrontmatterSchema, frontmatter: spaceFrontmatter },
+  { label: 'alias thing', schema: aliasThingFrontmatterSchema, frontmatter: aliasFrontmatter },
+  { label: 'space thing', schema: spaceThingFrontmatterSchema, frontmatter: spaceFrontmatter },
   {
-    label: 'imported markdown card',
-    schema: importMarkdownCardFrontmatterSchema,
+    label: 'imported markdown thing',
+    schema: importMarkdownThingFrontmatterSchema,
     frontmatter: markdownFrontmatter,
   },
   {
-    label: 'imported alias card',
-    schema: importAliasCardFrontmatterSchema,
+    label: 'imported alias thing',
+    schema: importAliasThingFrontmatterSchema,
     frontmatter: aliasFrontmatter,
   },
   {
-    label: 'imported space card',
-    schema: importSpaceCardFrontmatterSchema,
+    label: 'imported space thing',
+    schema: importSpaceThingFrontmatterSchema,
     frontmatter: spaceFrontmatter,
   },
 ];
 
 /** The unions and the stored document, each of which reads every kind. */
-const unionSchemas: readonly { readonly label: string; readonly schema: CardTitleSchema }[] = [
-  { label: 'card frontmatter', schema: cardFrontmatterSchema },
-  { label: 'card', schema: cardSchema },
-  { label: 'card document', schema: cardDocumentSchema },
-  { label: 'imported card frontmatter', schema: importCardFrontmatterSchema },
+const unionSchemas: readonly { readonly label: string; readonly schema: ThingTitleSchema }[] = [
+  { label: 'thing frontmatter', schema: thingFrontmatterSchema },
+  { label: 'thing', schema: thingSchema },
+  { label: 'thing document', schema: thingDocumentSchema },
+  { label: 'imported thing frontmatter', schema: importThingFrontmatterSchema },
 ];
 
 /**
- * Every door a Card's Title arrives through, carrying one Title.
+ * Every door a Thing's Title arrives through, carrying one Title.
  *
  * A rule that reaches only the three declared shapes is visibly not the rule at
  * every door: the union, the stored document and the import variants have to
@@ -108,8 +108,8 @@ const titleCases = (
   title: string,
 ): readonly {
   readonly label: string;
-  readonly schema: CardTitleSchema;
-  readonly value: CardFrontmatterDraft;
+  readonly schema: ThingTitleSchema;
+  readonly value: ThingFrontmatterDraft;
 }[] => [
   ...kindSchemas.map(({ label, schema, frontmatter }) => ({
     label,
@@ -134,7 +134,9 @@ const titleCases = (
  * promises (ADR 0057).
  */
 const refusesNamelessTitle = (issues: readonly ZodIssue[]): boolean =>
-  issues.some((issue) => issue.code === 'custom' && issue.params?.['code'] === CARD_TITLE_REQUIRED);
+  issues.some(
+    (issue) => issue.code === 'custom' && issue.params?.['code'] === THING_TITLE_REQUIRED,
+  );
 
 describe('a Title is one or more Title Lines', () => {
   it('gives a single-line Title one line at the title role', () => {
@@ -211,8 +213,8 @@ describe('normalizing a Title', () => {
   });
 });
 
-describe('a Card Title carries at least one non-empty line', () => {
-  it('normalizes the Title at every door a Card arrives through', () => {
+describe('a Thing Title carries at least one non-empty line', () => {
+  it('normalizes the Title at every door a Thing arrives through', () => {
     for (const { label, schema, value } of titleCases('Auth  \r\n\n  session \n\n')) {
       const parsed = schema.safeParse(value);
 
@@ -263,7 +265,7 @@ describe('Space, Diagram and Graph titles are untouched', () => {
     expect(parsed.title).toBe('Working ');
   });
 
-  it('still accepts the whitespace-only title a Card no longer may have', () => {
+  it('still accepts the whitespace-only title a Thing no longer may have', () => {
     expect(graphSchema.safeParse({ id: GRAPH_ID, title: '  ', edges: [] }).success).toBe(true);
   });
 });

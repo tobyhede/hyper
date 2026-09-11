@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
-import { uuidSchema, type CardId, type GraphId, type DiagramId, type UUID } from '@project/core';
+import { uuidSchema, type ThingId, type GraphId, type DiagramId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import {
   canRetreat,
@@ -10,7 +10,7 @@ import {
   type NavigationState,
   type NavigationOptions,
 } from '../src/navigation';
-import { cardFile } from './card-files';
+import { thingFile } from './thing-files';
 
 const navigationFor = (
   currentSpace: () => Space,
@@ -27,7 +27,7 @@ const uuid = (value: string): UUID => uuidSchema.parse(value);
  * point of the split: a state that is not presenting has no Traversal history to read, here
  * or anywhere else.
  */
-function traversalHistoryOf(state: NavigationState): readonly CardId[] {
+function traversalHistoryOf(state: NavigationState): readonly ThingId[] {
   if (state.mode !== 'presenting') throw new Error('navigation should be presenting');
   return state.traversalHistory;
 }
@@ -37,12 +37,12 @@ const GRAPH_TWO = uuid('00000000-0000-4000-8000-000000000032');
 const GRAPH_THREE = uuid('00000000-0000-4000-8000-000000000033');
 const FIRST_DIAGRAM = uuid('00000000-0000-4000-8000-000000000040');
 const DIAGRAM = uuid('00000000-0000-4000-8000-000000000041');
-const CARD_A = uuid('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuid('00000000-0000-4000-8000-000000000003');
-const CARD_C = uuid('00000000-0000-4000-8000-000000000004');
+const THING_A = uuid('00000000-0000-4000-8000-000000000002');
+const THING_B = uuid('00000000-0000-4000-8000-000000000003');
+const THING_C = uuid('00000000-0000-4000-8000-000000000004');
 
 /**
- * Two Diagrams, each owning one Graph over its own Cards (ADR 0040).
+ * Two Diagrams, each owning one Graph over its own Things (ADR 0040).
  *
  * Two rather than one deliberately: it is what makes the flatten an Algorithmic
  * View draws differ from what either Diagram draws, so both of Navigation's
@@ -59,7 +59,7 @@ function fixture(): Space {
           id: FIRST_DIAGRAM,
           title: 'First graph',
           positions: {
-            [CARD_A]: { x: 0, y: 0, open: false },
+            [THING_A]: { x: 0, y: 0, open: false },
           },
           graphs: [{ id: GRAPH_THREE, title: 'Three', edges: [] }],
         },
@@ -67,32 +67,32 @@ function fixture(): Space {
           id: DIAGRAM,
           title: 'Second graph',
           positions: {
-            [CARD_A]: { x: -320, y: 200, open: false },
-            [CARD_B]: { x: 0, y: 200, open: false },
-            [CARD_C]: { x: 320, y: 200, open: false },
+            [THING_A]: { x: -320, y: 200, open: false },
+            [THING_B]: { x: 0, y: 200, open: false },
+            [THING_C]: { x: 320, y: 200, open: false },
           },
           graphs: [
-            { id: GRAPH_ONE, title: 'One', edges: [{ from: CARD_A, to: CARD_B }] },
-            { id: GRAPH_TWO, title: 'Two', edges: [{ from: CARD_B, to: CARD_C }] },
+            { id: GRAPH_ONE, title: 'One', edges: [{ from: THING_A, to: THING_B }] },
+            { id: GRAPH_TWO, title: 'Two', edges: [{ from: THING_B, to: THING_C }] },
           ],
         },
       ],
     },
-    [cardFile(CARD_A), cardFile(CARD_B), cardFile(CARD_C)],
+    [thingFile(THING_A), thingFile(THING_B), thingFile(THING_C)],
   );
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
 }
 
 /**
- * One Diagram owning the given Graphs over the given Cards, which is the fewest
- * moving parts a Space with any structure at all has under ADR 0040. Every Card
+ * One Diagram owning the given Graphs over the given Things, which is the fewest
+ * moving parts a Space with any structure at all has under ADR 0040. Every Thing
  * named is a member, so the Diagram's Edges are closed over it by construction.
  */
 function spaceOwning(
   title: string,
   graphs: readonly { id: UUID; title: string; edges: readonly { from: UUID; to: UUID }[] }[],
-  cards: readonly { id: UUID; title?: string }[],
+  things: readonly { id: UUID; title?: string }[],
 ): Space {
   const loaded = loadSpace(
     {
@@ -104,14 +104,14 @@ function spaceOwning(
           id: DIAGRAM,
           title: 'Only',
           positions: Object.fromEntries(
-            cards.map((card, index) => [card.id, { x: index * 320, y: 0, open: false }]),
+            things.map((thing, index) => [thing.id, { x: index * 320, y: 0, open: false }]),
           ),
           graphs,
         },
       ],
     },
-    cards.map((card) =>
-      card.title === undefined ? cardFile(card.id) : cardFile(card.id, card.title),
+    things.map((thing) =>
+      thing.title === undefined ? thingFile(thing.id) : thingFile(thing.id, thing.title),
     ),
   );
   if (!loaded.ok)
@@ -131,7 +131,7 @@ it('selects a Diagram and its active Graph without changing the Space', () => {
     activeGraphId: GRAPH_ONE,
     mode: 'overview',
   });
-  expect(navigation.activeCardId()).toBeNull();
+  expect(navigation.activeThingId()).toBeNull();
   expect(space.defaultDiagram).toBeUndefined();
 
   navigation.selectDiagram(FIRST_DIAGRAM);
@@ -139,9 +139,9 @@ it('selects a Diagram and its active Graph without changing the Space', () => {
 });
 
 it('traverses an Edge from the changing working Space without installing a copy', () => {
-  const cardA = uuid('00000000-0000-4000-8000-000000000002');
-  const cardB = uuid('00000000-0000-4000-8000-000000000003');
-  const cardC = uuid('00000000-0000-4000-8000-000000000004');
+  const thingA = uuid('00000000-0000-4000-8000-000000000002');
+  const thingB = uuid('00000000-0000-4000-8000-000000000003');
+  const thingC = uuid('00000000-0000-4000-8000-000000000004');
   let working = fixture();
   const navigation = navigationFor(() => working, DIAGRAM);
   navigation.present();
@@ -159,17 +159,17 @@ it('traverses an Edge from the changing working Space without installing a copy'
           id: DIAGRAM,
           title: 'Second graph',
           positions: {
-            [cardA]: { x: 0, y: 0, open: false },
-            [cardB]: { x: 320, y: 0, open: false },
-            [cardC]: { x: 640, y: 0, open: false },
+            [thingA]: { x: 0, y: 0, open: false },
+            [thingB]: { x: 320, y: 0, open: false },
+            [thingC]: { x: 640, y: 0, open: false },
           },
           graphs: [
             {
               id: GRAPH_ONE,
               title: 'One',
               edges: [
-                { from: cardA, to: cardB },
-                { from: cardA, to: cardC },
+                { from: thingA, to: thingB },
+                { from: thingA, to: thingC },
               ],
             },
             working.diagrams[1]!.graphs[1]!,
@@ -177,81 +177,81 @@ it('traverses an Edge from the changing working Space without installing a copy'
         },
       ],
     },
-    [cardFile(cardA), cardFile(cardB), cardFile(cardC, 'New destination')],
+    [thingFile(thingA), thingFile(thingB), thingFile(thingC, 'New destination')],
   );
   if (!changed.ok) throw new Error('changed fixture should load');
   working = changed.space;
 
   expect(navigation.moves()).toEqual([
-    { cardId: cardB, title: 'B', selected: true },
-    { cardId: cardC, title: 'New destination', selected: false },
+    { thingId: thingB, title: 'B', selected: true },
+    { thingId: thingC, title: 'New destination', selected: false },
   ]);
   navigation.selectBranch(1);
   navigation.advance();
-  expect(navigation.activeCardId()).toBe(cardC);
+  expect(navigation.activeThingId()).toBe(thingC);
 });
 
 /**
  * A self-connection is the first gesture authoring ships, and the Graph it mints
- * is fully cyclic: every Card it holds is arrived at, so no Card is an entry.
- * Presenting one used to do nothing at all — `graphStartCard` answered nothing,
+ * is fully cyclic: every Thing it holds is arrived at, so no Thing is an entry.
+ * Presenting one used to do nothing at all — `graphStartThing` answered nothing,
  * `present()` returned before any state change, and the enabled control that
  * called it swallowed the click.
  */
-it('presents a fully cyclic Graph, which has no entry Card', () => {
-  const card = uuid('00000000-0000-4000-8000-000000000002');
+it('presents a fully cyclic Graph, which has no entry Thing', () => {
+  const thing = uuid('00000000-0000-4000-8000-000000000002');
   const space = spaceOwning(
     'Loop',
-    [{ id: GRAPH_ONE, title: 'Loop', edges: [{ from: card, to: card }] }],
-    [{ id: card }],
+    [{ id: GRAPH_ONE, title: 'Loop', edges: [{ from: thing, to: thing }] }],
+    [{ id: thing }],
   );
   const navigation = navigationFor(() => space, DIAGRAM);
 
   navigation.present();
 
-  expect(navigation.getState()).toMatchObject({ mode: 'presenting', traversalHistory: [card] });
-  expect(navigation.moves()).toEqual([{ cardId: card, title: 'A', selected: true }]);
+  expect(navigation.getState()).toMatchObject({ mode: 'presenting', traversalHistory: [thing] });
+  expect(navigation.moves()).toEqual([{ thingId: thing, title: 'A', selected: true }]);
 });
 
 /**
- * A move names the Card it goes to by that Card's **name** (ADR 0083).
+ * A move names the Thing it goes to by that Thing's **name** (ADR 0083).
  *
  * `moves()` is what the presenting chrome draws a row from and what a move's
  * accessible name is composed of, so a Title's later lines reaching it would
  * arrive on screen as a run-together label rather than as an error. The ladder
- * is the Card front's and does not travel.
+ * is the Thing front's and does not travel.
  */
-it('names a move by the Card’s name, not by its whole Title', () => {
-  const cardA = uuid('00000000-0000-4000-8000-000000000002');
-  const cardB = uuid('00000000-0000-4000-8000-000000000003');
+it('names a move by the Thing’s name, not by its whole Title', () => {
+  const thingA = uuid('00000000-0000-4000-8000-000000000002');
+  const thingB = uuid('00000000-0000-4000-8000-000000000003');
   const space = spaceOwning(
     'Presented',
-    [{ id: GRAPH_ONE, title: 'One', edges: [{ from: cardA, to: cardB }] }],
-    [{ id: cardA }, { id: cardB, title: 'Auth\nHow a session begins' }],
+    [{ id: GRAPH_ONE, title: 'One', edges: [{ from: thingA, to: thingB }] }],
+    [{ id: thingA }, { id: thingB, title: 'Auth\nHow a session begins' }],
   );
   const navigation = navigationFor(() => space, DIAGRAM);
 
   navigation.present();
 
-  expect(navigation.moves()).toEqual([{ cardId: cardB, title: 'Auth', selected: true }]);
+  expect(navigation.moves()).toEqual([{ thingId: thingB, title: 'Auth', selected: true }]);
 });
 
 /*
- * Traversal history may contain the same Card twice. Cycles and self-Edges are legal
+ * Traversal history may contain the same Thing twice. Cycles and self-Edges are legal
  * authored structure (ADR 0032), so a presenter traversing a loop accumulates a
- * history whose Cards repeat and whose last Card can be its first again. The Card
+ * history whose Things repeat and whose last Thing can be its first again. The Thing
  * being presented is Traversal history's *last* element, never the first occurrence of
- * it — a read that answered the first Card in Traversal history would go on offering the
- * moves out of that Card for the rest of the loop, and the two only diverge once
- * a Card repeats.
+ * it — a read that answered the first Thing in Traversal history would go on offering the
+ * moves out of that Thing for the rest of the loop, and the two only diverge once
+ * a Thing repeats.
  *
- * The other two shapes are pinned already and not repeated here: a one-Card Traversal history
- * is read by "opens and closes Cards…" straight after `present()`, and Traversal history
+ * The other two shapes are pinned already and not repeated here: a one-Thing Traversal history
+ * is read by "opens and closes Things…" straight after `present()`, and Traversal history
  * that has advanced by the fork test below.
  */
-it('reads the last Card when Traversal history returns to one it has already visited', () => {
-  const cardA = uuid('00000000-0000-4000-8000-000000000002');
-  const cardB = uuid('00000000-0000-4000-8000-000000000003');
+it('reads the last Thing when Traversal history returns to one it has already visited', () => {
+  const thingA = uuid('00000000-0000-4000-8000-000000000002');
+  const thingB = uuid('00000000-0000-4000-8000-000000000003');
   const space = spaceOwning(
     'Cycle',
     [
@@ -259,12 +259,12 @@ it('reads the last Card when Traversal history returns to one it has already vis
         id: GRAPH_ONE,
         title: 'Cycle',
         edges: [
-          { from: cardA, to: cardB },
-          { from: cardB, to: cardA },
+          { from: thingA, to: thingB },
+          { from: thingB, to: thingA },
         ],
       },
     ],
-    [{ id: cardA }, { id: cardB }],
+    [{ id: thingA }, { id: thingB }],
   );
   const navigation = navigationFor(() => space, DIAGRAM);
 
@@ -272,33 +272,33 @@ it('reads the last Card when Traversal history returns to one it has already vis
   navigation.advance();
   navigation.advance();
 
-  // Back where it began: Traversal history's last Card is its first, and presenting
+  // Back where it began: Traversal history's last Thing is its first, and presenting
   // stands on it rather than merely carrying it at the front.
-  expect(traversalHistoryOf(navigation.getState())).toEqual([cardA, cardB, cardA]);
-  expect(navigation.activeCardId()).toBe(cardA);
-  expect(navigation.moves()).toEqual([{ cardId: cardB, title: 'B', selected: true }]);
+  expect(traversalHistoryOf(navigation.getState())).toEqual([thingA, thingB, thingA]);
+  expect(navigation.activeThingId()).toBe(thingA);
+  expect(navigation.moves()).toEqual([{ thingId: thingB, title: 'B', selected: true }]);
 
   navigation.advance();
 
-  // The case the two answers separate on: Traversal history repeats a Card and its last
+  // The case the two answers separate on: Traversal history repeats a Thing and its last
   // is no longer its first, so reading the start answers A where the presenter
   // is standing on B. The moves are asserted here rather than only above,
-  // because above the last Card *is* the first and both readings agree — this
+  // because above the last Thing *is* the first and both readings agree — this
   // is the only place the Edges offered can tell a correct read from a wrong
   // one, and they are what the presenting chrome puts on screen.
-  expect(traversalHistoryOf(navigation.getState())).toEqual([cardA, cardB, cardA, cardB]);
-  expect(navigation.activeCardId()).toBe(cardB);
-  expect(navigation.moves()).toEqual([{ cardId: cardA, title: 'A', selected: true }]);
+  expect(traversalHistoryOf(navigation.getState())).toEqual([thingA, thingB, thingA, thingB]);
+  expect(navigation.activeThingId()).toBe(thingB);
+  expect(navigation.moves()).toEqual([{ thingId: thingA, title: 'A', selected: true }]);
 
   navigation.retreat();
-  expect(navigation.activeCardId()).toBe(cardA);
+  expect(navigation.activeThingId()).toBe(thingA);
 });
 
 /*
  * Traversal history belongs to presenting, and leaving presenting has none to clear. This
  * used to be four hand-written `traversalHistory: []` resets — one per path back to the
  * overview — any of which could have been forgotten without anything noticing
- * until a stale Card was read from history after presentation had ended.
+ * until a stale Thing was read from history after presentation had ended.
  */
 it('leaves no Traversal history behind when presenting ends', () => {
   const space = fixture();
@@ -313,15 +313,15 @@ it('leaves no Traversal history behind when presenting ends', () => {
     activeGraphId: GRAPH_ONE,
     mode: 'overview',
   });
-  expect(navigation.activeCardId()).toBeNull();
+  expect(navigation.activeThingId()).toBeNull();
 });
 
 /*
- * Presenting stands on a Card for as long as it lasts: it begins on the Graph's
- * start Card and `retreat` keeps the first, so Traversal history is non-empty by type
+ * Presenting stands on a Thing for as long as it lasts: it begins on the Graph's
+ * start Thing and `retreat` keeps the first, so Traversal history is non-empty by type
  * rather than by a check at each read.
  */
-it('stands on a Card for as long as it is presenting', () => {
+it('stands on a Thing for as long as it is presenting', () => {
   const space = fixture();
   const navigation = navigationFor(() => space, DIAGRAM);
 
@@ -330,7 +330,7 @@ it('stands on a Card for as long as it is presenting', () => {
   const state = navigation.getState();
   if (state.mode !== 'presenting')
     throw new Error('present() should have started Traversal history');
-  expectTypeOf(state.traversalHistory[0]).toEqualTypeOf<CardId>();
+  expectTypeOf(state.traversalHistory[0]).toEqualTypeOf<ThingId>();
   expect(state.traversalHistory[0]).toBe(uuid('00000000-0000-4000-8000-000000000002'));
 });
 
@@ -345,7 +345,7 @@ it('activating a Graph ends the current Traversal history without changing the S
     activeGraphId: GRAPH_TWO,
     mode: 'overview',
   });
-  expect(navigation.activeCardId()).toBeNull();
+  expect(navigation.activeThingId()).toBeNull();
   expect(space.defaultDiagram).toBeUndefined();
 });
 
@@ -366,7 +366,7 @@ it('opens a Graph destination in its named Diagram with one navigation publicati
   expect(space.defaultDiagram).toBeUndefined();
 });
 
-it('opens an exact presentation Card with fresh Traversal history in one publication', () => {
+it('opens an exact presentation Thing with fresh Traversal history in one publication', () => {
   const space = fixture();
   const navigation = navigationFor(() => space, DIAGRAM);
   navigation.present();
@@ -374,14 +374,14 @@ it('opens an exact presentation Card with fresh Traversal history in one publica
   const observed: NavigationState[] = [];
   navigation.subscribe(() => observed.push(navigation.getState()));
 
-  navigation.openPresentation(DIAGRAM, GRAPH_TWO, CARD_C);
+  navigation.openPresentation(DIAGRAM, GRAPH_TWO, THING_C);
 
   expect(observed).toHaveLength(1);
   expect(navigation.getState()).toEqual({
     selectedDiagramId: DIAGRAM,
     activeGraphId: GRAPH_TWO,
     mode: 'presenting',
-    traversalHistory: [CARD_C],
+    traversalHistory: [THING_C],
     branchIndex: 0,
   });
   expect(canRetreat(navigation.getState())).toBe(false);
@@ -563,9 +563,9 @@ it('opens a replacement Space as new navigation, retaining no reading state', ()
 });
 
 it('reads the working Space once per moves() call, whatever the branching', () => {
-  const cardA = uuid('00000000-0000-4000-8000-000000000002');
-  const cardB = uuid('00000000-0000-4000-8000-000000000003');
-  const cardC = uuid('00000000-0000-4000-8000-000000000004');
+  const thingA = uuid('00000000-0000-4000-8000-000000000002');
+  const thingB = uuid('00000000-0000-4000-8000-000000000003');
+  const thingC = uuid('00000000-0000-4000-8000-000000000004');
   const forked = spaceOwning(
     'Fork',
     [
@@ -573,12 +573,12 @@ it('reads the working Space once per moves() call, whatever the branching', () =
         id: GRAPH_ONE,
         title: 'Fork',
         edges: [
-          { from: cardA, to: cardB },
-          { from: cardA, to: cardC },
+          { from: thingA, to: thingB },
+          { from: thingA, to: thingC },
         ],
       },
     ],
-    [{ id: cardA }, { id: cardB }, { id: cardC }],
+    [{ id: thingA }, { id: thingB }, { id: thingC }],
   );
   // Reading the Space costs a full parse and reindex of the working snapshot,
   // and `moves()` runs during every App render — including the per-pointer-frame
@@ -607,7 +607,7 @@ it('reads the working Space once per moves() call, whatever the branching', () =
  * common mode and `moves()` is called at render time, so a read below the guard
  * would pay a parse and reindex of the working snapshot on every render only to
  * hand back an empty array — which is exactly what the flat state did, its
- * `activeCardId()` answering null after the Space had already been read.
+ * `activeThingId()` answering null after the Space had already been read.
  *
  * The answer alone cannot tell the two apart, so this counts the calls to the
  * thunk instead. `createNavigation` reads the Space to resolve its initial
@@ -627,9 +627,9 @@ it('answers no moves outside Traversal history without reading the working Space
 });
 
 it('traverses a fork, retreats along Traversal history, and reselects the Edge taken', () => {
-  const cardA = uuid('00000000-0000-4000-8000-000000000002');
-  const cardB = uuid('00000000-0000-4000-8000-000000000003');
-  const cardC = uuid('00000000-0000-4000-8000-000000000004');
+  const thingA = uuid('00000000-0000-4000-8000-000000000002');
+  const thingB = uuid('00000000-0000-4000-8000-000000000003');
+  const thingC = uuid('00000000-0000-4000-8000-000000000004');
   const forked = spaceOwning(
     'Fork',
     [
@@ -637,25 +637,25 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
         id: GRAPH_ONE,
         title: 'Fork',
         edges: [
-          { from: cardA, to: cardB },
-          { from: cardA, to: cardC },
+          { from: thingA, to: thingB },
+          { from: thingA, to: thingC },
         ],
       },
     ],
-    [{ id: cardA }, { id: cardB }, { id: cardC }],
+    [{ id: thingA }, { id: thingB }, { id: thingC }],
   );
   const navigation = navigationFor(() => forked, DIAGRAM);
   navigation.present();
 
   navigation.selectBranch(-1);
-  expect(navigation.moves().find((move) => move.selected)?.cardId).toBe(cardC);
+  expect(navigation.moves().find((move) => move.selected)?.thingId).toBe(thingC);
   navigation.advance();
   navigation.retreat();
 
-  expect(navigation.activeCardId()).toBe(cardA);
-  expect(navigation.moves().find((move) => move.selected)?.cardId).toBe(cardC);
+  expect(navigation.activeThingId()).toBe(thingA);
+  expect(navigation.moves().find((move) => move.selected)?.thingId).toBe(thingC);
   navigation.advance();
-  expect(navigation.activeCardId()).toBe(cardC);
+  expect(navigation.activeThingId()).toBe(thingC);
 });
 
 /**
@@ -670,13 +670,13 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
 describe('the address Navigation answers', () => {
   const addressOf = (navigation: Navigation) => navigationAddress(navigation.getState());
 
-  it('answers the Diagram a Space opens in, its Active Graph, and no presented Card', () => {
+  it('answers the Diagram a Space opens in, its Active Graph, and no presented Thing', () => {
     const navigation = navigationFor(fixture, DIAGRAM);
 
     expect(addressOf(navigation)).toEqual({
       selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_ONE,
-      presentingCardId: null,
+      presentingThingId: null,
     });
   });
 
@@ -688,7 +688,7 @@ describe('the address Navigation answers', () => {
     expect(addressOf(navigation)).toEqual({
       selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_ONE,
-      presentingCardId: null,
+      presentingThingId: null,
     });
   });
 
@@ -701,23 +701,23 @@ describe('the address Navigation answers', () => {
     expect(addressOf(navigation)).toEqual({
       selectedDiagramId: FIRST_DIAGRAM,
       activeGraphId: GRAPH_THREE,
-      presentingCardId: null,
+      presentingThingId: null,
     });
   });
 
   it('answers the adopted Diagram and the Graph handed with it after continueInDiagram', () => {
     const navigation = navigationFor(fixture, DIAGRAM);
     navigation.present();
-    const presented = navigation.activeCardId();
+    const presented = navigation.activeThingId();
 
     navigation.continueInDiagram(FIRST_DIAGRAM, GRAPH_THREE);
 
-    // Adopting a Diagram must not interrupt a traversal, so the presented Card
+    // Adopting a Diagram must not interrupt a traversal, so the presented Thing
     // is still part of the address it answers.
     expect(addressOf(navigation)).toEqual({
       selectedDiagramId: FIRST_DIAGRAM,
       activeGraphId: GRAPH_THREE,
-      presentingCardId: presented,
+      presentingThingId: presented,
     });
   });
 
@@ -729,23 +729,23 @@ describe('the address Navigation answers', () => {
     expect(addressOf(navigation)).toEqual({
       selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_TWO,
-      presentingCardId: null,
+      presentingThingId: null,
     });
   });
 
-  it('answers the exact Card an addressed presentation starts at after openPresentation', () => {
+  it('answers the exact Thing an addressed presentation starts at after openPresentation', () => {
     const navigation = navigationFor(fixture, FIRST_DIAGRAM);
 
-    navigation.openPresentation(DIAGRAM, GRAPH_TWO, CARD_C);
+    navigation.openPresentation(DIAGRAM, GRAPH_TWO, THING_C);
 
     expect(addressOf(navigation)).toEqual({
       selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_TWO,
-      presentingCardId: CARD_C,
+      presentingThingId: THING_C,
     });
   });
 
-  it('answers the activated Graph, and no presented Card, after activateGraph', () => {
+  it('answers the activated Graph, and no presented Thing, after activateGraph', () => {
     const navigation = navigationFor(fixture, DIAGRAM);
     navigation.present();
 
@@ -754,27 +754,27 @@ describe('the address Navigation answers', () => {
     expect(addressOf(navigation)).toEqual({
       selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_TWO,
-      presentingCardId: null,
+      presentingThingId: null,
     });
   });
 
-  it('moves the presented Card through present, advance, retreat and exitPresenting', () => {
+  it('moves the presented Thing through present, advance, retreat and exitPresenting', () => {
     const navigation = navigationFor(fixture, DIAGRAM);
 
     navigation.present();
-    expect(addressOf(navigation).presentingCardId).toBe(CARD_A);
+    expect(addressOf(navigation).presentingThingId).toBe(THING_A);
 
     navigation.advance();
-    expect(addressOf(navigation).presentingCardId).toBe(CARD_B);
+    expect(addressOf(navigation).presentingThingId).toBe(THING_B);
 
     navigation.retreat();
-    expect(addressOf(navigation).presentingCardId).toBe(CARD_A);
+    expect(addressOf(navigation).presentingThingId).toBe(THING_A);
 
     navigation.exitPresenting();
     expect(addressOf(navigation)).toEqual({
       selectedDiagramId: DIAGRAM,
       activeGraphId: GRAPH_ONE,
-      presentingCardId: null,
+      presentingThingId: null,
     });
   });
 
@@ -793,12 +793,12 @@ describe('the address Navigation answers', () => {
           id: GRAPH_ONE,
           title: 'Fork',
           edges: [
-            { from: CARD_A, to: CARD_B },
-            { from: CARD_A, to: CARD_C },
+            { from: THING_A, to: THING_B },
+            { from: THING_A, to: THING_C },
           ],
         },
       ],
-      [{ id: CARD_A }, { id: CARD_B }, { id: CARD_C }],
+      [{ id: THING_A }, { id: THING_B }, { id: THING_C }],
     );
     const navigation = navigationFor(() => forked, DIAGRAM);
     navigation.present();

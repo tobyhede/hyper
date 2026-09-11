@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { uuidSchema, type Card, type CardId } from '@project/core';
+import { uuidSchema, type Thing, type ThingId } from '@project/core';
 import {
   Button,
-  CardSearchCombobox,
+  ThingSearchCombobox,
   Field,
   FieldDescription,
   FieldError,
@@ -11,13 +11,13 @@ import {
   FieldTitle,
   Input,
 } from '@project/ui';
-import { CardPane } from './CardPane';
+import { ThingPane } from './ThingPane';
 import { paneInitialFocus } from './pane-focus';
-import type { CardCreationRefusalErrors } from '../authoring-refusal';
+import type { ThingCreationRefusalErrors } from '../authoring-refusal';
 
 export interface NewAliasProps {
-  /** Every Card an Alias may name: the non-Alias Cards of this Space (ADR 0009). */
-  readonly targets: readonly Card[];
+  /** Every Thing an Alias may name: the non-Alias Things of this Space (ADR 0009). */
+  readonly targets: readonly Thing[];
   /**
    * Why the Space refused the Alias this pane tried to create, already placed
    * on the fields this pane owns, or `null`.
@@ -30,15 +30,15 @@ export interface NewAliasProps {
    * creation panes refuse in two different vocabularies, so one translated
    * placement is what lets them share one state machine (ADR 0057).
    */
-  readonly refusal: CardCreationRefusalErrors | null;
+  readonly refusal: ThingCreationRefusalErrors | null;
   /**
    * Create the Alias on the chosen Target, with the title exactly as typed —
    * the empty string included. What an empty one becomes is Authoring's to
-   * decide, and it mints the same neutral `Card N` any other created Card gets
+   * decide, and it mints the same neutral `Thing N` any other created Thing gets
    * (ADR 0083); this pane neither supplies a name of its own nor normalizes the
    * one it holds, so both rules stay in the one place that owns them.
    */
-  readonly onCreate: (target: CardId, title: string) => void;
+  readonly onCreate: (target: ThingId, title: string) => void;
   readonly onCancel: () => void;
   /**
    * The refusal above describes an attempt, and editing either field begins a
@@ -50,10 +50,10 @@ export interface NewAliasProps {
 }
 
 /**
- * Adding an Alias: the Card editor, opened on a Card that does not exist yet.
+ * Adding an Alias: the Thing editor, opened on a Thing that does not exist yet.
  *
  * **Nothing is authored until a Target is chosen**, and that is the whole shape
- * of this surface. An Alias without a Target is not a valid Card, so there is no
+ * of this surface. An Alias without a Target is not a valid Thing, so there is no
  * partially created Alias to hold, nothing is added to the Space, and nothing
  * is persisted while this pane is open. Closing it
  * creates nothing — there is no draft to discard, because there was never
@@ -64,8 +64,8 @@ export interface NewAliasProps {
  * would ask the author to confirm a choice they have already made, and the pane
  * would have to hold an unconfirmed Target across it.
  *
- * The kind is fixed from the outset. This is not a Markdown Card that will later
- * become an Alias — a Card keeps the kind it was created with — so the pane says
+ * The kind is fixed from the outset. This is not a Markdown Thing that will later
+ * become an Alias — a Thing keeps the kind it was created with — so the pane says
  * which kind it is creating rather than offering a control that changes it.
  *
  * Escape closes it, creating nothing, and no key handler here says so: the
@@ -80,25 +80,25 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
   const formError = refusal?.form ?? null;
 
   return (
-    <CardPane ariaLabel="New Alias" testId="new-alias" onDismiss={onCancel}>
+    <ThingPane ariaLabel="New Alias" testId="new-alias" onDismiss={onCancel}>
       {/* One `onChange` for both fields rather than two handlers, because React
           bubbles change through its own tree. Editing either field is the same
           fact — the refused attempt is over. */}
-      <div className="card-pane__editor" onChange={refusal === null ? undefined : onRefusalStale}>
+      <div className="thing-pane__editor" onChange={refusal === null ? undefined : onRefusalStale}>
         {/* The fields scroll and the actions below them do not, exactly as on the
             Alias metadata pane. This one needs it most: it has no Markdown field to
             absorb the squeeze, so on a short window its heading, Title, list and
             hint together are taller than the frame. */}
-        <FieldGroup className="card-pane__fields">
-          {/* The kind is stated rather than offered, because a Card keeps the
+        <FieldGroup className="thing-pane__fields">
+          {/* The kind is stated rather than offered, because a Thing keeps the
               kind it was created with. */}
-          <Field className="card-pane__heading">
+          <Field className="thing-pane__heading">
             <FieldTitle>New Alias</FieldTitle>
             <FieldDescription>
-              An Alias shows another Card’s content at a second position.
+              An Alias shows another Thing’s content at a second position.
             </FieldDescription>
           </Field>
-          <Field className="card-pane__field" data-invalid={titleError !== null}>
+          <Field className="thing-pane__field" data-invalid={titleError !== null}>
             <FieldLabel htmlFor="new-alias-title">Title</FieldLabel>
             <Input
               id="new-alias-title"
@@ -110,13 +110,13 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
             />
             <FieldError id="new-alias-title-error">{titleError}</FieldError>
           </Field>
-          <Field className="card-pane__field" data-invalid={targetError !== null}>
-            <CardSearchCombobox
+          <Field className="thing-pane__field" data-invalid={targetError !== null}>
+            <ThingSearchCombobox
               label="Target"
-              choices={targets.map((card) => ({
-                id: card.id,
-                title: card.title,
-                kind: card.kind,
+              choices={targets.map((thing) => ({
+                id: thing.id,
+                title: thing.title,
+                kind: thing.kind,
               }))}
               value={null}
               inputAttributes={{
@@ -124,13 +124,13 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
                 'aria-invalid': targetError !== null,
                 'aria-describedby': targetError === null ? undefined : 'new-alias-target-error',
               }}
-              testId="card-picker-search"
-              resultsTestId="card-picker-results"
+              testId="thing-picker-search"
+              resultsTestId="thing-picker-results"
               onValueChange={(target) => {
                 const parsed = uuidSchema.safeParse(target);
                 if (parsed.success) onCreate(parsed.data, title);
               }}
-              emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
+              emptyMessage="An Alias needs a Thing that owns its content, and this Space has none yet."
             />
             <FieldError id="new-alias-target-error">{targetError}</FieldError>
           </Field>
@@ -139,21 +139,21 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
               finishes. It is withdrawn while a refusal stands, leaving the
               field-local corrective message to describe the next action. */}
           {refusal === null && (
-            <FieldDescription className="card-pane__hint">
+            <FieldDescription className="thing-pane__hint">
               Choosing a Target creates the Alias. Leave the title empty and it is named for you;
-              renaming continues on the Card.
+              renaming continues on the Thing.
             </FieldDescription>
           )}
         </FieldGroup>
         {formError !== null && (
-          <FieldError className="card-pane__field-error">{formError}</FieldError>
+          <FieldError className="thing-pane__field-error">{formError}</FieldError>
         )}
-        <div className="card-pane__actions">
+        <div className="thing-pane__actions">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
         </div>
       </div>
-    </CardPane>
+    </ThingPane>
   );
 }

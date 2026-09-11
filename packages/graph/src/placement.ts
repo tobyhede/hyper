@@ -1,7 +1,7 @@
 import {
-  COLLAPSED_CARD_SIZE,
-  type CardId,
-  type CardPlacement,
+  COLLAPSED_THING_SIZE,
+  type ThingId,
+  type ThingPlacement,
   type Diagram,
   type DiagramPosition,
 } from '@project/core';
@@ -11,19 +11,19 @@ import type { LayoutStrategyGraph } from './layout';
 declare const PLACEMENT: unique symbol;
 
 /**
- * A **Placement** is the card→position map itself: which cards sit where, and
- * nothing more. A `Diagram` is the authored thing a Space holds; the placement is
+ * A **Placement** is the thing→position map itself: which things sit where, and
+ * nothing more. A `Diagram` is the authored entity a Space holds; the placement is
  * the map inside it. It is also what an automatic strategy computes and what
  * `positionedStrategy` reads.
  *
- * Not the placement layer ADR 0004 rejected. That was an entity between a card
- * and its position that edges and graphs referenced instead of the card, letting
- * one card occupy two positions. This is keyed by card and holds at most one
+ * Not the placement layer ADR 0004 rejected. That was an entity between a thing
+ * and its position that edges and graphs referenced instead of the thing, letting
+ * one thing occupy two positions. This is keyed by thing and holds at most one
  * position for each.
  *
  * ## Sparse, and omission means something
  *
- * A placement may omit a card, and that Card is not a member of the Diagram.
+ * A placement may omit a thing, and that Thing is not a member of the Diagram.
  * `positionedStrategy` consequently omits it from the canvas; adding membership
  * and its authored position is an explicit Edit rather than a rendering concern.
  *
@@ -32,7 +32,7 @@ declare const PLACEMENT: unique symbol;
  * `Placement` is a `ReadonlyMap` the type system will not let you build with
  * `new Map()`. Every read works unchanged; only construction is closed. The
  * rendered geometry of an existing Diagram was twice copied wholesale into the
- * authored map by code that built one by hand, which persisted every card the
+ * authored map by code that built one by hand, which persisted every thing the
  * Diagram deliberately omitted. Routing construction through `fromEntries` and
  * merging through `next` is what makes that unrepresentable rather than a rule
  * each new caller has to remember.
@@ -50,12 +50,12 @@ declare const PLACEMENT: unique symbol;
  * `placement.get(id)!.x = 1` would author a position past `next` and `place`
  * both — the only two things allowed to decide what a placement authors.
  */
-export type Placement = ReadonlyMap<CardId, Readonly<CardPlacement>> & {
+export type Placement = ReadonlyMap<ThingId, Readonly<ThingPlacement>> & {
   readonly [PLACEMENT]: true;
 };
 
 /**
- * The one place a `CardId` key is asserted rather than parsed.
+ * The one place a `ThingId` key is asserted rather than parsed.
  *
  * SAFETY: a single erasure reaches this module: `Object.entries` widens the keys of a
  * `Diagram`'s `positions` to `string`. They have already been branded —
@@ -66,15 +66,15 @@ export type Placement = ReadonlyMap<CardId, Readonly<CardPlacement>> & {
  *
  * React Flow typing `Node.id` as `string` is the other erasure, and it is
  * repaired at the adapter that owns it rather than here. `fromEntries` takes
- * `CardId` keys, because a constructor open to plain strings would re-open the
+ * `ThingId` keys, because a constructor open to plain strings would re-open the
  * seam the brand exists to hold — pinned by `identity-types.test.ts`.
  */
-const brand = (positions: ReadonlyMap<CardId, Readonly<CardPlacement>>): Placement =>
+const brand = (positions: ReadonlyMap<ThingId, Readonly<ThingPlacement>>): Placement =>
   positions as Placement;
 
-type PlacementPoint = CardPlacement | (DiagramPosition & { readonly open?: never });
+type PlacementPoint = ThingPlacement | (DiagramPosition & { readonly open?: never });
 
-const point = (at: PlacementPoint): CardPlacement => {
+const point = (at: PlacementPoint): ThingPlacement => {
   if (at.open === undefined) return { x: at.x, y: at.y, open: false };
   if (at.open) {
     return {
@@ -96,15 +96,15 @@ const point = (at: PlacementPoint): CardPlacement => {
 
 /** The placement a Diagram holds. */
 function fromDiagram(diagram: Diagram): Placement {
-  const positions = new Map<CardId, CardPlacement>();
-  for (const [cardId, at] of Object.entries(diagram.positions)) {
+  const positions = new Map<ThingId, ThingPlacement>();
+  for (const [thingId, at] of Object.entries(diagram.positions)) {
     if (at !== undefined) {
       // SAFETY: `Object.entries` widens this key to `string`, but it was
       // already branded — `diagramSchema` declares `positions` as
       // `z.record(idSchema, …)`, so every key reaching here already passed
       // through `loadSpace`/`loadSpaceSnapshot` (see the module docstring
       // above `brand`).
-      positions.set(cardId as CardId, point(at));
+      positions.set(thingId as ThingId, point(at));
     }
   }
   return brand(positions);
@@ -114,14 +114,14 @@ function fromDiagram(diagram: Diagram): Placement {
  * The placement a laid-out strategy graph describes — `positionedStrategy`
  * run backwards.
  *
- * A card the strategy left unplaced is omitted rather than defaulted, because
+ * A thing the strategy left unplaced is omitted rather than defaulted, because
  * collapsing that to `(0, 0)` would assert a placement no strategy made.
  */
 function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement {
-  const positions = new Map<CardId, CardPlacement>();
-  for (const card of strategyGraph.cards) {
-    if (card.x === undefined || card.y === undefined) continue;
-    positions.set(card.id, { x: card.x, y: card.y, open: false });
+  const positions = new Map<ThingId, ThingPlacement>();
+  for (const thing of strategyGraph.things) {
+    if (thing.x === undefined || thing.y === undefined) continue;
+    positions.set(thing.id, { x: thing.x, y: thing.y, open: false });
   }
   return brand(positions);
 }
@@ -129,23 +129,23 @@ function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement 
 /**
  * The placement a renderer is reporting, from whatever it draws with.
  *
- * Total by nature — a rendered card always has coordinates — which is why this
+ * Total by nature — a rendered thing always has coordinates — which is why this
  * is never installed directly over an authored placement. `next` decides what
  * any of it is allowed to author.
  */
-function fromEntries(entries: Iterable<readonly [CardId, PlacementPoint]>): Placement {
-  const positions = new Map<CardId, CardPlacement>();
-  for (const [cardId, at] of entries) positions.set(cardId, point(at));
+function fromEntries(entries: Iterable<readonly [ThingId, PlacementPoint]>): Placement {
+  const positions = new Map<ThingId, ThingPlacement>();
+  for (const [thingId, at] of entries) positions.set(thingId, point(at));
   return brand(positions);
 }
 
-/** Value equality: the same cards, each at the same coordinates. */
+/** Value equality: the same things, each at the same coordinates. */
 function equals(a: Placement | null, b: Placement | null): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
   if (a.size !== b.size) return false;
-  for (const [cardId, at] of a) {
-    const other = b.get(cardId);
+  for (const [thingId, at] of a) {
+    const other = b.get(thingId);
     if (other === undefined) return false;
     if (other.x !== at.x || other.y !== at.y) return false;
     if (other.open !== at.open) return false;
@@ -156,25 +156,25 @@ function equals(a: Placement | null, b: Placement | null): boolean {
 }
 
 /**
- * The placement after a renderer reports its geometry, given the cards a
+ * The placement after a renderer reports its geometry, given the things a
  * completed gesture actually placed.
  *
  * With nothing authored yet the whole rendered map is adopted: an Algorithmic
- * View authors nothing, and conversion copies every card already on screen so
+ * View authors nothing, and conversion copies every thing already on screen so
  * that nothing moves at the moment it happens (ADR 0025).
  *
  * With an authored placement, the rendered geometry is a **report, not an
  * authorship claim**, and `placed` is the whole of what may be read out of it —
- * refreshing a card that was dragged and admitting one that was not in the map
- * before. Every other card keeps the coordinate it had, and a card the report
+ * refreshing a thing that was dragged and admitting one that was not in the map
+ * before. Every other thing keeps the coordinate it had, and a thing the report
  * caught **in flight** keeps the place the author last left it.
  *
- * That last one is why refreshing every authored card from the report is wrong
+ * That last one is why refreshing every authored thing from the report is wrong
  * rather than merely broader. A reprojection can land mid-gesture — an activated
  * Graph or a selection redraws the graph without the drag ending — and it
  * reports the live position, which no gesture has settled on. Reading it would
  * author a coordinate the author never chose and re-run the strategy underneath
- * a drag still in progress. A card that really moved arrives in `placed`, so
+ * a drag still in progress. A thing that really moved arrives in `placed`, so
  * nothing legitimate needs the wider read.
  *
  * What the report says is taken **as it stands**. Nothing sits between the
@@ -185,30 +185,30 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * conversion this used to run could not be total, and the band it could not
  * cover was the room the derivation itself invented.
  *
- * The card's own Open/Closed state and Open Size survive the merge: a renderer
+ * The thing's own Open/Closed state and Open Size survive the merge: a renderer
  * reports React Flow node positions and nothing else, so only `x` and `y` are
  * read out of it.
  *
  * Returns `authored` itself when nothing changes, so an unchanged placement
  * keeps its identity and a settled graph is not re-arranged by the projection
- * that reports it. A report that names no card is the common one — every
+ * that reports it. A report that names no thing is the common one — every
  * projection sync makes one — and answers without walking anything.
  */
 function next(
   authored: Placement | null,
   rendered: Placement,
-  placed: readonly CardId[],
+  placed: readonly ThingId[],
 ): Placement {
   if (authored === null) return rendered;
   if (placed.length === 0) return authored;
 
-  const merged = new Map<CardId, CardPlacement>(authored);
-  for (const cardId of placed) {
-    const at = rendered.get(cardId);
-    const original = authored.get(cardId);
+  const merged = new Map<ThingId, ThingPlacement>(authored);
+  for (const thingId of placed) {
+    const at = rendered.get(thingId);
+    const original = authored.get(thingId);
     if (at !== undefined) {
       merged.set(
-        cardId,
+        thingId,
         point({
           ...at,
           ...original,
@@ -224,44 +224,44 @@ function next(
 }
 
 /**
- * The placement with one more card authored at a named point.
+ * The placement with one more thing authored at a named point.
  *
- * The atomic create-and-connect Edit places its new Card where the author
+ * The atomic create-and-connect Edit places its new Thing where the author
  * dropped it, which is authorship rather than a report — no renderer has drawn
- * that Card yet, so it cannot come through `next`.
+ * that Thing yet, so it cannot come through `next`.
  */
-function place(placement: Placement, cardId: CardId, at: PlacementPoint): Placement {
+function place(placement: Placement, thingId: ThingId, at: PlacementPoint): Placement {
   const placed = new Map(placement);
-  placed.set(cardId, point(at));
+  placed.set(thingId, point(at));
   return brand(placed);
 }
 
 /**
- * The placement without one card.
+ * The placement without one thing.
  *
- * A diagram's position keys **are** its card membership (ADR 0040), so removing a
- * card from a diagram is exactly this — and, like `place`, it is authorship
+ * A diagram's position keys **are** its thing membership (ADR 0040), so removing a
+ * thing from a diagram is exactly this — and, like `place`, it is authorship
  * rather than a report, which is why it belongs here beside the closed
  * constructors rather than being done with a `new Map` at the call site.
  *
- * Answers the placement it was given when the card was not in it, so an
+ * Answers the placement it was given when the thing was not in it, so an
  * unchanged placement keeps its identity and the positioned strategy is not
  * rebuilt for an edit that moved nothing.
  */
-function remove(placement: Placement, cardId: CardId): Placement {
-  if (!placement.has(cardId)) return placement;
+function remove(placement: Placement, thingId: ThingId): Placement {
+  if (!placement.has(thingId)) return placement;
   const remaining = new Map(placement);
-  remaining.delete(cardId);
+  remaining.delete(thingId);
   return brand(remaining);
 }
 
-/** The record a Diagram stores. Keys are already card ids; this only widens them. */
-function toPositions(placement: Placement): Record<CardId, CardPlacement> {
-  return Object.fromEntries([...placement].map(([cardId, at]) => [cardId, point(at)]));
+/** The record a Diagram stores. Keys are already thing ids; this only widens them. */
+function toPositions(placement: Placement): Record<ThingId, ThingPlacement> {
+  return Object.fromEntries([...placement].map(([thingId, at]) => [thingId, point(at)]));
 }
 
 /**
- * Empty: a Diagram that authors no card yet. Distinct from having no Diagram.
+ * Empty: a Diagram that authors no thing yet. Distinct from having no Diagram.
  *
  * A function rather than a constant so no two callers are handed the same map.
  */
@@ -275,7 +275,7 @@ const empty = (): Placement => brand(new Map());
 type Extent = { readonly width: number; readonly height: number };
 
 /**
- * The growth an Open Card displaces its neighbours by: its Open rect less the
+ * The growth an Open Thing displaces its neighbours by: its Open rect less the
  * collapsed one, floored at zero on each axis independently.
  *
  * The conversion sits beside `displace` because the floor is part of the rule
@@ -285,52 +285,52 @@ type Extent = { readonly width: number; readonly height: number };
  * come through here.
  *
  * The floor is not defensive arithmetic. Nothing authors a rect below
- * `COLLAPSED_CARD_SIZE` — the resizer's minimum is exactly that, and
- * `cardPlacementSchema` refuses a smaller one — but a stored Space is bytes, and
- * a negative growth would pull neighbours backwards over the Card that caused
+ * `COLLAPSED_THING_SIZE` — the resizer's minimum is exactly that, and
+ * `thingPlacementSchema` refuses a smaller one — but a stored Space is bytes, and
+ * a negative growth would pull neighbours backwards over the Thing that caused
  * it, past the subject, where the negating Close can no longer find them. So the
  * floor is also what makes the Open/Close round trip below hold. A rect smaller
- * than a collapsed Card displaces nobody, which is the honest reading of it: it
+ * than a collapsed Thing displaces nobody, which is the honest reading of it: it
  * is not a shrink of its neighbours.
  */
 function growth(openSize: Extent): Extent {
   return {
-    width: Math.max(0, openSize.width - COLLAPSED_CARD_SIZE.width),
-    height: Math.max(0, openSize.height - COLLAPSED_CARD_SIZE.height),
+    width: Math.max(0, openSize.width - COLLAPSED_THING_SIZE.width),
+    height: Math.max(0, openSize.height - COLLAPSED_THING_SIZE.height),
   };
 }
 
 /**
- * The placement with every Card beyond a subject moved by a growth.
+ * The placement with every Thing beyond a subject moved by a growth.
  *
- * This is the whole of displacement (ADR 0084). Opening a Card applies its
+ * This is the whole of displacement (ADR 0084). Opening a Thing applies its
  * growth here as part of the Open Edit, and the coordinates it writes are
  * authored ones with the same standing as any other — the author opened the
- * Card, and opening is a Diagram decision. Closing applies the negation, and
+ * Thing, and opening is a Diagram decision. Closing applies the negation, and
  * resizing the difference. Between those Edits nothing derives anything: the
  * Diagram's positions are what the canvas draws.
  *
- * The comparison is **strict and per-axis**. A Card whose authored `x` is
+ * The comparison is **strict and per-axis**. A Thing whose authored `x` is
  * strictly greater than the subject's takes `growth.width`, and its `y` is
- * decided separately against `growth.height`, so a Card below the subject and
- * level with it moves down and not right. A Card sharing the subject's
+ * decided separately against `growth.height`, so a Thing below the subject and
+ * level with it moves down and not right. A Thing sharing the subject's
  * coordinate on an axis does not move on that axis, and the subject itself never
- * moves on either: a Card does not displace itself.
+ * moves on either: a Thing does not displace itself.
  *
  * A negative growth is how Close is expressed and nothing here special-cases it,
  * because the round trip is what makes Open and Close a pair:
  * `displace(displace(p, c, g), c, negate(g))` is `p` for every **nonnegative**
  * `g`. The bound is load-bearing rather than a convenience. Applying a negative
- * growth *first* can carry a Card back across the subject, and the negation then
+ * growth *first* can carry a Thing back across the subject, and the negation then
  * skips it as no longer beyond — subject at `x = 0`, neighbour at `x = 1`,
  * `growth.width = -2`. `growth` above floors Open's at zero, so no Open reaches
  * it — but Close and a shrinking Resize both apply a negative growth, and the
- * Cards they reach are whichever ones are beyond the subject *now*, not the
- * ones the Open pushed. A Card the author dropped inside an Open Card's rect is
- * beyond it and was never displaced by it, so closing carries that Card back
+ * Things they reach are whichever ones are beyond the subject *now*, not the
+ * ones the Open pushed. A Thing the author dropped inside an Open Thing's rect is
+ * beyond it and was never displaced by it, so closing carries that Thing back
  * across the subject and the reopen leaves it there. The asymmetry is therefore
- * stated rather than repaired — clamping it, or remembering which Cards a
- * particular Open pushed, is the per-Card history ADR 0084 rejected for making
+ * stated rather than repaired — clamping it, or remembering which Things a
+ * particular Open pushed, is the per-Thing history ADR 0084 rejected for making
  * two identical Diagrams behave differently.
  *
  * The same memorylessness read from the subject's side: a subject the author
@@ -343,44 +343,44 @@ function growth(openSize: Extent): Extent {
  *
  * Open/Closed state and the remembered Open Size ride through untouched; only
  * `x` and `y` move (ADR 0066). Answers the placement it was given whenever no
- * Card actually moves — a subject the map does not hold, a growth that is zero
+ * Thing actually moves — a subject the map does not hold, a growth that is zero
  * on both axes, and the case neither of those catches: a nonzero growth with
  * nothing beyond the subject on either axis, which `reclaim` reaches for a
  * subject the author dragged past its own displaced neighbours. Like `remove`,
  * so an Edit that moves nothing keeps the placement's identity and a settled
  * graph is not laid out again.
  */
-function displace(placement: Placement, subjectId: CardId, growth: Extent): Placement {
+function displace(placement: Placement, subjectId: ThingId, growth: Extent): Placement {
   const subject = placement.get(subjectId);
   if (subject === undefined) return placement;
   if (growth.width === 0 && growth.height === 0) return placement;
 
-  const displaced = new Map<CardId, CardPlacement>();
+  const displaced = new Map<ThingId, ThingPlacement>();
   let moved = false;
-  for (const [cardId, at] of placement) {
+  for (const [thingId, at] of placement) {
     const x = at.x > subject.x ? at.x + growth.width : at.x;
     const y = at.y > subject.y ? at.y + growth.height : at.y;
     if (x !== at.x || y !== at.y) moved = true;
-    displaced.set(cardId, point({ ...at, x, y }));
+    displaced.set(thingId, point({ ...at, x, y }));
   }
   return moved ? brand(displaced) : placement;
 }
 
 /**
- * The placement with the room an Open Card holds given back to every Card
- * beyond it, the Card's own entry left exactly as it was.
+ * The placement with the room an Open Thing holds given back to every Thing
+ * beyond it, the Thing's own entry left exactly as it was.
  *
- * The displacement half of every way an Open Card stops holding its room, and
- * the one statement of it (ADR 0084). A Card closes, leaves a Diagram, or is
+ * The displacement half of every way an Open Thing stops holding its room, and
+ * the one statement of it (ADR 0084). A Thing closes, leaves a Diagram, or is
  * deleted from the Space, and all three owe the same negation of the growth of
  * the size it is Open at — the size read off its own entry, not off whatever
  * rect the gesture is proposing. That is why this is a member here beside
  * `growth` and `displace` rather than a line each caller writes: the third
- * caller is how a Card deleted from a Diagram the Edit was not drawing came to
+ * caller is how a Thing deleted from a Diagram the Edit was not drawing came to
  * strand its room permanently, and a rule with three owners has none.
  *
- * Answers the placement it was given for a Card that is Closed or not a member,
- * neither of which holds any room. A Closed Card's remembered Open Size is not
+ * Answers the placement it was given for a Thing that is Closed or not a member,
+ * neither of which holds any room. A Closed Thing's remembered Open Size is not
  * room it holds — nothing was displaced for it — so it is deliberately not read
  * here (ADR 0066).
  *
@@ -388,11 +388,11 @@ function displace(placement: Placement, subjectId: CardId, growth: Extent): Plac
  * also how a placement is reconciled against a Diagram that has already
  * reclaimed, and reclaiming there would give the room back twice.
  */
-function reclaim(placement: Placement, cardId: CardId): Placement {
-  const at = placement.get(cardId);
+function reclaim(placement: Placement, thingId: ThingId): Placement {
+  const at = placement.get(thingId);
   if (at?.open !== true) return placement;
   const held = growth(at.openSize);
-  return displace(placement, cardId, { width: -held.width, height: -held.height });
+  return displace(placement, thingId, { width: -held.width, height: -held.height });
 }
 
 export const Placement = {

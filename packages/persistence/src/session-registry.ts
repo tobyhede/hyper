@@ -1,6 +1,6 @@
 import {
   SPACE_FILE_VERSION,
-  type CardDocument,
+  type ThingDocument,
   type DiagramPosition,
   type SpaceSnapshot,
   type UUID,
@@ -26,7 +26,7 @@ import {
   type SpaceSessionOptions,
 } from './session';
 
-type SpaceCardLifecycleChange =
+type SpaceThingLifecycleChange =
   | { readonly kind: 'create'; readonly snapshot: SpaceSnapshot }
   /**
    * An update is a rebase, not a snapshot, because lifecycle coordination waits for every
@@ -43,7 +43,7 @@ type SpaceCardLifecycleChange =
     }
   | { readonly kind: 'delete'; readonly spaceId: UUID };
 
-type SpaceCardCoordinationResult = CommitResult | { readonly kind: 'persistence-read-failed' };
+type SpaceThingCoordinationResult = CommitResult | { readonly kind: 'persistence-read-failed' };
 
 export interface ProvisionalSpaceSession {
   readonly kind: 'provisional';
@@ -76,32 +76,32 @@ export interface SpaceSessionRegistry {
   readonly release: (spaceId: UUID) => boolean;
   readonly session: (spaceId: UUID) => SpaceSession | undefined;
   readonly entry: (spaceId: UUID) => SpaceSessionRegistryEntry | undefined;
-  readonly spaceCards: (newId: () => UUID) => SpaceCardLifecycle;
+  readonly spaceThings: (newId: () => UUID) => SpaceThingLifecycle;
 }
 
-export interface CreateSpaceCardInput {
+export interface CreateSpaceThingInput {
   readonly containingSpaceId: UUID;
   readonly diagramId: UUID;
   readonly title: string;
   readonly position: DiagramPosition;
 }
-export interface LinkSpaceCardInput extends CreateSpaceCardInput {
+export interface LinkSpaceThingInput extends CreateSpaceThingInput {
   readonly targetSpaceId: UUID;
   readonly diagram?: UUID;
   readonly graph?: UUID;
 }
-export interface DeleteSpaceCardInput {
+export interface DeleteSpaceThingInput {
   readonly containingSpaceId: UUID;
-  readonly cardId: UUID;
+  readonly thingId: UUID;
 }
-export type SpaceCardLifecycleResult =
+export type SpaceThingLifecycleResult =
   | { readonly kind: 'completed' }
   | { readonly kind: 'unchanged' }
   | {
       readonly kind: 'refused';
       readonly refusal:
         | { readonly code: 'diagram-not-found'; readonly diagramId: UUID }
-        | { readonly code: 'space-card-not-found'; readonly cardId: UUID }
+        | { readonly code: 'space-thing-not-found'; readonly thingId: UUID }
         | {
             readonly code: 'persistence-recovery-required';
             readonly spaceId: UUID;
@@ -110,10 +110,10 @@ export type SpaceCardLifecycleResult =
         | { readonly code: 'aggregate-refused'; readonly errors: readonly SpaceAggregateError[] }
         | { readonly code: 'persistence-read-failed' };
     };
-export interface SpaceCardLifecycle {
-  readonly create: (input: CreateSpaceCardInput) => Promise<SpaceCardLifecycleResult>;
-  readonly link: (input: LinkSpaceCardInput) => Promise<SpaceCardLifecycleResult>;
-  readonly delete: (input: DeleteSpaceCardInput) => Promise<SpaceCardLifecycleResult>;
+export interface SpaceThingLifecycle {
+  readonly create: (input: CreateSpaceThingInput) => Promise<SpaceThingLifecycleResult>;
+  readonly link: (input: LinkSpaceThingInput) => Promise<SpaceThingLifecycleResult>;
+  readonly delete: (input: DeleteSpaceThingInput) => Promise<SpaceThingLifecycleResult>;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -128,42 +128,42 @@ const snapshotFromSpace = (space: Space): SpaceSnapshot => {
   return {
     id: space.id,
     document,
-    cards: space.cards.map(({ id, ...cardDocument }) => ({ id, document: cardDocument })),
+    things: space.things.map(({ id, ...thingDocument }) => ({ id, document: thingDocument })),
   };
 };
-const removeSpaceCard = (snapshot: SpaceSnapshot, cardId: UUID): SpaceSnapshot => ({
+const removeSpaceThing = (snapshot: SpaceSnapshot, thingId: UUID): SpaceSnapshot => ({
   ...snapshot,
-  cards: snapshot.cards.filter(({ id }) => id !== cardId),
+  things: snapshot.things.filter(({ id }) => id !== thingId),
   document: {
     ...snapshot.document,
     diagrams: (snapshot.document.diagrams ?? []).map((diagram) => ({
       ...diagram,
       positions: Object.fromEntries(
-        Object.entries(diagram.positions).filter(([id]) => id !== cardId),
+        Object.entries(diagram.positions).filter(([id]) => id !== thingId),
       ),
       graphs: diagram.graphs.map((graph) => ({
         ...graph,
-        edges: graph.edges.filter(({ from, to }) => from !== cardId && to !== cardId),
+        edges: graph.edges.filter(({ from, to }) => from !== thingId && to !== thingId),
       })),
     })),
   },
 });
-const addSpaceCard = (
+const addSpaceThing = (
   snapshot: SpaceSnapshot,
   diagramId: UUID,
-  cardId: UUID,
-  document: CardDocument,
+  thingId: UUID,
+  document: ThingDocument,
   position: DiagramPosition,
 ): SpaceSnapshot => ({
   ...snapshot,
-  cards: [...snapshot.cards, { id: cardId, document }],
+  things: [...snapshot.things, { id: thingId, document }],
   document: {
     ...snapshot.document,
     diagrams: (snapshot.document.diagrams ?? []).map((diagram) =>
       diagram.id === diagramId
         ? {
             ...diagram,
-            positions: { ...diagram.positions, [cardId]: { ...position, open: false } },
+            positions: { ...diagram.positions, [thingId]: { ...position, open: false } },
           }
         : diagram,
     ),
@@ -211,12 +211,12 @@ export function createSpaceSessionRegistry(
     return managed.session;
   };
 
-  const runSpaceCardCoordination = async (
+  const runSpaceThingCoordination = async (
     derive: () =>
-      | readonly [SpaceCardLifecycleChange, ...SpaceCardLifecycleChange[]]
+      | readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]]
       | undefined
-      | Promise<readonly [SpaceCardLifecycleChange, ...SpaceCardLifecycleChange[]] | undefined>,
-    installed: (result?: SpaceCardCoordinationResult) => void,
+      | Promise<readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]] | undefined>,
+    installed: (result?: SpaceThingCoordinationResult) => void,
   ): Promise<CommitResult> => {
     const previous = lifecycleTail;
     let releaseTurn = (): void => undefined;
@@ -321,14 +321,14 @@ export function createSpaceSessionRegistry(
           ];
         }),
       );
-      const identityChange = (change: SpaceCardLifecycleChange): SpaceCardLifecycleChange =>
+      const identityChange = (change: SpaceThingLifecycleChange): SpaceThingLifecycleChange =>
         change.kind === 'update' ? { ...change, edit: (current) => current } : change;
       let conflictCurrents = new Map<UUID, LoadedSpace | undefined>();
       let recoveryStarted = false;
       const startRecovery = (recoverConflict: boolean): void => {
         if (recoveryStarted) return;
         recoveryStarted = true;
-        const retryChanges = changes.flatMap((change): SpaceCardLifecycleChange[] => {
+        const retryChanges = changes.flatMap((change): SpaceThingLifecycleChange[] => {
           if (!recoverConflict) return [identityChange(change)];
           const id = change.kind === 'create' ? change.snapshot.id : change.spaceId;
           if (!conflictCurrents.has(id)) return [identityChange(change)];
@@ -351,7 +351,7 @@ export function createSpaceSessionRegistry(
         });
         const [first, ...remaining] = retryChanges;
         if (first === undefined) return;
-        void coordinateSpaceCardLifecycle(() => [first, ...remaining]);
+        void coordinateSpaceThingLifecycle(() => [first, ...remaining]);
       };
       const recovery = {
         retry: (): void => {
@@ -441,7 +441,7 @@ export function createSpaceSessionRegistry(
         throw error;
       }
 
-      const backendChange = (change: SpaceCardLifecycleChange): SpaceChange => {
+      const backendChange = (change: SpaceThingLifecycleChange): SpaceChange => {
         if (change.kind === 'create') {
           const managed = participants.get(change.snapshot.id);
           return {
@@ -564,26 +564,26 @@ export function createSpaceSessionRegistry(
     }
   };
 
-  const coordinateSpaceCardLifecycle = async (
+  const coordinateSpaceThingLifecycle = async (
     derive: () =>
-      | readonly [SpaceCardLifecycleChange, ...SpaceCardLifecycleChange[]]
+      | readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]]
       | undefined
-      | Promise<readonly [SpaceCardLifecycleChange, ...SpaceCardLifecycleChange[]] | undefined>,
-  ): Promise<SpaceCardCoordinationResult> => {
-    const installation = Promise.withResolvers<SpaceCardCoordinationResult>();
-    void runSpaceCardCoordination(derive, (result) =>
+      | Promise<readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]] | undefined>,
+  ): Promise<SpaceThingCoordinationResult> => {
+    const installation = Promise.withResolvers<SpaceThingCoordinationResult>();
+    void runSpaceThingCoordination(derive, (result) =>
       installation.resolve(result ?? { kind: 'committed', revisions: [], deletedSpaceIds: [] }),
     ).catch(installation.reject);
     return installation.promise;
   };
 
-  const spaceCards = (newId: () => UUID): SpaceCardLifecycle => {
+  const spaceThings = (newId: () => UUID): SpaceThingLifecycle => {
     const working = (id: UUID): SpaceSnapshot => {
       const session = sessions.get(id)?.session;
       if (session === undefined) throw new Error(`Space ${id} has no live session`);
       return session.getState().working;
     };
-    const recoveryRefusal = (spaceId: UUID): SpaceCardLifecycleResult | undefined => {
+    const recoveryRefusal = (spaceId: UUID): SpaceThingLifecycleResult | undefined => {
       const persistence = sessions.get(spaceId)?.session.getState().persistence;
       if (persistence?.kind === 'failed') {
         return {
@@ -603,9 +603,9 @@ export function createSpaceSessionRegistry(
       }
       return undefined;
     };
-    const link = async (input: LinkSpaceCardInput): Promise<SpaceCardLifecycleResult> => {
-      let refusal: SpaceCardLifecycleResult | undefined;
-      const result = await coordinateSpaceCardLifecycle(() => {
+    const link = async (input: LinkSpaceThingInput): Promise<SpaceThingLifecycleResult> => {
+      let refusal: SpaceThingLifecycleResult | undefined;
+      const result = await coordinateSpaceThingLifecycle(() => {
         refusal = recoveryRefusal(input.containingSpaceId);
         if (refusal !== undefined) return undefined;
         const source = working(input.containingSpaceId);
@@ -616,20 +616,20 @@ export function createSpaceSessionRegistry(
           };
           return undefined;
         }
-        let document: CardDocument = {
+        let document: ThingDocument = {
           title: input.title,
           kind: 'space',
           spaceId: input.targetSpaceId,
         };
         if (input.diagram !== undefined) document = { ...document, diagram: input.diagram };
         if (input.graph !== undefined) document = { ...document, graph: input.graph };
-        const cardId = newId();
+        const thingId = newId();
         return [
           {
             kind: 'update',
             spaceId: input.containingSpaceId,
             edit: (current) =>
-              addSpaceCard(current, input.diagramId, cardId, document, input.position),
+              addSpaceThing(current, input.diagramId, thingId, document, input.position),
           },
         ];
       });
@@ -643,8 +643,8 @@ export function createSpaceSessionRegistry(
     };
     return {
       create: async (input) => {
-        let refusal: SpaceCardLifecycleResult | undefined;
-        const result = await coordinateSpaceCardLifecycle(() => {
+        let refusal: SpaceThingLifecycleResult | undefined;
+        const result = await coordinateSpaceThingLifecycle(() => {
           refusal = recoveryRefusal(input.containingSpaceId);
           if (refusal !== undefined) return undefined;
           const source = working(input.containingSpaceId);
@@ -656,19 +656,19 @@ export function createSpaceSessionRegistry(
             return undefined;
           }
           const initialized = initializeSpace({ title: input.title, newId });
-          const loaded = loadSpace(initialized.file, initialized.cardFiles);
+          const loaded = loadSpace(initialized.file, initialized.thingFiles);
           if (!loaded.ok) throw new Error(loaded.errors.map(({ message }) => message).join('\n'));
           const target = snapshotFromSpace(loaded.space);
-          const cardId = newId();
+          const thingId = newId();
           return [
             {
               kind: 'update',
               spaceId: input.containingSpaceId,
               edit: (current) =>
-                addSpaceCard(
+                addSpaceThing(
                   current,
                   input.diagramId,
-                  cardId,
+                  thingId,
                   { title: input.title, kind: 'space', spaceId: target.id },
                   input.position,
                 ),
@@ -689,8 +689,8 @@ export function createSpaceSessionRegistry(
       },
       link,
       delete: async (input) => {
-        let refusal: SpaceCardLifecycleResult | undefined;
-        const result = await coordinateSpaceCardLifecycle(async () => {
+        let refusal: SpaceThingLifecycleResult | undefined;
+        const result = await coordinateSpaceThingLifecycle(async () => {
           refusal = recoveryRefusal(input.containingSpaceId);
           if (refusal !== undefined) return undefined;
           let aggregate: LoadedAggregate;
@@ -703,11 +703,11 @@ export function createSpaceSessionRegistry(
             return undefined;
           }
           const source = working(input.containingSpaceId);
-          const card = source.cards.find(({ id }) => id === input.cardId);
-          if (card?.document.kind !== 'space') {
+          const thing = source.things.find(({ id }) => id === input.thingId);
+          if (thing?.document.kind !== 'space') {
             refusal = {
               kind: 'refused',
-              refusal: { code: 'space-card-not-found', cardId: input.cardId },
+              refusal: { code: 'space-thing-not-found', thingId: input.thingId },
             };
             return undefined;
           }
@@ -717,11 +717,11 @@ export function createSpaceSessionRegistry(
           for (const [id, managed] of sessions) {
             snapshots.set(id, managed.session.getState().working);
           }
-          snapshots.set(input.containingSpaceId, removeSpaceCard(source, input.cardId));
+          snapshots.set(input.containingSpaceId, removeSpaceThing(source, input.thingId));
           const inbound = new Map<UUID, number>();
           for (const snapshot of snapshots.values()) inbound.set(snapshot.id, 0);
           for (const snapshot of snapshots.values())
-            for (const candidate of snapshot.cards) {
+            for (const candidate of snapshot.things) {
               if (candidate.document.kind === 'space')
                 inbound.set(
                   candidate.document.spaceId,
@@ -730,16 +730,16 @@ export function createSpaceSessionRegistry(
             }
           const deleted: UUID[] = [];
           const pending: UUID[] =
-            card.document.spaceId === aggregate.metaSpaceId ||
-            (inbound.get(card.document.spaceId) ?? 0) !== 0
+            thing.document.spaceId === aggregate.metaSpaceId ||
+            (inbound.get(thing.document.spaceId) ?? 0) !== 0
               ? []
-              : [card.document.spaceId];
+              : [thing.document.spaceId];
           for (const id of pending) {
             if (deleted.includes(id)) continue;
             const snapshot = snapshots.get(id);
             if (snapshot === undefined) continue;
             deleted.push(id);
-            for (const child of snapshot.cards)
+            for (const child of snapshot.things)
               if (child.document.kind === 'space') {
                 const count = (inbound.get(child.document.spaceId) ?? 0) - 1;
                 inbound.set(child.document.spaceId, count);
@@ -759,7 +759,7 @@ export function createSpaceSessionRegistry(
             {
               kind: 'update',
               spaceId: input.containingSpaceId,
-              edit: (current) => removeSpaceCard(current, input.cardId),
+              edit: (current) => removeSpaceThing(current, input.thingId),
             },
             ...deleted.map((spaceId) => ({ kind: 'delete' as const, spaceId })),
           ];
@@ -814,7 +814,7 @@ export function createSpaceSessionRegistry(
       if (managed !== undefined) return { kind: 'session', session: managed.session };
       return provisional.get(spaceId);
     },
-    spaceCards,
+    spaceThings,
   };
   return registry;
 }

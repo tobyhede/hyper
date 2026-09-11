@@ -42,7 +42,7 @@ Application and adapter code import the public `@project/ui` surface. Add or com
 
 ## Custom composites
 
-A Hyper-specific visual or semantic composite is encouraged when it adds reusable Hyper meaning. `CanvasCard` composed from shared Card primitives is such a component. A second locally implemented Dialog for a styling difference is not.
+A Hyper-specific visual or semantic composite is encouraged when it adds reusable Hyper meaning. `CanvasThing` composed from shared Card primitives is such a component. A second locally implemented Dialog for a styling difference is not.
 
 Treat styling differences as variants, theme, or composition concerns before considering replacement behavior.
 

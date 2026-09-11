@@ -8,24 +8,24 @@ import {
   graphChoices,
   graphLegendSwatchColor,
   diagramChoices,
-  openCard,
+  openThing,
   selectCanvas,
   selectedCanvas,
   settled,
 } from './graph';
 
 // The app loads the abstract layout fixture (packages/app/fixture) — two
-// disconnected collections sharing no Cards:
+// disconnected collections sharing no Things:
 //   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — graphs over one spine,
 //      plus T, a member of that Diagram no Edge reaches, whose Title is three
 //      lines (ADR 0083)
 //   2. Echo (E→F→G→H→E′) — a plain linear collection
 // Each collection is a Diagram, because a Graph is a nested owned value of one
-// (ADR 0040) and these two share no Cards. The fixture opens in Collection 1,
-// and each Diagram draws only the Cards and Graphs it owns.
+// (ADR 0040) and these two share no Things. The fixture opens in Collection 1,
+// and each Diagram draws only the Things and Graphs it owns.
 // Each returns to its start via an alias, so this particular fixture is acyclic
 // and lays out as clean forward paths even though Graphs may contain cycles
-// (ADR 0032). These tests assert *behaviour* against that shape; none read card prose. See
+// (ADR 0032). These tests assert *behaviour* against that shape; none read thing prose. See
 // packages/app/README.md for why each case is there.
 //
 // This file is the **overview**: the space drawn whole, every graph at once.
@@ -34,7 +34,7 @@ import {
 // its own spec. The deck's tests are not adapted here; they asserted against a
 // surface that no longer exists.
 
-/** A graph node located by its exact card title, so single-letter titles don't
+/** A graph node located by its exact thing title, so single-letter titles don't
  *  collide (an alias node names its target, so "A" appears on more than one). */
 function nodeByTitle(page: Page, title: string): Locator {
   return page
@@ -55,12 +55,12 @@ test('draws every Graph in the selected Diagram, each in its own color', async (
   // Collection 1 owns three Graphs. A legend maps each to a color.
   await expect(page.getByTestId('graph-legend').locator('.legend__item')).toHaveCount(3);
 
-  // Six Cards — the five on the spine plus T, which joins no Graph — Long's four
+  // Six Things — the five on the spine plus T, which joins no Graph — Long's four
   // Edges plus Mid's three plus Short's two, and 18 handles. T draws none of
   // those handles: a graph port is a Graph's, and T is in no Graph.
   await expect(page.locator('.react-flow__node')).toHaveCount(6);
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
-  await expect(page.locator('.rf-card-node__port')).toHaveCount(18);
+  await expect(page.locator('.rf-thing-node__port')).toHaveCount(18);
 
   // Distinct colors, so the graphs can be told apart.
   const strokes = await page
@@ -71,12 +71,12 @@ test('draws every Graph in the selected Diagram, each in its own color', async (
 });
 
 test(
-  'production Canvas Cards expose Alias identity and a keyboard Open action',
+  'production Canvas Things expose Alias identity and a keyboard Open action',
   {
     tag: [
-      '@parity:canvas-card-exposes-kind-and-keyboard-actions',
-      '@parity:canvas-card-shows-kind-treatment',
-      '@parity:markdown-card-opens-and-closes-in-place',
+      '@parity:canvas-thing-exposes-kind-and-keyboard-actions',
+      '@parity:canvas-thing-shows-kind-treatment',
+      '@parity:markdown-thing-opens-and-closes-in-place',
     ],
   },
   async ({ page }) => {
@@ -88,34 +88,34 @@ test(
 
     const markdown = nodeByTitle(page, 'A').first();
     await markdown.click();
-    const open = markdown.getByRole('button', { name: 'Open Card A' });
+    const open = markdown.getByRole('button', { name: 'Open Thing A' });
     await open.focus();
     await expect(open).toBeFocused();
     await open.press('Enter');
     await expect(markdown.getByRole('heading', { name: 'A', exact: true })).toBeVisible();
     await expect(markdown.getByText('entry point')).toBeVisible();
-    await markdown.getByRole('button', { name: 'Edit Card A' }).click();
+    await markdown.getByRole('button', { name: 'Edit Thing A' }).click();
     const source = markdown.getByRole('textbox', { name: 'Markdown source of A' });
     await expect(source).toBeFocused();
     await markdown.getByRole('heading', { name: 'A', exact: true }).click();
     await expect(source).toBeVisible();
-    await expect(markdown.getByRole('button', { name: 'Close Card A' })).toBeDisabled();
+    await expect(markdown.getByRole('button', { name: 'Close Thing A' })).toBeDisabled();
     await source.press('Escape');
-    await expect(markdown.getByRole('button', { name: 'Edit Card A' })).toBeFocused();
+    await expect(markdown.getByRole('button', { name: 'Edit Thing A' })).toBeFocused();
   },
 );
 
 test(
-  "a selected Card's rail carries the Active Graph's own colour",
-  { tag: '@parity:canvas-card-shows-active-graph-colour' },
+  "a selected Thing's rail carries the Active Graph's own colour",
+  { tag: '@parity:canvas-thing-shows-active-graph-colour' },
   async ({ page }) => {
     await page.goto('/');
     await activateGraph(page, 'Long');
     const graphColor = await graphLegendSwatchColor(page, 'Long');
 
-    const card = nodeByTitle(page, 'A').first();
-    await card.click();
-    await expect(card.locator('.canvas-card__rail')).toHaveCSS('background-color', graphColor);
+    const thing = nodeByTitle(page, 'A').first();
+    await thing.click();
+    await expect(thing.locator('.canvas-thing__rail')).toHaveCSS('background-color', graphColor);
   },
 );
 
@@ -220,22 +220,22 @@ test(
  *
  * The Ladle story is where the front is reviewed whole; this is the half of that
  * evidence a browser owns — the projection carrying a stored multiline Title
- * through to a drawn Card, clamped inside the Card the author sized rather than
+ * through to a drawn Thing, clamped inside the Thing the author sized rather than
  * growing it. `T` is the fixture's one such Title, one line of each role
  * (packages/app/README.md), which is also why a regression here shows up in a
  * failure screenshot rather than only in a unit test.
  */
 test(
-  'a Card whose author wrote more than one line draws its Title as Title Lines',
-  { tag: '@parity:canvas-card-front-draws-only-its-title-lines' },
+  'a Thing whose author wrote more than one line draws its Title as Title Lines',
+  { tag: '@parity:canvas-thing-front-draws-only-its-title-lines' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
 
-    const card = page.locator('.react-flow__node[data-id="00000000-0000-4000-8000-00000000000e"]');
-    await expect(card).toBeVisible();
+    const thing = page.locator('.react-flow__node[data-id="00000000-0000-4000-8000-00000000000e"]');
+    await expect(thing).toBeVisible();
 
-    const lines = card.locator('.canvas-card__title-line');
+    const lines = thing.locator('.canvas-thing__title-line');
     await expect(lines).toHaveCount(3);
     expect(await lines.allInnerTexts()).toEqual(['T', 'a subtitle line', 'a caption line']);
     expect(
@@ -244,20 +244,20 @@ test(
       ),
     ).toEqual(['title', 'subtitle', 'caption']);
 
-    // Descending, and nothing else drawn on the front: the Card's own text is
+    // Descending, and nothing else drawn on the front: the Thing's own text is
     // its Title Lines, which is what the two undecided reference lines failed.
     const sizes = await lines.evaluateAll((elements) =>
       elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
     );
     expect(sizes[0]! > sizes[1]!).toBe(true);
     expect(sizes[1]! > sizes[2]!).toBe(true);
-    await expect(card.locator('.canvas-card__body > *')).toHaveCount(1);
-    await expect(card.locator('.canvas-card__content')).toHaveCount(0);
+    await expect(thing.locator('.canvas-thing__body > *')).toHaveCount(1);
+    await expect(thing.locator('.canvas-thing__content')).toHaveCount(0);
 
-    // A Title never resizes a Card (ADR 0014, ADR 0083): three rungs draw in
-    // the same box every other Card on this Diagram has.
-    const laddered = await boxOf(card, 'the multiline-Title Card');
-    const plain = await boxOf(nodeByTitle(page, 'B'), 'Card B');
+    // A Title never resizes a Thing (ADR 0014, ADR 0083): three rungs draw in
+    // the same box every other Thing on this Diagram has.
+    const laddered = await boxOf(thing, 'the multiline-Title Thing');
+    const plain = await boxOf(nodeByTitle(page, 'B'), 'Thing B');
     expect(laddered.height).toBeCloseTo(plain.height, 0);
     expect(laddered.width).toBeCloseTo(plain.width, 0);
   },
@@ -268,11 +268,11 @@ test('handles stay measurable, so edges attach where the strategy put them', asy
 
   // React Flow measures every handle's box to work out where an edge attaches,
   // so a handle hidden with `display: none` reports 0x0 and its edges land
-  // somewhere else — silently, with no warning to catch. `CardNode` dims
+  // somewhere else — silently, with no warning to catch. `ThingNode` dims
   // receding graphs with `opacity`, which keeps the box; that reads as an
   // ordinary styling choice, and this is what stops a later CSS tidy-up from
   // reaching for `display: none`. See react-flow-guidance/issues/03.
-  const ports = page.locator('.rf-card-node__port');
+  const ports = page.locator('.rf-thing-node__port');
   await expect(ports.first()).toBeAttached();
 
   const boxes = await ports.evaluateAll((els) =>
@@ -282,7 +282,7 @@ test('handles stay measurable, so edges attach where the strategy put them', asy
     }),
   );
 
-  // Asserted against whatever the fixture currently draws — its graph/card
+  // Asserted against whatever the fixture currently draws — its graph/thing
   // shape is free to change (fixture/README.md).
   expect(boxes.length).toBeGreaterThan(0);
   expect(boxes.every((box) => box.width > 0 && box.height > 0)).toBe(true);
@@ -320,48 +320,48 @@ test('selecting a graph emphasises it without hiding the others', async ({ page 
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
 });
 
-test('a card shows its title in the graph, and opens to show rendered Markdown', async ({
+test('a thing shows its title in the graph, and opens to show rendered Markdown', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
 
-  // The graph draws the title, never the card's body (ADR 0051). "entry point"
+  // The graph draws the title, never the thing's body (ADR 0051). "entry point"
   // is A's body text, which must not appear.
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
   await expect(a).not.toContainText('entry point');
-  await expect(a.getByRole('button', { name: 'Open Card A' })).toBeVisible();
+  await expect(a.getByRole('button', { name: 'Open Thing A' })).toBeVisible();
 
-  // Opening renders the Markdown in the existing Card and keeps Close reachable.
-  await openCard(a, 'A');
+  // Opening renders the Markdown in the existing Thing and keeps Close reachable.
+  await openThing(a, 'A');
   await expect(a.getByText('A', { exact: true }).last()).toHaveCSS('font-weight', '700');
 
-  // Hovered again before the press: opening grows the Card under the pointer, so
+  // Hovered again before the press: opening grows the Thing under the pointer, so
   // the rail the Open left revealed may already have faded by the time Close is
   // reached — and a faded rail takes no pointer events.
   await a.hover();
-  await a.getByRole('button', { name: 'Close Card A' }).click();
-  await expect(a.getByRole('button', { name: 'Open Card A' })).toBeVisible();
+  await a.getByRole('button', { name: 'Close Thing A' }).click();
+  await expect(a.getByRole('button', { name: 'Open Thing A' })).toBeVisible();
 });
 
-/** The two attributes of a Card's content as one commit left them. */
+/** The two attributes of a Thing's content as one commit left them. */
 interface PresenceCommit {
   readonly presence: string | null;
   readonly inert: string | null;
 }
 
-test('the Close action closes an opened card', async ({ page }) => {
+test('the Close action closes an opened thing', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const card = nodeByTitle(page, 'A').first();
-  await openCard(card, 'A');
-  await expect(card.locator('.canvas-card__content')).toHaveAttribute('data-presence', 'present');
+  const thing = nodeByTitle(page, 'A').first();
+  await openThing(thing, 'A');
+  await expect(thing.locator('.canvas-thing__content')).toHaveAttribute('data-presence', 'present');
 
   // Installed ahead of the Close click, because leaving is over before anything
   // out here can ask about it. `usePresence` keeps the leaving content mounted
-  // for the duration the element itself declares — `--card-placement-duration
+  // for the duration the element itself declares — `--thing-placement-duration
   // * 0.4`, 80ms — and then unmounts it, so an `expect.poll` from the test
   // process is spending a CDP round trip on a window that is already closing;
   // on a loaded runner the first sample lands after the unmount and sees an
@@ -371,17 +371,17 @@ test('the Close action closes an opened card', async ({ page }) => {
   // record is read back afterwards at leisure.
   //
   // Both attributes are read together in the one callback, which is what makes
-  // this one observation of one commit — `CanvasCard`'s `inert` layout effect
+  // this one observation of one commit — `CanvasThing`'s `inert` layout effect
   // runs in the commit that writes `data-presence`, and a MutationObserver is
   // delivered after that whole commit rather than between its two writes. The
   // observer then stops, so `inert` arriving a commit later would be recorded
   // here as the `null` it was when `leaving` appeared, and fail. An empty
   // record is a failure too, and a different one: the content never entered
   // `leaving` at all.
-  const leaving = await card.evaluateHandle((node) => {
+  const leaving = await thing.evaluateHandle((node) => {
     const commits: PresenceCommit[] = [];
     new MutationObserver((_mutations, observer) => {
-      const content = node.querySelector('.canvas-card__content');
+      const content = node.querySelector('.canvas-thing__content');
       if (content === null) return;
       const presence = content.getAttribute('data-presence');
       if (presence !== 'leaving') return;
@@ -395,37 +395,37 @@ test('the Close action closes an opened card', async ({ page }) => {
     return commits;
   });
 
-  await card.getByRole('button', { name: 'Close Card A' }).click();
+  await thing.getByRole('button', { name: 'Close Thing A' }).click();
   // The unmount is a fact worth asserting on its own and also the proof that
   // the leaving window has closed, so what the observer caught is read once
   // after it rather than polled for.
-  await expect(card.locator('.canvas-card__content')).toHaveCount(0);
+  await expect(thing.locator('.canvas-thing__content')).toHaveCount(0);
   expect(await leaving.jsonValue()).toEqual([{ presence: 'leaving', inert: '' }]);
-  await expect(card.getByRole('button', { name: 'Open Card A' })).toBeVisible();
+  await expect(thing.getByRole('button', { name: 'Open Thing A' })).toBeVisible();
 });
 
-test('cards are drawn at exactly the size the strategy placed them at', async ({ page }) => {
+test('things are drawn at exactly the size the strategy placed them at', async ({ page }) => {
   await page.goto('/');
-  const inner = page.locator('.rf-card-node__inner').first();
+  const inner = page.locator('.rf-thing-node__inner').first();
   await expect(inner).toBeVisible();
 
-  // The layout strategy arranges cards at `card.ts`'s size and the stylesheet draws them
-  // from the same numbers. If these drift, handles land where the card isn't —
+  // The layout strategy arranges things at `thing.ts`'s size and the stylesheet draws them
+  // from the same numbers. If these drift, handles land where the thing isn't —
   // silently, and looking like a strategy bug.
   const declared = await page.evaluate(() => {
     const el = document.querySelector('.graph-area')!;
     const s = getComputedStyle(el);
     return {
-      w: s.getPropertyValue('--card-width').trim(),
-      h: s.getPropertyValue('--card-height').trim(),
+      w: s.getPropertyValue('--thing-width').trim(),
+      h: s.getPropertyValue('--thing-height').trim(),
     };
   });
   expect(declared.w).toBe('260px');
 
   const drawn = await inner.evaluate((el) => {
     const s = getComputedStyle(el);
-    const card = el.querySelector('.canvas-card')!;
-    return { w: s.width, h: getComputedStyle(card).height };
+    const thing = el.querySelector('.canvas-thing')!;
+    return { w: s.width, h: getComputedStyle(thing).height };
   });
   expect(drawn.w).toBe(declared.w);
   expect(drawn.h).toBe(declared.h);
@@ -444,18 +444,18 @@ test(
     const recap = nodeByTitle(page, 'A′');
     await expect(recap).toBeVisible();
 
-    await openCard(recap, 'A′');
+    await openThing(recap, 'A′');
     await expect(recap.getByText('entry point')).toBeVisible();
     await expect(recap.getByRole('heading', { name: 'A′', exact: true })).toBeVisible();
     await expect(recap.getByRole('textbox')).toHaveCount(0);
-    await expect(recap.getByRole('button', { name: /Edit Card/ })).toHaveCount(0);
+    await expect(recap.getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
-    await recap.getByRole('button', { name: 'Close Card A′' }).click();
+    await recap.getByRole('button', { name: 'Close Thing A′' }).click();
 
     await recap.focus();
     await page.keyboard.press('Enter');
-    await expect(recap.getByRole('button', { name: 'Close Card A′' })).toBeVisible();
-    await recap.getByRole('button', { name: 'Close Card A′' }).click();
+    await expect(recap.getByRole('button', { name: 'Close Thing A′' })).toBeVisible();
+    await recap.getByRole('button', { name: 'Close Thing A′' }).click();
 
     await recap.focus();
     await page.keyboard.press('Space');
@@ -482,7 +482,7 @@ test(
     const resizeBox = await boxOf(resizeControl, "Alias A′'s resize control");
     // The drag has to end **inside the viewport**: a `mousemove` past the
     // window's edge is clamped, and the gesture then ends where it never went
-    // and commits nothing. `A′` is the last Card on the spine and sits near the
+    // and commits nothing. `A′` is the last Thing on the spine and sits near the
     // right edge, so the delta is what fits rather than what is round.
     const grabX = resizeBox.x + resizeBox.width / 2;
     const grabY = resizeBox.y + resizeBox.height / 2;
@@ -503,9 +503,9 @@ test(
     expect(resizedSize.width).toBeGreaterThan(openSize.width);
     expect(resizedSize.height).toBeGreaterThan(openSize.height);
 
-    await recap.getByRole('button', { name: 'Close Card A′' }).click();
+    await recap.getByRole('button', { name: 'Close Thing A′' }).click();
     await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 2));
-    await openCard(recap, 'A′');
+    await openThing(recap, 'A′');
     await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 3));
     await recap.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
@@ -520,7 +520,7 @@ test(
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A′');
     await expect(persisted.getByText('entry point')).toBeVisible();
-    await expect(persisted.getByRole('button', { name: 'Close Card A′' })).toBeVisible();
+    await expect(persisted.getByRole('button', { name: 'Close Thing A′' })).toBeVisible();
     const persistedSize = await persisted.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
@@ -530,6 +530,6 @@ test(
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
 
     await persisted.getByRole('button', { name: 'Edit Title A′', exact: true }).click();
-    await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('A′');
+    await expect(page.getByRole('textbox', { name: 'Thing title' })).toHaveValue('A′');
   },
 );

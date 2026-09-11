@@ -1,4 +1,4 @@
-import type { CardId, GraphId } from '@project/core';
+import type { ThingId, GraphId } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
 import type { DiagramId } from '@project/core';
@@ -6,9 +6,9 @@ import { requireDefaultDiagram } from './diagram-resolution';
 
 export interface DestinationOpening {
   readonly selection: DiagramId;
-  readonly cardId: CardId | null;
+  readonly thingId: ThingId | null;
   readonly graphId: GraphId | null;
-  readonly presentationCardId: CardId | null;
+  readonly presentationThingId: ThingId | null;
 }
 
 /** Translate a resolved product destination into the application state it opens. */
@@ -19,41 +19,41 @@ export function destinationOpening(
   if (destination.kind === 'space') {
     return {
       selection: requireDefaultDiagram(space),
-      cardId: null,
+      thingId: null,
       graphId: null,
-      presentationCardId: null,
+      presentationThingId: null,
     };
   }
   if (destination.kind === 'diagram') {
     return {
       selection: destination.diagramId,
-      cardId: null,
+      thingId: null,
       graphId: null,
-      presentationCardId: null,
+      presentationThingId: null,
     };
   }
-  if (destination.kind === 'diagram-card') {
+  if (destination.kind === 'diagram-thing') {
     return {
       selection: destination.diagramId,
-      cardId: destination.cardId,
+      thingId: destination.thingId,
       graphId: null,
-      presentationCardId: null,
+      presentationThingId: null,
     };
   }
   if (destination.kind === 'diagram-graph') {
     return {
       selection: destination.diagramId,
-      cardId: null,
+      thingId: null,
       graphId: destination.graphId,
-      presentationCardId: null,
+      presentationThingId: null,
     };
   }
   if (destination.kind === 'presentation') {
     return {
       selection: destination.diagramId,
-      cardId: null,
+      thingId: null,
       graphId: destination.graphId,
-      presentationCardId: destination.cardId,
+      presentationThingId: destination.thingId,
     };
   }
   if (destination.kind === 'graph') {
@@ -63,15 +63,15 @@ export function destinationOpening(
     }
     return {
       selection: owned.owner.diagram.id,
-      cardId: null,
+      thingId: null,
       graphId: destination.graphId,
-      presentationCardId: null,
+      presentationThingId: null,
     };
   }
   return {
     selection: requireDefaultDiagram(space),
-    cardId: destination.cardId,
+    thingId: destination.thingId,
     graphId: null,
-    presentationCardId: null,
+    presentationThingId: null,
   };
 }

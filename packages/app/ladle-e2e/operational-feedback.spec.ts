@@ -21,7 +21,7 @@ test(
     const alert = page.getByRole('alert');
     await expect(alert.getByText('Unable to open this space')).toBeVisible();
     const detail = page.getByRole('region', { name: 'Space app failure detail' });
-    await expect(detail).toContainText('Graph names an absent card');
+    await expect(detail).toContainText('Graph names an absent thing');
     await detail.focus();
     await expect(detail).toBeFocused();
   },
@@ -35,7 +35,7 @@ test(
 
     const alert = page.getByRole('alert');
     await expect(alert.getByText('Unable to arrange this view')).toBeVisible();
-    await expect(alert).toContainText('No position for Card A');
+    await expect(alert).toContainText('No position for Thing A');
   },
 );
 

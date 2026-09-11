@@ -21,7 +21,7 @@ export interface UncataloguedComponent {
 /**
  * A class block `packages/app/src/styles.css` still declares, and the React Flow
  * or integration requirement that keeps it out of `@project/ui`. The block is the
- * BEM root — `rf-card-node` covers `rf-card-node__port` and `rf-card-node--active`.
+ * BEM root — `rf-thing-node` covers `rf-thing-node__port` and `rf-thing-node--active`.
  */
 export interface HandRolledStyle {
   readonly block: string;
@@ -461,9 +461,14 @@ const moduleReferences = (source: ts.SourceFile): readonly ModuleReference[] => 
         : node.exportClause;
       // An import specifier's `propertyName` is the *exported* name and its
       // `name` the local one; an export specifier is the other way round, and
-      // `name` is what a consumer writes. `packages/ui/src/index.ts` carries both
-      // `CardContent` and `CardContent as CardSection` from different modules,
-      // so reading the wrong side made importing one of them reach both.
+      // `name` is what a consumer writes. Reading the wrong side made an aliased
+      // re-export match on its *local* name, so importing one component reached
+      // a second module that no story rendered. The alias that found this —
+      // `packages/ui/src/index.ts` re-exporting the shadcn registry's content
+      // component under a second name, because a domain component of the same
+      // name stood in the way — is gone with the collision ADR 0085 resolved.
+      // The rule is not: the barrel may alias again, and the fixtures below are
+      // the executable statement of it.
       const named =
         bindings === undefined
           ? null
@@ -604,7 +609,7 @@ const declaredClasses = (css: string): ReadonlySet<string> =>
 
 /**
  * A rule that names no class at all still styles something, and the inventory
- * could not see it: `styles.css` carries `[data-card-search-combobox] { … }`
+ * could not see it: `styles.css` carries `[data-thing-search-combobox] { … }`
  * rule sets that no block covered. Such a rule is keyed by its leading
  * attribute or id instead, so one entry covers the family.
  */
@@ -636,15 +641,15 @@ const declaredNonClassSubjects = (css: string): ReadonlySet<string> =>
       .filter((subject) => subject !== ''),
   );
 
-/** The BEM root: `rf-card-node` owns `rf-card-node__port` and `--active` alike. */
+/** The BEM root: `rf-thing-node` owns `rf-thing-node__port` and `--active` alike. */
 const blockOf = (className: string): string => className.split(/__|--/u)[0] ?? className;
 
 /**
  * The class names a module could be writing.
  *
  * `whole` is what a plain string literal says outright. `partial` is what a
- * template literal says up to its first interpolation — `CardNode` builds
- * ``rf-card-node__authoring-handle--${role}``, so the class exists in the source
+ * template literal says up to its first interpolation — `ThingNode` builds
+ * ``rf-thing-node__authoring-handle--${role}``, so the class exists in the source
  * only as the stem before the substitution, and a whole-token comparison would
  * report the rule that styles it as dead.
  */
@@ -666,9 +671,9 @@ const CLASS_STEM = /^[a-zA-Z][\w-]*$/u;
  * Where a class name is actually written: a `className`/`class` JSX attribute,
  * a `className` property (React Flow node objects carry one), or a `cn`/`clsx`
  * call. Reading *every* string literal instead made domain values look like
- * class names — `.card` was held live by `{ kind: 'card' }` in `render-adapter`
- * and `type: 'card'` in `projection`, none of which is a class, so deleting the
- * real `className="card"` would have left the rule reported as named.
+ * class names — `.thing` was held live by `{ kind: 'thing' }` in `render-adapter`
+ * and `type: 'thing'` in `projection`, none of which is a class, so deleting the
+ * real `className="thing"` would have left the rule reported as named.
  */
 const CLASS_BUILDERS = new Set(['cn', 'clsx', 'classNames', 'twMerge']);
 
@@ -961,8 +966,8 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
 
   /**
    * The dead-rule half of the ratchet, over the stylesheets that live beside their
-   * component rather than in `styles.css` — `canvas-card.css` beside `CanvasCard`,
-   * `card-search-combobox.css` beside `CardSearchCombobox`,
+   * component rather than in `styles.css` — `canvas-thing.css` beside `CanvasThing`,
+   * `thing-search-combobox.css` beside `ThingSearchCombobox`,
    * `markdown-source-editor.css` beside `MarkdownSourceEditor`, and
    * `command-dock.css` beside `CommandDock`, which is the first of them under
    * `packages/app/src` rather than `packages/ui/src`. The walk is over

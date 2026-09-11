@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '../src/index';
-import { uuid } from './card-files';
+import { uuid } from './thing-files';
 
 const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuid('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuid('00000000-0000-4000-8000-000000000003');
+const THING_A = uuid('00000000-0000-4000-8000-000000000002');
+const THING_B = uuid('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000004');
 const DIAGRAM_ID = uuid('00000000-0000-4000-8000-000000000022');
 
@@ -20,16 +20,16 @@ const snapshot: SpaceSnapshot = {
         title: 'Working',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 0, y: 0, open: false },
-          [CARD_B]: { x: 320, y: 0, open: false },
+          [THING_A]: { x: 0, y: 0, open: false },
+          [THING_B]: { x: 320, y: 0, open: false },
         },
-        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_B }] }],
       },
     ],
   },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'Body A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'Body B' } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'Body A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'Body B' } },
   ],
 };
 
@@ -74,7 +74,7 @@ describe('loadSpaceSnapshot', () => {
   it('locates an invalid shape in prose rather than dumping Zod', () => {
     const result = loadSpaceSnapshot({
       ...snapshot,
-      cards: [{ id: CARD_A, document: { kind: 'markdown', body: 'Body A' } }],
+      things: [{ id: THING_A, document: { kind: 'markdown', body: 'Body A' } }],
     });
 
     expect(result.ok).toBe(false);
@@ -82,7 +82,7 @@ describe('loadSpaceSnapshot', () => {
     expect(result.errors.map(({ kind }) => kind)).toEqual(['invalid-shape']);
 
     const message = result.errors.map((error) => error.message).join('\n');
-    expect(message).toMatch(/^cards\.0\.document\.title: \S/);
+    expect(message).toMatch(/^things\.0\.document\.title: \S/);
     expect(message.startsWith('[')).toBe(false);
     // SAFETY: `JSON.parse` returns `any`; narrowing to `unknown` only stops
     // that `any` from leaking into the assertion above — this call is
@@ -95,8 +95,8 @@ describe('loadSpaceSnapshot', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.space.id).toBe(SPACE_ID);
-    const card = result.space.lookup.card(CARD_A);
-    expect(card?.kind === 'markdown' && card.body).toBe('Body A');
+    const thing = result.space.lookup.thing(THING_A);
+    expect(thing?.kind === 'markdown' && thing.body).toBe('Body A');
     expect(result.space.lookup.graph(GRAPH_ID)?.graph.title).toBe('Main');
   });
 
@@ -131,17 +131,17 @@ describe('loadSpaceSnapshot', () => {
     expect(result.errors[0]?.kind).toBe('invalid-shape');
   });
 
-  it('canonicalizes backend card order by title and id', () => {
-    const reversed = { ...snapshot, cards: [...snapshot.cards].reverse() };
+  it('canonicalizes backend thing order by title and id', () => {
+    const reversed = { ...snapshot, things: [...snapshot.things].reverse() };
     const fromOriginal = loadSpaceSnapshot(snapshot);
     const fromReversed = loadSpaceSnapshot(reversed);
     expect(fromOriginal.ok).toBe(true);
     expect(fromReversed.ok).toBe(true);
     if (!fromOriginal.ok || !fromReversed.ok) return;
 
-    expect(fromReversed.space.cards.map((card) => card.id)).toEqual(
-      fromOriginal.space.cards.map((card) => card.id),
+    expect(fromReversed.space.things.map((thing) => thing.id)).toEqual(
+      fromOriginal.space.things.map((thing) => thing.id),
     );
-    expect(fromReversed.space.cards.map((card) => card.id)).toEqual([CARD_A, CARD_B]);
+    expect(fromReversed.space.things.map((thing) => thing.id)).toEqual([THING_A, THING_B]);
   });
 });

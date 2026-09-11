@@ -36,10 +36,10 @@
 }
 
 /*
- * **Sand is the canvas and nothing else.** The beige is the paper the Cards are
+ * **Sand is the canvas and nothing else.** The beige is the paper the Things are
  * laid on; it is not a tint the chrome inherits. The chrome is a neutral grey
  * scale over sand, so the only two things on screen carrying warmth are the
- * canvas and a Card's own face, and the only thing carrying colour is a Graph.
+ * canvas and a Thing's own face, and the only thing carrying colour is a Graph.
  *
  * These values were settled in the Command Dock prototype, which drew a light
  * canvas while this block was still dark and so had to fork every token it
@@ -54,7 +54,7 @@
   --background: #e5dbc7;
   --foreground: #1f2933;
   /* Chrome paper: the shell, its popovers, its menus and its dialogs. Neutral
-     and a shade off white, so it never reads as the Card's cream. */
+     and a shade off white, so it never reads as the Thing's cream. */
   --card: #fbfbfa;
   --card-foreground: var(--foreground);
   --popover: var(--card);
@@ -92,18 +92,18 @@
      sand. The dot is the sand a step down rather than a neutral. */
   --xy-background-color: var(--background);
   --xy-background-pattern-color: #cdbfa4;
-  --canvas-card-ink-color: #0b0d11;
-  --canvas-card-face-rest: #f4efe4;
-  --canvas-card-face-active: #fffaf0;
-  --canvas-card-title-color: #12161c;
-  --card-hover-duration: 120ms;
-  --card-hover-easing: ease;
-  /* Text roles the Card draws on its own cream faces. The Card's paper is
+  --canvas-thing-ink-color: #0b0d11;
+  --canvas-thing-face-rest: #f4efe4;
+  --canvas-thing-face-active: #fffaf0;
+  --canvas-thing-title-color: #12161c;
+  --thing-hover-duration: 120ms;
+  --thing-hover-easing: ease;
+  /* Text roles the Thing draws on its own cream faces. The Thing's paper is
      warmer and lighter than the chrome's, so these stay separate from
      `--foreground` and `--muted-foreground` rather than inheriting them;
-     `test/unit/canvas-card-contrast.test.ts` holds them to AA on both faces. */
-  --canvas-card-muted-color: #4a505c;
-  --canvas-card-error-color: #b3261e;
+     `test/unit/canvas-thing-contrast.test.ts` holds them to AA on both faces. */
+  --canvas-thing-muted-color: #4a505c;
+  --canvas-thing-error-color: #b3261e;
   --radius-md: 0.5rem;
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);

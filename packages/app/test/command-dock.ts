@@ -5,14 +5,14 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
  *
  * Every one of these was a single control on the Space Sidebar and is a
  * disclosure on the Command Dock: the Sidebar had room for a permanent `Add
- * Card`, a permanent `Add Diagram` and a Present button because it was a column
+ * Thing`, a permanent `Add Diagram` and a Present button because it was a column
  * sixteen rem wide, and the Dock is a strip over the canvas that finds room by
  * disclosure instead (ADR 0082). So a test that used to press one button now
  * opens a menu and presses a row.
  *
  * They live here rather than in each suite because the *surface* changed and the
  * claims did not: twenty tests across six files assert what happens after Add
- * Card, and none of them is about how Add Card is reached. One module is what
+ * Thing, and none of them is about how Add Thing is reached. One module is what
  * stops the next change to the Dock being a change to twenty files — and what
  * stops six of them quietly settling on six different ways to press it.
  *
@@ -36,7 +36,7 @@ export const unavailable = (control: HTMLElement): boolean =>
  *
  * The name is a **button** while a chrome rename is available and a plain label
  * while it is not — the Space is never renameable, and a Diagram or a Graph stops
- * being while a Card title editor or a live content edit owns the caret, or
+ * being while a Thing title editor or a live content edit owns the caret, or
  * before the canvas has a placement to edit at all. So a test that presses the
  * name has to wait for it to be a control, and the wait is the assertion: it is
  * how "the rename is withdrawn" and "the rename is back" are both read.
@@ -50,24 +50,24 @@ export const beginRename = async (testId: 'selected-canvas' | 'active-graph'): P
 export const dock = (): HTMLElement => screen.getByRole('toolbar', { name: 'Command Dock' });
 
 /**
- * Create a Card of one kind.
+ * Create a Thing of one kind.
  *
- * `Create Card` is a bare `+` glyph in the Cards cluster with the three kinds
+ * `Create Thing` is a bare `+` glyph in the Things cluster with the three kinds
  * behind it — the kind is chosen at creation, so the menu offers three peers
  * rather than a split button with a hidden default.
  */
-export const createCard = (kind: 'Markdown Card' | 'Space Card' | 'Alias'): void => {
-  fireEvent.click(within(dock()).getByRole('button', { name: 'Create Card' }));
-  // The row says the kind twice — `CardKindIcon` announces it and the word beside
+export const createThing = (kind: 'Markdown Thing' | 'Space Thing' | 'Alias'): void => {
+  fireEvent.click(within(dock()).getByRole('button', { name: 'Create Thing' }));
+  // The row says the kind twice — `ThingKindIcon` announces it and the word beside
   // it repeats it — so the accessible name is the kind doubled. Matched rather
   // than spelled out, because which of the two carries the name is the glyph's
   // decision and not this module's.
   fireEvent.click(screen.getByRole('menuitem', { name: new RegExp(`^(${kind}\\s*)+$`) }));
 };
 
-/** Whether creating a Card is available at all, which the `+` reports. */
-export const createCardControl = (): HTMLElement =>
-  within(dock()).getByRole('button', { name: 'Create Card' });
+/** Whether creating a Thing is available at all, which the `+` reports. */
+export const createThingControl = (): HTMLElement =>
+  within(dock()).getByRole('button', { name: 'Create Thing' });
 
 /**
  * The Diagram cluster's disclosure: the authored Diagrams, then the commands on
@@ -133,7 +133,7 @@ export const openSpaceRow = (title: RegExp | string): HTMLElement =>
  * cannot see the bar behind it — and a reader cannot press it either. The claim
  * a test spends this on is not that the control is reachable; it is what the
  * application does *when* a presentation begins, which is also reachable by
- * Back onto a presenting Card's URL with the pane still up. Naming the exception
+ * Back onto a presenting Thing's URL with the pane still up. Naming the exception
  * here keeps it one exception rather than a habit.
  */
 export const presentControlBehindAModal = (graphTitle: string): HTMLElement =>

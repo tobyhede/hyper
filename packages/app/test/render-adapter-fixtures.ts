@@ -1,16 +1,16 @@
 import type { NodeChange } from '@xyflow/react';
 import { uuidSchema } from '@project/core';
-import type { CardFlowNode } from '@project/react-flow-adapter';
+import type { ThingFlowNode } from '@project/react-flow-adapter';
 import type { RenderAdapter } from '../src/render-adapter';
 
-export function node(id: string, x: number, y: number, title = id): CardFlowNode {
+export function node(id: string, x: number, y: number, title = id): ThingFlowNode {
   return {
     id,
-    type: 'card',
+    type: 'thing',
     position: { x, y },
-    className: 'rf-card-node',
+    className: 'rf-thing-node',
     data: {
-      cardId: uuidSchema.parse(id),
+      thingId: uuidSchema.parse(id),
       title,
       readOnly: false,
       kind: 'markdown',
@@ -26,11 +26,11 @@ export function node(id: string, x: number, y: number, title = id): CardFlowNode
   };
 }
 
-export function moving(id: string, x: number, y: number): NodeChange<CardFlowNode>[] {
+export function moving(id: string, x: number, y: number): NodeChange<ThingFlowNode>[] {
   return [{ type: 'position', id, position: { x, y }, dragging: true }];
 }
 
-export function settled(id: string, x: number, y: number): NodeChange<CardFlowNode>[] {
+export function settled(id: string, x: number, y: number): NodeChange<ThingFlowNode>[] {
   return [{ type: 'position', id, position: { x, y }, dragging: false }];
 }
 

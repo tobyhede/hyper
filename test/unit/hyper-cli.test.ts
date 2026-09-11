@@ -26,7 +26,7 @@ import type {
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
-const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const GRAPH_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const THIRD_SPACE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
@@ -35,10 +35,10 @@ const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
     document: { version: 1, title: 'Stored talk' },
-    cards: [
+    things: [
       {
-        id: CARD_ID,
-        document: { title: 'Stored card', kind: 'markdown', body: 'Stored body.\n' },
+        id: THING_ID,
+        document: { title: 'Stored thing', kind: 'markdown', body: 'Stored body.\n' },
       },
     ],
   },
@@ -113,9 +113,9 @@ const makeTemporaryDirectory = async (): Promise<string> => {
 
 const writeValidSpace = async (id: UUID = SPACE_ID, title = 'Imported talk'): Promise<string> => {
   const directory = await makeTemporaryDirectory();
-  await mkdir(join(directory, 'cards'));
+  await mkdir(join(directory, 'things'));
   await writeFile(join(directory, 'space.json'), JSON.stringify({ version: 1, id, title }));
-  await writeFile(join(directory, 'cards', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
+  await writeFile(join(directory, 'things', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
   return directory;
 };
 
@@ -162,8 +162,8 @@ describe('runHyper', () => {
     await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
       `${JSON.stringify({ version: 1, id: SPACE_ID, title: 'Stored talk' }, null, 2)}\n`,
     );
-    await expect(readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8')).resolves.toBe(
-      `---\nid: ${CARD_ID}\ntitle: Stored card\nkind: markdown\n---\n\nStored body.\n`,
+    await expect(readFile(join(destination, 'things', `${THING_ID}.md`), 'utf8')).resolves.toBe(
+      `---\nid: ${THING_ID}\ntitle: Stored thing\nkind: markdown\n---\n\nStored body.\n`,
     );
   });
 
@@ -195,12 +195,12 @@ describe('runHyper', () => {
   it('replaces discovered files while preserving files outside space discovery', async () => {
     const parent = await makeTemporaryDirectory();
     const destination = join(parent, 'exported');
-    await mkdir(join(destination, 'cards', 'nested'), { recursive: true });
+    await mkdir(join(destination, 'things', 'nested'), { recursive: true });
     await writeFile(join(destination, 'space.json'), '{}\n');
     await writeFile(join(destination, 'stale-root.md'), 'stale\n');
-    await writeFile(join(destination, 'cards', 'stale.md'), 'stale\n');
+    await writeFile(join(destination, 'things', 'stale.md'), 'stale\n');
     await writeFile(join(destination, 'notes.txt'), 'keep root\n');
-    await writeFile(join(destination, 'cards', 'nested', 'keep.md'), 'keep nested\n');
+    await writeFile(join(destination, 'things', 'nested', 'keep.md'), 'keep nested\n');
 
     const exitCode = await runHyper(['export', SPACE_ID, destination], {
       repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
@@ -212,11 +212,11 @@ describe('runHyper', () => {
     await expect(access(join(destination, 'stale-root.md'))).rejects.toMatchObject({
       code: 'ENOENT',
     });
-    await expect(access(join(destination, 'cards', 'stale.md'))).rejects.toMatchObject({
+    await expect(access(join(destination, 'things', 'stale.md'))).rejects.toMatchObject({
       code: 'ENOENT',
     });
     await expect(readFile(join(destination, 'notes.txt'), 'utf8')).resolves.toBe('keep root\n');
-    await expect(readFile(join(destination, 'cards', 'nested', 'keep.md'), 'utf8')).resolves.toBe(
+    await expect(readFile(join(destination, 'things', 'nested', 'keep.md'), 'utf8')).resolves.toBe(
       'keep nested\n',
     );
   });
@@ -245,7 +245,7 @@ describe('runHyper', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     await mkdir(destination);
     await writeFile(join(destination, 'space.json'), 'previous space\n');
-    await writeFile(join(destination, 'cards'), 'not a directory\n');
+    await writeFile(join(destination, 'things'), 'not a directory\n');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
@@ -257,7 +257,7 @@ describe('runHyper', () => {
     await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
     );
-    await expect(readFile(join(destination, 'cards'), 'utf8')).resolves.toBe('not a directory\n');
+    await expect(readFile(join(destination, 'things'), 'utf8')).resolves.toBe('not a directory\n');
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
@@ -267,9 +267,9 @@ describe('runHyper', () => {
     const parent = await makeTemporaryDirectory();
     const external = await makeTemporaryDirectory();
     const destination = join(parent, 'exported');
-    await mkdir(join(external, 'cards'));
+    await mkdir(join(external, 'things'));
     await writeFile(join(external, 'space.json'), 'external space\n');
-    await writeFile(join(external, 'cards', 'external.md'), 'external card\n');
+    await writeFile(join(external, 'things', 'external.md'), 'external thing\n');
     await symlink(external, destination);
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
@@ -283,22 +283,22 @@ describe('runHyper', () => {
     ]);
     expect((await lstat(destination)).isSymbolicLink()).toBe(true);
     await expect(readFile(join(external, 'space.json'), 'utf8')).resolves.toBe('external space\n');
-    await expect(readFile(join(external, 'cards', 'external.md'), 'utf8')).resolves.toBe(
-      'external card\n',
+    await expect(readFile(join(external, 'things', 'external.md'), 'utf8')).resolves.toBe(
+      'external thing\n',
     );
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
   });
 
-  it('rejects a symlinked cards directory without changing the destination or external cards', async () => {
+  it('rejects a symlinked things directory without changing the destination or external things', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const externalCards = await makeTemporaryDirectory();
+    const externalThings = await makeTemporaryDirectory();
     await mkdir(destination);
     await writeFile(join(destination, 'space.json'), 'previous space\n');
     await writeFile(join(destination, 'notes.txt'), 'keep root\n');
-    await writeFile(join(externalCards, 'external.md'), 'external card\n');
-    await symlink(externalCards, join(destination, 'cards'));
+    await writeFile(join(externalThings, 'external.md'), 'external thing\n');
+    await symlink(externalThings, join(destination, 'things'));
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
@@ -307,28 +307,28 @@ describe('runHyper', () => {
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
-      `Export failed: Export destination contains a symbolic link: ${join(destination, 'cards')}\n`,
+      `Export failed: Export destination contains a symbolic link: ${join(destination, 'things')}\n`,
     ]);
-    expect((await lstat(join(destination, 'cards'))).isSymbolicLink()).toBe(true);
+    expect((await lstat(join(destination, 'things'))).isSymbolicLink()).toBe(true);
     await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
     );
     await expect(readFile(join(destination, 'notes.txt'), 'utf8')).resolves.toBe('keep root\n');
-    await expect(readFile(join(externalCards, 'external.md'), 'utf8')).resolves.toBe(
-      'external card\n',
+    await expect(readFile(join(externalThings, 'external.md'), 'utf8')).resolves.toBe(
+      'external thing\n',
     );
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
   });
 
-  it('rejects a symlinked canonical card file without changing its external target', async () => {
+  it('rejects a symlinked canonical thing file without changing its external target', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const external = join(await makeTemporaryDirectory(), 'external.md');
-    await mkdir(join(destination, 'cards'), { recursive: true });
+    await mkdir(join(destination, 'things'), { recursive: true });
     await writeFile(join(destination, 'space.json'), 'previous space\n');
-    await writeFile(external, 'external card\n');
-    await symlink(external, join(destination, 'cards', `${CARD_ID}.md`));
+    await writeFile(external, 'external thing\n');
+    await symlink(external, join(destination, 'things', `${THING_ID}.md`));
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
@@ -337,13 +337,15 @@ describe('runHyper', () => {
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
-      `Export failed: Export destination contains a symbolic link: ${join(destination, 'cards', `${CARD_ID}.md`)}\n`,
+      `Export failed: Export destination contains a symbolic link: ${join(destination, 'things', `${THING_ID}.md`)}\n`,
     ]);
-    expect((await lstat(join(destination, 'cards', `${CARD_ID}.md`))).isSymbolicLink()).toBe(true);
+    expect((await lstat(join(destination, 'things', `${THING_ID}.md`))).isSymbolicLink()).toBe(
+      true,
+    );
     await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
     );
-    await expect(readFile(external, 'utf8')).resolves.toBe('external card\n');
+    await expect(readFile(external, 'utf8')).resolves.toBe('external thing\n');
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
@@ -409,14 +411,14 @@ describe('runHyper', () => {
             kind: 'positioned',
             positions: {
               [THIRD_SPACE_ID]: { x: 30, y: 40, open: false },
-              [CARD_ID]: { x: 10, y: 20, open: false },
+              [THING_ID]: { x: 10, y: 20, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Main graph',
                 color: '#123456',
-                edges: [{ from: CARD_ID, to: THIRD_SPACE_ID }],
+                edges: [{ from: THING_ID, to: THIRD_SPACE_ID }],
               },
             ],
             activeGraph: GRAPH_ID,
@@ -424,13 +426,13 @@ describe('runHyper', () => {
         ],
         defaultDiagram: OTHER_SPACE_ID,
       },
-      cards: [
+      things: [
         {
           id: THIRD_SPACE_ID,
-          document: { title: 'Alias: opening', kind: 'alias', target: CARD_ID },
+          document: { title: 'Alias: opening', kind: 'alias', target: THING_ID },
         },
         {
-          id: CARD_ID,
+          id: THING_ID,
           document: {
             title: 'Opening: why',
             kind: 'markdown',
@@ -453,29 +455,29 @@ describe('runHyper', () => {
 
     const exportedJson = await readFile(join(destination, 'space.json'), 'utf8');
     const positionsJson = exportedJson.slice(exportedJson.indexOf('"positions"'));
-    expect(positionsJson.indexOf(`"${CARD_ID}"`)).toBeLessThan(
+    expect(positionsJson.indexOf(`"${THING_ID}"`)).toBeLessThan(
       positionsJson.indexOf(`"${THIRD_SPACE_ID}"`),
     );
     await expect(readSingleSpace(destination)).resolves.toEqual({
       id: snapshot.id,
       document: snapshot.document,
-      cards: [...snapshot.cards].reverse(),
+      things: [...snapshot.things].reverse(),
     });
   });
 
-  it('canonicalizes card frontmatter independently of document key insertion order', async () => {
+  it('canonicalizes thing frontmatter independently of document key insertion order', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const reordered: LoadedSpace = {
       ...storedSpace,
       snapshot: {
         ...storedSpace.snapshot,
-        cards: [
+        things: [
           {
-            id: CARD_ID,
+            id: THING_ID,
             document: {
               kind: 'markdown',
               body: 'Stored body.\n',
-              title: 'Stored card',
+              title: 'Stored thing',
             },
           },
         ],
@@ -490,8 +492,8 @@ describe('runHyper', () => {
       }),
     ).resolves.toBe(0);
 
-    await expect(readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8')).resolves.toBe(
-      `---\nid: ${CARD_ID}\ntitle: Stored card\nkind: markdown\n---\n\nStored body.\n`,
+    await expect(readFile(join(destination, 'things', `${THING_ID}.md`), 'utf8')).resolves.toBe(
+      `---\nid: ${THING_ID}\ntitle: Stored thing\nkind: markdown\n---\n\nStored body.\n`,
     );
   });
 
@@ -501,11 +503,11 @@ describe('runHyper', () => {
       ...storedSpace,
       snapshot: {
         ...storedSpace.snapshot,
-        cards: [
+        things: [
           {
-            id: CARD_ID,
+            id: THING_ID,
             document: {
-              title: 'Stored card',
+              title: 'Stored thing',
               kind: 'markdown',
               body: 'First\r\nSecond\rThird\n',
             },
@@ -522,9 +524,9 @@ describe('runHyper', () => {
       }),
     ).resolves.toBe(0);
 
-    const cardFile = await readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8');
-    expect(cardFile).not.toContain('\r');
-    expect(cardFile).toContain('\nFirst\nSecond\nThird\n');
+    const thingFile = await readFile(join(destination, 'things', `${THING_ID}.md`), 'utf8');
+    expect(thingFile).not.toContain('\r');
+    expect(thingFile).toContain('\nFirst\nSecond\nThird\n');
   });
 
   it('opens the stored Meta Space without filesystem import and preserves its revision', async () => {
@@ -656,11 +658,11 @@ describe('runHyper', () => {
 
   it('reports every file diagnostic with its path', async () => {
     const directory = await makeTemporaryDirectory();
-    const firstCardPath = join(directory, 'first.md');
-    const secondCardPath = join(directory, 'second.md');
+    const firstThingPath = join(directory, 'first.md');
+    const secondThingPath = join(directory, 'second.md');
     await writeFile(join(directory, 'space.json'), '{ invalid JSON');
-    await writeFile(firstCardPath, 'Missing frontmatter.\n');
-    await writeFile(secondCardPath, 'Also missing frontmatter.\n');
+    await writeFile(firstThingPath, 'Missing frontmatter.\n');
+    await writeFile(secondThingPath, 'Also missing frontmatter.\n');
     const output = captureIo();
 
     const exitCode = await runHyper([directory], {
@@ -672,8 +674,8 @@ describe('runHyper', () => {
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([]);
     expect(output.stderr.join('')).toContain(join(directory, 'space.json'));
-    expect(output.stderr.join('')).toContain(firstCardPath);
-    expect(output.stderr.join('')).toContain(secondCardPath);
+    expect(output.stderr.join('')).toContain(firstThingPath);
+    expect(output.stderr.join('')).toContain(secondThingPath);
   });
 
   it.each([
@@ -689,17 +691,17 @@ describe('runHyper', () => {
       outcome: {
         kind: 'rejected',
         code: 'invalid-snapshot',
-        message: `Graph ${GRAPH_ID} has an unresolved card`,
+        message: `Graph ${GRAPH_ID} has an unresolved thing`,
       } satisfies RepositoryImportResult,
       entityId: GRAPH_ID,
     },
     {
       outcome: {
         kind: 'rejected',
-        code: 'card-ownership',
-        message: `Card ${CARD_ID} already belongs to another space`,
+        code: 'thing-ownership',
+        message: `Thing ${THING_ID} already belongs to another space`,
       } satisfies RepositoryImportResult,
-      entityId: CARD_ID,
+      entityId: THING_ID,
     },
   ] as const)(
     'reports a classified import failure naming $entityId',
@@ -730,10 +732,10 @@ describe('runHyper', () => {
    */
   it('reports a graph id two diagrams own, naming both of them', async () => {
     const directory = await makeTemporaryDirectory();
-    await mkdir(join(directory, 'cards'));
+    await mkdir(join(directory, 'things'));
     await writeFile(
-      join(directory, 'cards', 'opening.md'),
-      `---\nid: ${CARD_ID}\ntitle: Opening\n---\nHello.\n`,
+      join(directory, 'things', 'opening.md'),
+      `---\nid: ${THING_ID}\ntitle: Opening\n---\nHello.\n`,
     );
     await writeFile(
       join(directory, 'space.json'),
@@ -746,15 +748,15 @@ describe('runHyper', () => {
             id: OTHER_SPACE_ID,
             title: 'First owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
-            graphs: [{ id: GRAPH_ID, title: 'Shared', edges: [{ from: CARD_ID, to: CARD_ID }] }],
+            positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+            graphs: [{ id: GRAPH_ID, title: 'Shared', edges: [{ from: THING_ID, to: THING_ID }] }],
           },
           {
             id: THIRD_SPACE_ID,
             title: 'Second owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 10, y: 10, open: false } },
-            graphs: [{ id: GRAPH_ID, title: 'Shared', edges: [{ from: CARD_ID, to: CARD_ID }] }],
+            positions: { [THING_ID]: { x: 10, y: 10, open: false } },
+            graphs: [{ id: GRAPH_ID, title: 'Shared', edges: [{ from: THING_ID, to: THING_ID }] }],
           },
         ],
       }),

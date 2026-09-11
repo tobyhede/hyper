@@ -14,7 +14,7 @@
  *
  * The top-level Ladle section is enforced by folder <-> title-prefix pairing
  * in `scripts/ui-catalog.ts`. It is not the domain hierarchy — a Space does
- * not "contain" a Card here — and it is not how many parts something is built
+ * not "contain" a Thing here — and it is not how many parts something is built
  * from. It answers one question: **what real machinery does this story need
  * to mean anything?**
  *
@@ -50,7 +50,7 @@
  * fit-vs-fixed-viewport union, so a new story cannot quietly drift from what
  * every other canvas story already agreed on. `stories/review/` may carry
  * pre-existing exceptions that predate this rule and aren't obligated to
- * migrate — `space-card-canvas-prototype.stories.tsx` is the current one. The
+ * migrate — `space-thing-canvas-prototype.stories.tsx` is the current one. The
  * `SurfacesExample` below shows the pattern; delete it if the component under
  * test needs no canvas, and see `ComponentsExample` after it instead.
  */

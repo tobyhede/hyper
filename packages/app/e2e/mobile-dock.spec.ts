@@ -3,8 +3,8 @@ import type { Route } from '@playwright/test';
 import {
   activateGraph,
   boxOf,
-  createCard,
-  createCardControl,
+  createThing,
+  createThingControl,
   dock,
   diagramMenu,
   newDiagram,
@@ -64,7 +64,7 @@ test(
     await expect(page.getByTestId('space-title')).toBeVisible();
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(page.getByTestId('active-graph')).toBeVisible();
-    await expect(dock(page).getByRole('button', { name: 'Cards' })).toBeVisible();
+    await expect(dock(page).getByRole('button', { name: 'Things' })).toBeVisible();
 
     // And every disclosure still discloses. The Diagram menu is opened, a choice
     // is made, and the result is on the canvas with nothing dismissed in
@@ -83,20 +83,20 @@ test(
  * A command whose result opens an editor on the canvas.
  *
  * This is the case the Sheet could not serve at all: the editor took focus as it
- * mounted and the Sheet's trap took it straight back, so Add Card had to dismiss
+ * mounted and the Sheet's trap took it straight back, so Add Thing had to dismiss
  * before it could run. Here the strip is beside the result rather than over it,
  * and the caret lands where the author is looking.
  */
-test('Create Card from the strip names the new Card on the canvas', async ({ page }) => {
+test('Create Thing from the strip names the new Thing on the canvas', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createCard(page, 'Markdown Card');
+  await createThing(page, 'Markdown Thing');
 
-  const title = page.getByRole('textbox', { name: 'Card title' });
+  const title = page.getByRole('textbox', { name: 'Thing title' });
   await expect(title).toBeFocused();
-  await expect(title).toHaveValue('Card 1');
+  await expect(title).toHaveValue('Thing 1');
   await expect(dock(page)).toBeVisible();
 });
 
@@ -106,7 +106,7 @@ test('Create Alias from the strip opens the Target picker', async ({ page }) => 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createCard(page, 'Alias');
+  await createThing(page, 'Alias');
 
   await expect(page.getByRole('combobox', { name: 'Target' })).toBeFocused();
 });
@@ -128,13 +128,13 @@ test('New Diagram selects an empty authored Diagram, and Delete returns to the o
   await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
-  // An empty Diagram reveals the Cards drawer, which at this width overlays the
+  // An empty Diagram reveals the Things drawer, which at this width overlays the
   // end of the strip — so it is dismissed before the next command rather than
   // reached around. That is the drawer's own contract and not the Dock's: a
   // surface the author opens is dismissed by the author.
-  await expect(page.getByRole('dialog', { name: 'Cards' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Cards' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
 
   const menu = await diagramMenu(page);
   await menu.getByRole('menuitem', { name: 'Delete Diagram 1' }).click();
@@ -142,25 +142,25 @@ test('New Diagram selects an empty authored Diagram, and Delete returns to the o
 });
 
 /**
- * Delete reaching a Dock control leaves the selected Card standing.
+ * Delete reaching a Dock control leaves the selected Thing standing.
  *
  * React Flow subscribes its delete key on `document`, so a control beside the
  * canvas is inside that subscription and outside the canvas's own guard. Every
  * Dock control carries `nokey` for exactly this, and at phone width the strip is
  * the *only* chrome there is — so if the marker were ever dropped, this is where
- * a reader would lose a Card to a keystroke meant for a menu.
+ * a reader would lose a Thing to a keystroke meant for a menu.
  */
-test('Delete on a Dock control leaves the selected Card on the canvas', async ({ page }) => {
+test('Delete on a Dock control leaves the selected Thing on the canvas', async ({ page }) => {
   await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
-  await card.click();
+  const thing = nodeByTitle(page, 'A').first();
+  await expect(thing).toBeVisible();
+  await thing.click();
 
   await selectedCanvas(page).focus();
   await page.keyboard.press('Delete');
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-  await expect(card).toBeVisible();
+  await expect(thing).toBeVisible();
 });
 
 /**
@@ -182,7 +182,7 @@ test('Present from the strip leaves the presentation reachable', async ({ page }
   await expect(dock(page)).toBeHidden();
 
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.react-flow__node.rf-card-node--active')).toHaveCount(1);
+  await expect(page.locator('.react-flow__node.rf-thing-node--active')).toHaveCount(1);
 });
 
 /**
@@ -258,7 +258,7 @@ test('a persistence failure stays inside the viewport beside a side-edge Dock', 
   await page.route('**/api/spaces', failCommit);
 
   // Any Edit will do; this one is reachable from the strip itself at this width.
-  await createCard(page, 'Markdown Card');
+  await createThing(page, 'Markdown Thing');
 
   const failure = page.getByTestId('persistence-failure');
   await expect(failure).toBeVisible();
@@ -337,7 +337,7 @@ test.describe('a short viewport', () => {
     expect(scroll.content).toBeGreaterThan(scroll.client);
 
     // And the far cluster is reachable, which is what the scrolling is for.
-    const create = createCardControl(page);
+    const create = createThingControl(page);
     await create.scrollIntoViewIfNeeded();
     await expect(create).toBeInViewport({ ratio: 1 });
     await create.click();

@@ -85,7 +85,7 @@ export default defineConfig({
         /*
          * `core`'s branch number moved down when ADR 0079's removal deleted
          * covered core source: what is left uncovered is two of v8's synthetic
-         * module-load records (`card-geometry.ts` and `compact-uuid.ts` both
+         * module-load records (`thing-geometry.ts` and `compact-uuid.ts` both
          * report line 1 uncovered while every function in them is exercised),
          * and the smaller denominator stopped diluting them. No test reaches
          * one — importing the module directly leaves the record untaken — so

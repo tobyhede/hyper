@@ -1,13 +1,13 @@
 import { expectTypeOf, it } from 'vitest';
-import type { CardNodeData, CardTitleEditor } from '../src/projection';
+import type { ThingNodeData, ThingTitleEditor } from '../src/projection';
 
 /**
  * The inline title editor is one value carrying both operations that end it,
  * not a boolean beside two independently optional callbacks.
  *
  * Split, the editing state could be asked for with either operation missing,
- * and `CardNode` had to invent total functions to satisfy `CanvasCardProps` —
- * an absent completion answered `null`, which `CanvasCard` reads as *accepted*,
+ * and `ThingNode` had to invent total functions to satisfy `CanvasThingProps` —
+ * an absent completion answered `null`, which `CanvasThing` reads as *accepted*,
  * so the editor closed on a rename that never happened. Pairing them is what
  * makes that state unrepresentable rather than merely unreached.
  *
@@ -16,10 +16,10 @@ import type { CardNodeData, CardTitleEditor } from '../src/projection';
  * enforces it, as with `SpaceCanvas-types.test.tsx`.
  */
 
-const editor = (value: CardTitleEditor) => value;
+const editor = (value: ThingTitleEditor) => value;
 
 it('cannot ask for a title editor without what ends it', () => {
-  expectTypeOf<CardNodeData['titleEditor']>().toEqualTypeOf<CardTitleEditor | undefined>();
+  expectTypeOf<ThingNodeData['titleEditor']>().toEqualTypeOf<ThingTitleEditor | undefined>();
 
   // @ts-expect-error An editor with no cancel leaves Escape with nothing to do.
   editor({ onComplete: () => null });
@@ -29,5 +29,5 @@ it('cannot ask for a title editor without what ends it', () => {
 });
 
 it('keeps no separate flag that could be raised over a missing operation', () => {
-  expectTypeOf<'editingTitle'>().not.toExtend<keyof CardNodeData>();
+  expectTypeOf<'editingTitle'>().not.toExtend<keyof ThingNodeData>();
 });

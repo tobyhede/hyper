@@ -3,7 +3,7 @@ import {
   encodeCompactUuid,
   spaceSnapshotSchema,
   uuidSchema,
-  type CardId,
+  type ThingId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -15,10 +15,10 @@ import { createWorkingSpaceReader } from '../src/snapshot';
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 
 const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');
-const CARD_A = uuid('00000000-0000-4000-8000-000000000002');
-const CARD_B = uuid('00000000-0000-4000-8000-000000000003');
-/** A Card of the Space the Diagram does not hold, so no contextual URL names it. */
-const CARD_OFF_DIAGRAM = uuid('00000000-0000-4000-8000-000000000004');
+const THING_A = uuid('00000000-0000-4000-8000-000000000002');
+const THING_B = uuid('00000000-0000-4000-8000-000000000003');
+/** A Thing of the Space the Diagram does not hold, so no contextual URL names it. */
+const THING_OFF_DIAGRAM = uuid('00000000-0000-4000-8000-000000000004');
 const DIAGRAM = uuid('00000000-0000-4000-8000-000000000010');
 const OPENING_GRAPH = uuid('00000000-0000-4000-8000-000000000020');
 const OTHER_GRAPH = uuid('00000000-0000-4000-8000-000000000021');
@@ -45,12 +45,12 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Diagram',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 0, y: 0, open: false },
-          [CARD_B]: { x: 320, y: 0, open: false },
+          [THING_A]: { x: 0, y: 0, open: false },
+          [THING_B]: { x: 320, y: 0, open: false },
         },
         graphs: [
-          { id: OPENING_GRAPH, title: 'Opening', edges: [{ from: CARD_A, to: CARD_B }] },
-          { id: OTHER_GRAPH, title: 'Other', edges: [{ from: CARD_B, to: CARD_A }] },
+          { id: OPENING_GRAPH, title: 'Opening', edges: [{ from: THING_A, to: THING_B }] },
+          { id: OTHER_GRAPH, title: 'Other', edges: [{ from: THING_B, to: THING_A }] },
         ],
         activeGraph: OPENING_GRAPH,
       },
@@ -58,15 +58,15 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_DIAGRAM,
         title: 'Other Diagram',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 0, y: 0, open: false } },
+        positions: { [THING_A]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_DIAGRAM_GRAPH, title: 'Other Diagram Graph', edges: [] }],
       },
     ],
   },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: '' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: '' } },
-    { id: CARD_OFF_DIAGRAM, document: { title: 'C', kind: 'markdown', body: '' } },
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: '' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: '' } },
+    { id: THING_OFF_DIAGRAM, document: { title: 'C', kind: 'markdown', body: '' } },
   ],
 });
 
@@ -75,13 +75,13 @@ const space = createWorkingSpaceReader()(snapshot);
 const overview = (activeGraphId: UUID | null = OPENING_GRAPH): NavigationAddress => ({
   selectedDiagramId: DIAGRAM,
   activeGraphId,
-  presentingCardId: null,
+  presentingThingId: null,
 });
 
-const presenting = (cardId: CardId, activeGraphId: UUID = OPENING_GRAPH): NavigationAddress => ({
+const presenting = (thingId: ThingId, activeGraphId: UUID = OPENING_GRAPH): NavigationAddress => ({
   selectedDiagramId: DIAGRAM,
   activeGraphId,
-  presentingCardId: cardId,
+  presentingThingId: thingId,
 });
 
 const view = `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM)}`;
@@ -90,13 +90,13 @@ const sync = (
   pathname: string,
   address: NavigationAddress,
   synced: NavigationAddress,
-  addressedCardId: CardId | null = null,
+  addressedThingId: ThingId | null = null,
 ) =>
   destinationSync({
     space,
     snapshot,
     pathname,
-    position: { ...address, addressedCardId },
+    position: { ...address, addressedThingId },
     synced,
   });
 
@@ -116,13 +116,13 @@ describe('what the browser should do about an address', () => {
     });
   });
 
-  it('does nothing at a canonical Card location naming the addressed Card', () => {
+  it('does nothing at a canonical Thing location naming the addressed Thing', () => {
     expect(
       sync(
-        productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: CARD_A }),
+        productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: THING_A }),
         overview(),
         overview(),
-        CARD_A,
+        THING_A,
       ),
     ).toEqual({ kind: 'none' });
   });
@@ -144,14 +144,14 @@ describe('what the browser should do about an address', () => {
   });
 
   it('pushes the presentation point a presenting address is at', () => {
-    expect(sync(view, presenting(CARD_A), overview())).toEqual({
+    expect(sync(view, presenting(THING_A), overview())).toEqual({
       kind: 'push',
       destination: {
         kind: 'presentation',
         spaceId: SPACE_ID,
         diagramId: DIAGRAM,
         graphId: OPENING_GRAPH,
-        cardId: CARD_A,
+        thingId: THING_A,
       },
     });
   });
@@ -162,9 +162,9 @@ describe('what the browser should do about an address', () => {
    * specific as it was rather than widened.
    */
   it('keeps the Graph a location already names when a presentation ends', () => {
-    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(CARD_A)}`;
+    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(THING_A)}`;
 
-    expect(sync(point, overview(), presenting(CARD_A))).toEqual({
+    expect(sync(point, overview(), presenting(THING_A))).toEqual({
       kind: 'push',
       destination: {
         kind: 'diagram-graph',
@@ -176,18 +176,18 @@ describe('what the browser should do about an address', () => {
   });
 
   /**
-   * Leaving a presentation returns to the Graph, whatever Card the location has
+   * Leaving a presentation returns to the Graph, whatever Thing the location has
    * been naming.
    *
-   * A canonical Card URL leaves `addressedCardId` set, and nothing on the way
-   * out of a presentation clears it. Answering a Card destination there would
+   * A canonical Thing URL leaves `addressedThingId` set, and nothing on the way
+   * out of a presentation clears it. Answering a Thing destination there would
    * drop the Active Graph out of the address — which is exactly the
-   * distinction the two Card spellings exist to keep.
+   * distinction the two Thing spellings exist to keep.
    */
-  it('leaves a presentation for the Graph even while a Card is still addressed', () => {
-    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(CARD_A)}`;
+  it('leaves a presentation for the Graph even while a Thing is still addressed', () => {
+    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(THING_A)}`;
 
-    expect(sync(point, overview(), presenting(CARD_A), CARD_A)).toEqual({
+    expect(sync(point, overview(), presenting(THING_A), THING_A)).toEqual({
       kind: 'push',
       destination: {
         kind: 'diagram-graph',
@@ -199,15 +199,19 @@ describe('what the browser should do about an address', () => {
   });
 
   /**
-   * The canonical Card URL is the Card's identity and names no Diagram; the
+   * The canonical Thing URL is the Thing's identity and names no Diagram; the
    * contextual one names both. Nothing here may rewrite the first into the
    * second — the reader holding a canonical link would find it silently
    * narrowed to the context they happened to be in.
    */
-  it('does not rewrite a canonical Card location into its contextual spelling', () => {
-    const canonical = productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: CARD_A });
+  it('does not rewrite a canonical Thing location into its contextual spelling', () => {
+    const canonical = productDestinationPath({
+      kind: 'thing',
+      spaceId: SPACE_ID,
+      thingId: THING_A,
+    });
 
-    expect(sync(canonical, overview(OTHER_GRAPH), overview(), CARD_A)).toEqual({
+    expect(sync(canonical, overview(OTHER_GRAPH), overview(), THING_A)).toEqual({
       kind: 'push',
       destination: {
         kind: 'diagram-graph',
@@ -221,15 +225,15 @@ describe('what the browser should do about an address', () => {
   /**
    * Every destination this answers must be one the same Space can open again.
    *
-   * A Card the Diagram omits has a canonical URL and no contextual one: the
-   * resolver refuses `/diagrams/<diagram>/cards/<card>` and the host answers 404.
-   * Addressing that Card *within* the Diagram would therefore write a
+   * A Thing the Diagram omits has a canonical URL and no contextual one: the
+   * resolver refuses `/diagrams/<diagram>/things/<thing>` and the host answers 404.
+   * Addressing that Thing *within* the Diagram would therefore write a
    * location that reloads into nothing.
    */
   it('answers no destination this Space refuses to resolve', () => {
-    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(CARD_A)}`;
+    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(THING_A)}`;
 
-    const decision = sync(point, overview(), presenting(CARD_A), CARD_OFF_DIAGRAM);
+    const decision = sync(point, overview(), presenting(THING_A), THING_OFF_DIAGRAM);
 
     expect(decision.kind).not.toBe('none');
     if (decision.kind === 'none') return;
@@ -239,10 +243,10 @@ describe('what the browser should do about an address', () => {
     ).toBe('resolved');
   });
 
-  it('replaces, without a history entry, when the location still names a Card the address has dropped', () => {
+  it('replaces, without a history entry, when the location still names a Thing the address has dropped', () => {
     // Choosing the current Diagram row again: Navigation republishes the same
-    // address, and the Card the location names is no longer addressed.
-    expect(sync(`${view}/cards/${encodeCompactUuid(CARD_A)}`, overview(), overview())).toEqual({
+    // address, and the Thing the location names is no longer addressed.
+    expect(sync(`${view}/things/${encodeCompactUuid(THING_A)}`, overview(), overview())).toEqual({
       kind: 'replace',
       destination: { kind: 'diagram', spaceId: SPACE_ID, diagramId: DIAGRAM },
     });
@@ -264,7 +268,7 @@ describe('what the browser should do about an address', () => {
         {
           selectedDiagramId: OTHER_DIAGRAM,
           activeGraphId: OTHER_DIAGRAM_GRAPH,
-          presentingCardId: null,
+          presentingThingId: null,
         },
         overview(),
       ),

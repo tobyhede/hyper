@@ -16,7 +16,7 @@
  * reason nor an owner is the one to be suspicious of.
  *
  * **A reason must be a property of its subject, never of this check.** One entry
- * currently breaks that rule and says so — `CardNode.tsx` is rendered by a stable
+ * currently breaks that rule and says so — `ThingNode.tsx` is rendered by a stable
  * story the walk cannot follow — and it is a defect with a ticket rather than an
  * entry to keep.
  *
@@ -45,14 +45,14 @@ export const uncataloguedComponents = [
     reason: 'The browser entry point: one `createRoot` call and startup composition.',
   },
   {
-    module: 'packages/react-flow-adapter/src/CardNode.tsx',
+    module: 'packages/react-flow-adapter/src/ThingNode.tsx',
     reason:
-      "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-card-hover-reveals-actions-and-handles-together` mounts the real `CardNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",
+      "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-thing-hover-reveals-actions-and-handles-together` mounts the real `ThingNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",
   },
   {
     module: 'packages/ui/src/Command.tsx',
     reason:
-      'Deliberately without a consumer. It wraps cmdk, which ADR 0050 kept rather than migrating; `CardSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
+      'Deliberately without a consumer. It wraps cmdk, which ADR 0050 kept rather than migrating; `ThingSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
   },
   {
     module: 'packages/ui/src/components/empty.tsx',
@@ -69,14 +69,14 @@ export const uncataloguedComponents = [
  * A block earns its place by being React Flow's geometry, React Flow's
  * integration, or a placement the framework forces into the application layer.
  * Product appearance does not: it belongs beside the component that draws it,
- * hand-rolled the way `canvas-card.css` sits beside `CanvasCard`.
+ * hand-rolled the way `canvas-thing.css` sits beside `CanvasThing`.
  *
  * A rule naming no class at all — `#root`, the `*` and `body` resets — is keyed by
  * its leading attribute or id, or failing both by its leading element name, so those
  * cannot slip past by having no class to record.
  *
- * The Card-choice popup's theme lives in
- * `packages/ui/src/card-search-combobox.css` beside `CardSearchCombobox`, the
+ * The Thing-choice popup's theme lives in
+ * `packages/ui/src/thing-search-combobox.css` beside `ThingSearchCombobox`, the
  * component it actually styles.
  */
 export const handRolledStyles = [
@@ -86,24 +86,24 @@ export const handRolledStyles = [
       "React Flow's own classes, restyled where the library's defaults do not suit the canvas. Integration styling by definition — no module here emits these names.",
   },
   {
-    block: 'rf-card-node',
+    block: 'rf-thing-node',
     reason:
-      "The adapter's node wrapper: card sizing from `--card-width`/`--card-height` and the Expanded Card's fill of the box the Diagram authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Card's palette, and the one rule naming the actively presented Card. React Flow measures against this box, so it cannot move into the component it wraps.",
+      "The adapter's node wrapper: thing sizing from `--thing-width`/`--thing-height` and the Expanded Thing's fill of the box the Diagram authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Thing's palette, and the one rule naming the actively presented Thing. React Flow measures against this box, so it cannot move into the component it wraps.",
   },
   {
-    block: 'card',
+    block: 'thing',
     reason:
-      "`CardContent`'s base appearance plus the container-query typography that scales a presented Card with its 16:9 frame (ADR 0027). The scaling half is React Flow's, and the base half sits here with it because the two are separated only by source order.",
+      "`ThingContent`'s base appearance plus the container-query typography that scales a presented Thing with its 16:9 frame (ADR 0027). The scaling half is React Flow's, and the base half sits here with it because the two are separated only by source order.",
   },
   {
-    block: 'canvas-card',
+    block: 'canvas-thing',
     reason:
-      'One rule only: React Flow\'s "this is the actively presented Card" fact, which is adapter and application state. `CanvasCard`\'s own appearance is in `packages/ui/src/canvas-card.css`, beside the component.',
+      'One rule only: React Flow\'s "this is the actively presented Thing" fact, which is adapter and application state. `CanvasThing`\'s own appearance is in `packages/ui/src/canvas-thing.css`, beside the component.',
   },
   {
     block: 'graph-area',
     reason:
-      'The flex item the `ReactFlow` instance fills beside the optional Cards drawer; it owns React Flow integration geometry rather than product appearance.',
+      'The flex item the `ReactFlow` instance fills beside the optional Things drawer; it owns React Flow integration geometry rather than product appearance.',
   },
   {
     block: 'root',
@@ -121,9 +121,9 @@ export const handRolledStyles = [
       'The base font stack and the page background and foreground colours, set once on the document. Not a component and not stylable from one — the `html, body, #root` sizing that gives the app its one viewport is recorded as `root` above.',
   },
   {
-    block: 'new-card-preview',
+    block: 'new-thing-preview',
     reason:
-      'Placement and opacity for the ghost Card drawn over the canvas mid-drag. What it draws is a real `CanvasCard`; this is only where it sits.',
+      'Placement and opacity for the ghost Thing drawn over the canvas mid-drag. What it draws is a real `CanvasThing`; this is only where it sits.',
   },
   {
     block: 'edge-control-layer',
@@ -141,8 +141,8 @@ export const handRolledStyles = [
       'Viewport ownership: the app owns exactly one viewport and never scrolls the page, and the canvas notice is placed over the canvas without covering its controls. `AppShell` owns the chrome; this owns where it sits against a full-bleed canvas.',
   },
   {
-    block: 'card-pane',
+    block: 'thing-pane',
     reason:
-      "The modal frame a Card is authored on: the 16:9 silhouette that matches `card.ts`, and the scroll boundary that keeps Cancel and Done reachable. Base UI's Dialog owns modality, focus and dismissal; this owns the frame's geometry against the canvas behind it.",
+      "The modal frame a Thing is authored on: the 16:9 silhouette that matches `thing.ts`, and the scroll boundary that keeps Cancel and Done reachable. Base UI's Dialog owns modality, focus and dismissal; this owns the frame's geometry against the canvas behind it.",
   },
 ] as const;

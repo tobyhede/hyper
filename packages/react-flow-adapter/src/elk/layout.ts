@@ -1,5 +1,5 @@
 import type { LayoutOptions } from 'elkjs/lib/elk.bundled.js';
-import type { CardId } from '@project/core';
+import type { ThingId } from '@project/core';
 
 /**
  * ELK "layered" options for a left→right graph.
@@ -16,8 +16,8 @@ export const DEFAULT_ELK_LAYOUT_OPTIONS: LayoutOptions = {
   // Explicit statement of ELK's default (layered graphs orthogonally), now that
   // the app actually *draws* ELK's routed geometry rather than discarding it and
   // letting React Flow bezier between the handles. Cyclic graphs and graphs that
-  // disagree on shared-card order can both produce back-edges; this routes them
-  // as channels around the cards rather than self-curling stubs. See
+  // disagree on shared-thing order can both produce back-edges; this routes them
+  // as channels around the things rather than self-curling stubs. See
   // `.scratch/layout-seam/issues/03-render-elk-edge-routing.md`.
   'elk.edgeRouting': 'ORTHOGONAL',
 
@@ -33,7 +33,7 @@ export const DEFAULT_ELK_LAYOUT_OPTIONS: LayoutOptions = {
   // spaces routinely carry four or more graphs.
   'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
 
-  // Cosmetic, tuned to the 260x146 card. `nodeNode: 80` came from React Flow's
+  // Cosmetic, tuned to the 260x146 thing. `nodeNode: 80` came from React Flow's
   // *plain* elkjs example, not the multiple-handles one the README cites.
   'elk.layered.spacing.nodeNodeBetweenLayers': '160',
   'elk.spacing.nodeNode': '80',
@@ -44,12 +44,12 @@ export const PORT_ID_SEPARATOR = '##';
 
 /**
  * ELK port ids must be unique across the whole graph, but a handle id
- * (`<graphId>::out`) is the *same* on every card the graph passes through.
- * Handing ELK the bare handle id leaves it unable to tell which card an edge
+ * (`<graphId>::out`) is the *same* on every thing the graph passes through.
+ * Handing ELK the bare handle id leaves it unable to tell which thing an edge
  * attaches to, so it resolves arbitrarily and the diagram collapses — badly
- * enough to mislay even a single graph. Namespacing by card id is what makes the
+ * enough to mislay even a single graph. Namespacing by thing id is what makes the
  * endpoint unambiguous. The render layer never sees these; `elkStrategy` strips the
  * prefix back off, so ports keep their bare ids.
  */
-export const elkPortId = (cardId: CardId, handleId: string): string =>
-  `${cardId}${PORT_ID_SEPARATOR}${handleId}`;
+export const elkPortId = (thingId: ThingId, handleId: string): string =>
+  `${thingId}${PORT_ID_SEPARATOR}${handleId}`;

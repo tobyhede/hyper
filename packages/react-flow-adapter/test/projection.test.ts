@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildCardHandles,
+  buildThingHandles,
   buildLayoutStrategyGraph,
   buildGraphRenderEdges,
   loadSpace,
   type Space,
 } from '@project/graph';
 import type { SpaceFile } from '@project/core';
-import { projectCardNodes, projectGraphEdges, type GraphEmphasis } from '../src/index';
-import { aliasFile, cardFile } from './card-files';
+import { projectThingNodes, projectGraphEdges, type GraphEmphasis } from '../src/index';
+import { aliasFile, thingFile } from './thing-files';
 import { uuid } from './uuid';
 
 function load(
   input: unknown,
-  cardFiles = [
-    cardFile('00000000-0000-4000-8000-000000000002', 'Card A'),
-    cardFile('00000000-0000-4000-8000-000000000003', 'Card B'),
+  thingFiles = [
+    thingFile('00000000-0000-4000-8000-000000000002', 'Thing A'),
+    thingFile('00000000-0000-4000-8000-000000000003', 'Thing B'),
   ],
 ): Space {
-  const result = loadSpace(input, cardFiles);
+  const result = loadSpace(input, thingFiles);
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
 }
@@ -27,8 +27,8 @@ function load(
  * A version 1 space document over the given graphs.
  *
  * A graph is an owned value of the diagram that holds it now (ADR 0040), and
- * every edge endpoint must be a card of *that* diagram, so the one diagram below
- * takes membership of every card the graphs touch. The positions are arbitrary
+ * every edge endpoint must be a thing of *that* diagram, so the one diagram below
+ * takes membership of every thing the graphs touch. The positions are arbitrary
  * — nothing in this file reads them — and what they express here is membership,
  * which is what a diagram's position keys are.
  *
@@ -93,23 +93,23 @@ const colors = {
   '00000000-0000-4000-8000-000000000004': '#111111',
   '00000000-0000-4000-8000-000000000030': '#222222',
 };
-const handles = buildCardHandles(space);
+const handles = buildThingHandles(space);
 
-describe('projectCardNodes', () => {
-  it('maps cards to card nodes carrying the title, not the content', () => {
-    const nodes = projectCardNodes(space, handles, colors);
+describe('projectThingNodes', () => {
+  it('maps things to thing nodes carrying the title, not the content', () => {
+    const nodes = projectThingNodes(space, handles, colors);
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
-    expect(a.type).toBe('card');
-    expect(a.data.title).toBe('Card A');
+    expect(a.type).toBe('thing');
+    expect(a.data.title).toBe('Thing A');
     expect(a.data.active).toBe(false);
-    // ADR 0006: content is loaded when a card is opened, not embedded per node.
+    // ADR 0006: content is loaded when a thing is opened, not embedded per node.
     expect('markdown' in a.data).toBe(false);
   });
 
   it('attaches per-graph handles colored by graph', () => {
-    const nodes = projectCardNodes(space, handles, colors);
+    const nodes = projectThingNodes(space, handles, colors);
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
-    // main leaves card a (out); alt ends at card a (in).
+    // main leaves thing a (out); alt ends at thing a (in).
     expect(a.data.sourceHandles).toMatchObject([
       {
         id: '00000000-0000-4000-8000-000000000004::out',
@@ -128,10 +128,10 @@ describe('projectCardNodes', () => {
     expect(typeof a.data.sourceHandles[0]!.offsetY).toBe('number');
   });
 
-  it('uses the port offsets and positions a diagram put on the cards', () => {
-    const nodes = projectCardNodes(space, handles, colors, {
+  it('uses the port offsets and positions a diagram put on the things', () => {
+    const nodes = projectThingNodes(space, handles, colors, {
       strategyGraph: {
-        cards: [
+        things: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
             x: 500,
@@ -149,23 +149,23 @@ describe('projectCardNodes', () => {
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     expect(a.position).toEqual({ x: 500, y: 600 });
     expect(a.data.sourceHandles[0]!.offsetY).toBe(42);
-    // card b is absent from the diagram → falls back to the origin (no authored position).
+    // thing b is absent from the diagram → falls back to the origin (no authored position).
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.position).toEqual({
       x: 0,
       y: 0,
     });
   });
 
-  it("spreads a placed card's anchors down the card's own box, not the collapsed constant", () => {
-    // The strategies arrange every collapsed Card at `CARD_SIZE`, so this only
+  it("spreads a placed thing's anchors down the thing's own box, not the collapsed constant", () => {
+    // The strategies arrange every collapsed Thing at `THING_SIZE`, so this only
     // ever differs for an Expanded one (ADR 0064) — and it has to differ, or an
-    // Edge attaches partway down a box the Card no longer occupies. `ports` is
+    // Edge attaches partway down a box the Thing no longer occupies. `ports` is
     // left empty because `positionedStrategy` places none: this is the fallback
     // spread, which is what an authored Diagram actually draws.
-    const expanded = projectCardNodes(space, handles, colors, {
+    const expanded = projectThingNodes(space, handles, colors, {
       nodeHeight: 146,
       strategyGraph: {
-        cards: [
+        things: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
             x: 0,
@@ -179,21 +179,21 @@ describe('projectCardNodes', () => {
       },
     });
     const a = expanded.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
-    // One anchor of each role, so each sits at half the Card's own height.
+    // One anchor of each role, so each sits at half the Thing's own height.
     expect(a.data.sourceHandles[0]!.offsetY).toBe(210);
     expect(a.data.targetHandles[0]!.offsetY).toBe(210);
 
-    // The constant still answers for a card no strategy has placed yet.
-    const unplaced = projectCardNodes(space, handles, colors, { nodeHeight: 146 });
+    // The constant still answers for a thing no strategy has placed yet.
+    const unplaced = projectThingNodes(space, handles, colors, { nodeHeight: 146 });
     expect(
       unplaced.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!.data.sourceHandles[0]!
         .offsetY,
     ).toBe(73);
   });
 
-  it('declares an attachment point for every Graph on a card the strategy has placed', () => {
-    // A third Graph that never touches card A, so "every Graph" is distinguishable
-    // from "every Graph this card is already on". A self-edge is authored structure
+  it('declares an attachment point for every Graph on a thing the strategy has placed', () => {
+    // A third Graph that never touches thing A, so "every Graph" is distinguishable
+    // from "every Graph this thing is already on". A self-edge is authored structure
     // (ADR 0032), which is the cheapest way to keep it away from A.
     const withThirdGraph = load(
       spaceFile([
@@ -223,9 +223,9 @@ describe('projectCardNodes', () => {
       '00000000-0000-4000-8000-000000000004': '#111111',
       '00000000-0000-4000-8000-000000000031': '#333333',
     };
-    const nodes = projectCardNodes(withThirdGraph, buildCardHandles(withThirdGraph), palette, {
+    const nodes = projectThingNodes(withThirdGraph, buildThingHandles(withThirdGraph), palette, {
       strategyGraph: {
-        cards: [
+        things: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
             x: 500,
@@ -251,9 +251,9 @@ describe('projectCardNodes', () => {
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     const declared = new Map((a.handles ?? []).map((handle) => [handle.id, handle]));
 
-    // Card A is only on Main, and only outbound. The rest are declared all the
+    // Thing A is only on Main, and only outbound. The rest are declared all the
     // same: React Flow resolves an Edge against the geometry the node carries, so
-    // an Edge completed onto a card resolves in the render that first makes it
+    // an Edge completed onto a thing resolves in the render that first makes it
     // incident — before the projection that draws its anchor has run.
     expect(declared.get('00000000-0000-4000-8000-000000000004::out')?.type).toBe('source');
     expect(declared.get('00000000-0000-4000-8000-000000000004::in')?.type).toBe('target');
@@ -272,13 +272,13 @@ describe('projectCardNodes', () => {
   });
 
   it('declares every Graph attachment point when the colour map is incomplete', () => {
-    const nodes = projectCardNodes(
+    const nodes = projectThingNodes(
       space,
       handles,
       {},
       {
         strategyGraph: {
-          cards: [
+          things: [
             {
               id: uuid('00000000-0000-4000-8000-000000000002'),
               x: 500,
@@ -305,10 +305,10 @@ describe('projectCardNodes', () => {
     ]);
   });
 
-  it('declares no geometry for a card the strategy has not placed, leaving React Flow to measure it', () => {
-    const nodes = projectCardNodes(space, handles, colors, {
+  it('declares no geometry for a thing the strategy has not placed, leaving React Flow to measure it', () => {
+    const nodes = projectThingNodes(space, handles, colors, {
       strategyGraph: {
-        cards: [
+        things: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
             x: 500,
@@ -325,21 +325,21 @@ describe('projectCardNodes', () => {
 
     // Both keys are absent together, and that pairing is load-bearing: React Flow
     // reads declared handles only when they are there, and re-measures a node that
-    // carries no measured size. Declaring one without the other strands a card on
+    // carries no measured size. Declaring one without the other strands a thing on
     // whichever half it kept.
     expect('handles' in b).toBe(false);
     expect('measured' in b).toBe(false);
   });
 
-  it('flags the active card', () => {
-    const nodes = projectCardNodes(space, handles, colors, {
-      activeCardId: uuid('00000000-0000-4000-8000-000000000003'),
+  it('flags the active thing', () => {
+    const nodes = projectThingNodes(space, handles, colors, {
+      activeThingId: uuid('00000000-0000-4000-8000-000000000003'),
     });
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.data.active).toBe(
       true,
     );
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.className).toContain(
-      'rf-card-node--active',
+      'rf-thing-node--active',
     );
   });
 
@@ -359,13 +359,13 @@ describe('projectCardNodes', () => {
         },
       ]),
       [
-        cardFile('00000000-0000-4000-8000-000000000002', 'Opening', '## Authored once'),
+        thingFile('00000000-0000-4000-8000-000000000002', 'Opening', '## Authored once'),
         aliasFile(aliasId, 'Return', '00000000-0000-4000-8000-000000000002'),
       ],
     );
 
-    const nodes = projectCardNodes(withAlias, buildCardHandles(withAlias), colors, {
-      openCardIds: new Set([aliasId]),
+    const nodes = projectThingNodes(withAlias, buildThingHandles(withAlias), colors, {
+      openThingIds: new Set([aliasId]),
     });
     expect(nodes.find((node) => node.id === aliasId)?.data).toMatchObject({
       title: 'Return',
@@ -405,7 +405,7 @@ describe('projectGraphEdges', () => {
   it("carries ELK's routed points when a strategy has placed them", () => {
     const edges = projectGraphEdges(graphRenderEdges, colors, {
       strategyGraph: {
-        cards: [],
+        things: [],
         edges: [
           {
             id: MAIN_EDGE_ID,
@@ -476,44 +476,44 @@ describe('projectGraphEdges', () => {
 });
 
 /**
- * A Card declares an anchor for every Graph, including ones it is not on, so an
+ * A Thing declares an anchor for every Graph, including ones it is not on, so an
  * Edge completed onto it resolves in the render that first makes it incident.
  *
  * Those extra anchors have no DOM element, and React Flow picks the *closest*
  * declared handle within its connection radius. If one ever landed on the same
  * point as a visible authoring handle, a release near that point could resolve
  * to an anchor that cannot accept it. The fallback spreads them evenly down the
- * Card, so with an odd number of Graphs the middle one sits at exactly half the
+ * Thing, so with an odd number of Graphs the middle one sits at exactly half the
  * height — where the Left and Right authoring handles are.
  */
 describe('non-incident graph anchors versus the authoring handles', () => {
-  const cardA = '00000000-0000-4000-8000-000000000002';
-  const cardB = '00000000-0000-4000-8000-000000000003';
+  const thingA = '00000000-0000-4000-8000-000000000002';
+  const thingB = '00000000-0000-4000-8000-000000000003';
 
   const singleGraphSpace = load(
     spaceFile([
       {
         id: '00000000-0000-4000-8000-000000000004',
         title: 'Only',
-        edges: [{ from: cardA, to: cardA }],
+        edges: [{ from: thingA, to: thingA }],
       },
     ]),
   );
 
   it('places a lone non-incident anchor exactly on the authoring handle centre', () => {
-    const handlesByCard = buildCardHandles(singleGraphSpace);
-    const cardIds = singleGraphSpace.cards.map((card) => card.id);
+    const handlesByThing = buildThingHandles(singleGraphSpace);
+    const thingIds = singleGraphSpace.things.map((thing) => thing.id);
     const strategyGraph = buildLayoutStrategyGraph(
-      cardIds,
-      handlesByCard,
+      thingIds,
+      handlesByThing,
       buildGraphRenderEdges(singleGraphSpace),
       () => ({ width: 260, height: 146 }),
     );
     const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
-    const nodes = projectCardNodes(singleGraphSpace, handlesByCard, colors, { strategyGraph });
-    const cardNode = nodes.find((node) => node.id === cardB);
-    if (cardNode === undefined) throw new Error('Card B should be projected');
-    const handles = cardNode.handles ?? [];
+    const nodes = projectThingNodes(singleGraphSpace, handlesByThing, colors, { strategyGraph });
+    const thingNode = nodes.find((node) => node.id === thingB);
+    if (thingNode === undefined) throw new Error('Thing B should be projected');
+    const handles = thingNode.handles ?? [];
 
     const leftAuthoring = handles.find((handle) => handle.id === 'authoring-target-left');
     const graphAnchor = handles.find((handle) => handle.id?.endsWith('::in'));
@@ -530,19 +530,19 @@ describe('non-incident graph anchors versus the authoring handles', () => {
   });
 
   it('declares the authoring handles before the graph anchors', () => {
-    const handlesByCard = buildCardHandles(singleGraphSpace);
-    const cardIds = singleGraphSpace.cards.map((card) => card.id);
+    const handlesByThing = buildThingHandles(singleGraphSpace);
+    const thingIds = singleGraphSpace.things.map((thing) => thing.id);
     const strategyGraph = buildLayoutStrategyGraph(
-      cardIds,
-      handlesByCard,
+      thingIds,
+      handlesByThing,
       buildGraphRenderEdges(singleGraphSpace),
       () => ({ width: 260, height: 146 }),
     );
     const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
-    const nodes = projectCardNodes(singleGraphSpace, handlesByCard, colors, { strategyGraph });
-    const cardNode = nodes.find((node) => node.id === cardB);
-    if (cardNode === undefined) throw new Error('Card B should be projected');
-    const ids = (cardNode.handles ?? []).map((handle) => handle.id ?? '');
+    const nodes = projectThingNodes(singleGraphSpace, handlesByThing, colors, { strategyGraph });
+    const thingNode = nodes.find((node) => node.id === thingB);
+    if (thingNode === undefined) throw new Error('Thing B should be projected');
+    const ids = (thingNode.handles ?? []).map((handle) => handle.id ?? '');
 
     // React Flow resolves an exact distance tie by array order, preferring a
     // handle of the opposite type — and both candidates here are targets. The
