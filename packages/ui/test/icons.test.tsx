@@ -203,6 +203,32 @@ describe('the public icon facade', () => {
     expect(space.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  /**
+   * A decorative glyph sits inside a control that has already named the command
+   * it performs — `Create Alias`, not `Alias`. A `title` here is a second
+   * tooltip on the same pixels, and the inner node is the one the pointer lands
+   * on, so the button's own tooltip never appears: hovering Create Alias would
+   * read `Alias`, which names the noun the button does not perform.
+   */
+  it('gives a decorative glyph no tooltip of its own', () => {
+    const { container } = render(
+      <>
+        <ThingKindIcon kind="markdown" decorative />
+        <ThingKindIcon kind="alias" decorative />
+        <ThingKindIcon kind="space" decorative />
+      </>,
+    );
+
+    const glyphs = container.querySelectorAll('[data-thing-kind]');
+
+    expect(glyphs).toHaveLength(3);
+    for (const glyph of glyphs) {
+      expect(glyph).toHaveAttribute('aria-hidden', 'true');
+      expect(glyph).not.toHaveAttribute('title');
+    }
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
   it('tells an Alias of a Space Thing from an Alias of a Markdown Thing', () => {
     render(
       <>

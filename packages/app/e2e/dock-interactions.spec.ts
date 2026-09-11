@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { boxOf, dock, nodeByTitle, settled } from './graph';
+import { boxOf, createThing, createThingControl, dock, nodeByTitle, settled } from './graph';
 
 for (const delay of [0, 120]) {
   test(`Dock disclosures switch on one press (${delay}ms)`, async ({ page }) => {
@@ -250,3 +250,93 @@ test('a reported failure is dismissed off the Dock it covers', async ({ page }) 
     .click({ delay: 120 });
   await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toBeVisible();
 });
+
+/**
+ * Create Thing, as three peers, through the running application.
+ *
+ * The Ladle half of this claim asserts the three controls are present, named
+ * and ungated; this half asserts what a press of one actually *does*, which the
+ * catalogue cannot: an application Edit, on the real Space, against the real
+ * Authoring composition.
+ *
+ * **The press count is the obligation.** `markdown` completes on activation, so
+ * one press puts a Thing on the canvas with its title editor open. `alias` and
+ * `space` each open a pane, because a Target and a target Space are still owed
+ * — so their one press reaches a pane rather than a menu that would then have
+ * needed a second. That asymmetry is the reason the disclosure went: it charged
+ * the kind that needs no second decision for one anyway.
+ */
+test(
+  'each Thing kind is created in one press from the Dock',
+  { tag: '@parity:command-dock-creates-each-kind-in-one-press' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+
+    // Nothing is disclosed on the way: the three are on the surface, so no menu
+    // is opened by any of these presses.
+    await expect(page.getByRole('menu')).toHaveCount(0);
+
+    await createThing(page, 'Markdown Thing');
+    const title = page.getByRole('textbox', { name: 'Thing title' });
+    await expect(title).toBeFocused();
+    await title.press('Escape');
+
+    // The two that owe a choice reach their pane in the same single press.
+    await createThing(page, 'Alias');
+    await expect(page.getByRole('combobox', { name: 'Target' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('new-alias')).toHaveCount(0);
+
+    await createThing(page, 'Space Thing');
+    await expect(page.getByTestId('new-space-thing')).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    // **Back to the control it was opened from, not to a neighbour.** Each peer
+    // carries its own continuation address; a cancelled Space Thing landing on
+    // Create Markdown Thing would be the caret on a command never pressed.
+    await expect(createThingControl(page, 'Space Thing')).toBeFocused();
+  },
+);
+
+/**
+ * The Things cluster packs onto one row on a side edge, in the application.
+ *
+ * The Ladle half measures the arrangement against a story's dock. This half
+ * measures it on the real Dock, moved to a real slot through the position menu
+ * the author uses — so what is asserted is the column the product actually
+ * draws, not one a story arranged.
+ */
+test(
+  'a side-edge Dock packs Things onto one row at its neighbours’ height',
+  { tag: '@parity:command-dock-packs-things-onto-one-row' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+
+    await dock(page)
+      .getByRole('button', { name: /^Move Command Dock/ })
+      .click();
+    await page.getByRole('menuitemradio', { name: 'Middle', exact: true }).nth(1).click();
+    const surface = page.getByRole('toolbar', { name: 'Command Dock' });
+    await expect(surface).toHaveAttribute('data-orientation', 'vertical');
+    // The slot transition is 160ms of `top`; measure where the column rests.
+    await page.waitForTimeout(400);
+
+    const things = await boxOf(
+      surface.getByRole('group', { name: 'Things' }),
+      'the Things cluster',
+    );
+    const graph = await boxOf(surface.getByRole('group', { name: 'Graph' }), 'the Graph cluster');
+
+    // One row, so the cluster carrying four controls stands at the height of
+    // the one carrying three. Three siblings would auto-place onto three rows.
+    expect(Math.abs(things.height - graph.height)).toBeLessThanOrEqual(1);
+
+    // And its trailing edge is still the surface's, so packing bought the room
+    // without pushing a command out of the column.
+    expect(things.x + things.width).toBeLessThanOrEqual(graph.x + graph.width + 1);
+  },
+);

@@ -337,10 +337,18 @@ test.describe('a short viewport', () => {
     expect(scroll.content).toBeGreaterThan(scroll.client);
 
     // And the far cluster is reachable, which is what the scrolling is for.
+    //
+    // **Pressing it now completes an Edit rather than opening a menu.** Create
+    // Thing was one `+` disclosing three kinds, so the cheapest proof that the
+    // far cluster could be *pressed* was that its menu appeared. The kinds are
+    // peers now and Create Markdown Thing completes on activation, so the proof
+    // is the Thing it makes — and the assertion is the one
+    // `Create Thing from the strip names the new Thing on the canvas` already
+    // uses, rather than a second way of saying a Thing arrived.
     const create = createThingControl(page);
     await create.scrollIntoViewIfNeeded();
     await expect(create).toBeInViewport({ ratio: 1 });
     await create.click();
-    await expect(page.getByRole('menu')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Thing title' })).toBeFocused();
   });
 });

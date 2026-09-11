@@ -250,21 +250,32 @@ export function presentControl(page: Page): Locator {
   return dock(page).getByRole('button', { name: /^Present / });
 }
 
-/** Whether creating a Thing is available at all, which the `+` reports. */
-export function createThingControl(page: Page): Locator {
-  return dock(page).getByRole('button', { name: 'Create Thing' });
+/** The kinds the Dock offers, named as their controls announce them. */
+export type ThingKindName = 'Markdown Thing' | 'Space Thing' | 'Alias';
+
+/**
+ * One kind's Create control, which is also what reports whether creating is
+ * available at all — every peer is withdrawn by the same fact.
+ *
+ * **The default answers the availability question and nothing else.** Asking
+ * "can a Thing be created" may use any peer, because `createDisabled` withdraws
+ * all three together. An assertion about *which* control — focus after a
+ * cancelled pane, most of all — has to name its kind: each peer carries its own
+ * continuation address, so a defaulted call there reads as passing while the
+ * caret sits on a neighbour. Two tests were caught by exactly that.
+ */
+export function createThingControl(page: Page, kind: ThingKindName = 'Markdown Thing'): Locator {
+  return dock(page).getByRole('button', { name: `Create ${kind}` });
 }
 
-/** Create a Thing of one kind, from the Things cluster's `+`. */
-export async function createThing(
-  page: Page,
-  kind: 'Markdown Thing' | 'Space Thing' | 'Alias',
-): Promise<void> {
-  const menu = await disclose(page, 'Create Thing');
-  // The row says the kind twice — `ThingKindIcon` announces it and the word
-  // beside it repeats it — so which of the two carries the accessible name is
-  // the glyph's decision and not this module's.
-  await menu.getByRole('menuitem', { name: new RegExp(`^(${kind}\\s*)+$`) }).click();
+/**
+ * Create a Thing of one kind, from its own control in the Things cluster.
+ *
+ * The three kinds are peers with no disclosure in front of them, so this is one
+ * press whichever kind is asked for.
+ */
+export async function createThing(page: Page, kind: ThingKindName): Promise<void> {
+  await createThingControl(page, kind).click();
 }
 
 /** The resolved colour drawn on one Graph's legend swatch, by its title. */

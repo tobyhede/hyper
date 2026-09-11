@@ -3191,7 +3191,11 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await quiescent(page);
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-  await expect(createThingControl(page)).toBeFocused();
+  // **Create Alias, not whichever peer is first.** The three kinds are peers, so
+  // each carries its own return address and a cancelled Alias comes back to the
+  // control it was opened from (`continuation.ts`). Naming the kind here is what
+  // stops this passing against a caret that landed on a neighbour.
+  await expect(createThingControl(page, 'Alias')).toBeFocused();
 });
 
 /**

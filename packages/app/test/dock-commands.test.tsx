@@ -227,8 +227,16 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
    * Four `Toolbar` roots is four tab stops, where the ADR draws one root whose
    * arrows move between every command in it. The groups are what assistive
    * technology announces on the way past instead.
+   *
+   * **The fifth group is nested inside Things, and is load-bearing rather than
+   * decorative.** The three Create commands are one `role="group"` so the
+   * vertical column has a single element to place: left as three siblings the
+   * cluster's grid auto-places them onto three rows and Things stands at 102px
+   * beside a 44px Diagram. Base UI's group carries no positional logic and does
+   * not divide the keyboard, so the roving tabindex stays on the one root —
+   * which the arrow-order test below is what actually proves.
    */
-  it('draws one root and four named groups inside it', async () => {
+  it('draws one root and its named groups, with Create nested inside Things', async () => {
     await renderDock(<Default />);
 
     const groups = within(dock()).getAllByRole('group');
@@ -238,9 +246,31 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
       'Diagram',
       'Graph',
       'Things',
+      'Create a Thing',
     ]);
     // No toolbar inside the toolbar: the clusters are groups now.
     expect(within(dock()).queryAllByRole('toolbar')).toHaveLength(0);
+  });
+
+  /**
+   * One tooltip per Create control, and it names the command.
+   *
+   * The glyph fills the button, so it is what the pointer is over — a `title`
+   * on the glyph is the tooltip the author actually sees, and the button's own
+   * never shows. `Alias` where the button says `Create Alias` names the noun in
+   * a slot that performs a verb, which is the one reading the issue's own
+   * cost list says a silent visual reading could already take for a filter.
+   */
+  it('gives each Create control one tooltip, and it is the command', async () => {
+    await renderDock(<Default />);
+
+    const create = within(dock()).getByRole('group', { name: 'Create a Thing' });
+
+    for (const name of ['Create Markdown Thing', 'Create Alias', 'Create Space Thing']) {
+      const control = within(create).getByRole('button', { name });
+      expect(control).toHaveAttribute('title', name);
+      expect(control.querySelectorAll('[title]')).toHaveLength(0);
+    }
   });
 
   /**

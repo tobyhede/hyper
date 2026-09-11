@@ -173,14 +173,30 @@ const THING_CREATION_CLOSED: ThingCreationState = {
  * Where focus goes when a pane closes leaving no Thing to continue at.
  *
  * Cancellation and a Space Thing creation take the same one: the author is
- * returned to the control the menu was opened from, which is where a closing
- * menu puts them anyway.
+ * returned to the control they opened the pane from.
+ *
+ * **Keyed by the kind, because the Dock draws one control per kind.** While the
+ * three kinds sat behind a single `+` there was one place to come back to and
+ * the address could be a constant. They are peers now, so a cancelled Alias
+ * returns to Create Alias rather than to whichever peer happens to carry the
+ * attribute — landing the caret on a command the author never pressed is the
+ * kind of near-miss nobody reports and everybody feels.
  */
-const RETURN_TO_ADD_THING: PendingContinuation = {
-  target: { kind: 'control', name: 'add-thing' },
+const returnToCreate = (kind: ThingCreationKind): PendingContinuation => ({
+  target: { kind: 'control', name: kind === 'alias' ? 'create-alias' : 'create-space-thing' },
   select: false,
   then: 'focus',
-};
+});
+
+/**
+ * The kind the pane is creating, where a close has to name it.
+ *
+ * Read off `choices`, which is where the open pane records it — the two arms of
+ * `ThingCreationChoices` are keyed by the same union, so there is no second
+ * field to keep in step with it.
+ */
+const creatingKind = (state: ThingCreationState): ThingCreationKind | null =>
+  state.pane.status === 'closed' ? null : state.pane.choices.kind;
 
 /** Where a creation that minted a Thing continues: on it, selected and named. */
 const nameCreatedThing = (thingId: ThingId): PendingContinuation => ({
@@ -453,11 +469,16 @@ export function createThingCreation({
    * already closed.
    */
   const settle = (outcome: ThingCreationOutcome): void => {
+    // Read before dispatching: `settled` closes the pane, so the kind it was
+    // creating is gone by the time the continuation is asked for.
+    const kind = creatingKind(observable.getState());
     dispatch({ type: 'settled', outcome });
     if (outcome.kind !== 'created') return;
-    continuation.request(
-      outcome.thingId === null ? RETURN_TO_ADD_THING : nameCreatedThing(outcome.thingId),
-    );
+    if (outcome.thingId !== null) {
+      continuation.request(nameCreatedThing(outcome.thingId));
+      return;
+    }
+    if (kind !== null) continuation.request(returnToCreate(kind));
   };
 
   const broke: ObserverErrorReporter = (failure) => {
@@ -517,8 +538,11 @@ export function createThingCreation({
     },
 
     cancel: () => {
+      // Same order and the same reason as `settle`: the kind is read off the
+      // open pane before the cancel closes it.
+      const kind = creatingKind(observable.getState());
       if (dispatch({ type: 'cancel' }) === null) return;
-      continuation.request(RETURN_TO_ADD_THING);
+      if (kind !== null) continuation.request(returnToCreate(kind));
     },
     // Presenting is the one close that owes nothing: the author asked for a
     // presentation, not for a control.

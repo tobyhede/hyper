@@ -71,7 +71,7 @@ const NAME_A: PendingContinuation = {
   then: 'rename',
 };
 const FOCUS_ADD_THING: PendingContinuation = {
-  target: { kind: 'control', name: 'add-thing' },
+  target: { kind: 'control', name: 'create-alias' },
   select: false,
   then: 'focus',
 };
@@ -197,7 +197,7 @@ describe('the wait policy', () => {
 
   it.each([
     ['the canvas', { kind: 'canvas' } as const],
-    ['a control', { kind: 'control', name: 'add-thing' } as const],
+    ['a control', { kind: 'control', name: 'create-alias' } as const],
   ])('falls through on %s', (_name, target) => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(false);
   });

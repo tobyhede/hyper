@@ -61,22 +61,30 @@ export const dock = (): HTMLElement => screen.getByRole('toolbar', { name: 'Comm
 /**
  * Create a Thing of one kind.
  *
- * `Create Thing` is a bare `+` glyph in the Things cluster with the three kinds
- * behind it — the kind is chosen at creation, so the menu offers three peers
- * rather than a split button with a hidden default.
+ * The three kinds are peer controls in the Things cluster — the kind is chosen
+ * at creation, so none of them is a default, and no disclosure stands in front
+ * of them. One press per creation, whichever kind.
  */
-export const createThing = (kind: 'Markdown Thing' | 'Space Thing' | 'Alias'): void => {
-  fireEvent.click(within(dock()).getByRole('button', { name: 'Create Thing' }));
-  // The row says the kind twice — `ThingKindIcon` announces it and the word beside
-  // it repeats it — so the accessible name is the kind doubled. Matched rather
-  // than spelled out, because which of the two carries the name is the glyph's
-  // decision and not this module's.
-  fireEvent.click(screen.getByRole('menuitem', { name: new RegExp(`^(${kind}\\s*)+$`) }));
+export const createThing = (kind: ThingKindName): void => {
+  fireEvent.click(createThingControl(kind));
 };
 
-/** Whether creating a Thing is available at all, which the `+` reports. */
-export const createThingControl = (): HTMLElement =>
-  within(dock()).getByRole('button', { name: 'Create Thing' });
+/** The kinds the Dock offers, named as their controls announce them. */
+export type ThingKindName = 'Markdown Thing' | 'Space Thing' | 'Alias';
+
+/**
+ * One kind's Create control, which is also what reports whether creating is
+ * available at all — every peer is withdrawn by the same fact.
+ *
+ * **The default answers the availability question and nothing else.** Asking
+ * "can a Thing be created" may use any peer, because `createDisabled` withdraws
+ * all three together. An assertion about *which* control — focus after a
+ * cancelled pane, most of all — has to name its kind: each peer carries its own
+ * continuation address, so a defaulted call there reads as passing while the
+ * caret sits on a neighbour. Two tests were caught by exactly that.
+ */
+export const createThingControl = (kind: ThingKindName = 'Markdown Thing'): HTMLElement =>
+  within(dock()).getByRole('button', { name: `Create ${kind}` });
 
 /**
  * The Diagram cluster's disclosure: the authored Diagrams, then the commands on

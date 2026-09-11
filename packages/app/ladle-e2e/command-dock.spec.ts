@@ -425,7 +425,7 @@ test(
     for (const testId of ['space-title', 'selected-canvas', 'active-graph'])
       await expect(strip.getByTestId(testId)).toBeAttached();
     await expect(strip.getByRole('button', { name: 'Things' })).toBeVisible();
-    await expect(strip.getByRole('button', { name: 'Create Thing' })).toBeVisible();
+    await expect(strip.getByRole('button', { name: 'Create Markdown Thing' })).toBeVisible();
 
     // And a command runs from the strip with nothing dismissed first: the menu
     // opens over the canvas, the choice lands, and the strip is still there.
@@ -435,6 +435,114 @@ test(
       'Collection 2',
     );
     await expect(strip).toBeVisible();
+  },
+);
+
+/**
+ * Create Thing, as three peers rather than a disclosure.
+ *
+ * **The obligation is the press count.** The kind is chosen at creation, so
+ * none of the three is a default and none is disclosed behind another — which
+ * means one activation reaches any kind, and the cheapest one (`markdown`,
+ * which completes its Edit on activation) is not charged for a choice it never
+ * makes. A menu here read as one command and was three; three controls read as
+ * three and are.
+ *
+ * Each is named for the kind it makes rather than for the set. The glyphs are
+ * the same silhouettes the Things list and the canvas use for *what a Thing
+ * is*, so the accessible name is what separates "make one of these" from "one
+ * of these" — and it is asserted rather than assumed.
+ *
+ * They withdraw together, because `createDisabled` is one fact about the set:
+ * a surface that greyed one kind and not another would be saying something the
+ * application cannot mean.
+ */
+test(
+  'Create offers the three kinds as peers, each named for what it makes',
+  { tag: '@parity:command-dock-creates-each-kind-in-one-press' },
+  async ({ page }) => {
+    await page.goto(story('default'));
+
+    const strip = surface(page);
+    for (const kind of ['Markdown Thing', 'Space Thing', 'Alias']) {
+      const control = strip.getByRole('button', { name: `Create ${kind}` });
+      await expect(control).toBeVisible();
+      // Available, and reached without opening anything first — which is the
+      // whole claim. A disclosed command would not be here to assert on.
+      await expect(control).toHaveAttribute('aria-disabled', 'false');
+    }
+
+    // No disclosure stands in front of them: nothing in the cluster is a menu
+    // trigger but the Things list itself.
+    await expect(strip.getByRole('button', { name: 'Create Thing' })).toHaveCount(0);
+    await expect(page.getByRole('menu')).toHaveCount(0);
+
+    // One group, so assistive technology announces the run once rather than
+    // three unrelated commands after the Things trigger.
+    await expect(strip.getByRole('group', { name: 'Create a Thing' })).toBeAttached();
+  },
+);
+
+/**
+ * The side-edge dock packs the Things cluster onto one row.
+ *
+ * **Things is the one cluster whose name is not a title**, so it is the one
+ * that can give up the `1fr` track the others need: Space, Diagram and Graph
+ * name entities the author renamed, and that track is what lets their names
+ * take the slack and truncate instead of resizing the column. "Things" is a
+ * fixed word, so the track held about 69px of nothing — and the three Create
+ * commands are what it is spent on instead.
+ *
+ * Asserted as the obligation and not as a CSS value: the cluster is **one row**
+ * (so it stands at its neighbours' height rather than three times it), and its
+ * four glyphs sit on **one pitch** (so the trigger's chevron reads as the first
+ * of four rather than as punctuation after the word). The alternative — three
+ * verb tracks — would have stood empty on the other three rows.
+ */
+test(
+  'a side-edge dock packs Things onto one row at its neighbours’ height',
+  { tag: '@parity:command-dock-packs-things-onto-one-row' },
+  async ({ page }) => {
+    await page.goto(story('docked-left'));
+    await expect(surface(page)).toHaveAttribute('data-orientation', 'vertical');
+
+    const strip = surface(page);
+    const things = strip.getByRole('group', { name: 'Things' });
+    const graph = strip.getByRole('group', { name: 'Graph' });
+
+    // One row: the cluster carrying four controls is no taller than the one
+    // carrying a name, a disclosure and Present. Three siblings auto-place onto
+    // three rows and this is what fails.
+    const thingsBox = await things.boundingBox();
+    const graphBox = await graph.boundingBox();
+    expect(thingsBox).not.toBeNull();
+    expect(graphBox).not.toBeNull();
+    if (thingsBox !== null && graphBox !== null)
+      expect(Math.abs(thingsBox.height - graphBox.height)).toBeLessThanOrEqual(1);
+
+    // One pitch: the chevron and the three Creates are evenly spaced, so the
+    // disclosure reads as the first of four glyphs. Centres rather than edges,
+    // because the chevron is a 14px glyph inside a padded trigger and the
+    // Creates are 14px glyphs inside 28px buttons.
+    const centres = await strip.evaluate((root) => {
+      const cluster = root.querySelector('[aria-label="Things"]');
+      if (cluster === null) return [];
+      const trigger = cluster.querySelector('[aria-label="Things"][class*="things-trigger"]');
+      const glyphs = trigger === null ? [] : [...trigger.querySelectorAll('svg')];
+      const chevron = glyphs.at(-1);
+      // `button`, because the group wrapping the three is itself labelled
+      // "Create a Thing" and an attribute prefix match takes it as a fourth.
+      const creates = [...cluster.querySelectorAll('button[aria-label^="Create "]')];
+      return [chevron, ...creates]
+        .filter((element): element is Element => element !== undefined)
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return rect.left + rect.width / 2;
+        });
+    });
+    expect(centres).toHaveLength(4);
+    const pitches = centres.slice(1).map((centre, index) => centre - (centres[index] ?? 0));
+    for (const pitch of pitches) expect(Math.abs(pitch - (pitches[0] ?? 0))).toBeLessThanOrEqual(1);
   },
 );
 

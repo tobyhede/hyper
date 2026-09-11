@@ -146,7 +146,7 @@ afterAll(() => vi.unstubAllGlobals());
 
 /** Wait for the canvas to be authorable, which is what makes the Dock's commands available. */
 async function readyToAuthor(): Promise<void> {
-  const create = await screen.findByRole('button', { name: 'Create Thing' });
+  const create = await screen.findByRole('button', { name: 'Create Markdown Thing' });
   await waitFor(() => expect(unavailable(create)).toBe(false));
 }
 

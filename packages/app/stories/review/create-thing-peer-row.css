@@ -1,0 +1,95 @@
+/* THROWAWAY UX PROTOTYPE — see create-thing-permutations.stories.tsx.
+
+   **The question is settled and production owns the answer.** Option B packed
+   onto one row is what shipped: `command-dock.css` carries
+   `.command-dock__things` and `.command-dock__create`, and the evidence is the
+   two parity claims named in `parity-claims.ts`. What is left here is the
+   comparison that produced that decision, kept because the reasoning is worth
+   more than the rules — a later reader asking "why not a menu, or a split, or a
+   badge" is asking a question this sheet answers and the production code does
+   not. Do not develop these rules further; change the production sheet.
+
+   **One rule, and it was the whole of the production change B asked for.** It
+   stayed here rather than moving into `command-dock.css` because this file is
+   the staged comparison and the production sheet is where the accepted
+   arrangement went: `.command-dock__things` and `.command-dock__create` carry
+   it there. These rules exist only to draw the five options side by side.
+
+   The peers are a nested `ToolbarGroup` — `role="group"`, a plain div in Base
+   UI with no positional logic of its own, so it nests inside the Things cluster
+   legally and the roving tabindex stays on the one `Toolbar` root. That means
+   the same construction draws both edges and the edge decides the arrangement,
+   which is how every other rule in `command-dock.css` is written. */
+
+/* The horizontal dock: an ordinary run of commands at the cluster's own gap, so
+   the group contributes nothing and the row is what it already was. */
+.cdp-peer-row {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 1px;
+}
+
+/* The vertical dock: the group is one grid item, so it takes a row of its own
+   across all three tracks instead of its three buttons auto-placing onto three
+   rows. Trailing, because that is where a cluster's own verbs sit — the peers
+   line up under the disclosure and the verb track above them rather than
+   starting at the name's left edge. */
+.command-dock__surface[data-orientation='vertical'] .cdp-peer-row {
+  grid-column: 1 / span 3;
+  justify-content: flex-end;
+}
+
+/* ------------------------------------------------- the single-line attempt */
+
+/* **Things is the one cluster whose name is not a title.** Space, Diagram and
+   Graph each name an entity the author renamed, so their names are arbitrary
+   length and the grid gives them `minmax(0, 1fr)` to take the slack and
+   truncate into. "Things" is a literal word that never changes, so that track
+   buys it nothing — it is 140px held open for a string that is always the same
+   ~45px.
+
+   So this cluster leaves the grid and packs: the trigger at its intrinsic
+   width, the peers trailing. Flex rather than a narrower track because a track
+   would be a second magic number to keep in step with the font. */
+.command-dock__surface[data-orientation='vertical'] .cdp-single-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1px;
+}
+
+/* The peers are what the row is sized around, so they take no slack and the
+   trigger takes all of it. */
+.command-dock__surface[data-orientation='vertical'] .cdp-single-line .cdp-peer-row {
+  flex: 0 0 auto;
+}
+
+/* **The chevron is pinned into the peers' rhythm, not left against the word.**
+
+   Taking the slack is the whole of it, and it is what the rule above does by
+   *not* overriding `.command-dock__name`'s `flex: 1 1 auto`. With the peers
+   fixed and the trigger elastic, the trigger's trailing edge is one gap before
+   the first peer, and `.command-dock__things-trigger`'s own
+   `margin-inline-start: auto` on its last child has already pushed the chevron
+   to that edge. So the chevron stops reading as punctuation after "Things" and
+   becomes the first of four evenly spaced glyphs.
+
+   **No padding change is owed, and that was worth measuring rather than
+   deriving.** A peer is a 28px button around a 14px glyph and the cluster's gap
+   is 1px, so the peer-to-peer pitch is 29px. Sweeping the trigger's
+   `padding-inline-end` across 5, 6, 7 and 8px in the browser gives chevron-to-
+   first-peer pitches of 28, 29, 30 and 31 — and 6px is what `command-dock.css`
+   already sets. An arithmetic argument here landed on 7px and was off by one;
+   the sweep is in the story's notes because a 1px error across four glyphs is
+   exactly the kind that reads as "not quite right" and never gets named. */
+
+/* ------------------------------------- the placement production used to have */
+
+/* `.command-dock__set-verb` placed the Things cluster's one trailing command in
+   the vertical grid's third track. It went with the `+` menu it was written for
+   — the cluster packs now rather than taking a verb track — so the options on
+   this sheet that still want it carry their own. Kept only so A, C and E keep
+   drawing the arrangement they are being compared against. */
+.command-dock__surface[data-orientation='vertical'] .cdp-set-verb {
+  grid-column: 3;
+}

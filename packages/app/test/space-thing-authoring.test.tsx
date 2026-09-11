@@ -331,11 +331,11 @@ const settled = (session: SpaceSession): Promise<void> =>
 
 /** Wait for the Things to reach the canvas, which is what makes Thing authoring available. */
 async function readyToAuthor(): Promise<void> {
-  const create = await screen.findByRole('button', { name: 'Create Thing' });
+  const create = await screen.findByRole('button', { name: 'Create Markdown Thing' });
   await waitFor(() => expect(unavailable(create)).toBe(false));
 }
 
-/** Reach Create Space Thing the way an author does: through the Create Thing menu. */
+/** Reach Create Space Thing the way an author does: its own control in the Dock. */
 async function openSpaceThingCreation(): Promise<void> {
   await readyToAuthor();
   createThing('Space Thing');
@@ -416,7 +416,7 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe('Add Space Thing', () => {
-  it('is reached through the Add Thing menu and opens its creation pane', async () => {
+  it('is reached from its own Create control and opens its creation pane', async () => {
     const { session } = mount();
 
     await openSpaceThingCreation();
@@ -998,17 +998,21 @@ describe('a coordination that broke rather than refused', () => {
    * Creating an Alias hands it to the editor that opens on the Alias, and taking
    * it back would be a steal — but this pane has no naming continuation, because
    * the title was typed on it before the Edit ran. So there is nothing to hand
-   * it to and the Add Thing trigger is where it belongs, exactly as after a
-   * cancellation.
+   * it to and the control it was opened from is where it belongs, exactly as
+   * after a cancellation. **That control is Create Space Thing and not a
+   * neighbour**: the kinds are peers now, so each carries its own return
+   * address (`continuation.ts`).
    */
-  it('returns focus to the Add Thing menu after creating a Space Thing', async () => {
+  it('returns focus to Create Space Thing after creating a Space Thing', async () => {
     const { session } = mount();
     await openSpaceThingCreation();
 
     createNamed('Architecture');
 
     await waitFor(() => expect(screen.queryByTestId('new-space-thing')).not.toBeInTheDocument());
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Create Thing' })).toHaveFocus());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Create Space Thing' })).toHaveFocus(),
+    );
     await settled(session);
   });
 

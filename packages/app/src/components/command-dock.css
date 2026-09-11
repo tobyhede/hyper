@@ -299,12 +299,15 @@
    remove. Naming the three parts is what makes an absent one leave a hole
    rather than shift the row.
 
-   **Three tracks, and both verbs share the last.** A leading verb would need a
+   **Three tracks, and the one verb takes the last.** A leading verb would need a
    fourth: Present would take a track of its own on every row, empty on the
-   three that have no verb, while Things' Create still trailed — 84px of a 208px
-   column spent on gutters. Trailing, Present and Create sit in one track and
-   the name keeps the width. `GraphControls` reorders its own JSX for this, so
-   the Tab order still matches what the eye reads. */
+   three that have no verb — 84px of a 208px column spent on gutters. Trailing,
+   it sits in one track and the name keeps the width. `GraphControls` reorders
+   its own JSX for this, so the Tab order still matches what the eye reads.
+
+   **Things is not placed by this grid at all** — see the Things cluster below.
+   Its three Create commands would have wanted three more tracks, so it packs
+   instead and gives up the `1fr` track its fixed word never needed. */
 .command-dock__surface[data-orientation='vertical'] .command-dock__name,
 .command-dock__surface[data-orientation='vertical'] .command-dock__name-item,
 .command-dock__surface[data-orientation='vertical'] .command-dock__crumb {
@@ -315,9 +318,52 @@
   grid-column: 2;
 }
 
-.command-dock__surface[data-orientation='vertical'] .command-dock__verb,
-.command-dock__surface[data-orientation='vertical'] .command-dock__set-verb {
+.command-dock__surface[data-orientation='vertical'] .command-dock__verb {
   grid-column: 3;
+}
+
+/* ------------------------------------------------------- the Things cluster */
+
+/* **Things leaves the grid, because it is the one cluster whose name is not a
+   title.**
+
+   The grid above exists for names the author wrote: Space, Diagram and Graph
+   each name an entity that has been renamed, so the length is theirs, and the
+   `1fr` track is what lets a name take the slack and truncate instead of
+   resizing the column when the reader crosses from `Meta Space` to `Design
+   system`. "Things" names a *set*. It has no name to edit — which is why the
+   word lives inside its trigger rather than beside it — and it is the same
+   literal string in every Space there will ever be. Measured, that track holds
+   about 69px of nothing: the run from the Thing glyph to the chevron is 122px
+   under the grid against 53px packed.
+
+   So this cluster packs and spends that room on its three Create commands. It
+   is the only cluster with a control on both sides of its name, and the
+   alternative was three verb tracks standing empty on the other three rows —
+   84px of a 208px column spent on gutters.
+
+   What it costs is the chevron column: a packed trigger puts its chevron where
+   the word ends (x=101) rather than in track 2 (x=146). That column was already
+   not exact at this row — under the grid this trigger spans tracks 1-2 and
+   pushes its chevron to the end of that span, landing at x=153 against the
+   others' x=146 — and this chevron is the odd one anyway, being *inside* its
+   trigger rather than a button beside it. The trailing edge is unaffected: the
+   last Create ends where Present ends. */
+.command-dock__surface[data-orientation='vertical'] .command-dock__things {
+  display: flex;
+  justify-content: space-between;
+  gap: 1px;
+}
+
+/* The three are sized by their glyphs; the trigger takes every remaining pixel.
+   That is also what pins the chevron: `.command-dock__things-trigger` already
+   pushes its last child to its own trailing edge, so an elastic trigger puts
+   that chevron one gap before the first Create — on the same 29px pitch the
+   three keep between themselves (a 28px button plus this 1px gap). The
+   trigger's existing 6px end padding is what makes that pitch exact; 5px and
+   7px put the chevron a pixel either side of the rhythm. */
+.command-dock__surface[data-orientation='vertical'] .command-dock__things .command-dock__create {
+  flex: 0 0 auto;
 }
 
 /* The trail's own leading pad is a horizontal-dock rule — there it puts the
@@ -352,6 +398,16 @@
    which is what a Thing rail is (ADR 0073) — so each is a `Toolbar`, drawn
    tight, with the dock's own gap doing the separating between them. */
 .command-dock__cluster {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 1px;
+}
+
+/* The three Create commands, as one run. A group rather than three siblings so
+   the vertical column has one element to place — left loose they auto-place
+   onto three rows and the cluster stands at 102px beside a 44px Diagram. */
+.command-dock__create {
   display: inline-flex;
   min-width: 0;
   align-items: center;
