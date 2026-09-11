@@ -75,6 +75,13 @@ export type ThingKindName = 'Markdown Thing' | 'Space Thing' | 'Alias';
 /**
  * One kind's Create control, which is also what reports whether creating is
  * available at all — every peer is withdrawn by the same fact.
+ *
+ * **The default answers the availability question and nothing else.** Asking
+ * "can a Thing be created" may use any peer, because `createDisabled` withdraws
+ * all three together. An assertion about *which* control — focus after a
+ * cancelled pane, most of all — has to name its kind: each peer carries its own
+ * continuation address, so a defaulted call there reads as passing while the
+ * caret sits on a neighbour. Two tests were caught by exactly that.
  */
 export const createThingControl = (kind: ThingKindName = 'Markdown Thing'): HTMLElement =>
   within(dock()).getByRole('button', { name: `Create ${kind}` });
