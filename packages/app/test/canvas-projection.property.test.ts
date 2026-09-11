@@ -91,32 +91,34 @@ async function projectThroughDiagram(generated: { file: unknown; thingFiles: Thi
 }
 
 describe('canvasProjection handle invariants', () => {
-  it('every drawn Edge names handles that exist on the Things it connects', async () => {
+  it('declares the anchors of both roles on every Thing a drawn Edge reaches', async () => {
     await fc.assert(
       fc.asyncProperty(diagramSpaceArb, async (generated) => {
         const { nodes, edges } = await projectThroughDiagram(generated);
-
-        const handleIds = new Map(
-          nodes.map((node) => [
-            node.id,
-            {
-              source: new Set(node.data.sourceHandles.map((handle) => handle.id)),
-              target: new Set(node.data.targetHandles.map((handle) => handle.id)),
-            },
-          ]),
-        );
 
         // Not vacuous: the Space holds at least two Graphs, and every Graph has
         // at least one Edge.
         expect(edges.length).toBeGreaterThan(0);
 
+        const declared = new Map(nodes.map((node) => [node.id, node.handles ?? []]));
+
+        // An Edge names no handle since ADR 0087, so React Flow resolves each end
+        // to the first declared bound of that kind — and answers null, drawing
+        // nothing at all, for a Thing that declares none. What the two
+        // derivations have to agree on is therefore which Things are on the
+        // canvas, not which handle ids exist.
         for (const edge of edges) {
-          const from = handleIds.get(edge.source);
-          const to = handleIds.get(edge.target);
-          expect(from, `edge ${edge.id} has no source node`).toBeDefined();
-          expect(to, `edge ${edge.id} has no target node`).toBeDefined();
-          expect(from!.source, `edge ${edge.id} source handle`).toContain(edge.sourceHandle);
-          expect(to!.target, `edge ${edge.id} target handle`).toContain(edge.targetHandle);
+          for (const [role, thingId] of [
+            ['source', edge.source],
+            ['target', edge.target],
+          ] as const) {
+            const handles = declared.get(thingId);
+            expect(handles, `edge ${edge.id} has no ${role} node`).toBeDefined();
+            expect(
+              (handles ?? []).filter((handle) => handle.type === role),
+              `edge ${edge.id} ${role} anchors`,
+            ).toHaveLength(4);
+          }
         }
       }),
     );

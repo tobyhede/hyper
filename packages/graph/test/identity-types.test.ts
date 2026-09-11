@@ -6,7 +6,6 @@ import {
   type GraphRenderEdge,
   type LayoutStrategyThing,
   type LayoutStrategyEdge,
-  type GraphRenderHandleRef,
 } from '@project/graph';
 
 describe('graph identity types', () => {
@@ -14,7 +13,6 @@ describe('graph identity types', () => {
     expectTypeOf<GraphRenderEdge['graphId']>().toEqualTypeOf<GraphId>();
     expectTypeOf<GraphRenderEdge['source']>().toEqualTypeOf<ThingId>();
     expectTypeOf<GraphRenderEdge['target']>().toEqualTypeOf<ThingId>();
-    expectTypeOf<GraphRenderHandleRef['graphId']>().toEqualTypeOf<GraphId>();
     expectTypeOf<LayoutStrategyThing['id']>().toEqualTypeOf<ThingId>();
     expectTypeOf<LayoutStrategyEdge['source']>().toEqualTypeOf<ThingId>();
     expectTypeOf<LayoutStrategyEdge['target']>().toEqualTypeOf<ThingId>();

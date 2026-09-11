@@ -15,8 +15,10 @@
  * a Thing and its position, so there is nowhere for a port offset or an Edge's
  * waypoints to land — routed geometry could only ever have been render-time,
  * and an automatic arrangement is an Edit over a Diagram rather than a render
- * path. The contract carried both until then and neither had a consumer; where
- * an Edge attaches is the render layer's own question (`.scratch/edge-attachment/`).
+ * path. An Edge's two endpoint references went the same way with ADR 0087: an
+ * Edge names no handle, and the side it attaches to is chosen while it is drawn
+ * from where its two Things are at that moment. So an Edge reaches a strategy as
+ * the pair of Things it joins, which is all a strategy ever read.
  *
  * Which things a strategy arranges is decided by the view before it runs. A
  * strategy is free to ignore parts of the graph it has no use for — a grid never
@@ -38,8 +40,6 @@ export interface LayoutStrategyEdge {
   id: string;
   source: ThingId;
   target: ThingId;
-  sourceHandle: string;
-  targetHandle: string;
 }
 
 export interface LayoutStrategyGraph {
@@ -79,12 +79,6 @@ export function buildLayoutStrategyGraph(
     }),
     edges: edges
       .filter((e) => visible.has(e.source) && visible.has(e.target))
-      .map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        sourceHandle: e.sourceHandle,
-        targetHandle: e.targetHandle,
-      })),
+      .map((e) => ({ id: e.id, source: e.source, target: e.target })),
   };
 }

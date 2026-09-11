@@ -1,9 +1,10 @@
 import fc from 'fast-check';
+import { Position } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 import {
-  buildThingHandles,
   buildGraphRenderEdges,
   loadSpace,
+  type LayoutStrategyGraph,
   type ThingFile,
 } from '@project/graph';
 import { projectThingNodes, projectGraphEdges } from '../src/index';
@@ -13,15 +14,23 @@ import { thingFile } from './thing-files';
  * The projection's handle invariants, as properties rather than examples.
  *
  * React Flow warning #008 — "Couldn't create edge for source/target handle id" —
- * fires when an edge names a handle that doesn't resolve on the node it points
- * at, and that condition is fully determined by what `projectThingNodes` and
- * `projectGraphEdges` produce *together*. Each projection is well covered on its
- * own in `projection.test.ts`; nothing there asserts the relationship, so a
- * change to the handle id scheme on one side only would pass every test and
- * render a graph with no edges.
+ * fires when an Edge names a handle that does not resolve on the node it points
+ * at, and warning or not, `getEdgePosition` then answers null and the Edge is
+ * not drawn at all. That condition is fully determined by what
+ * `projectThingNodes` and `projectGraphEdges` produce *together*. Each
+ * projection is well covered on its own in `projection.test.ts`; nothing there
+ * asserts the relationship, so a change to one side only would pass every test
+ * and render a Graph with no Edges.
  *
- * Properties rather than examples because the failure mode is multi-graph: a
- * thing carries more than one same-side handle only when graphs share it. See
+ * Since ADR 0087 an Edge names no handle and attaches to one of four anchors
+ * chosen while it is drawn, so what has to hold is that **every** Thing an Edge
+ * reaches carries those anchors — not that some named handle happens to exist.
+ * React Flow resolves an unnamed handle to the first of the node's bounds of
+ * that kind, so a Thing missing either kind is an Edge that silently vanishes.
+ *
+ * Properties rather than examples because the failure mode is multi-graph: the
+ * generated Spaces overlap on Things, which is the shape that once put several
+ * same-side handles on one node. See
  * `.scratch/react-flow-guidance/issues/02-projection-handle-invariants.md`.
  */
 
@@ -100,65 +109,94 @@ const spaceFileArb = thingIdPool.chain((pool) =>
   }),
 );
 
-/** Project a generated space to React Flow nodes and edges. Colors are
- *  irrelevant to these invariants, so the fallback is fine. */
+/**
+ * Project a generated Space to React Flow nodes and Edges. Colors are irrelevant
+ * to these invariants, so the fallback is fine.
+ *
+ * A strategy graph is supplied because a Thing declares its anchors only once
+ * something has placed it — before that React Flow measures the DOM instead,
+ * which is not what these properties are about.
+ */
 function project(generated: { file: unknown; thingFiles: ThingFile[] }) {
   const result = loadSpace(generated.file, generated.thingFiles);
   if (!result.ok) throw new Error(`generated space should load: ${JSON.stringify(result.errors)}`);
   const space = result.space;
+  const strategyGraph: LayoutStrategyGraph = {
+    things: space.things.map((thing, index) => ({
+      id: thing.id,
+      width: 260,
+      height: 146,
+      x: index * 400,
+      y: 0,
+    })),
+    edges: [],
+  };
 
   return {
-    nodes: projectThingNodes(space, buildThingHandles(space), {}),
+    nodes: projectThingNodes(space, { strategyGraph }),
     edges: projectGraphEdges(buildGraphRenderEdges(space), {}),
   };
 }
 
 describe('projection handle invariants', () => {
-  it('every edge names handles that exist on the nodes it connects', () => {
+  const SIDES = new Set([Position.Top, Position.Right, Position.Bottom, Position.Left]);
+
+  it('declares the four anchors of each role on every Thing an Edge reaches', () => {
     fc.assert(
       fc.property(spaceFileArb, (generated) => {
         const { nodes, edges } = project(generated);
 
-        const handleIds = new Map(
-          nodes.map((node) => [
-            node.id,
-            {
-              source: new Set(node.data.sourceHandles.map((handle) => handle.id)),
-              target: new Set(node.data.targetHandles.map((handle) => handle.id)),
-            },
-          ]),
-        );
-
-        // Not vacuous: every generated graph carries at least one edge.
+        // Not vacuous: every generated Graph carries at least one Edge.
         expect(edges.length).toBeGreaterThan(0);
 
+        const declared = new Map(nodes.map((node) => [node.id, node.handles ?? []]));
+
         for (const edge of edges) {
-          const from = handleIds.get(edge.source);
-          const to = handleIds.get(edge.target);
-          expect(from, `edge ${edge.id} has no source node`).toBeDefined();
-          expect(to, `edge ${edge.id} has no target node`).toBeDefined();
-          expect(from!.source, `edge ${edge.id} source handle`).toContain(edge.sourceHandle);
-          expect(to!.target, `edge ${edge.id} target handle`).toContain(edge.targetHandle);
+          for (const [role, thingId] of [
+            ['source', edge.source],
+            ['target', edge.target],
+          ] as const) {
+            const handles = declared.get(thingId);
+            expect(handles, `edge ${edge.id} has no ${role} node`).toBeDefined();
+            const sides = (handles ?? [])
+              .filter((handle) => handle.type === role)
+              .map((handle) => handle.position);
+            expect(new Set(sides), `edge ${edge.id} ${role} anchors`).toEqual(SIDES);
+          }
         }
       }),
     );
   });
 
-  it('a thing never carries two handles of the same kind with the same id', () => {
+  it('leaves an Edge naming no handle at all', () => {
+    fc.assert(
+      fc.property(spaceFileArb, (generated) => {
+        const { edges } = project(generated);
+
+        // The projection does not run again during a drag, so a side chosen here
+        // would be right only once the gesture settled (ADR 0087). Leaving both
+        // unnamed is what hands the choice to the Edge, which is the one thing
+        // that can follow the drag.
+        for (const edge of edges) {
+          expect(edge.sourceHandle, `edge ${edge.id} source handle`).toBeUndefined();
+          expect(edge.targetHandle, `edge ${edge.id} target handle`).toBeUndefined();
+        }
+      }),
+    );
+  });
+
+  it('gives a Thing no two handles of one kind on one side', () => {
     fc.assert(
       fc.property(spaceFileArb, (generated) => {
         const { nodes } = project(generated);
 
-        // React Flow can't tell two same-side handles apart otherwise, and picks
-        // whichever it finds first. Holds here because a handle id is
-        // `<graphId>::out`/`::in` — one per graph per side, so a thing a graph
-        // forks at still carries exactly one outbound handle however many edges
-        // leave it. The scheme, not a domain rule, is what makes this true.
+        // React Flow cannot tell two same-kind handles apart otherwise, and picks
+        // whichever it finds first. Four anchors named for their sides satisfy
+        // that by construction — which is the ground ADR 0045 gave the per-Graph
+        // ids, and the reason four anchors could take their place.
         for (const node of nodes) {
-          const sourceIds = node.data.sourceHandles.map((handle) => handle.id);
-          const targetIds = node.data.targetHandles.map((handle) => handle.id);
-          expect(new Set(sourceIds).size, `${node.id} source handles`).toBe(sourceIds.length);
-          expect(new Set(targetIds).size, `${node.id} target handles`).toBe(targetIds.length);
+          const seen = (node.handles ?? []).map((handle) => `${handle.type}-${handle.position}`);
+          expect(new Set(seen).size, `${node.id} handles`).toBe(seen.length);
         }
       }),
     );

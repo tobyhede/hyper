@@ -15,14 +15,14 @@ import {
   type CanvasThingFront,
   type CanvasThingProps,
 } from '@project/ui';
-import type { ThingFlowNode, ThingHandle } from './projection';
-import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
+import type { ThingFlowNode } from './projection';
+import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 
 /**
- * React Flow custom node: a Thing front with one coloured handle per Graph at
- * the vertical offset the strategy computed for it. An opened Markdown Thing
- * draws its content inside the same node; presenting independently draws the
- * active Thing's rendered content at the frame's scale (ADR 0064, ADR 0027).
+ * React Flow custom node: a Thing front with one Edge anchor on each of its four
+ * sides. An opened Markdown Thing draws its content inside the same node;
+ * presenting independently draws the active Thing's rendered content at the
+ * frame's scale (ADR 0064, ADR 0027).
  *
  * The Thing front itself — Markdown and Alias treatment, title editing, refusal
  * display, Open/Edit controls and interaction-state visuals — is the
@@ -139,24 +139,15 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
   const front: CanvasThingFront =
     data.kind === 'alias' ? aliasFront : data.kind === 'space' ? spaceFront : markdownFront;
 
-  const renderHandle = (handle: ThingHandle, type: 'source' | 'target') => (
-    <Handle
-      key={handle.id}
-      id={handle.id}
-      type={type}
-      position={type === 'target' ? Position.Left : Position.Right}
-      className="rf-thing-node__port"
-      aria-hidden="true"
-      isConnectable={false}
-      style={{
-        top: handle.offsetY,
-        width: GRAPH_PORT_DIAMETER,
-        height: GRAPH_PORT_DIAMETER,
-        background: handle.color,
-        opacity: 0,
-      }}
-    />
-  );
+  /**
+   * Whether this Thing's anchors are also affordances.
+   *
+   * Read-only draws a Thing without Thing-owned controls, and an embedded Space
+   * boundary offers no connection authoring — but both still draw Edges, and an
+   * Edge attaches to an anchor (ADR 0087). So the four sides render either way
+   * and this decides only whether an author may take hold of one.
+   */
+  const connectionAuthoring = !data.readOnly && data.connectionAuthoringEnabled !== false;
 
   const renderAuthoringHandle = (
     side: (typeof AUTHORING_SIDES)[number],
@@ -168,20 +159,24 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
       type={role}
       position={side}
       className={`rf-thing-node__authoring-handle rf-thing-node__authoring-handle--${role}`}
-      aria-label={`${role === 'source' ? 'Connect from' : 'Connect to'} ${side}`}
+      {...(connectionAuthoring
+        ? { 'aria-label': `${role === 'source' ? 'Connect from' : 'Connect to'} ${side}` }
+        : { 'aria-hidden': true })}
       // `isConnectable` is React Flow's own switch and it only works if a custom
       // node forwards it: `NodeWrapper` resolves `nodesConnectable` and the
       // node's own `connectable` into this one prop and hands it over, and
       // enforces nothing itself on a handle it did not render. Its `DefaultNode`
       // passes it straight to both `Handle`s, and this is the same forwarding.
       //
-      // These four are the only handles that can begin a gesture — the graph
-      // ports below are `isConnectable={false}` outright — so dropping it left
-      // the flow-level flag governing nothing but whether the connection line
-      // rendered, with CSS and a pane's backdrop standing in for the withdrawal.
-      isConnectable={isConnectable}
-      isConnectableStart={isConnectable && role === 'source' && !connectionInProgress}
-      isConnectableEnd={isConnectable && role === seeking}
+      // These are the only handles a gesture can begin at — there are no others
+      // left since ADR 0087 — so dropping it left the flow-level flag governing
+      // nothing but whether the connection line rendered, with CSS and a pane's
+      // backdrop standing in for the withdrawal.
+      isConnectable={connectionAuthoring && isConnectable}
+      isConnectableStart={
+        connectionAuthoring && isConnectable && role === 'source' && !connectionInProgress
+      }
+      isConnectableEnd={connectionAuthoring && isConnectable && role === seeking}
       // A handle is a drag affordance, and a click is not a drag. A press and
       // release inside React Flow's drag threshold starts no connection, so the
       // click reached the Thing underneath and opened it to read — from the one
@@ -347,6 +342,11 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
       data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={seeking ?? 'none'}
+      // Whether the four anchors are also affordances. They render either way —
+      // an Edge attaches to an anchor and React Flow draws no Edge for a Thing
+      // whose handles it cannot resolve — so this is what the reveal in
+      // `styles.css` reads before showing one to a pointer (ADR 0087).
+      data-connection-authoring={connectionAuthoring}
       data-resizing={resizeActive}
       // The wrapper React Flow sizes from `node.width`/`node.height` is this
       // element's parent, so an Expanded Thing only reaches its own rect if this
@@ -393,7 +393,6 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
           />
         </>
       )}
-      {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       {data.showContent ? (
         <div className="rf-thing-node__content">
           <ThingContent title={data.title} markdown={data.body ?? ''} />
@@ -421,7 +420,7 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
         />
       )}
       {/*
-        Every authoring handle renders *after* the Thing, both roles together.
+        Every anchor renders *after* the Thing, both roles together.
         `canvas-thing.css` keeps the Thing's hover treatment alive while the
         pointer sits on a handle through `:has(~ …__authoring-handle:hover)`,
         and `~` reaches following siblings only — a handle rendered before the
@@ -430,13 +429,8 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
         `position` on the handle itself, so the four sides are unaffected by the
         order they are declared in. `ThingNode.test.tsx` pins the ordering.
       */}
-      {!data.readOnly &&
-        data.connectionAuthoringEnabled !== false &&
-        AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
-      {!data.readOnly &&
-        data.connectionAuthoringEnabled !== false &&
-        AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
-      {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
+      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
+      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
     </div>
   );
 }

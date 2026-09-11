@@ -67,7 +67,10 @@ test(
       has: page.getByRole('heading', { name: 'Intake', exact: true }),
     });
     await embedded.hover();
-    await expect(embedded.locator('.rf-thing-node__authoring-handle')).toHaveCount(0);
+    // Anchors, not affordances (ADR 0087): an embedded Diagram draws Edges, and
+    // an Edge attaches to an anchor — but nothing here offers a drag one.
+    await expect(embedded.locator('.rf-thing-node__authoring-handle')).toHaveCount(8);
+    await expect(embedded.getByRole('button', { name: /^Connect (from|to) / })).toHaveCount(0);
     await embedded.getByRole('button', { name: 'Edit Thing Intake' }).click();
     await embedded
       .getByRole('textbox', { name: 'Markdown source of Intake' })

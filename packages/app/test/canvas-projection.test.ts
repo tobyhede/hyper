@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type DiagramId } from '@project/core';
 import { loadSpace, Placement, positionedStrategy, type Space } from '@project/graph';
-import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
 import { GRAPH_PALETTE } from '../src/colors';
 import { resolveDiagram } from '../src/diagram-resolution';
@@ -71,14 +70,6 @@ async function projectThrough(
     projection.strategyGraph,
   );
   return { ...projection, ...projection.project(laidOut, interaction) };
-}
-
-/** Every Graph a projected Thing carries a coloured handle for. */
-function handledGraphIds(nodes: readonly ThingFlowNode[]): string[] {
-  const ids = nodes.flatMap((node) =>
-    [...node.data.sourceHandles, ...node.data.targetHandles].map((handle) => handle.graphId),
-  );
-  return [...new Set(ids)].sort();
 }
 
 describe('canvasProjection', () => {
@@ -154,16 +145,18 @@ describe('canvasProjection', () => {
 
     const { visibleGraphs, nodes, edges } = await projectThrough(space, AT_REST, DIAGRAM);
 
-    // Graphs, Edges and handles are derived separately and must agree on the
-    // same set — the Graphs this Diagram owns (ADR 0040), which here is both.
+    // Graphs and Edges are derived separately and must agree on the same set —
+    // the Graphs this Diagram owns (ADR 0040), which here is both. A Thing's
+    // anchors used to be a third derivation of it; they are Graph-independent
+    // since ADR 0087, so every Thing the Diagram draws carries the same four.
     expect(visibleGraphs.map((graph) => graph.id)).toEqual([DRAWN_GRAPH, OTHER_GRAPH]);
     expect(edges.map((edge) => edge.data?.['graphId']).sort()).toEqual(
       [DRAWN_GRAPH, OTHER_GRAPH].sort(),
     );
-    expect(handledGraphIds(nodes)).toEqual([DRAWN_GRAPH, OTHER_GRAPH].sort());
+    expect(nodes.map((node) => node.id).sort()).toEqual([THING_A, THING_B]);
   });
 
-  it('draws neither the Edge nor the handle of a Graph a sibling Diagram owns', async () => {
+  it('draws no Edge of a Graph a sibling Diagram owns', async () => {
     // Two Diagrams of one Space place the same Things, and an embedded sub-flow
     // merges their projections into one React Flow instance (ADR 0068). Both
     // Things the unowned Edge names are therefore mounted, so what keeps that
@@ -183,7 +176,6 @@ describe('canvasProjection', () => {
     expect(sibling.nodes.map((node) => node.id).sort()).toEqual([THING_A, THING_B]);
     expect(sibling.visibleGraphs.map((graph) => graph.id)).toEqual([OTHER_GRAPH]);
     expect(sibling.edges.map((edge) => edge.data?.['graphId'])).toEqual([OTHER_GRAPH]);
-    expect(handledGraphIds(sibling.nodes)).toEqual([OTHER_GRAPH]);
   });
 
   it('carries each authored Expanded rect through strategy input and node projection', async () => {

@@ -328,7 +328,16 @@ test(
     const embedded = embeddedNodes(page);
     await expect(embedded).toHaveCount(1);
     await embedded.hover();
-    await expect(embedded.locator('.rf-thing-node__authoring-handle')).toHaveCount(0);
+    // The four sides are anchors here and nothing more (ADR 0087): an embedded
+    // Diagram draws Edges, and an Edge attaches to an anchor. Hovering reveals
+    // none of them, because the reveal reads whether this Thing offers
+    // connection authoring at all — and a Thing inside a Space Thing does not.
+    await expect(embedded.locator('.rf-thing-node__authoring-handle')).toHaveCount(8);
+    await expect(embedded.getByRole('button', { name: /^Connect (from|to) / })).toHaveCount(0);
+    await expect(embedded.locator('.rf-thing-node__authoring-handle').first()).toHaveCSS(
+      'opacity',
+      '0',
+    );
     await embedded.getByRole('button', { name: 'Edit Thing Thing 1' }).click();
     const editor = embedded.locator('[contenteditable="true"]');
     await expect(editor).toBeVisible();

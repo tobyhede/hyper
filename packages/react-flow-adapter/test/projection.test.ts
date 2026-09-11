@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildThingHandles,
-  buildLayoutStrategyGraph,
-  buildGraphRenderEdges,
-  loadSpace,
-  type Space,
-} from '@project/graph';
+import { buildGraphRenderEdges, loadSpace, type Space } from '@project/graph';
 import type { SpaceFile } from '@project/core';
+import { Position } from '@xyflow/react';
+import { AUTHORING_HANDLE_DIAMETER } from '../src/authoring-handle';
 import { projectThingNodes, projectGraphEdges, type GraphEmphasis } from '../src/index';
 import { aliasFile, thingFile } from './thing-files';
 import { uuid } from './uuid';
@@ -93,11 +89,9 @@ const colors = {
   '00000000-0000-4000-8000-000000000004': '#111111',
   '00000000-0000-4000-8000-000000000030': '#222222',
 };
-const handles = buildThingHandles(space);
-
 describe('projectThingNodes', () => {
   it('maps things to thing nodes carrying the title, not the content', () => {
-    const nodes = projectThingNodes(space, handles, colors);
+    const nodes = projectThingNodes(space);
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     expect(a.type).toBe('thing');
     expect(a.data.title).toBe('Thing A');
@@ -106,30 +100,8 @@ describe('projectThingNodes', () => {
     expect('markdown' in a.data).toBe(false);
   });
 
-  it('attaches per-graph handles colored by graph', () => {
-    const nodes = projectThingNodes(space, handles, colors);
-    const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
-    // main leaves thing a (out); alt ends at thing a (in).
-    expect(a.data.sourceHandles).toMatchObject([
-      {
-        id: '00000000-0000-4000-8000-000000000004::out',
-        graphId: '00000000-0000-4000-8000-000000000004',
-        color: '#111111',
-      },
-    ]);
-    expect(a.data.targetHandles).toMatchObject([
-      {
-        id: '00000000-0000-4000-8000-000000000030::in',
-        graphId: '00000000-0000-4000-8000-000000000030',
-        color: '#222222',
-      },
-    ]);
-    // A vertical offset is always assigned (even spread before ELK runs).
-    expect(typeof a.data.sourceHandles[0]!.offsetY).toBe('number');
-  });
-
-  it('uses the positions a diagram put on the things, and spreads the anchors itself', () => {
-    const nodes = projectThingNodes(space, handles, colors, {
+  it('uses the positions a diagram put on the things', () => {
+    const nodes = projectThingNodes(space, {
       strategyGraph: {
         things: [
           {
@@ -145,10 +117,11 @@ describe('projectThingNodes', () => {
     });
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     expect(a.position).toEqual({ x: 500, y: 600 });
-    // A position is all a strategy answers (ADR 0086). Thing A has one outbound
-    // anchor, so the even spread puts it at half the box the diagram placed —
-    // there is no placed offset left that could say otherwise.
-    expect(a.data.sourceHandles[0]!.offsetY).toBe(150);
+    // A position is all a strategy answers (ADR 0086), and the rect it placed is
+    // what the node declares — width and height together with the handles, since
+    // React Flow re-measures a node that carries no measured size.
+    expect(a.width).toBe(260);
+    expect(a.height).toBe(300);
     // thing b is absent from the diagram → falls back to the origin (no authored position).
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.position).toEqual({
       x: 0,
@@ -156,13 +129,12 @@ describe('projectThingNodes', () => {
     });
   });
 
-  it("spreads a placed thing's anchors down the thing's own box, not the collapsed constant", () => {
-    // The strategies arrange every collapsed Thing at `THING_SIZE`, so this only
-    // ever differs for an Expanded one (ADR 0064) — and it has to differ, or an
-    // Edge attaches partway down a box the Thing no longer occupies. The even
-    // spread over that box is the only rule there is (ADR 0086).
-    const expanded = projectThingNodes(space, handles, colors, {
-      nodeHeight: 146,
+  it("declares four anchors of each role on the rim of the Thing's own box", () => {
+    // A Thing's anchors follow the rect it occupies rather than a constant: the
+    // strategies arrange every collapsed Thing at `THING_SIZE`, so this differs
+    // only for an Open one (ADR 0064) — and it has to, or an Edge attaches
+    // partway down a box the Thing no longer fills.
+    const nodes = projectThingNodes(space, {
       strategyGraph: {
         things: [
           {
@@ -176,144 +148,53 @@ describe('projectThingNodes', () => {
         edges: [],
       },
     });
-    const a = expanded.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
-    // One anchor of each role, so each sits at half the Thing's own height.
-    expect(a.data.sourceHandles[0]!.offsetY).toBe(210);
-    expect(a.data.targetHandles[0]!.offsetY).toBe(210);
-
-    // The constant still answers for a thing no strategy has placed yet.
-    const unplaced = projectThingNodes(space, handles, colors, { nodeHeight: 146 });
-    expect(
-      unplaced.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!.data.sourceHandles[0]!
-        .offsetY,
-    ).toBe(73);
-  });
-
-  it('declares an attachment point for every Graph on a thing the strategy has placed', () => {
-    // A third Graph that never touches thing A, so "every Graph" is distinguishable
-    // from "every Graph this thing is already on". A self-edge is authored structure
-    // (ADR 0032), which is the cheapest way to keep it away from A.
-    const withThirdGraph = load(
-      spaceFile([
-        {
-          id: '00000000-0000-4000-8000-000000000004',
-          title: 'Main',
-          edges: [
-            {
-              from: '00000000-0000-4000-8000-000000000002',
-              to: '00000000-0000-4000-8000-000000000003',
-            },
-          ],
-        },
-        {
-          id: '00000000-0000-4000-8000-000000000031',
-          title: 'Solo',
-          edges: [
-            {
-              from: '00000000-0000-4000-8000-000000000003',
-              to: '00000000-0000-4000-8000-000000000003',
-            },
-          ],
-        },
-      ]),
-    );
-    const palette = {
-      '00000000-0000-4000-8000-000000000004': '#111111',
-      '00000000-0000-4000-8000-000000000031': '#333333',
-    };
-    const nodes = projectThingNodes(withThirdGraph, buildThingHandles(withThirdGraph), palette, {
-      strategyGraph: {
-        things: [
-          {
-            id: uuid('00000000-0000-4000-8000-000000000002'),
-            x: 500,
-            y: 600,
-            width: 260,
-            height: 300,
-          },
-          {
-            id: uuid('00000000-0000-4000-8000-000000000003'),
-            x: 900,
-            y: 600,
-            width: 260,
-            height: 300,
-          },
-        ],
-        edges: [],
-      },
-    });
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
-    const declared = new Map((a.handles ?? []).map((handle) => [handle.id, handle]));
+    const radius = AUTHORING_HANDLE_DIAMETER / 2;
+    const declared = (a.handles ?? []).map((handle) => ({
+      id: handle.id,
+      type: handle.type,
+      position: handle.position,
+      x: handle.x,
+      y: handle.y,
+    }));
 
-    // Thing A is only on Main, and only outbound. The rest are declared all the
-    // same: React Flow resolves an Edge against the geometry the node carries, so
-    // an Edge completed onto a thing resolves in the render that first makes it
-    // incident — before the projection that draws its anchor has run.
-    expect(declared.get('00000000-0000-4000-8000-000000000004::out')?.type).toBe('source');
-    expect(declared.get('00000000-0000-4000-8000-000000000004::in')?.type).toBe('target');
-    expect(declared.get('00000000-0000-4000-8000-000000000031::out')?.type).toBe('source');
-    expect(declared.get('00000000-0000-4000-8000-000000000031::in')?.type).toBe('target');
-
-    // An incident anchor sits at the even spread down the box the diagram placed,
-    // less half the 11px the CSS draws the handle at, because React Flow centres
-    // a handle on the border. Thing A has one outbound anchor, so it sits at half
-    // of 300. Nothing places a port any more (ADR 0086), so the declaration and
-    // the drawn anchor are one spread read twice — and they have to agree, or an
-    // Edge attaches where no anchor is.
-    expect(declared.get('00000000-0000-4000-8000-000000000004::out')?.y).toBe(144.5);
-    expect(declared.get('00000000-0000-4000-8000-000000000004::out')?.y).toBe(
-      a.data.sourceHandles[0]!.offsetY - 5.5,
-    );
-    // A Graph thing A is not on has no anchor to read, so its declaration falls
-    // back to the Graph's own index — 1 of 2 and 2 of 2 down the same box.
-    expect(declared.get('00000000-0000-4000-8000-000000000004::in')?.y).toBe(94.5);
-    expect(declared.get('00000000-0000-4000-8000-000000000031::in')?.y).toBe(194.5);
-
-    const b = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!;
-    const drawnOnB = b.data.targetHandles.find(
-      (handle) => handle.id === '00000000-0000-4000-8000-000000000004::in',
-    )!;
-    expect(
-      (b.handles ?? []).find((handle) => handle.id === '00000000-0000-4000-8000-000000000004::in')
-        ?.y,
-    ).toBe(drawnOnB.offsetY - 5.5);
-  });
-
-  it('declares every Graph attachment point when the colour map is incomplete', () => {
-    const nodes = projectThingNodes(
-      space,
-      handles,
-      {},
-      {
-        strategyGraph: {
-          things: [
-            {
-              id: uuid('00000000-0000-4000-8000-000000000002'),
-              x: 500,
-              y: 600,
-              width: 260,
-              height: 300,
-            },
-          ],
-          edges: [],
+    expect(declared).toHaveLength(8);
+    for (const role of ['source', 'target'] as const) {
+      expect(declared.filter((handle) => handle.type === role)).toEqual([
+        {
+          id: `authoring-${role}-top`,
+          type: role,
+          position: Position.Top,
+          x: 280 - radius,
+          y: -radius,
         },
-      },
-    );
-    const a = nodes.find((node) => node.id === '00000000-0000-4000-8000-000000000002')!;
-    const graphHandleIds = (a.handles ?? [])
-      .map((handle) => handle.id)
-      .filter((id) => id?.includes('::'));
-
-    expect(graphHandleIds).toEqual([
-      '00000000-0000-4000-8000-000000000004::in',
-      '00000000-0000-4000-8000-000000000030::in',
-      '00000000-0000-4000-8000-000000000004::out',
-      '00000000-0000-4000-8000-000000000030::out',
-    ]);
+        {
+          id: `authoring-${role}-right`,
+          type: role,
+          position: Position.Right,
+          x: 560 - radius,
+          y: 210 - radius,
+        },
+        {
+          id: `authoring-${role}-bottom`,
+          type: role,
+          position: Position.Bottom,
+          x: 280 - radius,
+          y: 420 - radius,
+        },
+        {
+          id: `authoring-${role}-left`,
+          type: role,
+          position: Position.Left,
+          x: -radius,
+          y: 210 - radius,
+        },
+      ]);
+    }
   });
 
   it('declares no geometry for a thing the strategy has not placed, leaving React Flow to measure it', () => {
-    const nodes = projectThingNodes(space, handles, colors, {
+    const nodes = projectThingNodes(space, {
       strategyGraph: {
         things: [
           {
@@ -338,7 +219,7 @@ describe('projectThingNodes', () => {
   });
 
   it('flags the active thing', () => {
-    const nodes = projectThingNodes(space, handles, colors, {
+    const nodes = projectThingNodes(space, {
       activeThingId: uuid('00000000-0000-4000-8000-000000000003'),
     });
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.data.active).toBe(
@@ -370,7 +251,7 @@ describe('projectThingNodes', () => {
       ],
     );
 
-    const nodes = projectThingNodes(withAlias, buildThingHandles(withAlias), colors, {
+    const nodes = projectThingNodes(withAlias, {
       openThingIds: new Set([aliasId]),
     });
     expect(nodes.find((node) => node.id === aliasId)?.data).toMatchObject({
@@ -394,7 +275,7 @@ describe('projectGraphEdges', () => {
   const MAIN_EDGE_ID = edgeIdOf('00000000-0000-4000-8000-000000000004');
   const ALT_EDGE_ID = edgeIdOf('00000000-0000-4000-8000-000000000030');
 
-  it('maps graph edges to colored, port-connected React Flow edges', () => {
+  it('maps graph edges to coloured React Flow edges that name no handle', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors);
     expect(edges).toHaveLength(2);
     const mainEdge = edges.find((e) => e.id === MAIN_EDGE_ID)!;
@@ -402,9 +283,11 @@ describe('projectGraphEdges', () => {
       type: 'routed',
       source: '00000000-0000-4000-8000-000000000002',
       target: '00000000-0000-4000-8000-000000000003',
-      sourceHandle: '00000000-0000-4000-8000-000000000004::out',
-      targetHandle: '00000000-0000-4000-8000-000000000004::in',
     });
+    // The side is chosen while the Edge is drawn, from where its two Things are
+    // at that moment (ADR 0087), so there is nothing for the projection to name.
+    expect(mainEdge.sourceHandle).toBeUndefined();
+    expect(mainEdge.targetHandle).toBeUndefined();
     expect(mainEdge.style?.stroke).toBe('#111111');
   });
 
@@ -414,8 +297,8 @@ describe('projectGraphEdges', () => {
     // The Edge data is the Graph id and nothing else (ADR 0086). It carried an
     // optional routed polyline until then, for waypoints a routing strategy
     // might have placed; nothing ever placed one, and a Diagram has nowhere to
-    // store one, so the bezier React Flow draws between the two resolved handles
-    // is the only Edge geometry there has ever been.
+    // store one, so the bezier the Edge draws between the two anchors it
+    // attaches to is the only Edge geometry there has ever been.
     expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000004'),
     });
@@ -459,86 +342,5 @@ describe('projectGraphEdges', () => {
       0,
     );
     expect(subtle.count).toBe(equal.count);
-  });
-});
-
-/**
- * A Thing declares an anchor for every Graph, including ones it is not on, so an
- * Edge completed onto it resolves in the render that first makes it incident.
- *
- * Those extra anchors have no DOM element, and React Flow picks the *closest*
- * declared handle within its connection radius. If one ever landed on the same
- * point as a visible authoring handle, a release near that point could resolve
- * to an anchor that cannot accept it. The fallback spreads them evenly down the
- * Thing, so with an odd number of Graphs the middle one sits at exactly half the
- * height — where the Left and Right authoring handles are.
- */
-describe('non-incident graph anchors versus the authoring handles', () => {
-  const thingA = '00000000-0000-4000-8000-000000000002';
-  const thingB = '00000000-0000-4000-8000-000000000003';
-
-  const singleGraphSpace = load(
-    spaceFile([
-      {
-        id: '00000000-0000-4000-8000-000000000004',
-        title: 'Only',
-        edges: [{ from: thingA, to: thingA }],
-      },
-    ]),
-  );
-
-  it('places a lone non-incident anchor exactly on the authoring handle centre', () => {
-    const handlesByThing = buildThingHandles(singleGraphSpace);
-    const thingIds = singleGraphSpace.things.map((thing) => thing.id);
-    const strategyGraph = buildLayoutStrategyGraph(
-      thingIds,
-      buildGraphRenderEdges(singleGraphSpace),
-      () => ({ width: 260, height: 146 }),
-    );
-    const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
-    const nodes = projectThingNodes(singleGraphSpace, handlesByThing, colors, { strategyGraph });
-    const thingNode = nodes.find((node) => node.id === thingB);
-    if (thingNode === undefined) throw new Error('Thing B should be projected');
-    const handles = thingNode.handles ?? [];
-
-    const leftAuthoring = handles.find((handle) => handle.id === 'authoring-target-left');
-    const graphAnchor = handles.find((handle) => handle.id?.endsWith('::in'));
-    if (leftAuthoring === undefined || graphAnchor === undefined) {
-      throw new Error('both a graph anchor and a left authoring handle should be declared');
-    }
-
-    const centre = (handle: { x?: number; y?: number; width?: number; height?: number }) => ({
-      x: (handle.x ?? 0) + (handle.width ?? 0) / 2,
-      y: (handle.y ?? 0) + (handle.height ?? 0) / 2,
-    });
-
-    expect(centre(graphAnchor)).toEqual(centre(leftAuthoring));
-  });
-
-  it('declares the authoring handles before the graph anchors', () => {
-    const handlesByThing = buildThingHandles(singleGraphSpace);
-    const thingIds = singleGraphSpace.things.map((thing) => thing.id);
-    const strategyGraph = buildLayoutStrategyGraph(
-      thingIds,
-      buildGraphRenderEdges(singleGraphSpace),
-      () => ({ width: 260, height: 146 }),
-    );
-    const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
-    const nodes = projectThingNodes(singleGraphSpace, handlesByThing, colors, { strategyGraph });
-    const thingNode = nodes.find((node) => node.id === thingB);
-    if (thingNode === undefined) throw new Error('Thing B should be projected');
-    const ids = (thingNode.handles ?? []).map((handle) => handle.id ?? '');
-
-    // React Flow resolves an exact distance tie by array order, preferring a
-    // handle of the opposite type — and both candidates here are targets. The
-    // authoring handle is the one with a DOM element behind it, so it has to come
-    // first or the release resolves to an anchor that cannot accept it.
-    const authoringIndices = ids.flatMap((id, index) =>
-      id.startsWith('authoring-') ? [index] : [],
-    );
-    const lastAuthoring = Math.max(...authoringIndices);
-    const firstAnchor = ids.findIndex((id) => id.endsWith('::in') || id.endsWith('::out'));
-    expect(authoringIndices).toHaveLength(8);
-    expect(firstAnchor).toBeGreaterThan(lastAuthoring);
   });
 });

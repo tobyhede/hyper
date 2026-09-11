@@ -109,10 +109,16 @@
       // the boundary itself is the seam, same as `no-runtime-typeof`'s
       // postgres/http-protocol exceptions above but for a vendored render
       // dependency rather than a wire format.
+      // `RoutedEdge.test.tsx` is the same seam read the other way: the Edge asks
+      // React Flow's store where its two Things are now, and the stand-in is what
+      // lets a test put them somewhere. The rule the answer feeds is pure and
+      // tested without any of this in `edge-attachment.test.ts`; what is left
+      // here is the reading, which has no in-repo implementation to inject.
       "files": [
         "packages/ui/test/Button.test.tsx",
         "packages/react-flow-adapter/test/ThingNode.test.tsx",
         "packages/react-flow-adapter/test/GraphHud.test.tsx",
+        "packages/react-flow-adapter/test/RoutedEdge.test.tsx",
         "packages/app/test/cameras.test.tsx"
       ],
       "rules": {

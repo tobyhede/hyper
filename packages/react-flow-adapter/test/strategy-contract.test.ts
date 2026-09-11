@@ -130,14 +130,12 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
     }
   });
 
-  it('conserves every edge, with its endpoints and handles intact', async () => {
+  it('conserves every edge, with its endpoints intact', async () => {
     const input = sampleGraph();
     const output = await make()(input);
 
     const identity = (g: LayoutStrategyGraph) =>
-      g.edges
-        .map((e) => `${e.id}|${e.source}|${e.target}|${e.sourceHandle}|${e.targetHandle}`)
-        .sort();
+      g.edges.map((e) => `${e.id}|${e.source}|${e.target}`).sort();
 
     expect(identity(output)).toEqual(identity(input));
   });

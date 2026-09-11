@@ -965,8 +965,17 @@ describe('the Diagram an Open Space Thing draws', () => {
     // the DOM tree. What the DOM does carry is the refusal: no rail, and so no
     // control that could author another Space from this canvas (ADR 0040).
     const drawn = embeddedNode(DRAWN_A);
-    expect(drawn.querySelector('.rf-thing-node__authoring-handle')).toBeNull();
     expect(within(drawn).getByRole('button', { name: /Open Thing/ })).toBeTruthy();
+    // The four sides are anchors here and nothing more. They render because an
+    // embedded Diagram draws Edges and an Edge attaches to an anchor (ADR 0087),
+    // and the Thing publishes that they are not affordances — which is what
+    // keeps the reveal in `styles.css` off them and what leaves no labelled
+    // control for a pointer to take hold of.
+    expect(drawn.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-authoring',
+      'false',
+    );
+    expect(within(drawn).queryByRole('button', { name: /^Connect (from|to) / })).toBeNull();
   });
 
   /**

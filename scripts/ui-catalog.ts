@@ -21,7 +21,7 @@ export interface UncataloguedComponent {
 /**
  * A class block `packages/app/src/styles.css` still declares, and the React Flow
  * or integration requirement that keeps it out of `@project/ui`. The block is the
- * BEM root — `rf-thing-node` covers `rf-thing-node__port` and `rf-thing-node--active`.
+ * BEM root — `rf-thing-node` covers `rf-thing-node__inner` and `rf-thing-node--active`.
  */
 export interface HandRolledStyle {
   readonly block: string;
@@ -641,7 +641,7 @@ const declaredNonClassSubjects = (css: string): ReadonlySet<string> =>
       .filter((subject) => subject !== ''),
   );
 
-/** The BEM root: `rf-thing-node` owns `rf-thing-node__port` and `--active` alike. */
+/** The BEM root: `rf-thing-node` owns `rf-thing-node__inner` and `--active` alike. */
 const blockOf = (className: string): string => className.split(/__|--/u)[0] ?? className;
 
 /**

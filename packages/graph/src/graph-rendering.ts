@@ -2,59 +2,45 @@ import type { ThingId, GraphEdge, GraphId } from '@project/core';
 import type { Space } from './space';
 
 /**
- * Derives the render surface's ports and connections from the authored Graphs.
+ * Derives the render surface's connections from the authored Graphs.
  *
- * The model: a thing that a Graph leaves gets one outbound port
- * (`<graphId>::out`, on the right), a thing a Graph arrives at gets one inbound
- * port (`<graphId>::in`, on the left), and each authored `{ from, to }` Edge
- * becomes a port-to-port connection belonging to that Graph. One port per Graph
- * per side, however many Edges use it — a fork leaves a thing by the same
- * outbound port twice.
+ * Each authored `{ from, to }` Edge becomes one connection belonging to its
+ * Graph, tagged so the render layer can colour it. This is what lets each Graph
+ * draw as its own coloured line across the canvas. It belongs to the
+ * **overview** — the view that draws every Graph at once (ADR 0021) — not to
+ * the domain.
  *
- * This is what lets each Graph render as its own colored line across the
- * canvas and drives the multiple-handles rendering. It belongs to the
- * **overview** — the view that draws every Graph at once and needs distinct
- * attachment points to stay legible (ADR 0021) — not to the domain.
+ * It named the two ports each Edge attached to until ADR 0087. A Thing carried
+ * an invisible `<graphId>::in` on its left and `<graphId>::out` on its right,
+ * one pair per Graph, because elkjs needed ports to route through; ADR 0045
+ * justified the *ids* separately, on React Flow's rule that same-kind handles be
+ * distinguishable. Four anchors named for their sides satisfy that just as well,
+ * and an Edge now attaches to whichever of them faces its neighbour — chosen
+ * while it is drawn, from where the two Things are at that moment, which is not
+ * something this derivation could answer.
  */
-
-export interface GraphRenderHandleRef {
-  /** Handle id, also the id an Edge names its two ends by. */
-  id: string;
-  graphId: GraphId;
-}
-
-export interface ThingHandleSet {
-  /** Outbound ports, drawn on the right. */
-  sourceHandles: GraphRenderHandleRef[];
-  /** Inbound ports, drawn on the left. */
-  targetHandles: GraphRenderHandleRef[];
-}
 
 /**
  * A Graph's Edge as the render graph draws it: the authored `{ from, to }`
- * (`@project/core`'s `GraphEdge`) resolved onto the ports it attaches to, and tagged with the Graph
- * it belongs to so the render layer can colour it. `buildLayoutStrategyGraph` narrows
- * this to a `LayoutStrategyEdge`, which is the same Edge without the Graph it is
- * tagged with — a strategy arranges the Things and answers no geometry for an
- * Edge at all (ADR 0086).
+ * (`@project/core`'s `GraphEdge`), tagged with the Graph it belongs to so the
+ * render layer can colour it. `buildLayoutStrategyGraph` narrows this to a
+ * `LayoutStrategyEdge`, which is the same Edge without the Graph it is tagged
+ * with — a strategy arranges the Things and answers no geometry for an Edge at
+ * all (ADR 0086), and where an Edge attaches is decided while it is drawn
+ * (ADR 0087).
  */
 export interface GraphRenderEdge {
   id: string;
   graphId: GraphId;
   source: ThingId;
   target: ThingId;
-  sourceHandle: string;
-  targetHandle: string;
 }
-
-export const outHandleId = (graphId: GraphId): string => `${graphId}::out`;
-export const inHandleId = (graphId: GraphId): string => `${graphId}::in`;
 
 /**
  * The render layer's id for one authored edge: the Graph and the two endpoints.
  *
- * Named and offered for the same reason `inHandleId` and `outHandleId` are — it
- * owns the format, and a second producer of it is the defect. A test that
+ * Named and offered because it owns the format, and a second producer of it is
+ * the defect. A test that
  * stands a projected Edge up by hand mints its id here rather than spelling the
  * separator out, so changing the format moves those fixtures with it instead of
  * leaving them green against a shape nothing mints any more. That is the
@@ -62,41 +48,6 @@ export const inHandleId = (graphId: GraphId): string => `${graphId}::in`;
  */
 export const graphRenderEdgeId = (graphId: GraphId, edge: GraphEdge): string =>
   `${graphId}::${edge.from}::${edge.to}`;
-
-/** Map each thing id to the in/out ports contributed by the graphs through it. */
-export function buildThingHandles(space: Space): Map<ThingId, ThingHandleSet> {
-  const map = new Map<ThingId, ThingHandleSet>();
-  const ensure = (thingId: ThingId): ThingHandleSet => {
-    let set = map.get(thingId);
-    if (!set) {
-      set = { sourceHandles: [], targetHandles: [] };
-      map.set(thingId, set);
-    }
-    return set;
-  };
-
-  // A thing gets an outbound port because an edge leaves it and an inbound one
-  // because an edge arrives — read off the edges directly rather than from a
-  // thing's position in a list, so a fork's several outgoing edges share one
-  // port and a graph's sinks get no outbound port because nothing leaves them.
-  for (const graph of space.graphs) {
-    for (const edge of graph.edges) {
-      const outId = outHandleId(graph.id);
-      const source = ensure(edge.from);
-      if (!source.sourceHandles.some((h) => h.id === outId)) {
-        source.sourceHandles.push({ id: outId, graphId: graph.id });
-      }
-
-      const inId = inHandleId(graph.id);
-      const target = ensure(edge.to);
-      if (!target.targetHandles.some((h) => h.id === inId)) {
-        target.targetHandles.push({ id: inId, graphId: graph.id });
-      }
-    }
-  }
-
-  return map;
-}
 
 /**
  * The distinct things the given graphs touch — graphs in the order supplied,
@@ -135,33 +86,8 @@ export function graphThingIds(space: Space, graphId: GraphId): ThingId[] {
   return thingIdsForGraphs(space, [graphId]);
 }
 
-/** Keep only the handles belonging to the given graphs. */
-export function filterHandlesByGraphs(
-  handlesByThing: ReadonlyMap<ThingId, ThingHandleSet>,
-  graphIds: readonly GraphId[],
-): Map<ThingId, ThingHandleSet> {
-  const wanted = new Set(graphIds);
-  const filtered = new Map<ThingId, ThingHandleSet>();
-  for (const [thingId, set] of handlesByThing) {
-    const sourceHandles = set.sourceHandles.filter((h) => wanted.has(h.graphId));
-    const targetHandles = set.targetHandles.filter((h) => wanted.has(h.graphId));
-    if (sourceHandles.length || targetHandles.length) {
-      filtered.set(thingId, { sourceHandles, targetHandles });
-    }
-  }
-  return filtered;
-}
-
-/** Keep only the handles belonging to a single graph. */
-export function filterHandlesByGraph(
-  handlesByThing: ReadonlyMap<ThingId, ThingHandleSet>,
-  graphId: GraphId,
-): Map<ThingId, ThingHandleSet> {
-  return filterHandlesByGraphs(handlesByThing, [graphId]);
-}
-
 /**
- * Resolve every graph's authored edges onto the ports they attach to.
+ * Every Graph's authored edges, as the render layer draws them.
  *
  * One edge in, one edge out: the graph already *is* its connections, so nothing
  * here derives them from an order.
@@ -178,8 +104,7 @@ export function filterHandlesByGraph(
  * which is how a completed reconnection ended up focused on a stale element
  * that put the replaced Edge back on the selection.
  *
- * The id is opaque to every consumer: nothing parses it, and the handle ids
- * (`<graphId>::out`/`::in`) are minted separately and unaffected.
+ * The id is opaque to every consumer: nothing parses it.
  *
  * **What holds the uniqueness up is `duplicate-graph-edge`**, not this function.
  * The position-keyed id was collision-proof by construction; this one leans on
@@ -200,8 +125,6 @@ export function buildGraphRenderEdges(space: Space): GraphRenderEdge[] {
         graphId: graph.id,
         source: edge.from,
         target: edge.to,
-        sourceHandle: outHandleId(graph.id),
-        targetHandle: inHandleId(graph.id),
       });
     }
   }
