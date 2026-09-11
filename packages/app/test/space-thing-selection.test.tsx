@@ -484,8 +484,10 @@ describe('an Open Space Thing', () => {
     // Exactly two, named: a third would be the retarget control this Thing is
     // not allowed to have, whatever it happened to be labelled.
     expect(choiceControls(thing)).toHaveLength(2);
-    expect(within(thing).getByRole('button', { name: 'Diagram: none' })).toBeInTheDocument();
-    expect(within(thing).getByRole('button', { name: 'Graph: none' })).toBeInTheDocument();
+    expect(
+      within(thing).getByRole('button', { name: 'Diagram: Collection 1' }),
+    ).toBeInTheDocument();
+    expect(within(thing).getByRole('button', { name: 'Graph: Overview' })).toBeInTheDocument();
     await settled(session);
   });
 });

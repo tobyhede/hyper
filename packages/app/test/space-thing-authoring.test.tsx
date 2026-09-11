@@ -374,16 +374,14 @@ async function openSpaceThing(title: string): Promise<void> {
 /**
  * Choose one row of an Open Space Thing's selector.
  *
- * Base UI's own list, driven the way the primitive expects: a keyboard press on
- * the trigger to open, then the full pointer sequence on the row, because a bare
- * `click` reaches the item before the pointer handlers that select it.
+ * The shared `ChoiceMenu` the Command Dock's Diagram and Graph lists are: a menu
+ * of radio rows behind the control that names what is chosen. Driven the way
+ * `packages/app/test/space-thing-selection.test.tsx` drives the same control —
+ * press the trigger, press the row.
  */
 function chooseSelection(testId: string, name: string): void {
-  fireEvent.keyDown(screen.getByTestId(testId), { key: 'ArrowDown' });
-  const option = screen.getByRole('option', { name });
-  fireEvent.pointerDown(option, { button: 0 });
-  fireEvent.pointerUp(option, { button: 0 });
-  fireEvent.click(option);
+  fireEvent.click(screen.getByTestId(testId));
+  fireEvent.click(screen.getByRole('menuitemradio', { name }));
 }
 
 /** Type a title and confirm, which is the whole of the pane's completion. */

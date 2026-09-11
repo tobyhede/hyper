@@ -58,8 +58,26 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   },
   things: [
     { id: META_THING_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
-    { id: META_TO_HOME_ID, document: { title: 'Home', kind: 'space', spaceId: HOME_ID } },
-    { id: META_TO_OTHER_ID, document: { title: 'Other', kind: 'space', spaceId: OTHER_ID } },
+    {
+      id: META_TO_HOME_ID,
+      document: {
+        title: 'Home',
+        kind: 'space',
+        spaceId: HOME_ID,
+        diagram: HOME_DIAGRAM_ID,
+        graph: HOME_GRAPH_ID,
+      },
+    },
+    {
+      id: META_TO_OTHER_ID,
+      document: {
+        title: 'Other',
+        kind: 'space',
+        spaceId: OTHER_ID,
+        diagram: OTHER_DIAGRAM_ID,
+        graph: OTHER_GRAPH_ID,
+      },
+    },
   ],
 });
 
