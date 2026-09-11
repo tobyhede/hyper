@@ -7,6 +7,7 @@ import {
   type ImportSpaceFile,
 } from '@project/core';
 import { documentRefusal, parseImportThingFile } from '@project/graph';
+import { compareOrdinal } from '../ordinal';
 
 type SpaceImportFileErrorKind = 'discovery' | 'parsing';
 
@@ -29,33 +30,19 @@ const resolveSpaceFile = async (inputPath: string): Promise<string> => {
     : absoluteInput;
 };
 
-/**
- * Order two relative paths by code unit, not by locale.
- *
- * `localeCompare` reads the host's collation, so the same space directory could
- * import its things in a different order on a different machine. Import order is
- * observable — it is the order things are inserted and the order a canonical
- * export will emit — so it has to come from the bytes alone.
- */
-const compareOrdinal = (left: string, right: string): number =>
-  left < right ? -1 : left > right ? 1 : 0;
-
 const markdownFilesIn = async (directory: string): Promise<string[]> =>
   (await readdir(directory, { withFileTypes: true }))
     .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
     .map((entry) => join(directory, entry.name));
 
-const isMissingFile = (error: unknown): boolean =>
+/**
+ * Shared with `read-aggregate`, which faces the same question about the same
+ * kind of value: both readers have to tell "this file is not there" from every
+ * other reason a read failed, and a second copy of the test is a second place
+ * for it to drift.
+ */
+export const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
-
-const isRegularFile = async (path: string): Promise<boolean> => {
-  try {
-    return (await stat(path)).isFile();
-  } catch (error) {
-    if (isMissingFile(error)) return false;
-    throw error;
-  }
-};
 
 const discoverThingFiles = async (spaceDirectory: string): Promise<string[]> => {
   const rootFiles = await markdownFilesIn(spaceDirectory);
@@ -170,73 +157,4 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   return importSpaceSchema.parse(
     id === undefined ? { document, things } : { id, document, things },
   );
-};
-
-export const readImportBatch = async (inputPath: string): Promise<readonly ImportSpace[]> => {
-  const absoluteInput = resolve(inputPath);
-  let input;
-  try {
-    input = await stat(absoluteInput);
-  } catch (error) {
-    throw new SpaceImportFileError('discovery', [String(error)]);
-  }
-
-  let containsSpace: boolean;
-  try {
-    containsSpace = input.isDirectory() && (await isRegularFile(join(absoluteInput, 'space.json')));
-  } catch (error) {
-    throw new SpaceImportFileError('discovery', [String(error)]);
-  }
-
-  if (!input.isDirectory() || containsSpace) {
-    return [await readSingleSpace(absoluteInput)];
-  }
-
-  let entries;
-  try {
-    entries = await readdir(absoluteInput, { withFileTypes: true });
-  } catch (error) {
-    throw new SpaceImportFileError('discovery', [String(error)]);
-  }
-
-  const childDirectories = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => join(absoluteInput, entry.name))
-    .sort((left, right) =>
-      compareOrdinal(relative(absoluteInput, left), relative(absoluteInput, right)),
-    );
-  let spaceDirectories;
-  try {
-    spaceDirectories = (
-      await Promise.all(
-        childDirectories.map(async (directory) => ({
-          directory,
-          containsSpace: await isRegularFile(join(directory, 'space.json')),
-        })),
-      )
-    ).filter((candidate) => candidate.containsSpace);
-  } catch (error) {
-    throw new SpaceImportFileError('discovery', [String(error)]);
-  }
-
-  const results = await Promise.allSettled(
-    spaceDirectories.map(({ directory }) => readSingleSpace(directory)),
-  );
-  // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
-  // `unknown` stops that `any` from propagating into `failures`.
-  const failures: unknown[] = results.flatMap((result) =>
-    result.status === 'rejected' ? [result.reason as unknown] : [],
-  );
-  if (failures.length > 0) {
-    const fileFailures = failures.filter(
-      (error): error is SpaceImportFileError => error instanceof SpaceImportFileError,
-    );
-    if (fileFailures.length !== failures.length) throw failures[0];
-    throw new SpaceImportFileError(
-      fileFailures.some(({ kind }) => kind === 'discovery') ? 'discovery' : 'parsing',
-      fileFailures.flatMap(({ diagnostics }) => diagnostics),
-    );
-  }
-
-  return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
 };

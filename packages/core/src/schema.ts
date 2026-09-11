@@ -375,6 +375,41 @@ export const spaceSnapshotSchema = z.object({
   things: z.array(z.object({ id: uuidSchema, document: thingDocumentSchema })),
 });
 
+/**
+ * The **first-public** aggregate file version.
+ *
+ * Its own constant rather than a second use of `SPACE_FILE_VERSION`, because
+ * the two version different documents: that one says what a space file holds,
+ * this one says what the directory around it holds. Both are `1` today and
+ * nothing holds them in step — a change to the space file's shape does not
+ * move the aggregate file's, and reusing one constant would make the next such
+ * change look like it did.
+ */
+export const AGGREGATE_FILE_VERSION = 1;
+
+/**
+ * `hyper.json` — the root of a canonical aggregate directory.
+ *
+ * It carries the one thing the directory cannot say for itself: which of its
+ * Spaces is Meta. No adapter may infer that from ordering, cardinality or
+ * topology (ADR 0078), and a directory is exactly where such an inference would
+ * be tempting — the first child, the alphabetically-least name — so the
+ * aggregate file states it outright, and a directory without one is not an aggregate.
+ *
+ * There is deliberately **no Space inventory** beside it. A Space is in the
+ * aggregate because its directory is there, exactly as a thing exists because
+ * its file does (ADR 0020); a list would be a second answer to the same
+ * question, and the two would disagree the first time someone deleted a
+ * directory.
+ *
+ * **Strict**, as every document schema here is: a stripped key is a question
+ * answered silently (ADR 0056).
+ */
+export const aggregateFileSchema = z.strictObject({
+  version: z.literal(AGGREGATE_FILE_VERSION),
+  metaSpaceId: uuidSchema,
+});
+
 export const importGraphSchema = graphSchema.extend({ id: uuidSchema.optional() });
 /**
  * A diagram being imported, with the ids the importer mints left out — its own

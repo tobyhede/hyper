@@ -1,5 +1,5 @@
-import { newUuid, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
-import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
+import type { UUID } from '@project/core';
+import { loadSpaceAggregate } from '@project/graph';
 import {
   AggregateInvariantError,
   type AggregateLoadResult,
@@ -11,10 +11,8 @@ import {
 } from '@project/persistence';
 import type {
   AggregateInput,
-  ImportMode,
   InitializeAggregateResult,
   ReplaceAggregateResult,
-  RepositoryImportResult,
   SpaceRepository,
 } from '../../src/persistence/space-repository';
 import { classifyInitializedAggregate } from '../../src/persistence/aggregate-lifecycle';
@@ -50,32 +48,6 @@ const loadedAggregate = (metaSpaceId: UUID, spaces: Iterable<LoadedSpace>): Load
   metaSpaceId,
   spaces: [...spaces].map(read).sort((left, right) => ascendingById(left.snapshot, right.snapshot)),
 });
-
-/**
- * A diagram's own id and the ids of the graphs it owns are minted in one pass,
- * because a graph is reached only through its owner now (ADR 0040) — there is no
- * space-level collection left to walk instead. `resolveImport` in
- * `PostgresSpaceRepository` mints the same way and for the same reason; the
- * shared contract holds the two to it.
- */
-const identifyImport = (input: ImportSpace): SpaceSnapshot => {
-  const { diagrams: importedDiagrams, ...document } = input.document;
-  const diagrams = importedDiagrams?.map(({ id, graphs, ...diagram }) => ({
-    ...diagram,
-    id: id ?? newUuid(),
-    graphs: graphs.map(({ id: graphId, ...graph }) => ({ ...graph, id: graphId ?? newUuid() })),
-  }));
-  return {
-    id: input.id ?? newUuid(),
-    // The document is carried through rather than rebuilt field by field, so a
-    // version this build does not read reaches domain intake and is rejected
-    // there. Rebuilding it stamped `version` with a constant, which quietly
-    // rewrote an unsupported document into a supported one — the one thing a
-    // double of an insert-only importer must not do.
-    document: diagrams === undefined ? { ...document } : { ...document, diagrams },
-    things: input.things.map(({ id, ...thing }) => ({ ...thing, id: id ?? newUuid() })),
-  };
-};
 
 /** Behavioral repository for server-side startup tests. */
 export class MemorySpaceRepository implements SpaceRepository {
@@ -330,123 +302,5 @@ export class MemorySpaceRepository implements SpaceRepository {
         change.kind === 'delete' ? [change.spaceId] : [],
       ),
     });
-  }
-
-  importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {
-    const identified = input.map(identifyImport);
-
-    // Batch identity is settled before any Space faces domain intake, because
-    // `PostgresSpaceRepository` settles it before its transaction opens:
-    // `parseImport` then `validateImportIdentities` run over the whole batch,
-    // and `loadSpaceSnapshot` runs per Space inside. A batch that is both
-    // duplicated and domain-invalid is therefore a `duplicate-identity` there
-    // whatever order it is in, and has to be one here.
-    //
-    // One deliberate difference of input, not of outcome: `duplicateIdentity`
-    // there reads the ids the caller *supplied* and skips every absent one,
-    // while this runs over the identified batch, after `identifyImport` has
-    // minted the missing ones. A minted id is a fresh `newUuid` and can collide
-    // with nothing, so the wider read rejects no batch of id-less Spaces the
-    // real backend would accept — where it, too, mints ids that cannot repeat.
-    const batchSpaceIds = new Set<UUID>();
-    // Two distinct facts, deliberately not merged. `batchThingIds` is what this
-    // batch already claims, and a repeat is `duplicate-identity`. `storedThingOwner`
-    // below is what survives the call, and claiming one of those is
-    // `thing-ownership` — a collision the real backend only meets on its thing
-    // writes, inside the transaction. Folding them together makes this double
-    // reject valid input under a code the real backend never returns for it.
-    const batchThingIds = new Set<UUID>();
-    for (const snapshot of identified) {
-      if (batchSpaceIds.has(snapshot.id)) {
-        return Promise.resolve({
-          kind: 'rejected',
-          code: 'duplicate-identity',
-          message: `Duplicate Space identity ${snapshot.id}`,
-        });
-      }
-      batchSpaceIds.add(snapshot.id);
-
-      for (const thing of snapshot.things) {
-        if (batchThingIds.has(thing.id)) {
-          return Promise.resolve({
-            kind: 'rejected',
-            code: 'duplicate-identity',
-            message: `Duplicate thing identity "${thing.id}"`,
-          });
-        }
-        batchThingIds.add(thing.id);
-      }
-    }
-
-    const storedThingOwner = new Map<UUID, UUID>();
-    if (mode === 'insert') {
-      for (const { snapshot } of this.#spaces.values()) {
-        for (const thing of snapshot.things) storedThingOwner.set(thing.id, snapshot.id);
-      }
-    }
-
-    // Then per Space in batch order, in the order the real transaction meets
-    // each fault: the row insert a stored Space identity rejects, then domain
-    // intake, then the thing writes a stored owner rejects.
-    const snapshots: SpaceSnapshot[] = [];
-    for (const identifiedSnapshot of identified) {
-      if (mode === 'insert' && this.#spaces.has(identifiedSnapshot.id)) {
-        return Promise.resolve({
-          kind: 'rejected',
-          code: 'duplicate-identity',
-          message: `Space ${identifiedSnapshot.id} already exists`,
-        });
-      }
-
-      const intake = loadSpaceSnapshot(identifiedSnapshot);
-      if (!intake.ok) {
-        return Promise.resolve({
-          kind: 'rejected',
-          code: 'invalid-snapshot',
-          message: intake.errors.map(({ message }) => message).join('\n'),
-        });
-      }
-
-      for (const thing of intake.snapshot.things) {
-        const owner = storedThingOwner.get(thing.id);
-        if (owner !== undefined && owner !== intake.snapshot.id) {
-          return Promise.resolve({
-            kind: 'rejected',
-            code: 'thing-ownership',
-            message: `Thing ${thing.id} belongs to space ${owner}`,
-          });
-        }
-      }
-      snapshots.push(intake.snapshot);
-    }
-
-    const stored = snapshots.map((snapshot): LoadedSpace => ({
-      snapshot: clone(snapshot),
-      revision: 0n,
-      exportedRevision: null,
-    }));
-    const candidateMetaSpaceId = stored[0]?.snapshot.id;
-    if (candidateMetaSpaceId !== undefined && (mode === 'truncate' || this.#spaces.size === 0)) {
-      const input = { metaSpaceId: candidateMetaSpaceId, spaces: snapshots };
-      const lifecycle =
-        this.#metaSpaceId === undefined
-          ? this.initializeAggregate(input)
-          : this.replaceAggregate(input, this.#metaSpaceId);
-      return lifecycle.then((result) => {
-        if (result.kind === 'initialized' || result.kind === 'replaced') {
-          return { kind: 'imported', spaces: stored.map(read) };
-        }
-        if (result.kind === 'aggregate-refused') {
-          return {
-            kind: 'rejected',
-            code: 'invalid-snapshot',
-            message: result.errors.map((error) => error.kind).join('\n'),
-          };
-        }
-        throw new Error(`Compatibility import reached unexpected lifecycle result ${result.kind}`);
-      });
-    }
-    for (const space of stored) this.#spaces.set(space.snapshot.id, clone(space));
-    return Promise.resolve({ kind: 'imported', spaces: stored.map(read) });
   }
 }

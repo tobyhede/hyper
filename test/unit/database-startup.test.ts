@@ -107,7 +107,13 @@ describe('openDatabaseSelection', () => {
     const remaining = storedSpace(0n);
     const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_THING_ID, 'Other space');
     const repository = new MemorySpaceRepository([remaining, selected], SPACE_ID);
-    await repository.importSpaces([remaining.snapshot], 'truncate');
+    // Not a lifecycle assertion — the Space is made to vanish after construction,
+    // which since ADR 0078 is `replaceAggregate` and no longer a mode on one door.
+    const replaced = await repository.replaceAggregate(
+      { metaSpaceId: SPACE_ID, spaces: [remaining.snapshot] },
+      SPACE_ID,
+    );
+    expect(replaced).toMatchObject({ kind: 'replaced' });
 
     await expect(openDatabaseSelection(repository, OTHER_SPACE_ID)).rejects.toThrow(OTHER_SPACE_ID);
     await expect(repository.listSpaces()).resolves.toEqual([

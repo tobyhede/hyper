@@ -141,8 +141,12 @@ An application-supplied collection of the Space's Things absent from the selecte
 _Avoid_: Space-Thing palette, Thing panel, drawer or Dock as the domain name.
 
 **Exporting**:
-Projecting a space into the repository-friendly form an author can review, commit and share. Exporting is not what makes an edit durable; it records the space outside Hyper at a chosen revision.
-_Avoid_: saving, publishing, syncing.
+Projecting the complete aggregate into the repository-friendly form an author can review, commit and share. The unit is every Space at once, rooted at the Meta Space, rather than one Space chosen from among them. Exporting is not what makes an edit durable; it records each Space outside Hyper at the revision it was read at.
+_Avoid_: saving, publishing, syncing; exporting a single Space.
+
+**Importing**:
+Taking a complete aggregate from outside Hyper and making it the stored one. It either establishes the aggregate of a repository that has none, or replaces the stored one outright — never both, and never partly. Importing does not merge, reconcile or add to what is stored, and it does not rewrite what it read.
+_Avoid_: loading, restoring, syncing; merging.
 
 **Opening**:
 Bringing a single Thing's content up **on the Thing itself**, by growing it where it already sits. A Markdown Thing opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias opens on its own Title and its immutable Target's content read-only, while the Target Thing must be opened explicitly to author that content. A Space Thing opens on the Diagram it selects. Opening is not presenting — the canvas it happens on is still what is being worked in — and Open Markdown content reads through the same renderer used while presenting.

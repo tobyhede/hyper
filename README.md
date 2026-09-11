@@ -85,6 +85,37 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
 
 "Manifest" is retired, as a word and as a type ([ADR 0010](docs/adr/0010-space-is-the-root-loaded-by-loadspace.md)): the top-level value is a **Space**, and it is minted only by `loadSpace`.
 
+### The aggregate directory
+
+One space directory is not what the `hyper` CLI imports or exports. The unit is the complete **aggregate** — every Space, rooted at the Meta Space — and on disk that is a directory holding a versioned `hyper.json` plus one child directory per Space, named for that Space's UUID:
+
+```
+my-aggregate/
+  hyper.json                                  { "version": 1, "metaSpaceId": "…0041" }
+  00000000-0000-4000-8000-000000000041/       the Meta Space
+    space.json
+    things/00000000-0000-4000-8000-000000000027.md
+  00000000-0000-4000-8000-000000000060/       an ordinary Space
+    space.json
+    things/…
+```
+
+`hyper.json` carries the one thing the directory cannot say for itself: **which Space is Meta**. No adapter infers that from ordering, cardinality or topology ([ADR 0078](docs/adr/0078-the-server-side-repository-owns-meta-lifecycle.md)), and a directory is exactly where such an inference would be tempting — the first child, the alphabetically-least name — so the aggregate file states it, and a directory without one is not an aggregate. There is deliberately no Space inventory beside it: a Space is in the aggregate because its directory is there, the same way a thing exists because its file does.
+
+Every Space Id is explicit, and the **directory name is where it is written**. A name that is not a UUID is refused rather than read around, because silently taking the id out of `space.json` instead would let a renamed directory pass as a fresh Space on the next round trip; where `space.json` also declares an `id`, the two must agree. The spelling has to be **canonical lower case**, not merely a parseable UUID: export writes lower case and nothing else, so an upper-cased name is a directory somebody renamed — import must not take a Space id from it, and obsolete-directory removal, which is recursive, must not mistake it for one a previous export wrote. Nested ids — thing, diagram, graph — may still be omitted by a hand-authored file and are minted on import, which is safe precisely because nothing already in the document can name a UUID the importer has just invented. A reference to an id nobody declared is left to dangle and refused by aggregate intake.
+
+Everything the reader does not look at survives a round trip: root files it ignores, and undiscovered contents inside a Space directory it keeps. What it does regenerate, it replaces — so a Thing deleted since the last export leaves no file behind, and a Space deleted since then loses its directory.
+
+```sh
+pnpm hyper export ./my-aggregate           # write the complete stored aggregate
+pnpm hyper ./my-aggregate                  # initialize an empty repository from it
+pnpm hyper ./my-aggregate --dangerous-truncate   # replace the stored aggregate outright
+```
+
+Two doors and no mode parameter on either. Without the flag, an already-initialized repository is left exactly as it is and the command says so; with it, the stored aggregate and its Meta identity are replaced atomically, authorized by the identity the repository just reported. There is no merge mode.
+
+The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to truncate, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `hyper` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
+
 ### Durable URLs and HTTP resources
 
 Every addressable entity has a durable product URL built from its UUID. Product URLs encode UUIDs as unpadded 22-character base64url values; titles never participate in identity. A URL may name an entity canonically or add the Diagram and Graph context needed to reopen the same canvas or Active Thing while Presenting:
@@ -149,7 +180,7 @@ Things, Diagrams and Graphs are parts of the Space aggregate, so they have produ
 | Key | Meaning |
 | --- | --- |
 | `version` | `1` is the first-public shape. Version 2 was the disposable pre-release one, which carried a space-level `graphs` array beside diagrams that owned none; Hyper is unreleased, so it is rejected by name rather than migrated ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)). |
-| `id`, `title` | What names the space. Every explicit id is a UUID; an import may omit ids for the persistence layer to allocate. The id is not the title and not the file name. |
+| `id`, `title` | What names the space. Every explicit id is a UUID; a hand-authored import may omit the nested ones for the importer to mint. Inside an aggregate directory the space's own id is the directory's name, and a declared `id` must agree with it. The id is not the title and not the file name. |
 | `diagrams` | Optional authored thing-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). A diagram's position keys **are** its thing membership: sparse relative to the space — it may omit things, but may not name one the space lacks. Each diagram owns a non-empty ordered `graphs` collection and may name which of them opens **active** (`activeGraph`; absent means the first it owns) — [ADR 0026](docs/adr/superseded/0026-a-route-is-active-and-the-layout-may-name-it.md). A space with no diagrams has no graphs, which is what a **new space** is: it renders and cannot be presented ([ADR 0015](docs/adr/0015-a-space-may-have-no-routes.md)). |
 | `diagrams[].graphs` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between things **of that diagram** ([ADR 0032](docs/adr/0032-routes-may-contain-cycles.md)). Forks, merges, disconnected components, cycles and self-edges are legal; an exact duplicate Edge within one Graph is not, and an endpoint naming a thing the owning diagram omits is a load error. A graph belongs to exactly one diagram, and there is no space-level collection beside them ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)); its id is nonetheless unique across the whole space, because a view drawing every graph flattened across diagrams keys colour and activation on that id alone ([ADR 0045](docs/adr/superseded/0045-a-view-takes-cards-and-graphs-and-returns-a-layout.md), superseded by [ADR 0079](docs/adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md)). The edge set may be empty. Graphs are a diagram's only connection structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges are derived from them. Where an edge attaches is not: a thing's four anchors are graph-independent, and the side is chosen at render ([ADR 0087](docs/adr/0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md)). |
 | `defaultDiagram` | The declared Diagram UUID the Space opens in. |
@@ -212,7 +243,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 ## Current limitations
 
 - **Thing authoring is intentionally narrow.** Markdown source, Titles and Alias Targets are editable, while visual editing, freehand drawing and whiteboard shapes are not built. Thing, placement and Edge edits commit through the HTTP persistence session: under `pnpm dev` they land in PostgreSQL and outlive the page, and under `pnpm dev:new` they survive a browser reload but not a server restart.
-- **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic version 1 space directory from the database and records the revision it projected.
+- **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic aggregate directory from the database and records the revision it projected for each Space.
 - **Overlay legibility.** The graph draws every Graph at once, at the positions the diagram authored. An edge runs backward whenever the author placed its target left of its source — which two graphs disagreeing about the order of things they share will force on one of them — and nothing routes an edge around a thing: every edge is the bezier React Flow draws, so a backward one curls back on itself. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Things are a fixed shape.** A thing draws its title, so every thing is the same size — declared once in `packages/app/src/thing.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the thing, not the reverse, which is why a measured DOM size never decides placement.
 - **Structural authoring is partial.** Dragging between spatial handles draws an Edge, and the first one mints and activates `Graph 1` ([ADR 0033](docs/adr/0033-route-authoring-uses-spatial-route-coloured-handles.md)). Option/Alt plus an empty drop atomically creates and connects a blank `Thing N`. There is no detached Thing creation, and deleting Things, Edges or Graphs is deliberately disabled until those operations can complete through the same persisted-Edit lifecycle. Broader Graph management is also unbuilt.

@@ -1,12 +1,7 @@
 import {
   thingDocumentSchema,
-  importSpaceSchema,
-  newUuid,
-  SPACE_FILE_VERSION,
   spaceDocumentSchema,
-  spaceSnapshotSchema,
   uuidSchema,
-  type ImportSpace,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -25,21 +20,16 @@ import { db } from '../prisma/db';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
 import type {
   AggregateInput,
-  ImportMode,
   InitializeAggregateResult,
   ReplaceAggregateResult,
-  RepositoryImportResult,
   SpaceRepository,
 } from './space-repository';
 
 type Orm = typeof db.orm;
 type JsonValue =
   null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
-type SpaceCreateInput = Parameters<Orm['public']['Space']['create']>[0];
 
 class SnapshotValidationError extends Error {}
-
-class DuplicateIdentityError extends Error {}
 
 class ThingOwnershipError extends Error {}
 
@@ -144,156 +134,6 @@ const parseSnapshot = (input: unknown): SpaceSnapshot => {
   }
 
   return intake.snapshot;
-};
-
-interface SchemaIssue {
-  readonly path: readonly PropertyKey[];
-  readonly message: string;
-}
-
-/**
- * Zod serializes its entire issue array into `Error.message`, and both callers
- * below hand that to `rejectInvalidSnapshot`, which puts it in the
- * `{ message: string }` error contract — a JSON document nested inside a field
- * the CLI prints and clients render as a sentence. `parseSnapshot` above already
- * throws located intake prose; these two were the last raw dumps on the import
- * path.
- *
- * The same answer `decodeSnapshot` gives in `@project/persistence`'s wire codec
- * (`packages/persistence/src/http-protocol.ts`): the first three failing paths
- * and their reasons, then a count of the rest. Restated here rather than shared,
- * because sharing it means exporting a string-formatting helper from a
- * browser-safe package for one server-side caller. What the two owe each other
- * is the behaviour — prose, not Zod — and that format is the whole of the debt,
- * so neither moves alone: one failure should not read one way at the CLI and
- * another on the wire. `postgres-import-decoding.test.ts` holds them to it.
- *
- * The fold to lower case is checked rather than incidental. Zod capitalises a
- * sentence that stands alone; here it is a clause after a path, so it reads as
- * one — but only while no message carries a word whose case is information.
- * None does: Zod 3 writes `Invalid uuid`, no reachable message echoes the input
- * back, and every literal `@project/core` declares is already lower case, so the
- * kinds a discriminator quotes survive intact. It costs exactly one thing, the
- * capital on the second sentence of that discriminator message. The test scans
- * real failures from both schemas for an acronym or a capitalised quoted
- * identifier, so the day Zod or a literal grows one, this stops being safe out
- * loud rather than quietly.
- *
- * `issues` is never empty. A failed `safeParse` goes through Zod's
- * `handleResult`, which throws `Validation failed but no issues detected.`
- * rather than returning a zero-issue error, so the summary always names a path
- * and `remaining` never counts below zero.
- */
-const describeSchemaFailure = (issues: readonly SchemaIssue[], label: string): string => {
-  const described = issues
-    .slice(0, 3)
-    .map((issue) => `${issue.path.join('.') || 'space'} ${issue.message.toLowerCase()}`)
-    .join('; ');
-  const remaining = issues.length - 3;
-  return `${label} is invalid: ${described}${remaining > 0 ? ` (and ${remaining} more)` : ''}`;
-};
-
-const parseSnapshotSchema = (input: unknown): SpaceSnapshot => {
-  const parsed = spaceSnapshotSchema.safeParse(input);
-  if (!parsed.success) {
-    throw new SnapshotValidationError(
-      describeSchemaFailure(parsed.error.issues, 'identified space'),
-    );
-  }
-  return parsed.data;
-};
-
-const parseImport = (input: unknown): ImportSpace => {
-  const parsed = importSpaceSchema.safeParse(input);
-  if (!parsed.success) {
-    throw new SnapshotValidationError(describeSchemaFailure(parsed.error.issues, 'import space'));
-  }
-  return parsed.data;
-};
-
-/**
- * The identities a batch may not repeat: space ids among spaces, thing ids among
- * things. Both are rows, so both must stay unique across the database.
- *
- * Per kind, and no wider. An earlier version pooled space, thing, graph and
- * diagram ids into one set spanning the whole batch, which rejected two things
- * the model allows (ADR 0030): a graph id reused in a second Space, and one UUID
- * naming entities of different kinds. It also made acceptance depend on how a
- * batch was split — importing two such Spaces separately succeeded while
- * importing them together failed, for identical stored results.
- *
- * Graph and diagram ids are absent here deliberately. They resolve only inside
- * the space document that carries them, and normal domain intake already rejects
- * duplicates of each kind within a Space (`duplicate-graph-id`,
- * `duplicate-diagram-id`). Checking them here would either duplicate that or
- * exceed it.
- */
-const duplicateIdentity = (
-  spaces: readonly ImportSpace[],
-): { readonly kind: string; readonly id: UUID } | undefined => {
-  const spaceIds = new Set<UUID>();
-  const thingIds = new Set<UUID>();
-
-  for (const space of spaces) {
-    if (space.id !== undefined) {
-      if (spaceIds.has(space.id)) return { kind: 'space', id: space.id };
-      spaceIds.add(space.id);
-    }
-    for (const { id } of space.things) {
-      if (id === undefined) continue;
-      if (thingIds.has(id)) return { kind: 'thing', id };
-      thingIds.add(id);
-    }
-  }
-
-  return undefined;
-};
-
-const rejectInvalidSnapshot = (error: SnapshotValidationError) => ({
-  kind: 'rejected' as const,
-  code: 'invalid-snapshot' as const,
-  message: error.message,
-});
-
-const validateImportIdentities = (spaces: readonly ImportSpace[]): void => {
-  const duplicate = duplicateIdentity(spaces);
-  if (duplicate !== undefined) {
-    throw new DuplicateIdentityError(`Duplicate ${duplicate.kind} identity "${duplicate.id}"`);
-  }
-};
-
-/**
- * Fill in every id the import input left out, producing the fully identified
- * aggregate that domain intake and the writes below both require.
- *
- * Ids are minted in process by `newUuid`. Only the space id comes from
- * PostgreSQL, and by the ordinary path: the `spaces.id` column default fires
- * when `Space.create` omits it, and the created row hands the value back as
- * `reservedSpaceId`. Graphs and diagrams are not rows at all — they live inside
- * the space document (ADR 0030) — so no column default can reach them, and
- * things are minted here too, so the whole snapshot can be validated before the
- * first thing is written.
- *
- * A diagram's id and the ids of the graphs it owns are minted in the **same
- * pass**, because under version 1 a graph is reached only through its owner
- * (ADR 0040): there is no space-level collection to walk beside the diagrams.
- * That the pass runs before `parseSnapshotSchema` and before the first thing write
- * is what keeps a rejection rolling the complete batch back.
- */
-const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot => {
-  const diagrams = input.document.diagrams?.map((diagram) => ({
-    ...diagram,
-    id: diagram.id ?? newUuid(),
-    graphs: diagram.graphs.map((graph) => ({ ...graph, id: graph.id ?? newUuid() })),
-  }));
-
-  const document = diagrams === undefined ? { ...input.document } : { ...input.document, diagrams };
-
-  return parseSnapshotSchema({
-    id: input.id ?? reservedSpaceId,
-    document,
-    things: input.things.map((thing) => ({ ...thing, id: thing.id ?? newUuid() })),
-  });
 };
 
 /**
@@ -628,10 +468,10 @@ const replaceAllSpaces = async (orm: Orm, input: AggregateInput): Promise<Loaded
  *
  * The singleton row is what `commit` and `loadAggregate` lock and read, and the
  * migration deliberately creates the table empty — a migration has no Space to
- * name. So the paths that first put a Space in the repository are what
- * establish it: `initializeAggregate` is the one that does so deliberately, and
- * the compatibility importer does so incidentally, the way
- * `MemorySpaceRepository` does.
+ * name. So a write path is what establishes it, and `initializeAggregate` is
+ * the only one: ADR 0078 leaves exactly two lifecycle doors, and the other,
+ * `replaceAggregate`, refuses a repository that has no Meta identity to
+ * replace. Nothing establishes it as a side effect of storing a Space.
  */
 export class PostgresSpaceRepository implements SpaceRepository {
   readonly #database: typeof db;
@@ -760,8 +600,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
       // consistent and the collision only exists in the stored rows the write
       // loop meets in request order. It is permanent, so it has to leave here
       // as a rejection: escaping instead becomes 503 `persistence-unavailable`,
-      // which the client retries forever. `importSpaces` answers the same
-      // error the same way.
+      // which the client retries forever.
       if (error instanceof ThingOwnershipError) {
         return { kind: 'rejected', code: 'invalid-commit', message: error.message };
       }
@@ -902,182 +741,5 @@ export class PostgresSpaceRepository implements SpaceRepository {
       }
       return { kind: 'committed', revisions, deletedSpaceIds };
     });
-  }
-
-  async importSpaces(
-    input: readonly ImportSpace[],
-    mode: ImportMode = 'insert',
-  ): Promise<RepositoryImportResult> {
-    let accepted: ImportSpace[];
-    try {
-      accepted = input.map(parseImport);
-      validateImportIdentities(accepted);
-    } catch (error) {
-      if (error instanceof SnapshotValidationError) {
-        return rejectInvalidSnapshot(error);
-      }
-      if (error instanceof DuplicateIdentityError) {
-        return {
-          kind: 'rejected',
-          code: 'duplicate-identity',
-          message: error.message,
-        };
-      }
-      throw error;
-    }
-
-    const resolved = accepted.map((item) => resolveImport(item, item.id ?? newUuid()));
-    for (const snapshot of resolved) {
-      const intake = loadSpaceSnapshot(snapshot);
-      if (!intake.ok) {
-        return {
-          kind: 'rejected',
-          code: 'invalid-snapshot',
-          message: intake.errors.map(({ message }) => message).join('\n'),
-        };
-      }
-    }
-    const currentMetaSpaceId = await this.#database.transaction(({ orm }) => lockMetaIdentity(orm));
-    if (mode === 'truncate' || currentMetaSpaceId === undefined) {
-      const metaSpaceId = resolved[0]?.id;
-      if (metaSpaceId === undefined) return { kind: 'imported', spaces: [] };
-      const aggregate = { metaSpaceId, spaces: resolved };
-      const lifecycle =
-        currentMetaSpaceId === undefined
-          ? await this.initializeAggregate(aggregate)
-          : await this.replaceAggregate(aggregate, currentMetaSpaceId);
-      if (lifecycle.kind === 'initialized' || lifecycle.kind === 'replaced') {
-        return { kind: 'imported', spaces: lifecycle.aggregate.spaces };
-      }
-      if (lifecycle.kind === 'aggregate-refused') {
-        return {
-          kind: 'rejected',
-          code: 'invalid-snapshot',
-          message: lifecycle.errors.map((error) => error.kind).join('\n'),
-        };
-      } else if (lifecycle.kind === 'existing' || lifecycle.kind === 'already-initialized') {
-        const duplicate = resolved.find((snapshot) =>
-          lifecycle.aggregate.spaces.some(({ snapshot: stored }) => stored.id === snapshot.id),
-        );
-        if (duplicate !== undefined) {
-          return {
-            kind: 'rejected',
-            code: 'duplicate-identity',
-            message: `Space ${duplicate.id} already exists`,
-          };
-        }
-        throw new Error(
-          `Compatibility import reached unexpected lifecycle result ${lifecycle.kind}`,
-        );
-      }
-      /*
-       * `conflict` and `uninitialized` mean the replacement rolled back, so the
-       * store still holds everything the truncate was to remove. Control that
-       * leaves this branch reaches the insert path below, writes the batch
-       * beside that data and answers `imported` — a truncate that became an
-       * insert, reported as a success.
-       *
-       * An ordinary edit is what reaches it. `commitTopologyPreservingUpdate`
-       * takes no Meta lock, so a single authored update commits while the
-       * replacement holds one, moves the revision the replacement read as its
-       * baseline, and turns it into a `conflict`.
-       *
-       * No rejection code names this and no caller can act on it, so it leaves
-       * as an error: the CLI reports a failed import and the operator runs the
-       * command again against a store the rollback left untouched.
-       */
-      throw new Error(`Truncating import could not replace the aggregate: ${lifecycle.kind}`);
-    }
-
-    try {
-      return await this.#database.transaction(async ({ orm }) => {
-        const imported: LoadedSpace[] = [];
-
-        for (const importInput of accepted) {
-          let space;
-          try {
-            // A placeholder document, replaced below once the space id it is
-            // being inserted to reserve is known. It carries no graph
-            // collection, because a space has none until a diagram exists to own
-            // one (ADR 0040) — under version 2 this was an empty space-level
-            // array, and there is no longer a key for it to be empty in.
-            const spaceCreateInput: SpaceCreateInput = {
-              document: toJsonValue({
-                version: SPACE_FILE_VERSION,
-                title: importInput.document.title,
-              }),
-              revision: 0,
-            };
-            if (importInput.id !== undefined) spaceCreateInput.id = importInput.id;
-            space = await orm.public.Space.create(spaceCreateInput);
-          } catch (error) {
-            // An explicit id that collides is an identity rejection, never a
-            // revision conflict: insert-only import compares no revisions, so
-            // there is nothing to disagree about — the id is simply taken.
-            //
-            // Deliberately classified off the violation rather than off a
-            // preceding existence check. Under READ COMMITTED a check would see
-            // a rival's row only if that rival had already committed, so
-            // "existed before I began" versus "created while I ran" would be
-            // decided by commit timing, giving identical inputs different
-            // outcomes. Both are the same fact, so draw no line between them.
-            if (isSpacePrimaryKeyConflict(error)) {
-              if (importInput.id === undefined) throw error;
-              throw new DuplicateIdentityError(`Space ${importInput.id} already exists`);
-            }
-            throw error;
-          }
-
-          const reservedSpaceId = uuidSchema.parse(space.id);
-          const snapshot = resolveImport(importInput, reservedSpaceId);
-          const intake = loadSpaceSnapshot(snapshot);
-          if (!intake.ok) {
-            throw new SnapshotValidationError(
-              intake.errors.map(({ message }) => message).join('\n'),
-            );
-          }
-
-          space = await orm.public.Space.where({ id: snapshot.id })
-            .where({ revision: 0 })
-            .update({ document: toJsonValue(snapshot.document) });
-          if (space === null) {
-            throw new Error(`Newly inserted space ${snapshot.id} disappeared during import`);
-          }
-
-          await importThings(orm, snapshot);
-
-          // The only read that runs inside a transaction, and it reads rows this
-          // transaction has just written and not yet committed. That is exactly
-          // what a transaction sees of its own work, and the aggregate is still
-          // one statement here.
-          const stored = await loadSpaceAggregate(orm, snapshot.id);
-          if (stored === undefined) {
-            throw new Error(`Space ${snapshot.id} disappeared during import`);
-          }
-          imported.push(stored);
-        }
-
-        return { kind: 'imported', spaces: imported };
-      });
-    } catch (error) {
-      if (error instanceof DuplicateIdentityError) {
-        return {
-          kind: 'rejected',
-          code: 'duplicate-identity',
-          message: error.message,
-        };
-      }
-      if (error instanceof ThingOwnershipError) {
-        return {
-          kind: 'rejected',
-          code: 'thing-ownership',
-          message: error.message,
-        };
-      }
-      if (error instanceof SnapshotValidationError) {
-        return rejectInvalidSnapshot(error);
-      }
-      throw error;
-    }
   }
 }

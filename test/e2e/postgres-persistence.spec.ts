@@ -1,7 +1,12 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { encodeCompactUuid, newUuid, type UUID } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
+import { exportAggregate } from '../../src/export/export-aggregate';
+import { AGGREGATE_FILE_NAME } from '../../src/import/read-aggregate';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
 import { clearHyperContent } from '../support/clear-hyper-content';
@@ -36,7 +41,7 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
   }
 };
 
-const openImportedSpace = async (
+const openStoredSpace = async (
   browser: Browser,
   baseURL: string,
   spaceId: UUID,
@@ -71,49 +76,70 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
   let secondHost: ViteDevServer | undefined;
   let firstContext: BrowserContext | undefined;
   let secondContext: BrowserContext | undefined;
+  let exportDirectory: string | undefined;
   let spaceRemains: boolean | undefined;
 
   try {
+    // Before the fixture, not only after it. `initializeAggregate` establishes
+    // first state and leaves an initialized repository exactly as it is (ADR
+    // 0078), so on a developer's database that already holds a Meta Space it
+    // would answer `already-initialized` and write nothing — and the drag below
+    // would then be looking for a Thing that was never stored. The old
+    // `importSpaces` hid that by falling through to an insert; there is no such
+    // door now, so the empty repository this test needs has to be arranged
+    // rather than assumed. Safe for the same reason the cleanup below is:
+    // `workers: 1` and one test, so nothing else holds this `DATABASE_URL`.
+    await clearHyperContent();
+
     // The Diagram is part of the fixture, and has to be. A diagramless Space is
     // initialized on its first working load (ADR 0079), and that initialization
     // mints an *empty* Diagram — `positions: {}` in `working-space.ts`. The
-    // imported Thing would then belong to the Space and to no Diagram, so the
+    // fixture's Thing would then belong to the Space and to no Diagram, so the
     // canvas would draw nothing and `nodeByTitle` below would wait out the
     // timeout with the Thing sitting in the Things list. Placing the Thing here
     // also keeps this test about durability alone: initialization is a write,
     // and an unasked-for write is one more thing between the drag and the
     // revision this asserts.
-    const imported = await repository.importSpaces([
-      {
-        id: spaceId,
-        document: {
-          version: 1,
-          title,
-          diagrams: [
+    //
+    // This Space is Meta, and says so rather than being inferred to be. A
+    // one-Space aggregate has nowhere else for the root to be, but naming it is
+    // what the lifecycle takes (ADR 0078) — array position no longer decides.
+    const initialized = await repository.initializeAggregate({
+      metaSpaceId: spaceId,
+      spaces: [
+        {
+          id: spaceId,
+          document: {
+            version: 1,
+            title,
+            diagrams: [
+              {
+                id: diagramId,
+                title: 'Diagram 1',
+                kind: 'positioned',
+                positions: { [thingId]: { x: 0, y: 0, open: false } },
+                graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
+                activeGraph: graphId,
+              },
+            ],
+            defaultDiagram: diagramId,
+          },
+          things: [
             {
-              id: diagramId,
-              title: 'Diagram 1',
-              kind: 'positioned',
-              positions: { [thingId]: { x: 0, y: 0, open: false } },
-              graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
-              activeGraph: graphId,
+              id: thingId,
+              document: { title: 'Restart thing', kind: 'markdown', body: 'Durable.' },
             },
           ],
-          defaultDiagram: diagramId,
         },
-        things: [
-          {
-            id: thingId,
-            document: { title: 'Restart thing', kind: 'markdown', body: 'Durable.' },
-          },
-        ],
-      },
-    ]);
-    if (imported.kind !== 'imported') throw new Error(imported.message);
+      ],
+    });
+    if (initialized.kind !== 'initialized') {
+      throw new Error(`The fixture aggregate was not established: ${initialized.kind}`);
+    }
 
     const first = await startHost();
     firstHost = first.server;
-    const openedFirst = await openImportedSpace(browser, first.baseURL, spaceId, title);
+    const openedFirst = await openStoredSpace(browser, first.baseURL, spaceId, title);
     firstContext = openedFirst.context;
     const thing = nodeByTitle(openedFirst.page, 'Restart thing');
     await settled(openedFirst.page);
@@ -134,7 +160,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
 
     const second = await startHost();
     secondHost = second.server;
-    const openedSecond = await openImportedSpace(browser, second.baseURL, spaceId, title);
+    const openedSecond = await openStoredSpace(browser, second.baseURL, spaceId, title);
     secondContext = openedSecond.context;
     const reloaded = nodeByTitle(openedSecond.page, 'Restart thing');
     await expect(reloaded).toBeVisible();
@@ -144,24 +170,55 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
       'data-revision',
       '1',
     );
+
+    // Durability is only half of what the aggregate owes; the other half is
+    // that it can leave again, at the revision the drag actually reached. An
+    // export taken at revision 0 would still write a directory that reads back
+    // and still record *something*, so the assertion that matters is the
+    // projected revision: `markExported` runs after the bytes land, and 1n is
+    // what says it recorded the edit rather than the fixture.
+    exportDirectory = await mkdtemp(join(tmpdir(), 'hyper-postgres-e2e-export-'));
+    const exported = await exportAggregate(repository, exportDirectory);
+    expect(exported.kind).toBe('exported');
+    const aggregateFile: unknown = JSON.parse(
+      await readFile(join(exportDirectory, AGGREGATE_FILE_NAME), 'utf8'),
+    );
+    expect(aggregateFile).toEqual({ version: 1, metaSpaceId: spaceId });
+    // The Space directory is named for the Space, which is where an aggregate
+    // writes every Space Id down (ADR 0078) — so its presence under this name
+    // is the check, not a search for a file called `space.json` somewhere.
+    const spaceFile: unknown = JSON.parse(
+      await readFile(join(exportDirectory, spaceId, 'space.json'), 'utf8'),
+    );
+    expect(spaceFile).toMatchObject({ id: spaceId, title });
+    await expect(repository.loadSpace(spaceId)).resolves.toMatchObject({
+      revision: 1n,
+      exportedRevision: 1n,
+    });
   } finally {
     await secondContext?.close();
     await firstContext?.close();
     await secondHost?.close();
     await firstHost?.close();
+    if (exportDirectory !== undefined) {
+      await rm(exportDirectory, { recursive: true, force: true });
+    }
     // Cleanup records what it observed rather than asserting it. An assertion
     // here throws over whatever failure sent us into this block, and would also
     // strand the connection below unclosed.
     try {
-      // Not a per-Space delete, because on a fresh database this Space *is* the
-      // Meta Space: `importSpaces` takes the `initializeAggregate` branch when no
-      // Meta identity is stored, and makes the first Space imported the Meta one.
-      // `repository_state_meta_space_id_fkey` is `Restrict`, so deleting it then
-      // fails — which the integration suite asserts on purpose, in *prevents
-      // direct deletion of the Meta Space while repository state names it*. That
-      // is also why this passes on a developer's database and failed in CI: a
-      // database that already holds a Meta Space takes the ordinary insert branch
-      // and the old cleanup had nothing to trip over.
+      // Not a per-Space delete, because this Space *is* the Meta Space: the
+      // fixture above names it as the root of the aggregate it establishes.
+      // `repository_state_meta_space_id_fkey` is `Restrict`, so deleting the
+      // Space row while repository state still names it fails — which the
+      // integration suite asserts on purpose, in *prevents direct deletion of
+      // the Meta Space while repository state names it*.
+      //
+      // There is no longer a second branch to fall into. The old cleanup could
+      // pass on a developer's database and fail in CI because `importSpaces`
+      // established Meta only when the repository was empty and otherwise
+      // inserted beside whatever was there; the reset now runs before the
+      // fixture as well as after it, so this Space is Meta on every machine.
       //
       // `clearHyperContent` drops the repository-state row first, which is what
       // releases the key, and it is the same reset the integration suite runs.

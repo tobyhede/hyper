@@ -93,7 +93,7 @@
       // docstring for why the duplication would be worse than the exception).
       "files": [
         "packages/core/test/thing-document-equality.test.ts",
-        "test/unit/postgres-import-decoding.test.ts"
+        "test/unit/import-decoding.test.ts"
       ],
       "rules": {
         "anti-slop/no-shape-in-symbol-names": "off"
@@ -136,13 +136,13 @@
       // export's cleanup-after-partial-failure paths are reachable at all —
       // real disk-full/permission-denied conditions aren't practically
       // triggerable in a test. Unlike the Base UI/React Flow boundary above,
-      // a real fix exists in principle: give `exportSpace` an injected
+      // a real fix exists in principle: give `exportAggregate` an injected
       // filesystem seam (ADR 0016's composition-time pattern) so this test
       // could supply a faithful in-memory implementation that fails on
       // command. That is a production-code change this bounded, zero-prod-risk
       // phase deliberately does not make — left for whoever next touches
-      // `src/export/export-space.ts`.
-      "files": ["test/unit/export-space-recovery.test.ts"],
+      // `src/export/export-aggregate.ts`.
+      "files": ["test/unit/export-aggregate-recovery.test.ts"],
       "rules": {
         "anti-slop/no-module-mocking": "off"
       }
@@ -280,7 +280,7 @@
         "test/unit/raw-http-request.test.ts",
         "test/unit/vite-hono-host.test.ts",
         "test/unit/vite-space-http-plugin.test.ts",
-        "test/unit/export-space-recovery.test.ts"
+        "test/unit/export-aggregate-recovery.test.ts"
       ],
       "rules": {
         "anti-slop/no-runtime-typeof": "off"
@@ -399,7 +399,7 @@
       // Each of these three test files builds a deliberately raw or
       // deliberately invalid value and hands it straight to a real intake or
       // schema this repo already trusts to parse it — `loadSpace` (the one
-      // intake, ADR 0010), `importSpaces` or `decodeCommitRequest` —
+      // intake, ADR 0010), a Zod schema or `decodeCommitRequest` —
       // specifically to exercise their refusal paths: the same "deliberately
       // loosely-typed fixture, so the real runtime validation is what's under
       // test" case as issue 04/05's `spaceWith` exception. There is nothing to
@@ -407,7 +407,7 @@
       "files": [
         "packages/core/test/persistence-schema.test.ts",
         "packages/react-flow-adapter/test/projection.test.ts",
-        "test/unit/postgres-import-decoding.test.ts"
+        "test/unit/import-decoding.test.ts"
       ],
       "rules": {
         "anti-slop/no-unknown-parameters": "off"

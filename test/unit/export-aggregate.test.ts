@@ -1,11 +1,11 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
-import { exportSpace } from '../../src/export/export-space';
-import { readSingleSpace } from '../../src/import/read-single-space';
+import { exportAggregate } from '../../src/export/export-aggregate';
+import { captureError } from '../support/capture-error';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
@@ -18,8 +18,19 @@ const ECHO_DIAGRAM_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000021')
 const LONG_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000030');
 const SHORT_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000031');
 const ECHO_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000032');
+/**
+ * A UUID-shaped directory name in upper case. Canonical export writes a Space's
+ * id in lower case and nothing else, so no export can have written this one.
+ */
+const UPPER_CASE_NAME = 'B0000000-0000-4000-8000-0000000000FF';
 
 /**
+ * What one Space's bytes look like is this file's whole subject, so every
+ * aggregate below holds exactly one Space and that Space is Meta. The aggregate
+ * shapes — the aggregate file, several Space directories, converging Space Things —
+ * belong to `aggregate-round-trip.test.ts`, which owns the round trip; a second
+ * Space here would only make the canonical form harder to read off the page.
+ *
  * Two Diagrams owning three Graphs between them, which is the only shape that
  * exercises what version 1 moved: a Graph reached through its owner rather than
  * through a Space-level array. The second Diagram's Graph shares no Thing with the
@@ -87,6 +98,19 @@ const makeTemporaryDirectory = async (): Promise<string> => {
   return directory;
 };
 
+/**
+ * Export, insisting the aggregate was there to export. `uninitialized` is a real
+ * answer rather than a failure, so a test that means to write bytes has to say
+ * which answer it expected or read an empty destination and blame the exporter.
+ */
+const exportTo = async (repository: MemorySpaceRepository, destination: string): Promise<void> => {
+  const result = await exportAggregate(repository, destination);
+  if (result.kind !== 'exported') throw new Error(`Export answered ${result.kind}`);
+};
+
+/** The Space's own directory under the aggregate root, named by its id. */
+const spaceFileIn = (destination: string): string => join(destination, SPACE_ID, 'space.json');
+
 afterEach(async () => {
   for (const directory of temporaryDirectories) {
     await rm(directory, { recursive: true, force: true });
@@ -99,9 +123,9 @@ describe('canonical export', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
-    await exportSpace(repository, SPACE_ID, destination);
+    await exportTo(repository, destination);
 
-    const written: unknown = JSON.parse(await readFile(join(destination, 'space.json'), 'utf8'));
+    const written: unknown = JSON.parse(await readFile(spaceFileIn(destination), 'utf8'));
     expect(written).toEqual({
       version: 1,
       id: SPACE_ID,
@@ -209,16 +233,16 @@ describe('canonical export', () => {
     const first = join(await makeTemporaryDirectory(), 'exported');
     const second = join(await makeTemporaryDirectory(), 'exported');
 
-    await exportSpace(new MemorySpaceRepository([storedSpace], SPACE_ID), SPACE_ID, first);
-    await exportSpace(new MemorySpaceRepository([shuffledStoredSpace], SPACE_ID), SPACE_ID, second);
+    await exportTo(new MemorySpaceRepository([storedSpace], SPACE_ID), first);
+    await exportTo(new MemorySpaceRepository([shuffledStoredSpace], SPACE_ID), second);
 
-    await expect(readFile(join(first, 'space.json'), 'utf8')).resolves.toBe(
-      await readFile(join(second, 'space.json'), 'utf8'),
+    await expect(readFile(spaceFileIn(first), 'utf8')).resolves.toBe(
+      await readFile(spaceFileIn(second), 'utf8'),
     );
     for (const thingId of [THING_A, THING_B, THING_E, THING_F]) {
-      await expect(readFile(join(first, 'things', `${thingId}.md`), 'utf8')).resolves.toBe(
-        await readFile(join(second, 'things', `${thingId}.md`), 'utf8'),
-      );
+      await expect(
+        readFile(join(first, SPACE_ID, 'things', `${thingId}.md`), 'utf8'),
+      ).resolves.toBe(await readFile(join(second, SPACE_ID, 'things', `${thingId}.md`), 'utf8'));
     }
   });
 
@@ -269,9 +293,9 @@ describe('canonical export', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpaceWithOpenSizes], SPACE_ID);
 
-    await exportSpace(repository, SPACE_ID, destination);
+    await exportTo(repository, destination);
 
-    const written = await readFile(join(destination, 'space.json'), 'utf8');
+    const written = await readFile(spaceFileIn(destination), 'utf8');
     // Positions export sorted by Thing id, so the Open Thing's rect is first and
     // the Closed Thing's remembered rect second.
     expect(exportedOpenSizeKeys(written)).toEqual([
@@ -297,37 +321,110 @@ describe('canonical export', () => {
     });
   });
 
-  /**
-   * Separate from the ordering above: this is the staged, validated replacement
-   * running over a destination it has already written, which is the path an
-   * author actually repeats.
+  /*
+   * Staging is a copy of the destination, and verification re-reads the staged
+   * copy through the ordinary import reader — which refuses a Space directory
+   * whose name is not its Space's id. So a directory the author put there would
+   * fail every export from that moment on, and the path the diagnostic names
+   * lives inside a staging root deleted before the operator can read it.
+   *
+   * The destination is checked first, and by the path that is really there.
    */
-  it('re-exports over its own output without changing a byte', async () => {
-    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
-    const destination = join(await makeTemporaryDirectory(), 'exported');
+  it('refuses a destination holding a Space directory import could not read back', async () => {
+    const root = await makeTemporaryDirectory();
+    const destination = join(root, 'exported');
+    const drafts = join(destination, 'drafts');
+    await mkdir(drafts, { recursive: true });
+    await writeFile(join(drafts, 'space.json'), '{ "version": 1, "title": "Drafts" }\n');
 
-    await exportSpace(repository, SPACE_ID, destination);
-    const afterFirst = await readFile(join(destination, 'space.json'), 'utf8');
-    await exportSpace(repository, SPACE_ID, destination);
+    const thrown = await captureError(() =>
+      exportAggregate(new MemorySpaceRepository([storedSpace], SPACE_ID), destination),
+    );
 
-    await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(afterFirst);
+    expect(thrown?.message).toContain(drafts);
+    expect(thrown?.message).not.toContain('hyper-export-');
+    // Nothing was staged beside the destination and nothing was written into it.
+    await expect(readdir(root)).resolves.toEqual(['exported']);
+    await expect(readdir(destination)).resolves.toEqual(['drafts']);
   });
 
-  it('exports a directory that imports back as the Space it came from', async () => {
+  /*
+   * `z.string().uuid()` is case insensitive, so an upper-cased UUID name parses
+   * — and obsolete-directory removal is recursive. Canonical export only ever
+   * writes lower case, so such a directory is the author's, and the rule that
+   * justifies removing it ("a previous export wrote this") does not hold.
+   */
+  it('leaves a UUID-shaped directory no export could have written', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    await exportTo(repository, destination);
+    const authored = join(destination, UPPER_CASE_NAME);
+    await mkdir(authored);
+    await writeFile(join(authored, 'notes.md'), '# Notes\n');
 
-    await exportSpace(repository, SPACE_ID, destination);
+    await exportTo(repository, destination);
 
-    await expect(readSingleSpace(destination)).resolves.toEqual({
-      id: SPACE_ID,
-      document: storedSpace.snapshot.document,
-      things: [
-        { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-        { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
-        { id: THING_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
-        { id: THING_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
-      ],
-    });
+    await expect(readFile(join(authored, 'notes.md'), 'utf8')).resolves.toBe('# Notes\n');
+  });
+
+  /**
+   * An uninitialized repository has no Meta Space, so there is no aggregate to
+   * write and no directory whose absence would be a defect — the answer is a
+   * kind rather than a thrown error, because "nothing has been created yet" is
+   * a state the command reports rather than a failure it recovers from.
+   *
+   * The parent directory is what proves nothing was written, not the
+   * destination: the staging root is minted *beside* the destination, so an
+   * exporter that started work and then noticed would leave a sibling behind
+   * where a check on the destination alone would still pass.
+   */
+  /*
+   * Staged verification is the last thing standing between a serialization
+   * defect and a destination that cannot be imported, and the only way it can
+   * fail is one: `loadAggregate` has already validated, so a refusal here means
+   * the canonical bytes say something the stored aggregate did not.
+   *
+   * Which makes the identities inside the refusal the whole of its value — the
+   * operator has to find the Space or Thing the serializer mangled. Rendering
+   * `error.kind` alone reduced that to one word, which is exactly the loss
+   * `src/cli/aggregate-refusal.ts` was added in the same change to prevent.
+   *
+   * `loadAggregate` is stubbed because a valid repository cannot reach here; the
+   * refusal has to come from the staged bytes disagreeing with Meta rooting.
+   */
+  it('names the Space in a refusal raised by verifying the staged aggregate', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    const orphan = uuidSchema.parse('c0000000-0000-4000-8000-0000000000aa');
+    repository.loadAggregate = () =>
+      Promise.resolve({
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: SPACE_ID,
+          spaces: [
+            storedSpace,
+            {
+              snapshot: { id: orphan, document: { version: 1, title: 'Orphan' }, things: [] },
+              revision: 0n,
+              exportedRevision: null,
+            },
+          ],
+        },
+      });
+
+    const thrown = await captureError(() => exportAggregate(repository, destination));
+
+    expect(thrown?.message).toContain(orphan);
+    expect(thrown?.message).toContain('no Space Thing points at it');
+  });
+
+  it('writes nothing and answers uninitialized when the repository holds no aggregate', async () => {
+    const root = await makeTemporaryDirectory();
+
+    await expect(
+      exportAggregate(new MemorySpaceRepository(), join(root, 'exported')),
+    ).resolves.toEqual({ kind: 'uninitialized' });
+
+    await expect(readdir(root)).resolves.toEqual([]);
   });
 });
