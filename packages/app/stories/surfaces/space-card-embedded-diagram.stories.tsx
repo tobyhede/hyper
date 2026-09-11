@@ -1,17 +1,7 @@
-import { useEffect, useState } from 'react';
 import type { Story } from '@ladle/react';
-import {
-  newUuid,
-  spaceSnapshotSchema,
-  uuidSchema,
-  type SpaceSnapshot,
-  type UUID,
-} from '@project/core';
-import { MemorySpaceBackend } from '@project/persistence';
-import { productDestinationPath } from '@project/http';
-import { StatusFailure } from '@project/ui';
-import { createOpenSpaces, type OpenSpace } from '#src/open-spaces';
-import { OpenSpacesApplication } from '#components/OpenSpacesApplication';
+import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { Application } from '#components/Application';
+import { storyOpening, storySpaces } from '../support/application';
 
 export default { title: 'Surfaces/Space Card Embedded Diagram' };
 
@@ -116,53 +106,11 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-function EmbeddedDiagramCanvas() {
-  const [spaces] = useState(() => {
-    const backend = new MemorySpaceBackend(
-      HOME_ID,
-      [home, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
-    );
-    const location = { pathname: productDestinationPath({ kind: 'space', spaceId: HOME_ID }) };
-    return createOpenSpaces({
-      backend,
-      metaSpaceId: HOME_ID,
-      newId: newUuid,
-      history: {
-        pathname: () => location.pathname,
-        href: () => `https://example.test${location.pathname}`,
-        push: (pathname) => {
-          location.pathname = pathname;
-        },
-        replace: (pathname) => {
-          location.pathname = pathname;
-        },
-        onPopState: () => () => undefined,
-      },
-    });
-  });
-  const [initial, setInitial] = useState<OpenSpace | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
-  useEffect(() => {
-    const lifetime = { mounted: true };
-    void (async () => {
-      try {
-        const opened = await spaces.open(HOME_ID);
-        if (lifetime.mounted) setInitial(opened);
-      } catch (error) {
-        if (lifetime.mounted) setFailure(error instanceof Error ? error.message : String(error));
-      }
-    })();
-    return () => {
-      lifetime.mounted = false;
-    };
-  }, [spaces]);
-  if (failure !== null)
-    return (
-      <StatusFailure title="Space could not be opened" detailLabel="Details" detail={failure} />
-    );
-  return initial === null ? null : <OpenSpacesApplication spaces={spaces} initial={initial} />;
-}
+const openEmbeddedDiagram = async () => {
+  const spaces = storySpaces(HOME_ID, [home, target]);
+  return storyOpening(spaces, await spaces.open(HOME_ID));
+};
 
-/** The production multi-Space composition, including editing and persistence recovery. */
-export const SelectedDiagram: Story = () => <EmbeddedDiagramCanvas />;
+/** The production application host over an isolated multi-Space repository. */
+export const SelectedDiagram: Story = () => <Application resolve={openEmbeddedDiagram} />;
 SelectedDiagram.meta = { iframed: true };

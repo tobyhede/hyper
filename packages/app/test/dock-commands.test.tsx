@@ -1,15 +1,28 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { newUuid } from '@project/core';
+import { Application } from '../src/components/Application';
+import { MemorySpaceBackendTestControl } from '@project/persistence';
+import { storyOpening, storySpaces } from '../stories/support/application';
+import type { OpenSpace } from '../src/open-spaces';
+import {
+  metaSnapshot,
+  commandDockSnapshot,
+  platformSnapshot,
+  designSystemSnapshot,
+  traversalSnapshot,
+  authoredSnapshot,
+  deepDiveSnapshot,
+} from '../stories/support/spaces';
 import { Default, SaveFailedElsewhere } from '../stories/space/command-dock.stories';
-import { CommandDockFixture, useCommandDockChrome } from '../stories/support/CommandDockFixture';
+
 // The shared reading of "unavailable": ADR 0073 keeps a toolbar item focusable
 // while it is withdrawn, so `aria-disabled` is the attribute and `toBeDisabled`
 // would call every one of them available.
 import { unavailable } from './command-dock';
 
 /**
- * What the Command Dock owes an author, held over the prototype that draws it.
+ * What the Command Dock owes an author, held over the application the catalogue mounts.
  *
  * Three of ADR 0082's obligations and one of ADR 0073's are assertable without
  * a browser, and each of them is a claim the prototype failed before this file
@@ -22,6 +35,16 @@ import { unavailable } from './command-dock';
  * canvas and the Dock over it — and a second assembly beside it would be a
  * surface this file could get right while the catalogue's stayed wrong.
  */
+
+async function renderDock(view: ReactElement): Promise<void> {
+  await act(() => {
+    render(view);
+    return Promise.resolve();
+  });
+  await waitFor(() =>
+    expect(within(dock()).getByRole('button', { name: /^Rename Diagram:/ })).toBeInTheDocument(),
+  );
+}
 
 /** jsdom ships none, and React Flow observes its own container. */
 beforeAll(() => {
@@ -108,8 +131,8 @@ describe('placing a Card into a Diagram without a pointer (ADR 0082)', () => {
    * an HTML5 drag was the only way to add a Card to the Diagram. ADR 0082 says a
    * drag may be *a* way and never the only one.
    */
-  it('offers each Card in the list as a focusable button', () => {
-    render(<Default />);
+  it('offers each Card in the list as a focusable button', async () => {
+    await renderDock(<Default />);
     fireEvent.click(within(dock()).getByRole('button', { name: 'Cards' }));
 
     const row = screen.getByRole('button', { name: 'Add Constraints to Diagram' });
@@ -130,13 +153,16 @@ describe('placing a Card into a Diagram without a pointer (ADR 0082)', () => {
    * would have produced.
    */
   it('adds the Card to the drawing Diagram, as the drop does', async () => {
-    render(<Default />);
+    await renderDock(<Default />);
     fireEvent.click(within(dock()).getByRole('button', { name: 'Cards' }));
 
     // `Collection 1` places five of the fixture's Cards and `Constraints` is
     // not one of them. The canvas resolves its placement asynchronously, so the
     // count is waited for rather than read on the spot.
-    const placed = (): number => document.querySelectorAll('[data-testid^="rf__node-"]').length;
+    const placed = (): number =>
+      [...document.querySelectorAll('[data-testid^="rf__node-"]')].filter(
+        (node) => node.closest('[hidden]') === null,
+      ).length;
     await waitFor(() => expect(placed()).toBe(5));
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Constraints to Diagram' }));
@@ -154,13 +180,22 @@ describe("every control's accessible name contains its visible label (WCAG 2.5.3
    * `Spaces` under `aria-label="Switch Space. N open."`, so speech input could
    * not reach the word on its face. It is one token now, spent in both places.
    */
-  it('names the root Open Spaces menu with the word it shows', () => {
-    render(<Default />);
+  it('names the root Open Spaces menu with the word it shows', async () => {
+    await renderDock(<Default />);
     // Three crossings in, the Open Spaces menu is a bare chevron; the word is what the
     // root draws. Walk up to it, which is what the parent step is for.
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Design system' }));
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Platform' }));
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Meta Space' }));
+    await act(() => {
+      fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Design system' }));
+      return Promise.resolve();
+    });
+    await act(() => {
+      fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Platform' }));
+      return Promise.resolve();
+    });
+    await act(() => {
+      fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Meta Space' }));
+      return Promise.resolve();
+    });
 
     const openSpacesMenu = within(dock()).getByRole('button', { name: /^Spaces\./ });
 
@@ -173,8 +208,8 @@ describe("every control's accessible name contains its visible label (WCAG 2.5.3
    * A control with no words on it owes nothing here; every one that carries
    * them owes its name.
    */
-  it('holds every named control in the bar to it', () => {
-    render(<Default />);
+  it('holds every named control in the bar to it', async () => {
+    await renderDock(<Default />);
 
     const labelled = within(dock())
       .getAllByRole('button')
@@ -193,8 +228,8 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
    * arrows move between every command in it. The groups are what assistive
    * technology announces on the way past instead.
    */
-  it('draws one root and four named groups inside it', () => {
-    render(<Default />);
+  it('draws one root and four named groups inside it', async () => {
+    await renderDock(<Default />);
 
     const groups = within(dock()).getAllByRole('group');
 
@@ -213,8 +248,8 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
    * while each cluster owned its own root, so they were plain Buttons and each
    * took a tab stop. They are items now, which is what makes the bar one.
    */
-  it('keeps the way back inside the same roving order', () => {
-    render(<Default />);
+  it('keeps the way back inside the same roving order', async () => {
+    await renderDock(<Default />);
 
     const parent = within(dock()).getByRole('button', { name: 'Go to Design system' });
 
@@ -232,7 +267,11 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
 const PRIMARY = { pointerId: 1, button: 0, isPrimary: true } as const;
 
 /** The frame the slot decides and the drag moves, which is what a gesture shows on. */
-const frame = (): HTMLElement => screen.getByTestId('command-dock');
+const frame = (): HTMLElement => {
+  const value = dock().closest('[data-testid="command-dock"]');
+  if (!(value instanceof HTMLElement)) throw new Error('The Dock has no frame');
+  return value;
+};
 
 describe('the grip discloses the twelve slots (ADR 0082)', () => {
   /**
@@ -241,8 +280,8 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
    * built on a guard that does not exist. It is a plain toolbar button with one
    * `onClick`, and the menu positions against it through `anchor`.
    */
-  it('opens the slot menu from one activation', () => {
-    render(<Default />);
+  it('opens the slot menu from one activation', async () => {
+    await renderDock(<Default />);
     const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
 
     expect(grip).toHaveAttribute('aria-expanded', 'false');
@@ -256,8 +295,8 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
   });
 
   /** Choosing a slot is what the drag chooses, and the edge decides the shape. */
-  it('redocks the surface to a chosen slot', () => {
-    render(<Default />);
+  it('redocks the surface to a chosen slot', async () => {
+    await renderDock(<Default />);
     fireEvent.click(within(dock()).getByRole('button', { name: /^Move Command Dock\./ }));
 
     // `Middle` is the vertical edges' centre stop, and both of them offer one,
@@ -276,8 +315,8 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
    * the grip is named as the popup's `finalFocus` — otherwise dismissing the
    * list drops the reader on the document body.
    */
-  it('returns focus to the grip when the list is dismissed', () => {
-    render(<Default />);
+  it('returns focus to the grip when the list is dismissed', async () => {
+    await renderDock(<Default />);
     const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
     // The focus a keyboard activation would already have put on the control;
     // jsdom's synthetic click does not move it.
@@ -298,8 +337,8 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
    * completed drag redocked the bar and then opened the twelve-slot menu over
    * the slot it had just landed in.
    */
-  it('does not open the slot list when the press was a drag', () => {
-    render(<Default />);
+  it('does not open the slot list when the press was a drag', async () => {
+    await renderDock(<Default />);
     const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
 
     fireEvent.pointerDown(grip, { ...PRIMARY, clientX: 100, clientY: 100 });
@@ -317,8 +356,8 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
    * press, so the `click` behind that press must not ask for it again — a grip
    * that reopens what it just closed is a control with no off.
    */
-  it('does not reopen the slot list when the press dismissed it', () => {
-    render(<Default />);
+  it('does not reopen the slot list when the press dismissed it', async () => {
+    await renderDock(<Default />);
     const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
     fireEvent.click(grip);
     expect(screen.getByRole('menu')).toBeInTheDocument();
@@ -341,8 +380,8 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
    * of the dock and its release docked the whole command surface wherever the
    * pointer had wandered.
    */
-  it('refuses a press from a secondary button', () => {
-    render(<Default />);
+  it('refuses a press from a secondary button', async () => {
+    await renderDock(<Default />);
     const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
 
     fireEvent.pointerDown(grip, { ...PRIMARY, button: 2, clientX: 100, clientY: 100 });
@@ -360,8 +399,8 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
    * a stray release docked it there. The initiating pointer is retained and
    * every other one is ignored for the life of the press.
    */
-  it('ignores a second pointer while a gesture is in flight', () => {
-    render(<Default />);
+  it('ignores a second pointer while a gesture is in flight', async () => {
+    await renderDock(<Default />);
     const grip = within(dock()).getByRole('button', { name: /^Move Command Dock\./ });
 
     fireEvent.pointerDown(grip, { ...PRIMARY, clientX: 100, clientY: 100 });
@@ -390,8 +429,8 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
  * replaced it.
  */
 describe('an unwell Space the reader is not in', () => {
-  it('marks the Spaces trigger before anything is disclosed', () => {
-    render(<SaveFailedElsewhere />);
+  it('marks the Spaces trigger before anything is disclosed', async () => {
+    await renderDock(<SaveFailedElsewhere />);
 
     expect(screen.queryByRole('menu')).toBeNull();
     const trigger = within(dock()).getByRole('button', { name: /^Spaces\./ });
@@ -400,8 +439,8 @@ describe('an unwell Space the reader is not in', () => {
   });
 
   /** Nothing to say while every open Space is fine, which is most of the time. */
-  it('leaves the trigger unmarked while every open Space is well', () => {
-    render(<Default />);
+  it('leaves the trigger unmarked while every open Space is well', async () => {
+    await renderDock(<Default />);
 
     const trigger = within(dock()).getByRole('button', { name: /^Spaces\./ });
     expect(trigger).not.toHaveAccessibleName(/needs attention/i);
@@ -426,8 +465,8 @@ describe('an unwell Space the reader is not in', () => {
    * export owes a parity claim and two suites (ADR 0052), and what is under
    * test is a derivation, not a treatment.
    */
-  it('discloses the set when the only other open Space is the unwell one', () => {
-    render(<TwoSpacesWithAnUnwellParent />);
+  it('discloses the set when the only other open Space is the unwell one', async () => {
+    await renderDock(<TwoSpacesWithAnUnwellParent />);
 
     const trigger = within(dock()).getByRole('button', { name: /^Spaces\./ });
     expect(trigger).toHaveAccessibleName(/needs attention/i);
@@ -443,70 +482,91 @@ describe('an unwell Space the reader is not in', () => {
 });
 
 /**
- * The Dock over a session two Spaces deep whose parent's commit failed.
+ * The parent's commit, waited for on the session itself.
  *
- * `useCommandDockChrome` opens on the catalogue's five-Space session, and how
- * a Space joins the open set is not the Dock's business (ADR 0068) — so the
- * session shape is handed in rather than reached for. Only `space` is replaced;
- * every other cluster is the fixture's own, which is what keeps this the
- * production surface rather than a second assembly of it.
+ * **Not testing-library's `waitFor`.** This runs inside `Application`'s startup
+ * resolver, which `renderDock`'s `act` scope has already returned from — so a
+ * `waitFor` here opens a nested act scope of its own, and the `setView` that
+ * follows it lands under neither. React reports that as "An update to
+ * Application inside a test was not wrapped in act(...)". A plain subscription
+ * schedules nothing of its own, leaving the flush to the act-wrapped `waitFor`
+ * in `renderDock`.
+ *
+ * The wait is for the state it wants rather than for "no longer pending":
+ * `submit` publishes no `pending` at all when the session is coordinating or
+ * paused, so "not pending" can be true before the commit has begun.
  */
+const failedCommit = (session: OpenSpace['session']): Promise<void> =>
+  new Promise((resolve) => {
+    const failed = () => session.getState().persistence.kind === 'failed';
+    const unsubscribe = session.subscribe(() => {
+      if (failed()) {
+        unsubscribe();
+        resolve();
+      }
+    });
+    if (failed()) {
+      unsubscribe();
+      resolve();
+    }
+  });
+
+/** Two real open Spaces; the parent's backend rejects its completed Edit. */
 function TwoSpacesWithAnUnwellParent() {
-  const chrome = useCommandDockChrome();
-  const parent = { spaceId: newUuid(), title: 'Design system' };
   return (
-    <CommandDockFixture
-      chrome={{
-        ...chrome,
-        space: {
-          ...chrome.space,
-          parent,
-          openSpaces: [
-            {
-              ...parent,
-              depth: 0,
-              persistence: {
-                kind: 'failed',
-                failure: {
-                  kind: 'retryable-failure',
-                  code: 'network',
-                  message: 'The space could not be reached.',
-                },
-              },
-            },
-            {
-              spaceId: chrome.space.currentSpaceId,
-              title: chrome.space.title,
-              depth: 1,
-              persistence: { kind: 'settled' },
-            },
+    <Application
+      resolve={async () => {
+        const control = new MemorySpaceBackendTestControl();
+        const parent = {
+          ...metaSnapshot,
+          document: { ...metaSnapshot.document, title: 'Design system' },
+        };
+        const spaces = storySpaces(
+          parent.id,
+          [
+            parent,
+            commandDockSnapshot,
+            platformSnapshot,
+            designSystemSnapshot,
+            traversalSnapshot,
+            authoredSnapshot,
+            deepDiveSnapshot,
           ],
-        },
+          control,
+        );
+        const openedParent = await spaces.open(parent.id);
+        control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'Unavailable' });
+        const card = parent.cards[0];
+        if (card === undefined) throw new Error('The parent needs a Card');
+        const edit = openedParent.app.authoring.complete({
+          kind: 'edited-card',
+          cardId: card.id,
+          document: { ...card.document, title: 'An edited Card' },
+        });
+        // A refused Edit commits nothing, so the wait below would spend its
+        // whole timeout and then report the persistence state rather than the
+        // refusal that caused it. `openDockStory` checks the same thing.
+        if (edit.kind !== 'completed')
+          throw new Error(`The parent's Edit was ${edit.kind}, so no commit failed.`);
+        await failedCommit(openedParent.session);
+        return storyOpening(spaces, await spaces.enter(commandDockSnapshot.id));
       }}
     />
   );
 }
 
 /**
- * **The last Diagram and the last Graph cannot be deleted from a story either.**
+ * **The last Diagram and the last Graph cannot be deleted, and the rule is not this file's.**
  *
- * The fixture passes `deleteDisabled: false` and `editsDisabled: false`, which
- * reads at a glance like a story being allowed to empty a Space the application
- * would refuse — and emptying it would reach `loadSpaceSnapshot`'s refusal or
- * the fixture's own `has no Diagram to draw` throw.
+ * The prototype's version of this test had to argue that the fixture's
+ * `deleteDisabled`/`editsDisabled` flags were not the floor — that each row read
+ * `<flag> || <collection>.length <= 1`, so a story passing `false` was saying
+ * *no additional reason to withhold* rather than *no floor*. There is no fixture
+ * flag to mistake now: the catalogue mounts production Authoring and the rule is
+ * wherever Authoring keeps it.
  *
- * It cannot, and the reason is that neither flag is the floor. Both rows read
- * `<flag> || <collection>.length <= 1`, and each flag's doc says so in as many
- * words: `deleteDisabled` is "beyond the rule the row already knows", and
- * `editsDisabled` notes that "Delete carries the ADR 0079 rule on top of this
- * one, read off `graphs` here". The fixture is saying *no additional reason to
- * withhold*, not *no floor* — so pushing the floor into the fixture as well
- * would be the same rule in two places, which is the arrangement that lets two
- * copies disagree later.
- *
- * Written as a test rather than as a comment on the fixture, because the next
- * reader will have the same doubt and a comment there would only assert the
- * answer.
+ * Still written as a test rather than as a comment, because the next reader will
+ * have the same doubt and a comment would only assert the answer.
  */
 describe('the last Diagram and Graph', () => {
   /** Whichever the cluster is showing now, which each deletion changes. */
@@ -525,8 +585,8 @@ describe('the last Diagram and Graph', () => {
     return screen.getByRole('menuitem', { name: `Delete ${title}` });
   };
 
-  it('withhold Delete from a story, which cannot empty the Space', () => {
-    render(<Default />);
+  it('withhold Delete from a story, which cannot empty the Space', async () => {
+    await renderDock(<Default />);
 
     for (const kind of ['Diagram', 'Active Graph'] as const) {
       // Down to one, however many the fixture starts with. The loop is bounded

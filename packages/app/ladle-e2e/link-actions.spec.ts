@@ -44,7 +44,7 @@ test('the Space name is a label with one address, beside a Diagram that renames'
 }) => {
   await page.goto('/?story=space--command-dock--default&mode=preview');
 
-  const title = page.getByTestId('space-title');
+  const title = page.getByTestId('space-title').filter({ visible: true });
   await expect(title).toContainText('Rendering');
   await expect(title).not.toHaveJSProperty('tagName', 'BUTTON');
   await expect(page.getByRole('button', { name: /^Rename Space/ })).toHaveCount(0);

@@ -1,7 +1,7 @@
 import { openSpaceStatusLabel, type OpenSpaceStatus } from '@project/ui';
 import type { SpaceSessionState } from '@project/persistence';
-import type { GraphId, Diagram, DiagramId, SpaceSnapshot, UUID } from '@project/core';
-import type { ExitSpaceResult, RejectedExitConfirmation } from './open-spaces';
+import type { UUID } from '@project/core';
+import type { ExitSpaceResult } from './open-spaces';
 
 /**
  * The Command Dock's model: what it derives, with no React and no DOM.
@@ -324,105 +324,6 @@ export const nearestAlong = (bounds: DockBox, box: DockBox, edge: DockEdge): Doc
   ).along;
 };
 
-/* ---------------------------------------------------------------- session */
-
-/**
- * One open Space: the document, where it was entered from, and what it is
- * showing.
- */
-export interface OpenEntry {
-  readonly snapshot: SpaceSnapshot;
-  readonly from: UUID | null;
-  /**
-   * The Diagram this entry is showing, or nothing.
-   *
-   * **Nullable because `defaultDiagram` is optional and a Delete can empty it.**
-   * ADR 0079 makes the stored `defaultDiagram` the durable opening selection and
-   * leaves it absent on a stored diagramless Space until first working load
-   * initializes one, so "no Diagram selected" is a state the entry has to be able
-   * to hold. `null` is how it holds it; the render's fallback to the first
-   * Diagram is what turns it back into something to draw.
-   */
-  readonly diagramId: DiagramId | null;
-  readonly graphId: GraphId | null;
-  /**
-   * How this Space's last commit went — **per open Space, and not per session**.
-   *
-   * A commit belongs to the Space it was made in (ADR 0076), and the reader is
-   * only ever standing in one of the open set. So a Space whose save failed
-   * while the reader was somewhere else has to keep saying so until they come
-   * back to it, which a single session-wide field could not express: it would
-   * report the Space you are looking at and silently drop the other four.
-   */
-  readonly persistence: SpaceSessionState['persistence'];
-}
-
-/**
- * A Space opened from nothing stored: where it opens is `defaultDiagram`, as in
- * the app.
- *
- * **`?? null` and not `String(...)`.** The laundering that stood here answered
- * the five-letter string `"undefined"` for a diagramless Space — an id no Diagram
- * can carry, in the field the whole surface reads to decide what is drawing. It
- * compiled because everything downstream was declared `string`; branding
- * `diagramId` is what made it unrepresentable, and `dock-session.test.ts` is what
- * says it stays that way.
- */
-export const opened = (snapshot: SpaceSnapshot, from: UUID | null): OpenEntry => ({
-  snapshot,
-  from,
-  diagramId: snapshot.document.defaultDiagram ?? null,
-  graphId: null,
-  persistence: { kind: 'settled' },
-});
-
-const storedDiagrams = (snapshot: SpaceSnapshot): readonly Diagram[] =>
-  snapshot.document.diagrams ?? [];
-
-/** One Edit on the stored document, which the reload then validates. */
-export const editDocument = (
-  snapshot: SpaceSnapshot,
-  edit: (diagrams: readonly Diagram[]) => readonly Diagram[],
-): SpaceSnapshot => ({
-  ...snapshot,
-  document: { ...snapshot.document, diagrams: [...edit(storedDiagrams(snapshot))] },
-});
-
-/**
- * One Edit on whichever Diagram the entry selects.
- *
- * **The entry is the argument because the entry is the only thing that can
- * answer.** The hook resolved this from a `selectedId` read during render and
- * then spent it inside a functional state updater that had correctly gone and
- * fetched the *live* entry — so what was being written and what said where to
- * write it came from two different moments. React flushes discrete events, so
- * it usually agreed; a gesture that selected a Diagram and edited it in one tick
- * did not, and wrote into the Diagram that had been selected before it.
- *
- * The same stale-closure class the drag gesture had, and the same answer: take
- * the state being written rather than closing over a rendered copy of it. Made
- * an argument, a captured id is not merely wrong — it cannot be expressed.
- *
- * The fallback is the render's: a `diagramId` naming no stored Diagram selects
- * the first, which is what `useChrome` draws and so what an Edit must agree
- * with. ADR 0079 keeps at least one Diagram, so an empty document is not a state
- * this has to answer for — it edits nothing and says so by changing nothing.
- */
-export const editSelectedDiagram = (
-  entry: OpenEntry,
-  edit: (diagram: Diagram) => Diagram,
-): OpenEntry => {
-  const diagrams = storedDiagrams(entry.snapshot);
-  const selected = diagrams.find((each) => each.id === entry.diagramId) ?? diagrams[0];
-  if (selected === undefined) return entry;
-  return {
-    ...entry,
-    snapshot: editDocument(entry.snapshot, (current) =>
-      current.map((each) => (each.id === selected.id ? edit(each) : each)),
-    ),
-  };
-};
-
 /* ------------------------------------------------------------ open Spaces */
 
 /** A Space the Dock names: the parent step, and every row of the Open Spaces menu. */
@@ -446,33 +347,7 @@ export interface OpenRow extends SpaceStep {
   readonly persistence: SpaceSessionState['persistence'];
 }
 
-/** Every Space the session has open, and which of them is on the canvas. */
-export interface SessionState {
-  readonly open: ReadonlyMap<UUID, OpenEntry>;
-  readonly currentId: UUID;
-  /**
-   * The Space that cannot be exited, named rather than inferred.
-   *
-   * Exit's root rule is `spaceId === metaSpaceId` (`open-spaces.ts`), and this
-   * carried no Meta id — so {@link exitSpace} approximated it as "the entry
-   * with no Opener", which is a *different* rule: production records a `null`
-   * Opener for a Space opened directly and for one reached by URL too, so the
-   * stand-in refused Exits the built one performs. One field is the whole
-   * distance between the two.
-   */
-  readonly metaSpaceId: UUID;
-}
-
-/**
- * One open Space, as little of it as the tree needs.
- *
- * **Four fields rather than the session's own entry**, because there are two
- * sessions: the application's `OpenSpacesState` — entries plus the `openedFrom`
- * map that is deliberately kept off them — and the catalogue fixture's map of
- * stored snapshots. Neither is convertible to the other, and a model that took
- * either would be a model one of its two callers had to reshape itself for.
- * What the tree actually reads is a name, an opener and a persistence state.
- */
+/** The presentation fields Open Spaces supplies for each row. */
 export interface OpenSpaceRow {
   readonly spaceId: UUID;
   readonly title: string;
@@ -495,7 +370,7 @@ export interface OpenSpaceRow {
  * the reader moved would move the row they were aiming at.
  *
  * **Every `from` names a Space that is open**, which is what makes the walk
- * total: entries begin that way and {@link exitSpace} re-homes the rows below
+ * total: entries begin that way and Open Spaces re-homes the rows below
  * the Space it closes. Without that invariant this drops a Space whose opener
  * exited — still open, and not in the list that is the only way back to it.
  */
@@ -589,11 +464,6 @@ export const trailControls = (
  */
 export type ExitOutcome = Exclude<ExitSpaceResult, { kind: 'exited' }>;
 
-export interface SpaceExit {
-  readonly result: ExitSpaceResult;
-  readonly session: SessionState;
-}
-
 type ExitRefusal = Extract<ExitSpaceResult, { kind: 'refused' }>['refusal'];
 
 /**
@@ -635,101 +505,3 @@ const EXIT_REPORT = {
 /** What an exit that did not happen owes the reader: which Space, and what to do about it. */
 export const exitReportSentence = (title: string, outcome: ExitOutcome): string =>
   EXIT_REPORT[exitReportKey(outcome)](title);
-
-/**
- * Exiting one Space — the prototype's stand-in for `openSpaces.exit`.
- *
- * **The rules below are not this file's.** They are `retireOpenSpace`'s
- * (`packages/app/src/open-spaces.ts`), which is `CONTEXT.md`'s Exit verbatim:
- * the root refuses as `meta-space-permanent`, `failed` refuses with the
- * recovery `retry` and `conflicted` with `resolve-conflict`, `rejected` warns
- * once and proceeds only when the warning is handed back, one Space closes and
- * never a second (ADR 0068), and the canvas falls to the first entry still open
- * when the Space it was on is the one that went. The result is production's
- * `ExitSpaceResult` rather than a shape invented here, which is what the three
- * arms the Dock draws are drawn from.
- *
- * **The root rule is production's own now.** It refused an entry whose Opener
- * was `null`, which coincided with Meta in this fixture and was a different
- * rule everywhere else — production records a `null` Opener for a Space opened
- * directly and for one reached by URL, and closes both. `SessionState` names
- * the Meta id instead, so the stand-in and the built Exit refuse the same one
- * Space.
- *
- * **It is a stand-in and not the call, and that is a finding rather than a
- * shortcut.** `exit` is a closure over a `SpaceSessionRegistry` of live
- * `SpaceSession`s: it decides by awaiting `waitUntilRetirable` and reading
- * `session.getState().persistence`, then releases the session and disposes a
- * composed app. A story has none of that — this prototype's Spaces are stored
- * snapshots re-derived through `loadSpaceSnapshot`, and its unwell states are
- * fixtures a story hands in, which over a real registry would take a scripted
- * backend to produce. Reaching the built rules from here needs a seam that does
- * not exist: the *decision* — persistence state, Meta, confirmation, in;
- * `ExitSpaceResult` out — separated from the waiting and the disposal that
- * surround it. Ticket 07 is where that is worth cutting, because promoting the
- * Dock puts a real `OpenSpaces` behind it either way.
- *
- * **Where the rows below the closed Space go.** They hang off its opener, which
- * is the nearest Space still open. Nothing acts on it — the field is a picture
- * of the order Spaces were opened in and Exit stays a one-Space operation
- * whichever way it points (ADR 0074 gives a Space no canonical parent anyway).
- * What it buys is that {@link openTree}'s walk stays total, so a Space whose
- * opener exited is still in the list that is the only way back to it.
- */
-export const exitSpace = (
-  session: SessionState,
-  spaceId: UUID,
-  confirmation?: RejectedExitConfirmation,
-): SpaceExit => {
-  const entry = session.open.get(spaceId);
-  // Production throws here too: exiting a Space that is not open is a defect in
-  // the caller rather than an outcome a reader is owed a sentence about.
-  if (entry === undefined) throw new Error(`Space ${spaceId} is not open`);
-  const opener = entry.from;
-  // Production's rule verbatim: Meta is permanent and nothing else is. It is
-  // asked of the named Space rather than of the Opener, because a Space opened
-  // by its own address has no Opener and is still exitable.
-  if (spaceId === session.metaSpaceId) {
-    return { result: { kind: 'refused', refusal: { code: 'meta-space-permanent' } }, session };
-  }
-  const { persistence } = entry;
-  if (persistence.kind === 'failed') {
-    return {
-      result: {
-        kind: 'refused',
-        refusal: { code: 'persistence-recovery-required', recovery: 'retry' },
-      },
-      session,
-    };
-  }
-  if (persistence.kind === 'conflicted') {
-    return {
-      result: {
-        kind: 'refused',
-        refusal: { code: 'persistence-recovery-required', recovery: 'resolve-conflict' },
-      },
-      session,
-    };
-  }
-  if (persistence.kind === 'rejected' && confirmation?.warning !== 'persistence-rejected') {
-    return { result: { kind: 'warning', warning: 'persistence-rejected' }, session };
-  }
-  const open = new Map<UUID, OpenEntry>();
-  for (const [id, each] of session.open) {
-    if (id === spaceId) continue;
-    open.set(id, each.from === spaceId ? { ...each, from: opener } : each);
-  }
-  // The Opener, not the Space just removed, is what an empty set falls back to
-  // — and Meta behind it, because a Space opened by its own address has no
-  // Opener and can still be exited. Neither arm is reachable while Meta is
-  // permanent and open, which is the whole of why both say something true.
-  const first = [...open.keys()][0] ?? opener ?? session.metaSpaceId;
-  return {
-    result: { kind: 'exited' },
-    session: {
-      open,
-      currentId: session.currentId === spaceId ? first : session.currentId,
-      metaSpaceId: session.metaSpaceId,
-    },
-  };
-};
