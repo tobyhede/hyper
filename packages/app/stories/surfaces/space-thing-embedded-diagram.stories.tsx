@@ -135,3 +135,151 @@ const openEmbeddedDiagram = async () => {
 /** The production application host over an isolated multi-Space repository. */
 export const SelectedDiagram: Story = () => <Application resolve={openEmbeddedDiagram} />;
 SelectedDiagram.meta = { iframed: true };
+
+const PAIR_HOME_ID = id('000000000020');
+const PAIR_HOME_DIAGRAM_ID = id('000000000021');
+const PAIR_HOME_GRAPH_ID = id('000000000022');
+const PAIR_OVERVIEW_THING_ID = id('000000000023');
+const PAIR_DETAIL_THING_ID = id('000000000024');
+
+const PAIR_TARGET_ID = id('000000000030');
+const PAIR_OVERVIEW_DIAGRAM_ID = id('000000000031');
+const PAIR_OVERVIEW_GRAPH_ID = id('000000000032');
+const PAIR_DETAIL_DIAGRAM_ID = id('000000000033');
+const PAIR_DETAIL_GRAPH_ID = id('000000000034');
+const PAIR_INTAKE_ID = id('000000000035');
+const PAIR_STORAGE_ID = id('000000000036');
+const PAIR_INDEX_ID = id('000000000037');
+
+/**
+ * One Space seen two ways: a target owning two Diagrams over overlapping Things.
+ *
+ * `Overview` places Intake beside Storage; `Detail` places Storage beside Index
+ * and leaves Intake out. So the two Diagrams disagree about *which* Things are
+ * on them, which is what makes a difference on screen attributable to the
+ * selection rather than to styling (ADR 0040).
+ */
+const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
+  id: PAIR_TARGET_ID,
+  document: {
+    version: 1,
+    title: 'Architecture',
+    diagrams: [
+      {
+        id: PAIR_OVERVIEW_DIAGRAM_ID,
+        title: 'Overview',
+        kind: 'positioned',
+        positions: {
+          [PAIR_INTAKE_ID]: { x: 0, y: 0, open: false },
+          [PAIR_STORAGE_ID]: { x: 220, y: 0, open: false },
+        },
+        graphs: [
+          {
+            id: PAIR_OVERVIEW_GRAPH_ID,
+            title: 'Overview',
+            edges: [{ from: PAIR_INTAKE_ID, to: PAIR_STORAGE_ID }],
+          },
+        ],
+      },
+      {
+        id: PAIR_DETAIL_DIAGRAM_ID,
+        title: 'Detail',
+        kind: 'positioned',
+        positions: {
+          [PAIR_STORAGE_ID]: { x: 0, y: 0, open: false },
+          [PAIR_INDEX_ID]: { x: 220, y: 0, open: false },
+        },
+        graphs: [
+          {
+            id: PAIR_DETAIL_GRAPH_ID,
+            title: 'Detail',
+            edges: [{ from: PAIR_STORAGE_ID, to: PAIR_INDEX_ID }],
+          },
+        ],
+      },
+    ],
+    defaultDiagram: PAIR_OVERVIEW_DIAGRAM_ID,
+  },
+  things: [
+    { id: PAIR_INTAKE_ID, document: { title: 'Intake', kind: 'markdown', body: '' } },
+    { id: PAIR_STORAGE_ID, document: { title: 'Storage', kind: 'markdown', body: '' } },
+    { id: PAIR_INDEX_ID, document: { title: 'Index', kind: 'markdown', body: '' } },
+  ],
+});
+
+/**
+ * Two Space Things, one target, two selections — the shape ADR 0068 makes the
+ * only way to show a Space twice.
+ *
+ * Both Things name `PAIR_TARGET_ID` and neither is a copy of the other; what
+ * differs is the pair each stores, so the left draws Intake and Storage and the
+ * right draws Storage and Index. Storage appears in both, which is the point:
+ * convergence is on the Space, not on a duplicated Thing, and one Thing of the
+ * target is genuinely on two embeddings at once.
+ *
+ * The second Thing selects `Detail` although the target opens on `Overview`,
+ * which is what says the stored selection wins over the target's own
+ * `defaultDiagram` (ADR 0079). Under the fallback this replaced, the same
+ * document would have drawn `Overview` twice.
+ */
+const pairHome: SpaceSnapshot = spaceSnapshotSchema.parse({
+  id: PAIR_HOME_ID,
+  document: {
+    version: 1,
+    title: 'Home',
+    diagrams: [
+      {
+        id: PAIR_HOME_DIAGRAM_ID,
+        title: 'Diagram 1',
+        kind: 'positioned',
+        positions: {
+          [PAIR_OVERVIEW_THING_ID]: {
+            x: 0,
+            y: 0,
+            open: true,
+            openSize: { width: 460, height: 320 },
+          },
+          [PAIR_DETAIL_THING_ID]: {
+            x: 500,
+            y: 0,
+            open: true,
+            openSize: { width: 460, height: 320 },
+          },
+        },
+        graphs: [{ id: PAIR_HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
+      },
+    ],
+    defaultDiagram: PAIR_HOME_DIAGRAM_ID,
+  },
+  things: [
+    {
+      id: PAIR_OVERVIEW_THING_ID,
+      document: {
+        title: 'The overview',
+        kind: 'space',
+        spaceId: PAIR_TARGET_ID,
+        diagram: PAIR_OVERVIEW_DIAGRAM_ID,
+        graph: PAIR_OVERVIEW_GRAPH_ID,
+      },
+    },
+    {
+      id: PAIR_DETAIL_THING_ID,
+      document: {
+        title: 'The detail',
+        kind: 'space',
+        spaceId: PAIR_TARGET_ID,
+        diagram: PAIR_DETAIL_DIAGRAM_ID,
+        graph: PAIR_DETAIL_GRAPH_ID,
+      },
+    },
+  ],
+});
+
+const openTwoSelections = async () => {
+  const spaces = storySpaces(PAIR_HOME_ID, [pairHome, pairTarget]);
+  return storyOpening(spaces, await spaces.open(PAIR_HOME_ID));
+};
+
+/** Two Space Things on one target, each drawing the Diagram it stores. */
+export const TwoSelectionsOfOneTarget: Story = () => <Application resolve={openTwoSelections} />;
+TwoSelectionsOfOneTarget.meta = { iframed: true };

@@ -248,6 +248,21 @@ export const parityClaims: readonly ParityClaim[] = [
       'A reference cycle cannot be authored through a browser gesture yet: it needs a Space Thing created inside an entered Space, and Entering is `entity-url-addressability/08`. `packages/app/test/space-thing-authoring.test.tsx` proves the refusal through the application path meanwhile.',
   },
   {
+    id: 'two-space-things-draw-one-target-at-their-own-selections',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'TwoSelectionsOfOneTarget',
+    claim:
+      'Two Space Things referencing one Space each draw the Diagram they store rather than the target\u2019s own opening Diagram, so their embeddings differ in membership while converging on one Space.',
+    // Both Space Things can be authored in a browser, but only against a target
+    // that owns two Diagrams \u2014 and a second Diagram is Add Diagram, which acts on
+    // the Space the author is *in*. Reaching the target means Entering it, and
+    // Entering is `entity-url-addressability/08`. So the second selection cannot
+    // be authored through a browser gesture yet, and the claim takes the
+    // documented exemption meanwhile.
+    applicationEvidence:
+      'A second Diagram in the target is Add Diagram from inside that Space, and Entering a Space Thing is `entity-url-addressability/08`, so a browser cannot yet reach a target owning two Diagrams. `packages/app/test/space-thing-authoring.test.tsx` proves two Space Things keeping their own selections through the application path meanwhile, and `test/support/repository-contract.ts` proves the pair survives the aggregate round trip.',
+  },
+  {
     id: 'new-alias-completes-on-the-target-chosen',
     storyFile: 'components/thing-and-alias-panes.stories.tsx',
     storyExport: 'NewAliasPane',

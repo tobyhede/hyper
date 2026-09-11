@@ -449,6 +449,12 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
   }
 };
 
+/** The refusals the Target field answers — see {@link presentNewSpaceThingRefusal}. */
+const TARGET_FIELD_REFUSALS: ReadonlySet<SpaceThingRefusal['code']> = new Set([
+  'aggregate-refused',
+  'space-thing-target-unavailable',
+]);
+
 /**
  * Error placement for Space Thing creation, which owns Title and Target.
  *
@@ -457,15 +463,7 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
  * answered by choosing a different Space, and so is a target that could not be
  * prepared to be shown. The rest describe the containing Space or the
  * repository, which no row in that list would fix.
- *
- * A set rather than a comparison, because the question is now which codes the
- * list answers rather than which single one does.
  */
-const TARGET_FIELD_REFUSALS: ReadonlySet<SpaceThingRefusal['code']> = new Set([
-  'aggregate-refused',
-  'space-thing-target-unavailable',
-]);
-
 export const presentNewSpaceThingRefusal = (
   refusal: SpaceThingRefusal,
 ): ThingCreationRefusalErrors =>

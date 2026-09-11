@@ -1337,6 +1337,106 @@ describe('Space Thing lifecycle', () => {
     expect(control.requests).toHaveLength(1);
   });
 
+  /**
+   * The residue an aggregate refusal leaves behind, stated rather than repaired
+   * (ADR 0079).
+   *
+   * Initialization commits on its own, before `derive` returns, so a refusal
+   * that lands after it keeps the Diagram and Graph it minted while making no
+   * Thing. That is accepted: ADR 0079 already has a Space gain its Diagram the
+   * first time anything works with it, so what survives is the state merely
+   * opening the target would have reached — and the second attempt proves it
+   * costs nothing, minting no identity and issuing no commit of its own before
+   * being refused again for the same reason.
+   *
+   * The refusal itself is a cycle, which is a refusal only the whole aggregate
+   * can see: the target already names Meta, so linking Meta to the target
+   * closes the loop, and nothing before the coordinated intake could have known
+   * that.
+   */
+  it('keeps a target it initialized when the Edit that asked for it is refused', async () => {
+    const diagramlessTargetNamingMeta: SpaceSnapshot = {
+      id: TARGET_ID,
+      document: { version: 1, title: 'Architecture' },
+      things: [
+        {
+          id: TARGET_THING_ID,
+          document: {
+            title: 'Back to Meta',
+            kind: 'space',
+            spaceId: META_ID,
+            diagram: META_DIAGRAM_ID,
+            graph: META_GRAPH_ID,
+          },
+        },
+      ],
+    };
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: diagramlessTargetNamingMeta, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const before = structuredClone(meta.getState());
+    // Three for the first attempt — the Diagram, its Graph, then the Thing the
+    // refusal discards — and one for the second, which draws a Thing id the way
+    // every attempt does and draws no Diagram or Graph, which is the claim. A
+    // fifth would mean the retry re-initialized.
+    const lifecycle = registry.spaceThings(
+      idSource([TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_THING_ID, SECOND_SPACE_THING_ID]),
+    );
+    const link = () =>
+      lifecycle.link({
+        containingSpaceId: META_ID,
+        diagramId: META_DIAGRAM_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      });
+
+    const first = await link();
+    expect(first).toEqual({
+      kind: 'refused',
+      refusal: {
+        code: 'aggregate-refused',
+        errors: [
+          {
+            kind: 'space-thing-reference-cycle',
+            spaceId: TARGET_ID,
+            thingId: TARGET_THING_ID,
+            targetSpaceId: META_ID,
+          },
+        ],
+      },
+    });
+
+    // No Thing anywhere, and Meta is exactly as it was.
+    expect(meta.getState()).toEqual(before);
+    expect(await backend.loadSpace(META_ID)).toEqual({
+      snapshot: metaSnapshot,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    // The target, however, keeps what initialization gave it.
+    const initialized = await backend.loadSpace(TARGET_ID);
+    expect(initialized?.revision).toBe(8n);
+    expect(initialized?.snapshot.document.defaultDiagram).toBe(TARGET_DIAGRAM_ID);
+    expect(control.requests).toHaveLength(1);
+
+    // Idempotent: the retry reads a target that is already initialized, so it
+    // mints no second Diagram or Graph and issues no second commit, and is
+    // refused for the one reason that was ever true. Exhausting the id source
+    // is what would report a re-initialization.
+    expect(await link()).toEqual(first);
+    expect(await backend.loadSpace(TARGET_ID)).toEqual(initialized);
+    expect(control.requests).toHaveLength(1);
+  });
+
   it('refuses a link to a target that has gone since it was listed', async () => {
     const control = new MemorySpaceBackendTestControl();
     const backend = new MemorySpaceBackend(

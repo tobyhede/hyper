@@ -175,3 +175,45 @@ test('the embedded Diagram story is isolated from the Ladle catalogue', async ({
   });
   await expect(page.locator('.react-flow__node[data-id^="embedded:"]')).toHaveCount(0);
 });
+
+const TWO_SELECTIONS_STORY =
+  '/?story=surfaces--space-thing-embedded-diagram--two-selections-of-one-target&mode=preview';
+
+/**
+ * One Space drawn twice, differently, because the selection lives on the Thing.
+ *
+ * Both Space Things name one target, so what separates the two embeddings is
+ * the Diagram each stores and nothing else (ADR 0068, ADR 0079). `Intake` is on
+ * `Overview` alone and `Index` on `Detail` alone, which is what makes each
+ * embedding's membership readable from outside; `Storage` is on both, so the
+ * pair is convergence on one Space rather than two copies of it.
+ *
+ * Asserted per embedding rather than over the canvas as a whole: four embedded
+ * nodes in total would also be satisfied by one Diagram drawn twice, which is
+ * exactly the failure the stored selection exists to prevent.
+ */
+test(
+  'two Space Things on one target each draw the Diagram they store',
+  { tag: '@parity:two-space-things-draw-one-target-at-their-own-selections' },
+  async ({ page }) => {
+    await page.goto(TWO_SELECTIONS_STORY);
+    await expect(embeddedNodes(page)).toHaveCount(4, { timeout: 20_000 });
+
+    const overview = page.locator(
+      '.react-flow__node[data-id^="embedded:00000000-0000-4000-8000-000000000023:"]',
+    );
+    const detail = page.locator(
+      '.react-flow__node[data-id^="embedded:00000000-0000-4000-8000-000000000024:"]',
+    );
+
+    await expect(overview).toHaveCount(2);
+    await expect(overview.getByRole('heading', { name: 'Intake' })).toBeVisible();
+    await expect(overview.getByRole('heading', { name: 'Storage' })).toBeVisible();
+    await expect(overview.getByRole('heading', { name: 'Index' })).toHaveCount(0);
+
+    await expect(detail).toHaveCount(2);
+    await expect(detail.getByRole('heading', { name: 'Storage' })).toBeVisible();
+    await expect(detail.getByRole('heading', { name: 'Index' })).toBeVisible();
+    await expect(detail.getByRole('heading', { name: 'Intake' })).toHaveCount(0);
+  },
+);

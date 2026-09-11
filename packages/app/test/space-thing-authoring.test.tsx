@@ -53,7 +53,6 @@ const HOME_NEXT_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
 const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const OTHER_TO_HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
-const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
 /**
  * `Collection 1` owns two Graphs and has authored the second as its Active one.
  *
@@ -62,6 +61,7 @@ const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023'
  * Diagram owns one Graph, so only a Diagram like this can say which rule ran
  * (ADR 0026).
  */
+const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
 const OTHER_DRAFT_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000025');
 const OTHER_SECOND_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000026');

@@ -145,6 +145,29 @@ export interface SpaceThingLifecycle {
   readonly delete: (input: DeleteSpaceThingInput) => Promise<SpaceThingLifecycleResult>;
 }
 
+/**
+ * What a Space Thing selects in a Space it is shown: the Diagram that Space
+ * opens on, and that Diagram's Active Graph (ADR 0079, ADR 0026).
+ *
+ * The Active Graph is not re-derived here. `lookup.diagram` already answers a
+ * `ResolvedDiagram` carrying the exact owned Graph — the authored choice, or
+ * the first-Graph fallback — and resolving it in a second place is how the two
+ * would come to disagree. So the only question left is whether the Space has an
+ * opening Diagram at all.
+ *
+ * `undefined` is therefore the type-level boundary between a snapshot that
+ * passed intake and the ids read out of it, not a state an author can produce:
+ * an initialized Space records a `defaultDiagram`, and a Diagram owning no
+ * Graph fails `buildSpaceLookup` before it can be asked.
+ */
+const selectionOf = (space: Space): SpaceThingSelection | undefined => {
+  if (space.defaultDiagram === undefined) return undefined;
+  const resolved = space.lookup.diagram(space.defaultDiagram);
+  return resolved === undefined
+    ? undefined
+    : { diagram: resolved.diagram.id, graph: resolved.activeGraph.id };
+};
+
 const clone = <T>(value: T): T => structuredClone(value);
 const completed = { kind: 'completed' } as const;
 const snapshotFromSpace = (space: Space): SpaceSnapshot => {
@@ -609,54 +632,53 @@ export function createSpaceSessionRegistry(
   const spaceThings = (newId: () => UUID): SpaceThingLifecycle => {
     const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
     /**
-     * The one rule for what a Space Thing selects in a Space it is shown
-     * (ADR 0079, ADR 0026).
+     * Make the target working, then read the selection it opens on.
      *
-     * The Diagram the Space itself opens on, and that Diagram's own Active
-     * Graph — the head of its list only where it has authored none, which is
-     * what an absent `activeGraph` means. Written here rather than at the two
-     * callers because `create` and `link` reach a Space by different routes and
-     * must still seed the same selection, and because the on-canvas selector
-     * seeds a *changed* Diagram by the same rule
-     * (`packages/app/src/canvas-thing-authoring.ts`).
+     * **Inside `derive`, and after the containing Space's own checks.** Those
+     * two placements are the whole of what keeps this honest: a turn is claimed
+     * synchronously by the call this sits in, so a Space cannot be released out
+     * from under the Edit, and an Edit the containing Space has already refused
+     * initializes nothing and mints no id — which is what an empty id source in
+     * `refuses %s when its containing Diagram is absent` holds it to.
      *
-     * `undefined` says the Space supplies no selection. After initialization
-     * that is unreachable through a valid Space — `defaultDiagram` is recorded
-     * and every Diagram owns at least one Graph — so this is the type-level
-     * boundary between a snapshot that passed intake and the ids read out of
-     * it, not a state the author can produce.
-     */
-    const selectionOf = (space: Space): SpaceThingSelection | undefined => {
-      if (space.defaultDiagram === undefined) return undefined;
-      const resolved = space.lookup.diagram(space.defaultDiagram);
-      if (resolved === undefined) return undefined;
-      const { diagram } = resolved;
-      const graph =
-        diagram.graphs.find(({ id }) => id === diagram.activeGraph) ?? diagram.graphs[0];
-      if (graph === undefined) return undefined;
-      return { diagram: diagram.id, graph: graph.id };
-    };
-    /**
-     * Make the target working, then read what it opens on.
+     * Initialization is its own durable single-Space commit, issued while the
+     * coordination's barrier is raised, and that is deliberate rather than a
+     * leak through it. The barrier stops a *session* committing over the
+     * topology Edit; this commit belongs to a Space with no live session to
+     * pause, since opening a Space is the working load that initializes it and
+     * a live session is read from its own working state above. The coordination
+     * reads the aggregate after `derive` returns, so it sees the initialized
+     * target and spends its revision rather than a stale one.
      *
-     * **Before the coordination, never inside it.** Initialization is its own
-     * durable single-Space commit, and `derive` runs with the persistence
-     * barrier raised against revisions the coordination is about to spend — a
-     * commit from in there would conflict with the Edit that called it. Running
-     * first is also what the ticket asks for in order: the target is durably
-     * initialized, and only then is a Thing authored against what it minted. So
-     * a failure here produces no Thing at all rather than a half-written pair.
+     * **A failure after this point leaves the target initialized and makes no
+     * Thing, and that is accepted rather than repaired.** An aggregate refusal,
+     * a conflict or a commit failure all land after `derive` has returned, so
+     * the Diagram and Graph minted here outlive the Edit that asked for them.
+     * What is left behind is not debris: ADR 0079 already has a Space gain its
+     * Diagram the first time anything works with it, so this is the state the
+     * author would have reached by merely opening that Space. It is also
+     * idempotent — a second attempt finds `defaultDiagram` recorded, mints
+     * nothing, commits nothing and selects the same pair — which is what makes
+     * retrying the refused Edit clean rather than cumulative. Folding the
+     * initialization into the coordinated Edit instead would buy atomicity at
+     * the price of a second initializer beside `working-space.ts`, and ADR 0079
+     * puts that boundary in one place.
      *
-     * An open target is read from its live session instead, because that is the
-     * Space the author can see; it is already initialized, opening being the
-     * working load that does it.
+     * The one thing that makes that commit legal is a carve-out the adapters
+     * already share: a diagramless ordinary Space is necessarily *unreferenced*
+     * — intake refuses a Space Thing whose target supplies no Diagram — so
+     * initialization's own commit would otherwise be refused for leaving it
+     * unreferenced. `baselineUnreferenced` forgives exactly the Space that was
+     * already unreferenced before the commit, which is why the only window in
+     * which a diagramless Space can gain a Diagram and a first reference is
+     * this one.
      *
-     * Nothing holds the target still between this and the Edit. It does not
-     * need to: the selection is validated against the whole aggregate inside
+     * Nothing holds the target still between this and the Edit, and nothing
+     * needs to: the selection is validated against the whole aggregate inside
      * the coordination, so a Diagram deleted in the gap is refused as
      * `space-thing-diagram-missing` rather than stored.
      */
-    const targetSelection = async (
+    const workingTargetSelection = async (
       targetSpaceId: UUID,
     ): Promise<SpaceThingSelection | undefined> => {
       const live = sessions.get(targetSpaceId)?.session.getState().working;
@@ -719,7 +741,7 @@ export function createSpaceSessionRegistry(
         // Last, and deliberately: an Edit the containing Space has already
         // refused must not initialize the Space it was pointed at, and must not
         // mint the two identities doing so would spend.
-        const selection = await targetSelection(input.targetSpaceId);
+        const selection = await workingTargetSelection(input.targetSpaceId);
         if (selection === undefined) {
           refusal = {
             kind: 'refused',
