@@ -33,6 +33,15 @@ Every action asks the applicable guards before its own checks:
 1. Placement reported? → `placement-pending`
 2. Does the selected Diagram still exist? → `diagram-not-found`
 
+Three actions are derived **above** the placement gate and so ask neither:
+`created-diagram`, `deleted-diagram` and `renamed-space` write keys of
+`document` rather than anything inside a Diagram, read the working snapshot
+direct, and answer their own placement. The last two still resolve a Diagram —
+for the placement the completion carries, not for permission — so
+`diagram-not-found` appears in their rows as an ordinary check, and in
+`renamed-space` it is asked *after* the title checks: a blank name is a blank
+name whether or not the canvas has moved on.
+
 ## Per-action checks
 
 Guards above are omitted below.
@@ -98,16 +107,27 @@ survivor: the selected Diagram if it survived, else the first, which is also wha
 | --- | --- |
 | `created-diagram` | none → completed |
 
+### Space edits
+
+| Action | Its own checks, in order |
+| --- | --- |
+| `renamed-space` | `space-title-required` → (same title ⇒ `unchanged`) → `diagram-not-found` → completed |
+
+`renamed-space` writes `document.title` and nothing else, and it raises no
+refusal of its own beyond the blank title: `diagram-not-found` is the code the
+chosen shape already had, and a Diagram condition invented for it would make an
+Edit that holds no Diagram say it needed one.
+
 ### Movement
 
 | Action | Its own checks, in order |
 | --- | --- |
 | `settled-thing-movement` | none → completed |
 
-## The 24 codes
+## The 25 codes
 
-2 contextual (`placement-pending`, `diagram-not-found`) plus 22 action-specific —
-none is produced anywhere else. 21 of those 22 are tabulated above;
+2 contextual (`placement-pending`, `diagram-not-found`) plus 23 action-specific —
+none is produced anywhere else. 22 of those 23 are tabulated above;
 `diagram-required` is declared and presented but currently raised nowhere, so it
 appears in no row.
 Count the codes, not the cells: several serve more than one action —

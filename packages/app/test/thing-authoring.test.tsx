@@ -622,22 +622,27 @@ describe('authoring an opened Thing', () => {
    * Diagram rather than a change to it — so the menu stays and only the name
    * stops being a control.
    *
-   * **The mechanism changed with the surface and the claim did not.** The
+   * **The mechanism changed with the surface twice, and the claim did not.** The
    * Sidebar drew Rename as a row in the Diagram's actions menu, so the withdrawal
    * was a menu item going missing. The Dock renames a Diagram by clicking the
-   * name it already draws, so the withdrawal is that name ceasing to be a
-   * button — which is the same fact, said where the reader is looking.
+   * name it already draws, so the withdrawal moved onto that name — which is the
+   * same fact, said where the reader is looking. It was read as the name ceasing
+   * to be a button until the Space's name became renameable too
+   * (`renamed-space`): the withheld name drew as a label then, and the slot is a
+   * `ToolbarButton` in both states now. So the reading is `aria-disabled`, the
+   * one every other withdrawn Dock control is read by (ADR 0073 keeps a withdrawn
+   * toolbar item focusable, so it announces itself rather than vanishing).
    */
   it('withdraws the Diagram rename, but not its address, while a Thing title editor is open', async () => {
     const session = mount();
     await settled(session);
 
-    expect(screen.getByTestId('selected-canvas').tagName).toBe('BUTTON');
+    expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(false);
 
     createThing('Markdown Thing');
     expect(await screen.findByRole('textbox', { name: 'Thing title' })).toBeVisible();
 
-    expect(screen.getByTestId('selected-canvas').tagName).not.toBe('BUTTON');
+    expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(true);
     openDiagramMenu('Diagram');
     const menu = await screen.findByRole('menu');
     expect(within(menu).getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();

@@ -871,9 +871,12 @@ describe('Space app Things drawer', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Arranging…');
     // The Diagram's Edits are withdrawn and its address is not. Renaming is
     // clicking the name the Dock already draws, so the withdrawal is that name
-    // ceasing to be a button; Delete is present and unavailable, because a
-    // control that disappears teaches nothing about why.
-    expect(screen.getByTestId('selected-canvas').tagName).not.toBe('BUTTON');
+    // going unavailable — `aria-disabled`, not a missing control, exactly as
+    // Delete is present and unavailable beside it, because a control that
+    // disappears teaches nothing about why. It read `tagName` until the Space's
+    // name became renameable too (`renamed-space`): the withheld name used to
+    // draw as a label, and the slot is a `ToolbarButton` in both states now.
+    expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(true);
     openDiagramMenu('Diagram');
     expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Diagram' }))).toBe(true);
     expect(screen.getByRole('menuitem', { name: /^Copy link/ })).toBeInTheDocument();
@@ -881,7 +884,7 @@ describe('Space app Things drawer', () => {
     // Left settling rather than abandoned mid-placement: the strategy resolves
     // against an unmounted tree otherwise, and the Edits it restores are the
     // other half of the rule.
-    await waitFor(() => expect(screen.getByTestId('selected-canvas').tagName).toBe('BUTTON'));
+    await waitFor(() => expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(false));
   });
 
   /**

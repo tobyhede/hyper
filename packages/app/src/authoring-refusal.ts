@@ -57,6 +57,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'A Thing title is required.';
     case 'diagram-title-required':
       return 'A Diagram title is required.';
+    case 'space-title-required':
+      return 'A Space title is required.';
     case 'space-must-keep-diagram':
       return 'A Space keeps at least one Diagram.';
     case 'alias-target-not-found':
@@ -121,6 +123,7 @@ const titleAndTargetPlacements = {
   'space-thing-deletion-unsupported': form,
   'thing-title-required': 'title',
   'diagram-title-required': form,
+  'space-title-required': form,
   'space-must-keep-diagram': form,
   'alias-target-not-found': 'target',
   'alias-target-must-own-content': 'target',
@@ -174,6 +177,7 @@ const correctableByThingChoice = {
   'space-thing-deletion-unsupported': false,
   'thing-title-required': false,
   'diagram-title-required': false,
+  'space-title-required': false,
   'space-must-keep-diagram': false,
   'alias-target-not-found': false,
   'alias-target-must-own-content': false,

@@ -33,6 +33,7 @@ import {
   selectCanvas,
   selectedCanvas,
   settled,
+  spaceName,
   viewportTransform,
 } from './graph';
 import { seedPositionedDiagram } from './seed';
@@ -1922,7 +1923,7 @@ test('editing an existing Diagram updates it instead of creating another one', a
 });
 
 test(
-  'Diagram and Graph names edit from the Dock and survive reload',
+  'Space, Diagram and Graph names edit from the Dock and survive reload',
   { tag: '@parity:command-dock-edits-identity-names' },
   async ({ page }) => {
     await page.goto('/');
@@ -1964,9 +1965,43 @@ test(
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
     await expect(activeGraph(page)).toContainText('Journey');
 
+    // **The Space's own name, from inside the Space, as one Edit on its session.**
+    // It writes `document.title` and nothing else: no Space Thing pointing here
+    // moves with it, and ADR 0083 keeps this name off any Thing's front, so the
+    // reload below is reading the stored document rather than a Thing that
+    // happened to agree with it.
+    await spaceName(page).click();
+    const spaceTitle = page.getByRole('textbox', { name: 'Space name' });
+    await expect(spaceTitle).toBeFocused();
+    // Whitespace rather than nothing, because that is the case the schema cannot
+    // refuse — `z.string().min(1)` counts characters — and the surface refuses it
+    // on the trim before the Edit is asked, exactly as it does for a Diagram.
+    await spaceTitle.fill('   ');
+    await spaceTitle.press('Enter');
+    await expect(page.getByText('A Space needs a name.')).toBeVisible();
+    // Refused and still open, with the author's words still theirs.
+    await expect(spaceTitle).toBeVisible();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+    await spaceTitle.fill('Atlas');
+    await spaceTitle.press('Enter');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
+    await expect(spaceName(page)).toContainText('Atlas');
+
+    // Begun again from the same control and cancelled: Escape drops the draft,
+    // and the caret goes back to the name it was begun from rather than falling
+    // to the body the unmounted editor left it on.
+    await spaceName(page).click();
+    const cancelledSpace = page.getByRole('textbox', { name: 'Space name' });
+    await cancelledSpace.fill('Ledger');
+    await cancelledSpace.press('Escape');
+    await expect(spaceName(page)).toContainText('Atlas');
+    await expect(spaceName(page)).toBeFocused();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
+
     await page.reload();
     await selectCanvas(page, 'Workshop');
     await expect(activeGraph(page)).toContainText('Journey');
+    await expect(spaceName(page)).toContainText('Atlas');
   },
 );
 

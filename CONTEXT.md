@@ -8,6 +8,8 @@ Graph-native technical content. Things hold the content and live in spatial Diag
 The whole authored world, and the top-level of the domain model: Things organised into spatial Diagrams, with each Diagram carrying the Graphs authored across its Things. Everything else — Things, Diagrams and their Graphs — belongs within a Space. Spaces may reference one another through Space Things, and whichever Space is loaded independently is the root of that navigation context — loading a Space changes what you are navigating, never what owns it.
 _Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable entity — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph, workspace (used loosely for the loaded Space and for the app chrome around it — say Space, or Dock/canvas for the chrome).
 
+A Space has its own **name**, stored on the Space document. A Space Thing that points at a Space carries its own Title, and that Title is what the Thing front draws (ADR 0083). The two are independent values: creating a Space Thing writes one name into both, so they agree at creation, and either one may be renamed afterwards without the other. Neither is the authority for the other, and nothing propagates between them. A Space is renamed from inside it, by one Edit on that Space's own session.
+
 A **new space** is one Thing in one centered Diagram with one empty Graph — not an empty canvas (ADR 0018, ADR 0079). One Thing is the starting state, not a permanent minimum: deliberate deletion may later leave the Space with no Things.
 
 **Meta Space**:

@@ -768,13 +768,26 @@ export const createApp = (
      * landed. `unchanged` is `null` too: renaming a Diagram to the title it
      * already has is the value the author already authored, and closing the
      * editor is the right answer to it (`space-authoring.ts`).
+     *
+     * **Three subjects through one seam, not three seams.** The Space joined the
+     * Diagram and the Graph here rather than beside them, because every part of
+     * this that is worth writing down is the same for all three: which Edit the
+     * name completes is the only difference, and the answer — a sentence or
+     * `null` — is what the editor spends. A second callback for the Space would
+     * have been a second place for the refusal-versus-`unchanged` reading to
+     * drift, and the Dock has one rename slot under the whole bar precisely so
+     * that there is one of these.
      */
     const renameChromeTitle = useCallback(
       (subject: SpaceChromeTitleSubject, title: string): string | null => {
         const result =
-          subject.kind === 'diagram'
-            ? authoring.complete({ kind: 'renamed-diagram', diagramId: subject.id, title })
-            : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
+          subject.kind === 'space'
+            ? // No id: the Edit writes `document.title` on the session this
+              // composition is closed over, which is the Space the Dock draws.
+              authoring.complete({ kind: 'renamed-space', title })
+            : subject.kind === 'diagram'
+              ? authoring.complete({ kind: 'renamed-diagram', diagramId: subject.id, title })
+              : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
         return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
       },
       [],
@@ -1290,10 +1303,16 @@ export const createApp = (
               currentSpaceId: renderedSpace.id,
               parent: parentSpace,
               openSpaces: openSpaceRows,
-              // Null: there is no `renamed-space` Edit, and the name is a label until
-              // there is. See `DockSpace.onRename` for why that is a domain question
-              // rather than one this surface can settle.
-              onRename: null,
+              // Behind `chromeTitleEdit` exactly as the Diagram and Graph names
+              // are below, and for the one reason the guard exists: all three
+              // names are withdrawn together while something else owns the caret
+              // or the canvas has no placement to edit against. A Space rename
+              // needs nothing else withheld from it — the meta Space renames like
+              // any other, only its deletion being protected, and a Space with
+              // rejected work is covered by this same guard.
+              onRename: availability.chromeTitleEdit
+                ? (title) => renameChromeTitle({ kind: 'space' }, title)
+                : null,
               onCopyLink: runEntityCommand({ kind: 'space' }, COPY_LINK_ACTION_ID),
               onNewSpace: () => thingCreation.open('space'),
               onSwitchTo: (spaceId) => {

@@ -71,12 +71,10 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  buttonVariants,
   ThingKindIcon,
   thingKindName,
   ChevronDownIcon,
   CloseIcon,
-  cn,
   CopyIcon,
   DropdownMenu,
   DropdownMenuContent,
@@ -308,20 +306,24 @@ export interface DockSpace {
   /** Every open Space, depth-first from the root — what the Open Spaces menu lists. */
   readonly openSpaces: readonly OpenRow[];
   /**
-   * Rename this Space, or `null` while the product has no such Edit.
+   * Rename this Space, or `null` while no chrome rename may run.
    *
-   * **Null in the application today, and that is a fact rather than a gap this
-   * surface can close.** Space Authoring's completion union has
-   * `renamed-diagram` and `renamed-graph` and no `renamed-space`: a Space's title
-   * lives on the stored document, and a Space is named from outside by the Space
-   * Thing that references it (ADR 0074), so what a rename from *inside* does to
-   * that Thing is a domain question rather than a control this component can
-   * answer by drawing a field. Until it is answered, the name is a label.
+   * **From inside the Space, and only from inside it.** `renamed-space` writes
+   * `document.title` of the session it is completed on and nothing else: no Space
+   * Thing pointing at this Space changes with it, because a Space's name and the
+   * Title of a Thing that references it are two stored values that agree only at
+   * creation, and ADR 0083 keeps the target's name off that Thing's front. So
+   * there is nothing here for this surface to keep in step — the Open Spaces
+   * rows and the parent step each read their own session's title and redraw on
+   * its publication (`open-spaces.ts`). Renaming *another* Space, from a Space
+   * Thing or from a row of that menu, is a `SpaceThingLifecycle` operation over
+   * a second session (ADR 0076) and is deliberately not this.
    *
-   * Nullable rather than optional so both callers state it: the catalogue
-   * fixture passes the same `null` the application does, which is what keeps the
-   * story parity evidence instead of a surface showing a command production has
-   * not got.
+   * Nullable rather than optional so both callers state it, and `null` now means
+   * the one thing it means for {@link DockCanvas.onRename} and
+   * {@link DockGraph.onRename}: the application has withdrawn chrome title
+   * editing — a live Thing title editor or content edit owns the caret, or the
+   * canvas has no placement to edit against — and all three names go together.
    */
   readonly onRename: ((title: string) => string | null) | null;
   /** Copy this Space's own address — the one link a Space offers (`entity-actions.tsx`). */
@@ -629,7 +631,12 @@ function IdentityName({
    * slot; the text in it is what is under test.
    */
   readonly testId: string;
-  /** Absent for an entity the product cannot rename — see {@link DockSpace.onRename}. */
+  /**
+   * `null` while this name's rename is unavailable — never because the product
+   * has no such Edit. All three identities have one, so every `null` here is a
+   * withdrawal the application has made and will lift (see
+   * {@link DockSpace.onRename}).
+   */
   readonly onRename: ((title: string) => string | null) | null;
 }) {
   /**
@@ -700,29 +707,7 @@ function IdentityName({
     nameRef.current?.focus();
   }, [editing]);
 
-  /**
-   * A name with no rename behind it is a **label**, not a disabled button.
-   *
-   * A control that is present and unavailable teaches that the command exists
-   * and is out of reach now, which is right for Delete on the last Diagram. This
-   * is the other case: the product has no such Edit at all, so a greyed-out
-   * name would be advertising a command nobody can ever run. It keeps the
-   * treatment and the `testId` either way, so the surface reads the same and a
-   * behaviour test addresses the same slot.
-   */
-  if (onRename === null) {
-    return (
-      <span
-        className={cn(buttonVariants({ variant: 'label', size: 'compact' }), 'command-dock__name')}
-        data-testid={testId}
-      >
-        {icon}
-        <IdentityLabel>{title}</IdentityLabel>
-      </span>
-    );
-  }
-
-  if (editing) {
+  if (onRename !== null && editing) {
     return (
       <InlineTitleEditor
         variant="header"
@@ -749,6 +734,41 @@ function IdentityName({
     );
   }
 
+  /**
+   * **One control, unavailable rather than absent — and that is a change.**
+   *
+   * A withdrawn name used to draw as a `<span>` carrying the Button's `label`
+   * variant, on the argument that a control which is present and greyed teaches
+   * the reader that a command exists and is out of reach *now*, while the
+   * Space's name had no Edit behind it at all and so would have been
+   * advertising something nobody could ever run. `renamed-space` retired the
+   * second half of that: all three identities have a rename, so every `null`
+   * that reaches here is the application withdrawing one it will hand back — a
+   * live Thing title editor or content edit owning the caret, or no placement to
+   * edit against — which is exactly the "out of reach now" case the old comment
+   * said a disabled control was right for.
+   *
+   * So there is one element instead of two. It keeps the `testId` and
+   * `command-dock__name` either way, so the surface measures the same and a
+   * behaviour test addresses the same slot; what changes is that the slot is now
+   * always a `button`, announcing itself as unavailable through `aria-disabled`
+   * rather than vanishing from the accessibility tree as a label (ADR 0073 —
+   * `ToolbarButton` keeps a withdrawn item focusable, so `:disabled` will not
+   * match it and `aria-disabled` is what a test reads).
+   *
+   * **That last sentence is also why a stylesheet rule is owed and not optional.**
+   * With no native `disabled` attribute, every `disabled:` utility on the button
+   * misses, `cursor-pointer` stands and the ghost variant's hover fill still
+   * lands — so the visible half of "unavailable" is
+   * `.command-dock__name[aria-disabled='true']` in `command-dock.css` rather
+   * than anything here. Without it the two states are pixel-identical and a
+   * withdrawn name lights up under the pointer.
+   *
+   * **`onClick` stays stated rather than withheld.** Base UI's button
+   * suppresses activation for a disabled item — pointer and keyboard both — so a
+   * second guard written here would be this surface re-deciding what the
+   * primitive already decides (ADR 0047's second rule).
+   */
   return (
     <ToolbarButton
       variant="ghost"
@@ -756,6 +776,7 @@ function IdentityName({
       ref={nameRef}
       className="command-dock__name"
       data-testid={testId}
+      disabled={onRename === null}
       aria-label={`Rename ${kind}: ${title}`}
       title={`Rename ${kind}`}
       onClick={() => onRenaming(kind)}

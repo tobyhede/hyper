@@ -391,6 +391,28 @@
   gap: 6px;
 }
 
+/* **A name whose rename is withheld, and why this rule has to exist.**
+
+   `IdentityName` draws one control in both states and hands `disabled` to a
+   `Toolbar` item, and a toolbar item stays focusable when disabled — which is
+   the accessible behaviour we want and means the DOM carries
+   `aria-disabled="true"` and **no** native `disabled` attribute. So every
+   `disabled:` utility on the button misses, the base `cursor-pointer` stands,
+   and the ghost variant's hover fill still lands: without this, a withdrawn
+   name is pixel-identical to an available one and lights up under the pointer.
+   The same reasoning already produced `canvas-thing.css`'s rail-action rule.
+
+   Quieted rather than faded to a ghost: the name is what tells the reader which
+   Space, Diagram and Graph they are in, and that has to stay legible while the
+   command over it is out of reach. The hover arm is listed with it so the fill
+   is suppressed rather than merely overridden at rest. */
+.command-dock__name[aria-disabled='true'],
+.command-dock__name[aria-disabled='true']:hover {
+  background: transparent;
+  color: color-mix(in srgb, currentcolor 62%, transparent);
+  cursor: default;
+}
+
 .command-dock__name-editor {
   flex: 1 1 auto;
 }

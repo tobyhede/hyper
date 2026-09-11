@@ -987,6 +987,192 @@ describe('Rename Diagram', () => {
   });
 });
 
+/**
+ * The one Edit on the Space document above any Diagram.
+ *
+ * It is grouped with Add Diagram and Delete Diagram rather than with Rename
+ * Diagram and Rename Graph, because those two write inside the drawing Diagram
+ * and this writes the key beside `diagrams`. What that buys is asserted below:
+ * the Edit needs no reported placement, and it moves nothing.
+ */
+describe('Rename Space', () => {
+  /** Composed the way the application composes it: the opening placement the Diagram authors. */
+  const openWithOpeningPlacement = (snapshot: SpaceSnapshot) => {
+    const loaded = { snapshot, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: DIAGRAM_ID,
+      newId: mintingIds(MINTED),
+    });
+    return { session, authoring };
+  };
+
+  it('trims and replaces only the Space title', () => {
+    const { authoring, session } = openPositioned();
+
+    expect(authoring.complete({ kind: 'renamed-space', title: '  Second draft  ' })).toEqual({
+      kind: 'completed',
+    });
+    const after = session.getState().working;
+    expect(after.document.title).toBe('Second draft');
+    expect(after.things).toEqual(positionedSnapshot.things);
+    expect(after.document.diagrams).toEqual(positionedSnapshot.document.diagrams);
+    expect(after.document.defaultDiagram).toBe(DIAGRAM_ID);
+  });
+
+  /**
+   * **The emphasised Graph is Navigation's answer, and a rename must not retake it.**
+   *
+   * Activating a Graph is not an Edit (ADR 0028), so the Graph a reader is
+   * looking at routinely differs from the `activeGraph` the Diagram stores. An
+   * Edit that re-resolves from the Diagram would therefore make a rename of the
+   * Space activate a different Graph — moving the emphasis, the Dock's Graph
+   * cluster and the product URL for a change that wrote only `document.title`.
+   * `created-diagram` and `deleted-diagram` re-resolve because each lands the
+   * reader in a different Diagram; this one lands nowhere.
+   */
+  it('leaves the Active Graph where Navigation put it', () => {
+    const twoGraphs: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        diagrams: [
+          {
+            ...positionedSnapshot.document.diagrams![0]!,
+            graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
+            // Stored as the first, so re-resolving and preserving give different
+            // answers and the assertion below can tell them apart.
+            activeGraph: GRAPH_ID,
+          },
+        ],
+      },
+    };
+    const { authoring, navigation } = open(twoGraphs);
+    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
+    navigation.activateGraph(OTHER_GRAPH_ID);
+
+    expect(authoring.complete({ kind: 'renamed-space', title: 'Renamed' })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
+    expect(navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
+  });
+
+  it('refuses a blank Space title and treats the stored title with padding as unchanged', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'renamed-space', title: '' })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'space-title-required' },
+    });
+    expect(authoring.complete({ kind: 'renamed-space', title: '  \t ' })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'space-title-required' },
+    });
+    expect(authoring.complete({ kind: 'renamed-space', title: ' Space ' })).toEqual({
+      kind: 'unchanged',
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
+  /**
+   * The Edit sits above the `placement-pending` gate, so it is available before
+   * the canvas has reported anything — the same standing Add Diagram and Delete
+   * Diagram have. A Space's name is not written into a Diagram, so there is no
+   * geometry for the Edit to wait on.
+   */
+  it('does not require the current canvas placement to resolve', () => {
+    const { authoring, session } = open();
+
+    expect(authoring.complete({ kind: 'renamed-space', title: 'Before any layout' })).toEqual({
+      kind: 'completed',
+    });
+    expect(session.getState().working.document.title).toBe('Before any layout');
+  });
+
+  /**
+   * The placement derivation loses nothing, which is what lets this Edit take the
+   * `CompletedEdit` shape rather than weakening it.
+   *
+   * `Placement.fromDiagram` over the Diagram this Edit does not touch is an
+   * identity on the placement the canvas had already reported, and ADR 0084 is
+   * why: a canvas coordinate *is* an authored one, the Diagram is the authority,
+   * and `Placement.next` merges only the Things a settled gesture names. So the
+   * installed placement is already `Placement.fromDiagram` of the same Diagram,
+   * and re-deriving it cannot lose an Open state, a remembered Open Size or a
+   * position — asserted with `toBe`, because `install` keeps the map's identity
+   * exactly when the value did not change.
+   *
+   * An Open Thing carrying an Open Size is in the fixture deliberately: those are
+   * the fields a derivation through anything narrower than the Diagram would
+   * drop.
+   */
+  it('leaves the placement the canvas reported exactly as it was', () => {
+    const opened: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        diagrams: [
+          {
+            ...positionedSnapshot.document.diagrams![0]!,
+            positions: {
+              [THING_A]: { x: 10, y: 20, open: false, openSize: { width: 500, height: 300 } },
+              [THING_B]: { x: 300, y: 40, open: true, openSize: { width: 640, height: 360 } },
+            },
+          },
+        ],
+      },
+    };
+    const { authoring, session } = openWithOpeningPlacement(opened);
+    const before = authoring.authoredPlacement();
+    expect(before).not.toBeNull();
+
+    expect(authoring.complete({ kind: 'renamed-space', title: 'Renamed' })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(authoring.authoredPlacement()).toBe(before);
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)).toEqual(
+      diagramOf(opened, DIAGRAM_ID),
+    );
+  });
+
+  /**
+   * The title rides inside the `document` JSON the ordinary commit path already
+   * carries, so the round trip needs no migration — only the proof that it is
+   * really there when the Space is read back.
+   */
+  it('survives a commit and a reload', async () => {
+    const loaded = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded);
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: DIAGRAM_ID,
+      newId: mintingIds(MINTED),
+    });
+
+    expect(authoring.complete({ kind: 'renamed-space', title: 'Stored name' })).toEqual({
+      kind: 'completed',
+    });
+    await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
+
+    const stored = await backend.loadSpace(SPACE_ID);
+    expect(stored?.snapshot.document.title).toBe('Stored name');
+
+    // Reload: a fresh session and composition over exactly what was stored.
+    const reopened = composeApp({
+      spaceSession: openSpaceSession(backend, stored!),
+      selection: DIAGRAM_ID,
+      newId: mintingIds(MINTED),
+    });
+    expect(reopened.currentSpace().title).toBe('Stored name');
+  });
+});
+
 describe('Delete Diagram', () => {
   const otherGraph: Graph = { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] };
   const twoDiagrams: SpaceSnapshot = {

@@ -341,6 +341,42 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
   });
 
   /**
+   * The Space's own name, which `renamed-space` made a draft this rule has to
+   * reach — and which reaches it for a *different* reason than the Diagram above.
+   *
+   * The Dock's one rename slot ends a draft on two facts: the replacement epoch,
+   * and the subject the rename was begun against changing under it
+   * (`useDockRenaming`). The Diagram case is ambiguous between them only by
+   * accident — the accepted Space carries the same Diagram id, so the subject is
+   * unchanged there too — but the Space makes the point unmistakable: its subject
+   * is `currentSpaceId`, which a replacement *cannot* change, since replacing is
+   * accepting the stored version of this very Space. So if the epoch were not
+   * read, nothing else would end this draft, and the editor would be left
+   * standing over a Space the author never saw, reseeded from the accepted title
+   * and one Enter away from renaming it.
+   *
+   * `hidden: true` and the blank draft are the Diagram case's, for the reasons
+   * written there.
+   */
+  it('discards a Space rename left open when the stored Space is accepted', async () => {
+    const session = await mountedSpaceApp();
+    await beginRename('space-title');
+    const name = screen.getByRole('textbox', { name: 'Space name' });
+    fireEvent.change(name, { target: { value: '   ' } });
+    expect(name).toHaveValue('   ');
+
+    await raiseConflict(session);
+    expect(screen.getByRole('textbox', { name: 'Space name', hidden: true })).toHaveValue('   ');
+    acceptRemote();
+
+    await replacementLanded();
+    expect(
+      screen.queryByRole('textbox', { name: 'Space name', hidden: true }),
+    ).not.toBeInTheDocument();
+    expect(await screen.findByTestId('space-title')).toHaveTextContent('Remote space');
+  });
+
+  /**
    * React Flow's drag attempt, which ADR 0042 names alongside the title fields.
    *
    * A drag in flight is a draft in two places at once: the render adapter's
