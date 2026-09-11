@@ -4,6 +4,19 @@ Status: needs-triage
 Tags: release/v1
 Blocked by: nothing.
 
+**Written before ADR 0085.** Where this ticket says Layout read Diagram, and
+where it says Card read Thing — the commands are drawn as **New Diagram** and
+**New Space**, and the surface New Diagram opens is the Things Popover that
+`10` put in the drawer's place.
+
+**Both behaviours are unchanged and still as described**, checked at `37e44bc2`:
+`App.tsx`'s `created-diagram` handler still calls `setDiscloseThings` on a
+completed Edit, and `CommandDock.tsx`'s New Space row still carries a comment
+conceding the point this ticket has to settle — *"creating a Space is Create
+Thing → Space, so this is a second path to one command. Drawn because the
+arrangement asked for it; it is the one item here that has not been
+reconciled."*
+
 **What to decide:** What an author gets from each creation command, including
 where the author continues after creation and what cancelling does. Ticket 11
 identified these as product decisions, not proven branch regressions.

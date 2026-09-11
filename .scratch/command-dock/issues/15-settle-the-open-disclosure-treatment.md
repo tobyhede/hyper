@@ -4,6 +4,15 @@ Status: needs-triage
 Tags: release/v1
 Blocked by: nothing. `07` landed the change this ticket is about (`36165cf7`).
 
+**Written before ADR 0085.** `CardSearchCombobox` below is spelled
+`ThingSearchCombobox` now; the component and the reasoning are unchanged.
+
+**Both premises still hold**, checked at `37e44bc2`: `packages/ui/src/Button.tsx`
+carries `aria-expanded:bg-secondary aria-expanded:text-secondary-foreground` on
+the feedback string shared by `ghost` and `receded`, and
+`SelectedEdgeControls.tsx`'s "Edit this Edge" trigger is still there to inherit
+it.
+
 **What to decide:** whether a `ghost` trigger filling while the thing it
 discloses is open is the rule for the whole application, or a Dock treatment
 that reached further than it was meant to.

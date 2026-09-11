@@ -1,8 +1,16 @@
 # 11 — Restore Card and Dock behaviour with trustworthy application evidence
 
-Status: ready-for-human
+Status: resolved
 Tags: release/v1
 Blocked by: nothing — the confirmed regressions and evidence repair can start immediately.
+
+**Written before ADR 0085.** Where this ticket says Card read Thing, and where
+it says Layout read Diagram.
+
+**The branch this ticket instructs you to hold merged as `36165cf7`** (PR #178).
+Every sentence below that the branch is unmerged, in draft, or awaiting a merge
+recommendation is spent — the instructions in the header and the statements of
+fact in the Answer alike. The repair is in `main`.
 
 **What to build:** Authors can Open, Edit and Resize Cards with the visible Card,
 handles and Edges sharing the same geometry, and use Dock commands without
@@ -70,11 +78,14 @@ investigation. PostgreSQL E2E was reported fixed but not executed locally.
 - [x] Pointing at the Card reaches its rail. Audit sibling-dependent hover
       treatment too: the new wrapper also separates the face from the authoring
       handles. Demonstrate the actual hover behaviour in a browser.
-- [ ] Reproduce the reported Layout/Graph-name click opening a Card, before
-      choosing a fix. Clicking either name begins only its rename interaction,
-      including while another disclosure is open; no Card Open/Edit or unrelated
-      authored change occurs. Outside-press propagation is a candidate, not a
-      confirmed explanation.
+- [ ] ~~Reproduce the reported Layout/Graph-name click opening a Card, before
+      choosing a fix.~~ **Never obtained, and moved to `18`.** The half of this
+      item that was proven is split out below; the reproduction itself is what
+      this box stays open for, in `18` rather than here.
+- [x] Clicking either name begins only its rename interaction, including while
+      another disclosure is open; no Card Open/Edit or unrelated authored change
+      occurs. Proven for the gestures `18` lists. Outside-press propagation
+      remains a candidate, not a confirmed explanation.
 - [x] Verify failure reporting and recovery while presenting. The Dock currently
       hides its persistence Retry with the whole surface; establish and implement
       the required reachable recovery path.
@@ -175,7 +186,7 @@ press Layout, Graph and Space disclosures directly at both 0 and 120 ms press
 durations. Rename tests click Layout and Graph names with another menu open,
 assert editor focus, cancel, and check unchanged Card state and revision.
 **The reported name-click opening a Card was not reproduced** in those cases;
-the unchecked reproduction item above records that limitation. Outside-press
+`18` is where the reproduction is now owed. Outside-press
 propagation is not established as a cause and no speculative event fix was made.
 
 Both application-evidence waivers are replaced: a side-edge Dock keeps names and
@@ -227,3 +238,34 @@ file then passed all 16 tests in isolation. The separate sandboxed coverage run
 encountered IPC socket EPERM errors and a raw HTTP test timeout; it was stopped
 and rerun with the required permissions.
 No timeout, assertion or product gesture was weakened to make these runs pass.
+
+## Answer — closing, 2026-09-11
+
+**The reported name-click opening a Card was never reproduced, and this ticket
+closes without it.** The gestures tried are in the Answer above and are repeated
+in `18`: Diagram and Graph names clicked with another menu open, at 0 and 120 ms
+press durations, asserting editor focus, cancel, unchanged Thing state and
+unchanged revision. None opened a Thing. Outside-press propagation was the
+standing hypothesis and is *not* established — no speculative event fix was
+made, deliberately, because a fix with no reproduction has nothing to fail
+against.
+
+**It is `18`, `needs-info`, and not a note in this file.** Closing it here was
+the first attempt and review caught it: the argument offered was that a ticket
+nobody can start is the shape `16` exists to prevent, which is backwards — `16`
+exists because *a sentence in a resolved ticket that nothing can be scanned for*
+is the failure, and `15` says the same of a decision left inside a report marked
+resolved. The mechanical half is worse than the argument: `roadmap.ts` reads
+`Status:` lines, `docs/agents/issue-tracker.md`'s body grep looks for
+`deferred`/`out of scope`/`follow-up`, and a note disclaiming that it is a
+deferral matches neither. A live bug report would have been invisible to every
+scan the repo runs. `needs-info` is the honest label — the thing it waits on is
+information, not an agent.
+
+Everything else this ticket asked for is built and merged. The remaining
+decisions it identified are assigned and live under their own numbers: `13`
+(New Diagram and New Space outcomes), `14` (decoration invalidation and Active
+Graph agreement), `15` (the open-disclosure treatment) and `16` (the registry
+`Drawer`). The tickets this one held open above have all closed since: `06`,
+`08`, `09`, `10` and `12` are resolved, so the body's "ticket 06 was
+deliberately left ready-for-human" is history rather than a current status.

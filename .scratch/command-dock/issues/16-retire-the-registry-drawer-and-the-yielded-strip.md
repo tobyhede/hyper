@@ -5,9 +5,15 @@ Blocked by: nothing. `10` is what left all three without a consumer.
 
 **The decision to take:** delete the registry `Drawer`, its `DRAWER_WIDTH`, and
 `AppShell`'s `insetEnd` — or decide deliberately to keep them and say why here.
-Three sites of prose currently say "taking these is a decision of its own", and
-this file is that decision. Until it is taken, the drawer keeps its inventory
+Three source-code comments currently say "taking these is a decision of its
+own", and this file is that decision. Until it is taken, the drawer keeps its inventory
 entry and `insetEnd` keeps its doc comment, and both point here.
+
+**A fourth unconsumed thing was briefly filed here and has moved to `17`.**
+`Button`'s `label` variant lost its last consumer to `09`, but the argument
+below is about a vendored registry component drifting from an upstream that
+`shadcn add` could regenerate, and a CVA variant neither drifts nor
+regenerates. Same failure, different question, so it gets its own file.
 
 **This ticket exists because two resolved tickets pointed at each other and
 neither owned the work.** `10` wrote *"`08-retire-the-sidebar-era-primitives.md`
@@ -36,6 +42,9 @@ yielded to it both went dark in the same change.
 ## What deleting them would take with it
 
 - The three names' exports from `packages/ui/src/index.ts`.
+- `packages/ui/test/drawer.test.tsx`, which mounts the full composition. It is
+  the component's own test rather than a consumer, which is why the "no
+  consumer" table above does not count it and why it is easy to miss.
 - `packages/ui/src/components/drawer.tsx`'s inventory entry in
   `packages/app/stories/design-system-inventory.ts` — `ui:catalog:check` reports
   an entry whose module is gone, so the entry cannot be forgotten.
@@ -75,9 +84,10 @@ That tension is the thing to settle. It is not settled by this file.
 
 ## Not a defect and not blocking anything
 
-Nothing renders any of the three, so there is no behaviour to regress and no
-user-visible consequence to leaving them. The cost of carrying them is a
-primitive that drifts and three doc comments a reader has to reconcile.
+No production surface renders any of the three, so there is no behaviour to
+regress and no user-visible consequence to leaving them. The cost of carrying
+them is a primitive that drifts and three doc comments a reader has to
+reconcile.
 
 ## Sites that cite this ticket
 

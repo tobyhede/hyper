@@ -35,14 +35,16 @@ the questions are:
 
 ## Acceptance
 
-- [ ] The decision above is recorded, in `CONTEXT.md` or an ADR, whichever the
+- [x] The decision above is recorded, in `CONTEXT.md` or an ADR, whichever the
       Space-Card-title question turns out to need.
-- [ ] If it is built: a `renamed-space` completion, its refusal codes, and its
+- [x] If it is built: a `renamed-space` completion, its refusal codes, and its
       round trip through the stored document.
-- [ ] `DockSpace.onRename` stops being `null` at its one call site in `App.tsx`,
+- [x] `DockSpace.onRename` stops being `null` at its one call site in `App.tsx`,
       and `IdentityName` draws the Space name as a button — the component already
       takes both arms, so no surface change is owed beyond passing the callback.
-- [ ] A parity claim, with both a Ladle and an application proof, exactly as the
+      *Answered, but not as written: the last clause was wrong and the tail below
+      says why. The withdrawn arm is a disabled `ToolbarButton`, not a label.*
+- [x] A parity claim, with both a Ladle and an application proof, exactly as the
       Layout and Graph renames have.
 
 ## Comments
@@ -51,19 +53,9 @@ the questions are:
 its own ticket" and lived only in that ticket's prose, which is what a status scan
 misses (`docs/agents/issue-tracker.md`). This is that ticket.
 
-**Raised by `07`'s "Found while building it".** It was written there as "it wants its own ticket" and lived only in that ticket's prose, which is what a status scan misses (`docs/agents/issue-tracker.md`). This is that ticket.
-
 **Triaged from `needs-triage` to `ready-for-agent`.** The three questions the ticket held open are answered above: the Space Thing question by ADR 0083 and by the creation path that already lets the two titles disagree; the propagation question by the session subscription in `open-spaces.ts`; the refusal question by the trim the other two renames already use. What was left undecided was not a domain question at all — it was where an Edit with no Diagram fits in a derivation shaped around Diagrams.
 
 **One stale read is worth checking while you are here, and is not part of this ticket's acceptance.** `spaceTitleById` (`App.tsx:1125`) comes from `useSpaceThingTargets`, which reads once for each set of referenced Spaces, and it supplies the search text for a Space Thing in the Things drawer (`ThingsDrawer.tsx:122`). If that hook does not read again when a target session changes, a renamed Space stays findable only under its old name. This affects search text alone. Nothing drawn is wrong.
-
-**Reviewed at `high`, and two findings were real.**
-
-The first was a defect this ticket introduced. The Edit answered `nextActiveGraphId` by re-resolving the Diagram's stored `activeGraph`, so renaming a Space silently activated a different Graph whenever the reader had picked one — which is routine, because activating a Graph is not an Edit (ADR 0028). It now carries Navigation's own Active Graph forward, as the general path does and for the same reason, and `leaves the Active Graph where Navigation put it` holds it there. That test was confirmed to fail against the shape the review caught.
-
-The second was the visible half of the disabled arm. A `Toolbar` item stays focusable when disabled, so the DOM carries `aria-disabled="true"` and no native `disabled` attribute — every `disabled:` utility missed, `cursor-pointer` stood, and the ghost hover fill still landed, leaving a withdrawn name pixel-identical to an available one and reactive under the pointer. `command-dock.css` now quiets it, on the same reasoning that produced `canvas-thing.css`'s rail-action rule, and the component comment says where the visible half lives.
-
-**One finding was left, deliberately.** `packages/ui/src/Button.tsx`'s `label` variant lost its last consumer with the label arm, and the review argued the repo's own rule about deleting unreachable branches should take it. A CVA variant on a shared primitive is not a branch in control flow, and `CLAUDE.md` says in terms that `@project/ui` tolerates a primitive with no consumer — `Select` and `Textarea` each spent a while with none and both came back. Removing it is a `@project/ui` decision about that primitive's surface, not this ticket's, so it is recorded here rather than taken silently.
 
 **Decided and built.** An author renames a Space from inside it. `renamed-space` is one Edit on that Space's own session, and it writes `document.title` and nothing else. The words above are pre-ADR 0085 and stand as written: what this ticket calls `renamed-layout` is `renamed-diagram`, and what it calls a Space Card is a Space Thing.
 
@@ -83,6 +75,6 @@ The claim that no surface change was owed beyond the callback was wrong. `Identi
 
 **Three defects were found after the build, and all three are fixed.** Review caught the Edit answering `nextActiveGraphId` by re-resolving the Diagram's stored `activeGraph`, so a rename silently activated a different Graph whenever the reader had picked one — routine, because activating a Graph is not an Edit (ADR 0028). It carries Navigation's own forward now, and `leaves the Active Graph where Navigation put it` was confirmed to fail against the shape the review caught. Review also caught the missing stylesheet rule above. CI then caught a third, in the evidence rather than the product: an accessible name matches as a substring, so `Space: Rendering` began resolving to both the menu trigger and the new `Rename Space: Rendering` button, and `link-actions.spec.ts` needed `exact`. Both typography proofs had a related flaw of their own — they read the three names one after another while all three share a 200ms colour transition, so the comparison sampled different points of one animation; they now sample the three together.
 
-**One finding was left, deliberately.** `packages/ui/src/Button.tsx`'s `label` variant lost its last consumer with the label arm, and the review argued the repo's rule about deleting unreachable branches should take it. A CVA variant on a shared primitive is not a branch in control flow, and `CLAUDE.md` says `@project/ui` tolerates a primitive with no consumer — `Select` and `Textarea` each spent a while with none. Removing it is a decision about that primitive's surface, not this ticket's.
+**One finding was left, deliberately.** `packages/ui/src/Button.tsx`'s `label` variant lost its last consumer with the label arm, and the review argued the repo's own rule about deleting unreachable branches should take it. A CVA variant on a shared primitive is not a branch in control flow, and `CLAUDE.md` says in terms that `@project/ui` tolerates a primitive with no consumer — `Select` and `Textarea` each spent a while with none and both came back. Removing it is a `@project/ui` decision about that primitive's surface, not this ticket's, so it is recorded here rather than taken silently. It is still unconsumed, and it now has the decision of its own it wanted: `17`.
 
 **Acceptance, all met.** The decision recorded in `CONTEXT.md`; the `renamed-space` completion with its refusals and its round trip; `DockSpace.onRename` wired at its one call site with the name drawn as a button; the label arm converted to a disabled control with its reason rewritten; a test showing the placement derivation loses nothing; and the parity claims, two of them rather than one.
