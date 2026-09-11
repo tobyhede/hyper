@@ -1,6 +1,6 @@
 # 06 — Retire the prototype scaffolding
 
-Status: ready-for-human
+Status: resolved
 Tags: release/v1
 Blocked by: nothing. The theme change landed as `a5a76669` (`feat(theme): sand
 is the canvas, and the chrome is neutral over it`), which is what the phantom
@@ -140,8 +140,15 @@ change could reach.
 
 Nothing here. All four items are done and the theme change that blocked the
 fourth has merged, so no colour judgement in this ticket or in `07` is waiting on
-anything. The `Status:` line is left at `ready-for-human` for the human to
-confirm and close rather than being closed on an agent's reading.
+anything. Confirmed against the tree and closed.
+
+**Every path in this ticket is where it was when the ticket was written**, and
+`07` moved most of them: the prototype sheet is `packages/app/src/components/command-dock.css`
+now, `dropdown-menu.tsx` is under `packages/ui/src/components/`, the `dock-proto__`
+prefix is gone, and `scripts/ui-catalog.ts` treats colocation as an approved home
+rather than reading only `packages/app/src/styles.css`. The line references are
+left as they were — a record of a decision reads against the tree it was taken
+against.
 
 Two things this ticket surfaced are owed by `07` rather than by it, and both are
 written into `07`'s checklist:
