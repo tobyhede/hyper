@@ -323,6 +323,38 @@ describe('importAggregate', () => {
   });
 
   /*
+   * The gap between the `loadAggregate` that found nothing and the
+   * `initializeAggregate` that follows it is real: `pnpm dev`'s startup, or a
+   * second `hyper`, can establish the Meta Space in between. What comes back is
+   * `already-initialized`, whose sentence tells the operator to re-run with
+   * `--dangerous-truncate` — the flag they just passed. It is a lost race, so it
+   * is reported as the conflict it is, and the advice becomes "run it again".
+   */
+  it('reports a Meta Space established during the truncate race as a conflict', async () => {
+    const stored = new MemorySpaceRepository();
+    await stored.initializeAggregate({
+      metaSpaceId: META_SPACE_ID,
+      spaces: [{ id: META_SPACE_ID, document: { version: 1, title: 'Raced in' }, things: [] }],
+    });
+    const repository = new RecordingRepository(stored);
+    // The repository was empty when it was read, and holds a Meta Space by the
+    // time the import writes — which is exactly what the losing side of the race
+    // observes.
+    repository.loadAggregate = () => Promise.resolve({ kind: 'uninitialized' });
+
+    const result = await importFrom(
+      await writeMetaOnlyAggregate(OTHER_META_ID, 'Replacement'),
+      repository,
+      true,
+    );
+
+    expect(result.kind).toBe('conflict');
+    if (result.kind !== 'conflict') return;
+    expect(result.currentMetaSpaceId).toBe(META_SPACE_ID);
+    await expect(storedMetaSpaceId(stored)).resolves.toBe(META_SPACE_ID);
+  });
+
+  /*
    * Meta rooting is intake's question, not the reader's, so a directory that
    * read cleanly still arrives as a refusal — carrying the intake errors rather
    * than a second vocabulary written for import.

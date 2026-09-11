@@ -48,15 +48,22 @@ const reportImportFileError = (error: unknown, io: CliIo): void => {
  */
 const reportImportResult = (result: AggregateImportResult, io: CliIo): number => {
   switch (result.kind) {
-    case 'imported':
-    case 'unchanged': {
-      io.stdout(
-        result.kind === 'imported'
-          ? 'Imported the aggregate\n'
-          : 'The repository already holds this aggregate\n',
-      );
+    case 'imported': {
+      io.stdout('Imported the aggregate\n');
       for (const space of result.spaces) {
         io.stdout(`Imported space ${space.snapshot.id} at revision ${space.revision.toString()}\n`);
+      }
+      return 0;
+    }
+    // Nothing was written, so no line may say otherwise. The per-Space lines
+    // report what the repository holds rather than what an import did: a second
+    // run that printed `Imported space ...` under "already holds this
+    // aggregate" contradicts its own headline, and a script reading the output
+    // cannot tell a no-op from a real write.
+    case 'unchanged': {
+      io.stdout('The repository already holds this aggregate\n');
+      for (const space of result.spaces) {
+        io.stdout(`Holds space ${space.snapshot.id} at revision ${space.revision.toString()}\n`);
       }
       return 0;
     }

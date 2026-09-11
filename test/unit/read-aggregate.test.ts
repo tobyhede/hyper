@@ -10,6 +10,8 @@ import { captureError } from '../support/capture-error';
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+/** A Space id spelled with hex letters, so upper-casing its name changes it. */
+const LETTERED_SPACE_ID = uuidSchema.parse('abcdefab-cdef-4abc-8def-abcdefabcdef');
 
 const countingIds = (): (() => UUID) => {
   let next = 0;
@@ -140,6 +142,30 @@ describe('readAggregate', () => {
     expect(thrown.diagnostics.join('\n')).toContain('named for its Space UUID');
   });
 
+  /*
+   * `z.string().uuid()` is case insensitive, and canonical export only ever
+   * writes a Space's id in canonical lower case — so an upper-cased name is a
+   * renamed directory like any other. Reading the id out of the name anyway
+   * would store a Space whose UUID is spelled the way nothing else spells it,
+   * and every reference to it elsewhere in the aggregate would miss.
+   */
+  it('refuses a Space directory whose name is its UUID in upper case', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, LETTERED_SPACE_ID);
+    await writeSpace(
+      root,
+      LETTERED_SPACE_ID.toUpperCase(),
+      JSON.stringify({ version: 1, title: 'Meta' }),
+    );
+
+    const thrown = await captureError(() => readAggregate(root, countingIds()));
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics.join('\n')).toContain('named for its Space UUID');
+  });
+
   it('refuses a space file that declares an identity its directory contradicts', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
@@ -258,6 +284,38 @@ describe('readAggregate', () => {
 
     expect(aggregate.metaSpaceId).toBe(META_SPACE_ID);
     expect(aggregate.spaces.map(({ id }) => id)).toEqual([OTHER_SPACE_ID]);
+  });
+
+  /*
+   * Only the failures this reader models are collected into one refusal. A
+   * Space that failed for a reason it does not — here the identity generator
+   * itself throwing, which is exactly how canonical export verifies a staged
+   * aggregate — has to reach the caller, even when a neighbour has an ordinary
+   * parse diagnostic that sorts ahead of it.
+   */
+  it('raises an unmodelled fault ahead of the parse diagnostic beside it', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, '{ invalid');
+    const unidentified = await writeSpace(
+      root,
+      OTHER_SPACE_ID,
+      JSON.stringify({ version: 1, title: 'Unidentified' }),
+    );
+    await mkdir(join(unidentified, 'things'));
+    await writeFile(
+      join(unidentified, 'things', 'opening.md'),
+      '---\ntitle: Opening\n---\nHello.\n',
+    );
+
+    const thrown = await captureError(() =>
+      readAggregate(root, () => {
+        throw new Error('Canonical export wrote an entity with no id');
+      }),
+    );
+
+    expect(thrown).not.toBeInstanceOf(SpaceImportFileError);
+    expect(thrown?.message).toBe('Canonical export wrote an entity with no id');
   });
 
   it('keeps a Space Thing reference exactly as authored', async () => {

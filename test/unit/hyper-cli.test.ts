@@ -590,6 +590,39 @@ describe('runHyper', () => {
     expect(output.stderr).toEqual([]);
   });
 
+  /*
+   * A second run of the same command wrote nothing, and the per-Space lines have
+   * to say so too: "Imported space ..." under "already holds this aggregate"
+   * contradicts the headline, and a script reading the output cannot tell a
+   * no-op from a real write.
+   */
+  it('reports a re-import of the same aggregate without claiming to have written', async () => {
+    // Every id is written down, because `existing` is decided by deep equality
+    // against what is stored — a Thing id minted afresh on the second run would
+    // make the two aggregates differ and take the `already-initialized` door.
+    const directory = await writeAggregate(SPACE_ID, [
+      {
+        name: SPACE_ID,
+        spaceFile: JSON.stringify({ version: 1, id: SPACE_ID, title: 'Imported talk' }),
+        things: {
+          [`${THING_ID}.md`]: `---\nid: ${THING_ID}\ntitle: Opening\nkind: markdown\n---\n\nHello.\n`,
+        },
+      },
+    ]);
+    const repository = new MemorySpaceRepository();
+    await runHyper([directory], { repository, io: captureIo().io, newId: newUuid });
+    const output = captureIo();
+
+    const exitCode = await runHyper([directory], { repository, io: output.io, newId: newUuid });
+
+    expect(exitCode).toBe(0);
+    expect(output.stdout).toEqual([
+      'The repository already holds this aggregate\n',
+      `Holds space ${SPACE_ID} at revision 0\n`,
+    ]);
+    expect(output.stderr).toEqual([]);
+  });
+
   it('replaces the stored aggregate when --dangerous-truncate is given', async () => {
     const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');
     const output = captureIo();

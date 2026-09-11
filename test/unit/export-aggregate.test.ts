@@ -1,10 +1,11 @@
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
+import { captureError } from '../support/capture-error';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
@@ -17,6 +18,11 @@ const ECHO_DIAGRAM_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000021')
 const LONG_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000030');
 const SHORT_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000031');
 const ECHO_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000032');
+/**
+ * A UUID-shaped directory name in upper case. Canonical export writes a Space's
+ * id in lower case and nothing else, so no export can have written this one.
+ */
+const UPPER_CASE_NAME = 'B0000000-0000-4000-8000-0000000000FF';
 
 /**
  * What one Space's bytes look like is this file's whole subject, so every
@@ -313,6 +319,52 @@ describe('canonical export', () => {
         },
       ],
     });
+  });
+
+  /*
+   * Staging is a copy of the destination, and verification re-reads the staged
+   * copy through the ordinary import reader — which refuses a Space directory
+   * whose name is not its Space's id. So a directory the author put there would
+   * fail every export from that moment on, and the path the diagnostic names
+   * lives inside a staging root deleted before the operator can read it.
+   *
+   * The destination is checked first, and by the path that is really there.
+   */
+  it('refuses a destination holding a Space directory import could not read back', async () => {
+    const root = await makeTemporaryDirectory();
+    const destination = join(root, 'exported');
+    const drafts = join(destination, 'drafts');
+    await mkdir(drafts, { recursive: true });
+    await writeFile(join(drafts, 'space.json'), '{ "version": 1, "title": "Drafts" }\n');
+
+    const thrown = await captureError(() =>
+      exportAggregate(new MemorySpaceRepository([storedSpace], SPACE_ID), destination),
+    );
+
+    expect(thrown?.message).toContain(drafts);
+    expect(thrown?.message).not.toContain('hyper-export-');
+    // Nothing was staged beside the destination and nothing was written into it.
+    await expect(readdir(root)).resolves.toEqual(['exported']);
+    await expect(readdir(destination)).resolves.toEqual(['drafts']);
+  });
+
+  /*
+   * `z.string().uuid()` is case insensitive, so an upper-cased UUID name parses
+   * — and obsolete-directory removal is recursive. Canonical export only ever
+   * writes lower case, so such a directory is the author's, and the rule that
+   * justifies removing it ("a previous export wrote this") does not hold.
+   */
+  it('leaves a UUID-shaped directory no export could have written', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    await exportTo(repository, destination);
+    const authored = join(destination, UPPER_CASE_NAME);
+    await mkdir(authored);
+    await writeFile(join(authored, 'notes.md'), '# Notes\n');
+
+    await exportTo(repository, destination);
+
+    await expect(readFile(join(authored, 'notes.md'), 'utf8')).resolves.toBe('# Notes\n');
   });
 
   /**

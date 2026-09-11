@@ -1,9 +1,14 @@
 import { cp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { AGGREGATE_FILE_VERSION, uuidSchema, type AggregateFile, type UUID } from '@project/core';
+import { basename, join, resolve } from 'node:path';
+import { AGGREGATE_FILE_VERSION, type AggregateFile, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import type { LoadedAggregate } from '@project/persistence';
-import { AGGREGATE_FILE_NAME, readAggregate } from '../import/read-aggregate';
+import {
+  AGGREGATE_FILE_NAME,
+  discoverSpaceDirectories,
+  readAggregate,
+  spaceDirectoryId,
+} from '../import/read-aggregate';
 import type { SpaceRepository } from '../persistence/space-repository';
 import { compareOrdinal, writeSpaceDirectory } from './canonical-space';
 import {
@@ -35,11 +40,16 @@ const aggregateFile = (metaSpaceId: UUID): AggregateFile => ({
 /**
  * Drop the Space directories the aggregate no longer holds.
  *
- * A directory named for a UUID is one a previous export wrote, so a Space
+ * A directory named for a Space Id is one a previous export wrote, so a Space
  * deleted since then has to leave with it — otherwise the next import reads the
  * deletion back as a Space that still exists. Everything else the destination
  * carries is left alone: a directory this export did not name and cannot have
  * written is the author's, and re-export preserves it.
+ *
+ * `spaceDirectoryId` is what "cannot have written" means, and the canonical
+ * lower-case spelling it insists on is load-bearing here: removal is recursive,
+ * and `z.string().uuid()` alone would accept an upper-cased name this exporter
+ * never writes — an author's own directory, destroyed for looking like ours.
  */
 const removeObsoleteSpaceDirectories = async (
   directory: string,
@@ -48,8 +58,8 @@ const removeObsoleteSpaceDirectories = async (
   const entries = await readdir(directory, { withFileTypes: true });
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const named = uuidSchema.safeParse(entry.name);
-    if (!named.success || keep.has(named.data)) continue;
+    const id = spaceDirectoryId(entry.name);
+    if (id === undefined || keep.has(id)) continue;
     await rm(join(directory, entry.name), { recursive: true, force: true });
   }
 };
@@ -100,6 +110,37 @@ const stageAggregate = async (aggregate: LoadedAggregate, replacement: string): 
   }
 
   await verifyStagedAggregate(replacement, aggregate.metaSpaceId);
+};
+
+/**
+ * Refuse a destination holding a Space directory import could not read back,
+ * before anything is staged.
+ *
+ * Staging is a copy of the destination and verification re-reads the staged
+ * copy, so a Space directory the author left here under a name that is not its
+ * Space's id — an old flat-format Space, a hand-authored sample — fails every
+ * export from then on. And the diagnostic would name a path inside a staging
+ * root this function's caller deletes before the operator can read it, so the
+ * path they are told to fix would not exist.
+ *
+ * Checked here rather than answered by having the reader skip a directory it
+ * cannot name: that skip is the guard which stops a renamed Space directory
+ * importing as a fresh Space, and dropping it would trade a loud failure for a
+ * silent duplication.
+ */
+const rejectUnreadableSpaceDirectories = async (destination: string): Promise<void> => {
+  if (!(await exists(destination))) return;
+  const unreadable = (await discoverSpaceDirectories(destination)).filter(
+    (child) => spaceDirectoryId(basename(child)) === undefined,
+  );
+  if (unreadable.length === 0) return;
+  throw new Error(
+    [
+      'Export destination holds a Space directory that is not named for its Space, so the export could not be read back:',
+      ...unreadable,
+      'Rename each to its Space id in lower case, or move it out of the destination.',
+    ].join('\n'),
+  );
 };
 
 const rejectSymbolicLinks = async (
@@ -179,6 +220,7 @@ export const exportAggregate = async (
   const destination = resolve(destinationPath);
   await mkdir(resolve(destination, '..'), { recursive: true });
   await rejectSymbolicLinks(destination, aggregate);
+  await rejectUnreadableSpaceDirectories(destination);
 
   const stagingRoot = await createStagingRoot(destination);
   const replacement = join(stagingRoot, 'replacement');

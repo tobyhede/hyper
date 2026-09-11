@@ -62,6 +62,27 @@ const initialize = async (
 };
 
 /**
+ * Initialize from the truncate path, where `already-initialized` means a race
+ * was lost rather than an overwrite was refused.
+ *
+ * The operator passed `--dangerous-truncate`; the repository held nothing when
+ * `loadAggregate` read it and holds a Meta Space by the time this writes,
+ * because something else established one in between — `pnpm dev`'s startup, or a
+ * concurrent `hyper`. Answering `already-initialized` would tell them to re-run
+ * with the flag they just passed. It is the conflict outcome, whose sentence
+ * already gives the true advice: nothing was written, run the command again.
+ */
+const initializeUnderTruncate = async (
+  repository: SpaceRepository,
+  input: AggregateInput,
+): Promise<AggregateImportResult> => {
+  const result = await initialize(repository, input);
+  return result.kind === 'already-initialized'
+    ? { kind: 'conflict', currentMetaSpaceId: result.currentMetaSpaceId }
+    : result;
+};
+
+/**
  * Import one complete Meta-rooted aggregate from a canonical directory.
  *
  * Two doors, never a mode parameter on one (ADR 0078). Without
@@ -94,7 +115,7 @@ export const importAggregate = async (
   // truncate, and the flag is permission to destroy rather than a demand that
   // something be destroyed.
   const loaded = await repository.loadAggregate();
-  if (loaded.kind === 'uninitialized') return initialize(repository, input);
+  if (loaded.kind === 'uninitialized') return initializeUnderTruncate(repository, input);
 
   const replaced = await repository.replaceAggregate(input, loaded.aggregate.metaSpaceId);
   switch (replaced.kind) {
