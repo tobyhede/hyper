@@ -204,14 +204,13 @@ const exactRecord = (
  * needs concise corrective detail instead: the failing paths and their reasons,
  * nothing else.
  *
- * `describeSchemaFailure` in `src/persistence/postgres-space-repository.ts`
- * summarises an import failure in this same format — first three failing paths,
- * then a count of the rest — restated rather than shared, because one
- * server-side caller does not earn a string-formatting export from a
- * browser-safe package. That format is the whole of what the two owe each other,
- * so neither moves alone: one failure should not read one way at the CLI and
- * another on the wire. `test/unit/postgres-import-decoding.test.ts` holds them
- * to it.
+ * `describeSchemaFailure` in `src/import/identify-space.ts` summarises an import
+ * failure in this same format — first three failing paths, then a count of the
+ * rest — restated rather than shared, because one server-side caller does not
+ * earn a string-formatting export from a browser-safe package. That format is
+ * the whole of what the two owe each other, so neither moves alone: one failure
+ * should not read one way at the CLI and another on the wire.
+ * `test/unit/import-decoding.test.ts` holds them to it.
  *
  * That test also pins the two things this formula quietly assumes. The fold to
  * lower case loses nothing whose case is information — no message either schema

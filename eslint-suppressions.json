@@ -109,19 +109,9 @@
       "count": 1
     }
   },
-  "test/unit/import-space.test.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 6
-    }
-  },
   "test/unit/playwright-flake-policy.test.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1
-    }
-  },
-  "test/unit/postgres-import-decoding.test.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
     }
   },
   "test/unit/vite-hono-host.test.ts": {

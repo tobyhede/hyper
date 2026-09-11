@@ -1,11 +1,10 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
-import { exportSpace } from '../../src/export/export-space';
-import { readSingleSpace } from '../../src/import/read-single-space';
+import { exportAggregate } from '../../src/export/export-aggregate';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
@@ -20,6 +19,12 @@ const SHORT_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000031');
 const ECHO_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000032');
 
 /**
+ * What one Space's bytes look like is this file's whole subject, so every
+ * aggregate below holds exactly one Space and that Space is Meta. The aggregate
+ * shapes — the manifest, several Space directories, converging Space Things —
+ * belong to `aggregate-round-trip.test.ts`, which owns the round trip; a second
+ * Space here would only make the canonical form harder to read off the page.
+ *
  * Two Diagrams owning three Graphs between them, which is the only shape that
  * exercises what version 1 moved: a Graph reached through its owner rather than
  * through a Space-level array. The second Diagram's Graph shares no Thing with the
@@ -87,6 +92,19 @@ const makeTemporaryDirectory = async (): Promise<string> => {
   return directory;
 };
 
+/**
+ * Export, insisting the aggregate was there to export. `uninitialized` is a real
+ * answer rather than a failure, so a test that means to write bytes has to say
+ * which answer it expected or read an empty destination and blame the exporter.
+ */
+const exportTo = async (repository: MemorySpaceRepository, destination: string): Promise<void> => {
+  const result = await exportAggregate(repository, destination);
+  if (result.kind !== 'exported') throw new Error(`Export answered ${result.kind}`);
+};
+
+/** The Space's own directory under the aggregate root, named by its id. */
+const spaceFileIn = (destination: string): string => join(destination, SPACE_ID, 'space.json');
+
 afterEach(async () => {
   for (const directory of temporaryDirectories) {
     await rm(directory, { recursive: true, force: true });
@@ -99,9 +117,9 @@ describe('canonical export', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
-    await exportSpace(repository, SPACE_ID, destination);
+    await exportTo(repository, destination);
 
-    const written: unknown = JSON.parse(await readFile(join(destination, 'space.json'), 'utf8'));
+    const written: unknown = JSON.parse(await readFile(spaceFileIn(destination), 'utf8'));
     expect(written).toEqual({
       version: 1,
       id: SPACE_ID,
@@ -209,16 +227,16 @@ describe('canonical export', () => {
     const first = join(await makeTemporaryDirectory(), 'exported');
     const second = join(await makeTemporaryDirectory(), 'exported');
 
-    await exportSpace(new MemorySpaceRepository([storedSpace], SPACE_ID), SPACE_ID, first);
-    await exportSpace(new MemorySpaceRepository([shuffledStoredSpace], SPACE_ID), SPACE_ID, second);
+    await exportTo(new MemorySpaceRepository([storedSpace], SPACE_ID), first);
+    await exportTo(new MemorySpaceRepository([shuffledStoredSpace], SPACE_ID), second);
 
-    await expect(readFile(join(first, 'space.json'), 'utf8')).resolves.toBe(
-      await readFile(join(second, 'space.json'), 'utf8'),
+    await expect(readFile(spaceFileIn(first), 'utf8')).resolves.toBe(
+      await readFile(spaceFileIn(second), 'utf8'),
     );
     for (const thingId of [THING_A, THING_B, THING_E, THING_F]) {
-      await expect(readFile(join(first, 'things', `${thingId}.md`), 'utf8')).resolves.toBe(
-        await readFile(join(second, 'things', `${thingId}.md`), 'utf8'),
-      );
+      await expect(
+        readFile(join(first, SPACE_ID, 'things', `${thingId}.md`), 'utf8'),
+      ).resolves.toBe(await readFile(join(second, SPACE_ID, 'things', `${thingId}.md`), 'utf8'));
     }
   });
 
@@ -269,9 +287,9 @@ describe('canonical export', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpaceWithOpenSizes], SPACE_ID);
 
-    await exportSpace(repository, SPACE_ID, destination);
+    await exportTo(repository, destination);
 
-    const written = await readFile(join(destination, 'space.json'), 'utf8');
+    const written = await readFile(spaceFileIn(destination), 'utf8');
     // Positions export sorted by Thing id, so the Open Thing's rect is first and
     // the Closed Thing's remembered rect second.
     expect(exportedOpenSizeKeys(written)).toEqual([
@@ -298,36 +316,23 @@ describe('canonical export', () => {
   });
 
   /**
-   * Separate from the ordering above: this is the staged, validated replacement
-   * running over a destination it has already written, which is the path an
-   * author actually repeats.
+   * An uninitialized repository has no Meta Space, so there is no aggregate to
+   * write and no directory whose absence would be a defect — the answer is a
+   * kind rather than a thrown error, because "nothing has been created yet" is
+   * a state the command reports rather than a failure it recovers from.
+   *
+   * The parent directory is what proves nothing was written, not the
+   * destination: the staging root is minted *beside* the destination, so an
+   * exporter that started work and then noticed would leave a sibling behind
+   * where a check on the destination alone would still pass.
    */
-  it('re-exports over its own output without changing a byte', async () => {
-    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
-    const destination = join(await makeTemporaryDirectory(), 'exported');
+  it('writes nothing and answers uninitialized when the repository holds no aggregate', async () => {
+    const root = await makeTemporaryDirectory();
 
-    await exportSpace(repository, SPACE_ID, destination);
-    const afterFirst = await readFile(join(destination, 'space.json'), 'utf8');
-    await exportSpace(repository, SPACE_ID, destination);
+    await expect(
+      exportAggregate(new MemorySpaceRepository(), join(root, 'exported')),
+    ).resolves.toEqual({ kind: 'uninitialized' });
 
-    await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(afterFirst);
-  });
-
-  it('exports a directory that imports back as the Space it came from', async () => {
-    const destination = join(await makeTemporaryDirectory(), 'exported');
-    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
-
-    await exportSpace(repository, SPACE_ID, destination);
-
-    await expect(readSingleSpace(destination)).resolves.toEqual({
-      id: SPACE_ID,
-      document: storedSpace.snapshot.document,
-      things: [
-        { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-        { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
-        { id: THING_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
-        { id: THING_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
-      ],
-    });
+    await expect(readdir(root)).resolves.toEqual([]);
   });
 });

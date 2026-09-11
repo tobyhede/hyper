@@ -5,8 +5,11 @@ import { join } from 'node:path';
 import { uuidSchema } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { exportSpace } from '../../src/export/export-space';
+import { exportAggregate } from '../../src/export/export-aggregate';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
+
+const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
+const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 
 // SAFETY: `kind` starts `undefined` but is reassigned to 'backup'/'staging'
 // later (per test) — the cast states the mutable field's real type up front
@@ -31,10 +34,14 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       data: Parameters<typeof actual.writeFile>[1],
       options?: Parameters<typeof actual.writeFile>[2],
     ) =>
+      // A Space's file now sits under its own id inside the staged aggregate, so
+      // the manifest at the replacement root is already written by the time this
+      // fires — which is the point: the failure lands part-way through staging,
+      // where the destination has not been touched yet.
       cleanupFailure.replacementWrite &&
       typeof path === 'string' &&
       path.includes('.hyper-export-') &&
-      path.endsWith('/replacement/space.json')
+      path.endsWith(`/replacement/${SPACE_ID}/space.json`)
         ? Promise.reject(
             Object.assign(new Error(`ENOSPC: no space left on device, write '${path}'`), {
               code: 'ENOSPC',
@@ -57,9 +64,11 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   };
 });
 
-const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
-const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-
+/**
+ * One Space, and it is Meta: what is under test is the destination swap, and a
+ * second Space would add directories to copy without adding a way for the swap
+ * to fail. The whole-aggregate shapes belong to `aggregate-round-trip.test.ts`.
+ */
 const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
@@ -83,6 +92,17 @@ const makeTemporaryDirectory = async (): Promise<string> => {
   return directory;
 };
 
+/**
+ * A destination a previous export left behind, in the shape this one will find
+ * it: the Space's file inside the directory named for its id. Its content is
+ * recognizable rather than canonical, so a test can tell "still the old bytes"
+ * from "rewritten" without parsing anything.
+ */
+const previouslyExported = async (destination: string): Promise<void> => {
+  await mkdir(join(destination, SPACE_ID), { recursive: true });
+  await writeFile(join(destination, SPACE_ID, 'space.json'), 'previous space\n');
+};
+
 afterEach(async () => {
   cleanupFailure.kind = undefined;
   cleanupFailure.replacementWrite = false;
@@ -96,16 +116,15 @@ describe('canonical export recovery cleanup', () => {
   it('reports a completed export when the recovery copy cannot be removed after the swap', async () => {
     cleanupFailure.kind = 'backup';
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    await mkdir(destination);
-    await writeFile(join(destination, 'space.json'), 'previous space\n');
+    await previouslyExported(destination);
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
-    await expect(exportSpace(repository, SPACE_ID, destination)).resolves.toMatchObject({
-      revision: 7n,
+    await expect(exportAggregate(repository, destination)).resolves.toMatchObject({
+      kind: 'exported',
     });
 
     await expect(
-      readFile(join(destination, 'things', `${THING_ID}.md`), 'utf8'),
+      readFile(join(destination, SPACE_ID, 'things', `${THING_ID}.md`), 'utf8'),
     ).resolves.toContain(`id: ${THING_ID}`);
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: 7n,
@@ -117,12 +136,12 @@ describe('canonical export recovery cleanup', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
-    await expect(exportSpace(repository, SPACE_ID, destination)).resolves.toMatchObject({
-      revision: 7n,
+    await expect(exportAggregate(repository, destination)).resolves.toMatchObject({
+      kind: 'exported',
     });
 
     await expect(
-      readFile(join(destination, 'things', `${THING_ID}.md`), 'utf8'),
+      readFile(join(destination, SPACE_ID, 'things', `${THING_ID}.md`), 'utf8'),
     ).resolves.toContain(`id: ${THING_ID}`);
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: 7n,
@@ -132,16 +151,15 @@ describe('canonical export recovery cleanup', () => {
   it('preserves the export failure when staging cleanup also fails', async () => {
     cleanupFailure.kind = 'staging';
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    await mkdir(destination);
-    await writeFile(join(destination, 'space.json'), 'previous space\n');
+    await previouslyExported(destination);
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     cleanupFailure.replacementWrite = true;
 
-    await expect(exportSpace(repository, SPACE_ID, destination)).rejects.toMatchObject({
+    await expect(exportAggregate(repository, destination)).rejects.toMatchObject({
       code: 'ENOSPC',
     });
 
-    await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
+    await expect(readFile(join(destination, SPACE_ID, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
     );
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({

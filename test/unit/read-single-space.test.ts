@@ -3,11 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { loadSpace } from '@project/graph';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  SpaceImportFileError,
-  readImportBatch,
-  readSingleSpace,
-} from '../../src/import/read-single-space';
+import { SpaceImportFileError, readSingleSpace } from '../../src/import/read-single-space';
 import { captureError } from '../support/capture-error';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
@@ -348,59 +344,5 @@ describe('readSingleSpace', () => {
     if (!(thrown instanceof SpaceImportFileError)) return;
     expect(intake.errors).toHaveLength(1);
     expect(thrown.diagnostics[0]).toContain(intake.errors[0]?.message);
-  });
-});
-
-describe('readImportBatch', () => {
-  it('classifies a child-space probe failure as file discovery', async () => {
-    const collection = await makeTemporaryDirectory();
-    const unreadable = join(collection, 'unreadable');
-    await mkdir(unreadable);
-    await chmod(unreadable, 0o000);
-
-    const thrown = await captureError(() => readImportBatch(collection));
-    await chmod(unreadable, 0o700);
-
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
-    expect(thrown.kind).toBe('discovery');
-    expect(thrown.diagnostics.join('\n')).toContain(unreadable);
-  });
-
-  it('imports only immediate child spaces from a collection in directory order', async () => {
-    const collection = await makeTemporaryDirectory();
-    const first = join(collection, 'a-first');
-    const second = join(collection, 'b-second');
-    const nested = join(collection, 'wrapper', 'nested');
-    await mkdir(first);
-    await mkdir(second);
-    await mkdir(nested, { recursive: true });
-    await writeFile(join(first, 'space.json'), JSON.stringify({ version: 1, title: 'First' }));
-    await writeFile(join(second, 'space.json'), JSON.stringify({ version: 1, title: 'Second' }));
-    await writeFile(join(nested, 'space.json'), JSON.stringify({ version: 1, title: 'Nested' }));
-
-    const batch = await readImportBatch(collection);
-
-    expect(batch.map(({ document }) => document.title)).toEqual(['First', 'Second']);
-  });
-
-  it('reports parsing failures from every discovered child space together', async () => {
-    const collection = await makeTemporaryDirectory();
-    const first = join(collection, 'first');
-    const second = join(collection, 'second');
-    await mkdir(first);
-    await mkdir(second);
-    const firstSpaceFile = join(first, 'space.json');
-    const secondSpaceFile = join(second, 'space.json');
-    await writeFile(firstSpaceFile, '{ invalid first');
-    await writeFile(secondSpaceFile, '{ invalid second');
-
-    const thrown = await captureError(() => readImportBatch(collection));
-
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
-    expect(thrown.kind).toBe('parsing');
-    expect(thrown.diagnostics.join('\n')).toContain(firstSpaceFile);
-    expect(thrown.diagnostics.join('\n')).toContain(secondSpaceFile);
   });
 });

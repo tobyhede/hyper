@@ -1,4 +1,4 @@
-import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { expect, it } from 'vitest';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 
@@ -14,8 +14,8 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  *
  * It sits here rather than behind `@project/persistence/test-support`, where the
  * `SpaceBackend` contract lives, because `SpaceRepository` is declared in `src/`
- * — `importSpaces` and `markExported` are CLI capability and stay out of the
- * browser-safe package. `packages/persistence` may not import `src/` (its
+ * — the two aggregate lifecycle doors and `markExported` are CLI capability and
+ * stay out of the browser-safe package. `packages/persistence` may not import `src/` (its
  * tsconfig `paths` resolve only `core` and `graph`, and ESLint blocks the
  * relative escape), and both consumers of this suite are root tests, so there
  * is no package boundary to publish across.
@@ -178,10 +178,15 @@ const commitUpdate = (repository: SpaceRepository, snapshot: SpaceSnapshot, revi
   });
 
 /**
- * Seeding runs through `importSpaces` rather than through a constructor
- * argument, unlike the `SpaceBackend` contract. A repository backed by
- * PostgreSQL has no other door: rows only arrive by import or commit, and both
- * are part of the seam under test.
+ * Seeding runs through `initializeAggregate` rather than through a constructor
+ * argument, unlike the `SpaceBackend` contract. That is the door (ADR 0078):
+ * rows reach a PostgreSQL-backed repository only through the two lifecycle
+ * operations or a commit, all of which are part of the seam under test, and a
+ * test helper seeds through the same ones the product uses.
+ *
+ * The first Space named is the Meta identity, stated rather than inferred —
+ * every case below passes its whole aggregate in one call, so there is no batch
+ * position for Meta to be read off.
  */
 export const spaceRepositoryContract = (
   name: string,
@@ -197,9 +202,11 @@ export const spaceRepositoryContract = (
   };
 
   const seed = async (repository: SpaceRepository, ...spaces: readonly SpaceSnapshot[]) => {
-    const result = await repository.importSpaces(spaces, 'insert');
-    if (result.kind !== 'imported') throw new Error(`Seeding failed: ${result.message}`);
-    return result.spaces;
+    const meta = spaces[0];
+    if (meta === undefined) throw new Error('Seeding needs at least a Meta Space');
+    const result = await repository.initializeAggregate({ metaSpaceId: meta.id, spaces });
+    if (result.kind !== 'initialized') throw new Error(`Seeding failed: ${result.kind}`);
+    return result.aggregate.spaces;
   };
 
   it(`${name} initializes and replaces only through explicit Meta-rooted aggregates`, async () => {
@@ -393,13 +400,15 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} imports a Space, then lists, loads and commits it`, async () => {
+  it(`${name} stores an initialized Space, then lists, loads and commits it`, async () => {
     await withHarness(async (repository) => {
       const first = space(SPACE_ID, 'One', [THING_ID]);
 
-      await expect(repository.importSpaces([first], 'insert')).resolves.toEqual({
-        kind: 'imported',
-        spaces: [stored(first, 0n, null)],
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
+      ).resolves.toEqual({
+        kind: 'initialized',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
       });
       expect(new Set(await repository.listSpaces())).toEqual(
         new Set([{ id: SPACE_ID, title: 'One' }]),
@@ -864,16 +873,20 @@ export const spaceRepositoryContract = (
    * whole-snapshot `toEqual` comparisons throughout this suite are
    * order-sensitive on that array. Supplied here in descending order, because
    * every other case supplies them already sorted, where an unordered
-   * implementation passes.
+   * implementation passes. Both halves are asserted because both are reads:
+   * the aggregate an initialization answers with, and the Space loaded after a
+   * commit.
    */
   it(`${name} returns a Space's Things in ascending id order however they were supplied`, async () => {
     await withHarness(async (repository) => {
       const descending = space(SPACE_ID, 'Unordered', [OTHER_THING_ID, SECOND_THING_ID, THING_ID]);
       const ascending = space(SPACE_ID, 'Unordered', [THING_ID, SECOND_THING_ID, OTHER_THING_ID]);
 
-      await expect(repository.importSpaces([descending], 'insert')).resolves.toEqual({
-        kind: 'imported',
-        spaces: [stored(ascending, 0n, null)],
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [descending] }),
+      ).resolves.toEqual({
+        kind: 'initialized',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(ascending, 0n, null)] },
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(ascending, 0n, null));
 
@@ -907,205 +920,88 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} refuses a batch that repeats a Space identity, storing none of it`, async () => {
+  it(`${name} refuses an aggregate that repeats a Space identity, storing none of it`, async () => {
     await withHarness(async (repository) => {
-      const batch = [
+      const spaces = [
         space(SPACE_ID, 'First', [THING_ID]),
         space(SPACE_ID, 'Repeat', [OTHER_THING_ID]),
       ];
 
-      await expect(repository.importSpaces(batch, 'insert')).resolves.toMatchObject({
-        kind: 'rejected',
-        code: 'duplicate-identity',
-      });
+      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
+      expect(result.kind).toBe('aggregate-refused');
+      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ kind: 'duplicate-space-id', spaceId: SPACE_ID }),
+      );
       expect(await repository.listSpaces()).toEqual([]);
     });
   });
 
   /*
-   * A Thing repeated inside one batch is an identity collision; a Thing already
-   * owned by a stored Space is an ownership conflict. Two distinct codes for two
-   * distinct facts, and the pair is the reason this suite exists — the memory
-   * double folded them together twice before, which made it reject valid input
-   * under a code the real backend never returns for it.
+   * A Thing belongs to exactly one Space of the aggregate, and an aggregate
+   * that says otherwise is refused whole. There is no longer a second,
+   * insert-only reading in which a proposal collides with a Thing some
+   * *surviving stored* Space owns: both lifecycle doors take the aggregate
+   * entire, so what is stored after the call is what the call proposed, and
+   * ownership is settled inside that proposal alone (ADR 0078). The two
+   * distinct codes this pair of cases used to hold apart went with it.
    */
-  it(`${name} refuses a batch that repeats a Thing identity, storing none of it`, async () => {
+  it(`${name} refuses an aggregate that repeats a Thing identity, storing none of it`, async () => {
     await withHarness(async (repository) => {
-      const batch = [
+      const spaces = [
         space(SPACE_ID, 'First', [THING_ID]),
         space(OTHER_SPACE_ID, 'Second', [THING_ID]),
       ];
 
-      await expect(repository.importSpaces(batch, 'insert')).resolves.toEqual({
-        kind: 'rejected',
-        code: 'duplicate-identity',
-        message: `Duplicate thing identity "${THING_ID}"`,
-      });
+      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
+      expect(result.kind).toBe('aggregate-refused');
+      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ kind: 'duplicate-thing-id', thingId: THING_ID }),
+      );
       expect(await repository.listSpaces()).toEqual([]);
     });
   });
 
-  it(`${name} refuses a batch claiming a Thing a stored Space owns`, async () => {
-    await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
-      await seed(repository, first);
-
-      await expect(
-        repository.importSpaces([space(OTHER_SPACE_ID, 'Claimant', [THING_ID])], 'insert'),
-      ).resolves.toMatchObject({ kind: 'rejected', code: 'thing-ownership' });
-      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
-      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
-    });
-  });
-
-  it(`${name} refuses a Space identity it already stores, without touching it`, async () => {
-    await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
-      await seed(repository, first);
-      const later = [
-        space(OTHER_SPACE_ID, 'Must roll back', [OTHER_THING_ID]),
-        retitled(first, 'Reimported'),
-      ];
-
-      await expect(repository.importSpaces(later, 'insert')).resolves.toEqual({
-        kind: 'rejected',
-        code: 'duplicate-identity',
-        message: `Space ${SPACE_ID} already exists`,
-      });
-      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
-      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
-    });
-  });
-
-  it(`${name} refuses an import that fails domain intake, storing none of the batch`, async () => {
+  it(`${name} refuses an initialization that fails domain intake, storing none of it`, async () => {
     await withHarness(async (repository) => {
       const valid = space(SPACE_ID, 'Must roll back', [THING_ID]);
       const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_THING_ID);
 
-      await expect(repository.importSpaces([valid, dangling], 'insert')).resolves.toMatchObject({
-        kind: 'rejected',
-        code: 'invalid-snapshot',
-      });
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [valid, dangling] }),
+      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
+      // A refusal stores none of what it was offered, not even the Space that
+      // would have loaded on its own.
       expect(await repository.listSpaces()).toEqual([]);
     });
   });
 
   /*
-   * A batch can be both, and only one code comes back.
-   * `PostgresSpaceRepository` settles that before its transaction opens: shape
-   * and then batch identity run over the whole batch, while domain intake runs
-   * per Space inside it. Identity therefore wins over intake whatever order the
-   * batch is in, and the double has to lose the same way round — otherwise the
-   * CLI names a different fault for the same directory depending on backend.
+   * Replacement drops every stored Space, so a Thing a doomed Space owns is free
+   * for the replacement to claim. Ownership is judged against what the
+   * replacement proposes, never against what the same call is about to delete —
+   * which is what taking the aggregate entire buys over inserting into whatever
+   * is already there.
    */
-  it(`${name} answers a batch that is both duplicated and domain-invalid with the duplicate`, async () => {
-    await withHarness(async (repository) => {
-      const dangling = spaceWithDanglingEdge(SPACE_ID, 'Dangling', THING_ID);
-      const repeated = space(SPACE_ID, 'Repeat', [OTHER_THING_ID]);
-
-      await expect(repository.importSpaces([dangling, repeated], 'insert')).resolves.toMatchObject({
-        kind: 'rejected',
-        code: 'duplicate-identity',
-      });
-      expect(await repository.listSpaces()).toEqual([]);
-    });
-  });
-
-  /*
-   * Truncation drops every stored Space, so a Thing a doomed Space owns is free.
-   * Ownership is judged against what survives the call, never against what the
-   * same call is about to delete.
-   */
-  it(`${name} replaces everything stored in truncate mode, freeing the Thing ids it clears`, async () => {
+  it(`${name} replaces everything stored, freeing the Thing ids it clears`, async () => {
     await withHarness(async (repository) => {
       await seed(repository, space(SPACE_ID, 'Cleared', [THING_ID]));
       const replacement = space(OTHER_SPACE_ID, 'Replacement', [THING_ID]);
 
-      await expect(repository.importSpaces([replacement], 'truncate')).resolves.toEqual({
-        kind: 'imported',
-        spaces: [stored(replacement, 0n, null)],
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: OTHER_SPACE_ID, spaces: [replacement] },
+          SPACE_ID,
+        ),
+      ).resolves.toEqual({
+        kind: 'replaced',
+        aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(replacement, 0n, null)] },
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
       expect(new Set(await repository.listSpaces())).toEqual(
         new Set([{ id: OTHER_SPACE_ID, title: 'Replacement' }]),
       );
-    });
-  });
-
-  /*
-   * A graph id is minted where the graph now lives — under the diagram that owns
-   * it — and in the same pass as that diagram's own id, before the snapshot faces
-   * domain intake and before the first thing is written. Two id-less diagrams,
-   * because minting under one owner reads the same whether the pass walks
-   * diagrams or flattens them, and only a second owner tells those apart.
-   */
-  it(`${name} mints every identity an import leaves out, keeping the explicit ones`, async () => {
-    await withHarness(async (repository) => {
-      const input: ImportSpace = {
-        document: {
-          version: 1,
-          title: 'Partly identified',
-          diagrams: [
-            {
-              title: 'Minted diagram',
-              kind: 'positioned',
-              positions: {
-                [THING_ID]: { x: 4, y: 8, open: false },
-                [SECOND_THING_ID]: { x: 12, y: 16, open: false },
-              },
-              graphs: [
-                { title: 'Explicit things', edges: [{ from: THING_ID, to: SECOND_THING_ID }] },
-              ],
-            },
-            {
-              title: 'Second minted diagram',
-              kind: 'positioned',
-              positions: { [THING_ID]: { x: 0, y: 0, open: false } },
-              graphs: [
-                {
-                  id: GRAPH_ID,
-                  title: 'Explicit graph',
-                  edges: [{ from: THING_ID, to: THING_ID }],
-                },
-              ],
-            },
-          ],
-        },
-        things: [
-          thing(THING_ID, 'First'),
-          thing(SECOND_THING_ID, 'Second'),
-          { document: { title: 'Minted', kind: 'markdown', body: 'Minted' } },
-        ],
-      };
-
-      const result = await repository.importSpaces([input], 'insert');
-      expect(result.kind).toBe('imported');
-      if (result.kind !== 'imported') throw new Error(result.message);
-      const [only] = result.spaces;
-      if (only === undefined) throw new Error('Import returned no Space');
-
-      const minted = only.snapshot.things.find(
-        ({ id }) => id !== THING_ID && id !== SECOND_THING_ID,
-      );
-      const [diagram, second] = only.snapshot.document.diagrams ?? [];
-      if (minted === undefined) throw new Error('The id-less thing kept no identity');
-      if (diagram === undefined || second === undefined)
-        throw new Error('Structure was not stored');
-      const graph = diagram.graphs[0];
-      if (graph === undefined) throw new Error('The diagram owns no graph');
-
-      const identities = [only.snapshot.id, minted.id, graph.id, diagram.id, second.id];
-      for (const id of identities) expect(uuidSchema.safeParse(id).success).toBe(true);
-      expect(new Set(identities).size).toBe(identities.length);
-      expect(graph.edges).toEqual([{ from: THING_ID, to: SECOND_THING_ID }]);
-      expect(diagram.positions).toEqual({
-        [THING_ID]: { x: 4, y: 8, open: false },
-        [SECOND_THING_ID]: { x: 12, y: 16, open: false },
-      });
-      // The explicit graph id is kept, and kept under its own owner rather than
-      // pooled with the minted one.
-      expect(second.graphs.map(({ id }) => id)).toEqual([GRAPH_ID]);
-      await expect(repository.loadSpace(only.snapshot.id)).resolves.toEqual(only);
     });
   });
 };

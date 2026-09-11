@@ -1,40 +1,32 @@
-import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   AggregateInvariantError,
   createWorkingSpaceLoader,
   type LoadedSpace,
 } from '@project/persistence';
-import { afterAll, afterEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
-import type {
-  ImportMode,
-  RepositoryImportResult,
-  SpaceRepository,
-} from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { db } from '../../src/prisma/db';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { spaceRepositoryContract } from '../support/repository-contract';
 
-expectTypeOf<Parameters<SpaceRepository['importSpaces']>[0]>().toEqualTypeOf<
-  readonly ImportSpace[]
->();
-expectTypeOf<Parameters<SpaceRepository['importSpaces']>[1]>().toEqualTypeOf<ImportMode>();
-
 /**
  * Every Hyper row, gone. The same thing `--dangerous-truncate` does, and safe
- * for the same reason the truncate-mode tests below are: `fileParallelism` is
+ * for the same reason the replacement cases below are: `fileParallelism` is
  * off, so one integration file at a time owns the single `DATABASE_URL`.
  */
 /*
  * Declared before the suite below so it runs before it, and therefore before the
  * `afterAll` that closes the connection. The harness owns a clean database at
- * both ends rather than tracking the ids it created: half these cases are about
- * what a rejected batch leaves behind, and a per-id cleanup list would be
- * written from the same assumption the test is checking.
+ * both ends rather than tracking the ids it created: several of these cases are
+ * about what a refused proposal leaves behind, and a per-id cleanup list would
+ * be written from the same assumption the test is checking.
  */
 // Deliberately unseeded: a repository has to reach a committable state from an
-// empty store on its own, and every case here begins by importing the contract's
-// Meta Space. Seeding it by hand hid that the PostgreSQL adapter could not.
+// empty store on its own, and every case here begins by establishing the
+// contract's Meta Space through `initializeAggregate`. Seeding it by hand hid
+// that the PostgreSQL adapter could not.
 spaceRepositoryContract('PostgresSpaceRepository', async () => {
   await clearHyperContent();
   const repository = new PostgresSpaceRepository(db);
@@ -47,7 +39,6 @@ spaceRepositoryContract('PostgresSpaceRepository', async () => {
       repository.replaceAggregate(input, expectedMetaSpaceId),
     commit: (request) => repository.commit(request),
     markExported: (id, revision) => repository.markExported(id, revision),
-    importSpaces: (input, mode) => repository.importSpaces(input, mode),
   };
   return { repository: harness, close: clearHyperContent };
 });
@@ -63,11 +54,9 @@ const OTHER_THING_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
 const CONCURRENT_SPACE_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
 const CONCURRENT_THING_ID = uuidSchema.parse('9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a');
 const MIXED_FIRST_THING_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-const MIXED_SECOND_THING_ID = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 const UNRESOLVED_THING_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 const ORDERED_SPACE_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
-const ALL_IDLESS_THING_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
-const SECOND_IDLESS_THING_ID = uuidSchema.parse('fefefefe-fefe-4fef-8fef-fefefefefefe');
+const LINK_THING_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
 const DIAGRAM_ID = uuidSchema.parse('0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a');
 const OTHER_DIAGRAM_ID = uuidSchema.parse('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
 const OTHER_SPACE_DIAGRAM_ID = uuidSchema.parse('0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c');
@@ -161,73 +150,35 @@ const concurrentSnapshot: SpaceSnapshot = {
   ],
 };
 
-const mixedImport: ImportSpace = {
-  document: {
-    version: 1,
-    title: 'Mixed identity space',
-    diagrams: [
-      {
-        title: 'Mixed diagram',
-        kind: 'positioned',
-        positions: {
-          [MIXED_FIRST_THING_ID]: { x: 40, y: 80, open: false },
-          [MIXED_SECOND_THING_ID]: { x: 300, y: 80, open: false },
-        },
-        graphs: [
-          {
-            title: 'Explicit thing graph',
-            edges: [{ from: MIXED_FIRST_THING_ID, to: MIXED_SECOND_THING_ID }],
-          },
-        ],
-      },
-    ],
-  },
+/**
+ * `snapshot` with the Space Thing that makes `otherSnapshot` part of the same
+ * aggregate.
+ *
+ * A two-Space seed is not two Spaces side by side any more. Complete aggregate
+ * intake refuses an ordinary Space nothing references
+ * (`ordinary-space-unreferenced`), and both lifecycle doors ask it before they
+ * write — so the pair that used to arrive through two insert-mode imports has
+ * to arrive as one aggregate with Meta reaching the other Space (ADR 0078).
+ *
+ * It selects `otherSnapshot`'s own Diagram and Graph, which a Space Thing names
+ * from the moment it exists (ADR 0079).
+ */
+const linkedSnapshot: SpaceSnapshot = {
+  ...snapshot,
   things: [
+    ...snapshot.things,
     {
-      id: MIXED_FIRST_THING_ID,
-      document: { title: 'First explicit thing', kind: 'markdown', body: 'First.' },
-    },
-    {
-      id: MIXED_SECOND_THING_ID,
-      document: { title: 'Second explicit thing', kind: 'markdown', body: 'Second.' },
-    },
-    {
-      document: { title: 'Generated thing', kind: 'markdown', body: 'Generated.' },
+      id: LINK_THING_ID,
+      document: {
+        title: 'Other Space',
+        kind: 'space',
+        spaceId: OTHER_SPACE_ID,
+        diagram: OTHER_SPACE_DIAGRAM_ID,
+        graph: OTHER_SPACE_GRAPH_ID,
+      },
     },
   ],
 };
-
-/**
- * Every id an import may leave out, left out — which under version 1 is
- * everything except the thing an edge names.
- *
- * A diagram owns at least one graph, a graph holds at least one edge, and an
- * edge names its endpoints by id, so a thing an edge reaches cannot be id-less
- * and still be reachable: there would be no value to write in the edge. The
- * thing id is therefore the one identity supplied, and it is a parameter because
- * things are rows — a second import reusing it would collide on the primary key
- * and be rejected, which is a different fact from the one below.
- */
-const idlessImport = (thingId: UUID): ImportSpace => ({
-  document: {
-    version: 1,
-    title: 'All generated identities',
-    diagrams: [
-      {
-        title: 'Generated diagram',
-        kind: 'positioned',
-        positions: { [thingId]: { x: 0, y: 0, open: false } },
-        graphs: [{ title: 'Generated graph', edges: [{ from: thingId, to: thingId }] }],
-      },
-    ],
-  },
-  things: [
-    {
-      id: thingId,
-      document: { title: 'Generated only thing', kind: 'markdown', body: 'Generated.' },
-    },
-  ],
-});
 
 describe('PostgresSpaceRepository', () => {
   const repository = new PostgresSpaceRepository(db);
@@ -237,9 +188,20 @@ describe('PostgresSpaceRepository', () => {
       changes: [{ kind: 'update', spaceId: next.id, snapshot: next, expectedRevision }],
     });
 
-  const trackImported = (result: RepositoryImportResult): void => {
-    if (result.kind !== 'imported') return;
-    for (const stored of result.spaces) createdSpaceIds.add(stored.snapshot.id);
+  /**
+   * Establish the aggregate a case starts from, and fail loudly if it did not.
+   *
+   * Every seed goes through `initializeAggregate`, which is one of the two
+   * lifecycle doors left (ADR 0078) and the only one that establishes first
+   * state. It names Meta outright, so a fixture no longer says which Space is
+   * the root by putting it first.
+   */
+  const seed = async (metaSpaceId: UUID, spaces: readonly SpaceSnapshot[]): Promise<void> => {
+    for (const space of spaces) createdSpaceIds.add(space.id);
+    const result = await repository.initializeAggregate({ metaSpaceId, spaces });
+    if (result.kind !== 'initialized') {
+      throw new Error(`Could not seed the aggregate: ${result.kind}`);
+    }
   };
 
   afterEach(async () => {
@@ -289,17 +251,27 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
   });
 
-  it('imports a completely identified space and exposes it through load and list', async () => {
-    const imported = await repository.importSpaces([snapshot]);
-
-    expect(imported).toEqual({
-      kind: 'imported',
-      spaces: [{ snapshot, revision: 0n, exportedRevision: null }],
+  it('initializes a completely identified aggregate and exposes it through load and list', async () => {
+    createdSpaceIds.add(SPACE_ID);
+    const initialized = await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [snapshot],
     });
-    if (imported.kind !== 'imported') {
-      throw new Error(imported.message);
+
+    // The whole aggregate comes back, Meta identity included — the door
+    // establishes a repository rather than inserting a Space, so what it
+    // answers with is the repository's new state (ADR 0078).
+    expect(initialized).toEqual({
+      kind: 'initialized',
+      aggregate: {
+        metaSpaceId: SPACE_ID,
+        spaces: [{ snapshot, revision: 0n, exportedRevision: null }],
+      },
+    });
+    if (initialized.kind !== 'initialized') {
+      throw new Error(`The aggregate was not established: ${initialized.kind}`);
     }
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(imported.spaces[0]);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(initialized.aggregate.spaces[0]);
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Repository space' },
     ]);
@@ -460,82 +432,8 @@ describe('PostgresSpaceRepository', () => {
     ]).toContainEqual(loaded);
   });
 
-  /*
-   * A truncating import that cannot replace the aggregate must fail, not become
-   * an insert.
-   *
-   * `replaceAggregate` reads every revision without a lock, then locks each row
-   * and reads it again. An authored update that commits in between moves the
-   * revision and rolls the replacement back as a `conflict` -- and an ordinary
-   * update reaches this, because `commitTopologyPreservingUpdate` holds no Meta
-   * lock and so runs while the replacement holds one. The blocking transaction
-   * below stands in for that update, and holds the row lock so the replacement
-   * has to read its baseline first.
-   *
-   * `importSpaces` used to let that `conflict` fall out of its truncate branch
-   * into the insert path below it. The batch was then written beside the data
-   * the truncate was to remove, and answered `imported`: the CLI printed
-   * `Imported space <id> at revision 0` for a truncate that never happened.
-   */
-  it('fails a truncating import that cannot replace the aggregate, storing none of it', async () => {
-    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
-
-    const updateApplied = Promise.withResolvers<undefined>();
-    const releaseCommit = Promise.withResolvers<undefined>();
-    const committing = db.transaction(async ({ orm }) => {
-      await orm.public.Space.where({ id: SPACE_ID }).update({
-        document: { version: 1, title: 'Authored winner' },
-        revision: 1,
-      });
-      updateApplied.resolve(undefined);
-      await releaseCommit.promise;
-    });
-    await updateApplied.promise;
-
-    const importing = repository.importSpaces(
-      [
-        {
-          id: CONCURRENT_SPACE_ID,
-          document: { version: 1, title: 'Truncating import' },
-          things: [
-            {
-              id: CONCURRENT_THING_ID,
-              document: { title: 'Imported thing', kind: 'markdown', body: 'Imported.' },
-            },
-          ],
-        },
-      ],
-      'truncate',
-    );
-    // Settled only once the authored update releases the row: the replacement
-    // reads its baseline before that and then waits for the lock.
-    let settled = false;
-    void importing.then(
-      () => (settled = true),
-      () => (settled = true),
-    );
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    expect(settled).toBe(false);
-
-    releaseCommit.resolve(undefined);
-    await committing;
-
-    await expect(importing).rejects.toThrow(
-      'Truncating import could not replace the aggregate: conflict',
-    );
-    // The rollback left the store as the authored update wrote it, and the
-    // batch is nowhere: neither replacing it nor added beside it.
-    await expect(repository.listSpaces()).resolves.toEqual([
-      { id: SPACE_ID, title: 'Authored winner' },
-    ]);
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({ revision: 1n });
-    await expect(repository.loadSpace(CONCURRENT_SPACE_ID)).resolves.toBeUndefined();
-  });
-
   it('persists first-working-load initialization for a fresh repository host', async () => {
-    const imported = await repository.importSpaces([snapshot]);
-    trackImported(imported);
-    if (imported.kind !== 'imported') throw new Error(imported.message);
+    await seed(SPACE_ID, [snapshot]);
 
     const ids = [DIAGRAM_ID, GRAPH_ID];
     const first = await createWorkingSpaceLoader(repository, () => {
@@ -564,8 +462,7 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('prevents direct deletion of the Meta Space while repository state names it', async () => {
-    const imported = await repository.importSpaces([snapshot]);
-    trackImported(imported);
+    await seed(SPACE_ID, [snapshot]);
 
     await expect(db.orm.public.Space.where({ id: SPACE_ID }).delete()).rejects.toThrow(
       'repository_state_meta_space_id_fkey',
@@ -578,8 +475,7 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('commits a topology-preserving edit without waiting for the repository singleton lock', async () => {
-    const imported = await repository.importSpaces([snapshot]);
-    trackImported(imported);
+    await seed(SPACE_ID, [snapshot]);
     const lockAcquired = Promise.withResolvers<undefined>();
     const releaseLock = Promise.withResolvers<undefined>();
     const blocker = db.transaction(async ({ orm }) => {
@@ -613,8 +509,7 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('refuses an unlocked single-Space write whose row moved after it read the revision', async () => {
-    const imported = await repository.importSpaces([snapshot]);
-    trackImported(imported);
+    await seed(SPACE_ID, [snapshot]);
 
     /*
      * The same lost update as the multi-Space case below, on the path that has
@@ -658,24 +553,7 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('refuses a multi-Space write whose row moved after the conflict check read it', async () => {
-    const linked: SpaceSnapshot = {
-      ...snapshot,
-      things: [
-        ...snapshot.things,
-        {
-          id: MISSING_THING_ID,
-          document: {
-            title: 'Link',
-            kind: 'space',
-            spaceId: OTHER_SPACE_ID,
-            diagram: OTHER_SPACE_DIAGRAM_ID,
-            graph: OTHER_SPACE_GRAPH_ID,
-          },
-        },
-      ],
-    };
-    const imported = await repository.importSpaces([linked, otherSnapshot]);
-    trackImported(imported);
+    await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
 
     /*
      * The lost update this closes is only reachable from the *other* writer:
@@ -713,7 +591,10 @@ describe('PostgresSpaceRepository', () => {
         {
           kind: 'update',
           spaceId: SPACE_ID,
-          snapshot: { ...linked, document: { ...linked.document, title: 'Coordinated meta' } },
+          snapshot: {
+            ...linkedSnapshot,
+            document: { ...linkedSnapshot.document, title: 'Coordinated meta' },
+          },
           expectedRevision: 0n,
         },
         {
@@ -765,7 +646,7 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('commits an authoritative complete snapshot and advances its revision', async () => {
-    await repository.importSpaces([snapshot]);
+    await seed(SPACE_ID, [snapshot]);
     const changed: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Committed space' },
@@ -794,10 +675,10 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('records the projected revision without hiding a concurrent edit', async () => {
-    await repository.importSpaces([snapshot]);
+    await seed(SPACE_ID, [snapshot]);
     const exported = await repository.loadSpace(SPACE_ID);
     expect(exported).toBeDefined();
-    if (exported === undefined) throw new Error('Imported space disappeared');
+    if (exported === undefined) throw new Error('The seeded space disappeared');
     const changed: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Edited during export' },
@@ -818,7 +699,7 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('returns the current aggregate for a stale revision without changing it', async () => {
-    await repository.importSpaces([snapshot]);
+    await seed(SPACE_ID, [snapshot]);
     const current: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Current space' },
@@ -856,7 +737,7 @@ describe('PostgresSpaceRepository', () => {
         },
       ],
     });
-    await repository.importSpaces([atRevision(0)]);
+    await seed(SPACE_ID, [atRevision(0)]);
 
     const writeRevisions = async () => {
       for (let revision = 1; revision <= 50; revision += 1) {
@@ -872,7 +753,7 @@ describe('PostgresSpaceRepository', () => {
       for (let read = 0; read < 75; read += 1) {
         const loaded = await repository.loadSpace(SPACE_ID);
         expect(loaded).toBeDefined();
-        if (loaded === undefined) throw new Error('Imported space disappeared');
+        if (loaded === undefined) throw new Error('The seeded space disappeared');
 
         const marker = `Revision ${loaded.revision}`;
         expect(loaded.snapshot.document.title).toBe(marker);
@@ -894,16 +775,21 @@ describe('PostgresSpaceRepository', () => {
       id,
       document: { title, kind: 'markdown' as const, body: title },
     });
-    const result = await repository.importSpaces([
-      {
-        id: ORDERED_SPACE_ID,
-        document: { version: 1, title: 'Ordered things' },
-        things: [thing(third, 'Third'), thing(second, 'Second'), thing(first, 'First')],
-      },
-    ]);
-    trackImported(result);
-    expect(result.kind).toBe('imported');
-    if (result.kind !== 'imported') throw new Error(result.message);
+    createdSpaceIds.add(ORDERED_SPACE_ID);
+    const result = await repository.initializeAggregate({
+      metaSpaceId: ORDERED_SPACE_ID,
+      spaces: [
+        {
+          id: ORDERED_SPACE_ID,
+          document: { version: 1, title: 'Ordered things' },
+          things: [thing(third, 'Third'), thing(second, 'Second'), thing(first, 'First')],
+        },
+      ],
+    });
+    expect(result.kind).toBe('initialized');
+    if (result.kind !== 'initialized') {
+      throw new Error(`The aggregate was not established: ${result.kind}`);
+    }
 
     const order = (stored: LoadedSpace) => ({
       ids: stored.snapshot.things.map((thing) => thing.id),
@@ -911,15 +797,16 @@ describe('PostgresSpaceRepository', () => {
     });
     const ascending = { ids: [first, second, third], titles: ['First', 'Second', 'Third'] };
 
-    // Two reads, not one: the import result comes from the read-back inside the
-    // import transaction, and `loadSpace` is the same aggregate read outside
-    // one. Only asserting the second would leave the in-transaction path — the
-    // one place this read sees uncommitted rows — unordered and unnoticed.
-    expect(order(result.spaces[0]!)).toEqual(ascending);
+    // Two reads, not one: the aggregate the door answers with comes from the
+    // read-back inside its own transaction, and `loadSpace` is the same
+    // aggregate read outside one. Only asserting the second would leave the
+    // in-transaction path — the one place this read sees uncommitted rows —
+    // unordered and unnoticed.
+    expect(order(result.aggregate.spaces[0]!)).toEqual(ascending);
 
     const loaded = await repository.loadSpace(ORDERED_SPACE_ID);
     expect(loaded).toBeDefined();
-    if (loaded === undefined) throw new Error('Imported space disappeared');
+    if (loaded === undefined) throw new Error('The seeded space disappeared');
     expect(order(loaded)).toEqual(ascending);
   });
 
@@ -938,7 +825,7 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('rejects a domain-invalid snapshot without changing the stored aggregate', async () => {
-    await repository.importSpaces([snapshot]);
+    await seed(SPACE_ID, [snapshot]);
     const invalid: SpaceSnapshot = {
       ...snapshot,
       document: {
@@ -972,34 +859,18 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('rejects a thing owned by another space and rolls back the whole commit', async () => {
-    const linked: SpaceSnapshot = {
-      ...snapshot,
-      things: [
-        ...snapshot.things,
-        {
-          id: MISSING_THING_ID,
-          document: {
-            title: 'Other Space',
-            kind: 'space',
-            spaceId: OTHER_SPACE_ID,
-            diagram: OTHER_SPACE_DIAGRAM_ID,
-            graph: OTHER_SPACE_GRAPH_ID,
-          },
-        },
-      ],
-    };
-    await repository.importSpaces([linked, otherSnapshot]);
+    await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
     const claimed: SpaceSnapshot = {
-      ...linked,
-      document: { ...linked.document, title: 'Must roll back' },
-      things: [...linked.things, otherSnapshot.things[0]!],
+      ...linkedSnapshot,
+      document: { ...linkedSnapshot.document, title: 'Must roll back' },
+      things: [...linkedSnapshot.things, otherSnapshot.things[0]!],
     };
 
     await expect(commitSpace(claimed, 0n)).resolves.toMatchObject({
       kind: 'aggregate-refused',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: linked,
+      snapshot: linkedSnapshot,
       revision: 0n,
       exportedRevision: null,
     });
@@ -1011,7 +882,7 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('serializes concurrent topology commits so the loser observes the complete winner', async () => {
-    await repository.importSpaces([snapshot]);
+    await seed(SPACE_ID, [snapshot]);
     const firstRepository = new PostgresSpaceRepository(db);
     const secondRepository = new PostgresSpaceRepository(db);
     const firstTarget: SpaceSnapshot = {
@@ -1142,55 +1013,27 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(losingTargetId)).resolves.toBeUndefined();
   });
 
-  it('rejects an existing space identity without changing stored content', async () => {
-    await repository.importSpaces([snapshot]);
-    await repository.importSpaces([otherSnapshot]);
-    const suppliedThing = {
-      ...snapshot.things[0]!,
-      document: {
-        ...snapshot.things[0]!.document,
-        title: 'Updated by import',
-      },
-    };
-    const reimported: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Reimported space' },
-      things: [suppliedThing],
-    };
-
-    // An identity rejection, not a conflict. Insert-only import runs no
-    // optimistic revision operation, so there is no revision to disagree
-    // about — the id was simply already taken. `conflict` is reserved for a
-    // genuine race, proven by the concurrent-import test below.
-    await expect(repository.importSpaces([reimported])).resolves.toEqual({
-      kind: 'rejected',
-      code: 'duplicate-identity',
-      message: `Space ${SPACE_ID} already exists`,
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual({
-      snapshot: otherSnapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-  });
-
-  it('replaces every stored space and thing in truncate mode', async () => {
-    await repository.importSpaces([snapshot]);
-    await repository.importSpaces([otherSnapshot]);
+  it('replaces every stored Space and Thing when the aggregate is replaced', async () => {
+    await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
     const replacement: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Only remaining space' },
       things: [snapshot.things[0]!],
     };
 
-    await expect(repository.importSpaces([replacement], 'truncate')).resolves.toEqual({
-      kind: 'imported',
-      spaces: [{ snapshot: replacement, revision: 0n, exportedRevision: null }],
+    // Authorized by the Meta identity the caller is replacing, not by a mode
+    // parameter (ADR 0078). The proposal drops both the Space Thing and the
+    // Space it reached, which is the only way `otherSnapshot` can leave — a
+    // proposal keeping the link and dropping the target would be refused as a
+    // missing Space Thing target rather than performed.
+    await expect(
+      repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [replacement] }, SPACE_ID),
+    ).resolves.toEqual({
+      kind: 'replaced',
+      aggregate: {
+        metaSpaceId: SPACE_ID,
+        spaces: [{ snapshot: replacement, revision: 0n, exportedRevision: null }],
+      },
     });
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Only remaining space' },
@@ -1203,24 +1046,26 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
   });
 
-  it('rolls back truncation and every earlier batch write when later validation fails', async () => {
-    await repository.importSpaces([snapshot]);
-    await repository.importSpaces([otherSnapshot]);
+  it('refuses an invalid replacement before it truncates anything', async () => {
+    await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
     const replacement: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Must roll back' },
     };
-    const invalid: ImportSpace = {
+    const invalid: SpaceSnapshot = {
+      id: CONCURRENT_SPACE_ID,
       document: {
         version: 1,
         title: 'Invalid later space',
         diagrams: [
           {
+            id: DIAGRAM_ID,
             title: 'Dangling diagram',
             kind: 'positioned',
             positions: {},
             graphs: [
               {
+                id: GRAPH_ID,
                 title: 'Dangling graph',
                 edges: [{ from: UNRESOLVED_THING_ID, to: MISSING_THING_ID }],
               },
@@ -1231,11 +1076,19 @@ describe('PostgresSpaceRepository', () => {
       things: [],
     };
 
+    // Complete intake runs before the transaction opens, so "rolls back" is now
+    // "never started": there is one validated proposal rather than a batch
+    // written Space by Space, and a refusal cannot leave half of it behind.
+    // What still has to hold is the stored side — both seeded Spaces untouched
+    // at the revision they were seeded at.
     await expect(
-      repository.importSpaces([replacement, invalid], 'truncate'),
-    ).resolves.toMatchObject({ kind: 'rejected', code: 'invalid-snapshot' });
+      repository.replaceAggregate(
+        { metaSpaceId: SPACE_ID, spaces: [replacement, invalid] },
+        SPACE_ID,
+      ),
+    ).resolves.toMatchObject({ kind: 'aggregate-refused' });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot,
+      snapshot: linkedSnapshot,
       revision: 0n,
       exportedRevision: null,
     });
@@ -1244,188 +1097,11 @@ describe('PostgresSpaceRepository', () => {
       revision: 0n,
       exportedRevision: null,
     });
-  });
-
-  it('allocates every missing identity without rewriting explicit references', async () => {
-    const result = await repository.importSpaces([mixedImport]);
-    trackImported(result);
-    expect(result.kind).toBe('imported');
-    if (result.kind !== 'imported') {
-      throw new Error(result.message);
-    }
-
-    const stored = result.spaces[0]!;
-    const diagram = stored.snapshot.document.diagrams?.[0];
-    expect(diagram).toBeDefined();
-    if (diagram === undefined) throw new Error('Generated diagram was not returned');
-    const graph = diagram.graphs[0]!;
-    const generatedThing = stored.snapshot.things.find(
-      ({ id }) => id !== MIXED_FIRST_THING_ID && id !== MIXED_SECOND_THING_ID,
-    );
-    expect(generatedThing).toBeDefined();
-    if (generatedThing === undefined) throw new Error('Generated thing was not returned');
-    const generatedIds = [stored.snapshot.id, generatedThing.id, graph.id, diagram.id];
-
-    for (const id of generatedIds) expect(uuidSchema.safeParse(id).success).toBe(true);
-    expect(new Set(generatedIds).size).toBe(4);
-    expect(generatedIds).not.toContain(MIXED_FIRST_THING_ID);
-    expect(generatedIds).not.toContain(MIXED_SECOND_THING_ID);
-    expect(new Set(stored.snapshot.things.map(({ id }) => id))).toEqual(
-      new Set([MIXED_FIRST_THING_ID, MIXED_SECOND_THING_ID, generatedThing.id]),
-    );
-    expect(graph.edges).toEqual([{ from: MIXED_FIRST_THING_ID, to: MIXED_SECOND_THING_ID }]);
-    expect(diagram.positions).toEqual({
-      [MIXED_FIRST_THING_ID]: { x: 40, y: 80, open: false },
-      [MIXED_SECOND_THING_ID]: { x: 300, y: 80, open: false },
-    });
-    await expect(repository.loadSpace(stored.snapshot.id)).resolves.toEqual(stored);
-  });
-
-  it('mints a fresh identity per import for every id the input omits', async () => {
-    const first = await repository.importSpaces([idlessImport(ALL_IDLESS_THING_ID)]);
-    trackImported(first);
-    expect(first.kind).toBe('imported');
-    if (first.kind !== 'imported') {
-      throw new Error(first.message);
-    }
-
-    const second = await repository.importSpaces([idlessImport(SECOND_IDLESS_THING_ID)]);
-    trackImported(second);
-    expect(second.kind).toBe('imported');
-    if (second.kind !== 'imported') {
-      throw new Error(second.message);
-    }
-
-    // The three the input omitted, and the graph is reached through its owner
-    // because that is where the minting now happens. The thing id is deliberately
-    // not among them: it was supplied, so asserting it was minted would assert
-    // the opposite of what the fixture says.
-    const minted = (stored: LoadedSpace): UUID[] => {
-      const diagram = stored.snapshot.document.diagrams![0]!;
-      return [stored.snapshot.id, diagram.id, diagram.graphs[0]!.id];
-    };
-    const firstIds = minted(first.spaces[0]!);
-    const secondIds = minted(second.spaces[0]!);
-    for (const id of [...firstIds, ...secondIds]) {
-      expect(uuidSchema.safeParse(id).success).toBe(true);
-    }
-    // Six, so nothing is memoized across imports of identical structure.
-    expect(new Set([...firstIds, ...secondIds]).size).toBe(6);
-    expect([...firstIds, ...secondIds]).not.toContain(ALL_IDLESS_THING_ID);
-    expect([...firstIds, ...secondIds]).not.toContain(SECOND_IDLESS_THING_ID);
-  });
-
-  it('rejects reuse of explicit things by a generated space and rolls back the batch', async () => {
-    await repository.importSpaces([snapshot]);
-    const first = await repository.importSpaces([mixedImport]);
-    trackImported(first);
-    expect(first.kind).toBe('imported');
-    if (first.kind !== 'imported') {
-      throw new Error(first.message);
-    }
-    const firstStored = first.spaces[0]!;
-    const catalogBefore = await repository.listSpaces();
-
-    const second = await repository.importSpaces([otherSnapshot, mixedImport]);
-    trackImported(second);
-
-    expect(second).toMatchObject({ kind: 'rejected', code: 'thing-ownership' });
-    if (second.kind !== 'rejected') throw new Error('Conflicting import was not rejected');
-    expect(second.message).toContain(MIXED_FIRST_THING_ID);
-    await expect(repository.listSpaces()).resolves.toEqual(catalogBefore);
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
-    await expect(repository.loadSpace(firstStored.snapshot.id)).resolves.toEqual(firstStored);
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-  });
-
-  it('rejects unresolved UUID references after allocation and rolls back every generated row', async () => {
-    await repository.importSpaces([snapshot, otherSnapshot]);
-    const catalogBefore = await repository.listSpaces();
-    const knownSpaceBefore = await repository.loadSpace(SPACE_ID);
-    const otherSpaceBefore = await repository.loadSpace(OTHER_SPACE_ID);
-    const invalid: ImportSpace = {
-      document: {
-        version: 1,
-        title: 'Invalid generated space',
-        diagrams: [
-          {
-            title: 'Unresolved diagram',
-            kind: 'positioned',
-            positions: {},
-            graphs: [
-              {
-                title: 'Unresolved graph',
-                edges: [{ from: UNRESOLVED_THING_ID, to: MISSING_THING_ID }],
-              },
-            ],
-          },
-        ],
-      },
-      things: [
-        {
-          document: { title: 'Id-less thing', kind: 'markdown', body: 'Cannot be referenced.' },
-        },
-      ],
-    };
-
-    const result = await repository.importSpaces([invalid]);
-    trackImported(result);
-
-    expect(result).toMatchObject({ kind: 'rejected', code: 'invalid-snapshot' });
-    if (result.kind !== 'rejected') throw new Error('Invalid import was not rejected');
-    expect(result.message).toContain(UNRESOLVED_THING_ID);
-    await expect(repository.listSpaces()).resolves.toEqual(catalogBefore);
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(knownSpaceBefore);
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(otherSpaceBefore);
-  });
-
-  it('rejects duplicate durable identities across an import batch', async () => {
-    const duplicate = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Duplicate identity' },
-    };
-
-    await expect(repository.importSpaces([snapshot, duplicate])).resolves.toMatchObject({
-      kind: 'rejected',
-      code: 'duplicate-identity',
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
-  });
-
-  it('rejects a cross-space thing in an import and rolls back the whole batch', async () => {
-    await repository.importSpaces([snapshot]);
-    await repository.importSpaces([otherSnapshot]);
-    const changedFirst: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Must not persist' },
-    };
-    const claimedByOther: SpaceSnapshot = {
-      ...otherSnapshot,
-      things: [...otherSnapshot.things, snapshot.things[0]!],
-    };
-
-    await expect(repository.importSpaces([changedFirst, claimedByOther])).resolves.toMatchObject({
-      kind: 'rejected',
-      code: 'duplicate-identity',
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual({
-      snapshot: otherSnapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
+    await expect(repository.loadSpace(CONCURRENT_SPACE_ID)).resolves.toBeUndefined();
   });
 
   it('passes expected revisions beyond the safe integer range without narrowing', async () => {
-    await repository.importSpaces([snapshot]);
+    await seed(SPACE_ID, [snapshot]);
     const unsafeRevision = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
 
     await expect(commitSpace(snapshot, unsafeRevision)).resolves.toEqual({
@@ -1439,27 +1115,7 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
-  it('rolls back earlier batch inserts when a later space identity already exists', async () => {
-    await repository.importSpaces([snapshot]);
-    const collidingSnapshot: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Must not replace stored content' },
-    };
-
-    await expect(repository.importSpaces([otherSnapshot, collidingSnapshot])).resolves.toEqual({
-      kind: 'rejected',
-      code: 'duplicate-identity',
-      message: `Space ${SPACE_ID} already exists`,
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
-  });
-
-  it('imports a graph id already nested in another stored space', async () => {
+  it('stores two Spaces of one aggregate that reuse a graph id', async () => {
     // A graph id is unique across the space that holds it and no wider — its
     // owner is one diagram (ADR 0040), and the flatten a space-subject view draws
     // is what makes the space the scope (ADR 0045). Two spaces reusing one is
@@ -1468,10 +1124,16 @@ describe('PostgresSpaceRepository', () => {
     // and every query in the repository is by space id or thing id, so no lookup
     // anywhere can be made ambiguous by the reuse below. Space and thing ids are
     // rows and stay globally unique — enforced by their primary keys, which the
-    // duplicate-identity and thing-ownership tests cover.
+    // duplicate-identity and thing-ownership rules in the shared contract cover.
     //
     // Guards a decision, not a bug: scanning every stored document to reject
-    // this would cost a full table read per import and protect nothing.
+    // this would cost a full table read per Space stored and protect nothing.
+    //
+    // The Space Thing sharpens it rather than merely satisfying the
+    // referenced-Space rule: it names `DIAGRAM_ID` and `GRAPH_ID` while sitting
+    // in a Space whose own Diagram and Graph carry those very ids, so a
+    // resolver that looked them up anywhere but in the target would find the
+    // wrong pair and still find something.
     const first: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
@@ -1499,6 +1161,16 @@ describe('PostgresSpaceRepository', () => {
       things: [
         { id: THING_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
         { id: OMITTED_THING_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
+        {
+          id: LINK_THING_ID,
+          document: {
+            title: 'To the second space',
+            kind: 'space',
+            spaceId: OTHER_SPACE_ID,
+            diagram: DIAGRAM_ID,
+            graph: GRAPH_ID,
+          },
+        },
       ],
     };
     const second: SpaceSnapshot = {
@@ -1531,8 +1203,7 @@ describe('PostgresSpaceRepository', () => {
       ],
     };
 
-    expect((await repository.importSpaces([first])).kind).toBe('imported');
-    expect((await repository.importSpaces([second])).kind).toBe('imported');
+    await seed(SPACE_ID, [first, second]);
 
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       snapshot: {
@@ -1548,10 +1219,13 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
-  it('imports one batch whose Spaces share a graph id', async () => {
-    // The same two Spaces as the test above, in one batch instead of two.
-    // Splitting a batch must not change what is accepted: graph ids resolve only
-    // within their owning Space, so the batch boundary is not a scope.
+  it('refuses the same pair when nothing reaches the second Space', async () => {
+    // The pair above with the Space Thing taken out, and it is the *link* that
+    // the refusal is about, never the shared graph id. There is one door and
+    // one collection now — the batch boundary that used to be worth contrasting
+    // against a sequence of inserts no longer exists — so what this holds down
+    // is that graph-id reuse stays legal while the Space nothing references
+    // does not (`ordinary-space-unreferenced`).
     const first: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
@@ -1611,14 +1285,16 @@ describe('PostgresSpaceRepository', () => {
       ],
     };
 
-    await expect(repository.importSpaces([first, second])).resolves.toMatchObject({
-      kind: 'rejected',
-      code: 'invalid-snapshot',
+    await expect(
+      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first, second] }),
+    ).resolves.toEqual({
+      kind: 'aggregate-refused',
+      errors: [{ kind: 'ordinary-space-unreferenced', spaceId: OTHER_SPACE_ID }],
     });
     await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });
 
-  it('imports a Space whose graph id equals one of its thing ids', async () => {
+  it('stores a Space whose graph id equals one of its thing ids', async () => {
     // Entity kinds do not share an identity space. Intake checks each kind
     // separately — things among things, graphs among graphs — so a UUID naming
     // both a thing and a graph names two different things unambiguously.
@@ -1652,31 +1328,21 @@ describe('PostgresSpaceRepository', () => {
       ],
     };
 
-    expect((await repository.importSpaces([shared])).kind).toBe('imported');
-  });
+    await seed(SPACE_ID, [shared]);
 
-  it('rejects a batch whose Spaces claim the same thing id', async () => {
-    // Things are rows, so their ids must stay unique across the database. Caught
-    // before any write rather than as a late primary-key violation.
-    const claimant: SpaceSnapshot = {
-      id: OTHER_SPACE_ID,
-      document: { version: 1, title: 'Claims the first space thing' },
-      things: [{ id: THING_ID, document: { title: 'Taken', kind: 'markdown', body: 'Taken.' } }],
-    };
-
-    await expect(repository.importSpaces([snapshot, claimant])).resolves.toMatchObject({
-      kind: 'rejected',
-      code: 'duplicate-identity',
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot: shared,
+      revision: 0n,
+      exportedRevision: null,
     });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
   });
 
   it('rejects two diagrams owning a graph under one id', async () => {
-    // Domain intake's job, not the batch check's — and the reason the batch check
-    // does not need to look at graph ids at all. A graph id is unique across the
-    // space although one diagram owns it (ADR 0045), so the collision worth
-    // catching is the one that spans owners.
+    // Single-Space intake's job, and the reason nothing above it looks at graph
+    // ids at all. A graph id is unique across the space although one diagram
+    // owns it (ADR 0045), so the collision worth catching is the one that spans
+    // owners — and it is caught by the same `loadSpaceSnapshot` a commit goes
+    // through, before the lifecycle door opens a transaction.
     const collidingGraphs: SpaceSnapshot = {
       ...snapshot,
       document: {
@@ -1710,48 +1376,13 @@ describe('PostgresSpaceRepository', () => {
       },
     };
 
-    await expect(repository.importSpaces([collidingGraphs])).resolves.toMatchObject({
-      kind: 'rejected',
-      code: 'invalid-snapshot',
+    await expect(
+      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [collidingGraphs] }),
+    ).resolves.toMatchObject({
+      kind: 'aggregate-refused',
+      errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0 }],
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
-  });
-
-  it('rejects the losing identity when another import creates the space first', async () => {
-    // Exactly one wins; the loser is an identity rejection, not a conflict.
-    //
-    // The distinction insert-only import might have drawn here — "the id existed
-    // before I began" versus "a rival created it while I ran" — is not
-    // well-defined under PostgreSQL's default READ COMMITTED isolation: whether
-    // the loser observes the winner's row depends purely on commit timing, so
-    // classifying on it produces a nondeterministic result for identical inputs.
-    // Both are the same fact anyway — the identity is taken — and insert-only
-    // import compares no revisions, so neither is a revision conflict.
-    const firstRepository = new PostgresSpaceRepository(db);
-    const secondRepository = new PostgresSpaceRepository(db);
-    const firstSnapshot: SpaceSnapshot = {
-      id: CONCURRENT_SPACE_ID,
-      document: { version: 1, title: 'First concurrent insert' },
-      things: [],
-    };
-    const secondSnapshot: SpaceSnapshot = {
-      ...firstSnapshot,
-      document: { ...firstSnapshot.document, title: 'Second concurrent insert' },
-    };
-
-    const results = await Promise.all([
-      firstRepository.importSpaces([firstSnapshot]),
-      secondRepository.importSpaces([secondSnapshot]),
-    ]);
-
-    expect(results.filter((result) => result.kind === 'imported')).toHaveLength(1);
-    expect(results).toContainEqual({
-      kind: 'rejected',
-      code: 'duplicate-identity',
-      message: `Space ${CONCURRENT_SPACE_ID} already exists`,
-    });
-    await expect(repository.loadSpace(CONCURRENT_SPACE_ID)).resolves.toMatchObject({
-      revision: 0n,
-    });
+    await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });
 });

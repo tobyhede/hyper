@@ -320,8 +320,21 @@ describe('aggregate commit adapter differential', () => {
         const postgres = new PostgresSpaceRepository(db);
 
         await clearHyperContent();
-        const imported = await postgres.importSpaces(fixture.snapshots, 'insert');
-        expect(imported.kind).toBe('imported');
+        // Both sides are told which Space is Meta, by the same value. The memory
+        // backend always was — it takes `metaSpaceId` in its constructor — while
+        // PostgreSQL used to be seeded through `importSpaces(…, 'insert')`, which
+        // read Meta off the first element of the array. So the two agreed only
+        // while `fixture.snapshots[0]` stayed the Meta Space, and reordering the
+        // generator's output would have made the differential compare two
+        // differently-rooted aggregates and blame the adapter. ADR 0078 retired
+        // that inference along with the mode parameter; `initializeAggregate`
+        // names Meta outright, and the coupling is gone rather than merely
+        // unexercised.
+        const initialized = await postgres.initializeAggregate({
+          metaSpaceId: fixture.metaSpaceId,
+          spaces: fixture.snapshots,
+        });
+        expect(initialized.kind).toBe('initialized');
 
         const [memoryResult, postgresResult] = await Promise.all([
           memory.commit(fixture.commit),
