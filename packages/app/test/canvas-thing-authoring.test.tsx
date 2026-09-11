@@ -94,8 +94,6 @@ const node = (
     activeGraphId: GRAPH_ID,
     activeGraphColor: '#8a94a6',
     emphasis: 'equal',
-    sourceHandles: [],
-    targetHandles: [],
   },
 });
 

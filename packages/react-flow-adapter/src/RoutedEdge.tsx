@@ -117,13 +117,19 @@ export function RoutedEdge(props: EdgeProps<RoutedFlowEdge>) {
   return <RoutedEdgePath {...pathProps} />;
 }
 
-/** The rect React Flow currently holds for a Thing: where it is now, which is
- *  what a drag moves and the projection does not. */
+/**
+ * The rect React Flow currently holds for a Thing: where it is now, which is
+ * what a drag moves and the projection does not.
+ *
+ * The size is read the way React Flow's own `getNodeDimensions` reads it —
+ * measured first, then what the projection declared — so a Thing whose rect the
+ * Diagram placed attaches correctly before anything has been measured.
+ */
 const rectOf = (node: InternalNode<Node>): AnchorRect => ({
   x: node.internals.positionAbsolute.x,
   y: node.internals.positionAbsolute.y,
-  width: node.measured.width ?? 0,
-  height: node.measured.height ?? 0,
+  width: node.measured.width ?? node.width ?? 0,
+  height: node.measured.height ?? node.height ?? 0,
 });
 
 /**

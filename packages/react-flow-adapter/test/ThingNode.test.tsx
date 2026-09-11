@@ -5,12 +5,7 @@ import { Position, type NodeProps } from '@xyflow/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { vi } from 'vitest';
 import { ThingNode } from '../src/ThingNode';
-import type {
-  ThingFlowNode,
-  ThingHandle,
-  ThingNodeData,
-  ThingTitleEditor,
-} from '../src/projection';
+import type { ThingFlowNode, ThingNodeData, ThingTitleEditor } from '../src/projection';
 import { uuid } from './uuid';
 
 /**
@@ -137,15 +132,7 @@ beforeEach(() => {
 });
 
 const graphId = uuid('00000000-0000-4000-8000-000000000010');
-const otherGraphId = uuid('00000000-0000-4000-8000-000000000011');
 const thingId = uuid('00000000-0000-4000-8000-000000000001');
-
-const outHandle = (graph: typeof graphId, offsetY: number): ThingHandle => ({
-  id: `${graph}::out`,
-  graphId: graph,
-  color: '#6ea8fe',
-  offsetY,
-});
 
 interface Overrides {
   selected?: boolean;
@@ -164,8 +151,6 @@ interface Overrides {
   onBeginBodyEditing?: () => void;
   bodyEditor?: ThingNodeData['bodyEditor'];
   resize?: ThingNodeData['resize'];
-  sourceHandles?: ThingHandle[];
-  targetHandles?: ThingHandle[];
   readOnly?: boolean;
   connectionAuthoringEnabled?: boolean;
 }
@@ -186,8 +171,6 @@ function props({
   onBeginBodyEditing,
   bodyEditor,
   resize,
-  sourceHandles = [outHandle(graphId, 50)],
-  targetHandles = [],
   readOnly = false,
   connectionAuthoringEnabled,
 }: Overrides = {}): NodeProps<ThingFlowNode> {
@@ -203,8 +186,6 @@ function props({
     activeGraphId: graphId,
     activeGraphColor: '#6ea8fe',
     emphasis: 'subtle',
-    sourceHandles,
-    targetHandles,
     readOnly,
   };
   if (onEditThing !== undefined)
@@ -581,7 +562,6 @@ describe('ThingNode graph authoring', () => {
     expect(handles.every((handle) => handle.style.backgroundColor === 'rgb(110, 168, 254)')).toBe(
       true,
     );
-    expect(document.querySelector('.rf-thing-node__port')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('starts a drag from a source handle while no Edge is being drawn', () => {
@@ -659,11 +639,11 @@ describe('ThingNode graph authoring', () => {
 /*
  * `projection.ts` declares each laid-out Thing's handle geometry on the node, and
  * React Flow's `parseHandles` takes that in preference to measuring the DOM. A
- * forced remeasure replaces it with `getHandleBounds`, which reads *only* the
- * handles the DOM currently renders — the overview anchors of Graphs the Thing is
- * already on. The declarations for every other Graph, which are what let an Edge
- * completed onto this Thing resolve in the render that first makes it incident,
- * are discarded. So the contract with React Flow is that we never ask.
+ * forced remeasure replaces it with `getHandleBounds`, which reads the DOM and
+ * whatever it happens to report at that instant — `offsetWidth` is 0 on a node
+ * mid-transition, and a handle measured then is one an Edge attaches to at the
+ * wrong point until something else re-declares it. So the contract with React
+ * Flow is that we never ask.
  *
  * Asserting the absence of that call is the only seam that can say so: the loss
  * is visible in React Flow's node lookup and nowhere in the rendered output, and
@@ -680,22 +660,13 @@ describe('ThingNode handle geometry', () => {
     expect(updateNodeInternals).not.toHaveBeenCalled();
   });
 
-  it('leaves the declared geometry alone when a new Edge gives the Thing another Graph handle', () => {
+  it('leaves the declared geometry alone when Opening the Thing moves its anchors', () => {
     const { rerender } = render(<ThingNode {...props()} />);
 
-    rerender(
-      <ThingNode
-        {...props({ sourceHandles: [outHandle(graphId, 50), outHandle(otherGraphId, 150)] })}
-      />,
-    );
-
-    expect(updateNodeInternals).not.toHaveBeenCalled();
-  });
-
-  it('leaves the declared geometry alone when a strategy moves a handle the Thing already had', () => {
-    const { rerender } = render(<ThingNode {...props()} />);
-
-    rerender(<ThingNode {...props({ sourceHandles: [outHandle(graphId, 210)] })} />);
+    // An Open Thing occupies a larger rect, so all four of its anchors move
+    // (ADR 0064). The projection re-declares them on a freshly allocated node,
+    // which is the whole of how a moved anchor reaches React Flow.
+    rerender(<ThingNode {...props({ expanded: true })} />);
 
     expect(updateNodeInternals).not.toHaveBeenCalled();
   });

@@ -15,14 +15,14 @@ import {
   type CanvasThingFront,
   type CanvasThingProps,
 } from '@project/ui';
-import type { ThingFlowNode, ThingHandle } from './projection';
-import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
+import type { ThingFlowNode } from './projection';
+import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 
 /**
- * React Flow custom node: a Thing front with one coloured handle per Graph at
- * the vertical offset the strategy computed for it. An opened Markdown Thing
- * draws its content inside the same node; presenting independently draws the
- * active Thing's rendered content at the frame's scale (ADR 0064, ADR 0027).
+ * React Flow custom node: a Thing front with one Edge anchor on each of its four
+ * sides. An opened Markdown Thing draws its content inside the same node;
+ * presenting independently draws the active Thing's rendered content at the
+ * frame's scale (ADR 0064, ADR 0027).
  *
  * The Thing front itself — Markdown and Alias treatment, title editing, refusal
  * display, Open/Edit controls and interaction-state visuals — is the
@@ -139,25 +139,6 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
   const front: CanvasThingFront =
     data.kind === 'alias' ? aliasFront : data.kind === 'space' ? spaceFront : markdownFront;
 
-  const renderHandle = (handle: ThingHandle, type: 'source' | 'target') => (
-    <Handle
-      key={handle.id}
-      id={handle.id}
-      type={type}
-      position={type === 'target' ? Position.Left : Position.Right}
-      className="rf-thing-node__port"
-      aria-hidden="true"
-      isConnectable={false}
-      style={{
-        top: handle.offsetY,
-        width: GRAPH_PORT_DIAMETER,
-        height: GRAPH_PORT_DIAMETER,
-        background: handle.color,
-        opacity: 0,
-      }}
-    />
-  );
-
   /**
    * Whether this Thing's anchors are also affordances.
    *
@@ -187,10 +168,10 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
       // enforces nothing itself on a handle it did not render. Its `DefaultNode`
       // passes it straight to both `Handle`s, and this is the same forwarding.
       //
-      // These four are the only handles that can begin a gesture — the graph
-      // ports below are `isConnectable={false}` outright — so dropping it left
-      // the flow-level flag governing nothing but whether the connection line
-      // rendered, with CSS and a pane's backdrop standing in for the withdrawal.
+      // These are the only handles a gesture can begin at — there are no others
+      // left since ADR 0087 — so dropping it left the flow-level flag governing
+      // nothing but whether the connection line rendered, with CSS and a pane's
+      // backdrop standing in for the withdrawal.
       isConnectable={connectionAuthoring && isConnectable}
       isConnectableStart={
         connectionAuthoring && isConnectable && role === 'source' && !connectionInProgress
@@ -412,7 +393,6 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
           />
         </>
       )}
-      {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       {data.showContent ? (
         <div className="rf-thing-node__content">
           <ThingContent title={data.title} markdown={data.body ?? ''} />
@@ -440,7 +420,7 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
         />
       )}
       {/*
-        Every authoring handle renders *after* the Thing, both roles together.
+        Every anchor renders *after* the Thing, both roles together.
         `canvas-thing.css` keeps the Thing's hover treatment alive while the
         pointer sits on a handle through `:has(~ …__authoring-handle:hover)`,
         and `~` reaches following siblings only — a handle rendered before the
@@ -451,7 +431,6 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
       */}
       {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
       {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
-      {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>
   );
 }

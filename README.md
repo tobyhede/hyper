@@ -156,7 +156,7 @@ Things, Diagrams and Graphs are parts of the Space aggregate, so they have produ
 
 ### Graphs as color-coded flows
 
-Each authored edge becomes a colored drawn edge, and each thing a Graph leaves gains a `<graphId>::out` handle (right) while each thing it arrives at gains a `<graphId>::in` handle (left) — one per Graph per side, so a fork's several outgoing edges share one handle. `@project/graph` derives the handles (`buildThingHandles`) and edges (`buildGraphRenderEdges`), then assembles the graph to arrange (`buildLayoutStrategyGraph`); `@project/react-flow-adapter` applies a `LayoutStrategy` and colors the projection. Switching graphs changes emphasis, not visibility or placement.
+Each authored edge becomes a colored drawn edge. Every thing carries four Edge anchors, one on each side, and an edge attaches to whichever anchor faces the other thing — decided while the edge is drawn, from where the two things are at that moment, so the attachment follows a drag (ADR 0087). `@project/graph` derives the edges (`buildGraphRenderEdges`) and assembles the graph to arrange (`buildLayoutStrategyGraph`); `@project/react-flow-adapter` applies a `LayoutStrategy`, colors the projection and chooses each edge's two anchors. Switching graphs changes emphasis, not visibility or placement.
 
 ### Markdown things
 
@@ -173,7 +173,7 @@ Validation happens in two layers:
 - **Shape** — Zod schemas (`@project/core`) validate the space file and each thing file's frontmatter.
 - **References** — `@project/graph` checks that both ends of every Graph Edge resolve to a Thing, that no Graph contains an exact duplicate Edge, that a Diagram positions and shows only Things the Space has, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
 
-`@project/graph` also derives the Graph handles and edges (`buildThingHandles`, `buildGraphRenderEdges`); `@project/react-flow-adapter` projects colored thing nodes and edges (`projectThingNodes`, `projectGraphEdges`).
+`@project/graph` also derives the Graph edges (`buildGraphRenderEdges`); `@project/react-flow-adapter` projects colored thing nodes and edges (`projectThingNodes`, `projectGraphEdges`) and decides where each edge attaches (`edge-attachment.ts`).
 
 ### Diagrams
 

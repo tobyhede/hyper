@@ -9,9 +9,7 @@
  * here with nothing importing them. Functions are named one at a time, and a
  * helper no consumer needs to write stays in its module. Usually it sits behind
  * an offered form that calls it — `graphThingIds` calls `thingIdsForGraphs`,
- * `graphStartThing` calls `graphEntryThings`. It runs the other way for
- * `filterHandlesByGraph`, the single-Graph specialisation written on the offered
- * `filterHandlesByGraphs`.
+ * `graphStartThing` calls `graphEntryThings`.
  *
  * Two modules are absent whole for that reason and not by oversight.
  * `frontmatter` is how `thing-file` reads a fence, and `parseThingFile` is the
@@ -66,25 +64,17 @@ export { Placement } from './placement';
 
 export { positionedStrategy } from './positioned';
 
-// `inHandleId` and `outHandleId` are offered although no consumer *has* to name
-// a handle id: they mint the `<graphId>::out`/`::in` format, and a second
-// producer of it is the defect. `react-flow-adapter` declares a handle for a
-// Graph not yet incident to a Thing, so it needs the format for an id nothing
-// here has built yet — one module owns it, and that is what makes the
-// prohibition on owner-qualifying a Graph reference checkable by reading one.
-// `graphRenderEdgeId` is here on the same grounds and no others: a test outside
-// this package that stands a projected Edge up by hand was spelling the format
-// out, which is the second producer the rule above forbids.
-export {
-  buildThingHandles,
-  buildGraphRenderEdges,
-  filterHandlesByGraphs,
-  graphThingIds,
-  graphRenderEdgeId,
-  inHandleId,
-  outHandleId,
-} from './graph-rendering';
-export type { ThingHandleSet, GraphRenderEdge, GraphRenderHandleRef } from './graph-rendering';
+// `graphRenderEdgeId` is offered although no consumer *has* to name an Edge id:
+// it mints the `<graphId>::<from>::<to>` format, and a second producer of it is
+// the defect. A test outside this package that stands a projected Edge up by
+// hand was spelling the format out, which is exactly that.
+//
+// The per-Graph handle family that stood beside it — `buildThingHandles`,
+// `filterHandlesByGraphs`, `inHandleId`, `outHandleId` and the two types they
+// were written in — left with ADR 0087. An Edge names no handle now, and the
+// anchor it attaches to is chosen while it is drawn.
+export { buildGraphRenderEdges, graphThingIds, graphRenderEdgeId } from './graph-rendering';
+export type { GraphRenderEdge } from './graph-rendering';
 
 // `documentRefusal` is offered although `loadSpace` asks it on every caller's
 // behalf: the file importer parses against import schemas that run ahead of

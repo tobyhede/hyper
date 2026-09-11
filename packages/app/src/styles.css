@@ -244,20 +244,16 @@ body {
   pointer-events: none;
 }
 
-/* Per-Graph attachment anchors, positioned by the offset the projection resolves
-   (inline `top`). The `__port` in the class name is the older spelling and is
-   load-bearing as a selector; the word itself is `CONTEXT.md`'s to avoid, the
-   engine that made it a term having left with ADR 0086. React Flow handles the
-   left/right edge placement and vertical centering, and the size is declared
-   alongside the handle bounds in `authoring-handle.ts` so the two cannot drift.
+/* A Thing's four Edge anchors, one on each side (ADR 0087).
 
-   Existing Edge attachment geometry stays measurable for React Flow but is not
-   presented as an authoring control (ADR 0033). */
-.rf-thing-node__port.react-flow__handle {
-  border: 1px solid #0b0d11;
-  pointer-events: none;
-}
+   They are anchors before they are affordances: an Edge attaches to one, and
+   React Flow draws no Edge at all for a Thing whose handles it cannot resolve.
+   So they render on every Thing and sit at `opacity: 0` until the reveal below
+   says otherwise. Never `display: none` — React Flow measures a handle, and a
+   hidden one reports 0x0.
 
+   The size is declared alongside the handle bounds in `authoring-handle.ts` so
+   the two cannot drift. */
 .rf-thing-node__authoring-handle.react-flow__handle {
   z-index: 1;
   border: 3px solid #0b0d11;
@@ -280,25 +276,28 @@ body {
    Thing's embedded Diagram draws its Edges and offers no gesture, so the reveal
    is what withholds the affordance the anchors would otherwise expose. */
 .react-flow__node:hover
-  .rf-thing-node__inner[data-connection-authoring='true'][data-connection-in-progress='false']
+  .rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-in-progress='false']
   .rf-thing-node__authoring-handle--source,
-.rf-thing-node__inner[data-connection-authoring='true'][data-selected='true'][data-connection-in-progress='false']
+.rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-selected='true'][data-connection-in-progress='false']
   .rf-thing-node__authoring-handle--source,
-.rf-thing-node__inner[data-connection-authoring='true'][data-connection-seeking='target']
+.rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-seeking='target']
   .rf-thing-node__authoring-handle--target,
-.rf-thing-node__inner[data-connection-authoring='true'][data-connection-seeking='source']
+.rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-seeking='source']
   .rf-thing-node__authoring-handle--source {
   opacity: 1;
   pointer-events: auto;
 }
 
 /* Resizing is the Thing's one active authoring gesture. The resize control stays
-   reachable until release, while the rail and Edge-authoring handles withdraw
-   so no second operation competes with the pointer or remains visually armed. */
-.react-flow__node .rf-thing-node__inner[data-resizing='true'] .canvas-thing__rail,
-.react-flow__node
-  .rf-thing-node__inner[data-resizing='true']
-  .rf-thing-node__authoring-handle.react-flow__handle {
+   reachable until release, while the rail withdraws so no second operation
+   competes with the pointer or remains visually armed.
+
+   The anchors withdraw through `data-resizing` on the reveal above rather than
+   through a rule here. They are `opacity: 0` at rest, so a reveal that cannot
+   fire mid-gesture is the whole of the withdrawal — and stating the condition
+   where the reveal is decided keeps it out of a specificity race the two rules
+   would otherwise run against each other. */
+.react-flow__node .rf-thing-node__inner[data-resizing='true'] .canvas-thing__rail {
   opacity: 0;
   pointer-events: none;
 }

@@ -271,15 +271,21 @@ test(
   },
 );
 
-test('a read-only Thing owns the absence of authoring controls and handles', async ({ page }) => {
+test('a read-only Thing owns the absence of authoring affordances', async ({ page }) => {
   await page.goto('/?story=components--thing--hover&mode=preview');
 
   const node = specimen(page, 'read-only · no authoring affordances').locator('.react-flow__node');
   await node.hover();
 
   await expect(node.getByTestId('canvas-thing-actions')).toHaveCount(0);
-  await expect(node.locator('.rf-thing-node__authoring-handle')).toHaveCount(0);
   await expect(node.getByRole('button', { name: /^Edit Title / })).toHaveCount(0);
+  // The four sides stay, because they are anchors before they are affordances
+  // and an Edge attaches to one (ADR 0087). What read-only withholds is the
+  // reveal: unlabelled, `opacity: 0` under the pointer, and nothing a drag can
+  // take hold of.
+  await expect(node.locator('.rf-thing-node__authoring-handle')).toHaveCount(8);
+  await expect(node.getByRole('button', { name: /^Connect (from|to) / })).toHaveCount(0);
+  await expect(node.locator('.rf-thing-node__authoring-handle').first()).toHaveCSS('opacity', '0');
 });
 
 test(

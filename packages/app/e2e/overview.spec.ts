@@ -56,11 +56,12 @@ test('draws every Graph in the selected Diagram, each in its own color', async (
   await expect(page.getByTestId('graph-legend').locator('.legend__item')).toHaveCount(3);
 
   // Six Things — the five on the spine plus T, which joins no Graph — Long's four
-  // Edges plus Mid's three plus Short's two, and 18 handles. T draws none of
-  // those handles: a graph port is a Graph's, and T is in no Graph.
+  // Edges plus Mid's three plus Short's two, and eight anchors on every Thing.
+  // T draws its eight like the rest: an anchor is a Thing's and not a Graph's
+  // since ADR 0087, so joining no Graph takes none of them away.
   await expect(page.locator('.react-flow__node')).toHaveCount(6);
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
-  await expect(page.locator('.rf-thing-node__port')).toHaveCount(18);
+  await expect(page.locator('.rf-thing-node__authoring-handle')).toHaveCount(48);
 
   // Distinct colors, so the graphs can be told apart.
   const strokes = await page
@@ -263,16 +264,16 @@ test(
   },
 );
 
-test('handles stay measurable, so edges attach where the strategy put them', async ({ page }) => {
+test('anchors stay measurable, so Edges attach where the Thing is', async ({ page }) => {
   await page.goto('/');
 
   // React Flow measures every handle's box to work out where an edge attaches,
   // so a handle hidden with `display: none` reports 0x0 and its edges land
-  // somewhere else — silently, with no warning to catch. `ThingNode` dims
-  // receding graphs with `opacity`, which keeps the box; that reads as an
-  // ordinary styling choice, and this is what stops a later CSS tidy-up from
+  // somewhere else — silently, with no warning to catch. The four anchors sit at
+  // `opacity: 0` until the reveal shows them, which keeps the box; that reads as
+  // an ordinary styling choice, and this is what stops a later CSS tidy-up from
   // reaching for `display: none`. See react-flow-guidance/issues/03.
-  const ports = page.locator('.rf-thing-node__port');
+  const ports = page.locator('.rf-thing-node__authoring-handle');
   await expect(ports.first()).toBeAttached();
 
   const boxes = await ports.evaluateAll((els) =>

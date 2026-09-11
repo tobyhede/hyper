@@ -6,20 +6,17 @@ import type {
   EntityActionGroup,
 } from '@project/ui';
 import type { Thing, ThingId, GraphId } from '@project/core';
-import { inHandleId, outHandleId, resolveContentThing } from '@project/graph';
+import { resolveContentThing } from '@project/graph';
 import type {
-  ThingHandleSet,
   GraphRenderEdge,
-  GraphRenderHandleRef,
   LayoutStrategyThing,
   LayoutStrategyGraph,
   Space,
 } from '@project/graph';
 import type { RoutedEdgeData } from './RoutedEdge';
-import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
+import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 
 const FALLBACK_COLOR = '#8a94a6';
-const DEFAULT_NODE_HEIGHT = 300;
 
 /**
  * How strongly graphs other than the active one recede.
@@ -37,15 +34,6 @@ export const OTHER_GRAPH_OPACITY = {
   subtle: 0.35,
 } satisfies Record<GraphEmphasis, number>;
 
-/** A graph handle resolved for rendering: a color and a vertical offset (px from
- *  the node's top), spread evenly down the box the Thing occupies. */
-export type ThingHandle = {
-  id: string;
-  graphId: GraphId;
-  color: string;
-  offsetY: number;
-};
-
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the
  *  new title was accepted — the same contract `CanvasThing`'s editor reads, where
  *  `null` keeps the editor closed and a string keeps it open beside the message. */
@@ -55,8 +43,7 @@ export type ThingTitleEditor = {
 };
 
 /** Data carried by each custom thing node. Kept as a type alias so it satisfies
- *  React Flow's `Record<string, unknown>` data constraint, and it includes the
- *  per-Graph handle arrays the node draws its attachment points from. */
+ *  React Flow's `Record<string, unknown>` data constraint. */
 export type ThingNodeData = {
   thingId: ThingId;
   title: string;
@@ -209,15 +196,11 @@ export type ThingNodeData = {
   /** The active Graph's colour, used by graph-independent authoring handles. */
   activeGraphColor: string;
   emphasis: GraphEmphasis;
-  sourceHandles: ThingHandle[];
-  targetHandles: ThingHandle[];
 };
 
 export type ThingFlowNode = Node<ThingNodeData, 'thing'>;
 
 export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
-
-const EMPTY_HANDLES: ThingHandleSet = { sourceHandles: [], targetHandles: [] };
 
 export interface ProjectThingNodesOptions {
   /** Draw Things without any Thing-owned authoring controls or handles. */
@@ -239,8 +222,6 @@ export interface ProjectThingNodesOptions {
   emphasis?: GraphEmphasis;
   /** The laid-out graph; the things' positions come from here when present. */
   strategyGraph?: LayoutStrategyGraph;
-  /** Node height used to evenly distribute handles before the layout resolves. */
-  nodeHeight?: number;
   /** Restrict the projection to these thing ids (e.g. one graph's things). */
   thingIds?: readonly ThingId[];
   /** Diagram-authored Expanded Things whose Markdown body is drawn in place. */
@@ -248,45 +229,22 @@ export interface ProjectThingNodesOptions {
 }
 
 /**
- * A Thing's per-Graph anchors, spread evenly down the side of the rect it
- * occupies.
+ * The four anchors a Thing declares on each role, one per side.
  *
- * The even spread was a fallback until ADR 0086 and is now the rule: a strategy
- * answers positions only, so there is no placed offset that could override it.
- * Where an Edge attaches is the render layer's own question, still open
- * (`.scratch/edge-attachment/`).
+ * An Edge attaches to whichever of them faces its neighbour, chosen while it is
+ * drawn (ADR 0087) — so what is declared here is every side an Edge could ever
+ * take, and never which one it took. Both roles are declared on all four sides
+ * because an authoring gesture may begin or end anywhere, and because React Flow
+ * resolves an Edge that names no handle to the first bound of that kind.
+ *
+ * Declared rather than measured. `parseHandles` prefers what is on `node.handles`
+ * to anything in the DOM, and nothing may force a remeasure: the forced path
+ * rebuilds the bounds from `getHandleBounds`, which reads only the elements the
+ * DOM draws. `ThingNode` records the same rule from the other side.
  */
-function resolveHandles(
-  refs: GraphRenderHandleRef[],
-  colors: ColorByGraphId,
-  nodeHeight: number,
-): ThingHandle[] {
-  const count = refs.length;
-  return refs.map((ref, index) => {
-    const offsetY = ((index + 1) / (count + 1)) * nodeHeight;
-    return {
-      id: ref.id,
-      graphId: ref.graphId,
-      color: colors[ref.graphId] ?? FALLBACK_COLOR,
-      offsetY,
-    };
-  });
-}
-
-function declaredHandles(
-  sourceHandles: readonly ThingHandle[],
-  targetHandles: readonly ThingHandle[],
-  graphIds: readonly GraphId[],
-  thing: LayoutStrategyThing,
-): NodeHandle[] {
+function declaredHandles(thing: LayoutStrategyThing): NodeHandle[] {
   const radius = AUTHORING_HANDLE_DIAMETER / 2;
-  const portRadius = GRAPH_PORT_DIAMETER / 2;
-  const authoring = (
-    type: 'source' | 'target',
-    side: Position,
-    x: number,
-    y: number,
-  ): NodeHandle => ({
+  const anchor = (type: 'source' | 'target', side: Position, x: number, y: number): NodeHandle => ({
     id: `authoring-${type}-${side}`,
     type,
     position: side,
@@ -295,88 +253,40 @@ function declaredHandles(
     width: AUTHORING_HANDLE_DIAMETER,
     height: AUTHORING_HANDLE_DIAMETER,
   });
-  const targetByGraph = new Map(targetHandles.map((handle) => [handle.graphId, handle]));
-  const sourceByGraph = new Map(sourceHandles.map((handle) => [handle.graphId, handle]));
-  const fallbackOffset = (index: number) => ((index + 1) / (graphIds.length + 1)) * thing.height;
-  // The DOM renders only incident overview anchors. Declaring every existing
-  // Graph id keeps a completed connection resolvable in the same render that
-  // first makes its target incident, without exposing another visible control.
-  //
-  // This is also why nothing may force a React Flow remeasure of a placed Thing:
-  // `parseHandles` prefers what is declared here, but a forced update rebuilds
-  // the bounds from `getHandleBounds`, which sees only the anchors the DOM draws
-  // — and the not-yet-incident declarations, the whole point of the loop below,
-  // are gone. `ThingNode` records the same rule from the other side.
-  //
-  // Order matters, and the authoring handles come first. React Flow picks the
-  // closest declared handle within its connection radius and resolves an exact
-  // distance tie by array order. A non-incident anchor's fallback offset can land
-  // exactly on an authoring handle — with one Graph it always does, since the
-  // lone anchor sits at half the Thing's height and so do the Left and Right
-  // handles. The authoring handle is the one with a DOM element behind it, and a
-  // release that resolves to an anchor with none is refused, so the tie has to
-  // fall the other way.
-  return [
-    authoring('source', Position.Top, thing.width / 2 - radius, -radius),
-    authoring('source', Position.Right, thing.width - radius, thing.height / 2 - radius),
-    authoring('source', Position.Bottom, thing.width / 2 - radius, thing.height - radius),
-    authoring('source', Position.Left, -radius, thing.height / 2 - radius),
-    authoring('target', Position.Top, thing.width / 2 - radius, -radius),
-    authoring('target', Position.Right, thing.width - radius, thing.height / 2 - radius),
-    authoring('target', Position.Bottom, thing.width / 2 - radius, thing.height - radius),
-    authoring('target', Position.Left, -radius, thing.height / 2 - radius),
-    ...graphIds.map((graphId, index): NodeHandle => {
-      const handle = targetByGraph.get(graphId);
-      return {
-        id: handle?.id ?? inHandleId(graphId),
-        type: 'target',
-        position: Position.Left,
-        x: -portRadius,
-        y: (handle?.offsetY ?? fallbackOffset(index)) - portRadius,
-        width: GRAPH_PORT_DIAMETER,
-        height: GRAPH_PORT_DIAMETER,
-      };
-    }),
-    ...graphIds.map((graphId, index): NodeHandle => {
-      const handle = sourceByGraph.get(graphId);
-      return {
-        id: handle?.id ?? outHandleId(graphId),
-        type: 'source',
-        position: Position.Right,
-        x: thing.width - portRadius,
-        y: (handle?.offsetY ?? fallbackOffset(index)) - portRadius,
-        width: GRAPH_PORT_DIAMETER,
-        height: GRAPH_PORT_DIAMETER,
-      };
-    }),
-  ];
+  return (['source', 'target'] as const).flatMap((type) => [
+    anchor(type, Position.Top, thing.width / 2 - radius, -radius),
+    anchor(type, Position.Right, thing.width - radius, thing.height / 2 - radius),
+    anchor(type, Position.Bottom, thing.width / 2 - radius, thing.height - radius),
+    anchor(type, Position.Left, -radius, thing.height / 2 - radius),
+  ]);
 }
 
 /**
- * Map things → React Flow thing nodes, attaching per-graph handles spread evenly
- * down the box each thing occupies. The thing id is the React Flow node id.
+ * Map things → React Flow thing nodes, each declaring the four anchors an Edge
+ * may attach to on every side. The thing id is the React Flow node id.
+ *
+ * It took the Space's Graph colours too until ADR 0087, for the per-Graph
+ * anchors it coloured one by one. A Thing's anchors are Graph-independent, and
+ * the one colour left on a Thing is the Active Graph's, which the composition
+ * resolves and passes as `activeGraphColor`.
  *
  * A node carries its thing's *title*, not its content (ADR 0006) — the content is
  * loaded when a thing is opened or presented, not embedded in every node.
  */
 export function projectThingNodes(
   space: Space,
-  handlesByThing: ReadonlyMap<ThingId, ThingHandleSet>,
-  colors: ColorByGraphId,
   options: ProjectThingNodesOptions = {},
 ): ThingFlowNode[] {
   const activeThingId = options.activeThingId ?? null;
   const showActiveThingContent = options.showActiveThingContent ?? false;
   const activeGraphId = options.activeGraphId ?? null;
   const emphasis = options.emphasis ?? 'equal';
-  const nodeHeight = options.nodeHeight ?? DEFAULT_NODE_HEIGHT;
   const visible = options.thingIds ? new Set(options.thingIds) : null;
   const laidOut = new Map((options.strategyGraph?.things ?? []).map((t) => [t.id, t]));
 
   const source = visible ? space.things.filter((t) => visible.has(t.id)) : space.things;
 
   return source.map((thing) => {
-    const handles = handlesByThing.get(thing.id) ?? EMPTY_HANDLES;
     const placedThing = laidOut.get(thing.id);
     const active = thing.id === activeThingId;
     const showContent = active && showActiveThingContent;
@@ -390,16 +300,6 @@ export function projectThingNodes(
     // An alias shows its target's content under its own title (ADR 0009).
     const body =
       showContent || open ? (resolveContentThing(space, thing.id)?.body ?? '') : undefined;
-    // The Thing's own height once a strategy has placed it, and the constant only
-    // before one has. The two agree for every collapsed Thing — the strategies
-    // arrange at `THING_SIZE` — and differ exactly for an Open one, whose
-    // anchors have to spread down the box it actually occupies (ADR 0064).
-    // Read from the same rect `declaredHandles` reasons about below, so a
-    // Graph's drawn anchor and its declared one cannot land in different places.
-    const spread = placedThing?.height ?? nodeHeight;
-    const sourceHandles = resolveHandles(handles.sourceHandles, colors, spread);
-    const targetHandles = resolveHandles(handles.targetHandles, colors, spread);
-
     const node: ThingFlowNode = {
       id: thing.id,
       type: 'thing',
@@ -415,8 +315,6 @@ export function projectThingNodes(
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
         emphasis,
-        sourceHandles,
-        targetHandles,
       },
       className: active ? 'rf-thing-node rf-thing-node--active' : 'rf-thing-node',
     };
@@ -438,12 +336,7 @@ export function projectThingNodes(
     if (placedThing) {
       node.width = placedThing.width;
       node.height = placedThing.height;
-      node.handles = declaredHandles(
-        sourceHandles,
-        targetHandles,
-        space.graphs.map((graph) => graph.id),
-        placedThing,
-      );
+      node.handles = declaredHandles(placedThing);
     }
     if (body !== undefined) node.data.body = body;
     if (open) {
@@ -489,8 +382,6 @@ export function projectGraphEdges(
       type: 'routed',
       source: edge.source,
       target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
       className: `rf-graph-edge rf-graph-edge--${edge.graphId}`,
       animated: emphasized,
       style: {

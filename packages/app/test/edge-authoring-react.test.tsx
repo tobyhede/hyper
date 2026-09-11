@@ -9,7 +9,7 @@ import {
 } from '@xyflow/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { graphRenderEdgeId, inHandleId, outHandleId, Placement } from '@project/graph';
+import { graphRenderEdgeId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { Toolbar, ToolbarButton } from '@project/ui';
@@ -82,28 +82,32 @@ const snapshot: SpaceSnapshot = {
  * handle geometry (docs/agents/rendering.md): `parseHandles` prefers a declaration to the DOM,
  * and jsdom measures nothing, so without these no Edge resolves a position and
  * none is drawn at all.
+ *
+ * Four anchors of each role, as `projection.ts` declares them (ADR 0087). The
+ * diameter is spelled out rather than imported because `@project/react-flow-adapter`
+ * offers its projection and not its constants; what matters to these tests is
+ * that both roles are declared on every side, which is what lets an Edge naming
+ * no handle resolve at either end.
  */
 function thingNode(id: string, x: number, title: string): ThingFlowNode {
-  const anchors = [GRAPH_ID, OTHER_GRAPH_ID].flatMap((graphId) => [
-    {
-      id: inHandleId(graphId),
-      type: 'target' as const,
-      position: Position.Left,
-      x: 0,
-      y: THING_SIZE.height / 2,
-      width: 6,
-      height: 6,
-    },
-    {
-      id: outHandleId(graphId),
-      type: 'source' as const,
-      position: Position.Right,
-      x: THING_SIZE.width,
-      y: THING_SIZE.height / 2,
-      width: 6,
-      height: 6,
-    },
-  ]);
+  const radius = 12;
+  const sides = [
+    { position: Position.Top, x: THING_SIZE.width / 2 - radius, y: -radius },
+    { position: Position.Right, x: THING_SIZE.width - radius, y: THING_SIZE.height / 2 - radius },
+    { position: Position.Bottom, x: THING_SIZE.width / 2 - radius, y: THING_SIZE.height - radius },
+    { position: Position.Left, x: -radius, y: THING_SIZE.height / 2 - radius },
+  ];
+  const anchors = (['source', 'target'] as const).flatMap((type) =>
+    sides.map((side) => ({
+      id: `authoring-${type}-${side.position}`,
+      type,
+      position: side.position,
+      x: side.x,
+      y: side.y,
+      width: radius * 2,
+      height: radius * 2,
+    })),
+  );
   return {
     id,
     type: 'thing',
@@ -122,8 +126,6 @@ function thingNode(id: string, x: number, title: string): ThingFlowNode {
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
       emphasis: 'equal',
-      sourceHandles: [],
-      targetHandles: [],
     },
   };
 }
@@ -150,8 +152,6 @@ const flowEdge = (graphId: string, from: string, to: string): Edge => ({
   type: 'routed',
   source: from,
   target: to,
-  sourceHandle: outHandleId(uuidSchema.parse(graphId)),
-  targetHandle: inHandleId(uuidSchema.parse(graphId)),
   data: { graphId },
 });
 

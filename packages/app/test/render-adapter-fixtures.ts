@@ -14,8 +14,6 @@ export function node(id: string, x: number, y: number, title = id): ThingFlowNod
       title,
       readOnly: false,
       kind: 'markdown',
-      sourceHandles: [],
-      targetHandles: [],
       active: false,
       selectedForAuthoring: false,
       showContent: false,

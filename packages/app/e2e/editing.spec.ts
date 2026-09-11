@@ -2060,7 +2060,12 @@ test('a selected Thing exposes four circular handles coloured as the active Grap
       elements.every((element) => getComputedStyle(element).borderRadius === '50%'),
     ),
   ).toBe(true);
-  await expect(a.locator('.rf-thing-node__port').first()).toHaveCSS('opacity', '0');
+  // The target anchors on the same Thing stay hidden: no drag is in flight, so
+  // the Thing is offering where an Edge may start and nothing else.
+  await expect(a.locator('.rf-thing-node__authoring-handle--target').first()).toHaveCSS(
+    'opacity',
+    '0',
+  );
 });
 
 test('drawing between existing Things persists one active-Graph Edge and selects the target', async ({

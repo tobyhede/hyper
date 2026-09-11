@@ -1,9 +1,7 @@
 import type { ThingId, Graph, GraphId } from '@project/core';
 import {
-  buildThingHandles,
   buildGraphRenderEdges,
   buildLayoutStrategyGraph,
-  filterHandlesByGraphs,
   Placement,
   type LayoutStrategyGraph,
   type ResolvedDiagram,
@@ -16,7 +14,7 @@ import {
   type ThingFlowNode,
   type GraphEmphasis,
 } from '@project/react-flow-adapter';
-import { THING_HEIGHT, THING_SIZE } from './thing';
+import { THING_SIZE } from './thing';
 import { activeGraphColor, graphColorMap } from './colors';
 import { diagramThings } from './diagram-resolution';
 
@@ -74,7 +72,6 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
   const visibleGraphs = resolved.diagram.graphs;
   const drawnGraphIds = visibleGraphs.map((graph) => graph.id);
   const visible = new Set<GraphId>(drawnGraphIds);
-  const handles = filterHandlesByGraphs(buildThingHandles(space), drawnGraphIds);
   const edges = buildGraphRenderEdges(space).filter((edge) => visible.has(edge.graphId));
   // The Diagram chooses the Things it draws. In particular, a Diagram's sparse
   // placement omits Things from its canvas; the Things drawer is the surface that
@@ -100,7 +97,7 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
       const emphasis: GraphEmphasis = activeGraphId === null ? 'equal' : 'subtle';
 
       return {
-        nodes: projectThingNodes(space, handles, colors, {
+        nodes: projectThingNodes(space, {
           readOnly: false,
           activeThingId: interaction.activeThingId,
           selectedThingId: interaction.selectedThingId,
@@ -109,7 +106,6 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
           activeGraphColor: activeGraphColor(colors, activeGraphId),
           emphasis,
           strategyGraph: laidOut,
-          nodeHeight: THING_HEIGHT,
           thingIds,
           openThingIds,
         }),

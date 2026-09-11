@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildThingHandles,
-  buildGraphRenderEdges,
-  filterHandlesByGraphs,
-  loadSpace,
-  graphThingIds,
-  type Space,
-} from '../src/index';
+import { buildGraphRenderEdges, loadSpace, graphThingIds, type Space } from '../src/index';
 // Internal to the package, so not reachable through what it offers.
-import { thingIdsForGraphs, filterHandlesByGraph } from '../src/graph-rendering';
+import { thingIdsForGraphs } from '../src/graph-rendering';
 import { thingFile, uuid } from './thing-files';
 
 // a → b → c  (main),  a → c  (quick): c is shared, a fans out.
@@ -68,84 +61,6 @@ function loadFixture(): Space {
 
 const space = loadFixture();
 
-describe('buildThingHandles', () => {
-  const handles = buildThingHandles(space);
-
-  it('gives a thing nothing arrives at only outbound ports, one per graph leaving it', () => {
-    const a = handles.get(uuid('00000000-0000-4000-8000-000000000002'))!;
-    expect(a.targetHandles).toEqual([]);
-    expect(a.sourceHandles.map((h) => h.id)).toEqual([
-      '00000000-0000-4000-8000-000000000004::out',
-      '00000000-0000-4000-8000-000000000031::out',
-    ]);
-  });
-
-  it('gives an interior thing both in and out ports for its graph', () => {
-    const b = handles.get(uuid('00000000-0000-4000-8000-000000000003'))!;
-    expect(b.targetHandles.map((h) => h.id)).toEqual(['00000000-0000-4000-8000-000000000004::in']);
-    expect(b.sourceHandles.map((h) => h.id)).toEqual(['00000000-0000-4000-8000-000000000004::out']);
-  });
-
-  it('gives a shared sink one inbound port per graph arriving', () => {
-    const c = handles.get(uuid('00000000-0000-4000-8000-000000000005'))!;
-    expect(c.sourceHandles).toEqual([]);
-    expect(c.targetHandles.map((h) => h.id)).toEqual([
-      '00000000-0000-4000-8000-000000000004::in',
-      '00000000-0000-4000-8000-000000000031::in',
-    ]);
-  });
-
-  it('gives a fork one outbound port, not one per outgoing edge', () => {
-    // The handle is per graph per side, so several edges leaving a thing by the
-    // same Graph share it — which is why the scheme survives branching at all.
-    const forked = loadSpace(
-      {
-        version: 1,
-        id: uuid('00000000-0000-4000-8000-000000000001'),
-        title: 'Fork',
-        diagrams: [
-          {
-            id: uuid('00000000-0000-4000-8000-000000000022'),
-            title: 'Working',
-            positions: {
-              [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0, open: false },
-              [uuid('00000000-0000-4000-8000-000000000003')]: { x: 320, y: 0, open: false },
-              [uuid('00000000-0000-4000-8000-000000000005')]: { x: 320, y: 200, open: false },
-            },
-            graphs: [
-              {
-                id: uuid('00000000-0000-4000-8000-000000000004'),
-                title: 'Main',
-                edges: [
-                  {
-                    from: uuid('00000000-0000-4000-8000-000000000002'),
-                    to: uuid('00000000-0000-4000-8000-000000000003'),
-                  },
-                  {
-                    from: uuid('00000000-0000-4000-8000-000000000002'),
-                    to: uuid('00000000-0000-4000-8000-000000000005'),
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      [
-        thingFile(uuid('00000000-0000-4000-8000-000000000002')),
-        thingFile(uuid('00000000-0000-4000-8000-000000000003')),
-        thingFile(uuid('00000000-0000-4000-8000-000000000005')),
-      ],
-    );
-    if (!forked.ok) throw new Error('fixture should load');
-    expect(
-      buildThingHandles(forked.space)
-        .get(uuid('00000000-0000-4000-8000-000000000002'))!
-        .sourceHandles.map((h) => h.id),
-    ).toEqual(['00000000-0000-4000-8000-000000000004::out']);
-  });
-});
-
 describe('graphThingIds', () => {
   it('lists a graph’s distinct things', () => {
     expect(graphThingIds(space, uuid('00000000-0000-4000-8000-000000000004'))).toEqual([
@@ -202,52 +117,6 @@ describe('thingIdsForGraphs', () => {
 
   it('returns nothing for no graphs', () => {
     expect(thingIdsForGraphs(space, [])).toEqual([]);
-  });
-});
-
-describe('filterHandlesByGraph', () => {
-  it('keeps only the selected graph’s handles', () => {
-    const quick = filterHandlesByGraph(
-      buildThingHandles(space),
-      uuid('00000000-0000-4000-8000-000000000031'),
-    );
-    // c is shared, but only its quick inbound port survives the filter.
-    expect(
-      quick.get(uuid('00000000-0000-4000-8000-000000000005'))!.targetHandles.map((h) => h.id),
-    ).toEqual(['00000000-0000-4000-8000-000000000031::in']);
-    expect(quick.get(uuid('00000000-0000-4000-8000-000000000003'))).toBeUndefined(); // b is only on main
-  });
-});
-
-describe('filterHandlesByGraphs', () => {
-  it('keeps a shared thing’s handles for every graph given', () => {
-    const both = filterHandlesByGraphs(buildThingHandles(space), [
-      uuid('00000000-0000-4000-8000-000000000004'),
-      uuid('00000000-0000-4000-8000-000000000031'),
-    ]);
-    // The multi-graph case: c carries one inbound handle per graph arriving.
-    expect(
-      both.get(uuid('00000000-0000-4000-8000-000000000005'))!.targetHandles.map((h) => h.id),
-    ).toEqual([
-      '00000000-0000-4000-8000-000000000004::in',
-      '00000000-0000-4000-8000-000000000031::in',
-    ]);
-    expect(
-      both.get(uuid('00000000-0000-4000-8000-000000000002'))!.sourceHandles.map((h) => h.id),
-    ).toEqual([
-      '00000000-0000-4000-8000-000000000004::out',
-      '00000000-0000-4000-8000-000000000031::out',
-    ]);
-    expect(
-      both.get(uuid('00000000-0000-4000-8000-000000000003'))!.targetHandles.map((h) => h.id),
-    ).toEqual(['00000000-0000-4000-8000-000000000004::in']);
-  });
-
-  it('drops things left with no handles at all', () => {
-    const quickOnly = filterHandlesByGraphs(buildThingHandles(space), [
-      uuid('00000000-0000-4000-8000-000000000031'),
-    ]);
-    expect(quickOnly.get(uuid('00000000-0000-4000-8000-000000000003'))).toBeUndefined();
   });
 });
 
@@ -324,23 +193,19 @@ describe('buildGraphRenderEdges', () => {
     expect(new Set(sharedIds).size).toBe(2);
   });
 
-  it('produces one edge per authored edge, connected via graph ports', () => {
+  it('produces one edge per authored edge, naming the two Things it joins', () => {
     expect(edges).toHaveLength(3);
     expect(edges).toContainEqual({
       id: '00000000-0000-4000-8000-000000000004::00000000-0000-4000-8000-000000000002::00000000-0000-4000-8000-000000000003',
       graphId: uuid('00000000-0000-4000-8000-000000000004'),
       source: uuid('00000000-0000-4000-8000-000000000002'),
       target: uuid('00000000-0000-4000-8000-000000000003'),
-      sourceHandle: '00000000-0000-4000-8000-000000000004::out',
-      targetHandle: '00000000-0000-4000-8000-000000000004::in',
     });
     expect(edges).toContainEqual({
       id: '00000000-0000-4000-8000-000000000031::00000000-0000-4000-8000-000000000002::00000000-0000-4000-8000-000000000005',
       graphId: uuid('00000000-0000-4000-8000-000000000031'),
       source: uuid('00000000-0000-4000-8000-000000000002'),
       target: uuid('00000000-0000-4000-8000-000000000005'),
-      sourceHandle: '00000000-0000-4000-8000-000000000031::out',
-      targetHandle: '00000000-0000-4000-8000-000000000031::in',
     });
   });
 
@@ -403,7 +268,7 @@ describe('buildGraphRenderEdges', () => {
     expect(before).toContain(survivor[0]);
   });
 
-  it('gives each of a fork’s edges its own id, sharing one outbound port', () => {
+  it('gives each of a fork’s edges its own id', () => {
     const forked = loadSpace(
       {
         version: 1,
@@ -449,9 +314,9 @@ describe('buildGraphRenderEdges', () => {
       '00000000-0000-4000-8000-000000000004::00000000-0000-4000-8000-000000000002::00000000-0000-4000-8000-000000000003',
       '00000000-0000-4000-8000-000000000004::00000000-0000-4000-8000-000000000002::00000000-0000-4000-8000-000000000005',
     ]);
-    expect(forkEdges.map((e) => e.sourceHandle)).toEqual([
-      '00000000-0000-4000-8000-000000000004::out',
-      '00000000-0000-4000-8000-000000000004::out',
+    expect(forkEdges.map((e) => e.source)).toEqual([
+      uuid('00000000-0000-4000-8000-000000000002'),
+      uuid('00000000-0000-4000-8000-000000000002'),
     ]);
     expect(forkEdges.map((e) => e.target)).toEqual([
       uuid('00000000-0000-4000-8000-000000000003'),
