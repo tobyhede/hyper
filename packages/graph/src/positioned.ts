@@ -21,7 +21,7 @@ import type { Placement } from './placement';
  * diagrams, so a thing created while one was active genuinely has no position in
  * another; that is Diagram non-membership rather than a hole to backfill. Things
  * the map omits are therefore omitted from the projected graph and remain
- * available through the Things drawer.
+ * available through the Things list.
  */
 
 export function positionedStrategy(positions: Placement): LayoutStrategy {

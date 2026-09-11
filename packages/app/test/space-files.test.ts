@@ -81,7 +81,7 @@ describe.each([
     // Membership *is* the position map (ADR 0040), and `loadSpace` has already
     // refused an Edge endpoint that is not a member. What it cannot refuse is a
     // member no Edge reaches — which is both a legitimate authored state (Add
-    // Thing and the Things drawer each leave one) and what a Thing stranded in a
+    // Thing and the Things list each leave one) and what a Thing stranded in a
     // Diagram it does not belong to looks like. So the strays are named, by Thing
     // and by the Diagram holding them, rather than counted: a count cannot tell a
     // Thing that became connected apart from a different Thing stranded in the

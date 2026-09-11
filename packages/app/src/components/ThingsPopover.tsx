@@ -2,11 +2,13 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentType,
   type DragEvent,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import { titleName, type Thing, type ThingId, type UUID } from '@project/core';
+import { describeSpaceThingBreak, type SpaceThingBreak } from '../authoring-refusal';
 import {
   Button,
   Alert,
@@ -47,7 +49,26 @@ type Activation = 'keyboard' | 'pointer';
  */
 export type ThingsFilter = Thing['kind'] | 'spaces';
 
-const FILTERS = ['markdown', 'alias', 'space', 'spaces'] as const satisfies readonly ThingsFilter[];
+/**
+ * Every filter exactly once, in the order they are drawn — **coverage**, not
+ * membership.
+ *
+ * `as const satisfies readonly ThingsFilter[]` says each entry *is* a filter and
+ * says nothing about any being absent, so a kind added to `Thing` and left out
+ * here would compile and its Things would simply not appear in this list. The
+ * intersection makes the omission a `TS2345` where the array is written: with
+ * every member present `ThingsFilter extends T[number]` holds and the parameter
+ * is `T`, and with one missing it is `never`, which no array satisfies.
+ *
+ * The `if`/`return` cascade a filter's glyph would otherwise use is why this is
+ * needed rather than left to lint: `switch-exhaustiveness-check` never sees a
+ * cascade, and `FILTER_GLYPHS` below closes the same hole the same way.
+ */
+const everyFilter = <const T extends readonly ThingsFilter[]>(
+  filters: T & (ThingsFilter extends T[number] ? unknown : never),
+): T => filters;
+
+const FILTERS = everyFilter(['markdown', 'alias', 'space', 'spaces']);
 
 /**
  * Everything on, because the list's job is to show what is *not* on the canvas
@@ -70,11 +91,22 @@ const FILTER_NAMES = {
   spaces: 'Spaces in this Meta Space',
 } as const satisfies Record<ThingsFilter, string>;
 
+/**
+ * A record rather than a cascade, for the reason `everyFilter` exists: a
+ * fall-through `return <SpaceIcon />` absorbs every unhandled filter, so a new
+ * one would silently draw a Space cube. Keyed by the union, a miss is a
+ * compile error where the record is written. Same idiom as `ThingKindIcon`.
+ */
+const FILTER_GLYPHS = {
+  markdown: MarkdownIcon,
+  alias: AliasIcon,
+  space: SpaceThingIcon,
+  spaces: SpaceIcon,
+} satisfies Record<ThingsFilter, ComponentType>;
+
 const FilterGlyph = ({ filter }: { readonly filter: ThingsFilter }) => {
-  if (filter === 'markdown') return <MarkdownIcon />;
-  if (filter === 'alias') return <AliasIcon />;
-  if (filter === 'space') return <SpaceThingIcon />;
-  return <SpaceIcon />;
+  const Glyph = FILTER_GLYPHS[filter];
+  return <Glyph />;
 };
 
 /**
@@ -88,8 +120,13 @@ export interface ThingsPopoverProps {
   readonly allThings: readonly Thing[];
   readonly open: boolean;
   /**
-   * The reasons that close it, filtered — see the component's own note. The
-   * second argument is Base UI's own dismissal reason, passed through.
+   * Asks the owner of {@link open} to change it, with the dismissals this
+   * surface declines already filtered out — see the component's own note.
+   *
+   * Base UI's own dismissal reason is read here and **not** passed on: it is
+   * what decides which closes are declined, and a caller has no use for the
+   * ones that survive. What resets the list is `open` going false, not this
+   * being called, because the Dock closes the list by changing the prop.
    */
   readonly onOpenChange: (open: boolean) => void;
   /**
@@ -191,12 +228,24 @@ const searchableText = (
   return thing.title;
 };
 
-const emptyMessage = (available: number, inSpace: number): string =>
-  inSpace === 0
-    ? 'This Space has no Things.'
-    : available === 0
-      ? 'All Things are in this Diagram.'
-      : 'No matching Things.';
+/**
+ * Why the list is empty, over **both** sources.
+ *
+ * The two standing sentences are claims about the Things — that the Space has
+ * none, and that the Diagram already holds them all — and either is false as an
+ * account of an empty list while the Spaces source is switched on with
+ * something to give. So both are withheld the moment it is: what the reader is
+ * looking at then is a search that matched nothing, which is what the third
+ * sentence says.
+ */
+const emptyMessage = (available: number, inSpace: number, offeredSpaces: number): string =>
+  offeredSpaces > 0
+    ? 'No matching Things.'
+    : inSpace === 0
+      ? 'This Space has no Things.'
+      : available === 0
+        ? 'All Things are in this Diagram.'
+        : 'No matching Things.';
 
 /**
  * The dotted grip a row is dragged by.
@@ -293,6 +342,36 @@ export function ThingsPopover({
    * hold it.
    */
   const filterField = useRef<HTMLInputElement>(null);
+  /**
+   * Everything narrowing or interrupting the list is forgotten when it closes.
+   *
+   * Only the popup unmounts, so the query, the kind toggles and a standing
+   * refusal would otherwise still be there the next time it opens — and the
+   * reader would meet "No matching Things" over a red alert with no memory of
+   * having caused either.
+   *
+   * **Keyed off `open` going false rather than off `onOpenChange`, because the
+   * surface does not decide most of its own closes.** The Dock holds `open` as
+   * a prop and changes it directly from two paths — another disclosure taking
+   * the one slot, and the list being withdrawn while presenting — and neither
+   * invokes the handler. A reset hanging off the handler would cover the
+   * trigger press and Escape only, which is the third way it closes and the one
+   * the reader is least likely to have left state behind on.
+   *
+   * **During render rather than in an effect**, which is React's own answer for
+   * adjusting state when a prop changes: the reset is applied before anything
+   * is drawn, so no frame shows the stale query, and `react-hooks` is right to
+   * reject the effect that would show one and then correct it.
+   */
+  const [lastOpen, setLastOpen] = useState(open);
+  if (lastOpen !== open) {
+    setLastOpen(open);
+    if (!open) {
+      setQuery('');
+      setShown(ALL_FILTERS);
+      setRefusal(null);
+    }
+  }
   const titleById = useMemo(
     () => new Map(allThings.map((thing) => [thing.id, thing.title])),
     [allThings],
@@ -366,6 +445,17 @@ export function ThingsPopover({
     );
   }, [titleById, spaceTitles, things, spaces, shown, needle]);
 
+  /**
+   * The rejection arm of a Space placement, hoisted so the caught value takes
+   * its type from {@link SpaceThingBreak} rather than from an annotation written
+   * at the `then`.
+   */
+  const showBreak: SpaceThingBreak = (failure) => {
+    const said = describeSpaceThingBreak(failure);
+    setRefusal(said);
+    return said;
+  };
+
   const beginDrag = (event: DragEvent<HTMLButtonElement>, thingId: ThingId): void => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(THING_DRAG_TYPE, thingId);
@@ -385,15 +475,6 @@ export function ThingsPopover({
         // Dock's exclusivity all still close it.
         if (!next && (details.reason === 'outside-press' || details.reason === 'focus-out')) {
           return;
-        }
-        // Only the popup unmounts when the list closes, so the query and kind
-        // would otherwise still be narrowing it the next time it opens — and the
-        // reader would meet "No matching Things" with no memory of having typed
-        // anything.
-        if (!next) {
-          setQuery('');
-          setShown(ALL_FILTERS);
-          setRefusal(null);
         }
         onOpenChange(next);
       }}
@@ -494,7 +575,11 @@ export function ThingsPopover({
         </div>
         {visible.length === 0 ? (
           <p className="px-2 py-8 text-center text-sm text-muted-foreground">
-            {emptyMessage(things.length, allThings.length)}
+            {emptyMessage(
+              things.length,
+              allThings.length,
+              shown.includes('spaces') ? spaces.length : 0,
+            )}
           </p>
         ) : (
           <ul className="things-popover__list">
@@ -546,17 +631,34 @@ export function ThingsPopover({
                       setRefusal(next);
                       return;
                     }
-                    // The caret moves as soon as the row is spent rather than
-                    // when the Edit lands: a coordinated Edit takes a round
-                    // trip, and a reader held still for it would be waiting on
-                    // a surface that looks finished. A refusal arrives here
-                    // either way, on the list that asked for it.
-                    if (activation === 'keyboard') filterField.current?.focus();
+                    // **The caret stays put here, where a Thing Add moves it.**
+                    // The rule is the one written above `filterField`, not an
+                    // exception to it: the caret moves because a completed Add
+                    // takes its own row away, and a Space row is not taken
+                    // away. `referenceableSpaces` withholds only the containing
+                    // Space, so a Space stays offered however many Space Things
+                    // frame it — ADR 0074's convergence, which is why two Things
+                    // may reference one Space. Moving the caret off a row that
+                    // is still there costs the reader their place in the list
+                    // and claims a completion the surface cannot see.
+                    //
+                    // A refusal still arrives here either way, on the list that
+                    // asked for it.
                     setRefusal(null);
-                    void onAddSpace?.(row.space).then(setRefusal);
+                    // A rejection arm as well as a resolution one: a caller
+                    // that breaks rather than refusing would otherwise leave
+                    // this row having visibly done nothing, with the only trace
+                    // an unhandled rejection nobody reads. `App` reports the
+                    // same break on its own channel; this is what the reader
+                    // who pressed the row sees.
+                    void onAddSpace?.(row.space).then(setRefusal, showBreak);
                   }}
                 >
-                  <RowGrip />
+                  {/* Only where a drag actually starts. A Space is placed by
+                      authoring the Space Thing that frames it, which is a press
+                      and not a drop, so a grip here would promise a gesture
+                      that fires no `dragstart` and answers with nothing. */}
+                  {row.kind === 'thing' ? <RowGrip /> : null}
                   {row.kind === 'thing' ? <ThingKindIcon kind={row.thing.kind} /> : <SpaceIcon />}
                   {/* The name, not the whole Title: this is a row in a list
                       being scanned down, and ADR 0083 puts the ladder on the

@@ -19,9 +19,13 @@ export interface AppShellProps {
    *
    * **This is not the command surface taking room.** ADR 0082 binds that the
    * Space's command surface takes no layout space from the canvas, and the
-   * Command Dock takes none — it floats over `.shell__area`. The strip is the
-   * Things drawer's, a surface the author opens and closes rather than furniture
-   * standing on every screen.
+   * Command Dock takes none — it floats over `.shell__area`.
+   *
+   * **Nothing sets it.** The strip was the Things drawer's, and that drawer is
+   * gone: the Things list is a Popover anchored to its trigger, which overlays
+   * the canvas rather than displacing it. Retiring this prop along with
+   * `Drawer` is
+   * `.scratch/command-dock/issues/08-retire-the-sidebar-era-primitives.md`.
    */
   insetEnd?: string | undefined;
   children: ReactNode;

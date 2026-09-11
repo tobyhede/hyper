@@ -124,7 +124,11 @@ test(
 
     // Activating a row unmounts it, and a popover has no roving list to hand
     // the caret on to — so the surface puts it back in the filter, which is
-    // where a reader adding several Things is going next.
+    // where a reader adding several Things is going next. The row going is
+    // asserted first: it is the premise the focus claim rests on, and a
+    // fixture where the row stayed would pass the second line while proving
+    // nothing about the first.
+    await expect(row).toHaveCount(0);
     await expect(page.getByRole('textbox', { name: 'Search things' })).toBeFocused();
     await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
   },

@@ -77,7 +77,7 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
   const handles = filterHandlesByGraphs(buildThingHandles(space), drawnGraphIds);
   const edges = buildGraphRenderEdges(space).filter((edge) => visible.has(edge.graphId));
   // The Diagram chooses the Things it draws. In particular, a Diagram's sparse
-  // placement omits Things from its canvas; the Things drawer is the surface that
+  // placement omits Things from its canvas; the Things list is the surface that
   // reveals those Things without manufacturing positions (ADR 0040, ADR 0069) —
   // the Sidebar's Things collection before ADR 0082, the Dock's drawer now.
   const thingIds = diagramThings(space, resolved.diagram).map((thing) => thing.id);

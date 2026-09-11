@@ -861,7 +861,7 @@ describe.each([
   });
 });
 
-describe('dragging a Thing from the Things drawer over canvas chrome', () => {
+describe('dragging a Thing from the Things list over canvas chrome', () => {
   it('does not offer a drop the pane will refuse', () => {
     mountGraph();
     const zoomIn = screen.getByRole('button', { name: 'Zoom in' });

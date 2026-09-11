@@ -131,6 +131,55 @@ test(
 );
 
 /**
+ * Destroying a Space takes it out of the list that offers it.
+ *
+ * The Spaces source is read once and re-read on an epoch, and creating a Space
+ * Thing is not the only Edit that changes the set: deleting the last Space Thing
+ * that references a Space destroys that Space and every Space below it that
+ * nothing else references (ADR 0074, ADR 0076). A list still offering it would
+ * spend `link` against a Space that is gone, on a row the reader had no way to
+ * know was stale.
+ */
+test('stops offering a Space the moment the last Space Thing referencing it is deleted', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  await createThing(page, 'Space Thing');
+  await page.getByTestId('new-space-thing-title').fill('Architecture');
+  await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
+  await expect(nodeByTitle(page, 'Architecture')).toBeVisible();
+
+  const openList = async () => {
+    await page.getByRole('button', { name: 'Things' }).click();
+    const list = page.getByRole('dialog', { name: 'Things' });
+    await expect(list).toBeVisible();
+    return list;
+  };
+
+  const offered = await openList();
+  await expect(offered.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+
+  const thing = nodeByTitle(page, 'Architecture').first();
+  await thing.click();
+  await thing.hover();
+  await thing.getByRole('button', { name: 'Actions for Thing Architecture' }).click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Delete Thing' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete Thing' }).click();
+  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
+
+  // The Space went with its last reference, so the cube goes with it — and the
+  // count on the toggle agrees, which is the claim the count exists to make.
+  const after = await openList();
+  await expect(after.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Spaces in this Meta Space, 0' })).toBeVisible();
+});
+
+/**
  * The second Space Thing is offered the first's Space, and referencing it is not
  * a copy.
  *

@@ -79,7 +79,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     // mints an *empty* Diagram — `positions: {}` in `working-space.ts`. The
     // imported Thing would then belong to the Space and to no Diagram, so the
     // canvas would draw nothing and `nodeByTitle` below would wait out the
-    // timeout with the Thing sitting in the Things drawer. Placing the Thing here
+    // timeout with the Thing sitting in the Things list. Placing the Thing here
     // also keeps this test about durability alone: initialization is a write,
     // and an unasked-for write is one more thing between the drag and the
     // revision this asserts.

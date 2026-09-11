@@ -88,7 +88,7 @@ Between them the shape exercises every behaviour the e2e suite covers:
   up on screen rather than only in a unit test.
 - **A Diagram member no Edge reaches.** `T` again: it is placed on Collection 1
   and joins none of its Graphs, so it draws no graph handles and carries no
-  Edges. That is the state Add Thing and the Things drawer both author.
+  Edges. That is the state Add Thing and the Things list both author.
 - **Overlay counts.** 11 things, 13 edges (4 + 3 + 2 + 4), 26 handles, 4 graphs
   across both Diagrams. A *selected* Diagram draws only the Graphs it owns: 9
   edges for Collection 1, 4 for Collection 2 — and 6 Things on Collection 1,

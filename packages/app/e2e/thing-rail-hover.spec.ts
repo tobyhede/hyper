@@ -117,8 +117,14 @@ test('the revealed commands fit inside their Thing, Closed, Open and zoomed out'
   await thing.hover();
   await fits();
 
+  // Against the transform as it was, not against emptiness: the canvas already
+  // carries one from the Open above, so a poll for "not empty" resolves at once
+  // on the pre-zoom value and `fits()` then measures the rail against a
+  // viewport the zoom never reached.
+  const beforeZoom = await viewportTransform(page);
   await page.getByRole('button', { name: 'Zoom out' }).click();
-  await expect.poll(() => viewportTransform(page)).not.toBe('');
+  await expect.poll(() => viewportTransform(page)).not.toBe(beforeZoom);
+  await settled(page);
   await thing.hover();
   await fits();
 });

@@ -205,7 +205,7 @@ const DISCLOSURE_WIDTH = 'w-72';
  * `onValueChange` wearing the brand — so `onSelect(diagramId: DiagramId)` is
  * handed a string that is not one, and its declared type is a lie the compiler
  * helped tell. Bound, that literal is a `TS2322` where it is written.
- * `ThingsDrawer`'s `KindFilterItem` binds the same way, and
+ * `ThingsPopover`'s `FilterToggle` binds the same way, and
  * `tools/typing-fixtures/must-fail/mismatched-menu-item.tsx` is the standing
  * evidence that the rule bites.
  *

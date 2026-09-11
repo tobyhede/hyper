@@ -108,7 +108,7 @@ export const handRolledStyles = [
   {
     block: 'graph-area',
     reason:
-      'The flex item the `ReactFlow` instance fills beside the optional Things drawer; it owns React Flow integration geometry rather than product appearance.',
+      'The flex item the `ReactFlow` instance fills; it owns React Flow integration geometry rather than product appearance.',
   },
   {
     block: 'root',

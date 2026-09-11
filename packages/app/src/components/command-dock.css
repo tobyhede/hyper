@@ -552,9 +552,9 @@
      strip's width nameable — which the side rules below need — and leaves the
      container's width as the one term this element cannot say, so the viewport
      stands in for it. Nothing scrolls the page (`.shell` is `overflow: hidden`
-     with no scrollbar to discount), so the two agree except for the strip the
-     Things drawer yields, and the drawer is drawn over this notice rather than
-     beside it.
+     with no scrollbar to discount) and nothing yields a strip of it any more —
+     the Things list is a Popover anchored to its own trigger and drawn over this
+     notice rather than beside it — so the two agree.
 
      The 32px is `EDGE_INSET` spent twice — the 16px the dock is held off its own
      edge by, matched at the far end so the report stops where the furniture

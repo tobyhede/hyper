@@ -45,6 +45,12 @@
   border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
   border-radius: 6px;
   font-size: 13px;
+}
+
+/* Bound to the attribute that decides it rather than to the row, so the cursor
+   and the gesture cannot come apart: a Space row is placed by a press, and a
+   grab cursor over one advertises a drop it will never answer. */
+.things-popover__row[draggable='true'] {
   cursor: grab;
 }
 

@@ -53,18 +53,27 @@ function ThingsPopoverFixture({
 }) {
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState<readonly string[]>([]);
+  // A completed Add takes the Thing out of the list, which is what the
+  // application does: the Thing has joined the Diagram, so it is no longer
+  // outside it. Without that the activated row never unmounts, and every
+  // claim this catalogue makes about what follows an Add — the row going,
+  // the caret coming back to the filter — would hold over a row still on
+  // screen and still able to keep focus itself.
+  const [placed, setPlaced] = useState<readonly string[]>([]);
+  const outside = things.filter((thing) => !placed.includes(thing.id));
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex shrink-0 items-center gap-2 border-b p-2">
         <span className="text-sm font-medium">Diagram 1</span>
         <ThingsPopover
-          things={things}
+          things={outside}
           allThings={allThings}
           open={open}
           onOpenChange={setOpen}
           disabled={disabled}
           onAdd={(thing) => {
             setAdded((titles) => [...titles, thing.title]);
+            setPlaced((ids) => [...ids, thing.id]);
             return null;
           }}
           onDragStart={() => undefined}

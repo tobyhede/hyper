@@ -34,12 +34,17 @@ export type CommandToolbarProps = ComponentProps<typeof Toolbar> & {
 export const CommandToolbar = forwardRef<HTMLDivElement, CommandToolbarProps>(
   function CommandToolbar({ className, orientation = 'horizontal', ...props }, ref) {
     return (
+      // The rest props go first so the two halves of the orientation cannot be
+      // set apart: `orientation` drives the roving focus and `data-orientation`
+      // is what the stylesheet reads, and a caller able to write the second one
+      // over the top would make the column-whose-arrows-run-across state this
+      // component's doc calls unrepresentable.
       <Toolbar
         ref={ref}
+        {...props}
         orientation={orientation}
         data-orientation={orientation}
         className={cn('command-surface', className)}
-        {...props}
       />
     );
   },
@@ -64,12 +69,14 @@ export type CommandSurfaceProps = ComponentProps<'div'> & {
 export const CommandSurface = forwardRef<HTMLDivElement, CommandSurfaceProps>(
   function CommandSurface({ className, orientation = 'horizontal', ...props }, ref) {
     return (
+      // Rest props first, for `CommandToolbar`'s reason: the attribute the
+      // stylesheet reads is derived here and is not a caller's to overwrite.
       <div
         ref={ref}
+        {...props}
         data-slot="command-surface"
         data-orientation={orientation}
         className={cn('command-surface', className)}
-        {...props}
       />
     );
   },

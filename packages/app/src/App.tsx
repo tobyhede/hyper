@@ -30,6 +30,7 @@ import { canvasProjection } from './canvas-projection';
 import { canvasContent } from './canvas-content';
 import {
   describeAuthoringRefusal,
+  describeSpaceThingBreak,
   describeSpaceThingRefusal,
   presentNewAliasRefusal,
   presentNewSpaceThingRefusal,
@@ -466,15 +467,28 @@ export const createApp = (
      */
     const addSpaceThingFor = useCallback(
       async (space: { readonly id: UUID; readonly title: string }): Promise<string | null> => {
-        const resolved = resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
-        const result = await spaceThings.link({
-          containingSpaceId: currentSpace().id,
-          diagramId: resolved.diagram.id,
-          title: space.title,
-          position: centreAnchor(),
-          targetSpaceId: space.id,
-        });
-        return result.kind === 'refused' ? describeSpaceThingRefusal(result.refusal) : null;
+        // Answers rather than rejects, for `readReferenceableSpaces`'s reason
+        // and one more: the list spends this on a press, so a rejection left to
+        // travel is a row that visibly does nothing. `resolveDiagram` is inside
+        // the `try` because it is the likeliest break on this path — the list
+        // has been open across renders and the Diagram it resolves is the one
+        // drawing now.
+        try {
+          const resolved = resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
+          const result = await spaceThings.link({
+            containingSpaceId: currentSpace().id,
+            diagramId: resolved.diagram.id,
+            title: space.title,
+            position: centreAnchor(),
+            targetSpaceId: space.id,
+          });
+          return result.kind === 'refused' ? describeSpaceThingRefusal(result.refusal) : null;
+        } catch (failure) {
+          // Both: the reader gets the sentence on the list that asked, and the
+          // diagnostic still reaches the operational channel.
+          reportBreak(failure);
+          return describeSpaceThingBreak(failure);
+        }
       },
       [centreAnchor],
     );
@@ -867,7 +881,7 @@ export const createApp = (
      * node-decoration memo in `canvas-thing-authoring.ts`, so a fresh builder
      * rebuilds every node object, re-renders every `ThingNode` and runs
      * `spaceEntityActions` once per Thing — on renders that touch nothing on the
-     * canvas, the Things drawer opening among them. `SpaceCanvas`'s own note
+     * canvas, the Things list opening among them. `SpaceCanvas`'s own note
      * measures that and calls the widening harmless.
      *
      * Wrapping both builders in `useMemo` was tried and reverted: with the
@@ -928,7 +942,15 @@ export const createApp = (
               containingSpaceId: renderedSpace.id,
               thingId: thing.id,
             });
-            return result.kind === 'refused' ? describeSpaceThingRefusal(result.refusal) : null;
+            if (result.kind === 'refused') return describeSpaceThingRefusal(result.refusal);
+            // The other Edit that changes the Meta Space's set, and the reason
+            // the bump is not `createSpaceThing`'s alone: this deletion can
+            // destroy the target Space and every Space below it that nothing
+            // else references, so a list that was not told goes on offering a
+            // Space that is gone. A deletion that removed only the Thing still
+            // bumps, because telling the two apart here buys nothing.
+            setSpacesEpoch((epoch) => epoch + 1);
+            return null;
           }
         : () => {
             const result = authoring.complete({ kind: 'deleted-thing', thingId: thing.id });
@@ -1627,7 +1649,7 @@ export const createApp = (
             onRefused={setThingDeletionRefusal}
           />
         )}
-        {/* One child, not a row: the Things drawer portals over this rather than
+        {/* One child, not a row: the Things list portals over this rather than
             sitting beside it, so a toggle that says nothing about the Diagram no
             longer re-flows the canvas and re-measures every Thing on it. */}
         <div ref={graphArea} className="graph-area size-full min-w-0" style={thingSizeVars}>

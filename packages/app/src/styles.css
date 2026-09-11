@@ -38,7 +38,11 @@ body {
 }
 
 /* `padding-inline-end` is the strip yielded to a surface overlaying the end
-   edge — the Things drawer.
+   edge. Nothing asks for one now — the Things drawer it was written for is gone
+   and the Things list is an anchored Popover — so this is dead with
+   `AppShell.insetEnd`. Issue 08 retired the Sidebar-era primitives while
+   this one still had a consumer, so it did not take the pair; taking them is a
+   decision of its own, recorded there and in the design-system inventory.
 
    Deliberately not animated, although the panel beside it slides. React Flow
    re-measures this container continuously, so an animated width moves the
