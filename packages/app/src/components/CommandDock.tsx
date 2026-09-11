@@ -297,7 +297,14 @@ export interface DockChrome {
  * its menu are what you can do while you are in it.
  */
 export interface DockSpace {
-  /** This Space's name — a Space Thing's title, seen from inside it. */
+  /**
+   * This Space's own name — `document.title` of the session the Dock is drawing.
+   *
+   * **Not the Title of a Space Thing that points here.** The two agree only at
+   * creation, which writes one string into both, and either may be renamed
+   * afterwards without the other (`CONTEXT.md`); ADR 0083 keeps the target's
+   * name off the Thing's front, so nothing propagates in either direction.
+   */
   readonly title: string;
   /** Which Space the Dock is in, which is what the Open Spaces menu marks. */
   readonly currentSpaceId: UUID;
@@ -1286,8 +1293,8 @@ const DockRenamingContext = createContext<DockRenaming>({
  * `editingChromeTitle` is the *report* rather than the editor — lowering it
  * neither closes the editor nor stops it being completed. Nor can the
  * availability guard stand in: placement is asynchronous, so a replacement
- * passes through a render where `onRename` is `null` and the name draws as a
- * static label with the slot still taken. That looks like the draft going. It
+ * passes through a render where `onRename` is `null` and the name draws
+ * unavailable with the slot still taken. That looks like the draft going. It
  * comes back the moment placement resolves, reseeded from the *accepted*
  * Diagram's title — an editor the author never opened, over a Space they never
  * saw, one Enter away from renaming it. The caret is deliberately not returned
@@ -1298,9 +1305,9 @@ const DockRenamingContext = createContext<DockRenaming>({
  * *The application is told from an effect, never from a render.*
  * `onRenamingChange` is the App's own `setEditingChromeTitle`, and the
  * transitions above run in this render body. `live` rather than "the slot is
- * taken", because a name whose rename has stopped being available draws as a
- * label — a state in which no rename is live and the application must not think
- * one is. The cleanup covers the ending no transition sees, an unmount
+ * taken", because a name whose rename has stopped being available draws
+ * unavailable — a state in which no rename is live and the application must not
+ * think one is. The cleanup covers the ending no transition sees, an unmount
  * mid-rename, which otherwise left the flag stuck true with nothing able to
  * clear it.
  */

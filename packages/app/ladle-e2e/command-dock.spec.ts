@@ -623,25 +623,45 @@ test(
     const diagram = page.getByTestId('selected-canvas').filter({ visible: true });
     await expect(space).toBeVisible();
     await expect(diagram).toBeVisible();
-    const typography = await diagram.evaluate((element) => {
-      const style = getComputedStyle(element);
-      return [style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight, style.color];
-    });
-    for (const identity of [space, page.getByTestId('active-graph').filter({ visible: true })]) {
-      await expect(identity).toBeVisible();
-      expect(
-        await identity.evaluate((element) => {
-          const style = getComputedStyle(element);
-          return [
-            style.fontFamily,
-            style.fontSize,
-            style.fontWeight,
-            style.lineHeight,
-            style.color,
-          ];
-        }),
-      ).toEqual(typography);
-    }
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toBeVisible();
+    /**
+     * **The three read in one frame, and that is the assertion rather than a
+     * precaution.**
+     *
+     * The names share the Button's `transition-[color,…] duration-200`, so a colour
+     * read while that transition is in flight is a point on it rather than a settled
+     * value. Sampled one locator after another, the three land at different points
+     * of the same animation and the run fails on two intermediate values neither
+     * name ever rests at — a difference in *time* reported as a difference in
+     * treatment. Under `failOnFlakyTests` a retry that passes still fails the run,
+     * so waiting it out is not an option; reading them together removes the race
+     * instead. They mount together with one duration from one value, so a shared
+     * transition is shared at every frame of it, and a genuinely different colour
+     * still differs.
+     */
+    // The visibility filter is inside the page rather than on a locator for the
+    // same reason it is on the ones above: an inactive open Space stays mounted
+    // and draws a hidden Dock carrying these same ids.
+    const [reference, ...others] = await page
+      .locator(
+        '[data-testid="space-title"], [data-testid="selected-canvas"], [data-testid="active-graph"]',
+      )
+      .evaluateAll((elements) =>
+        elements
+          .filter((element) => element.checkVisibility())
+          .map((element) => {
+            const style = getComputedStyle(element);
+            return [
+              style.fontFamily,
+              style.fontSize,
+              style.fontWeight,
+              style.lineHeight,
+              style.color,
+            ];
+          }),
+      );
+    expect(others).toHaveLength(2);
+    for (const identity of others) expect(identity).toEqual(reference);
     // One control, named the way the other two are. A count rather than a
     // visibility check because the story keeps four other Spaces mounted, and
     // `getByRole` is what excludes theirs: an inactive Space's Dock is hidden

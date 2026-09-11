@@ -405,12 +405,26 @@
    Quieted rather than faded to a ghost: the name is what tells the reader which
    Space, Diagram and Graph they are in, and that has to stay legible while the
    command over it is out of reach. The hover arm is listed with it so the fill
-   is suppressed rather than merely overridden at rest. */
+   is suppressed rather than merely overridden at rest.
+
+   **Mixed toward the bar, never toward transparent**, which is the half of the
+   rail-action rule that matters most here and the one easiest to get wrong. The
+   Dock surface is itself translucent and blurred (`--card` at 92%, `blur(8px)`),
+   so ink mixed with `transparent` composites against whatever canvas is behind
+   the bar: the same withdrawn name reads one way over pale paper and another
+   over a dark Thing or a saturated Graph edge, which is a differently-coloured
+   name rather than an unavailable one — and it contradicts the legibility this
+   rule exists to keep. `--card` is the bar's own ground, so mixing toward it is
+   a step down from the enabled ink rather than a step toward the background.
+
+   `not-allowed` for the same reason it is on a withdrawn rail action: the two
+   are the same ADR 0073 state on the same kind of control, and one cursor is
+   what makes them read as one state. */
 .command-dock__name[aria-disabled='true'],
 .command-dock__name[aria-disabled='true']:hover {
   background: transparent;
-  color: color-mix(in srgb, currentcolor 62%, transparent);
-  cursor: default;
+  color: color-mix(in srgb, currentcolor 62%, var(--card));
+  cursor: not-allowed;
 }
 
 .command-dock__name-editor {

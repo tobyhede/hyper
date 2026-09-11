@@ -56,7 +56,12 @@ test('the Space name renames while its menu carries one address and no Rename ro
   // `delay` is the whole reason this test is in a browser: a default Playwright
   // click puts mousedown and mouseup in the same tick, and the dismissal that
   // this regressed on never gets a turn between them.
-  await page.getByRole('button', { name: 'Space: Rendering' }).click({ delay: 120 });
+  //
+  // `exact`, because an accessible name matches as a substring by default and
+  // the name beside this trigger is now `Rename Space: Rendering`, which
+  // contains this one. It was unambiguous only while a withheld Space name drew
+  // as a `<span>` and no button in the bar carried the longer string.
+  await page.getByRole('button', { name: 'Space: Rendering', exact: true }).click({ delay: 120 });
 
   const menu = page.getByRole('menu');
   await expect(menu.getByRole('menuitem', { name: 'Copy link' })).toBeVisible();

@@ -633,16 +633,29 @@ describe('authoring an opened Thing', () => {
    * one every other withdrawn Dock control is read by (ADR 0073 keeps a withdrawn
    * toolbar item focusable, so it announces itself rather than vanishing).
    */
-  it('withdraws the Diagram rename, but not its address, while a Thing title editor is open', async () => {
+  /** The three names the Dock draws, which the one `chromeTitleEdit` answers for. */
+  const CHROME_IDENTITIES = ['space-title', 'selected-canvas', 'active-graph'] as const;
+
+  it('withdraws all three chrome renames, but not the address, while a Thing title editor is open', async () => {
     const session = mount();
     await settled(session);
 
-    expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(false);
+    // **All three, because one `chromeTitleEdit` answers for the whole bar.**
+    // `renamed-space` put the Space behind that guard beside the Diagram and the
+    // Graph, and the claim the branch makes is that the three go together. Read
+    // on the Diagram alone, a regression leaving the Space's name live while a
+    // Thing title editor owned the caret passed every suite — which is the one
+    // collision the guard exists to prevent.
+    for (const identity of CHROME_IDENTITIES) {
+      expect([identity, unavailable(screen.getByTestId(identity))]).toEqual([identity, false]);
+    }
 
     createThing('Markdown Thing');
     expect(await screen.findByRole('textbox', { name: 'Thing title' })).toBeVisible();
 
-    expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(true);
+    for (const identity of CHROME_IDENTITIES) {
+      expect([identity, unavailable(screen.getByTestId(identity))]).toEqual([identity, true]);
+    }
     openDiagramMenu('Diagram');
     const menu = await screen.findByRole('menu');
     expect(within(menu).getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();

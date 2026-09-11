@@ -1094,23 +1094,45 @@ describe('Rename Space', () => {
   });
 
   /**
-   * The placement derivation loses nothing, which is what lets this Edit take the
-   * `CompletedEdit` shape rather than weakening it.
+   * The placement the Edit carries is the one that is **installed**, not one
+   * re-derived from the Diagram — which is what every other Edit does, and the
+   * only reason this one has to say so.
    *
-   * `Placement.fromDiagram` over the Diagram this Edit does not touch is an
-   * identity on the placement the canvas had already reported, and ADR 0084 is
-   * why: a canvas coordinate *is* an authored one, the Diagram is the authority,
-   * and `Placement.next` merges only the Things a settled gesture names. So the
-   * installed placement is already `Placement.fromDiagram` of the same Diagram,
-   * and re-deriving it cannot lose an Open state, a remembered Open Size or a
-   * position — asserted with `toBe`, because `install` keeps the map's identity
-   * exactly when the value did not change.
+   * The first version of this test composed the opening placement and reported
+   * nothing further, so `before` and the Edit's derivation were the same
+   * expression over the same Diagram and `toBe` could not fail. It was vacuous,
+   * and it hid a divergence from Rename Diagram: that Edit carries
+   * `reportedPlacement` forward (`deriveCompletedEdit`'s `completedPlacement`),
+   * so an installed placement the Diagram does not match survives it, while an
+   * Edit re-deriving through `Placement.fromDiagram` snapped every Thing back to
+   * its stored position. One Edit in the union answering the question a second
+   * way is the second source of truth the `CompletedEdit` shape exists to
+   * prevent, so this arranges an installed placement that diverges — with
+   * `place`, the same helper the rest of this file installs canvas geometry with
+   * — and holds the rename to leaving it alone.
    *
-   * An Open Thing carrying an Open Size is in the fixture deliberately: those are
-   * the fields a derivation through anything narrower than the Diagram would
-   * drop.
+   * `Placement.fromDiagram` is still the answer when nothing is installed at
+   * all, which is what keeps the Edit above the `placement-pending` gate: the
+   * test below this one completes it before any layout.
+   *
+   * An Open Thing carrying an Open Size is in the second fixture deliberately:
+   * those are the fields a derivation through anything narrower than the Diagram
+   * would drop.
    */
-  it('leaves the placement the canvas reported exactly as it was', () => {
+  it('carries the installed placement rather than re-deriving the Diagram', () => {
+    const { authoring } = open();
+    // What the canvas has drawn and no Edit has authored.
+    place(authoring, { [THING_A]: [900, 900], [THING_B]: [950, 950] });
+    const before = authoring.authoredPlacement();
+
+    expect(authoring.complete({ kind: 'renamed-space', title: 'Renamed' })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(authoring.authoredPlacement()).toBe(before);
+  });
+
+  it('leaves an Open Thing and its remembered Open Size exactly as they were', () => {
     const opened: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {

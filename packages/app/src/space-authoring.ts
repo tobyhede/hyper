@@ -744,7 +744,7 @@ const incomingAliases = (things: SnapshotThings, thingId: ThingId): SnapshotThin
 /**
  * A single-line title normalized for authorship, or `null` when it has no name.
  *
- * Diagrams and Graphs only. Their titles are single-line by ADR 0083, so the
+ * Spaces, Diagrams and Graphs. Their titles are single-line by ADR 0083, so the
  * whole string is one line and trimming it is the whole rule. A Thing's Title is
  * Title Lines and normalizes by a rule of its own — {@link namedThingTitle}.
  */
@@ -1203,9 +1203,20 @@ export function createSpaceAuthoring({
         kind: 'completed',
         edit: {
           snapshot: next,
-          // An identity on the placement already installed (ADR 0084), so the
-          // Edit carries a complete `CompletedEdit` without moving a Thing.
-          placement: Placement.fromDiagram(diagram),
+          // **The placement already installed, carried forward.** This is what
+          // every other Edit does — the general path below spends
+          // `reportedPlacement` as its `completedPlacement` — and an Edit that
+          // re-derived through `Placement.fromDiagram` instead would be a second
+          // answer to a question the union answers once. The two agree in the
+          // steady state and do not agree while the canvas holds geometry no
+          // Edit has authored, and there a re-derivation snaps every Thing back
+          // to its stored position for a change that wrote `document.title`.
+          //
+          // `Placement.fromDiagram` is the fallback and not the rule, for the
+          // case that keeps this Edit above the `placement-pending` gate: the
+          // canvas may have reported nothing at all, and a Space's name is not
+          // written into a Diagram, so there is no geometry to wait on.
+          placement: reportedPlacement ?? Placement.fromDiagram(diagram),
           // **Navigation's Active Graph, not the Diagram's stored one.**
           //
           // Activating a Graph is not an Edit (ADR 0028), so the emphasised
@@ -1220,13 +1231,16 @@ export function createSpaceAuthoring({
           // the general path below does for the same reason (`navigation.ts`
           // writes out the harm at length).
           //
-          // The embedded arm mirrors the one below too: `selection` is then the
-          // embedded Diagram rather than Navigation's, so Navigation's Graph may
-          // be one this Diagram does not show and `continueInDiagram` would
-          // refuse it. No gesture reaches a Space rename from an embedded
-          // Diagram — the Dock's Space name is not drawn inside one — and the
-          // arm is written rather than assumed because the cost of being wrong
-          // is a throw at the install window.
+          // The embedded arm mirrors the one below, and it is written for that
+          // reason alone. `selection` is then the embedded Diagram rather than
+          // Navigation's, so Navigation's Graph may be one this Diagram does not
+          // show — but nothing here reads the answer: `performCompletion`'s
+          // embedded path submits and installs and never calls
+          // `continueInDiagram`, so `nextActiveGraphId` is discarded whenever
+          // `embeddedDiagramId` is given. The arm is consistency with the
+          // general path, not a guard against anything, and no gesture reaches a
+          // Space rename from an embedded Diagram in any case — the Dock's Space
+          // name is not drawn inside one.
           nextActiveGraphId:
             embeddedDiagramId === undefined
               ? navigation.getState().activeGraphId
