@@ -2,6 +2,7 @@ import { newUuid, type UUID } from '@project/core';
 import {
   createSpaceSessionRegistry,
   type LoadedSpace,
+  type ObserverErrorReporter,
   type SpaceBackend,
   type SpaceSession,
   type SpaceSessionRegistry,
@@ -38,11 +39,20 @@ export const openTestSpace = (
   loaded: LoadedSpace,
   /** Mints the Space, Thing and Diagram identities a lifecycle Edit creates (ADR 0016). */
   newId: () => UUID = newUuid,
+  /**
+   * Where a Spaces-epoch observer's failure goes.
+   *
+   * Rethrown by default: the epoch's observers are the mounted Things lists,
+   * and one of them failing is a defect rather than something a test tolerates.
+   */
+  reportObserverError: ObserverErrorReporter = (error) => {
+    throw error;
+  },
 ): TestOpenedSpace => {
   const registry = createSpaceSessionRegistry(backend);
   return {
     registry,
     spaceSession: registry.open(loaded),
-    spaceThings: createSpaceThingLifecycle({ backend, registry, newId }),
+    spaceThings: createSpaceThingLifecycle({ backend, registry, newId, reportObserverError }),
   };
 };

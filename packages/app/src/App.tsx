@@ -432,29 +432,66 @@ export const createApp = (
      * changes when a Space is created or destroyed, which happens through the
      * coordinated lifecycle, so one bump per such Edit costs one read where
      * keying on the snapshot would cost one per keystroke.
+     *
+     * **The epoch is the lifecycle's and not this component's**, because the
+     * Edit that moves it is the *session's*: it is coordinated across Spaces,
+     * and every open Space stays mounted with its own list (ADR 0074, ADR 0076,
+     * `OpenSpacesApplication`). Local state here was re-read only where the Edit
+     * was made, so a Space framed or destroyed in one open Space left every
+     * other one offering the set as it was.
+     *
+     * **And the epoch invalidates rather than fetches.** One shared epoch with
+     * every mounted `App` reading on it is the same defect the other way round:
+     * one Edit becomes N repository reads and N state updates, for N−1 lists
+     * that cannot be opened — a hidden Space's Things trigger is not merely
+     * unread, it is unreachable. So only the drawn Space subscribes, `read`
+     * compares the epoch it last answered before spending anything, and a
+     * Space that was hidden across an Edit reads once, when it is shown. The
+     * guarantee is unchanged and the cost is back to one read per Edit.
      */
     const [metaSpaces, setMetaSpaces] = useState<readonly SpaceSummary[]>([]);
-    const [spacesEpoch, setSpacesEpoch] = useState(0);
     // Last read wins, by token rather than by a cancelled flag: two reads can
     // be in flight across a quick pair of Edits, and the one that started first
     // may answer last.
     const latestSpacesRead = useRef(0);
+    /**
+     * The epoch `metaSpaces` answers, or `null` for a list never read.
+     *
+     * A ref rather than state, because it decides whether to read and never
+     * what to draw — as state it would be a second render per read, and the
+     * render that matters is `setMetaSpaces`'s.
+     */
+    const readSpacesEpoch = useRef<number | null>(null);
     useEffect(() => {
-      const token = latestSpacesRead.current + 1;
-      latestSpacesRead.current = token;
-      void (async () => {
-        try {
-          const read = await spaceThings.referenceableSpaces(currentSpace().id);
-          if (latestSpacesRead.current === token) setMetaSpaces(read);
-        } catch (failure) {
-          // Reported rather than drawn: the list's own empty state says what it
-          // has, and a Spaces read that failed is not a refusal of anything the
-          // reader asked for.
-          reportBreak(failure);
-          if (latestSpacesRead.current === token) setMetaSpaces([]);
-        }
-      })();
-    }, [spacesEpoch]);
+      // Not subscribed at all while hidden, rather than subscribed and
+      // returning early: a subscriber that decides to do nothing has still
+      // woken every hidden Space on every Edit.
+      if (!active) return;
+      const read = (): void => {
+        const epoch = spaceThings.spaceSet.getState();
+        if (readSpacesEpoch.current === epoch) return;
+        readSpacesEpoch.current = epoch;
+        const token = latestSpacesRead.current + 1;
+        latestSpacesRead.current = token;
+        void (async () => {
+          try {
+            const spaces = await spaceThings.referenceableSpaces(currentSpace().id);
+            if (latestSpacesRead.current === token) setMetaSpaces(spaces);
+          } catch (failure) {
+            // Reported rather than drawn: the list's own empty state says what
+            // it has, and a Spaces read that failed is not a refusal of
+            // anything the reader asked for.
+            reportBreak(failure);
+            // The epoch goes back, so the next showing retries rather than
+            // standing on an empty list until another Space is framed.
+            readSpacesEpoch.current = null;
+            if (latestSpacesRead.current === token) setMetaSpaces([]);
+          }
+        })();
+      };
+      read();
+      return spaceThings.spaceSet.subscribe(read);
+    }, [active]);
 
     /**
      * Placing a Space: the Space Thing that frames it, authored in this Diagram.
@@ -522,11 +559,9 @@ export const createApp = (
         if (result.kind === 'unchanged') return { kind: 'none' };
         const created = spaceSession.getState().working.things.find(({ id }) => !before.has(id));
         if (created !== undefined) useRenderAdapter.getState().selectThing(created.id);
-        // A created Space joins the Meta Space, so the Things list's second
-        // source is stale until it is read again. A link changes no Space set
-        // and still bumps it, because this is the one place that knows an Edit
-        // of this shape landed and telling the two apart buys nothing.
-        setSpacesEpoch((epoch) => epoch + 1);
+        // Nothing bumps the Spaces epoch here: a created Space joins the Meta
+        // Space for *every* open Space, so the lifecycle that made it is what
+        // announces it (`space-thing-lifecycle.ts`).
         // `null` rather than the Thing just selected: there is nothing to
         // continue *at*, because the title was typed on the pane before the
         // Edit ran, so the author goes back to Add Thing.
@@ -943,13 +978,12 @@ export const createApp = (
               thingId: thing.id,
             });
             if (result.kind === 'refused') return describeSpaceThingRefusal(result.refusal);
-            // The other Edit that changes the Meta Space's set, and the reason
-            // the bump is not `createSpaceThing`'s alone: this deletion can
-            // destroy the target Space and every Space below it that nothing
-            // else references, so a list that was not told goes on offering a
-            // Space that is gone. A deletion that removed only the Thing still
-            // bumps, because telling the two apart here buys nothing.
-            setSpacesEpoch((epoch) => epoch + 1);
+            // The other Edit that changes the Meta Space's set: this deletion
+            // can destroy the target Space and every Space below it that
+            // nothing else references, so a list that was not told goes on
+            // offering a Space that is gone. Announced by the lifecycle for the
+            // same reason creation is — the Space it destroys was offered in
+            // every open Space, not only in this one.
             return null;
           }
         : () => {
