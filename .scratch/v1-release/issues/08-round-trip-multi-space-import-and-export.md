@@ -83,10 +83,11 @@ canonical initial aggregate without an import source.
       host the same test exports (`:181`) and asserts the aggregate file equals
       `{ version: 1, metaSpaceId }`, that `<spaceId>/space.json` carries the id
       and title, and that the Space reads back at `revision: 1n` with
-      `exportedRevision: 1n` (`:183-196`). **Written, not observed here** — the
+      `exportedRevision: 1n` (`:183-196`). **Observed in CI, not locally** — the
       one command that can run it, `pnpm e2e:postgres`, needs a migrated
-      database, and no run of it is recorded against this branch. CI runs it as
-      the last step of the `postgres` job, which is where the evidence will be.
+      database, which this worktree has no `.env` to supply. CI runs it as the
+      last step of the `postgres` job, and that job passed on PR #199 in
+      [run 34593109941](https://github.com/tobyhede/hyper/actions/runs/34593109941).
 
 This ticket absorbs the aggregate criteria formerly proposed as
 `layout-only-v1/05`, so it remains the one canonical aggregate-format and
@@ -179,15 +180,21 @@ and an unreferenced ordinary Space is `ordinary-space-unreferenced`. The
 layoutless round trip is therefore asserted against a layoutless **Meta** Space,
 which needs no referrer.
 
-**The one box still open, and why.** `pnpm test:integration:postgres` and
-`pnpm e2e:postgres` were not run: there is no `.env` in this tree, so there is
-no `DATABASE_URL` and no password to bring a database up with — that is the
-human's to supply. Both suites are *written* and typecheck clean, and the e2e
-spec now exports after the drag and asserts `hyper.json`, the Space directory
-and `exportedRevision === 1n`. The criterion stays unticked because nothing has
-observed them run, which is exactly the distinction the verification bar draws.
+**The last box, and what closed it.** `pnpm test:integration:postgres` and
+`pnpm e2e:postgres` could not run in this tree: there is no `.env`, so there is
+no `DATABASE_URL` and no password to bring a database up with. Both suites were
+*written* and typechecked clean, and the e2e spec exports after the drag and
+asserts the aggregate file, the Space directory and `exportedRevision === 1n` —
+but nothing had observed them run, so the criterion stayed unticked, which is
+exactly the distinction the verification bar draws.
 
-To close it:
+CI closed it. The `postgres` job of
+[run 34593109941](https://github.com/tobyhede/hyper/actions/runs/34593109941)
+passed on PR #199, and that job migrates the database and then runs
+`pnpm e2e:postgres` as its last step — so the criterion is observed rather than
+merely written, and the box above is ticked on that evidence.
+
+To reproduce it locally, with a password in `.env` first:
 
 ```sh
 pnpm postgres:up && pnpm test:integration:postgres && pnpm e2e:postgres; pnpm postgres:down

@@ -102,7 +102,7 @@ my-aggregate/
 
 `hyper.json` carries the one thing the directory cannot say for itself: **which Space is Meta**. No adapter infers that from ordering, cardinality or topology ([ADR 0078](docs/adr/0078-the-server-side-repository-owns-meta-lifecycle.md)), and a directory is exactly where such an inference would be tempting — the first child, the alphabetically-least name — so the aggregate file states it, and a directory without one is not an aggregate. There is deliberately no Space inventory beside it: a Space is in the aggregate because its directory is there, the same way a thing exists because its file does.
 
-Every Space Id is explicit, and the **directory name is where it is written**. A name that is not a UUID is refused rather than read around, because silently taking the id out of `space.json` instead would let a renamed directory pass as a fresh Space on the next round trip; where `space.json` also declares an `id`, the two must agree. Nested ids — thing, diagram, graph — may still be omitted by a hand-authored file and are minted on import, which is safe precisely because nothing already in the document can name a UUID the importer has just invented. A reference to an id nobody declared is left to dangle and refused by aggregate intake.
+Every Space Id is explicit, and the **directory name is where it is written**. A name that is not a UUID is refused rather than read around, because silently taking the id out of `space.json` instead would let a renamed directory pass as a fresh Space on the next round trip; where `space.json` also declares an `id`, the two must agree. The spelling has to be **canonical lower case**, not merely a parseable UUID: export writes lower case and nothing else, so an upper-cased name is a directory somebody renamed — import must not take a Space id from it, and obsolete-directory removal, which is recursive, must not mistake it for one a previous export wrote. Nested ids — thing, diagram, graph — may still be omitted by a hand-authored file and are minted on import, which is safe precisely because nothing already in the document can name a UUID the importer has just invented. A reference to an id nobody declared is left to dangle and refused by aggregate intake.
 
 Everything the reader does not look at survives a round trip: root files it ignores, and undiscovered contents inside a Space directory it keeps. What it does regenerate, it replaces — so a Thing deleted since the last export leaves no file behind, and a Space deleted since then loses its directory.
 
@@ -113,6 +113,8 @@ pnpm hyper ./my-aggregate --dangerous-truncate   # replace the stored aggregate 
 ```
 
 Two doors and no mode parameter on either. Without the flag, an already-initialized repository is left exactly as it is and the command says so; with it, the stored aggregate and its Meta identity are replaced atomically, authorized by the identity the repository just reported. There is no merge mode.
+
+The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to truncate, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `hyper` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
 
 ### Durable URLs and HTTP resources
 

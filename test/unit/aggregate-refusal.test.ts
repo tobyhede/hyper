@@ -111,6 +111,12 @@ describe('describeAggregateRefusal', () => {
     );
   });
 
+  /*
+   * Both descriptions and their order, not a count. `toHaveLength(2)` could not
+   * observe the one thing this test's name promises — a reordered or wrong pair
+   * passed it — and order is the part a caller depends on, since the renderer
+   * maps over the errors intake gave it and the CLI prints the result as written.
+   */
   it('describes every error it is given, in order', () => {
     expect(
       describeAggregateRefusal(
@@ -120,6 +126,9 @@ describe('describeAggregateRefusal', () => {
         ],
         [snapshot],
       ),
-    ).toHaveLength(2);
+    ).toEqual([
+      `Space ${TARGET_SPACE_ID} is not the Meta Space and no Space Thing points at it`,
+      `The aggregate names Meta Space ${SPACE_ID}, which it does not contain`,
+    ]);
   });
 });
