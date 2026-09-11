@@ -200,7 +200,7 @@ describe('PresentingChrome', () => {
 
   /**
    * The control that performs a shortcut is the one that announces it
-   * (`docs/agents/ui.md`, as `AddCardControl` does). The visible `Kbd` guidance is
+   * (`docs/agents/ui.md`, as `CanvasCard`'s Save and Cancel rail actions do). The visible `Kbd` guidance is
    * presentation only, so without this the binding reaches nobody who cannot see it.
    *
    * Only the non-native keys. Space and Enter activate any focused button by

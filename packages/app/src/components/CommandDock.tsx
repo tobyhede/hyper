@@ -1786,7 +1786,9 @@ function ParentSpace({
                         )}
                         {row.title}
                         {/* **The regression `OpenSpaces` did not have.** The
-                          vertical tab strip this Open Spaces menu replaces drew a badge
+                          vertical tab strip this Open Spaces menu replaced —
+                          deleted since, by
+                          `.scratch/command-dock/issues/08` — drew a badge
                           per open Space for `conflicted`, `failed` and
                           `rejected`; a list that says nothing makes a Space
                           whose commit conflicted while the reader was elsewhere
@@ -1854,9 +1856,9 @@ function ParentSpace({
  * the bar — Exit is in the Space menu — no
  * separate list of open Spaces beside a trail of ancestors, and no tooltip
  * carrying depth — the Open Spaces menu's indent carries it. The Sidebar's tab strip
- * (`OpenSpaces`) is not carried over as a strip, but this is what it modelled:
- * the *set* of open Spaces. What it could not model is the crossing, and the
- * parent step is that.
+ * (`OpenSpaces`, deleted by `.scratch/command-dock/issues/08`) is not carried
+ * over as a strip, but this is what it modelled: the *set* of open Spaces. What
+ * it could not model is the crossing, and the parent step is that.
  *
  * **What depth costs is width, and the two parts are how it is paid.** Only one
  * step is ever a word, so a fourth crossing costs nothing at all on the bar; and

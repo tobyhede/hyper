@@ -389,7 +389,9 @@ describe('CanvasCard Open and Close operation', () => {
       expect(button.querySelector('svg')).toHaveAttribute('data-icon');
     }
     // The key each performs is still stated, which is how a control that
-    // performs a shortcut announces it (`AddCardControl` does the same).
+    // performs a shortcut announces it (`docs/agents/ui.md`). These two are the
+    // repo's worked example of that convention, since `.scratch/command-dock/issues/08`
+    // deleted `AddCardControl`, which used to be.
     expect(buttons[0]).toHaveAttribute('aria-keyshortcuts', 'Meta+Enter Control+Enter');
     expect(buttons[1]).toHaveAttribute('aria-keyshortcuts', 'Escape');
   });

@@ -10,18 +10,20 @@ import {
 /**
  * What the Command Dock's Open Spaces menu says about an open Space that is not well.
  *
- * The Dock's Open Spaces menu is proposed to replace `OpenSpaces`, the vertical tab
- * strip that already badges each open Space for `conflicted`, `failed` and
- * `rejected`. Two surfaces reporting one state is a transitional fact, not a
- * design — so what they must not do is report it in *different words*, which is
- * how a reader learns that "Save failed" and "Changes not saved" are two
- * things.
+ * The Dock's Open Spaces menu replaced `OpenSpaces`, the vertical tab strip that
+ * badged each open Space for `conflicted`, `failed` and `rejected`, and
+ * `.scratch/command-dock/issues/08` deleted that strip. One surface reports the
+ * state now, so the transitional risk this test was written against — two
+ * surfaces reporting one state in *different words* — is gone with the second
+ * surface.
  *
- * The test is against the shared label rather than against a literal, so the
- * wording stays one decision. Changing it changes both surfaces or neither.
+ * The test stays, and still runs against the shared label rather than against a
+ * literal. `openSpaceStatusLabel` is where the wording is decided, and holding
+ * the menu to it is what keeps a literal from being typed here the next time
+ * someone edits a row.
  */
 describe('the Command Dock reports an unwell Space', () => {
-  it('in the same words as the open-Spaces strip it replaces', () => {
+  it('in the words `openSpaceStatusLabel` decides', () => {
     expect(unwellReport({ kind: 'failed', failure: retryable })).toBe(
       openSpaceStatusLabel('failed'),
     );

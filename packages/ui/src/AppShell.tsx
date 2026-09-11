@@ -37,7 +37,9 @@ export interface AppShellProps {
  * the command surface takes no layout space from the canvas. So the registry
  * `Sidebar`, its `SidebarProvider`, its `Ctrl/Cmd-B` and the header row that
  * carried its trigger are all gone, and the Command Dock floats over the area
- * below instead.
+ * below instead. The primitive itself is deleted too, with `sheet.tsx`,
+ * `skeleton.tsx` and `use-mobile.ts` behind it
+ * (`.scratch/command-dock/issues/08`), so there is nothing left to compose back.
  *
  * What is left is three things a canvas cannot do for itself: pin the viewport
  * so the page never scrolls, yield the strip a drawer overlays, and give the

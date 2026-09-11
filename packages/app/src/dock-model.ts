@@ -25,11 +25,16 @@ import type { ExitSpaceResult, RejectedExitConfirmation } from './open-spaces';
  * spinner about it, so neither earns a mark on a row a reader is scanning for
  * names.
  *
- * The words are `openSpaceStatusLabel`'s rather than this module's. `OpenSpaces`
- * — the tab strip this Open Spaces menu is proposed to replace — already reports the
- * same three states over the same open set, and a second vocabulary for one
+ * The words are `openSpaceStatusLabel`'s rather than this module's. They were
+ * shared with `OpenSpaces`, the vertical tab strip that reported the same three
+ * states over the same open set; this menu replaced it and
+ * `.scratch/command-dock/issues/08` deleted it, so the words now live in
+ * `packages/ui/src/open-space-status.ts` and {@link unwellReport} below is what
+ * spends them — the Open Spaces menu draws what that answers. They stay in
+ * `@project/ui` rather than moving here because a second vocabulary for one
  * state is how a reader learns that "Save failed" and "Changes not saved" are
- * two different things.
+ * two different things, and that risk returns with the next surface that
+ * reports an unwell Space.
  *
  * **A total record and not a chain of `if`s**, which is the difference between
  * a state this surface has decided about and a state it has never heard of. The

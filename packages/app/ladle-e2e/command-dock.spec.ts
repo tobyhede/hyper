@@ -459,11 +459,15 @@ test(
  * A Space that went wrong while the reader was somewhere else.
  *
  * The regression `OpenSpaces` did not have: the vertical tab strip this menu
- * replaces badged every open Space, and a list that says nothing makes a Space
+ * replaced badged every open Space, and a list that says nothing makes a Space
  * whose commit failed look exactly like one that is fine. The row says *which*
  * and nothing else — the recovery belongs to that Space's own Dock, one press
- * away — and it says it in words rather than colour alone, through the same
- * `openSpaceStatusLabel` both surfaces spend.
+ * away — and it says it in words rather than colour alone, through
+ * `openSpaceStatusLabel`. The strip is deleted
+ * (`.scratch/command-dock/issues/08`) and those words outlived it in
+ * `packages/ui/src/open-space-status.ts`, which `unwellReport`
+ * (`packages/app/src/dock-model.ts`) is what calls — this menu draws what that
+ * answers.
  */
 test(
   'the Open Spaces menu names which other open Space failed to commit',

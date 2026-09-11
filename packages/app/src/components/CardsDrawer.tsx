@@ -133,10 +133,14 @@ const emptyMessage = (available: number, inSpace: number): string =>
 /**
  * The Cards View: existing Cards absent from the selected Diagram.
  *
- * A `Drawer` rather than a second `Sidebar` — ADR 0053 gives the one Sidebar the
+ * A `Drawer` rather than a second `Sidebar` — ADR 0053 gave the one Sidebar the
  * left edge, and composing another on the right made this panel share the
  * shell's `SidebarProvider`, its open state and its `Ctrl/Cmd-B` shortcut while
- * still having no dismissal, focus or naming contract of its own.
+ * still having no dismissal, focus or naming contract of its own. ADR 0082 then
+ * retired the Sidebar entirely and `.scratch/command-dock/issues/08` deleted the
+ * primitive, so the alternative this paragraph argues against no longer exists.
+ * The reasoning is kept because it is why this is a `Drawer` rather than
+ * anything else, and it survives the surface it was written against.
  *
  * It is deliberately **non-modal and pointer-dismissal-free**. Dragging a Card
  * onto the canvas is the whole point of the surface, so a backdrop would defeat
