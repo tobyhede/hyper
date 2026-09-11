@@ -604,13 +604,19 @@ describe('Add Space Thing', () => {
   });
 
   /**
-   * A target that could not be prepared makes nothing at all.
+   * A target that could not be prepared makes nothing at all, and says so in
+   * the one arm that ends in advice.
    *
    * Initialization is its own durable commit and it runs before the Edit
    * (ADR 0079), so a commit that fails leaves no Thing, no half-written
    * selection and a containing Space nobody touched. The author is told on the
-   * **Target** field, because what answers it is choosing another Space —
-   * exactly as for the aggregate refusals beside it.
+   * **Target** field, because choosing another Space answers this — exactly as
+   * for the aggregate refusals beside it.
+   *
+   * The sentence is the `not-initialized` one, and asserting it whole is what
+   * separates this from a Space that has gone: a failed commit is the transient
+   * arm, so it is the only one that tells the author to try again. A target
+   * that no longer exists gets a different sentence and no such invitation.
    */
   it('creates nothing and names the Target when its target could not be prepared', async () => {
     const control = new MemorySpaceBackendTestControl();
@@ -631,7 +637,7 @@ describe('Add Space Thing', () => {
     const target = await screen.findByTestId('new-space-thing-target');
     await waitFor(() => expect(target).toHaveAttribute('aria-invalid', 'true'));
     expect(target).toHaveAccessibleDescription(
-      'That Space could not be prepared to be shown here, so nothing was created.',
+      'That Space could not be prepared to be shown here, so nothing was created. Try again.',
     );
     expect(screen.getByTestId('new-space-thing')).toBeVisible();
     expect(spaceThingsOf(session)).toEqual([]);

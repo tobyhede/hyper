@@ -87,6 +87,29 @@ interface SpaceThingSelection {
   readonly graph: UUID;
 }
 
+/**
+ * Why a target supplied no Diagram and Graph for a Space Thing to select.
+ *
+ * Three rather than one, because the move that answers them differs even though
+ * the pane offers the same two. `not-initialized` is the transient arm — a
+ * commit that failed can succeed on the next attempt — while `missing` and
+ * `unreadable` are permanent for that target and only another Space answers
+ * them. A single code would have told an author facing a failed commit
+ * something that reads like a dead end.
+ */
+export type SpaceThingTargetUnavailableReason =
+  /** The Space is not there: deleted between the listing that offered it and this Edit. */
+  | 'missing'
+  /** Its stored state does not load as a valid Space, so nothing can be read off it. */
+  | 'unreadable'
+  /** It could not be given the Diagram it needs — the initializing commit did not land. */
+  | 'not-initialized';
+
+/** A target's selection, or why it has none. */
+type TargetSelection =
+  | { readonly kind: 'selected'; readonly selection: SpaceThingSelection }
+  | { readonly kind: 'unavailable'; readonly reason: SpaceThingTargetUnavailableReason };
+
 export interface CreateSpaceThingInput {
   readonly containingSpaceId: UUID;
   readonly diagramId: UUID;
@@ -131,13 +154,18 @@ export type SpaceThingLifecycleResult =
          * The target could not be made working, so it supplies no Diagram and
          * Graph for the Thing to select (ADR 0079).
          *
-         * One code for reading it, initializing it and finding it gone between
-         * the listing and this Edit, because the author's answer is the same in
-         * all three and the Edit did not begin in any of them. It is separate
-         * from `persistence-read-failed`, which is about the Spaces this Edit
-         * validates against rather than the one it was pointed at.
+         * One code carrying {@link SpaceThingTargetUnavailableReason}, rather
+         * than three codes: what the Edit did is identical in all three — it did
+         * not begin — and only the advice differs, which is what a reason is
+         * for. It stays separate from `persistence-read-failed`, which is about
+         * the Spaces this Edit validates against rather than the one it was
+         * pointed at.
          */
-        | { readonly code: 'space-thing-target-unavailable'; readonly spaceId: UUID };
+        | {
+            readonly code: 'space-thing-target-unavailable';
+            readonly spaceId: UUID;
+            readonly reason: SpaceThingTargetUnavailableReason;
+          };
     };
 export interface SpaceThingLifecycle {
   readonly create: (input: CreateSpaceThingInput) => Promise<SpaceThingLifecycleResult>;
@@ -166,6 +194,27 @@ const selectionOf = (space: Space): SpaceThingSelection | undefined => {
   return resolved === undefined
     ? undefined
     : { diagram: resolved.diagram.id, graph: resolved.activeGraph.id };
+};
+
+const unavailableTarget = (reason: SpaceThingTargetUnavailableReason): TargetSelection => ({
+  kind: 'unavailable',
+  reason,
+});
+
+/**
+ * A Space that loaded, read for what it opens on.
+ *
+ * A Space with no opening Diagram reaches here only as `not-initialized`: for a
+ * stored target that is the arm the working load was supposed to close and did
+ * not, and for a live one it is a session opened by some path other than the
+ * working load — the deletion cascade opens participants directly. Neither is
+ * an author's doing, and neither leaves anything to select.
+ */
+const selectionOfLoaded = (space: Space): TargetSelection => {
+  const selection = selectionOf(space);
+  return selection === undefined
+    ? unavailableTarget('not-initialized')
+    : { kind: 'selected', selection };
 };
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -678,27 +727,25 @@ export function createSpaceSessionRegistry(
      * the coordination, so a Diagram deleted in the gap is refused as
      * `space-thing-diagram-missing` rather than stored.
      */
-    const workingTargetSelection = async (
-      targetSpaceId: UUID,
-    ): Promise<SpaceThingSelection | undefined> => {
+    const workingTargetSelection = async (targetSpaceId: UUID): Promise<TargetSelection> => {
       const live = sessions.get(targetSpaceId)?.session.getState().working;
       if (live !== undefined) {
         const loaded = loadSpaceSnapshot(live);
-        return loaded.ok ? selectionOf(loaded.space) : undefined;
+        return loaded.ok ? selectionOfLoaded(loaded.space) : unavailableTarget('unreadable');
       }
       let stored: LoadedSpace | undefined;
       try {
         stored = await loadWorkingSpace(targetSpaceId);
       } catch {
-        // The loader throws when initialization could not commit. That is the
-        // same answer to the author as a Space that has gone: this Edit was not
-        // attempted. Its own diagnostics belong to the opening path, which is
-        // where a reader would go looking for them.
-        return undefined;
+        // The loader throws when the initializing commit did not land, which is
+        // the one transient arm: the next attempt may well succeed. Its own
+        // diagnostics belong to the opening path, which is where a reader would
+        // go looking for them.
+        return unavailableTarget('not-initialized');
       }
-      if (stored === undefined) return undefined;
+      if (stored === undefined) return unavailableTarget('missing');
       const loaded = loadSpaceSnapshot(stored.snapshot);
-      return loaded.ok ? selectionOf(loaded.space) : undefined;
+      return loaded.ok ? selectionOfLoaded(loaded.space) : unavailableTarget('unreadable');
     };
     const working = (id: UUID): SpaceSnapshot => {
       const session = sessions.get(id)?.session;
@@ -741,13 +788,14 @@ export function createSpaceSessionRegistry(
         // Last, and deliberately: an Edit the containing Space has already
         // refused must not initialize the Space it was pointed at, and must not
         // mint the two identities doing so would spend.
-        const selection = await workingTargetSelection(input.targetSpaceId);
-        if (selection === undefined) {
+        const target = await workingTargetSelection(input.targetSpaceId);
+        if (target.kind === 'unavailable') {
           refusal = {
             kind: 'refused',
             refusal: {
               code: 'space-thing-target-unavailable',
               spaceId: input.targetSpaceId,
+              reason: target.reason,
             },
           };
           return undefined;
@@ -756,8 +804,8 @@ export function createSpaceSessionRegistry(
           title: input.title,
           kind: 'space',
           spaceId: input.targetSpaceId,
-          diagram: selection.diagram,
-          graph: selection.graph,
+          diagram: target.selection.diagram,
+          graph: target.selection.graph,
         };
         const thingId = newId();
         return [

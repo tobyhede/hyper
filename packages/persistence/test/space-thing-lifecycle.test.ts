@@ -1317,7 +1317,11 @@ describe('Space Thing lifecycle', () => {
       }),
     ).resolves.toEqual({
       kind: 'refused',
-      refusal: { code: 'space-thing-target-unavailable', spaceId: TARGET_ID },
+      refusal: {
+        code: 'space-thing-target-unavailable',
+        spaceId: TARGET_ID,
+        reason: 'not-initialized',
+      },
     });
 
     // The two identities the attempt drew are spent and the target is untouched,
@@ -1462,8 +1466,85 @@ describe('Space Thing lifecycle', () => {
       }),
     ).resolves.toEqual({
       kind: 'refused',
-      refusal: { code: 'space-thing-target-unavailable', spaceId: TARGET_ID },
+      refusal: { code: 'space-thing-target-unavailable', spaceId: TARGET_ID, reason: 'missing' },
     });
+    expect(meta.getState().working).toEqual(metaSnapshot);
+    expect(control.requests).toHaveLength(0);
+  });
+
+  /**
+   * A target whose stored state is not a valid Space is refused as unreadable,
+   * and nothing tries to repair it.
+   *
+   * The working load deliberately leaves an invalid snapshot alone — repairing
+   * one would replace the opening path's complete diagnostics with a commit
+   * refusal — so it comes back exactly as stored and has no selection to give.
+   * That is a different answer from a failed commit: the Space is there and
+   * retrying will read the same broken state, which is why this arm's sentence
+   * does not invite one.
+   */
+  it('refuses a link to a target whose stored state is not a valid Space', async () => {
+    const unreadableTarget: SpaceSnapshot = {
+      id: TARGET_ID,
+      document: {
+        version: 1,
+        title: 'Architecture',
+        defaultDiagram: TARGET_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: TARGET_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: { [TARGET_THING_ID]: { x: 0, y: 0, open: false } },
+            // Names a Thing this Space does not hold, which is what single-Space
+            // intake refuses and what no repair here would mend.
+            graphs: [
+              {
+                id: TARGET_GRAPH_ID,
+                title: 'Graph 1',
+                edges: [{ from: TARGET_THING_ID, to: SECOND_SPACE_THING_ID }],
+              },
+            ],
+            activeGraph: TARGET_GRAPH_ID,
+          },
+        ],
+      },
+      things: [
+        { id: TARGET_THING_ID, document: { title: 'Architecture', kind: 'markdown', body: '' } },
+      ],
+    };
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: unreadableTarget, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceThings(idSource([]));
+
+    await expect(
+      lifecycle.link({
+        containingSpaceId: META_ID,
+        diagramId: META_DIAGRAM_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    ).resolves.toEqual({
+      kind: 'refused',
+      refusal: {
+        code: 'space-thing-target-unavailable',
+        spaceId: TARGET_ID,
+        reason: 'unreadable',
+      },
+    });
+
+    // The empty id source is the second claim: an unreadable target is refused
+    // without minting the Diagram and Graph an initializable one would have.
     expect(meta.getState().working).toEqual(metaSnapshot);
     expect(control.requests).toHaveLength(0);
   });
