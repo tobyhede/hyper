@@ -14,8 +14,8 @@ import {
   settled,
 } from './graph';
 
-// The app loads the abstract layout fixture (packages/app/fixture) — two
-// disconnected collections sharing no Things:
+// The app loads the tracked fixture aggregate (packages/app/fixture) and opens
+// its Meta Space — two disconnected collections sharing no Things:
 //   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — graphs over one spine,
 //      plus T, a member of that Diagram no Edge reaches, whose Title is three
 //      lines (ADR 0083)
@@ -175,7 +175,7 @@ test('selecting a Diagram draws the Graphs it owns and only those', async ({ pag
   const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
 
   await expect(selectedCanvas(page)).toContainText('Collection 1');
-  await expect(await diagramChoices(page)).toHaveCount(2);
+  await expect(await diagramChoices(page)).toHaveCount(3);
   await page.keyboard.press('Escape');
 
   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.

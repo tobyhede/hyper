@@ -1,24 +1,33 @@
-# The app's two spaces
+# The tracked fixture and the example
 
-`fixture/` is the abstract space `pnpm dev:fixture` loads, and the one Playwright drives.
-It is a **test bed**, not the product demo — the narrative demo lives in
-`example/` and is kept for when real space-loading exists. Tests assert
-*behaviour* against this shape; nothing asserts on thing prose beyond the few
-markers listed below.
+`fixture/` is the complete `hyper.json` aggregate `pnpm dev:fixture` loads, and
+the one Playwright drives. It is a **test bed**, not the product demo — the
+narrative demo lives in `example/` and is kept as a single Space directory.
+Tests assert *behaviour* against this shape; nothing asserts on thing prose
+beyond the few markers listed below.
 
 This file sits here rather than in `fixture/` on purpose. A space is a directory
 (ADR 0020) and every `.md` beside its space file is a thing, so a `README.md` in
 there would be scanned as one and fail to parse for want of frontmatter.
 
-Each space is a directory: `space.json` holding structure — `version`, `id`,
-`title`, `diagrams` and `defaultDiagram` — and one markdown file per
-thing, either beside it or under `things/`. The fixture uses both locations
-(`a.md` at the top, the rest in `things/`) so the two-location scan is exercised
-by the space the app actually loads.
+The fixture is Meta-rooted. `hyper.json` names the Diagram fixture as Meta;
+ordinary Spaces live in sibling `<space-uuid>/` directories. Each Space is a
+directory: `space.json` holding structure — `version`, `id`, `title`,
+`diagrams` and `defaultDiagram` — and one markdown file per thing, either
+beside it or under `things/`. The Meta Space uses both locations (`a.md` at the
+top, the rest in `things/`) so the two-location scan is exercised by the Space
+the app actually opens.
 
-Two **disconnected collections** in one space, sharing no things, authored as two
+Meta still opens on Collection 1. Linked Spaces is a third Diagram of Space
+Things: Presentation walkthrough (which itself names Deep dive and Authoring
+notes) and Deep dive (also named from Meta, the converging reference). Depth
+from Meta through the walkthrough to Authoring notes is three. Cycle refusal
+is an aggregate-intake test, not an invalid fixture.
+
+Two **disconnected collections** on Meta, sharing no things, authored as two
 separate bands — and, because a Graph is a nested owned value of the
-Diagram that holds it (ADR 0040), **two Diagrams**:
+Diagram that holds it (ADR 0040), **two Diagrams** for the e2e canvas, plus
+Linked Spaces:
 
 ```
 Collection 1   Long   A → B → C → D → A′
@@ -26,6 +35,7 @@ Collection 1   Long   A → B → C → D → A′
                Short  A → B → C
                T      a member no Edge reaches
 Collection 2   Echo   E → F → G → H → E′
+Linked Spaces  Catalogue   Presentation walkthrough → Deep dive
 ```
 
 Each Diagram's position keys are its Thing membership, and every Edge it owns is
@@ -89,10 +99,11 @@ Between them the shape exercises every behaviour the e2e suite covers:
 - **A Diagram member no Edge reaches.** `T` again: it is placed on Collection 1
   and joins none of its Graphs, so it draws no graph handles and carries no
   Edges. That is the state Add Thing and the Things list both author.
-- **Overlay counts.** 11 things, 13 edges (4 + 3 + 2 + 4), 26 handles, 4 graphs
-  across both Diagrams. A *selected* Diagram draws only the Graphs it owns: 9
-  edges for Collection 1, 4 for Collection 2 — and 6 Things on Collection 1,
-  which is its 5 Edge endpoints plus `T`.
+- **Overlay counts.** Collection 1 and Collection 2 are unchanged: 11 things on
+  those two Diagrams, 13 edges (4 + 3 + 2 + 4), 6 Things on Collection 1.
+  Linked Spaces adds two Space Things and one Catalogue Edge. A *selected*
+  Diagram draws only the Graphs it owns: 9 edges for Collection 1, 4 for
+  Collection 2.
 
 The counts above are shape-dependent: change a Graph and the e2e counts change
 with it, deliberately.

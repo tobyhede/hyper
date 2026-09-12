@@ -1,10 +1,32 @@
 import { fileURLToPath } from 'node:url';
 import { newUuid } from '@project/core';
-import { identifySpace, readSingleSpace } from '../../src/aggregate-directory';
+import { identifySpace, readAggregate, readSingleSpace } from '../../src/aggregate-directory';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import type { LoadedSpace } from '@project/persistence';
 
 const fixtureDirectory = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
+
+const seededSpace = (
+  initialized: Awaited<ReturnType<SpaceRepository['initializeAggregate']>>,
+  directory: string,
+  spaceId: string,
+): LoadedSpace => {
+  if (initialized.kind !== 'initialized') {
+    // `existing` and `already-initialized` both mean the repository was seeded
+    // before this call, which is a fault in the test's setup rather than in the
+    // directory; `aggregate-refused` means the directory itself does not load.
+    const because =
+      initialized.kind === 'aggregate-refused'
+        ? initialized.errors.map(({ kind }) => kind).join(', ')
+        : 'the repository was already initialized';
+    throw new Error(`Directory ${directory} did not seed: ${initialized.kind} (${because})`);
+  }
+  const fixture = initialized.aggregate.spaces.find(({ snapshot: { id } }) => id === spaceId);
+  if (fixture === undefined) {
+    throw new Error(`Directory ${directory} seeded no Space for ${spaceId}`);
+  }
+  return fixture;
+};
 
 /**
  * Import one Space directory through the production file importer, and seed it
@@ -31,23 +53,21 @@ export const importSpaceDirectory = async (
     metaSpaceId: snapshot.id,
     spaces: [snapshot],
   });
-  if (initialized.kind !== 'initialized') {
-    // `existing` and `already-initialized` both mean the repository was seeded
-    // before this call, which is a fault in the test's setup rather than in the
-    // directory; `aggregate-refused` means the directory itself does not load.
-    const because =
-      initialized.kind === 'aggregate-refused'
-        ? initialized.errors.map(({ kind }) => kind).join(', ')
-        : 'the repository was already initialized';
-    throw new Error(`Space directory ${directory} did not seed: ${initialized.kind} (${because})`);
-  }
-  const fixture = initialized.aggregate.spaces.find(({ snapshot: { id } }) => id === snapshot.id);
-  if (fixture === undefined) {
-    throw new Error(`Space directory ${directory} seeded no Space for ${snapshot.id}`);
-  }
-  return fixture;
+  return seededSpace(initialized, directory, snapshot.id);
 };
 
-/** Import the tracked abstract-layout fixture through the production file importer. */
-export const importFixture = (repository: SpaceRepository): Promise<LoadedSpace> =>
-  importSpaceDirectory(repository, fixtureDirectory);
+/**
+ * Import the tracked fixture as a complete Meta-rooted aggregate, through the
+ * same `readAggregate` + `initializeAggregate` path public import uses.
+ *
+ * Returns the Meta Space so callers that open the fixture still receive the
+ * Diagram fixture they address.
+ */
+export const importFixture = async (repository: SpaceRepository): Promise<LoadedSpace> => {
+  const source = await readAggregate(fixtureDirectory, newUuid);
+  const initialized = await repository.initializeAggregate({
+    metaSpaceId: source.metaSpaceId,
+    spaces: source.spaces,
+  });
+  return seededSpace(initialized, fixtureDirectory, source.metaSpaceId);
+};

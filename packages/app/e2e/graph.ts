@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { aggregateFileSchema } from '@project/core';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
@@ -18,7 +19,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 /* -------------------------------------------------------------------------- */
 
 /**
- * How many Things and Edges `packages/app/fixture/` actually declares, read from
+ * How many Things and Edges the fixture Meta Space actually declares, read from
  * the authored files at load.
  *
  * Four assertions used to spell these out as literals — `40` target handles,
@@ -28,7 +29,21 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * being checked against, and no count here is ever derived from the page under
  * test.
  */
-const fixtureDir = fileURLToPath(new URL('../fixture', import.meta.url));
+const fixtureRoot = fileURLToPath(new URL('../fixture', import.meta.url));
+const rawAggregate: unknown = JSON.parse(readFileSync(`${fixtureRoot}/hyper.json`, 'utf8'));
+const fixtureAggregate = aggregateFileSchema.parse(rawAggregate);
+const fixtureMetaId = fixtureAggregate.metaSpaceId;
+const fixtureDir = `${fixtureRoot}/${fixtureMetaId}`;
+
+/**
+ * Ordinary Spaces the fixture aggregate already holds, excluding Meta.
+ *
+ * `space-thing.spec.ts` (`stops offering a Space…`, `deleting the last Space
+ * Thing…`) lands back on this count after destroying a Space it just created.
+ */
+export const FIXTURE_ORDINARY_SPACE_COUNT = readdirSync(fixtureRoot, {
+  withFileTypes: true,
+}).filter((entry) => entry.isDirectory() && entry.name !== fixtureMetaId).length;
 
 const markdownFileCount = (directory: string): number =>
   readdirSync(directory, { withFileTypes: true }).filter(
@@ -47,7 +62,7 @@ export const FIXTURE_THING_COUNT =
  * Graphs are a Diagram's only connection structure, so every Edge the overview
  * draws is one of a Graph's authored `{from, to}` pairs — summed across every
  * Diagram, because a Graph is a nested owned value of the one that holds it (ADR
- * 0040) and the fixture spreads four Graphs over two Diagrams.
+ * 0040) and the fixture Meta Space spreads five Graphs over three Diagrams.
  *
  * This is the count across every Diagram the fixture holds. A *selected*
  * Diagram draws only the Graphs it owns, so it is not the number to assert
@@ -195,9 +210,10 @@ export function selectedCanvas(page: Page): Locator {
  *
  * One exclusive choice over authored Diagrams, with no second control and no
  * empty value — ADR 0053's one durable clause, which ADR 0082 keeps verbatim.
- * The fixture declares two Diagrams (`fixture/space.json`), so a test can open
- * one without authoring it first, which is the only way to drag a Thing in a
- * Diagram that already owns Edges.
+ * The fixture Meta Space declares Collection 1 and Collection 2
+ * (`fixture/<meta>/space.json`), so a test can open one without authoring it
+ * first, which is the only way to drag a Thing in a Diagram that already owns
+ * Edges. Linked Spaces is the third Diagram, holding the Space Things.
  */
 export async function selectCanvas(page: Page, title: string): Promise<void> {
   // Exact, both times. On a substring the early return fires for `Workshop`
