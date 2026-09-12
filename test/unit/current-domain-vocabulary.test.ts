@@ -999,9 +999,16 @@ describe('the retired name for the surface over the open set is gone', () => {
  *
  * The shape rule transfers from ADR 0041 exactly, and for the same reason: the
  * bare English word is legitimate — a strategy lays things out, the Command Dock
- * takes no layout space, React Flow's docs have a layouting page — while a
- * compound is unambiguous. Nothing writes the retired id, the retired
+ * takes no layout space, React Flow's docs name a section after the gerund —
+ * while a compound is unambiguous. Nothing writes the retired id, the retired
  * collection or the retired opening field by accident.
+ *
+ * The gerund is described rather than written out, because the suffix arm below
+ * reports it and only `CITED_PATH` forgives the URL it appears in. That arm is
+ * the one this file learned late. An English suffix gives no capital, no
+ * boundary and no hyphen, so the retired spelling of `diagramless` — the
+ * adjective this codebase writes about a Space with no Diagram — passed every
+ * other arm, went green through `verify` and was caught by a human reviewer.
  *
  * **Two carve-outs are shape rather than exception**, in the `Routed*` idiom
  * this file already uses:
@@ -1079,6 +1086,15 @@ const RETIRED_DIAGRAM_NAME = new RegExp(
     // verb in the one screaming-case shape that keeps it, a CSS class group,
     // in the same idiom `(?<!use)` separates React's hook above.
     `(?<!GROUP)_${RETIRED_DIAGRAM_UPPER}\\b`,
+    // The retired word carrying a lowercase suffix that makes it a different
+    // word. Every arm above needs a capital after it, a boundary after it or a
+    // hyphen joined to it, and an English suffix offers none of the three — so
+    // the adjective this codebase actually writes, `diagramless`, went unseen
+    // in its retired spelling and reached review rather than the build. The
+    // plural is ruled out by name: `s` followed by a boundary is the compound
+    // arms' business, and claiming it here would report every `${retiredDiagramLower}s`
+    // twice.
+    `\\b${retiredDiagramLower}(?!s?\\b)[a-z]`,
   ].join('|'),
 );
 
@@ -1316,6 +1332,12 @@ describe('a Diagram is named once (ADR 0085)', () => {
       // The screaming constant with no trailing segment, which the underscore
       // arm needs a following capital to see.
       `const DEFAULT_${RETIRED_DIAGRAM_UPPER} = null;`,
+      // The English suffix, in the retired spelling of the adjective this
+      // codebase writes about a Space that has none. No capital follows the
+      // word, no boundary lands after it and no hyphen joins it, so every arm
+      // above reads straight past it.
+      `const ${retiredDiagramLower}less = space.${retiredDiagramLower}s.length === 0;`,
+      `// first working load initializes a stored ${retiredDiagramLower}less Space`,
     ];
 
     for (const line of retired) {
@@ -1351,7 +1373,6 @@ describe('a Diagram is named once (ADR 0085)', () => {
       // The verb, in the prose ADR 0085 leaves alone.
       `// it is furniture over the canvas and takes no ${retiredDiagramLower} space`,
       `const GROUP_${RETIRED_DIAGRAM_UPPER} = 'inline-flex items-center gap-1';`,
-      `// see reactflow.dev/learn/${retiredDiagramLower}ing/sub-flows for nesting`,
       // The vocabulary this rename arrived at.
       `const selectedDiagram = space.diagrams.find((diagram) => diagram.id === id);`,
       `export type DiagramId = z.infer<typeof uuidSchema>;`,
@@ -1360,6 +1381,19 @@ describe('a Diagram is named once (ADR 0085)', () => {
     for (const line of kept) {
       expect(RETIRED_DIAGRAM_NAME.test(line), line).toBe(false);
     }
+  });
+
+  it('reads a cited foreign path as the citation it is, not as the word', () => {
+    // React Flow's own docs site spells a section with the retired word, and
+    // `docs/agents/rendering.md` sends an agent to it. The suffix arm reports
+    // it — correctly, since nothing about the shape says foreign — and
+    // `CITED_PATH` is what forgives it, which is the same masking the kebab
+    // arms above rely on. Asserted from both ends so neither half can go
+    // silently: the raw line is a hit, the masked one is not.
+    const cited = `// see reactflow.dev/learn/${retiredDiagramLower}ing/sub-flows for nesting`;
+
+    expect(RETIRED_DIAGRAM_NAME.test(cited), cited).toBe(true);
+    expect(RETIRED_DIAGRAM_NAME.test(withoutQualifiedSpellings(cited)), cited).toBe(false);
   });
 });
 
