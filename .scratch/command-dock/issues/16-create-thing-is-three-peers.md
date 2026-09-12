@@ -4,7 +4,7 @@ Status: ready-for-human
 Tags: release/v1
 Blocked by: nothing. Built on `feat/create-thing-peers` (PR #195).
 
-**Amended by ticket `13` and ADR 0088: the peers are now two, not three.** Create
+**Amended by ticket `13` and ADR 0089: the peers are now two, not three.** Create
 Alias left the Dock — an Alias is always created from an existing Thing, which
 supplies the Target — so the Things cluster draws `markdown` and `space` only.
 Nothing in the reasoning below is withdrawn: the kind is still chosen at
@@ -13,7 +13,7 @@ their costs stand as taken. Two things below are now false and are kept as the
 record of what was true:
 
 - **The asymmetry table is gone.** All three kinds complete their Edit on
-  activation (ADR 0088), so the completes-versus-opens-a-pane split that this
+  activation (ADR 0089), so the completes-versus-opens-a-pane split that this
   ticket's whole argument turns on no longer exists. Option E, rejected here as
   "the close second" for mapping onto that asymmetry, has nothing left to map
   onto.

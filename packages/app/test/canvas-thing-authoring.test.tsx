@@ -138,7 +138,7 @@ const mountAuthoring = (
         nodes: [node(expanded, thingId, projectedKind)],
         // The two facts this hook's rules turn on, stated as facts and turned
         // into answers by the one module that owns them. A live chrome rename is
-        // what `enabled: false` means here now that ADR 0088 has retired the
+        // what `enabled: false` means here now that ADR 0089 has retired the
         // creation panes — it is the surviving fact that takes canvas authoring
         // away, and it is deliberately not the thing that ends a live content
         // edit.

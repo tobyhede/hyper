@@ -54,7 +54,7 @@ const exitSpace = async (page: Page): Promise<void> => {
 /**
  * Create a Space Thing and give it a name — one press, then the inline editor.
  *
- * ADR 0088 retired the pane that collected a Title before the Edit ran: the
+ * ADR 0089 retired the pane that collected a Title before the Edit ran: the
  * press mints the Space and the Thing that names it from one `Space N` and
  * continues in the Thing's own Title editor, so naming it anything else is an
  * ordinary rename afterwards. **Which means the Space keeps `Space N`** — a
@@ -73,7 +73,7 @@ const createSpaceThingNamed = async (page: Page, title: string): Promise<void> =
 /**
  * Reference a Space that already exists, from the Things list's add-Space row.
  *
- * The other half of what the pane did, and a different act (ADR 0088): this one
+ * The other half of what the pane did, and a different act (ADR 0089): this one
  * points at a Space rather than making one, so the Thing it authors is named
  * after the Space it found.
  */
@@ -87,7 +87,7 @@ const addExistingSpace = async (page: Page, title: string): Promise<void> => {
 };
 
 /**
- * The whole creation gesture, which is now one press (ADR 0088).
+ * The whole creation gesture, which is now one press (ADR 0089).
  *
  * **Optimistic, and this is where that is visible.** The Thing is placed and its
  * Title editor takes the caret while the two-snapshot lifecycle is still
@@ -230,7 +230,12 @@ test('a second Space Thing may reference the Space the first one created', async
   // Things list offered it as a row — so this is a second way to reach that
   // Space rather than a second copy of it.
   await expect(nodeByTitle(page, 'Space 1')).toHaveCount(1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  // Three Edits, not two: the creation completes on activation and the Title is
+  // typed into the Thing afterwards (ADR 0089), so `createSpaceThingNamed` spends
+  // a creation *and* a rename where the retired pane collected the Title first
+  // and spent one. The third is this Thing, authored against the Space that
+  // creation made.
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
 
   // Referencing an existing Space selects in it too (ADR 0079). The first Thing
   // stored what its target initializer minted; this one had to read the same

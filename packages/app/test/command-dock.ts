@@ -64,7 +64,7 @@ export const dock = (): HTMLElement => screen.getByRole('toolbar', { name: 'Comm
  * The two kinds are peer controls in the Things cluster — the kind is chosen at
  * creation, so neither is a default, and no disclosure stands in front of them.
  * One press per creation, whichever kind, and the Edit completes on that press
- * (ADR 0088). An Alias is not among them: it is created from the Thing it points
+ * (ADR 0089). An Alias is not among them: it is created from the Thing it points
  * at, through that Thing's own command menu.
  */
 export const createThing = (kind: ThingKindName): void => {

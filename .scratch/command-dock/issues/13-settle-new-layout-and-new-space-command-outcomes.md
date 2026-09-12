@@ -4,7 +4,7 @@ Status: done
 Tags: release/v1
 Blocked by: nothing.
 
-**Decided.** Every creation command's visible outcome is settled below, including where the author continues and what cancelling does. The creation-gesture half is **ADR 0088**, which this ticket produced; the New Diagram half is treatment and is recorded here, which is where ADR 0082 puts shape decisions.
+**Decided.** Every creation command's visible outcome is settled below, including where the author continues and what cancelling does. The creation-gesture half is **ADR 0089**, which this ticket produced; the New Diagram half is treatment and is recorded here, which is where ADR 0082 puts shape decisions.
 
 **This file was written before ADR 0085 and has been rewritten.** Where the history below says Layout read Diagram and where it says Card read Thing. The two premises the ticket was filed on both held at `37e44bc2` and are what the decisions below change.
 
@@ -34,11 +34,11 @@ Blocked by: nothing.
 
 The discoverability cost is real and accepted: after this, the only visible route to making a Space is a glyph in the Things cluster. The honest fix for an unlabelled glyph is to label the glyph, not to add a second control that then needs its own continuation address and diverges the moment either side changes.
 
-**`Create Space Thing` completes on activation** (ADR 0088). One press places the Thing at `centreAnchor()` in the Diagram Navigation has selected *at the moment of confirmation* — resolved then rather than closed over, which is the existing rule at `App.tsx:542` and is recorded as the decision rather than left as something a later reader may "simplify" — selects it, and puts the caret in the inline Title editor.
+**`Create Space Thing` completes on activation** (ADR 0089). One press places the Thing at `centreAnchor()` in the Diagram Navigation has selected *at the moment of confirmation* — resolved then rather than closed over, which is the existing rule at `App.tsx:542` and is recorded as the decision rather than left as something a later reader may "simplify" — selects it, and puts the caret in the inline Title editor.
 
 **It always creates a new Space.** Referencing an existing one is the Things Popover's add-Space row, which is link-only and keyboard-reachable. The `NEW_SPACE` sentinel, the `Select` of existing Spaces, and the `choosable` gate that withheld Create until the stored-Spaces listing had been read all go.
 
-**Placement is optimistic.** The Thing is drawn and focused before the two-snapshot lifecycle settles; on refusal it is removed and the reason reported through the Dock's refusal channel, beside `createDiagramRefusal`. The message must name what died, because the author may be typing into the Thing when it goes. Awaiting the commit and leaving a refused creation standing were both rejected; ADR 0088 records why.
+**Placement is optimistic.** The Thing is drawn and focused before the two-snapshot lifecycle settles; on refusal it is removed and the reason reported through the Dock's refusal channel, beside `createDiagramRefusal`. The message must name what died, because the author may be typing into the Thing when it goes. Awaiting the commit and leaving a refused creation standing were both rejected; ADR 0089 records why.
 
 **The new Space is `Space N`**, numbered over the containing Space's own Thing titles by a fourth `titles.ts` operation, and the same string is handed to both the Space and the Space Thing so they agree at creation exactly as the pane's typed title did. The divergence afterwards is the existing rule: `CONTEXT.md` already holds that either may be renamed without the other and nothing propagates between them. This makes that divergence the default rather than an edge case, which is the change's main cost.
 
@@ -46,7 +46,7 @@ The discoverability cost is real and accepted: after this, the only visible rout
 
 ### Create Alias
 
-**It leaves the Dock.** An Alias is always created from an existing Thing, which supplies the Target and removes the need for a Target-selection interaction entirely (ADR 0088).
+**It leaves the Dock.** An Alias is always created from an existing Thing, which supplies the Target and removes the need for a Target-selection interaction entirely (ADR 0089).
 
 It becomes a `Create Alias` row in the Thing's own command groups (`thingRailActions`, `App.tsx:1010`), beside `Copy link` and above the `Delete Thing` group — a command *about* the Thing, which is what that menu is, inheriting its keyboard route rather than needing one invented. A rail glyph was rejected as permanent width on the most crowded thing on the canvas; a bare shortcut was rejected as a pointer-free command with no visible control. A shortcut may be added on top of the row later.
 
@@ -64,7 +64,7 @@ The label is `Create Alias`, matching the vocabulary the other creations use. `C
 
 `CreatePeers` becomes two glyphs, markdown and space. Ticket `16`'s reasoning survives — the kind is chosen at creation, so none is a default — but its count does not, and it is amended rather than left titled for a count of three.
 
-`Select` loses its last consumer, which `CLAUDE.md` explicitly tolerates ("`Select` and `Textarea` each spent a while with none and both came back"), and this closes the "one flow asking two ways" seam `docs/agents/ui.md` records. `ThingSearchCombobox` is **not** orphaned: `SelectedEdgeControls.tsx` keeps it for Edge endpoints, and `ThingsPopover.tsx` and `SpaceCanvas.tsx` also consume it. ADR 0070's status block sentence naming it the Alias creation Target picker is what ADR 0088 refines.
+`Select` loses its last consumer, which `CLAUDE.md` explicitly tolerates ("`Select` and `Textarea` each spent a while with none and both came back"), and this closes the "one flow asking two ways" seam `docs/agents/ui.md` records. `ThingSearchCombobox` is **not** orphaned: `SelectedEdgeControls.tsx` keeps it for Edge endpoints, and `ThingsPopover.tsx` and `SpaceCanvas.tsx` also consume it. ADR 0070's status block sentence naming it the Alias creation Target picker is what ADR 0089 refines.
 
 ## Acceptance
 
@@ -73,7 +73,7 @@ The label is `Create Alias`, matching the vocabulary the other creations use. `C
 - [x] The Space Thing's optimistic placement proved in both directions: the Thing drawn and focused before the commit settles, and removed with a naming refusal when the lifecycle refuses. **What "removed" turned out to mean is worth recording.** The coordination installs its local Edit and *then* commits, and the promise the application awaits resolves at the installation — so the Thing is drawn and focused while the durable write is still in flight, which is the optimism. A refusal is delivered on that same resolution, *before* anything is installed, so there is never a half-made Thing to take away: `creates nothing and names the Space when the lifecycle refuses` asserts no Thing, no Title editor and the Dock's sentence. Making the placement any more optimistic than that is not possible without a new Edit kind — a Space Thing's schema requires a `spaceId`, a `diagram` and a `graph`, none of which exists until the lifecycle answers.
 - [x] Each changed stable-story claim given matching application and Ladle evidence; the retired panes' claims and inventory entries removed. The three pane claims are gone with their stories and both Ladle specs; `Select` and `Dialog` gained `uncataloguedComponents` entries, having lost their last consumers with the panes, and the `thing-pane` CSS block went with `ThingPane` itself.
 - [x] Ticket `16` amended for the peer count.
-- [x] `CLAUDE.md` brought into line **when the code lands, not before** — it describes what is built, so four of its sentences become false only at that point: `CreatePeers` offering three kinds, `thing-creation.ts` being shared by two panes, `Select`'s one remaining consumer being the Space Thing creation pane, and `ThingSearchCombobox` remaining the Alias creation Target picker. The ADR 0070 entry gains ADR 0088 the same way. No `CONTEXT.md` change is owed: nothing here moves a term, and `Space N` is a default title rather than vocabulary.
+- [x] `CLAUDE.md` brought into line **when the code lands, not before** — it describes what is built, so four of its sentences become false only at that point: `CreatePeers` offering three kinds, `thing-creation.ts` being shared by two panes, `Select`'s one remaining consumer being the Space Thing creation pane, and `ThingSearchCombobox` remaining the Alias creation Target picker. The ADR 0070 entry gains ADR 0089 the same way. No `CONTEXT.md` change is owed: nothing here moves a term, and `Space N` is a default title rather than vocabulary.
 
 Cancellation has no test to own: with no pane, nothing can be cancelled. Note for whoever writes these — the old pane refused cancellation while `submitting` on purpose, because "the Edit completes whether or not the surface that began it is still mounted", so a test that cancelled early never proved what it looked like it proved. Do not port that expectation forward as a no-Edit-after-cancel claim.
 

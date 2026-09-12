@@ -27,14 +27,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Create offers the three Thing kinds as peer controls rather than behind a disclosure, each named for the kind it makes and all withdrawn together, so one activation reaches any kind.',
+      'Create offers both Thing kinds as peer controls rather than behind a disclosure, each named for the kind it makes and both withdrawn together, so one activation reaches either kind — and every kind in the product now completes its Edit on that one activation (ADR 0089), an Alias being created from the Thing it points at rather than from here.',
   },
   {
     id: 'command-dock-packs-things-onto-one-row',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'DockedLeft',
     claim:
-      'On a side edge the Things cluster packs onto one row at its neighbours’ height, its trigger giving up the slack track the three authored names need, with the disclosure and the three Create controls on one glyph pitch.',
+      'On a side edge the Things cluster packs onto one row at its neighbours’ height, its trigger giving up the slack track the three authored names need, with the disclosure and both Create controls on one glyph pitch.',
   },
   {
     id: 'command-dock-identity-presentation',

@@ -37,6 +37,10 @@ const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 
 /**
  * Two placed Things and no Edges.
@@ -88,6 +92,44 @@ const withAlias: SpaceSnapshot = spaceSnapshotSchema.parse({
   things: [
     ...snapshot.things,
     { id: ALIAS_ID, document: { title: 'A alias', kind: 'alias', target: THING_ID } },
+  ],
+});
+
+/**
+ * The same Space with a Space Thing in it, for the other terminal row.
+ *
+ * The Target of an Alias must own its Markdown content (ADR 0009), which is one
+ * rule with two terminal kinds — `aliasTargetRefusal` refuses `space` exactly as
+ * it refuses `alias`. This fixture is what stops the row being drawn live on the
+ * second of them again; `spaceId` names a Space this snapshot does not hold,
+ * which is the ordinary shape of a Space Thing read on its own.
+ */
+const withSpaceThing: SpaceSnapshot = spaceSnapshotSchema.parse({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    diagrams: [
+      {
+        ...snapshot.document.diagrams?.[0],
+        positions: {
+          ...snapshot.document.diagrams?.[0]?.positions,
+          [SPACE_THING_ID]: { x: 0, y: 400, open: false },
+        },
+      },
+    ],
+  },
+  things: [
+    ...snapshot.things,
+    {
+      id: SPACE_THING_ID,
+      document: {
+        title: 'A space',
+        kind: 'space',
+        spaceId: TARGET_SPACE_ID,
+        diagram: TARGET_DIAGRAM_ID,
+        graph: TARGET_GRAPH_ID,
+      },
+    },
   ],
 });
 
@@ -186,7 +228,7 @@ describe('a Thing’s commands on the canvas rail', () => {
   /**
    * **Create Alias is a command about the Thing, so it lives on the Thing.**
    *
-   * An Alias is always created *from* its Target (ADR 0088), which is what
+   * An Alias is always created *from* its Target (ADR 0089), which is what
    * removes the Target-selection interaction entirely — the gesture is on the
    * Thing, so the Target is the Thing it was invoked on. It inherits this
    * menu's keyboard route rather than needing one invented, which is why it is
@@ -242,7 +284,13 @@ describe('a Thing’s commands on the canvas rail', () => {
     await waitFor(() => expect(thingIds(session)).toHaveLength(3));
     const alias = session.getState().working.things[2]!.id;
     const positions = session.getState().working.document.diagrams?.[0]?.positions;
-    expect(positions?.[alias]).toMatchObject({ x: THING_WIDTH / 2, y: THING_HEIGHT / 2 });
+    // Three quarters of a Thing on each axis, not half: at half the new Alias's
+    // centre lands exactly on the Target's bottom-right corner and the Target
+    // takes every pointer event aimed at it (`ALIAS_OFFSET_RATIO` in `App.tsx`).
+    expect(positions?.[alias]).toMatchObject({
+      x: Math.round(THING_WIDTH * 0.75),
+      y: Math.round(THING_HEIGHT * 0.75),
+    });
     await settled(session);
   });
 
@@ -261,6 +309,31 @@ describe('a Thing’s commands on the canvas rail', () => {
 
     const row = await screen.findByRole('menuitem', { name: /^Create Alias/ });
     expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(thingIds(session)).toHaveLength(3);
+    await settled(session);
+  });
+
+  /**
+   * **The single hop has two terminal kinds, and the row knows both.**
+   *
+   * `aliasTargetRefusal` refuses every non-`markdown` Target with
+   * `alias-target-must-own-content` (ADR 0009), so a Space Thing is as terminal
+   * as an Alias. Read as "not an Alias", the row was drawn live on a Space Thing
+   * and the press could only ever refuse — a command offered where it can never
+   * succeed, whose failure said "Alias not created" and gave no reason.
+   *
+   * The two kinds say different things, because "aliasing stops here" and "this
+   * never had content to alias" are different facts, so the reason is asserted
+   * and not only the unavailability.
+   */
+  it('offers Create Alias unavailable on a Space Thing, which owns no content', async () => {
+    const session = mount(undefined, undefined, withSpaceThing);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
+
+    const row = await screen.findByRole('menuitem', { name: /^Create Alias/ });
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(row).toHaveTextContent('Only a Markdown Thing can be aliased.');
     expect(thingIds(session)).toHaveLength(3);
     await settled(session);
   });

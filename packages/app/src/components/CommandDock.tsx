@@ -172,7 +172,7 @@ const GRAPH_COLORS: readonly (readonly [string, string])[] = GRAPH_PALETTE.map(
  *
  * **`alias` left, and it left the Dock rather than the list.** An Alias is
  * always created *from* the Thing it points at, which supplies the Target
- * (ADR 0088), so the gesture is a row in that Thing's own command menu and
+ * (ADR 0089), so the gesture is a row in that Thing's own command menu and
  * there is nothing here for it to be a peer of.
  */
 const THING_KINDS = ['markdown', 'space'] as const;
@@ -414,7 +414,17 @@ export interface DockCanvas {
   readonly onSelect: (diagramId: DiagramId) => void;
   /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
   readonly onRename: ((diagramId: DiagramId, title: string) => string | null) | null;
-  readonly onCreate: () => void;
+  /**
+   * Create an empty Diagram, select it, and answer whether the caret moved.
+   *
+   * **The answer is the point.** New Diagram continues in the new Diagram's name,
+   * so this cluster's menu must not take the caret back on close — but only a
+   * completion that actually requested that continuation moved it. Asserting the
+   * move on the press instead left a completion that did neither suppressing the
+   * restoration anyway, and the caret fell to `document.body`. Returning it keeps
+   * the two halves of that decision in one place rather than one per module.
+   */
+  readonly onCreate: () => boolean;
   /**
    * Whether New Diagram may run.
    *
@@ -555,10 +565,17 @@ export interface DockThingsList {
   readonly disabled: boolean;
 }
 
-/** One request to disclose the Things list, and the Thing it is about if any. */
+/** One request to disclose the Things list, and the Thing it is about. */
 export interface DockThingsDisclosure {
-  /** The Thing the request is about, for a caller that wants it marked too. */
-  readonly thingId: ThingId | null;
+  /**
+   * The Thing the request is about, which the list marks.
+   *
+   * Not nullable: every disclosure the application makes is about a Thing. The
+   * one caller that asked for the list with nothing to mark was New Diagram
+   * revealing it on an empty Diagram, and that command discloses nothing now —
+   * it continues in the new Diagram's name (ADR 0089).
+   */
+  readonly thingId: ThingId;
 }
 
 export interface DockThings {
@@ -949,8 +966,7 @@ function DiagramControls({
           className="gap-2"
           disabled={canvas.createDisabled}
           onClick={() => {
-            movedCaret.current = true;
-            canvas.onCreate();
+            movedCaret.current = canvas.onCreate();
           }}
         >
           <PlusIcon />
@@ -1185,10 +1201,12 @@ function GraphControls({
  * split button with a hidden default — the kind is chosen at creation, so none
  * of the three is the default. That reasoning is kept whole here. What is
  * dropped is the disclosure around them, which cost a press on *every*
- * creation, including the one kind that needs no second decision: `markdown`
- * completes its Edit on activation, while `alias` and `space` open a pane
- * because a Target and a target Space are still owed (`App.tsx`, `onCreate`).
- * So the menu charged the cheapest command for a choice it never makes.
+ * creation, including the one kind that then needed no second decision:
+ * `markdown` completed its Edit on activation, while `alias` and `space` opened
+ * a pane because a Target and a target Space were still owed. So the menu
+ * charged the cheapest command for a choice it never makes. ADR 0089 has since
+ * made every kind complete on activation and taken `alias` out of this cluster
+ * altogether, which makes the argument stronger rather than weaker.
  *
  * The other half of that recorded design is untouched and still load-bearing:
  * Create stays *outside* the Things surface. That list is a long scrolling one

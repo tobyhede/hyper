@@ -164,7 +164,7 @@ function mountGraph(
         // The facts a mounted canvas is given, turned into answers by the one
         // module that owns them: `titleEditing` is the chrome rename `App`
         // reports — the surviving fact that withdraws canvas authoring, the
-        // creation panes having gone with ADR 0088 — and `editable` is a
+        // creation panes having gone with ADR 0089 — and `editable` is a
         // resolved placement.
         availability={authoringAvailability({
           editable,

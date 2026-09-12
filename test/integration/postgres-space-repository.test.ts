@@ -442,7 +442,13 @@ describe('PostgresSpaceRepository', () => {
       return id;
     })(SPACE_ID);
 
-    expect(first).toMatchObject({ revision: 1n, initialization: 'created-diagram' });
+    // The revision alone, because `initialization` is gone: it existed so the
+    // App could reveal the Things list after New Diagram, and New Diagram now
+    // continues in the new Diagram's name instead (ADR 0089), so nothing reads
+    // it. What this file is here to prove is unchanged — the initialization was
+    // *committed* rather than derived per host, which is the revision and the
+    // stored Diagram below.
+    expect(first).toMatchObject({ revision: 1n });
     expect(first?.snapshot.document.diagrams?.[0]).toMatchObject({
       id: DIAGRAM_ID,
       positions: {},

@@ -210,10 +210,37 @@ export async function selectCanvas(page: Page, title: string): Promise<void> {
   await expect(selectedCanvas(page)).toHaveText(title);
 }
 
-/** Create and select an empty Diagram owning one empty Graph (ADR 0079, ADR 0080). */
+/**
+ * Create and select an empty Diagram owning one empty Graph (ADR 0079, ADR 0080).
+ *
+ * **It leaves the caret in the new Diagram's name**, which is where the command
+ * continues (`.scratch/command-dock/issues/13`) — so the Dock is drawing an
+ * editor and not a name when this returns, and `selectedCanvas` matches nothing.
+ * Callers that want to read the Dock back settle the editor with
+ * {@link settleNewDiagramName} first.
+ */
 export async function newDiagram(page: Page): Promise<void> {
   const menu = await diagramMenu(page);
   await menu.getByRole('menuitem', { name: 'New Diagram' }).click();
+}
+
+/**
+ * Assert the New Diagram continuation landed, and hand the Dock back its name.
+ *
+ * The caret in the new Diagram's name is the command's visible outcome, so it is
+ * asserted here rather than stepped over: a continuation that stopped firing
+ * would otherwise show up only as a puzzling absence somewhere later.
+ *
+ * Escape rather than Enter, because the Edit already stored this title — the
+ * editor opened on `Diagram N` as the numbering minted it, and cancelling an
+ * untouched draft leaves exactly that.
+ */
+export async function settleNewDiagramName(page: Page, title: string): Promise<void> {
+  const editor = page.getByRole('textbox', { name: 'Diagram name' });
+  await expect(editor).toBeFocused();
+  await expect(editor).toHaveValue(title);
+  await page.keyboard.press('Escape');
+  await expect(editor).toHaveCount(0);
 }
 
 /** The Diagrams the Space offers, read from the one list that offers them. */
@@ -269,7 +296,7 @@ export function createThingControl(page: Page, kind: ThingKindName = 'Markdown T
  * Create a Thing of one kind, from its own control in the Things cluster.
  *
  * The two kinds are peers with no disclosure in front of them and each completes
- * its Edit on the press (ADR 0088), so this is one press whichever kind is
+ * its Edit on the press (ADR 0089), so this is one press whichever kind is
  * asked for. An Alias is not here: it is created from the Thing it points at,
  * through that Thing's own command menu.
  */

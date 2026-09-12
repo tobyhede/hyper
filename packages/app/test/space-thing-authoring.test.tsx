@@ -345,7 +345,7 @@ async function readyToAuthor(): Promise<void> {
 
 /**
  * Create a Space Thing the way an author does: one press of its own Dock
- * control, which completes the Edit (ADR 0088).
+ * control, which completes the Edit (ADR 0089).
  *
  * Wrapped in `act` because the lifecycle is asynchronous: the press returns
  * before the coordination has installed anything, and the state it installs
@@ -378,7 +378,7 @@ async function openThingsList(): Promise<HTMLElement> {
 /**
  * Reference a Space that already exists — the Things list's add-Space row.
  *
- * The other half of what the retired creation pane did, and the half ADR 0088
+ * The other half of what the retired creation pane did, and the half ADR 0089
  * keeps as a gesture of its own: making a Space and pointing at one that exists
  * are different acts, and this one lists real Spaces with search where the pane
  * offered a sentinel row beside them.
@@ -426,7 +426,7 @@ describe('Create Space Thing', () => {
    * `Space N` is numbered over the containing Space's own Thing titles, which is
    * the only source that can be read synchronously; the Space and the Thing get
    * the same string, so they agree at creation exactly as the retired pane's
-   * typed title made them (ADR 0088). The target's first Thing is the neutral
+   * typed title made them (ADR 0089). The target's first Thing is the neutral
    * `Thing 1` every new Space begins with, because content titled after the
    * Space it lives in only reads as deliberate until the first rename makes the
    * pair disagree (ADR 0068).
@@ -452,7 +452,7 @@ describe('Create Space Thing', () => {
   /**
    * **The caret lands in the Thing, before the commit settles.**
    *
-   * This is the optimistic half of ADR 0088: the coordination installs its local
+   * This is the optimistic half of ADR 0089: the coordination installs its local
    * Edit and *then* commits two snapshots, and the press continues at the Thing
    * as soon as that installation lands rather than waiting for the durable
    * write. So the editor is open over a Thing whose Space is still being
@@ -498,7 +498,7 @@ describe('Create Space Thing', () => {
    * no Thing ever drawn — which is what "removed on refusal" amounts to from
    * out here. What the author needs is the sentence, because the gesture they
    * made looked exactly like the one that works, and the Dock's refusal channel
-   * is where a creation with no pane of its own reports (ADR 0088).
+   * is where a creation with no pane of its own reports (ADR 0089).
    */
   it('creates nothing and names the Space when the lifecycle refuses', async () => {
     const { session } = mount(other, {
@@ -593,7 +593,7 @@ describe('Create Space Thing', () => {
 /**
  * Referencing a Space that already exists, which is a different act.
  *
- * ADR 0088 splits the retired pane's two halves: Create Space Thing always makes
+ * ADR 0089 splits the retired pane's two halves: Create Space Thing always makes
  * a Space, and pointing at one that exists is the Things list's add-Space row —
  * a list of real Spaces with search, where the pane offered a sentinel row
  * beside them. Everything the lifecycle's `link` arm answers is proved here,

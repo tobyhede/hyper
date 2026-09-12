@@ -197,7 +197,7 @@ describe('the Spaces a Things list offers', () => {
     await closeThingsList(before);
 
     // Cross to Other and create a Space there — one press, which mints the Space
-    // and the Thing that names it from one `Space N` (ADR 0088). Other holds
+    // and the Thing that names it from one `Space N` (ADR 0089). Other holds
     // `Thing 1` and no `Space N`, so the new pair is called `Space 1`.
     await act(async () => {
       await spaces.switchTo(OTHER_ID);

@@ -84,6 +84,19 @@ const NO_OPEN_SPACES: OpenSpacesState = {
 const noOpenSpaces = (): OpenSpacesState => NO_OPEN_SPACES;
 const noOpenSpacesChanges = (): (() => void) => () => undefined;
 
+/**
+ * How far a new Alias steps from the Thing it was created from, as a fraction of
+ * that Thing's drawn size on both axes (`createAliasFrom`).
+ *
+ * Overlap is authored rather than avoided — a free-position search is a placement
+ * algorithm, and ADR 0086 keeps those behind an Edit — so this is deliberately
+ * less than a whole step. It is more than half a step because at exactly half the
+ * new Alias's centre lands on the Target's bottom-right corner, and the Target
+ * takes the pointer there: three quarters leaves a quarter-Thing corner of
+ * overlap and a centre the author can reach.
+ */
+const ALIAS_OFFSET_RATIO = 0.75;
+
 export const createApp = (
   { app: composition, session: spaceSession, spaceThings }: OpenSpace,
   browserLocation: BrowserLocation,
@@ -440,14 +453,26 @@ export const createApp = (
      *
      * **The Dock's refusal channel, beside `createDiagramRefusal`.** A creation
      * that completes on activation has no pane to hold its own failure against
-     * the field that caused it (ADR 0088), so it reports through the surface
+     * the field that caused it (ADR 0089), so it reports through the surface
      * that owns the command. The sentence has to name the Space, because the
      * author may be typing into the Thing when it goes.
      */
     const [spaceThingRefusal, setSpaceThingRefusal] = useState<string | null>(null);
 
     /**
-     * Create Space Thing: one press, one Thing, one new Space (ADR 0088).
+     * The Alias creation that refused, said in one sentence.
+     *
+     * **Beside `spaceThingRefusal`, for the reason that one exists.** Create
+     * Alias completes on activation and closes the menu it was pressed in
+     * (ADR 0089), so it has no field and no row of its own to hold a failure
+     * against — the surface that owns the command is the Space chrome, and this
+     * is its channel. The rows that can refuse by kind are drawn unavailable, so
+     * what lands here is a Target that went between the draw and the press.
+     */
+    const [aliasRefusal, setAliasRefusal] = useState<string | null>(null);
+
+    /**
+     * Create Space Thing: one press, one Thing, one new Space (ADR 0089).
      *
      * **Optimistic, in the one sense the lifecycle leaves open.** The
      * coordination installs its local Edit and *then* commits two snapshots, and
@@ -926,7 +951,7 @@ export const createApp = (
      * addresses exist is decided from the Diagram by the builder above.
      */
     /**
-     * Create Alias, from the Thing it points at (ADR 0088).
+     * Create Alias, from the Thing it points at (ADR 0089).
      *
      * **The gesture supplies the Target, so nothing is chosen first.** An author
      * creating an Alias is looking at the Thing they want to alias, which is why
@@ -947,14 +972,32 @@ export const createApp = (
      * of the render path deliberately — the overlap is authored and the author
      * drags it off. A Thing this Diagram does not place has no offset to take,
      * so its Alias lands at the visible centre like any other creation.
+     *
+     * **The offset is taken from the Target's *drawn* size, which is not the
+     * collapsed size when it is Open.** Read from the constants alone, an Alias
+     * of a Thing the author had opened and resized landed inside its body
+     * (ADR 0066), with no sign it had been made at all.
+     *
+     * **And it is `ALIAS_OFFSET_RATIO` of that size rather than half of it.** At
+     * a half-step the new Alias's own centre sits exactly on the Target's
+     * bottom-right corner, so the Target — raised while it is the selected Thing
+     * — takes every pointer event aimed at the middle of the Thing just created.
+     * The overlap the ticket authors is a corner to drag off; a Thing whose
+     * centre cannot be clicked is not that. Three quarters leaves a quarter-Thing
+     * of overlap on each axis and puts the new centre clear of the Target's
+     * edges.
      */
     const createAliasFrom = useCallback(
       (thing: Thing): EntityActionOutcome => {
         const at = selectedDiagram.diagram.positions[thing.id];
+        const size = at?.open === true ? at.openSize : { width: THING_WIDTH, height: THING_HEIGHT };
         const anchor =
           at === undefined
             ? centreAnchor()
-            : { x: at.x + THING_WIDTH / 2, y: at.y + THING_HEIGHT / 2 };
+            : {
+                x: at.x + Math.round(size.width * ALIAS_OFFSET_RATIO),
+                y: at.y + Math.round(size.height * ALIAS_OFFSET_RATIO),
+              };
         const created = authoring.complete({
           kind: 'created-alias',
           target: thing.id,
@@ -962,10 +1005,19 @@ export const createApp = (
           anchor,
         });
         // Each arm named rather than narrowed in one comparison, so the compiler
-        // asks again the day a fifth joins the union. A refusal here is reported
-        // by the menu's own word swap: the two an Alias creation can raise are
-        // about the Target, and the Target is the Thing whose menu this is.
-        if (created.kind === 'refused') return 'failed';
+        // asks again the day a fifth joins the union.
+        //
+        // A refusal takes the standing notice rather than the menu it was
+        // pressed in: this command closes its menu, because it moves the caret
+        // onto the canvas, so by the time an answer exists there is no row left
+        // to swap a word on. The rows that *can* refuse are drawn unavailable
+        // above, so what reaches here is a Target that went between the draw and
+        // the press — which is why it is worth a sentence rather than silence.
+        if (created.kind === 'refused') {
+          setAliasRefusal(describeAuthoringRefusal(created.refusal));
+          return 'failed';
+        }
+        setAliasRefusal(null);
         if (created.kind === 'queued') return 'done';
         if (created.kind === 'unchanged') return 'done';
         if (created.createdThingId === undefined) return 'done';
@@ -987,15 +1039,27 @@ export const createApp = (
         if (thing === undefined) return [];
         const addresses = entityActions({ kind: 'thing', thing, diagram: selectedDiagram.diagram });
         /**
-         * **Present and unavailable on an Alias, rather than absent.**
+         * **Present and unavailable wherever the single hop ends, rather than absent.**
          *
-         * ADR 0070 forbids an Alias of an Alias, and a row that can never apply
-         * would ordinarily simply not be one of that kind's commands. It is drawn
-         * and greyed anyway because an Alias is otherwise a regular Thing: a menu
-         * one row shorter, for a reason the reader cannot see, teaches nothing,
-         * and this row is where the product says that aliasing terminates.
+         * ADR 0009 requires a Target to own its Markdown content, so
+         * `aliasTargetRefusal` refuses *every* non-`markdown` kind — an Alias
+         * and a Space Thing alike (`space-authoring.ts`). Reading the rule as
+         * "not an Alias" left the row live on a Space Thing, where the press
+         * could only ever refuse.
+         *
+         * It is drawn and greyed rather than withheld because the Things it
+         * applies to are otherwise regular Things: a menu one row shorter, for a
+         * reason the reader cannot see, teaches nothing, and this row is where
+         * the product says where aliasing stops. Each kind says why in its own
+         * words, because "aliasing terminates here" and "this was never a thing
+         * with content to alias" are two different facts.
          */
-        const terminal = thing.kind === 'alias';
+        const terminal =
+          thing.kind === 'alias'
+            ? 'An Alias cannot be aliased.'
+            : thing.kind === 'markdown'
+              ? null
+              : 'Only a Markdown Thing can be aliased.';
         const alias: readonly EntityActionGroup[] = availability.addThing
           ? [
               [
@@ -1005,10 +1069,20 @@ export const createApp = (
                   // use. `Create Alias of <title>` is the shape `Delete Thing`
                   // already rejected, the menu being named for its Thing.
                   label: 'Create Alias',
-                  disabled: terminal,
-                  description: terminal ? 'An Alias cannot be aliased.' : undefined,
+                  disabled: terminal !== null,
+                  description: terminal ?? undefined,
                   icon: <ThingKindIcon kind="alias" decorative />,
-                  report: { done: 'Alias created', failed: 'Alias not created' },
+                  // **No `report`, and that is what closes the menu.** A
+                  // reporting item is held open to show its word
+                  // (`EntityActionsMenu`), and this command puts the caret in
+                  // the new Alias's Title editor on the canvas — so the menu it
+                  // was pressed in stayed up with its Base UI backdrop
+                  // intercepting every pointer event, over an editor the author
+                  // could not click into. The creation says itself: a Thing
+                  // appears with the caret in it. A refusal has nowhere to
+                  // report in a menu that has gone, so it takes the standing
+                  // notice below, which is where ADR 0089 puts the outcome of a
+                  // creation that completes on activation.
                   onSelect: () => createAliasFrom(thing),
                 },
               ],
@@ -1160,14 +1234,14 @@ export const createApp = (
      * Add Thing: one completed Edit, and then the naming continuation.
      *
      * **This is the one operation whose refusal no surface shows, and that is a
-     * decision rather than an oversight** — the asymmetry with `createAlias`
-     * below is the thing to read, so here is why it stands. A refusal carries a
-     * sentence for the author (ADR 0042), which is worth showing exactly where
-     * the author can act on it: the Alias pane keeps its own open because both
-     * of its refusals are about the Target just chosen, and the field that
-     * answers them is on screen. Add Thing takes no input at all. It completes on
-     * one activation, from a toolbar button and a keystroke, and leaves nothing
-     * standing that a sentence could correct.
+     * decision rather than an oversight.** A refusal carries a sentence for the
+     * author (ADR 0042), which is worth showing exactly where the author can act
+     * on it. Every other creation has somewhere: `createAliasFrom` and
+     * `createSpaceThing` both complete on activation and both close or leave the
+     * surface that ran them, so each reports through a standing notice on the
+     * Space chrome. Add Thing takes no input at all, cannot refuse against a
+     * choice the author made, and leaves nothing standing that a sentence could
+     * correct — so it has nothing to say and no field to say it on.
      *
      * The toolbar remains available for an empty authored Diagram: it is the
      * zero-Thing Space's way to create the first Thing. Canvas-local authoring is
@@ -1478,12 +1552,16 @@ export const createApp = (
                 const result = authoring.complete({ kind: 'created-diagram' });
                 setCreateDiagramRefusal(result.kind === 'refused' ? result.refusal : null);
                 setDiagramManagementRefusal(null);
-                if (result.kind !== 'completed') return;
+                // The caret moved only if a continuation was requested, which is
+                // what the Dock's menu reads to decide whether to restore focus
+                // to its trigger (`DockCanvas.onCreate`).
+                if (result.kind !== 'completed') return false;
                 continuation.request({
                   target: { kind: 'control', name: 'diagram-name' },
                   select: false,
                   then: 'rename',
                 });
+                return true;
               },
               // The Dock's Delete names the Diagram its cluster is showing, which is
               // the drawing one — resolved from the id it hands back rather than
@@ -1574,7 +1652,7 @@ export const createApp = (
                   thingsDrag.current = null;
                 },
               },
-              // Both kinds complete their Edit on the press (ADR 0088): nothing
+              // Both kinds complete their Edit on the press (ADR 0089): nothing
               // is chosen first, so there is no pane and nothing to cancel.
               onCreate: (kind) => {
                 if (kind === 'markdown') addThing();
@@ -1632,13 +1710,24 @@ export const createApp = (
             {spaceThingRefusal === null ? null : (
               <ShellNotice
                 /* It names what died. A Space Thing's placement is optimistic
-                   (ADR 0088), so the author may be typing into the Thing when
+                   (ADR 0089), so the author may be typing into the Thing when
                    the lifecycle answers — "Space not created" is the sentence
                    that makes a Thing vanishing from under the caret legible. */
                 title="Space not created"
                 onDismiss={() => setSpaceThingRefusal(null)}
               >
                 {spaceThingRefusal}
+              </ShellNotice>
+            )}
+            {aliasRefusal === null ? null : (
+              <ShellNotice
+                /* It names what was not made. The menu the command was pressed
+                   in has closed by the time this can be shown, so this is the
+                   only place the author learns the press did nothing. */
+                title="Alias not created"
+                onDismiss={() => setAliasRefusal(null)}
+              >
+                {aliasRefusal}
               </ShellNotice>
             )}
             {spaceCommandBreak === null ? null : (

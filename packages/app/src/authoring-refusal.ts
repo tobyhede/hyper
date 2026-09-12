@@ -420,17 +420,18 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
  *
  * The Things list places a Space by spending a coordinated Edit across Spaces,
  * and neither the Diagram it resolves first nor the transport under it is a
- * refusal channel: both *reject*. A rejection is not a refusal for the reason
- * `presentThingCreationBreak` gives — the lifecycle refuses for everything it
- * can name, so reaching here means an invariant broke — but the reader pressed
- * a row and is owed a sentence either way, and the list draws one string rather
- * than the pane's fielded errors.
+ * refusal channel: both *reject*. A rejection is not a refusal: the lifecycle
+ * refuses for everything it can name, so reaching here means an invariant broke
+ * and there is no field to correct. The reader pressed a row and is owed a
+ * sentence either way, and every surface that can show one now draws a single
+ * string — the panes that placed fielded errors are gone (ADR 0089).
  *
  * Here rather than on the surface, because a Space Thing's prose is written in
- * this module or nowhere. The rejection is `unknown` for `ThingCreationBreak`'s
- * reason and named the same way — at the type rather than at a parameter, which
- * is what lets a rejection arm take it without writing the annotation the
- * parsing rules reserve for an I/O boundary.
+ * this module or nowhere. The rejection is `unknown` because a `throw` can carry
+ * anything, and that is the caught-error boundary the parsing rules exempt —
+ * named at the type rather than at a parameter, which is what lets a rejection
+ * arm take it without writing the annotation those rules reserve for an I/O
+ * boundary.
  */
 export type SpaceThingBreak = (failure: unknown) => string;
 
@@ -442,7 +443,7 @@ export const describeSpaceThingBreak: SpaceThingBreak = (failure) =>
  * The same rejection, said by the command that *makes* a Space.
  *
  * Two sentences rather than one generic, because the two gestures are not the
- * same act (ADR 0088): the Things list points a Thing at a Space that already
+ * same act (ADR 0089): the Things list points a Thing at a Space that already
  * exists, and Create Space Thing mints one. A reader who pressed the Dock's
  * glyph and is told a Thing "was not added" has to work out what was supposed
  * to have been added to what.

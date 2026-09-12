@@ -30,7 +30,7 @@
  *
  * There were nine. `creatingThing` — a creation pane is open — went with the
  * panes themselves: every Thing creation now completes its Edit on activation
- * (ADR 0088), so there is no modal surface for the rest of the product to stand
+ * (ADR 0089), so there is no modal surface for the rest of the product to stand
  * out of the way of.
  */
 export interface AuthoringInProgress {

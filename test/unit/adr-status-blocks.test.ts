@@ -113,6 +113,31 @@ const readAdrs = (): ReadonlyMap<string, StatusBlock> =>
   new Map([...readDir('.', false), ...readDir(SUPERSEDED_DIR, true)]);
 
 /**
+ * Every ADR file, by the number it claims — the listing `readAdrs` flattens.
+ *
+ * **A `Map` keyed by number is what made a duplicate invisible.** Two files
+ * claiming one number is not an error to that shape, it is a key written twice:
+ * the second silently replaces the first, so the tree holds two decisions and
+ * every check below runs against one of them. Nothing else in this file can see
+ * it, because by the time they read the map the loser is gone.
+ *
+ * So the numbers are read a second time as a list, before anything collapses
+ * them. This is the arrangement's own blind spot rather than a property of any
+ * one ADR, which is why it is asserted here and not in the reciprocity block.
+ */
+const readAdrFiles = (): readonly (readonly [string, string])[] =>
+  (
+    [
+      ['.', readdirSync(adrDir)],
+      [SUPERSEDED_DIR, readdirSync(join(adrDir, SUPERSEDED_DIR))],
+    ] as const
+  ).flatMap(([dir, files]) =>
+    files
+      .filter((file) => /^\d{4}-.*\.md$/.test(file))
+      .map((file): readonly [string, string] => [adrNumber(file), join(dir, file)]),
+  );
+
+/**
  * A reference naming no ADR is reported rather than skipped. Resolving the
  * target first and *filtering* on it — which is what this did at first — makes
  * the guard silent about the one fault it cannot repair by symmetry: `Refines:
@@ -298,6 +323,20 @@ describe('ADR status blocks point both ways', () => {
     expect(adrs.size).toBeGreaterThan(40);
     expect(adrs.get('0001')).toBeDefined();
     expect([...adrs.values()].every((adr) => adr.status !== '')).toBe(true);
+  });
+
+  it('gives every ADR a number of its own', () => {
+    // Two files claiming one number is the one fault every other check here is
+    // structurally unable to report: they read a Map keyed by that number, so a
+    // duplicate arrives as a replacement and the loser's references stop being
+    // checked by anything while this file stays green.
+    const byNumber = new Map<string, string[]>();
+    for (const [number, file] of readAdrFiles())
+      byNumber.set(number, [...(byNumber.get(number) ?? []), file]);
+    const claimedTwice = [...byNumber]
+      .filter(([, files]) => files.length > 1)
+      .map(([number, files]) => `${number}: ${files.join(', ')}`);
+    expect(claimedTwice).toEqual([]);
   });
 
   it('answers every `Refines` with a `Refined by`, except from a rejected ADR', () => {

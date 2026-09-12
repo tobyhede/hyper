@@ -8,6 +8,7 @@ import {
   dock,
   diagramMenu,
   newDiagram,
+  settleNewDiagramName,
   nodeByTitle,
   presentControl,
   selectCanvas,
@@ -130,15 +131,15 @@ test('New Diagram selects an empty authored Diagram, and Delete returns to the o
   await settled(page);
 
   await newDiagram(page);
+
+  // New Diagram continues in the new Diagram's name at this width exactly as it
+  // does at any other — the caret, not a disclosure, is what the command leaves
+  // behind (`.scratch/command-dock/issues/13`). The Things list it used to
+  // reveal was the thing this test then had to dismiss to reach the next
+  // command; there is nothing overlaying the strip now.
+  await settleNewDiagramName(page, 'Diagram 1');
   await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-
-  // An empty Diagram reveals the Things list, which at this width overlays the
-  // end of the strip — so it is dismissed before the next command rather than
-  // reached around. That is the list's own contract and not the Dock's: a
-  // surface the author opens is dismissed by the author.
-  await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
-  await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
 
   const menu = await diagramMenu(page);

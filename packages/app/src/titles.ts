@@ -55,7 +55,7 @@ export const nextThingTitle = (snapshot: SpaceSnapshot): string =>
  * **Numbered over the containing Space's Thing titles, which is the only source
  * that can be read synchronously.** The names of the Spaces already stored come
  * from a repository read, and the creation gesture completes on activation
- * (ADR 0088) with nothing to wait on — so a globally unique name would have to
+ * (ADR 0089) with nothing to wait on — so a globally unique name would have to
  * be minted inside the lifecycle and would disagree with the Thing's from the
  * outset. One string is handed to both the Space and the Space Thing, so they
  * agree at creation exactly as the retired pane's typed title did. Collisions

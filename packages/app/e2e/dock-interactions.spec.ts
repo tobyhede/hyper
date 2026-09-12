@@ -260,7 +260,7 @@ test('a reported failure is dismissed off the Dock it covers', async ({ page }) 
  * Authoring composition.
  *
  * **The press count is the obligation, and it is now the same count for both.**
- * ADR 0088 retired the panes that stood between a press and a creation: each
+ * ADR 0089 retired the panes that stood between a press and a creation: each
  * kind completes its Edit on activation and continues in the Thing's own Title
  * editor, so neither owes a second decision. The asymmetry that killed the
  * disclosure — one kind completing on the press while two collected a value

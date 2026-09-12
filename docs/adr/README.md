@@ -107,7 +107,7 @@ under `superseded/`.
 | [0036](0036-a-card-selects-on-click-and-no-click-opens-it.md) | A Card selects on a click. No click opens it. |
 | [0064](0064-opening-a-card-expands-it-in-place.md) | To open a Card is a Layout-owned Edit that grows the Card in place. |
 | [0065](0065-a-card-title-edits-on-one-activation.md) | A Card Title edits on one activation. |
-| [0088](0088-creating-a-thing-completes-on-activation.md) | Creating a Thing completes on activation. A Target comes from context, never from a pane. |
+| [0089](0089-creating-a-thing-completes-on-activation.md) | Creating a Thing completes on activation. A Target comes from context, never from a pane. |
 | [0066](0066-open-size-survives-closing.md) | A Layout keeps the Open Size after a Close. |
 | [0073](0073-a-card-rail-is-a-toolbar.md) | A Card rail is one `role="toolbar"` with roving tabindex. |
 | [0084](0084-displacement-is-applied-by-the-edit-that-causes-it.md) | Opening and closing move their neighbours once, as an Edit. Nothing is derived at render. |

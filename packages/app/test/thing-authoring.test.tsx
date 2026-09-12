@@ -566,7 +566,7 @@ describe('authoring an opened Thing', () => {
    * the author settles it first.
    *
    * This is the one control outside the canvas that needs to know an edit is
-   * running, and since ADR 0088 retired the creation panes there is no modal
+   * running, and since ADR 0089 retired the creation panes there is no modal
    * surface left that could need it too.
    */
   it('cannot start presenting over a live content edit', async () => {

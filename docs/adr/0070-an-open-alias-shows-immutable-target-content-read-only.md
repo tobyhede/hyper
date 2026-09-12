@@ -3,7 +3,7 @@
 Status: accepted
 Supersedes: 0049
 Refines: 0009, 0039, 0046, 0048, 0051, 0064
-Refined by: 0085, 0088
+Refined by: 0085, 0089
 Related: 0066, 0068, 0069
 
 An Alias chooses its **Target** once, when it is created, and is never retargeted. It remains an ordinary independently titled Card in every other respect: its Title, Layout membership and placement, Graph Edges, Open/Closed state and Open Size remain authorable. Changing those facts edits the Alias or the Layout that contains it; immutability applies only to the Target and to content reached through it.

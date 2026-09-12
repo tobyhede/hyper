@@ -26,6 +26,7 @@ import {
   diagramChoices,
   diagramMenu,
   newDiagram,
+  settleNewDiagramName,
   nodeByTitle,
   openThing,
   positionOf,
@@ -466,7 +467,7 @@ test('the Markdown editor code loads only when a Markdown Thing opens', async ({
  * mono body that is the writing surface rather than a form control.
  *
  * Pinned because nothing else asserts it. The treatment's rules and the general
- * `.thing-pane__panel` rules they override have equal specificity, so only source
+ * `.thing--full` rules they override have equal specificity, so only source
  * order separates them — the same cascade trap `presenting.spec.ts` pins for
  * `.thing--full`. With the treatment colocated in its own stylesheet, that order
  * is now a fact about the module graph rather than about one file's line
@@ -890,11 +891,13 @@ test(
     // selected in one Edit (ADR 0079, ADR 0080).
     await newDiagram(page);
 
+    // The command opens nothing and continues in the new Diagram's name
+    // (`.scratch/command-dock/issues/13`). It used to reveal the Things list
+    // instead, which is why there is no dialog to dismiss here any more.
+    await settleNewDiagramName(page, 'Diagram 1');
     await expect(selectedCanvas(page)).toContainText('Diagram 1');
     await expect(persistence).toHaveAttribute('data-revision', '1');
-    await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
     expect(await allPositions(page)).toEqual({});
-    await page.keyboard.press('Escape');
 
     await page.reload();
     await expect(selectedCanvas(page)).toContainText('Diagram 1');
@@ -1565,16 +1568,35 @@ test('opening animates the Thing wrapper and displaced neighbours from one durat
   ).toBe(true);
 });
 
-test('New Diagram creates an empty Diagram and leaves existing Things in the Things View', async ({
+/**
+ * **It opens nothing, and the author continues in the name.**
+ *
+ * This test used to be named for the Things View it revealed. New Diagram no
+ * longer discloses anything — the Edit creates and selects an empty Diagram and
+ * the caret lands in its name (`.scratch/command-dock/issues/13`) — so what is
+ * left to hold is that the canvas really is empty, that the Space's existing
+ * Things are still there to be placed on it, and that the empty Diagram is
+ * durable. The Things are read from the list the author opens themselves, which
+ * is the half the old disclosure was standing in for.
+ */
+test('New Diagram creates an empty Diagram, continues in its name, and persists', async ({
   page,
 }) => {
   await page.goto('/');
   await newDiagram(page);
 
+  await settleNewDiagramName(page, 'Diagram 1');
   await expect(page.locator('.react-flow__node')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
-  await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
   await expect(selectedCanvas(page)).toContainText('Diagram 1');
+
+  // The Space kept its Things; only this Diagram is empty. Opened by hand,
+  // because that is now the only way the list opens.
+  await page.getByRole('button', { name: 'Things' }).click();
+  await expect(page.getByRole('button', { name: 'Add A to Diagram' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
@@ -3163,7 +3185,7 @@ test('Add Thing names the new Thing in place in the selected Diagram', async ({ 
 });
 
 /**
- * Create Alias is a command on the Thing it points at (ADR 0088).
+ * Create Alias is a command on the Thing it points at (ADR 0089).
  *
  * The gesture supplies the Target, so there is no picker, no pane and nothing to
  * cancel: one row, one press, and the Alias exists. The Title is the Target's,

@@ -62,12 +62,12 @@ export const uncataloguedComponents = [
   {
     module: 'packages/ui/src/Dialog.tsx',
     reason:
-      'Without a consumer since ADR 0088 retired the two Thing creation panes: `ThingPane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the Thing deletion confirmation — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',
+      'Without a consumer since ADR 0089 retired the two Thing creation panes: `ThingPane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the Thing deletion confirmation — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',
   },
   {
     module: 'packages/ui/src/Select.tsx',
     reason:
-      'Without a consumer since ADR 0088 retired the Space Thing creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Thing or a Space is `ThingSearchCombobox`\'s and `ChoiceMenu`\'s everywhere that remains.',
+      'Without a consumer since ADR 0089 retired the Space Thing creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Thing or a Space is `ThingSearchCombobox`\'s and `ChoiceMenu`\'s everywhere that remains.',
   },
   {
     module: 'packages/ui/src/components/empty.tsx',
