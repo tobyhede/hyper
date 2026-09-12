@@ -50,6 +50,7 @@ describe('authoring availability', () => {
       {
         ...ALL_AVAILABLE,
         chromeTitleEdit: false,
+        createDiagram: false,
         entityEdits: false,
         deleteThing: false,
         authorOnCanvas: false,

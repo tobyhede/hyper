@@ -91,7 +91,7 @@ const noOpenSpacesChanges = (): (() => void) => () => undefined;
 
 /**
  * How far a new Alias steps from the Thing it was created from, as a fraction of
- * that Thing's drawn size on both axes (`createAliasFrom`).
+ * its collapsed size on both axes, plus any room its Open Target holds.
  *
  * Overlap is authored rather than avoided — a free-position search is a placement
  * algorithm, and ADR 0086 keeps those behind an Edit — so this is deliberately
@@ -476,6 +476,10 @@ export const createApp = (
      */
     const [aliasRefusal, setAliasRefusal] = useState<string | null>(null);
 
+    // A second press must not reuse the title and anchor before the first Edit
+    // installs. A ref closes the window synchronously, including batched presses.
+    const creatingSpaceThing = useRef(false);
+
     /**
      * Create Space Thing: one press, one Thing, one new Space (ADR 0089).
      *
@@ -495,10 +499,12 @@ export const createApp = (
      * the Things list's add-Space row, which lists real Spaces with search.
      */
     const createSpaceThing = useCallback((): void => {
+      if (creatingSpaceThing.current) return;
+      creatingSpaceThing.current = true;
       setSpaceThingRefusal(null);
-      const title = nextSpaceTitle(spaceSession.getState().working);
       void (async () => {
         try {
+          const title = nextSpaceTitle(spaceSession.getState().working);
           // Resolved at the press rather than closed over, which is the rule the
           // pane needed for a surface open across renders and this keeps for a
           // gesture whose Edit lands one await later. `create` still refuses
@@ -520,8 +526,8 @@ export const createApp = (
           // id nothing draws. Not reachable from `create` today.
           if (result.kind === 'unchanged') return;
           // The id the lifecycle minted, not the Thing that appeared. Nothing
-          // closes the window between this press and the installed Edit — a
-          // second creation lands in it synchronously — so "which Thing is new"
+          // prevents a Markdown creation between this press and the installed
+          // Edit — that creation lands synchronously — so "which Thing is new"
           // answers a different question from "which Thing did this press make",
           // and the two disagree exactly when it matters.
           //
@@ -536,6 +542,8 @@ export const createApp = (
         } catch (failure) {
           reportBreak(failure);
           setSpaceThingRefusal(describeSpaceThingCreationBreak(failure));
+        } finally {
+          creatingSpaceThing.current = false;
         }
       })();
     }, [centreAnchor]);
@@ -981,30 +989,21 @@ export const createApp = (
      * drags it off. A Thing this Diagram does not place has no offset to take,
      * so its Alias lands at the visible centre like any other creation.
      *
-     * **The offset is taken from the Target's *drawn* size, which is not the
-     * collapsed size when it is Open.** Read from the constants alone, an Alias
-     * of a Thing the author had opened and resized landed inside its body
-     * (ADR 0066), with no sign it had been made at all.
-     *
-     * **And it is `ALIAS_OFFSET_RATIO` of that size rather than half of it.** At
-     * a half-step the new Alias's own centre sits exactly on the Target's
-     * bottom-right corner, so the Target — raised while it is the selected Thing
-     * — takes every pointer event aimed at the middle of the Thing just created.
-     * The overlap the ticket authors is a corner to drag off; a Thing whose
-     * centre cannot be clicked is not that. Three quarters leaves a quarter-Thing
-     * of overlap on each axis and puts the new centre clear of the Target's
-     * edges.
+     * **The offset leaves a fixed corner overlap before and after Close.**
+     * An Open Target holds room that Close reclaims from every Thing beyond it
+     * (ADR 0084), including this new Alias. Add that growth to the collapsed
+     * offset so reclaiming it leaves the Alias's centre clear of the Target.
      */
     const createAliasFrom = useCallback(
       (thing: Thing): EntityActionOutcome => {
         const at = selectedDiagram.diagram.positions[thing.id];
-        const size = at?.open === true ? at.openSize : { width: THING_WIDTH, height: THING_HEIGHT };
+        const growth = at?.open === true ? Placement.growth(at.openSize) : { width: 0, height: 0 };
         const anchor =
           at === undefined
             ? centreAnchor()
             : {
-                x: at.x + Math.round(size.width * ALIAS_OFFSET_RATIO),
-                y: at.y + Math.round(size.height * ALIAS_OFFSET_RATIO),
+                x: at.x + growth.width + Math.round(THING_WIDTH * ALIAS_OFFSET_RATIO),
+                y: at.y + growth.height + Math.round(THING_HEIGHT * ALIAS_OFFSET_RATIO),
               };
         const created = authoring.complete({
           kind: 'created-alias',

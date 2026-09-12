@@ -47,7 +47,8 @@
     "e2e:postgres": "playwright test --config playwright.postgres.config.ts",
     "test:integration:postgres": "pnpm contract:emit && pnpm db:migrate && vitest run --config vitest.integration.config.ts",
     "verify:static": "pnpm typecheck:toolchain && pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm lint:anti-slop && pnpm format:check",
-    "verify": "pnpm verify:static && pnpm test:coverage"
+    "verify": "pnpm verify:static && pnpm test:coverage",
+    "verify:local": "pnpm verify:static && pnpm test:coverage --maxWorkers=2 --minWorkers=1"
   },
   "pnpm": {
     "overrides": {

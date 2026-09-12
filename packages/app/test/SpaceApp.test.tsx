@@ -874,7 +874,16 @@ describe('Space app Things list', () => {
     expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(true);
     openDiagramMenu('Diagram');
     expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Diagram' }))).toBe(true);
+    const create = screen.getByRole('menuitem', { name: 'New Diagram' });
+    expect(unavailable(create)).toBe(true);
+    fireEvent.click(create);
+    expect(session.getState().working.document.diagrams).toHaveLength(1);
+    expect(screen.queryByRole('textbox', { name: 'Diagram name' })).toBeNull();
     expect(screen.getByRole('menuitem', { name: /^Copy link/ })).toBeInTheDocument();
+    fireEvent.keyDown(create, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Diagram: Diagram' })).toHaveFocus(),
+    );
 
     // Left settling rather than abandoned mid-placement: the strategy resolves
     // against an unmounted tree otherwise, and the Edits it restores are the

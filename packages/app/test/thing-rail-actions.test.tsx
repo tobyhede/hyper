@@ -294,6 +294,46 @@ describe('a Thing’s commands on the canvas rail', () => {
     await settled(session);
   });
 
+  it.each([4, 6])(
+    'keeps an Alias separated after closing its %s-times-sized Target',
+    async (scale) => {
+      const opened = spaceSnapshotSchema.parse({
+        ...snapshot,
+        document: {
+          ...snapshot.document,
+          diagrams: [
+            {
+              ...snapshot.document.diagrams?.[0],
+              positions: {
+                ...snapshot.document.diagrams?.[0]?.positions,
+                [THING_ID]: {
+                  x: 0,
+                  y: 0,
+                  open: true,
+                  openSize: { width: THING_WIDTH * scale, height: THING_HEIGHT * scale },
+                },
+              },
+            },
+          ],
+        },
+      });
+      const session = mount(undefined, undefined, opened);
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+      const editor = await screen.findByRole('textbox', { name: 'Thing title' });
+      fireEvent.keyDown(editor, { key: 'Escape' });
+      const alias = session.getState().working.things[2]!.id;
+      fireEvent.click(await screen.findByRole('button', { name: 'Close Thing A' }));
+      await waitFor(() => {
+        const positions = session.getState().working.document.diagrams?.[0]?.positions;
+        expect(positions?.[THING_ID]?.open).toBe(false);
+        expect(positions?.[alias]?.x).toBeGreaterThan(THING_WIDTH / 2);
+        expect(positions?.[alias]?.y).toBeGreaterThan(THING_HEIGHT / 2);
+      });
+      await settled(session);
+    },
+  );
+
   /**
    * **Present and unavailable on an Alias, not absent.**
    *

@@ -423,6 +423,28 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe('Create Space Thing', () => {
+  it('accepts only one Space creation before its local Edit installs', async () => {
+    const { session } = mount();
+    await readyToAuthor();
+    await act(async () => {
+      createThing('Space Thing');
+      createThing('Space Thing');
+      await Promise.resolve();
+    });
+    await settled(session);
+    expect(spaceThingsOf(session)).toHaveLength(1);
+    const editor = await screen.findByRole('textbox', { name: 'Thing title' });
+    expect(editor).toHaveValue('Space 1');
+    expect(editor).toHaveFocus();
+    fireEvent.keyDown(editor, { key: 'Escape' });
+    await createSpaceThing();
+    await settled(session);
+    expect(spaceThingsOf(session).map((thing) => thing.document.title)).toEqual([
+      'Space 1',
+      'Space 2',
+    ]);
+  });
+
   /**
    * One press mints three things — the Thing, the Space it names and that
    * Space's first Markdown Thing — and the first two take one `Space N`.
@@ -514,35 +536,6 @@ describe('Create Space Thing', () => {
   });
 
   /**
-   * The same window, opened twice by the same command.
-   *
-   * Two presses snapshot the same Things, so a creation reading a before/after
-   * difference re-finds the Thing the *first* press made and continues there —
-   * leaving the second Thing at its minted title with nothing pointing at it.
-   * Both Things carry the same `Space 1` here, because the title is minted at
-   * the press and neither press has installed anything yet, so the id is the
-   * only thing that can tell the two apart. That is the point: it is what the
-   * lifecycle now answers with.
-   */
-  it('continues in its own Thing when a second Space Thing is pressed into the window', async () => {
-    const { session } = mount();
-    await readyToAuthor();
-
-    await act(async () => {
-      createThing('Space Thing');
-      createThing('Space Thing');
-      await Promise.resolve();
-    });
-
-    await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(2));
-    const second = spaceThingsOf(session)[1]!;
-
-    const editor = await screen.findByRole('textbox', { name: 'Thing title' });
-    expect(nodeFor(second.id)).toContainElement(editor);
-    await settled(session);
-  });
-
-  /**
    * The seeding is a convenience at creation and never a link afterwards: the
    * Thing and the Space it names are separate entities from the moment they
    * exist, and the Thing's Title is the containing Space's to author.
@@ -587,6 +580,27 @@ describe('Create Space Thing', () => {
     expect(screen.queryByRole('textbox', { name: 'Thing title' })).toBeNull();
     await settled(session);
   });
+
+  it.each(['refused', 'rejected'] as const)(
+    'allows another attempt after a %s creation',
+    async (outcome) => {
+      const create = vi
+        .fn<SpaceThingAuthoring['create']>()
+        .mockImplementationOnce(() =>
+          outcome === 'refused'
+            ? Promise.resolve({ kind: 'refused', refusal: { code: 'persistence-read-failed' } })
+            : Promise.reject(new Error('coordination failed')),
+        )
+        .mockResolvedValue({ kind: 'unchanged' });
+      const { session } = mount(other, { create }, vi.fn());
+      await createSpaceThing();
+      expect(await screen.findByText('Space not created')).toBeVisible();
+      await createSpaceThing();
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText('Space not created')).toBeNull();
+      await settled(session);
+    },
+  );
 
   /**
    * A lifecycle that changed nothing did not create a Thing.

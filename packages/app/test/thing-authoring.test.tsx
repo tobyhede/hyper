@@ -236,7 +236,7 @@ describe('authoring a Thing title on the graph', () => {
     const session = mount();
     // **New Diagram is the control, and Create Thing is deliberately not.** The
     // two read different terms and the difference is the claim: `createDiagram`
-    // is `addThing && !editingThingTitle`, because creating a Diagram *selects* it
+    // requires a ready chrome name, because creating a Diagram *selects* it
     // and the canvas re-derives with no nodes at all — a Thing holding a live
     // draft unmounts. Creating a Thing re-derives nothing under the editor, so
     // it stays available, which is why the assertion below is on New Diagram

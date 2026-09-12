@@ -249,13 +249,12 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *
    * It omits `editingThingTitle` deliberately: Add Thing *begins* a title edit
    * rather than outliving one. Add Diagram below takes the same condition and
-   * that one term more.
+   * the name readiness it needs for its continuation.
    */
   const addThing = !presenting && !editingThingBody && !editingChromeTitle;
 
   /**
-   * Add Diagram is Add Thing plus `editingThingTitle`, and the extra term is this
-   * control's own.
+   * Add Diagram needs its naming continuation available as well as Add Thing.
    *
    * Creating a Diagram selects it, and the created Diagram is empty — so the
    * canvas re-derives with no nodes and a Thing mid-rename unmounts, taking the
@@ -263,9 +262,11 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * have been committed by the blur this button's own mousedown causes
    * (ADR 0065), which is precisely why a refused one is the case worth
    * withdrawing for: it is re-focused rather than settled, and nothing else
-   * stands between the click and the Thing that holds it.
+   * stands between the click and the Thing that holds it. Placement must also
+   * be ready: the new Diagram continues in its name, and an unavailable name
+   * cannot take the caret from the menu.
    */
-  const createDiagram = addThing && !editingThingTitle;
+  const createDiagram = addThing && chromeTitleEdit;
 
   /**
    * What an embedded Diagram drawn on this canvas may author — and the three
