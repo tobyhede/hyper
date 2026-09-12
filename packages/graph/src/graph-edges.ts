@@ -19,7 +19,7 @@ import type { GraphEdge } from '@project/core';
  *
  * Indices rather than Edge values, because both callers report position — one in
  * a load error naming where the repeat and its original sit, the other in the
- * refusal it throws at the View that produced it.
+ * refusal it throws at the caller that produced it.
  */
 export function repeatedGraphEdges(edges: readonly GraphEdge[]): ReadonlyMap<number, number> {
   const firstIndex = new Map<string, number>();

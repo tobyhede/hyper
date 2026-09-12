@@ -34,8 +34,18 @@ const TRAVERSAL = ['W', 'alk'].join('');
 // compound adjectives, and a guard that knew only the spaced form left the
 // hyphenated one as the spelling the sweep could hide in — which is exactly
 // where one survived, in a parity claim, until this line widened.
+// A hyphen, a space — or a line break with the comment's own leading `*`, which
+// is the separator a wrapped doc comment writes and the one this guard could
+// not see. `hits` reads line by line, so a two-word term the wrap split was
+// invisible to it in either half — and two really were: the second of the three
+// terms below survived a wrap in `packages/graph/src/placement.ts` and another
+// in `packages/app/test/navigation.test.ts`. The scan below uses `spanningHits`
+// for this reason, as the callback arm above already does. The terms stay
+// composed rather than spelled here, as everything retired in this file does,
+// because this comment sits inside what the scan reads.
+const RETIRED_TERM_GAP = '[ -]|\\s*\\n\\s*\\*?\\s*';
 const RETIRED_CANVAS_TERMS = new RegExp(
-  `${['Computed', 'View'].join('[ -]')}|${['Algorithmic', 'View'].join('[ -]')}|${['Space', 'View'].join('[ -]')}`,
+  `${['Computed', 'View'].join(`(?:${RETIRED_TERM_GAP})`)}|${['Algorithmic', 'View'].join(`(?:${RETIRED_TERM_GAP})`)}|${['Space', 'View'].join(`(?:${RETIRED_TERM_GAP})`)}`,
   'i',
 );
 const RETIRED_OPENING_FIELD = ['default', 'Renderer'].join('');
@@ -307,11 +317,14 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
   });
 
   it('finds no retired canvas vocabulary in live files', () => {
+    // `spanningHits` rather than `hits`: a two-word term wrapped across a line
+    // break is present in neither line on its own, and a line-by-line read
+    // reports nothing at all for it.
     const found = scannableFiles().flatMap((file) => {
       const source = readTracked(file);
       return source === null
         ? []
-        : hits(source, RETIRED_CANVAS_TERMS).map((hit) => `${file}:${hit}`);
+        : spanningHits(source, RETIRED_CANVAS_TERMS).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -333,6 +346,37 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
  * names ADR 0041 retired, and against the ones it deliberately leaves alone.
  */
 describe('the vocabulary that guard reads', () => {
+  it('reports a retired canvas term however the separator is written', () => {
+    // This arm had no fixture until two terms escaped through it, which is most
+    // of why they did: the file list said it reached every tracked file, and
+    // nothing said what it reached inside one. The composed halves are the
+    // three terms' own, so a term that leaves the regex leaves this too.
+    const first = ['Computed', 'View'];
+    const second = ['Algorithmic', 'View'];
+
+    for (const separator of [' ', '-', '\n * ', '\n   ']) {
+      const line = `a ${second.join(separator)} authors nothing`;
+      expect(spanningHits(line, RETIRED_CANVAS_TERMS), JSON.stringify(line)).not.toEqual([]);
+    }
+
+    // The wrapped form in the shape a doc comment actually writes it — which is
+    // the one `hits` cannot see at all, neither line holding the whole term.
+    const wrapped = ` * the whole rendered map is adopted: an ${first[0] ?? ''}\n * ${first[1] ?? ''} authors nothing`;
+    expect(spanningHits(wrapped, RETIRED_CANVAS_TERMS)).not.toEqual([]);
+    expect(hits(wrapped, RETIRED_CANVAS_TERMS), 'a line-by-line read is why this escaped').toEqual(
+      [],
+    );
+
+    // The compound that keeps the word: a Things View is live vocabulary
+    // (`CONTEXT.md`), and no arm names it.
+    for (const line of [
+      '<ThingsView things={absent} />',
+      'the Things View lists what the Diagram omits',
+    ]) {
+      expect(spanningHits(line, RETIRED_CANVAS_TERMS), line).toEqual([]);
+    }
+  });
+
   it('reports the retired names in every shape they were written in', () => {
     const retired = [
       `export type ${ENTITY}Id = string;`,

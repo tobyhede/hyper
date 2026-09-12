@@ -102,7 +102,7 @@ How work moves from a question to committed code: the grilling loop, when a deci
 
 ### Editing & persistence
 
-`SpaceBackend`, `SpaceSession`, Space Authoring's completed-edit lifecycle (`completed`/`unchanged`/`refused`), and the Diagram/Graph/View model. Read before touching `packages/persistence`, `packages/graph`, `space-authoring.ts`, `migrations/**`, or `src/prisma/**`. See `docs/agents/editing-and-persistence.md`.
+`SpaceBackend`, `SpaceSession`, Space Authoring's completed-edit lifecycle (`completed`/`unchanged`/`refused`), and the Diagram/Graph model. Read before touching `packages/persistence`, `packages/graph`, `space-authoring.ts`, `migrations/**`, or `src/prisma/**`. See `docs/agents/editing-and-persistence.md`.
 
 ### Canvas & rendering
 
