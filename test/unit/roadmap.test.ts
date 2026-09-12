@@ -653,12 +653,12 @@ describe('deferrals', () => {
     write(
       root,
       'effort/issues/01-a.md',
-      '# 01 — A\n\nStatus: resolved\n\n## Out of scope\n\nThe wider rename.\n\n- **Deferred:** the parity manifest\n',
+      '# 01 — A\n\nStatus: resolved\n\n## Out of scope\n\nThe wider rename.\n\n- **Deferred:** the parity sweep\n',
     );
 
     expect(featureNamed(buildRoadmap(root), 'effort').issues[0]?.deferrals).toEqual([
       'Out of scope',
-      '- **Deferred:** the parity manifest',
+      '- **Deferred:** the parity sweep',
     ]);
   });
 

@@ -1859,3 +1859,243 @@ describe('a Thing is named once (ADR 0085)', () => {
     }
   });
 });
+
+/**
+ * ADR 0010 makes Space the top-level domain value, minted only by `loadSpace`,
+ * and retires the shipping-ledger word that named it before. `CONTEXT.md:9`
+ * says so in as many words — "retired from the code, not merely avoided" — and
+ * `README.md` and `docs/agents/editing-and-persistence.md` both repeat it. Until
+ * now nothing in `verify` noticed, which is the gap this block closes.
+ *
+ * **The word has a second, foreign sense, and that is what shapes the scan.**
+ * A package's `package.json` and the file that lists the packages are manifests
+ * in npm's and pnpm's vocabulary, not ours, and the tree writes that sense
+ * freely: as prose in `scripts/`, `test/` and the agent-facing documents, and
+ * as three identifiers naming a parsed `package.json`. This is the same split
+ * the loose-name block above makes for pnpm's own retired word, and it is
+ * settled the same way — **by shape, not by file**.
+ *
+ * So two scopes:
+ *
+ *  - **Every scannable file** is held to the shapes a domain name is written
+ *    in: the PascalCase compound in either direction, the camelCase one, the
+ *    screaming constant, the kebab-case refusal code or test id, and the word
+ *    capitalised as a noun. None of those has ever named a `package.json` here.
+ *  - **Implementation source** is held to the bare word as well, because inside
+ *    `src/` and a package's own source tree there is no `package.json` to read
+ *    and the only sense left is ours.
+ *
+ * That leaves bare lowercase prose about a package manifest writable in a
+ * comment, a script and a document — deliberately, and for the reason the
+ * sibling block above leaves pnpm's bare monorepo prose writable: the arm reads
+ * shapes, so the foreign sense needs no exemption to survive and cannot be
+ * mistaken for the retired entity.
+ *
+ * **Three masks, no file exemptions.** The three identifiers naming a parsed
+ * `package.json` are masked by spelling, in the `withoutForeignSpellings`
+ * idiom, so a domain compound added to one of those modules is still reported.
+ * The two retirement notices — the sentences in `README.md` and in
+ * `packages/core/src/schema.ts` that exist to say the word is retired — are
+ * masked as quotations, in the `HISTORICAL_QUOTATIONS` idiom, because a
+ * document that explains what changed has to be able to name what it changed
+ * from. Each of the five is asserted below to still be earning itself.
+ */
+const RETIRED_SPACE = ['man', 'ifest'].join('');
+const RETIRED_SPACE_CAPITAL = ['Man', 'ifest'].join('');
+const RETIRED_SPACE_UPPER = RETIRED_SPACE.toUpperCase();
+
+const RETIRED_SPACE_NAME = new RegExp(
+  [
+    // PascalCase compounds opening with it: its id, its schema, its version.
+    `${RETIRED_SPACE_CAPITAL}[A-Z]`,
+    // Compounds ending in it, singular and plural: the space one, the stored
+    // one, the parsed one. This is the arm the three foreign spellings are
+    // masked out of.
+    `[A-Za-z]${RETIRED_SPACE_CAPITAL}s?\\b`,
+    // camelCase compounds opening with it: its id, its things, its version.
+    `\\b${RETIRED_SPACE}[A-Z]`,
+    // The screaming-case constants: the bare word, its plural, its fixtures.
+    // `\\b` before it would never land in `MONOREPO_${RETIRED_SPACE_UPPER}`, an
+    // underscore being a word character — which is the point, that name reads a
+    // `package.json` and is the foreign sense.
+    `\\b${RETIRED_SPACE_UPPER}S?\\b`,
+    `${RETIRED_SPACE_UPPER}_[A-Z]`,
+    // The kebab-case compounds: refusal codes, completion kinds, test ids and
+    // CSS blocks. A hyphen is not a word character, so every arm above reads
+    // straight past them, which is what the Diagram and Thing blocks learned.
+    `${RETIRED_SPACE}-[a-z]`,
+    `[a-z]-${RETIRED_SPACE}s?(?![a-z])`,
+    // The word capitalised as a noun, which is how a document names an entity
+    // rather than a tool's file. Nothing in the foreign sense is written this
+    // way: a compound spells it with a letter before the capital, and prose
+    // about a package manifest is lowercase.
+    `\\b${RETIRED_SPACE_CAPITAL}s?\\b`,
+  ].join('|'),
+);
+
+/**
+ * The bare word, which only implementation source is held to. A package's own
+ * source tree holds no `package.json` to read and no tooling prose about one,
+ * so the only sense the word can carry there is the retired entity.
+ */
+const RETIRED_SPACE_BARE = new RegExp(`\\b${RETIRED_SPACE}s?\\b`);
+
+/**
+ * The three identifiers naming a parsed `package.json` or the file that lists
+ * the packages. npm's and pnpm's sense, arriving with their file formats rather
+ * than ours to sweep — the same carve-out Lucide's glyph gets above, and masked
+ * by spelling for the same reason: a domain compound added to one of these
+ * modules is our vocabulary wearing a forgiven name, and stays visible.
+ *
+ * The predicate that guards the type needs no entry of its own: it contains
+ * the type's own spelling and is masked with it.
+ */
+const FOREIGN_SPACE_SPELLINGS: readonly string[] = [
+  `Typechecking${RETIRED_SPACE_CAPITAL}`,
+  `app${RETIRED_SPACE_CAPITAL}`,
+  `root${RETIRED_SPACE_CAPITAL}`,
+];
+
+/**
+ * The two sentences that exist to say the word is retired — one in `README.md`,
+ * one in the doc comment on the space-file schema. Both name the retired word
+ * because that is the whole content of the notice, and renaming either does not
+ * update a record, it deletes one.
+ *
+ * Masked rather than exempted by file, so the rest of both files stays
+ * governed, and each is asserted below to still be present: a notice that stops
+ * being written stops carrying the licence to write it.
+ */
+const RETIREMENT_NOTICES: readonly string[] = [
+  `"${RETIRED_SPACE_CAPITAL}" is retired`,
+  `"${RETIRED_SPACE}" is retired`,
+  `not a ${RETIRED_SPACE}.`,
+];
+
+const withoutForeignSpaceSpellings = (source: string): string =>
+  FOREIGN_SPACE_SPELLINGS.reduce((text, spelling) => text.split(spelling).join('foreign'), source);
+
+const withoutRetirementNotices = (source: string): string =>
+  RETIREMENT_NOTICES.reduce((text, notice) => text.split(notice).join('retired'), source);
+
+describe('a Space is named once (ADR 0010)', () => {
+  const scanned = scannableFiles();
+
+  it('reaches the kinds of file this retirement governs', () => {
+    // The schema whose doc comment carries the notice, the document that
+    // repeats it, and the script that writes the foreign sense. A file list
+    // that quietly stopped resolving would report nothing forever.
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
+    expect(scanned).toContain('scripts/check-typescript-toolchain.ts');
+  });
+
+  it('finds no shape of the retired name anywhere it governs', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      if (source === null) return [];
+      return hits(
+        withoutRetirementNotices(withoutForeignSpaceSpellings(source)),
+        RETIRED_SPACE_NAME,
+      ).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no bare retired name in implementation source', () => {
+    const found = scanned.filter(isImplementationSource).flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(withoutRetirementNotices(source), RETIRED_SPACE_BARE).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no mask that has stopped earning itself', () => {
+    const everything = scanned.map((file) => readTracked(file) ?? '').join('\n');
+
+    for (const spelling of FOREIGN_SPACE_SPELLINGS) {
+      expect(everything, `nothing tracked still writes ${spelling}`).toContain(spelling);
+    }
+
+    for (const notice of RETIREMENT_NOTICES) {
+      expect(everything, `no file still carries the notice ${notice}`).toContain(notice);
+    }
+  });
+
+  it('reports the retired name in every shape it was written in', () => {
+    // Composed rather than written out, in this file's usual idiom: spelled
+    // literally, each fixture would be a hit this scan reports against its own
+    // source.
+    const retired = [
+      `export type ${RETIRED_SPACE_CAPITAL}Id = string;`,
+      `export const ${RETIRED_SPACE}Schema = z.object({});`,
+      `const space${RETIRED_SPACE_CAPITAL} = parse(bytes);`,
+      `const stored${RETIRED_SPACE_CAPITAL}s = await readAll();`,
+      `const ${RETIRED_SPACE_UPPER}_VERSION = 1;`,
+      `const ${RETIRED_SPACE_UPPER} = 'space.json';`,
+      `refusal: { code: '${RETIRED_SPACE}-not-found' },`,
+      `return 'space-must-keep-${RETIRED_SPACE}';`,
+      `<div data-testid="space-${RETIRED_SPACE}">`,
+      `.${RETIRED_SPACE}-header { display: flex; }`,
+      `The ${RETIRED_SPACE_CAPITAL} is the top-level value a Space is read from.`,
+      `Two ${RETIRED_SPACE_CAPITAL}s cannot describe one Space.`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_SPACE_NAME.test(line), line).toBe(true);
+    }
+  });
+
+  it('reports the bare retired name implementation source is held to', () => {
+    // Lowercase only: the capital is a shape the arm above already reports, and
+    // repeating it here would claim this one covers more than it does.
+    for (const line of [
+      ` * the ${RETIRED_SPACE} this module parses`,
+      `const ${RETIRED_SPACE}s = await readAll();`,
+      `type SpaceFile = z.infer<typeof ${RETIRED_SPACE}>;`,
+    ]) {
+      expect(RETIRED_SPACE_BARE.test(line), line).toBe(true);
+    }
+
+    // ...and the shape arm is what reports the capital, in implementation
+    // source and everywhere else.
+    expect(RETIRED_SPACE_NAME.test(`export type ${RETIRED_SPACE_CAPITAL} = Space;`)).toBe(true);
+  });
+
+  it('stays silent on the foreign sense, on its prose, and on the name that replaced it', () => {
+    const kept = [
+      // The foreign sense as prose: a comment, a document, a test name. Left
+      // writable by the shape rule rather than by an exemption, which is the
+      // whole design of this block.
+      `// A matching directory is only a package if it carries a ${RETIRED_SPACE}.`,
+      `Upgrade both consuming ${RETIRED_SPACE}s together and re-run the suite.`,
+      `const ${RETIRED_SPACE} = readFileSync(join(root, 'package.json'), 'utf8');`,
+      // pnpm's own screaming-case name for the file that lists the packages:
+      // an underscore is a word character, so no boundary lands before it.
+      `const MONOREPO_${RETIRED_SPACE_UPPER} = /^packages\\/[^/]+\\/package\\.json$/;`,
+      // The vocabulary ADR 0010 arrived at.
+      `const space = loadSpace(spaceFileSchema.parse(input), thingFiles);`,
+      `export type SpaceFile = z.infer<typeof spaceFileSchema>;`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_SPACE_NAME.test(line), line).toBe(false);
+    }
+
+    // The three foreign identifiers are forgiven by their spelling, and the
+    // arm reads them exactly as it reads a domain compound — which is why they
+    // are masked rather than skipped, and why this asserts both ends.
+    for (const line of [
+      `interface Typechecking${RETIRED_SPACE_CAPITAL} { scripts: { typecheck: string } }`,
+      `import app${RETIRED_SPACE_CAPITAL} from '../../packages/app/package.json';`,
+      `const requested = root${RETIRED_SPACE_CAPITAL}.scripts['e2e:fixture'];`,
+    ]) {
+      expect(RETIRED_SPACE_NAME.test(line), line).toBe(true);
+      expect(RETIRED_SPACE_NAME.test(withoutForeignSpaceSpellings(line)), line).toBe(false);
+    }
+  });
+});
