@@ -78,8 +78,8 @@ and taking these two is a decision of its own. Deleting `insetEnd` would take th
 **That decision of its own is `22-retire-the-registry-drawer-and-the-yielded-strip.md`,
 and not this ticket.** This section is the handoff — what fell out and why — and
 a resolved ticket cannot be scanned for as work. `10` originally wrote that this
-ticket "owns taking it"; it does not, and `10` now points at `16` too. Every
-site of prose about the pair cites `16`.
+ticket "owns taking it"; it does not, and `10` now points at `22` too. Every
+site of prose about the pair cites `22`.
 
 ## The three stale premises, corrected
 

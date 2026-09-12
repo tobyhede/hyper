@@ -27,7 +27,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Create offers both Thing kinds as peer controls rather than behind a disclosure, each named for the kind it makes and both withdrawn together, so one activation reaches either kind — and every kind in the product now completes its Edit on that one activation (ADR 0089), an Alias being created from the Thing it points at rather than from here.',
+      'Create offers both Thing kinds as peer controls rather than behind a disclosure, each named for the kind it makes and both withdrawn together, so one activation reaches either kind available in the Dock — and every kind available in the Dock now completes its Edit on that one activation (ADR 0089). Alias is not a Dock Create peer.',
   },
   {
     id: 'command-dock-packs-things-onto-one-row',

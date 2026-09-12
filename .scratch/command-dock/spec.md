@@ -77,12 +77,12 @@ none of them blocking each other:
   the decision is the whole of it — what New Diagram and New Space should
   actually do, and whether a `ghost` disclosure trigger reading as open is an
   application-wide rule or a Dock treatment that reached too far.
-- **16** and **17** are the same shape and exist for the same reason: an
+- **22** and **17** are the same shape and exist for the same reason: an
   unconsumed thing whose retirement is a `@project/ui` decision, left in the
-  tail of a resolved ticket where nothing can scan for it. `16` holds the
+  tail of a resolved ticket where nothing can scan for it. `22` holds the
   registry `Drawer`, `DRAWER_WIDTH` and `AppShell`'s `insetEnd`, with five
   sites pointing at it; `17` holds `Button`'s `label` variant, which `09` left
-  behind. They were briefly one file and are two, because `16`'s argument is
+  behind. They were briefly one file and are two, because `22`'s argument is
   about a vendored component drifting from an upstream and a CVA variant
   neither drifts nor regenerates.
 - **14** is the one `ready-for-agent` ticket. Two of the three findings `07`'s

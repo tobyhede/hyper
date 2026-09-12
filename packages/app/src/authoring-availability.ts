@@ -137,11 +137,8 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *
    * A fact of this module rather than an answer of it, because it is not an
    * operation: nothing offers this to an author. It says one authoring surface
-   * at a time, and **the three terms earn that for different reasons**:
+   * at a time, and **the two terms earn that for different reasons**:
    *
-   * - A creation pane is genuinely modal — a `Dialog`, with a backdrop across
-   *   the whole graph area and a focus trap — so while it is open the canvas is
-   *   covered and cannot be reached at all.
    * - A chrome title edit is *not* modal. It is an inline `InlineTitleEditor`
    *   standing in the Dock's own name control: no dialog role, no backdrop, no
    *   focus trap, and the canvas stays fully reachable behind it — the Dock
@@ -150,7 +147,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *   authoring because a second authoring surface must not be startable over a
    *   live rename, not because anything is covering the graph.
    * - A canvas that is not the one being authored — a hidden Space, or an
-   *   embedding the canvas above has withdrawn — is the third term and the one
+   *   embedding the canvas above has withdrawn — is the other term and the one
    *   that is neither: it is not covered, it is simply not the canvas. Every
    *   open Space keeps its application mounted, so without this term a Space
    *   nobody is looking at answers `F2`, `C` and Enter from the `window`

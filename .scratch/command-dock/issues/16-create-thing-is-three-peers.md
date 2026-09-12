@@ -23,8 +23,9 @@ record of what was true:
   instead.
 
 The parity claims keep their names. `command-dock-creates-each-kind-in-one-press`
-is now true of every kind in the product rather than of one, which is the
-stronger claim, and it is checked over two controls.
+is now true of every kind available in the Dock rather than of one, which is the
+stronger claim, and it is checked over two controls. Alias is not a Dock Create
+peer — it completes on activation from a Thing’s menu, outside this claim.
 
 **What was decided:** the three Thing kinds are peer controls on the Dock
 surface rather than three rows behind a `+`, and on a side edge the Things
