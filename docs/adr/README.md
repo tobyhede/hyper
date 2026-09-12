@@ -92,7 +92,7 @@ under `superseded/`.
 | [0043](0043-a-camera-command-is-issued-never-awaited.md) | A camera command is issued and never awaited. |
 | [0044](0044-the-presenting-move-is-one-fitview-call.md) | The presenting move is one `fitView` call. |
 | [0033](0033-route-authoring-uses-spatial-route-coloured-handles.md) | Graph authoring uses spatial handles coloured as the active Graph. |
-| [0089](0089-seeking-handles-reveal-by-proximity-and-eligibility.md) | Seeking-end authoring handles reveal only on Things near the pointer that `edgeEligibility` would accept. |
+| [0090](0090-seeking-handles-reveal-by-proximity-and-eligibility.md) | Seeking-end authoring handles reveal only on Things near the pointer that `edgeEligibility` would accept. |
 
 ## UI foundation
 

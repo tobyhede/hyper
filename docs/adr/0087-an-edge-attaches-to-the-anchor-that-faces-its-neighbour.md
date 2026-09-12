@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0033, 0086
-Refined by: 0089
+Refined by: 0090
 Related: 0021, 0032, 0040, 0041, 0045, 0064, 0066, 0083, 0084
 
 A Thing has **four Edge anchors**, one on each side, and they are the same four handles the authoring gesture already uses. An Edge attaches to the anchor on the side that faces the other Thing. The side is decided while the Edge is drawn, from where the two Things are at that moment. Nothing about it is stored, authored, or carried in the document.
