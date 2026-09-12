@@ -5,6 +5,20 @@ import { RoutedEdge } from './RoutedEdge';
 export * from './projection';
 export { ThingNode } from './ThingNode';
 export {
+  CONNECTION_TARGET_PROXIMITY,
+  connectionPointerInFlow,
+  distanceToAabb,
+  isNearConnectionTarget,
+  offersConnectionEnd,
+  type CanvasPoint,
+  type CanvasRect,
+} from './connection-target-reveal';
+export {
+  ConnectionEndEligibilityContext,
+  type ConnectionEndEligibility,
+} from './connection-end-eligibility';
+export { ConnectionTargetProximityProvider } from './connection-target-proximity';
+export {
   RoutedEdge,
   RoutedEdgePath,
   routedEdgePathProps,

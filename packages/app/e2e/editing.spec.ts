@@ -2200,7 +2200,6 @@ test('drawing between existing Things persists one active-Graph Edge and selects
 
   const sourceHandle = authoringHandle(source, 'source', 'right');
   const targetHandle = authoringHandle(target, 'target', 'top');
-  const targetHandles = page.locator('.rf-thing-node__authoring-handle--target');
   await expect(sourceHandle).toHaveCSS('opacity', '1');
   await expect(targetHandle).toHaveCSS('opacity', '0');
   // The Graph this Edge will join is the one conversion minted, and it is what
@@ -2212,10 +2211,20 @@ test('drawing between existing Things persists one active-Graph Edge and selects
   );
 
   await connectHandles(page, sourceHandle, targetHandle, async () => {
-    // Every Thing offers a target on every side while a connection is in flight,
-    // so the drop is never blocked by which side the author aimed at.
-    await expect(targetHandles.first()).toHaveCSS('opacity', '1');
-    await expect(targetHandles).toHaveCount(7 * AUTHORING_HANDLE_SIDES);
+    // Seeking handles show only on the near, eligible Thing — here the target
+    // under the pointer — not on every Thing in the Diagram (ADR 0033 treatment
+    // refined under connection-handle-proximity/01).
+    await expect(target.locator('.rf-thing-node__authoring-handle--target').first()).toHaveCSS(
+      'opacity',
+      '1',
+    );
+    await expect(target.locator('.rf-thing-node__authoring-handle--target')).toHaveCount(
+      AUTHORING_HANDLE_SIDES,
+    );
+    await expect(source.locator('.rf-thing-node__authoring-handle--target').first()).toHaveCSS(
+      'opacity',
+      '0',
+    );
     const preview = page.locator('.react-flow__connection-path');
     // `toBeAttached`, not `toBeVisible`: a connection drawn between two Things
     // whose centres share a row is a horizontal `path`, and a zero-height

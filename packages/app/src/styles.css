@@ -268,11 +268,12 @@ body {
   transition: opacity var(--thing-hover-duration) var(--thing-hover-easing);
 }
 
-/* Idle, a Thing offers where an Edge may start; mid-drag, it offers whichever
-   end the drag is looking for — a target for an ordinary connection, and a
-   source for a reconnection that has taken hold of an Edge's `from` end. The
-   role is read off the drag rather than assumed, so the second gesture has
-   somewhere to land.
+/* Idle, a Thing offers where an Edge may start; mid-drag, a Thing that is both
+   near the pointer and eligible for the release offers whichever end the drag
+   is looking for — a target for an ordinary connection, and a source for a
+   reconnection that has taken hold of an Edge's `from` end. Far or refused
+   Things stay quiet. The role is read off the drag rather than assumed, so the
+   second gesture has somewhere to land.
 
    Every rule below is conditioned on `data-connection-authoring`, because the
    four sides are **anchors** before they are affordances and they render on
