@@ -97,6 +97,22 @@ Also stated in AGENTS.md; repeated here because it is the easiest step to skip.
 - A behaviour-preserving refactor should leave e2e green **and unchanged**. That is the guard that proves it was behaviour-preserving.
 - Prove a bug fix against the defect, not only against a test written afterwards to pass. A test you wrote to match your fix will pass whether or not the fix addresses the real problem — reproduce the broken behaviour first, then show it gone.
 
+## What a comment may assert
+
+Every other gate here is a command. This one cannot be: `verify` type-checks, lints, formats and tests, and not one of those steps can read a sentence. So the artefact this repo most rewards producing — a doc comment that states the decision and the reasoning rather than the code — is the one artefact nothing validates. Ticket 14 is the worked example: three of its review findings were comments asserting things no test or instrumentation backed, and the worst of them had already cost a full strand of the ticket before anyone checked it.
+
+Notice where those claims come from. A comment about the code it sits in is mostly self-checking — the reader is looking at both. A comment about *another* module is not, and that is the whole risk surface. All three failures were cross-module claims, two of them arriving at second hand from a subagent's summary rather than from the file.
+
+**A negative result belongs in a ticket, never in source.** "X was tried and reverted because it broke Y" is the highest-risk thing that can be written in a comment: it forecloses the work, it reads as settled because it is in the source, and nothing ever re-runs it. `App.tsx`'s `entityActions` carried exactly that — six embedded-Diagram tests said to fail under `useMemo` — copied from a handoff bullet, into a ticket, into the source, never once observed. It did not reproduce. Put the finding in `.scratch/<feature>/`, where it is dated and attributed and a reader can see it is a report rather than a fact.
+
+**No measurement in source.** Either the instrumentation is committed and re-runnable, or the number lives in the ticket with the method that produced it. A count in a comment whose bench is gone cannot be checked, refreshed, or falsified — it is hearsay with a decimal point. Ticket 14's counters are in the ticket for this reason; the comment keeps the invariant ("half the mount-time decoration work") and not the figures.
+
+**A claim about another module names the test that holds it, or is not made.** This is not a new mechanism — the repo already has that family of test, written precisely for claims a rendering or unit test cannot state: `test/unit/command-surface-sharing.test.ts` holds who owns the command surface, `codemirror-encapsulation.test.ts` holds the `.cm-*` and dynamic-import rules, `graph-package-surface.test.ts` holds the curated index, `current-domain-vocabulary.test.ts` holds the retired words. What goes wrong is not that the mechanism is missing; it is that prose reaches for it only when the claim is *about* structure, and not when the claim is structure stated in a sentence. "`EmbeddedDiagramAuthoring` calls `useCanvasThingAuthoring` without `thingEntityActions`" is one line of test. Written as prose instead, its second half was false for a month.
+
+The same rule applies to a decision a comment calls load-bearing. Ticket 14's reconciliation order was documented as load-bearing and reversing it broke nothing — five cases all read Navigation, which the repair fixes either way, so none could see the order at all. If a comment says the order matters, something has to fail when it is swapped.
+
+None of the three is lintable, and pretending otherwise would be its own unbacked claim. They hold in review or not at all — so a review of this repo should ask, of any comment in the diff, whether the code supports what it says.
+
 ## Skills
 
 Vendored skills are tracked, so every clone and worktree has them. The files live under `.agents/skills/` — the repo-wide location Codex reads — and `.claude/skills/` holds a symlink per skill, which is where Claude Code reads. `skills-lock.json` records the upstream path and content hash of each, and is tracked with them; without it the vendored copies have no recorded revision and the installer can't tell what's drifted.
