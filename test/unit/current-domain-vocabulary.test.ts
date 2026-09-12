@@ -2099,3 +2099,163 @@ describe('a Space is named once (ADR 0010)', () => {
     }
   });
 });
+
+/**
+ * ADR 0088 gives "aggregate" one sense — the complete Meta-rooted collection of
+ * every Space — and retires the two others: one Space plus its Things is a
+ * **snapshot**, and the stored Meta identity is a **row**.
+ *
+ * **This block is not shaped like the ones above, and the difference is the
+ * point.** Those retire a word, so they ban it. Sense 1 keeps this word — 1300
+ * occurrences across 61 identifier spellings — so there is nothing to ban, and
+ * no regex separates two senses of one spelling. What is bannable is the two
+ * **phrases** the retired senses were written in, and the import alias that
+ * existed only to dodge the collision between sense 1 and sense 2.
+ *
+ * So the guard holds three things, and is honest that it holds no more:
+ *
+ *  - The boundary phrase, in the compound, hyphenated and prose shapes. It
+ *    named one Space's own diagram and thing structure, which is the
+ *    snapshot's.
+ *  - The root phrase, likewise. It named the `RepositoryState` row, and in DDD
+ *    that phrase names an entity rather than the row that names one.
+ *  - The import alias, which was load-bearing and read as a stylistic choice
+ *    rather than as the collision-avoidance it was. Its absence is the
+ *    completion criterion for the rename: the name it dodged is free, and
+ *    `@project/graph`'s function is imported under it.
+ *
+ * **The verb phrase is untouched and is sense 1 saying what it means.** The
+ * aggregate *rooted at* the Meta Space is the rooting rule in words; the verb
+ * puts no word boundary after the noun, so no arm reaches it and none should.
+ *
+ * One mask, asserted below to still be earning itself: `CONTEXT.md`'s own
+ * `_Avoid_` line has to name the phrase it retires, in the
+ * `HISTORICAL_QUOTATIONS` idiom the Diagram block already uses.
+ */
+const KEPT_AGGREGATE = ['Agg', 'regate'].join('');
+const keptAggregate = KEPT_AGGREGATE.toLowerCase();
+const keptAggregateTail = KEPT_AGGREGATE.slice(1);
+const RETIRED_BOUNDARY = ['ound', 'ar'].join('');
+const RETIRED_ROOT = ['ro', 'ot'].join('');
+
+const RETIRED_AGGREGATE_SENSES = new RegExp(
+  [
+    // The boundary phrase: the PascalCase and camelCase compound, the
+    // hyphenated shape and the prose one. Truncated before the noun's own
+    // ending so the adjective and the plural are one arm rather than three.
+    `[Aa]${keptAggregateTail}[Bb]${RETIRED_BOUNDARY}`,
+    `\\b${keptAggregate}[- ]b${RETIRED_BOUNDARY}`,
+    // The root phrase, in the same shapes. `\\b` after the noun is what keeps
+    // the verb phrase out: the participle puts no boundary there.
+    `[Aa]${keptAggregateTail}[Rr]${RETIRED_ROOT.slice(1)}s?\\b`,
+    `\\b${keptAggregate}[- ]${RETIRED_ROOT}s?\\b`,
+  ].join('|'),
+);
+
+/**
+ * The alias, banned outright. Unlike the two phrases it is a single identifier
+ * and needs no shapes: it was written once, as an import rename, and the whole
+ * of what this holds is that it does not come back.
+ */
+const RETIRED_AGGREGATE_ALIAS = new RegExp(`\\bvalidateSpace${KEPT_AGGREGATE}\\b`);
+
+/**
+ * The glossary's own retirement notice. `CONTEXT.md` has to be able to name the
+ * phrase it retires, and renaming that line does not update a record — it
+ * deletes one.
+ */
+const AGGREGATE_RETIREMENT_NOTICE = `${keptAggregate} ${RETIRED_ROOT} as a name for the stored Meta identity`;
+
+const withoutAggregateNotice = (source: string): string =>
+  source.split(AGGREGATE_RETIREMENT_NOTICE).join('retired');
+
+describe('aggregate names one thing (ADR 0088)', () => {
+  const scanned = scannableFiles();
+
+  it('reaches the kinds of file this rename actually touched', () => {
+    // The repository that held both senses and the alias between them, the
+    // schema whose comment called one Space an aggregate, and the glossary that
+    // now has an entry for the word.
+    expect(scanned).toContain('src/persistence/postgres-space-repository.ts');
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('CONTEXT.md');
+  });
+
+  it('finds neither retired sense in any shape it was written in', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(withoutAggregateNotice(source), RETIRED_AGGREGATE_SENSES).map(
+            (hit) => `${file}:${hit}`,
+          );
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no alias standing in for the collision the rename removed', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_AGGREGATE_ALIAS).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no mask that has stopped earning itself', () => {
+    const everything = scanned.map((file) => readTracked(file) ?? '').join('\n');
+
+    expect(everything, 'no document still carries the retirement notice').toContain(
+      AGGREGATE_RETIREMENT_NOTICE,
+    );
+  });
+
+  it('reports both retired senses in every shape they were written in', () => {
+    const retired = [
+      `const preserves${KEPT_AGGREGATE}B${RETIRED_BOUNDARY}y = (current, next) => true;`,
+      `// past this point the ${keptAggregate} b${RETIRED_BOUNDARY}y is settled and this commits`,
+      `const checked = ${keptAggregate}B${RETIRED_BOUNDARY}ies.length;`,
+      `const ${keptAggregate}R${RETIRED_ROOT.slice(1)} = state.singletonId;`,
+      `// clear the ${keptAggregate} ${RETIRED_ROOT} before deleting any Space rows`,
+      `const ${KEPT_AGGREGATE}R${RETIRED_ROOT.slice(1)} = RepositoryState;`,
+      `expect(entries).toContain('${keptAggregate}-${RETIRED_ROOT}');`,
+      `the ${keptAggregate}-b${RETIRED_BOUNDARY}y check compares two snapshots of one Space`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_AGGREGATE_SENSES.test(line), line).toBe(true);
+    }
+
+    for (const line of [
+      `import { loadSpace${KEPT_AGGREGATE} as validateSpace${KEPT_AGGREGATE} } from '@project/graph';`,
+      `const intake = validateSpace${KEPT_AGGREGATE}({ metaSpaceId, spaces });`,
+    ]) {
+      expect(RETIRED_AGGREGATE_ALIAS.test(line), line).toBe(true);
+    }
+  });
+
+  it('stays silent on the sense that keeps the word, and on the names that replaced the two it lost', () => {
+    const kept = [
+      // Sense 1, which is what the word means now. The verb phrase is the
+      // rooting rule in words, and no arm reaches it.
+      `Exported the ${keptAggregate} ${RETIRED_ROOT}ed at \${metaSpaceId} to \${destination}`,
+      `it('loads the complete ${keptAggregate} ${RETIRED_ROOT}ed at the explicit Meta Space', () => {`,
+      `export interface Loaded${KEPT_AGGREGATE} { metaSpaceId: UUID; spaces: LoadedSpace[] }`,
+      `return { kind: '${keptAggregate}-refused', errors };`,
+      `await repository.replace${KEPT_AGGREGATE}(input);`,
+      `const ${keptAggregate} = loadSpace${KEPT_AGGREGATE}({ metaSpaceId, spaces });`,
+      // The names this rename arrived at.
+      `const preservesSnapshotB${RETIRED_BOUNDARY}y = (current, next) => true;`,
+      `const stored = await loadStoredSpace(orm, id);`,
+      `// clear the Meta identity row before deleting any Space rows`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_AGGREGATE_SENSES.test(line), line).toBe(false);
+      expect(RETIRED_AGGREGATE_ALIAS.test(line), line).toBe(false);
+    }
+  });
+});

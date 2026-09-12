@@ -1,6 +1,6 @@
 # 01 — Decide what "aggregate" names, and retire the other sense
 
-Status: ready-for-human
+Status: resolved
 Tags: vocabulary
 
 **What to decide:** "Aggregate" carries at least three distinct meanings in this
@@ -146,3 +146,42 @@ option. It crosses the HTTP boundary (`packages/persistence/src/http-protocol.ts
 and is rendered by `packages/app/src/authoring-refusal.ts`, so renaming it is a
 wire change with a fixture and test tail, not prose. Option A leaves it alone,
 which is part of why A is cheap.
+
+### Answered, 12 September 2026
+
+**Option A, as recommended.** Aggregate names the complete Meta-rooted
+collection of every Space. Sense 2 — one Space plus its Things — is a **Space
+snapshot**; sense 3 — the repository-state row — is the **Meta identity row**.
+
+Recorded in [ADR 0088](../../../docs/adr/0088-aggregate-names-the-meta-rooted-collection.md),
+with option B written up as the credible rejected alternative and the cost
+accepted stated rather than waved at: a reader arriving with DDD in mind will
+read `aggregate` as one consistency boundary and be wrong, and `CONTEXT.md`'s
+entry plus its `_Avoid_` line are what answer them. `CONTEXT.md` gains the
+entry the word has never had.
+
+What changed in code, in one commit of its own per the rename rule:
+
+- `spaceSnapshotSchema`'s doc comment speaks of a snapshot of one Space.
+- `preservesAggregateBoundary` → `preservesSnapshotBoundary`.
+- The private `loadSpaceAggregate` → `loadStoredSpace`, with a doc comment
+  saying which of the two it is and naming the other.
+- The `truncateHyperContent` comment names the Meta identity row.
+- **The alias is gone.** `@project/graph`'s `loadSpaceAggregate` is imported
+  under its own name, because nothing collides with it any more.
+- `test/unit/export-aggregate.test.ts` says "inside the aggregate directory",
+  which is README's own term for it.
+
+What holds it, and what it does not hold: `test/unit/current-domain-vocabulary.test.ts`
+gains a block banning the two retired **phrases** in their compound, hyphenated
+and prose shapes, plus the alias outright as the rename's completion criterion.
+It is deliberately not a ban on the word — sense 1 keeps it — so it cannot see a
+*new* misuse of "aggregate" for one Space. No regex separates two senses of one
+spelling; that limit is stated in the block and in the ADR rather than papered
+over. The verb phrase "the aggregate rooted at" is untouched and is sense 1
+saying what it means.
+
+Out of scope as the issue said: `hyper.json`'s on-disk `metaSpaceId` key and the
+directory format, both ticket 08's and already the clearer names. The
+wire-visible `aggregate-refused` refusal kind is untouched, which is part of why
+option A was cheap.

@@ -368,7 +368,7 @@ export const thingDocumentSchema = z.discriminatedUnion('kind', [
   spaceThingDocumentSchema,
 ]);
 
-/** A complete, fully identified aggregate exchanged at persistence seams. */
+/** A complete, fully identified snapshot of one Space, exchanged at persistence seams. */
 export const spaceSnapshotSchema = z.object({
   id: uuidSchema,
   document: spaceDocumentSchema,
