@@ -265,6 +265,27 @@ describe('the selected Diagram after a coordinated recovery restores a participa
       ),
     ).toContain(activeGraphId);
   });
+
+  it('reconciles the placement against the Diagram the repair selected', async () => {
+    const target = await openRolledBackOverCreatedDiagram();
+
+    /*
+     * The one observable that holds the reconciliation *order*.
+     *
+     * `reconcilePlacement` resolves the selected Diagram and returns for one it
+     * cannot, so run before the repair it asks against the dangling selection,
+     * finds nothing, and leaves the placement on the created Diagram's own —
+     * empty, that Diagram having been minted with no Things. Every other
+     * assertion in this file reads Navigation, which the repair fixes either
+     * way, so the order is invisible to all of them.
+     */
+    const placement = target.authoring.authoredPlacement();
+
+    expect(placement).not.toBeNull();
+    expect([...(placement?.keys() ?? [])].toSorted()).toEqual(
+      [TARGET_THING_ID, TARGET_THING_TWO].toSorted(),
+    );
+  });
 });
 
 describe('the Active Graph after a coordinated recovery restores a participant', () => {

@@ -151,8 +151,13 @@ kept as defence: it is what converted the broken state into a live command set,
 and without it the Dock reads exactly what `SpaceCanvas` reads.
 
 Regression: `packages/app/test/active-graph-after-coordinated-recovery.test.ts`,
-five cases — three for the Graph half, two for the Diagram half — each red
-before its fix and green after, driving production operations only
+six cases — three for the Graph half, two for the Diagram half, and one for the
+*order*, which review found nothing else held: reversing the two reconciliations
+left every other assertion green, because they all read Navigation, which the
+repair fixes either way. The placement is the one observable that separates
+them, and it comes back empty when placement asks against the dangling
+selection. Each is red before its fix and green after, driving production
+operations only
 (`registry.spaceThings(...).delete(...)` then
 `SpaceAuthoring.acceptStoredSpace()`, which is what `PersistenceControl`'s "use
 the stored Space" spends). Each composer that mints nothing is given a minter
