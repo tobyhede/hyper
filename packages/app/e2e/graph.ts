@@ -458,7 +458,7 @@ export async function connectHandles(
   targetHandle: Locator,
   whileConnecting?: () => Promise<void>,
 ): Promise<void> {
-  const from = (await sourceHandle.boundingBox())!;
+  const from = await boxOf(sourceHandle, 'the source handle');
   const to = await targetHandle.boundingBox();
   const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
   // The opening nudge goes *towards* the target rather than always rightwards.
@@ -480,7 +480,7 @@ export async function connectHandles(
   // so Playwright `hover` cannot arm them — move by coordinates onto the target
   // first, then the reveal turns pointer events back on.
   await expect(targetHandle).toHaveClass(/connectableend/);
-  const drop = (await targetHandle.boundingBox())!;
+  const drop = await boxOf(targetHandle, 'the target handle');
   await page.mouse.move(drop.x + drop.width / 2, drop.y + drop.height / 2, { steps: 8 });
   await expect(targetHandle).toHaveCSS('opacity', '1');
   expect(await targetHandle.evaluate((element) => element.matches(':hover'))).toBe(true);

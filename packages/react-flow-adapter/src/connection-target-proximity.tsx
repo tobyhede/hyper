@@ -5,15 +5,8 @@ import {
   connectionPointerInFlow,
   isNearConnectionTarget,
   type CanvasPoint,
+  type CanvasRect,
 } from './connection-target-reveal';
-
-/** The axis-aligned bounds proximity reads — absolute position plus measured size. */
-export type ConnectionTargetBounds = {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-};
 
 /**
  * Pure half of the proximity magnet: whether the live connection pointer is
@@ -22,10 +15,9 @@ export type ConnectionTargetBounds = {
 export function connectionTargetProximity(
   inProgress: boolean,
   pointer: CanvasPoint | null,
-  bounds: ConnectionTargetBounds | null,
+  bounds: CanvasRect | null,
 ): boolean {
   if (!inProgress || pointer === null || bounds === null) return false;
-  if (bounds.width === 0 || bounds.height === 0) return false;
   return isNearConnectionTarget(pointer, bounds, CONNECTION_TARGET_PROXIMITY);
 }
 

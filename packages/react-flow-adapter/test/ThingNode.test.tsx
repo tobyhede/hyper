@@ -630,15 +630,55 @@ describe('ThingNode graph authoring', () => {
    * Edge's *target*, so it is looking for a new **source**. Offering only target
    * handles left that gesture with nowhere to land — which is why the role is
    * read off the drag rather than assumed to be `target`.
+   *
+   * Near + eligible is the same reveal gate as an ordinary connect, with the
+   * seeking role inverted: source ends show, target ends stay quiet.
    */
-  it('ends a drag on a source handle while a source endpoint is being moved', () => {
+  it('offers source seeking ends when near and eligible during a source-endpoint move', () => {
     connection.inProgress = true;
     connection.fromHandle.type = 'target';
 
     render(<ThingNode {...props({ selected: true })} />);
 
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'source',
+    );
     expect(connectable('Connect from', 'end')).toEqual([true, true, true, true]);
     expect(connectable('Connect to', 'end')).toEqual([false, false, false, false]);
+  });
+
+  it('withholds source seeking reveal when the pointer is not near during a source-endpoint move', () => {
+    connection.inProgress = true;
+    connection.fromHandle.type = 'target';
+    proximity.near = false;
+
+    render(<ThingNode {...props({ selected: true })} />);
+
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'none',
+    );
+    // Snap may still land once the pointer enters the magnet; eligibility alone
+    // gates connectable-end, and with no provider every Thing stays eligible.
+    expect(connectable('Connect from', 'end')).toEqual([true, true, true, true]);
+  });
+
+  it('withholds source seeking ends when eligibility refuses during a source-endpoint move', () => {
+    connection.inProgress = true;
+    connection.fromHandle.type = 'target';
+
+    render(
+      <ConnectionEndEligibilityContext.Provider value={{ mayOffer: () => false }}>
+        <ThingNode {...props({ selected: true })} />
+      </ConnectionEndEligibilityContext.Provider>,
+    );
+
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'none',
+    );
+    expect(connectable('Connect from', 'end')).toEqual([false, false, false, false]);
   });
 
   /**

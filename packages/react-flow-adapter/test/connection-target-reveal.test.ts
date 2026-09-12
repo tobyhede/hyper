@@ -62,13 +62,14 @@ describe('connectionTargetProximity', () => {
     expect(connectionTargetProximity(true, { x: 100, y: 250 }, null)).toBe(false);
   });
 
-  it('is false when the Thing has not been measured', () => {
+  it('treats a zero-size AABB as a point: near when within R, far beyond', () => {
+    const point = { x: 100, y: 200, width: 0, height: 0 };
+    expect(connectionTargetProximity(true, { x: 100, y: 200 }, point)).toBe(true);
     expect(
-      connectionTargetProximity(
-        true,
-        { x: 100, y: 250 },
-        { x: 100, y: 200, width: 0, height: 146 },
-      ),
+      connectionTargetProximity(true, { x: 100 - CONNECTION_TARGET_PROXIMITY, y: 200 }, point),
+    ).toBe(true);
+    expect(
+      connectionTargetProximity(true, { x: 100 - CONNECTION_TARGET_PROXIMITY - 1, y: 200 }, point),
     ).toBe(false);
   });
 
