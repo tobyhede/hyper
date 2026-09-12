@@ -148,6 +148,10 @@ _Avoid_: Space-Thing palette, Thing panel, drawer or Dock as the domain name.
 Projecting the complete aggregate into the repository-friendly form an author can review, commit and share. The unit is every Space at once, rooted at the Meta Space, rather than one Space chosen from among them. Exporting is not what makes an edit durable; it records each Space outside Hyper at the revision it was read at.
 _Avoid_: saving, publishing, syncing; exporting a single Space.
 
+**Aggregate directory**:
+The on-disk form Exporting projects and Importing replaces: a directory holding `hyper.json` (naming the Meta Space) and one child directory per Space, each named for that Space's Id in lower case and holding `space.json` plus Thing markdown (`*.md` beside the space file and under `things/`). Anything else in those directories is preserved across a round trip; what Exporting removes is exactly what Importing scans. Reading an Aggregate directory also identifies any omitted nested Ids before the persistence seam sees the Aggregate.
+_Avoid_: catalog, bundle, export root as a second name for the same artifact.
+
 **Importing**:
 Taking a complete aggregate from outside Hyper and making it the stored one. It either establishes the aggregate of a repository that has none, or replaces the stored one outright — never both, and never partly. Importing does not merge, reconcile or add to what is stored, and it does not rewrite what it read.
 _Avoid_: loading, restoring, syncing; merging.

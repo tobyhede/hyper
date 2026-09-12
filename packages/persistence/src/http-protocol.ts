@@ -204,7 +204,7 @@ const exactRecord = (
  * needs concise corrective detail instead: the failing paths and their reasons,
  * nothing else.
  *
- * `describeSchemaFailure` in `src/import/identify-space.ts` summarises an import
+ * `describeSchemaFailure` in `src/aggregate-directory/identify-space.ts` summarises an import
  * failure in this same format — first three failing paths, then a count of the
  * rest — restated rather than shared, because one server-side caller does not
  * earn a string-formatting export from a browser-safe package. That format is

@@ -392,7 +392,7 @@ describe('canonical export', () => {
    * `loadAggregate` is stubbed because a valid repository cannot reach here; the
    * refusal has to come from the staged bytes disagreeing with Meta rooting.
    */
-  it('names the Space in a refusal raised by verifying the staged aggregate', async () => {
+  it('answers invalid-staged-aggregate when verifying the staged aggregate refuses', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const orphan = uuidSchema.parse('c0000000-0000-4000-8000-0000000000aa');
@@ -412,10 +412,15 @@ describe('canonical export', () => {
         },
       });
 
-    const thrown = await captureError(() => exportAggregate(repository, destination));
-
-    expect(thrown?.message).toContain(orphan);
-    expect(thrown?.message).toContain('no Space Thing points at it');
+    const result = await exportAggregate(repository, destination);
+    expect(result).toMatchObject({
+      kind: 'invalid-staged-aggregate',
+      metaSpaceId: SPACE_ID,
+      errors: [{ kind: 'ordinary-space-unreferenced', spaceId: orphan }],
+    });
+    if (result.kind !== 'invalid-staged-aggregate') return;
+    expect(result.spaces.map((space) => space.id).sort()).toEqual([SPACE_ID, orphan].sort());
+    await expect(readdir(destination).catch(() => [])).resolves.toEqual([]);
   });
 
   it('writes nothing and answers uninitialized when the repository holds no aggregate', async () => {

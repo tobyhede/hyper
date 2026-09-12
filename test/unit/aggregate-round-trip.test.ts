@@ -6,7 +6,7 @@ import { createWorkingSpaceLoader, type LoadedSpace } from '@project/persistence
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { importAggregate } from '../../src/import/import-aggregate';
-import { AGGREGATE_FILE_NAME } from '../../src/import/read-aggregate';
+import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');

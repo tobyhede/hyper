@@ -6,7 +6,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from '@pla
 import { encodeCompactUuid, newUuid, type UUID } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
 import { exportAggregate } from '../../src/export/export-aggregate';
-import { AGGREGATE_FILE_NAME } from '../../src/import/read-aggregate';
+import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
 import { clearHyperContent } from '../support/clear-hyper-content';

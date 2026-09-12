@@ -6,8 +6,7 @@ import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCliMain } from '../../src/cli/main';
 import { runHyper, type CliIo } from '../../src/cli/run';
-import { AGGREGATE_FILE_NAME } from '../../src/import/read-aggregate';
-import { readSingleSpace } from '../../src/import/read-single-space';
+import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
 import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
@@ -216,6 +215,37 @@ describe('runHyper', () => {
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
+  });
+
+  it('renders a staged Aggregate intake refusal without importing from Export', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const orphan = uuidSchema.parse('c0000000-0000-4000-8000-0000000000aa');
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    repository.loadAggregate = () =>
+      Promise.resolve({
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: SPACE_ID,
+          spaces: [
+            storedSpace,
+            {
+              snapshot: { id: orphan, document: { version: 1, title: 'Orphan' }, things: [] },
+              revision: 0n,
+              exportedRevision: null,
+            },
+          ],
+        },
+      });
+    const output = captureIo();
+
+    await expect(
+      runHyper(['export', destination], { repository, io: output.io, newId: newUuid }),
+    ).resolves.toBe(1);
+
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual([
+      `Exported aggregate does not read back as a valid aggregate:\nSpace ${orphan} is not the Meta Space and no Space Thing points at it\n`,
+    ]);
   });
 
   it('rejects a symlinked destination without changing its external target', async () => {

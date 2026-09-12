@@ -13,7 +13,7 @@ import {
   describeSchemaFailure,
   identifySpace,
   SpaceIdentityError,
-} from '../../src/import/identify-space';
+} from '../../src/aggregate-directory';
 
 /**
  * What is pinned is the shape of the rejection a client reads, not import
@@ -27,7 +27,7 @@ import {
  * **The door moved and the guard outlived it.** This reached that prose through
  * `PostgresSpaceRepository.importSpaces`, because the compatibility facade was
  * the only door parsing input the importer had not yet identified. ADR 0078
- * retired it, and `describeSchemaFailure` moved to `src/import/identify-space.ts`
+ * retired it, and `describeSchemaFailure` moved to `src/aggregate-directory/identify-space.ts`
  * with the minting it sits beside — so the door is `identifySpace` now, and it
  * raises `SpaceIdentityError` carrying the same summary. The debt the guard
  * exists for did not move with it: two functions still format that summary —

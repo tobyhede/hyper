@@ -3,8 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type UUID } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AGGREGATE_FILE_NAME, readAggregate } from '../../src/import/read-aggregate';
-import { SpaceImportFileError } from '../../src/import/read-single-space';
+import {
+  AGGREGATE_FILE_NAME,
+  AggregateDirectoryError,
+  readAggregate,
+} from '../../src/aggregate-directory';
 import { captureError } from '../support/capture-error';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -89,8 +92,8 @@ describe('readAggregate', () => {
 
     const thrown = await captureError(() => readAggregate(root, countingIds()));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('discovery');
     expect(thrown.diagnostics.join('\n')).toContain(AGGREGATE_FILE_NAME);
   });
@@ -101,8 +104,8 @@ describe('readAggregate', () => {
 
     const thrown = await captureError(() => readAggregate(root, countingIds()));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain('metaSpaceId');
   });
@@ -116,8 +119,8 @@ describe('readAggregate', () => {
 
     const thrown = await captureError(() => readAggregate(root, countingIds()));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('parsing');
   });
 
@@ -136,8 +139,8 @@ describe('readAggregate', () => {
 
     const thrown = await captureError(() => readAggregate(root, countingIds()));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain('named for its Space UUID');
   });
@@ -160,8 +163,8 @@ describe('readAggregate', () => {
 
     const thrown = await captureError(() => readAggregate(root, countingIds()));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain('named for its Space UUID');
   });
@@ -177,8 +180,8 @@ describe('readAggregate', () => {
 
     const thrown = await captureError(() => readAggregate(root, countingIds()));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.diagnostics.join('\n')).toContain(OTHER_SPACE_ID);
     expect(thrown.diagnostics.join('\n')).toContain(META_SPACE_ID);
   });
@@ -328,8 +331,8 @@ describe('readAggregate', () => {
 
     const thrown = await captureError(() => readAggregate(root, countingIds()));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.diagnostics.join('\n')).toContain(first);
     expect(thrown.diagnostics.join('\n')).toContain(second);
   });
@@ -384,7 +387,7 @@ describe('readAggregate', () => {
       }),
     );
 
-    expect(thrown).not.toBeInstanceOf(SpaceImportFileError);
+    expect(thrown).not.toBeInstanceOf(AggregateDirectoryError);
     expect(thrown?.message).toBe('Canonical export wrote an entity with no id');
   });
 

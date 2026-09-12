@@ -1,7 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { newUuid } from '@project/core';
-import { identifySpace } from '../../src/import/identify-space';
-import { readSingleSpace } from '../../src/import/read-single-space';
+import { identifySpace, readSingleSpace } from '../../src/aggregate-directory';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import type { LoadedSpace } from '@project/persistence';
 

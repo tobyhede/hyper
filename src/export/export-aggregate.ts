@@ -1,18 +1,16 @@
-import { cp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
-import { AGGREGATE_FILE_VERSION, type AggregateFile, type UUID } from '@project/core';
-import { loadSpaceAggregate } from '@project/graph';
+import { cp, mkdir, rm } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { type SpaceSnapshot, type UUID } from '@project/core';
+import { loadSpaceAggregate, type SpaceAggregateError } from '@project/graph';
 import type { LoadedAggregate } from '@project/persistence';
-import { describeAggregateRefusal } from '../cli/aggregate-refusal';
 import {
   AGGREGATE_FILE_NAME,
-  discoverSpaceDirectories,
+  assertExportableDestination,
+  pruneObsoleteSpaceDirectories,
   readAggregate,
-  spaceDirectoryId,
-} from '../import/read-aggregate';
+  writeAggregateDirectory,
+} from '../aggregate-directory';
 import type { SpaceRepository } from '../persistence/space-repository';
-import { compareOrdinal } from '../ordinal';
-import { writeSpaceDirectory } from './canonical-space';
 import {
   createStagingRoot,
   exists,
@@ -33,7 +31,18 @@ export type AggregateExportResult =
    * simply still reads as changed since its last export.
    */
   | { kind: 'exported'; aggregate: LoadedAggregate; unrecorded: readonly UnrecordedExport[] }
-  | { kind: 'uninitialized' };
+  | { kind: 'uninitialized' }
+  /**
+   * Staged bytes re-read as Spaces naming the expected Meta Space, but ordinary
+   * Aggregate intake refused them. The destination is untouched. The CLI renders
+   * `errors` through `describeAggregateRefusal`.
+   */
+  | {
+      kind: 'invalid-staged-aggregate';
+      metaSpaceId: UUID;
+      spaces: readonly SpaceSnapshot[];
+      errors: readonly SpaceAggregateError[];
+    };
 
 /**
  * Nothing in a canonical export is minted, because the aggregate being written
@@ -46,46 +55,14 @@ const mintsNothing = (): UUID => {
   throw new Error('Canonical export wrote an entity with no id');
 };
 
-const aggregateFile = (metaSpaceId: UUID): AggregateFile => ({
-  version: AGGREGATE_FILE_VERSION,
-  metaSpaceId,
-});
-
-/**
- * Drop the Space directories the aggregate no longer holds.
- *
- * A directory named for a Space Id is one a previous export wrote, so a Space
- * deleted since then has to leave with it — otherwise the next import reads the
- * deletion back as a Space that still exists. Everything else the destination
- * carries is left alone: a directory this export did not name and cannot have
- * written is the author's, and re-export preserves it.
- *
- * `spaceDirectoryId` is what "cannot have written" means, and the canonical
- * lower-case spelling it insists on is load-bearing here: removal is recursive,
- * and `z.string().uuid()` alone would accept an upper-cased name this exporter
- * never writes — an author's own directory, destroyed for looking like ours.
- */
-const removeObsoleteSpaceDirectories = async (
-  directory: string,
-  keep: ReadonlySet<UUID>,
-): Promise<void> => {
-  const entries = await readdir(directory, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const id = spaceDirectoryId(entry.name);
-    if (id === undefined || keep.has(id)) continue;
-    await rm(join(directory, entry.name), { recursive: true, force: true });
-  }
-};
-
 /**
  * Prove the staged directory reads back as the aggregate it was written from,
  * before anything replaces the destination.
  *
- * Read through the ordinary import reader and the ordinary aggregate intake,
- * rather than through a check written for export: what this needs to know is
- * that import will accept these bytes, and the only honest way to know that is
- * to ask import.
+ * Read through the ordinary Aggregate-directory reader and the ordinary
+ * aggregate intake, rather than through a check written for export: what this
+ * needs to know is that import will accept these bytes, and the only honest way
+ * to know that is to ask import.
  *
  * It is not an equality check against the stored snapshots, and deliberately.
  * Canonical export is canonical rather than byte-preserving (ADR 0030) — it
@@ -93,14 +70,25 @@ const removeObsoleteSpaceDirectories = async (
  * its exported form may legitimately differ. What must hold is that the result
  * is a valid, Meta-rooted aggregate naming the same Meta Space.
  *
- * A refusal is rendered through `describeAggregateRefusal`, the same renderer
- * the CLI's import path uses. `loadAggregate` has already validated, so the
- * only thing that can fail here is the canonical bytes disagreeing with the
- * aggregate they were written from — a serialization defect, where the Space and
- * Thing ids are precisely what the operator needs and `error.kind` alone is one
- * word for a fault that could be anywhere in a Space.
+ * An intake refusal is returned rather than rendered: `loadAggregate` has
+ * already validated, so a refusal here means the canonical bytes disagree with
+ * the aggregate they were written from — a serialization defect. The CLI owns
+ * the operator sentences via `describeAggregateRefusal`, the same renderer
+ * import uses. A Meta id mismatch remains a thrown Error: that is a bug in the
+ * writer, not an Aggregate the operator can repair in the destination.
  */
-const verifyStagedAggregate = async (directory: string, metaSpaceId: UUID): Promise<void> => {
+const verifyStagedAggregate = async (
+  directory: string,
+  metaSpaceId: UUID,
+): Promise<
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly metaSpaceId: UUID;
+      readonly spaces: readonly SpaceSnapshot[];
+      readonly errors: readonly SpaceAggregateError[];
+    }
+> => {
   const reread = await readAggregate(directory, mintsNothing);
   if (reread.metaSpaceId !== metaSpaceId) {
     throw new Error(
@@ -112,61 +100,32 @@ const verifyStagedAggregate = async (directory: string, metaSpaceId: UUID): Prom
     snapshots: reread.spaces,
   });
   if (!intake.ok) {
-    throw new Error(
-      [
-        'Exported aggregate does not read back as a valid aggregate:',
-        ...describeAggregateRefusal(intake.errors, reread.spaces),
-      ].join('\n'),
-    );
+    return {
+      ok: false,
+      metaSpaceId,
+      spaces: reread.spaces,
+      errors: intake.errors,
+    };
   }
+  return { ok: true };
 };
 
-const stageAggregate = async (aggregate: LoadedAggregate, replacement: string): Promise<void> => {
+const stageAggregate = async (
+  aggregate: LoadedAggregate,
+  replacement: string,
+): Promise<
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly metaSpaceId: UUID;
+      readonly spaces: readonly SpaceSnapshot[];
+      readonly errors: readonly SpaceAggregateError[];
+    }
+> => {
   const spaceIds = new Set(aggregate.spaces.map(({ snapshot }) => snapshot.id));
-  await removeObsoleteSpaceDirectories(replacement, spaceIds);
-
-  await writeFile(
-    join(replacement, AGGREGATE_FILE_NAME),
-    `${JSON.stringify(aggregateFile(aggregate.metaSpaceId), null, 2)}\n`,
-  );
-  for (const space of [...aggregate.spaces].sort((left, right) =>
-    compareOrdinal(left.snapshot.id, right.snapshot.id),
-  )) {
-    await writeSpaceDirectory(space, join(replacement, space.snapshot.id));
-  }
-
-  await verifyStagedAggregate(replacement, aggregate.metaSpaceId);
-};
-
-/**
- * Refuse a destination holding a Space directory import could not read back,
- * before anything is staged.
- *
- * Staging is a copy of the destination and verification re-reads the staged
- * copy, so a Space directory the author left here under a name that is not its
- * Space's id — an old flat-format Space, a hand-authored sample — fails every
- * export from then on. And the diagnostic would name a path inside a staging
- * root this function's caller deletes before the operator can read it, so the
- * path they are told to fix would not exist.
- *
- * Checked here rather than answered by having the reader skip a directory it
- * cannot name: that skip is the guard which stops a renamed Space directory
- * importing as a fresh Space, and dropping it would trade a loud failure for a
- * silent duplication.
- */
-const rejectUnreadableSpaceDirectories = async (destination: string): Promise<void> => {
-  if (!(await exists(destination))) return;
-  const unreadable = (await discoverSpaceDirectories(destination)).filter(
-    (child) => spaceDirectoryId(basename(child)) === undefined,
-  );
-  if (unreadable.length === 0) return;
-  throw new Error(
-    [
-      'Export destination holds a Space directory that is not named for its Space, so the export could not be read back:',
-      ...unreadable,
-      'Rename each to its Space id in lower case, or move it out of the destination.',
-    ].join('\n'),
-  );
+  await pruneObsoleteSpaceDirectories(replacement, spaceIds);
+  await writeAggregateDirectory(aggregate, replacement);
+  return verifyStagedAggregate(replacement, aggregate.metaSpaceId);
 };
 
 const rejectSymbolicLinks = async (
@@ -251,23 +210,29 @@ export const exportAggregate = async (
   const destination = resolve(destinationPath);
   await mkdir(resolve(destination, '..'), { recursive: true });
   await rejectSymbolicLinks(destination, aggregate);
-  await rejectUnreadableSpaceDirectories(destination);
+  await assertExportableDestination(destination);
 
   const stagingRoot = await createStagingRoot(destination);
   const replacement = join(stagingRoot, 'replacement');
-  let unrecorded: readonly UnrecordedExport[];
   try {
     if (await exists(destination)) {
       await cp(destination, replacement, { recursive: true });
     } else {
       await mkdir(replacement);
     }
-    await stageAggregate(aggregate, replacement);
+    const staged = await stageAggregate(aggregate, replacement);
+    if (!staged.ok) {
+      return {
+        kind: 'invalid-staged-aggregate',
+        metaSpaceId: staged.metaSpaceId,
+        spaces: staged.spaces,
+        errors: staged.errors,
+      };
+    }
     await replaceDestination(replacement, destination);
-    unrecorded = await markAggregateExported(repository, aggregate);
+    const unrecorded = await markAggregateExported(repository, aggregate);
+    return { kind: 'exported', aggregate, unrecorded };
   } finally {
     await rm(stagingRoot, { recursive: true, force: true }).catch(() => undefined);
   }
-
-  return { kind: 'exported', aggregate, unrecorded };
 };

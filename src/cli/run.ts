@@ -2,7 +2,7 @@ import type { UUID } from '@project/core';
 import { describeAggregateRefusal } from './aggregate-refusal';
 import { exportAggregate } from '../export/export-aggregate';
 import { importAggregate, type AggregateImportResult } from '../import/import-aggregate';
-import { SpaceImportFileError } from '../import/read-single-space';
+import { AggregateDirectoryError } from '../aggregate-directory';
 import type { SpaceRepository } from '../persistence/space-repository';
 import { resolveDatabaseStartup, type DatabaseStartupResult } from '../startup/database-startup';
 
@@ -29,7 +29,7 @@ const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 const reportImportFileError = (error: unknown, io: CliIo): void => {
-  if (error instanceof SpaceImportFileError) {
+  if (error instanceof AggregateDirectoryError) {
     const label = error.kind === 'discovery' ? 'File discovery failed' : 'File parsing failed';
     io.stderr(`${label}:\n${error.diagnostics.join('\n')}\n`);
     return;
@@ -117,29 +117,39 @@ const runExport = async (
   }
   try {
     const result = await exportAggregate(repository, destination);
-    if (result.kind === 'uninitialized') {
-      io.stderr('The repository is not initialized, so there is no aggregate to export\n');
-      return 1;
+    switch (result.kind) {
+      case 'uninitialized':
+        io.stderr('The repository is not initialized, so there is no aggregate to export\n');
+        return 1;
+      case 'invalid-staged-aggregate':
+        io.stderr(
+          `Exported aggregate does not read back as a valid aggregate:\n${describeAggregateRefusal(result.errors, result.spaces).join('\n')}\n`,
+        );
+        return 1;
+      case 'exported': {
+        io.stdout(
+          `Exported the aggregate rooted at ${result.aggregate.metaSpaceId} to ${destination}\n`,
+        );
+        for (const space of result.aggregate.spaces) {
+          io.stdout(
+            `Exported space ${space.snapshot.id} at revision ${space.revision.toString()}\n`,
+          );
+        }
+        // Not a failure, and not silent either. The files are complete; what did
+        // not happen is the bookkeeping behind them, so each Space is named with
+        // its reason and the command still succeeds. Left unsaid, the operator
+        // would find these Spaces reading as changed since their last export with
+        // nothing to explain why.
+        if (result.unrecorded.length > 0) {
+          io.stderr(
+            `The aggregate was exported, but these projected revisions were not recorded, so each Space still reads as changed since its last export:\n${result.unrecorded
+              .map(({ spaceId, reason }) => `  ${spaceId}: ${describeError(reason)}`)
+              .join('\n')}\n`,
+          );
+        }
+        return 0;
+      }
     }
-    io.stdout(
-      `Exported the aggregate rooted at ${result.aggregate.metaSpaceId} to ${destination}\n`,
-    );
-    for (const space of result.aggregate.spaces) {
-      io.stdout(`Exported space ${space.snapshot.id} at revision ${space.revision.toString()}\n`);
-    }
-    // Not a failure, and not silent either. The files are complete; what did
-    // not happen is the bookkeeping behind them, so each Space is named with
-    // its reason and the command still succeeds. Left unsaid, the operator
-    // would find these Spaces reading as changed since their last export with
-    // nothing to explain why.
-    if (result.unrecorded.length > 0) {
-      io.stderr(
-        `The aggregate was exported, but these projected revisions were not recorded, so each Space still reads as changed since its last export:\n${result.unrecorded
-          .map(({ spaceId, reason }) => `  ${spaceId}: ${describeError(reason)}`)
-          .join('\n')}\n`,
-      );
-    }
-    return 0;
   } catch (error) {
     io.stderr(`Export failed: ${describeError(error)}\n`);
     return 1;

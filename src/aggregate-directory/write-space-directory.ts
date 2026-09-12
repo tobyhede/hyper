@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   SPACE_FILE_VERSION,
@@ -10,7 +10,17 @@ import {
 import { serializeThingFile } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import { compareOrdinal } from '../ordinal';
-import { exists } from './replace-destination';
+import { isMissingFile } from './space-directory';
+
+const exists = async (path: string): Promise<boolean> => {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if (isMissingFile(error)) return false;
+    throw error;
+  }
+};
 
 /**
  * One placement, rebuilt key by key — the remembered Open Size included, on both
@@ -69,7 +79,7 @@ const canonicalGraphs = (
       : { id: graph.id, title: graph.title, color: graph.color, edges };
   });
 
-export const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
+const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
   const diagrams = snapshot.document.diagrams?.map((diagram) => {
     const diagramBase: Omit<NonNullable<SpaceFile['diagrams']>[number], 'activeGraph'> = {
       id: diagram.id,
@@ -105,7 +115,7 @@ export const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     : { ...withDiagrams, defaultDiagram: snapshot.document.defaultDiagram };
 };
 
-export const canonicalThing = (
+const canonicalThing = (
   id: UUID,
   document: LoadedSpace['snapshot']['things'][number]['document'],
 ): Thing => {
