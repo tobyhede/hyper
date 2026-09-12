@@ -94,6 +94,7 @@ export {
   CopyIcon,
   DeleteIcon,
   EditIcon,
+  EnterSpaceIcon,
   EntityActionsIcon,
   FitViewIcon,
   GraphIcon,

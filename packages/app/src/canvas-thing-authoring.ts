@@ -112,6 +112,15 @@ export interface CanvasThingAuthoringInput {
    * offers no menu rather than one that refuses.
    */
   readonly thingEntityActions?: ((thingId: ThingId) => readonly EntityActionGroup[]) | undefined;
+  /**
+   * Enter the Space a Space Thing on this canvas references.
+   *
+   * Asked one Thing at a time, the same way {@link thingEntityActions} is:
+   * the crossing is Open Spaces' and this module only knows which Things
+   * are on the canvas. Absent leaves every Space Thing without Enter, which
+   * is what an isolated mount and an embedded canvas want.
+   */
+  readonly onEnterSpace?: ((thingId: ThingId) => void) | undefined;
 }
 
 export interface CanvasThingAuthoring {
@@ -139,6 +148,7 @@ export function useCanvasThingAuthoring({
   onTitleEditingChange,
   spaceThingTargets = NO_SPACE_THING_TARGETS,
   thingEntityActions,
+  onEnterSpace,
 }: CanvasThingAuthoringInput): CanvasThingAuthoring {
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleThingId = caret?.field === 'title' ? caret.thingId : null;
@@ -413,6 +423,14 @@ export function useCanvasThingAuthoring({
         ) {
           data.entityActions = thingEntityActions(node.data.thingId);
         }
+        if (
+          onEnterSpace !== undefined &&
+          thingBelongsToWorkingSpace &&
+          availability.authorOnCanvas &&
+          node.data.kind === 'space'
+        ) {
+          data.onEnter = () => onEnterSpace(node.data.thingId);
+        }
         if (node.data.kind === 'space') {
           const stored = working.things.find((thing) => thing.id === node.data.thingId);
           const target =
@@ -456,6 +474,7 @@ export function useCanvasThingAuthoring({
       spaceThingTargets,
       completeSpaceThingSelection,
       thingEntityActions,
+      onEnterSpace,
     ],
   );
 

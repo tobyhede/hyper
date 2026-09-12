@@ -269,6 +269,13 @@ export interface SpaceCanvasProps {
    * note already names.
    */
   thingEntityActions?: (thingId: ThingId) => readonly EntityActionGroup[];
+  /**
+   * Enter the Space a Space Thing on this canvas references.
+   *
+   * Absent on an isolated mount and on an embedded canvas — Enter is a
+   * crossing the session owns, and those surfaces have no session to spend.
+   */
+  onEnterSpace?: ((thingId: ThingId) => void) | undefined;
 }
 
 export function SpaceCanvas({
@@ -302,6 +309,7 @@ export function SpaceCanvas({
   activeGraphThingIds,
   spaceThingTargets,
   thingEntityActions,
+  onEnterSpace,
 }: SpaceCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
 
@@ -474,6 +482,7 @@ export function SpaceCanvas({
     onSelectThing,
     spaceThingTargets,
     thingEntityActions,
+    onEnterSpace,
   });
   const { bodyEditing, openThing: onOpenThing, beginTitleEditing } = thingAuthoring;
 

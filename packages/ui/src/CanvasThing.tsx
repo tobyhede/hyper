@@ -25,6 +25,7 @@ import {
   CloseThingIcon,
   CommitEditIcon,
   EditIcon,
+  EnterSpaceIcon,
   GraphIcon,
   DiagramIcon,
   OpenThingIcon,
@@ -90,6 +91,12 @@ export type CanvasThingFront =
        * the target Space has not been read yet.
        */
       readonly selection?: CanvasSpaceThingSelection;
+      /**
+       * Enter the referenced Space, replacing the canvas. A kind command
+       * (ADR 0073): it belongs on this rail whether the Thing is Open or
+       * Closed, and it is withheld from a read-only surface.
+       */
+      readonly onEnter?: () => void;
     };
 
 /** One entity a Space Thing's selectors can be pointed at, named as an author reads it. */
@@ -288,6 +295,7 @@ export function CanvasThing(props: CanvasThingProps) {
   const contentPresence = usePresence(contentFront?.open === true, contentExitDuration);
   const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
   const onBeginContentEdit = !readOnly && front.kind === 'markdown' ? front.onBeginEdit : undefined;
+  const onEnter = !readOnly && front.kind === 'space' ? front.onEnter : undefined;
   /**
    * The edit running inside the Markdown front this Thing owns.
    *
@@ -306,6 +314,7 @@ export function CanvasThing(props: CanvasThingProps) {
     state !== 'editing' &&
     (visibleContentEdit !== null ||
       onOpenChange !== undefined ||
+      onEnter !== undefined ||
       actionableEntityActions ||
       beginContentEdit !== undefined);
   const style: CanvasThingStyle = { '--canvas-thing-graph': graphColor };
@@ -389,6 +398,11 @@ export function CanvasThing(props: CanvasThingProps) {
                 )
               ) : (
                 <ContentEditActions name={name} edit={visibleContentEdit} />
+              )}
+              {onEnter !== undefined && (
+                <ThingRailAction aria-label={`Enter Space ${name}`} onClick={onEnter}>
+                  <EnterSpaceIcon data-icon="inline-start" />
+                </ThingRailAction>
               )}
             </ThingRailKindActions>
             <ThingRailSharedActions>

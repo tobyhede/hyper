@@ -13,6 +13,7 @@ import {
   type EntityActionOutcome,
 } from '@project/ui';
 import {
+  titleName,
   type Thing,
   type ThingId,
   type DiagramId,
@@ -1038,6 +1039,29 @@ export const createApp = (
       [selectedDiagram.diagram, centreAnchor],
     );
 
+    const enterSpaceThing = useCallback(
+      (thingId: ThingId) => {
+        if (spaces === null) return;
+        const thing = renderedSpace.lookup.thing(thingId);
+        if (thing?.kind !== 'space') return;
+        const existing = spaces.entry(thing.spaceId);
+        const title = titleName(thing.title);
+        setSpaceCommandBreak(null);
+        void (async () => {
+          try {
+            const opened = await spaces.enter(thing.spaceId, thing.diagram);
+            if (existing === undefined) {
+              opened.app.navigation.activateGraph(thing.graph);
+            }
+          } catch (failure) {
+            reportBreak(failure);
+            setSpaceCommandBreak(`${title} could not be entered.`);
+          }
+        })();
+      },
+      [spaces, renderedSpace],
+    );
+
     const thingRailActions = useCallback(
       (thingId: ThingId): readonly EntityActionGroup[] => {
         const thing = renderedSpace.lookup.thing(thingId);
@@ -1889,6 +1913,7 @@ export const createApp = (
                 activeGraphThingIds={activeGraphThingIds}
                 spaceThingTargets={spaceThingTargets}
                 thingEntityActions={thingRailActions}
+                onEnterSpace={spaces === null ? undefined : enterSpaceThing}
               />
             </ReactFlowProvider>
           ) : (

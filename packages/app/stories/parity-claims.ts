@@ -250,7 +250,14 @@ export const parityClaims: readonly ParityClaim[] = [
     // be authored through a browser gesture yet, and the claim takes the
     // documented exemption meanwhile.
     applicationEvidence:
-      'A second Diagram in the target is Add Diagram from inside that Space, and Entering a Space Thing is `entity-url-addressability/08`, so a browser cannot yet reach a target owning two Diagrams. `packages/app/test/space-thing-authoring.test.tsx` proves two Space Things keeping their own selections through the application path meanwhile, and `test/support/repository-contract.ts` proves the pair survives the aggregate round trip.',
+      'A second Diagram in the target is Add Diagram from inside that Space. Entering a Space Thing is now the rail command `space-cards/11` owns, but this claim still needs a target that already owns two Diagrams — the e2e fixture does not author that second Diagram through the browser. `packages/app/test/space-thing-authoring.test.tsx` proves two Space Things keeping their own selections through the application path meanwhile, and `test/support/repository-contract.ts` proves the pair survives the aggregate round trip.',
+  },
+  {
+    id: 'space-thing-offers-enter',
+    storyFile: 'components/thing.stories.tsx',
+    storyExport: 'EnterSpace',
+    claim:
+      'A Space Thing offers Enter on its rail as a kind command; activating it is the crossing that adds the target to Open Spaces and shows that Space.',
   },
   {
     id: 'open-alias-shows-target-markdown-read-only',

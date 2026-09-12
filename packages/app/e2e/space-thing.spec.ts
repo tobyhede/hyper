@@ -645,6 +645,37 @@ test(
   },
 );
 
+/**
+ * Enter is the Space Thing's kind command (ADR 0073). The existing test above
+ * reaches the target through the Open Spaces menu after embed; this one is the
+ * rail press ticket 11 owns.
+ */
+test(
+  'Enter on a Space Thing shows the target and names the Space it was entered from',
+  { tag: '@parity:space-thing-offers-enter' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+    await createSpaceThingNamed(page, 'Architecture');
+    await settled(page);
+
+    const thing = nodeByTitle(page, 'Architecture');
+    // Open first so the Thing draws over its neighbour — a Closed Thing at the
+    // visible centre sits under a fixture Thing and its rail is not reliably
+    // clickable. Enter is offered Open or Closed; the press is the claim.
+    await thing.focus();
+    await thing.press('Enter');
+    await expect(thing.getByRole('button', { name: 'Enter Space Architecture' })).toBeVisible();
+    await thing.getByRole('button', { name: 'Enter Space Architecture' }).click();
+
+    await expect(showingSpace(page)).toContainText('Space 1');
+    await expect(page.getByRole('button', { name: 'Go to Diagram fixture' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enter Space Architecture' })).toHaveCount(0);
+  },
+);
+
 test('a Space Thing resizes to Close and remembers its Open Size', async ({ page }) => {
   const parent = await openSpaceThingOnItsDiagram(page);
   await parent.evaluate(async (element) => {

@@ -10,7 +10,7 @@ const spaceThingTargets = (things: readonly Thing[]): readonly UUID[] =>
   things.flatMap((thing) => (thing.kind === 'space' ? [thing.spaceId] : []));
 
 /**
- * Longest Space-Thing walk from Meta, and every ordinary Space that walk reaches.
+ * Longest Space-Thing path from Meta, and every ordinary Space that path reaches.
  *
  * Depth is the number of Spaces on the longest chain, Meta included — Meta → A → B
  * is depth three. A Space is reachable when some chain of Space Things starting

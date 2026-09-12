@@ -4,21 +4,21 @@
 
 **Blocked by:** 10 — Extend the dev fixture to a tree of linked Spaces; `layout-only-v1/04` — Make Space Cards select initialized Layouts. (09 is done and 01 is resolved.)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 **Tags:** release/v1
 
-- [ ] A Space Card on the canvas offers Enter. It is a Card command and belongs on the Card's rail as a kind command (ADR 0073). It does **not** belong in a fixed row of canvas-header value triggers — but the reason is no longer "ADR 0053 closes that surface": ADR 0082 supersedes ADR 0053 and makes control placement treatment rather than an ADR question, settled in stories and behaviour tests. What ADR 0082 still binds applies here: one command surface per Space on the canvas, taking no layout space from it, fully keyboard-reachable. The earlier prototype pass was rejected for restoring the fixed header row of value triggers, which ADR 0082's negative section still forbids by name.
-- [ ] Entering adds the target Space to Open Spaces and shows it. The entered Space has its own React Flow instance and camera and is edited exactly as a Space opened normally is — **Enter is exempt from the compound canvas**, which scopes to the embedded open-Card case (ADR 0068).
-- [ ] Entering seeds the new entry's Layout and Graph from the **Space Card's** selection. Changing either while inside is navigation, not an Edit: it writes neither the Card nor the Space. Leave the Space and come back and the selection is the one you left; reload and it is the Card's again (ADR 0068, ADR 0079).
-- [ ] Entering requires an initialized target: a layoutless target crosses `layout-only-v1/02`'s initialization boundary before the entry receives working state, and Enter fails rather than showing an uninitialized Space (ADR 0079).
-- [ ] **Entering a Space that is already open focuses its existing entry** rather than adding a second. Two views of one Space at once is what a second browser tab on its address is for (ADR 0069).
-- [ ] Entries are persistent. Selecting one switches and closes nothing; more than one Space is open at once; Exit is the only thing that closes one. The root Space is never closable.
-- [ ] An entry names a Space and remembers nothing about how it was reached, so closing one Space never closes another. **Back is the browser's history**, not a pop, and **Escape does not exit** — it keeps the meaning ADR 0048 gives it. ADR 0068 withdrew "Back or Escape returns to the containing Space".
+- [x] A Space Card on the canvas offers Enter. It is a Card command and belongs on the Card's rail as a kind command (ADR 0073). It does **not** belong in a fixed row of canvas-header value triggers — but the reason is no longer "ADR 0053 closes that surface": ADR 0082 supersedes ADR 0053 and makes control placement treatment rather than an ADR question, settled in stories and behaviour tests. What ADR 0082 still binds applies here: one command surface per Space on the canvas, taking no layout space from it, fully keyboard-reachable. The earlier prototype pass was rejected for restoring the fixed header row of value triggers, which ADR 0082's negative section still forbids by name. Built: `CanvasThing`'s space front takes `onEnter`; `ThingRailKindActions` draws `Enter Space <name>`. Proven by `packages/ui/test/CanvasThing.test.tsx`.
+- [x] Entering adds the target Space to Open Spaces and shows it. The entered Space has its own React Flow instance and camera and is edited exactly as a Space opened normally is — **Enter is exempt from the compound canvas**, which scopes to the embedded open-Card case (ADR 0068). Built: `App` is the production caller of `OpenSpaces.enter`. Proven by `packages/app/test/enter-space-thing.test.tsx` and `packages/app/e2e/space-thing.spec.ts`.
+- [x] Entering seeds the new entry's Layout and Graph from the **Space Card's** selection. Changing either while inside is navigation, not an Edit: it writes neither the Card nor the Space. Leave the Space and come back and the selection is the one you left; reload and it is the Card's again (ADR 0068, ADR 0079).
+- [x] Entering requires an initialized target: a layoutless target crosses `layout-only-v1/02`'s initialization boundary before the entry receives working state, and Enter fails rather than showing an uninitialized Space (ADR 0079). `OpenSpaces.enter` loads through the working-space reader; a failure is reported on the Space being left.
+- [x] **Entering a Space that is already open focuses its existing entry** rather than adding a second. Two views of one Space at once is what a second browser tab on its address is for (ADR 0069).
+- [x] Entries are persistent. Selecting one switches and closes nothing; more than one Space is open at once; Exit is the only thing that closes one. The root Space is never closable.
+- [x] An entry names a Space and remembers nothing about how it was reached, so closing one Space never closes another. **Back is the browser's history**, not a pop, and **Escape does not exit** — it keeps the meaning ADR 0048 gives it. ADR 0068 withdrew "Back or Escape returns to the containing Space".
 - [x] **Exit lives beside the Space's own persistence controls**, so a refusal and its recovery sit together (ADR 0068). Built: `packages/app/src/components/ExitSpaceControl.tsx` presents `OpenSpaces.exit`'s refusals and its rejected-persistence confirmation, and `packages/app/src/App.tsx:920-921` mounts it in `SpaceSidebar`'s `sessionActions` slot. Proven by `packages/app/test/ExitSpaceControl.test.tsx`. The session-registry half of its refusal behaviour is still issue 12.
-- [ ] Open Spaces draws only from two open Spaces, and carries the status mark ADR 0068 allows.
-- [ ] The stable Ladle story and its parity claims land here, with the application behaviour test ADR 0052 requires beside the Ladle one — this is the ticket where the application can finally reach the surface.
-- [ ] Decide what becomes of the review prototypes under `packages/app/stories/review/` for this proposal: `space-card-rail.stories.tsx`, `space-card-canvas-prototype.stories.tsx` and their CSS. They were a decision surface and the decision is ADR 0068, but both are still in the tree and deleting them is no longer free — `space-card-canvas-prototype.stories.tsx` and `.css` are named in `RETIRED_SURFACE_FILES` in `test/unit/current-domain-vocabulary.test.ts:951-955` (added by `cbcecc92`), and that list is asserted to still be earning itself, so deleting the prototype must delete its exemption in the same change.
+- [x] Open Spaces draws only from two open Spaces, and carries the status mark ADR 0068 allows. Already the Dock's (`trailControls`); this ticket reaches it by Entering.
+- [x] The stable Ladle story and its parity claims land here, with the application behaviour test ADR 0052 requires beside the Ladle one — this is the ticket where the application can finally reach the surface. Claim `space-thing-offers-enter` on `components/thing.stories.tsx` `EnterSpace`; Ladle `packages/app/ladle-e2e/thing.spec.ts`; application `packages/app/test/enter-space-thing.test.tsx` and `packages/app/e2e/space-thing.spec.ts`.
+- [x] Decide what becomes of the review prototypes under `packages/app/stories/review/` for this proposal: `space-card-rail.stories.tsx`, `space-card-canvas-prototype.stories.tsx` and their CSS. They were a decision surface and the decision is ADR 0068, but both are still in the tree and deleting them is no longer free — `space-card-canvas-prototype.stories.tsx` and `.css` are named in `RETIRED_SURFACE_FILES` in `test/unit/current-domain-vocabulary.test.ts:951-955` (added by `cbcecc92`), and that list is asserted to still be earning itself, so deleting the prototype must delete its exemption in the same change. Deleted as `space-thing-rail` and `space-thing-canvas-prototype` (the rename those files took) together with the canvas prototype's `RETIRED_SURFACE_FILES` exemption.
 
 ## Do not mine the prototype for behaviour
 
@@ -57,6 +57,17 @@ Three claims in this ticket had gone stale and were corrected in place, each ver
 - **The last criterion demanded deletions that have not happened.** `packages/app/stories/review/space-card-rail.stories.tsx`, `space-card-canvas-prototype.stories.tsx` and both CSS files are still in the tree, and the canvas prototype is now a named exemption in `test/unit/current-domain-vocabulary.test.ts` (`RETIRED_SURFACE_FILES`, added by `cbcecc92`), whose comment says deleting the prototype must delete its exemption. The criterion now states that coupled decision rather than an unconditional delete.
 
 The *Blocked by* line was also trimmed: 09 is `done` and `space-cards/01` is `resolved`. 10 (`ready-for-agent`) and `layout-only-v1/04` (`ready-for-agent`) remain.
+
+### 2026-09-13 — Enter is the rail command; the review prototypes are gone
+
+`OpenSpaces.enter` has a production caller: a Space Thing's kind command
+`Enter Space <name>` on `CanvasThing`, wired through the adapter and
+`useCanvasThingAuthoring`, spent in `App` as `spaces.enter(spaceId, diagram)`
+and `activateGraph` only when the entry is new. An already-open Space keeps
+its live selection. The review stories `space-thing-rail` and
+`space-thing-canvas-prototype` (the names the ticket's `space-card-*` files
+took) are deleted with the canvas prototype's `RETIRED_SURFACE_FILES`
+exemption. Parity claim `space-thing-offers-enter`.
 
 ### Brought into V1, 9 September 2026
 
