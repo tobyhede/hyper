@@ -327,8 +327,11 @@ describe('a Thing’s commands on the canvas rail', () => {
       await waitFor(() => {
         const positions = session.getState().working.document.diagrams?.[0]?.positions;
         expect(positions?.[THING_ID]?.open).toBe(false);
-        expect(positions?.[alias]?.x).toBeGreaterThan(THING_WIDTH / 2);
-        expect(positions?.[alias]?.y).toBeGreaterThan(THING_HEIGHT / 2);
+        // Same authored offset the closed-Target creation asserts: Close reclaims
+        // the growth that `createAliasFrom` added ahead of the collapsed step, so
+        // the Alias lands back on the rounded 0.75 of each collapsed axis.
+        expect(positions?.[alias]?.x).toBe(Math.round(THING_WIDTH * 0.75));
+        expect(positions?.[alias]?.y).toBe(Math.round(THING_HEIGHT * 0.75));
       });
       await settled(session);
     },
