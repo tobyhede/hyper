@@ -274,3 +274,20 @@ Deliberately not changed: the duplicated `Promise.allSettled` fold the reviewers
 flagged. The export side now returns `{ spaceId, reason }` per Space and the
 import side bare reasons, so the two no longer share a body — only the `as
 unknown` narrowing, which is not worth a module.
+
+### Audit of the branch handoff, 12 September 2026
+
+A handoff document written for this branch was audited against the tree before any follow-up work began. Three of its claims are wrong, and the ticket is where the correction goes: the handoff lives in a system temp directory and will not survive the machine, while this ticket is still `ready-for-human` and is what the evidence table above points at.
+
+**The guard does have Card and Layout arms.** The handoff says `current-domain-vocabulary.test.ts` has "no arm for Card/Layout", and further says the PR comment on #199 claiming otherwise is wrong. It is the handoff that is wrong, in both places. `test/unit/current-domain-vocabulary.test.ts:1215` is `describe('a Diagram is named once (ADR 0085)')` over `RETIRED_DIAGRAM = ['L', 'ayout'].join('')` (`:1026`), and `:1632` is `describe('a Thing is named once (ADR 0085)')` over `RETIRED_THING = ['C', 'ard'].join('')` (`:1412`) — thirteen shape arms each, with their own exemption and masking tables. The PR comment is accurate as written and needs no correction.
+
+**So the gap is one arm and one blind spot, not two arms.** What holds from the handoff's account:
+
+- There is no `manifest` arm at all. `MONOREPO_MANIFEST` (`:743`) is an exemption path regex belonging to the `workspace` arm, not a guard over the word.
+- The Layout arm cannot see `layoutless`. No capital follows the word, no `\b` lands after it and no hyphen joins it, so none of the thirteen arms match — which is why the four occurrences on this branch went green through `verify` and were caught by review instead. They were fixed in `a380e354`; a per-file sweep now finds `layoutless` only in `.scratch/` and `docs/adr/`, both excluded as historical trees. The blind spot outlives the occurrences.
+
+**One live `manifest` survivor, and it is not the one the handoff names.** `test/unit/roadmap.test.ts:656` and `:661` still hold `'- **Deferred:** the parity manifest'` in a fixture string — pre-existing, outside PR #199's diff, and a fixture quoting a `.scratch` issue, so it is either a fix or a masked historical quotation when the arm is written. `test/unit/export-aggregate-recovery.test.ts`, which the handoff gives as the example a `git ls-files | xargs grep` sweep missed, has zero occurrences today. The per-file-loop advice stands; the example is stale.
+
+**`.coderabbit.yaml` is behind the test, not ahead of it.** The handoff offers `:86` and `:305` as the content for new arms. Both regions name Route, Walk, `manifest`, `Arrangement`, a shared `Draft`, a `cards` array and an `edges` array — and neither names Card, Layout, `workspace` or `switcher`, all four of which the test already enforces. Bringing the config up to the test is its own small piece of work, in the opposite direction to the one implied.
+
+Scope for the `manifest` arm, if it is taken: the compound, kebab and key shapes run green over everything today, so the cost is entirely in the bare-word arm. Scoping that one to implementation source with `packages/core/src/schema.ts:311-312` masked as a retirement notice leaves `scripts/`, `test/` and the documents needing no exemption at all.
