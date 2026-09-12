@@ -9,15 +9,15 @@ import {
 import { documentRefusal, parseImportThingFile } from '@project/graph';
 import { compareOrdinal } from '../ordinal';
 
-type SpaceImportFileErrorKind = 'discovery' | 'parsing';
+type AggregateDirectoryErrorKind = 'discovery' | 'parsing';
 
-export class SpaceImportFileError extends Error {
-  readonly kind: SpaceImportFileErrorKind;
+export class AggregateDirectoryError extends Error {
+  readonly kind: AggregateDirectoryErrorKind;
   readonly diagnostics: readonly string[];
 
-  constructor(kind: SpaceImportFileErrorKind, diagnostics: readonly string[]) {
+  constructor(kind: AggregateDirectoryErrorKind, diagnostics: readonly string[]) {
     super(diagnostics.join('\n'));
-    this.name = 'SpaceImportFileError';
+    this.name = 'AggregateDirectoryError';
     this.kind = kind;
     this.diagnostics = diagnostics;
   }
@@ -36,7 +36,7 @@ const markdownFilesIn = async (directory: string): Promise<string[]> =>
     .map((entry) => join(directory, entry.name));
 
 /**
- * Shared with `read-aggregate`, which faces the same question about the same
+ * Shared with `aggregate-file`, which faces the same question about the same
  * kind of value: both readers have to tell "this file is not there" from every
  * other reason a read failed, and a second copy of the test is a second place
  * for it to drift.
@@ -67,7 +67,7 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
     const spaceDirectory = dirname(spaceFile);
     thingPaths = await discoverThingFiles(spaceDirectory);
   } catch (error) {
-    throw new SpaceImportFileError('discovery', [String(error)]);
+    throw new AggregateDirectoryError('discovery', [String(error)]);
   }
 
   const readPaths = [spaceFile, ...thingPaths];
@@ -116,11 +116,11 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   // decides nothing and the read failure is the only thing there is to say.
   const refusal = documentRefusal(spaceJson);
   if (refusal !== null) {
-    throw new SpaceImportFileError('parsing', [`${spaceFile}: ${refusal.message}`]);
+    throw new AggregateDirectoryError('parsing', [`${spaceFile}: ${refusal.message}`]);
   }
 
   if (readDiagnostics.length > 0 || spaceText === undefined) {
-    throw new SpaceImportFileError('discovery', readDiagnostics);
+    throw new AggregateDirectoryError('discovery', readDiagnostics);
   }
 
   const diagnostics: string[] = [];
@@ -150,7 +150,7 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   });
 
   if (diagnostics.length > 0 || parsedSpaceFile === undefined) {
-    throw new SpaceImportFileError('parsing', diagnostics);
+    throw new AggregateDirectoryError('parsing', diagnostics);
   }
 
   const { id, ...document } = parsedSpaceFile;

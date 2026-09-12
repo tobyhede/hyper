@@ -389,7 +389,7 @@
         "packages/persistence/src/session.ts",
         "src/cli/main.ts",
         "src/cli/run.ts",
-        "src/import/read-single-space.ts"
+        "src/aggregate-directory/space-directory.ts"
       ],
       "rules": {
         "anti-slop/no-unknown-parameters": "off"

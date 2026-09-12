@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { loadSpace } from '@project/graph';
 import { afterEach, describe, expect, it } from 'vitest';
-import { SpaceImportFileError, readSingleSpace } from '../../src/import/read-single-space';
+import { AggregateDirectoryError, readSingleSpace } from '../../src/aggregate-directory';
 import { captureError } from '../support/capture-error';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
@@ -124,8 +124,8 @@ describe('readSingleSpace', () => {
 
       const thrown = await captureError(() => readSingleSpace(talkDirectory));
 
-      expect(thrown).toBeInstanceOf(SpaceImportFileError);
-      if (!(thrown instanceof SpaceImportFileError)) return;
+      expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+      if (!(thrown instanceof AggregateDirectoryError)) return;
       expect(thrown.kind).toBe('discovery');
       expect(thrown.diagnostics).toHaveLength(2);
       expect(thrown.diagnostics[0]).toContain(rootThing);
@@ -139,8 +139,8 @@ describe('readSingleSpace', () => {
 
     const thrown = await captureError(() => readSingleSpace(relative(process.cwd(), missingInput)));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('discovery');
     expect(thrown.diagnostics).toHaveLength(1);
     expect(thrown.diagnostics[0]).toContain(missingInput);
@@ -162,8 +162,8 @@ describe('readSingleSpace', () => {
       readSingleSpace(relative(process.cwd(), talkDirectory)),
     );
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('discovery');
     expect(thrown.diagnostics).toHaveLength(1);
     expect(thrown.diagnostics[0]).toContain(spaceFile);
@@ -186,8 +186,8 @@ describe('readSingleSpace', () => {
       readSingleSpace(relative(process.cwd(), talkDirectory)),
     );
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain(spaceFile);
     expect(thrown.diagnostics.join('\n')).toContain(invalidYamlThing);
@@ -223,8 +223,8 @@ describe('readSingleSpace', () => {
 
     const thrown = await captureError(() => readSingleSpace(relative(process.cwd(), spaceFile)));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain(spaceFile);
     expect(thrown.diagnostics.join('\n')).toContain('diagrams.0.graphs.0.edges.0.from');
@@ -244,8 +244,8 @@ describe('readSingleSpace', () => {
 
     const thrown = await captureError(() => readSingleSpace(talkDirectory));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics).toHaveLength(1);
     expect(thrown.diagnostics[0]).toContain(spaceFile);
@@ -274,8 +274,8 @@ describe('readSingleSpace', () => {
 
       const thrown = await captureError(() => readSingleSpace(talkDirectory));
 
-      expect(thrown).toBeInstanceOf(SpaceImportFileError);
-      if (!(thrown instanceof SpaceImportFileError)) return;
+      expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+      if (!(thrown instanceof AggregateDirectoryError)) return;
       expect(thrown.kind).toBe('parsing');
       expect(thrown.diagnostics).toHaveLength(1);
       expect(thrown.diagnostics[0]).toContain('version 2');
@@ -293,8 +293,8 @@ describe('readSingleSpace', () => {
 
     const thrown = await captureError(() => readSingleSpace(talkDirectory));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('discovery');
   });
 
@@ -312,8 +312,8 @@ describe('readSingleSpace', () => {
 
     const thrown = await captureError(() => readSingleSpace(talkDirectory));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics).toHaveLength(1);
     expect(thrown.diagnostics[0]).toContain(spaceFile);
@@ -340,8 +340,8 @@ describe('readSingleSpace', () => {
 
     expect(intake.ok).toBe(false);
     if (intake.ok) return;
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(intake.errors).toHaveLength(1);
     expect(thrown.diagnostics[0]).toContain(intake.errors[0]?.message);
   });

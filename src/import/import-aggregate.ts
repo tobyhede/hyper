@@ -2,7 +2,7 @@ import type { SpaceSnapshot, UUID } from '@project/core';
 import type { SpaceAggregateError } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import type { AggregateInput, SpaceRepository } from '../persistence/space-repository';
-import { readAggregate } from './read-aggregate';
+import { readAggregate } from '../aggregate-directory';
 
 /**
  * What became of a complete aggregate import.
@@ -10,7 +10,7 @@ import { readAggregate } from './read-aggregate';
  * A result rather than a thrown error for every outcome the repository
  * anticipates, because each one is something the operator can act on and the
  * CLI has a different sentence for. Unreadable files still throw
- * `SpaceImportFileError`: an I/O failure is not an outcome of the import, it is
+ * `AggregateDirectoryError`: an I/O failure is not an outcome of the import, it is
  * the import never having started.
  */
 export type AggregateImportResult =
@@ -104,8 +104,7 @@ export const importAggregate = async (
   repository: SpaceRepository,
   { truncate, newId }: AggregateImportOptions,
 ): Promise<AggregateImportResult> => {
-  const source = await readAggregate(path, newId);
-  const input: AggregateInput = { metaSpaceId: source.metaSpaceId, spaces: source.spaces };
+  const input = await readAggregate(path, newId);
 
   if (!truncate) return initialize(repository, input);
 

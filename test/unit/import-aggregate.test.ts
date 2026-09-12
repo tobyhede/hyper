@@ -11,7 +11,7 @@ import type {
 } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importAggregate } from '../../src/import/import-aggregate';
-import { SpaceImportFileError } from '../../src/import/read-single-space';
+import { AggregateDirectoryError } from '../../src/aggregate-directory';
 import type {
   AggregateInput,
   InitializeAggregateResult,
@@ -148,7 +148,7 @@ describe('importAggregate', () => {
     ]);
     const repository = new RecordingRepository();
 
-    await expect(importFrom(root, repository)).rejects.toBeInstanceOf(SpaceImportFileError);
+    await expect(importFrom(root, repository)).rejects.toBeInstanceOf(AggregateDirectoryError);
     expect(repository.calls).toEqual([]);
   });
 
@@ -180,8 +180,8 @@ describe('importAggregate', () => {
 
     const error = await captureError(() => importFrom(root, repository));
 
-    expect(error).toBeInstanceOf(SpaceImportFileError);
-    if (!(error instanceof SpaceImportFileError)) return;
+    expect(error).toBeInstanceOf(AggregateDirectoryError);
+    if (!(error instanceof AggregateDirectoryError)) return;
     expect(error.kind).toBe('parsing');
     expect(error.diagnostics).toHaveLength(1);
     expect(error.diagnostics[0]).toContain('version 2');
@@ -209,8 +209,8 @@ describe('importAggregate', () => {
 
     const error = await captureError(() => importFrom(root, repository));
 
-    expect(error).toBeInstanceOf(SpaceImportFileError);
-    if (!(error instanceof SpaceImportFileError)) return;
+    expect(error).toBeInstanceOf(AggregateDirectoryError);
+    if (!(error instanceof AggregateDirectoryError)) return;
     expect(error.kind).toBe('parsing');
     expect(error.diagnostics).toHaveLength(1);
     expect(error.diagnostics[0]).toContain('`graphs`');

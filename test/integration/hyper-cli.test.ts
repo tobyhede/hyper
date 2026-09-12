@@ -1,13 +1,14 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { serializeThingFile } from '@project/graph';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { canonicalThing } from '../../src/export/canonical-space';
-import { AGGREGATE_FILE_NAME } from '../../src/import/read-aggregate';
-import { readSingleSpace } from '../../src/import/read-single-space';
+import {
+  AGGREGATE_FILE_NAME,
+  readSingleSpace,
+  writeSpaceDirectory as writeLoadedSpaceDirectory,
+} from '../../src/aggregate-directory';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
 import { clearHyperContent } from '../support/clear-hyper-content';
@@ -153,17 +154,7 @@ describe('hyper CLI', () => {
     snapshot: SpaceSnapshot,
   ): Promise<string> => {
     const directory = join(aggregate, snapshot.id);
-    await mkdir(join(directory, 'things'), { recursive: true });
-    await writeFile(
-      join(directory, 'space.json'),
-      `${JSON.stringify({ ...snapshot.document, id: snapshot.id }, null, 2)}\n`,
-    );
-    for (const thing of snapshot.things) {
-      await writeFile(
-        join(directory, 'things', `${thing.id}.md`),
-        serializeThingFile(canonicalThing(thing.id, thing.document)),
-      );
-    }
+    await writeLoadedSpaceDirectory({ snapshot, revision: 0n, exportedRevision: null }, directory);
     return directory;
   };
 

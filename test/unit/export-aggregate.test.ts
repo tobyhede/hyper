@@ -367,6 +367,25 @@ describe('canonical export', () => {
     await expect(readFile(join(authored, 'notes.md'), 'utf8')).resolves.toBe('# Notes\n');
   });
 
+  /*
+   * Write removes exactly what read scans. A lowercase UUID name is what a
+   * previous export would have used, but without `space.json` discovery would
+   * not scan it — so it is not a Space directory, and prune must not treat the
+   * name as enough.
+   */
+  it('leaves a UUID-named directory that holds no space.json', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    await exportTo(repository, destination);
+    const authored = join(destination, 'c0000000-0000-4000-8000-0000000000aa');
+    await mkdir(authored);
+    await writeFile(join(authored, 'notes.md'), '# Notes\n');
+
+    await exportTo(repository, destination);
+
+    await expect(readFile(join(authored, 'notes.md'), 'utf8')).resolves.toBe('# Notes\n');
+  });
+
   /**
    * An uninitialized repository has no Meta Space, so there is no aggregate to
    * write and no directory whose absence would be a defect — the answer is a
@@ -392,7 +411,7 @@ describe('canonical export', () => {
    * `loadAggregate` is stubbed because a valid repository cannot reach here; the
    * refusal has to come from the staged bytes disagreeing with Meta rooting.
    */
-  it('names the Space in a refusal raised by verifying the staged aggregate', async () => {
+  it('answers invalid-staged-aggregate when verifying the staged aggregate refuses', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const orphan = uuidSchema.parse('c0000000-0000-4000-8000-0000000000aa');
@@ -412,10 +431,15 @@ describe('canonical export', () => {
         },
       });
 
-    const thrown = await captureError(() => exportAggregate(repository, destination));
-
-    expect(thrown?.message).toContain(orphan);
-    expect(thrown?.message).toContain('no Space Thing points at it');
+    const result = await exportAggregate(repository, destination);
+    expect(result).toMatchObject({
+      kind: 'invalid-staged-aggregate',
+      metaSpaceId: SPACE_ID,
+      errors: [{ kind: 'ordinary-space-unreferenced', spaceId: orphan }],
+    });
+    if (result.kind !== 'invalid-staged-aggregate') return;
+    expect(result.spaces.map((space) => space.id).sort()).toEqual([SPACE_ID, orphan].sort());
+    await expect(readdir(destination).catch(() => [])).resolves.toEqual([]);
   });
 
   it('writes nothing and answers uninitialized when the repository holds no aggregate', async () => {

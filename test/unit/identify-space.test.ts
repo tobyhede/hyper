@@ -1,6 +1,6 @@
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { describe, expect, it } from 'vitest';
-import { describeSchemaFailure, identifySpace } from '../../src/import/identify-space';
+import { describeSchemaFailure, identifySpace } from '../../src/aggregate-directory';
 
 const THING_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const SECOND_THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
